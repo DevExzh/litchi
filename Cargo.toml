@@ -1,0 +1,16 @@
+[package]
+name = "litchi"
+version = "0.0.1"
+edition = "2021"
+homepage = "https://github.com/DevExzh/litchi"
+license = "Apache-2.0"
+repository = "https://github.com/DevExzh/litchi"
+documentation = "https://docs.rs/litchi"
+readme = "README.md"
+keywords = ["ole", "ooxml", "excel", "word", "powerpoint", "visio"]
+categories = ["data-formats", "office", "document-processing"]
+
+[dependencies]
+quick-xml = "0.38"
+zip = "5.1"
+memchr = "2.7"
