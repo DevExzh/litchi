@@ -13,13 +13,18 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
-        eprintln!("Usage: {} <path_to_doc_file>", args[0]);
-        eprintln!("\nExample:");
+        eprintln!("Usage: {} [path_to_doc_file]", args[0]);
+        eprintln!("\nExamples:");
         eprintln!("  cargo run --example parse_doc -- document.doc");
+        eprintln!("  cargo run --example parse_doc    # uses test.doc");
         process::exit(1);
     }
 
-    let file_path = &args[1];
+    let file_path = if args.len() > 1 {
+        &args[1]
+    } else {
+        "test.doc"
+    };
 
     println!("Opening DOC file: {}", file_path);
     println!("{}", "=".repeat(60));

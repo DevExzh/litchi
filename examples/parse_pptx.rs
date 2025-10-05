@@ -15,11 +15,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get the file path from command line arguments
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
-        eprintln!("Usage: {} <file.pptx>", args[0]);
+        eprintln!("Usage: {} [file.pptx]", args[0]);
+        eprintln!("\nExamples:");
+        eprintln!("  cargo run --example parse_pptx -- presentation.pptx");
+        eprintln!("  cargo run --example parse_pptx    # uses test.pptx");
         std::process::exit(1);
     }
 
-    let file_path = &args[1];
+    let file_path = if args.len() > 1 {
+        &args[1]
+    } else {
+        "test.pptx"
+    };
+
     println!("Opening PowerPoint presentation: {}", file_path);
     println!("{}", "=".repeat(60));
 
@@ -48,26 +56,52 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Extract and print slide content
     println!("\n📝 Slides:");
     println!("{}", "-".repeat(60));
-    
+
     let slides = pres.slides()?;
-    
+
     if slides.is_empty() {
         println!("  No slides found");
     } else {
         for (idx, slide) in slides.iter().enumerate() {
             println!("\n  Slide #{} - {}", idx + 1, slide.name().unwrap_or_else(|_| "(unnamed)".to_string()));
-            
+
             // Extract text content
             let text = slide.text()?;
             if !text.is_empty() {
                 println!("  Text content:");
-                for line in text.lines() {
+                let lines: Vec<&str> = text.lines().collect();
+                println!("    Total lines: {}", lines.len());
+
+                // Show first 15 lines of content
+                for (line_idx, line) in lines.iter().take(15).enumerate() {
                     if !line.trim().is_empty() {
-                        println!("    {}", line);
+                        println!("    {:2}: {}", line_idx + 1, line);
                     }
+                }
+
+                if lines.len() > 15 {
+                    println!("    ... ({} more lines)", lines.len() - 15);
                 }
             } else {
                 println!("    (No text content)");
+            }
+
+            // Show shapes information
+            match slide.shapes() {
+                Ok(shapes) => {
+                    println!("    Shapes: {} total", shapes.len());
+                    // Show shape types
+                    let mut shape_types = std::collections::HashMap::new();
+                    for shape in &shapes {
+                        *shape_types.entry(format!("{:?}", shape.shape_type())).or_insert(0) += 1;
+                    }
+                    if !shape_types.is_empty() {
+                        println!("      Types: {:?}", shape_types);
+                    }
+                }
+                Err(_) => {
+                    println!("    Shapes: (Error accessing)");
+                }
             }
         }
     }
