@@ -5,7 +5,7 @@
 /// - Row and cell definitions
 /// - Table positioning
 /// - Cell margins and spacing
-use super::super::package::{DocError, Result};
+use super::super::package::Result;
 
 /// Table Properties structure.
 ///
@@ -52,9 +52,10 @@ pub struct CellProperties {
 }
 
 /// Cell merge status.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CellMergeStatus {
     /// Not merged
+    #[default]
     None,
     /// First cell in merge
     First,
@@ -62,44 +63,29 @@ pub enum CellMergeStatus {
     Merged,
 }
 
-impl Default for CellMergeStatus {
-    fn default() -> Self {
-        CellMergeStatus::None
-    }
-}
-
 /// Vertical alignment within a cell.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VerticalAlignment {
+    #[default]
     Top,
     Center,
     Bottom,
 }
 
-impl Default for VerticalAlignment {
-    fn default() -> Self {
-        VerticalAlignment::Top
-    }
-}
-
 /// Table justification (alignment).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TableJustification {
+    #[default]
     Left,
     Center,
     Right,
 }
 
-impl Default for TableJustification {
-    fn default() -> Self {
-        TableJustification::Left
-    }
-}
-
 /// Text direction in a cell.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TextDirection {
     /// Left to right, top to bottom
+    #[default]
     LrTb,
     /// Top to bottom, right to left (vertical)
     TbRl,
@@ -109,12 +95,6 @@ pub enum TextDirection {
     LrBt,
     /// Top to bottom, left to right (vertical)
     TbLr,
-}
-
-impl Default for TextDirection {
-    fn default() -> Self {
-        TextDirection::LrTb
-    }
 }
 
 /// Table or cell width specification.

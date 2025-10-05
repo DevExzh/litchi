@@ -138,7 +138,7 @@ impl<'a> Presentation<'a> {
             // Resolve the target partname and get the part from the package
             let base_uri = pres_part.partname().base_uri();
             let target_partname = PackURI::from_rel_ref(base_uri, target_ref)
-                .map_err(|e| crate::ooxml::error::OoxmlError::InvalidFormat(e))?;
+                .map_err(crate::ooxml::error::OoxmlError::InvalidFormat)?;
             let related_part = self.package.get_part(&target_partname)?;
 
             let slide_part = SlidePart::from_part(related_part)?;
@@ -178,7 +178,7 @@ impl<'a> Presentation<'a> {
             // Resolve the target partname and get the part from the package
             let base_uri = pres_part.partname().base_uri();
             let target_partname = PackURI::from_rel_ref(base_uri, target_ref)
-                .map_err(|e| crate::ooxml::error::OoxmlError::InvalidFormat(e))?;
+                .map_err(crate::ooxml::error::OoxmlError::InvalidFormat)?;
             let related_part = self.package.get_part(&target_partname)?;
 
             let master_part = SlideMasterPart::from_part(related_part)?;

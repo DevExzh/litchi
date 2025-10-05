@@ -48,7 +48,6 @@
 /// }
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-
 pub mod document;
 pub mod package;
 pub mod paragraph;

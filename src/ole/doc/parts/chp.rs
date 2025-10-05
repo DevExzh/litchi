@@ -5,7 +5,7 @@
 /// - Font size and name
 /// - Text color and highlighting
 /// - Superscript/subscript
-use super::super::package::{DocError, Result};
+use super::super::package::Result;
 
 /// Character Properties structure.
 ///
@@ -39,9 +39,10 @@ pub struct CharacterProperties {
 }
 
 /// Underline styles supported in DOC format.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum UnderlineStyle {
     /// No underline
+    #[default]
     None,
     /// Single underline
     Single,
@@ -57,12 +58,6 @@ pub enum UnderlineStyle {
     Thick,
     /// Word-only underline (skip spaces)
     WordsOnly,
-}
-
-impl Default for UnderlineStyle {
-    fn default() -> Self {
-        UnderlineStyle::None
-    }
 }
 
 /// Highlight colors available in DOC format.
@@ -88,20 +83,15 @@ pub enum HighlightColor {
 }
 
 /// Vertical text position (superscript/subscript).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VerticalPosition {
     /// Normal position
+    #[default]
     Normal,
     /// Superscript
     Superscript,
     /// Subscript
     Subscript,
-}
-
-impl Default for VerticalPosition {
-    fn default() -> Self {
-        VerticalPosition::Normal
-    }
 }
 
 impl CharacterProperties {

@@ -7,7 +7,6 @@
 /// - Character and paragraph properties
 /// - Style definitions
 /// - Table structures
-
 pub mod chp;
 pub mod fib;
 pub mod tap;

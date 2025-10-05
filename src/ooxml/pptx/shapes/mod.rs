@@ -7,7 +7,6 @@
 /// - Placeholders
 ///
 /// The design follows the python-pptx library structure.
-
 pub mod base;
 pub mod picture;
 pub mod table;
