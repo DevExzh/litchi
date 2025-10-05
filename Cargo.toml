@@ -14,3 +14,6 @@ categories = ["data-formats", "office", "document-processing"]
 quick-xml = "0.38"
 zip = "5.1"
 memchr = "2.7"
+atoi_simd = "0.16"
+fast-float2 = "0.2"
+thiserror = "2.0"

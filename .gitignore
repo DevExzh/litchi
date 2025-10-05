@@ -83,3 +83,5 @@ Backup of *.doc*
 
 *.log
 *.lock
+
+test*
