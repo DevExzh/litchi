@@ -228,10 +228,10 @@ impl Relationships {
         // Find first gap or use next number
         let mut next_num = 1u32;
         for &num in &used_numbers {
-            if num == next_num {
-                next_num += 1;
-            } else if num > next_num {
-                break;
+            match num.cmp(&next_num) {
+                std::cmp::Ordering::Equal => next_num += 1,
+                std::cmp::Ordering::Greater => break,
+                std::cmp::Ordering::Less => {}
             }
         }
 

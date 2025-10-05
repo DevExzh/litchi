@@ -2,7 +2,6 @@
 ///
 /// A PackURI represents a part name within an OPC package, following the URI format
 /// defined by the Open Packaging Conventions specification.
-
 /// Represents a package URI, which is a partname within an OPC package.
 ///
 /// PackURIs always begin with a forward slash and use forward slashes as path separators,

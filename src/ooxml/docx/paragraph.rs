@@ -97,28 +97,24 @@ impl Paragraph {
                         depth = 1;
                         current_run_xml.clear();
                         current_run_xml.extend_from_slice(b"<w:r");
-                        for attr in e.attributes() {
-                            if let Ok(attr) = attr {
-                                current_run_xml.push(b' ');
-                                current_run_xml.extend_from_slice(attr.key.as_ref());
-                                current_run_xml.extend_from_slice(b"=\"");
-                                current_run_xml.extend_from_slice(&attr.value);
-                                current_run_xml.push(b'"');
-                            }
+                        for attr in e.attributes().flatten() {
+                            current_run_xml.push(b' ');
+                            current_run_xml.extend_from_slice(attr.key.as_ref());
+                            current_run_xml.extend_from_slice(b"=\"");
+                            current_run_xml.extend_from_slice(&attr.value);
+                            current_run_xml.push(b'"');
                         }
                         current_run_xml.push(b'>');
                     } else if in_run {
                         depth += 1;
                         current_run_xml.push(b'<');
                         current_run_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes() {
-                            if let Ok(attr) = attr {
-                                current_run_xml.push(b' ');
-                                current_run_xml.extend_from_slice(attr.key.as_ref());
-                                current_run_xml.extend_from_slice(b"=\"");
-                                current_run_xml.extend_from_slice(&attr.value);
-                                current_run_xml.push(b'"');
-                            }
+                        for attr in e.attributes().flatten() {
+                            current_run_xml.push(b' ');
+                            current_run_xml.extend_from_slice(attr.key.as_ref());
+                            current_run_xml.extend_from_slice(b"=\"");
+                            current_run_xml.extend_from_slice(&attr.value);
+                            current_run_xml.push(b'"');
                         }
                         current_run_xml.push(b'>');
                     }
@@ -142,14 +138,12 @@ impl Paragraph {
                 Ok(Event::Empty(e)) if in_run => {
                     current_run_xml.push(b'<');
                     current_run_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes() {
-                        if let Ok(attr) = attr {
-                            current_run_xml.push(b' ');
-                            current_run_xml.extend_from_slice(attr.key.as_ref());
-                            current_run_xml.extend_from_slice(b"=\"");
-                            current_run_xml.extend_from_slice(&attr.value);
-                            current_run_xml.push(b'"');
-                        }
+                    for attr in e.attributes().flatten() {
+                        current_run_xml.push(b' ');
+                        current_run_xml.extend_from_slice(attr.key.as_ref());
+                        current_run_xml.extend_from_slice(b"=\"");
+                        current_run_xml.extend_from_slice(&attr.value);
+                        current_run_xml.push(b'"');
                     }
                     current_run_xml.extend_from_slice(b"/>");
                 }
@@ -307,12 +301,10 @@ impl Run {
                     if name.as_ref() == b"rPr" {
                         in_r_pr = true;
                     } else if in_r_pr && name.as_ref() == b"rFonts" {
-                        for attr in e.attributes() {
-                            if let Ok(attr) = attr {
-                                if attr.key.as_ref() == b"ascii" {
-                                    let value = attr.unescape_value().unwrap_or(Cow::Borrowed(""));
-                                    return Ok(Some(value.to_string()));
-                                }
+                        for attr in e.attributes().flatten() {
+                            if attr.key.as_ref() == b"ascii" {
+                                let value = attr.unescape_value().unwrap_or(Cow::Borrowed(""));
+                                return Ok(Some(value.to_string()));
                             }
                         }
                     }
@@ -350,13 +342,11 @@ impl Run {
                     if name.as_ref() == b"rPr" {
                         in_r_pr = true;
                     } else if in_r_pr && name.as_ref() == b"sz" {
-                        for attr in e.attributes() {
-                            if let Ok(attr) = attr {
-                                if attr.key.as_ref() == b"val" {
-                                    if let Ok(value) = std::str::from_utf8(&attr.value) {
-                                        if let Ok(size) = value.parse::<u32>() {
-                                            return Ok(Some(size));
-                                        }
+                        for attr in e.attributes().flatten() {
+                            if attr.key.as_ref() == b"val" {
+                                if let Ok(value) = std::str::from_utf8(&attr.value) {
+                                    if let Ok(size) = value.parse::<u32>() {
+                                        return Ok(Some(size));
                                     }
                                 }
                             }
@@ -397,12 +387,10 @@ impl Run {
                         in_r_pr = true;
                     } else if in_r_pr && name.as_ref() == property_name {
                         // Check for w:val attribute
-                        for attr in e.attributes() {
-                            if let Ok(attr) = attr {
-                                if attr.key.as_ref() == b"val" {
-                                    let value = attr.value.as_ref();
-                                    return Ok(Some(value == b"true" || value == b"1"));
-                                }
+                        for attr in e.attributes().flatten() {
+                            if attr.key.as_ref() == b"val" {
+                                let value = attr.value.as_ref();
+                                return Ok(Some(value == b"true" || value == b"1"));
                             }
                         }
                         // Element present without val attribute means true

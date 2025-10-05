@@ -2,7 +2,6 @@
 ///
 /// This module contains content type URIs (like MIME-types) that specify a part's format,
 /// XML namespaces, and relationship types used in OPC packages.
-
 /// Content type URIs (like MIME-types) that specify a part's format
 pub mod content_type {
     // Image content types

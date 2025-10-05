@@ -510,11 +510,11 @@ impl<R: Read + Seek> OleFile<R> {
     fn collect_streams(
         &self,
         entry: &DirectoryEntry,
-        path: &mut Vec<String>,
+        path: &mut [String],
         streams: &mut Vec<Vec<String>>,
     ) {
         // Add current entry to path
-        let mut current_path = path.clone();
+        let mut current_path = path.to_owned();
         if !entry.name.is_empty() && entry.entry_type != STGTY_ROOT {
             current_path.push(entry.name.clone());
         }

@@ -89,28 +89,24 @@ impl Table {
                         depth = 1;
                         current_row_xml.clear();
                         current_row_xml.extend_from_slice(b"<w:tr");
-                        for attr in e.attributes() {
-                            if let Ok(attr) = attr {
-                                current_row_xml.push(b' ');
-                                current_row_xml.extend_from_slice(attr.key.as_ref());
-                                current_row_xml.extend_from_slice(b"=\"");
-                                current_row_xml.extend_from_slice(&attr.value);
-                                current_row_xml.push(b'"');
-                            }
+                        for attr in e.attributes().flatten() {
+                            current_row_xml.push(b' ');
+                            current_row_xml.extend_from_slice(attr.key.as_ref());
+                            current_row_xml.extend_from_slice(b"=\"");
+                            current_row_xml.extend_from_slice(&attr.value);
+                            current_row_xml.push(b'"');
                         }
                         current_row_xml.push(b'>');
                     } else if in_row {
                         depth += 1;
                         current_row_xml.push(b'<');
                         current_row_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes() {
-                            if let Ok(attr) = attr {
-                                current_row_xml.push(b' ');
-                                current_row_xml.extend_from_slice(attr.key.as_ref());
-                                current_row_xml.extend_from_slice(b"=\"");
-                                current_row_xml.extend_from_slice(&attr.value);
-                                current_row_xml.push(b'"');
-                            }
+                        for attr in e.attributes().flatten() {
+                            current_row_xml.push(b' ');
+                            current_row_xml.extend_from_slice(attr.key.as_ref());
+                            current_row_xml.extend_from_slice(b"=\"");
+                            current_row_xml.extend_from_slice(&attr.value);
+                            current_row_xml.push(b'"');
                         }
                         current_row_xml.push(b'>');
                     }
@@ -134,14 +130,12 @@ impl Table {
                 Ok(Event::Empty(e)) if in_row => {
                     current_row_xml.push(b'<');
                     current_row_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes() {
-                        if let Ok(attr) = attr {
-                            current_row_xml.push(b' ');
-                            current_row_xml.extend_from_slice(attr.key.as_ref());
-                            current_row_xml.extend_from_slice(b"=\"");
-                            current_row_xml.extend_from_slice(&attr.value);
-                            current_row_xml.push(b'"');
-                        }
+                    for attr in e.attributes().flatten() {
+                        current_row_xml.push(b' ');
+                        current_row_xml.extend_from_slice(attr.key.as_ref());
+                        current_row_xml.extend_from_slice(b"=\"");
+                        current_row_xml.extend_from_slice(&attr.value);
+                        current_row_xml.push(b'"');
                     }
                     current_row_xml.extend_from_slice(b"/>");
                 }
@@ -228,28 +222,24 @@ impl Row {
                         depth = 1;
                         current_cell_xml.clear();
                         current_cell_xml.extend_from_slice(b"<w:tc");
-                        for attr in e.attributes() {
-                            if let Ok(attr) = attr {
-                                current_cell_xml.push(b' ');
-                                current_cell_xml.extend_from_slice(attr.key.as_ref());
-                                current_cell_xml.extend_from_slice(b"=\"");
-                                current_cell_xml.extend_from_slice(&attr.value);
-                                current_cell_xml.push(b'"');
-                            }
+                        for attr in e.attributes().flatten() {
+                            current_cell_xml.push(b' ');
+                            current_cell_xml.extend_from_slice(attr.key.as_ref());
+                            current_cell_xml.extend_from_slice(b"=\"");
+                            current_cell_xml.extend_from_slice(&attr.value);
+                            current_cell_xml.push(b'"');
                         }
                         current_cell_xml.push(b'>');
                     } else if in_cell {
                         depth += 1;
                         current_cell_xml.push(b'<');
                         current_cell_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes() {
-                            if let Ok(attr) = attr {
-                                current_cell_xml.push(b' ');
-                                current_cell_xml.extend_from_slice(attr.key.as_ref());
-                                current_cell_xml.extend_from_slice(b"=\"");
-                                current_cell_xml.extend_from_slice(&attr.value);
-                                current_cell_xml.push(b'"');
-                            }
+                        for attr in e.attributes().flatten() {
+                            current_cell_xml.push(b' ');
+                            current_cell_xml.extend_from_slice(attr.key.as_ref());
+                            current_cell_xml.extend_from_slice(b"=\"");
+                            current_cell_xml.extend_from_slice(&attr.value);
+                            current_cell_xml.push(b'"');
                         }
                         current_cell_xml.push(b'>');
                     }
@@ -273,14 +263,12 @@ impl Row {
                 Ok(Event::Empty(e)) if in_cell => {
                     current_cell_xml.push(b'<');
                     current_cell_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes() {
-                        if let Ok(attr) = attr {
-                            current_cell_xml.push(b' ');
-                            current_cell_xml.extend_from_slice(attr.key.as_ref());
-                            current_cell_xml.extend_from_slice(b"=\"");
-                            current_cell_xml.extend_from_slice(&attr.value);
-                            current_cell_xml.push(b'"');
-                        }
+                    for attr in e.attributes().flatten() {
+                        current_cell_xml.push(b' ');
+                        current_cell_xml.extend_from_slice(attr.key.as_ref());
+                        current_cell_xml.extend_from_slice(b"=\"");
+                        current_cell_xml.extend_from_slice(&attr.value);
+                        current_cell_xml.push(b'"');
                     }
                     current_cell_xml.extend_from_slice(b"/>");
                 }
@@ -366,28 +354,24 @@ impl Cell {
                         depth = 1;
                         current_para_xml.clear();
                         current_para_xml.extend_from_slice(b"<w:p");
-                        for attr in e.attributes() {
-                            if let Ok(attr) = attr {
-                                current_para_xml.push(b' ');
-                                current_para_xml.extend_from_slice(attr.key.as_ref());
-                                current_para_xml.extend_from_slice(b"=\"");
-                                current_para_xml.extend_from_slice(&attr.value);
-                                current_para_xml.push(b'"');
-                            }
+                        for attr in e.attributes().flatten() {
+                            current_para_xml.push(b' ');
+                            current_para_xml.extend_from_slice(attr.key.as_ref());
+                            current_para_xml.extend_from_slice(b"=\"");
+                            current_para_xml.extend_from_slice(&attr.value);
+                            current_para_xml.push(b'"');
                         }
                         current_para_xml.push(b'>');
                     } else if in_para {
                         depth += 1;
                         current_para_xml.push(b'<');
                         current_para_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes() {
-                            if let Ok(attr) = attr {
-                                current_para_xml.push(b' ');
-                                current_para_xml.extend_from_slice(attr.key.as_ref());
-                                current_para_xml.extend_from_slice(b"=\"");
-                                current_para_xml.extend_from_slice(&attr.value);
-                                current_para_xml.push(b'"');
-                            }
+                        for attr in e.attributes().flatten() {
+                            current_para_xml.push(b' ');
+                            current_para_xml.extend_from_slice(attr.key.as_ref());
+                            current_para_xml.extend_from_slice(b"=\"");
+                            current_para_xml.extend_from_slice(&attr.value);
+                            current_para_xml.push(b'"');
                         }
                         current_para_xml.push(b'>');
                     }
@@ -411,14 +395,12 @@ impl Cell {
                 Ok(Event::Empty(e)) if in_para => {
                     current_para_xml.push(b'<');
                     current_para_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes() {
-                        if let Ok(attr) = attr {
-                            current_para_xml.push(b' ');
-                            current_para_xml.extend_from_slice(attr.key.as_ref());
-                            current_para_xml.extend_from_slice(b"=\"");
-                            current_para_xml.extend_from_slice(&attr.value);
-                            current_para_xml.push(b'"');
-                        }
+                    for attr in e.attributes().flatten() {
+                        current_para_xml.push(b' ');
+                        current_para_xml.extend_from_slice(attr.key.as_ref());
+                        current_para_xml.extend_from_slice(b"=\"");
+                        current_para_xml.extend_from_slice(&attr.value);
+                        current_para_xml.push(b'"');
                     }
                     current_para_xml.extend_from_slice(b"/>");
                 }
