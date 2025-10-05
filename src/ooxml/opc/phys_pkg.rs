@@ -1,14 +1,13 @@
+use crate::ooxml::opc::error::{OpcError, Result};
+use crate::ooxml::opc::packuri::PackURI;
 /// Provides a general interface to a physical OPC package (ZIP file).
 ///
 /// This module handles the low-level reading of OPC packages from ZIP archives,
 /// providing efficient access to package contents with minimal memory allocation.
-
 use std::fs::File;
 use std::io::{BufReader, Read, Seek};
 use std::path::Path;
 use zip::ZipArchive;
-use crate::ooxml::opc::error::{OpcError, Result};
-use crate::ooxml::opc::packuri::PackURI;
 
 /// Physical package reader that provides access to parts in a ZIP-based OPC package.
 ///
@@ -33,17 +32,15 @@ impl PhysPkgReader<BufReader<File>> {
     /// or cannot be opened.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
-        
+
         if !path.exists() {
-            return Err(OpcError::PackageNotFound(
-                path.display().to_string()
-            ));
+            return Err(OpcError::PackageNotFound(path.display().to_string()));
         }
 
         let file = File::open(path)?;
         // Use BufReader for better I/O performance
         let buf_reader = BufReader::with_capacity(8192, file);
-        
+
         Self::new(buf_reader)
     }
 }
@@ -73,19 +70,20 @@ impl<R: Read + Seek> PhysPkgReader<R> {
     /// The binary content of the part
     pub fn blob_for(&mut self, pack_uri: &PackURI) -> Result<Vec<u8>> {
         let membername = pack_uri.membername();
-        
+
         // Get the file from the ZIP archive
-        let mut file = self.archive
+        let mut file = self
+            .archive
             .by_name(membername)
             .map_err(|_| OpcError::PartNotFound(pack_uri.to_string()))?;
 
         // Pre-allocate vector to exact size to avoid reallocation
         let size = file.size() as usize;
         let mut buffer = Vec::with_capacity(size);
-        
+
         // Read directly into the vector
         file.read_to_end(&mut buffer)?;
-        
+
         Ok(buffer)
     }
 
@@ -106,9 +104,10 @@ impl<R: Read + Seek> PhysPkgReader<R> {
     /// # Arguments
     /// * `source_uri` - The PackURI of the source (part or package)
     pub fn rels_xml_for(&mut self, source_uri: &PackURI) -> Result<Option<Vec<u8>>> {
-        let rels_uri = source_uri.rels_uri()
+        let rels_uri = source_uri
+            .rels_uri()
             .map_err(|e| OpcError::InvalidPackUri(e))?;
-        
+
         match self.blob_for(&rels_uri) {
             Ok(blob) => Ok(Some(blob)),
             Err(OpcError::PartNotFound(_)) => Ok(None),
@@ -132,12 +131,12 @@ impl<R: Read + Seek> PhysPkgReader<R> {
     /// Useful for debugging or exploring package contents.
     pub fn member_names(&mut self) -> Result<Vec<String>> {
         let mut names = Vec::with_capacity(self.archive.len());
-        
+
         for i in 0..self.archive.len() {
             let file = self.archive.by_index(i)?;
             names.push(file.name().to_string());
         }
-        
+
         Ok(names)
     }
 
@@ -179,14 +178,14 @@ impl PhysPkgWriter {
     /// * `blob` - The binary content to write
     pub fn write(&mut self, pack_uri: &PackURI, blob: &[u8]) -> Result<()> {
         use zip::write::SimpleFileOptions;
-        
+
         let options = SimpleFileOptions::default()
             .compression_method(zip::CompressionMethod::Deflated)
             .compression_level(Some(6)); // Balanced compression level
-        
+
         self.archive.start_file(pack_uri.membername(), options)?;
         std::io::copy(&mut std::io::Cursor::new(blob), &mut self.archive)?;
-        
+
         Ok(())
     }
 
@@ -211,7 +210,7 @@ mod tests {
         {
             let cursor = Cursor::new(&mut zip_data);
             let mut writer = zip::ZipWriter::new(cursor);
-            
+
             use zip::write::SimpleFileOptions;
             let options = SimpleFileOptions::default();
             writer.start_file("test.txt", options).unwrap();
@@ -222,10 +221,9 @@ mod tests {
         // Read the ZIP archive
         let cursor = Cursor::new(zip_data);
         let mut reader = PhysPkgReader::new(cursor).unwrap();
-        
+
         let pack_uri = PackURI::new("/test.txt").unwrap();
         let content = reader.blob_for(&pack_uri).unwrap();
         assert_eq!(content, b"Hello, World!");
     }
 }
-

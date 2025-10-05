@@ -50,4 +50,3 @@ impl From<quick_xml::events::attributes::AttrError> for OpcError {
 }
 
 pub type Result<T> = std::result::Result<T, OpcError>;
-

@@ -16,7 +16,6 @@
 /// - Uses `quick-xml` for efficient zero-copy XML parsing
 /// - Minimizes allocations by borrowing data where possible
 /// - Uses hash maps for O(1) lookups
-
 pub mod constants;
 pub mod error;
 pub mod package;
@@ -29,6 +28,5 @@ pub mod rel;
 // Re-export commonly used types
 pub use package::OpcPackage;
 pub use packuri::PackURI;
-pub use part::{Part, XmlPart, BlobPart};
+pub use part::{BlobPart, Part, XmlPart};
 pub use rel::{Relationship, Relationships};
-

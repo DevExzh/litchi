@@ -1,17 +1,16 @@
+use crate::ooxml::opc::constants::target_mode;
+use crate::ooxml::opc::error::{OpcError, Result};
+use crate::ooxml::opc::packuri::{PackURI, PACKAGE_URI};
+use crate::ooxml::opc::phys_pkg::PhysPkgReader;
+use quick_xml::events::Event;
+use quick_xml::Reader;
 /// Low-level, read-only API to a serialized Open Packaging Convention (OPC) package.
 ///
 /// This module provides the PackageReader for parsing OPC packages, including
 /// content type mapping, relationship resolution, and part loading. It uses
 /// efficient algorithms for parsing and minimal memory allocation.
-
 use std::collections::HashMap;
 use std::io::{Read, Seek};
-use quick_xml::Reader;
-use quick_xml::events::Event;
-use crate::ooxml::opc::constants::target_mode;
-use crate::ooxml::opc::error::{OpcError, Result};
-use crate::ooxml::opc::packuri::{PackURI, PACKAGE_URI};
-use crate::ooxml::opc::phys_pkg::PhysPkgReader;
 
 /// Serialized part with its content and relationships.
 ///
@@ -21,16 +20,16 @@ use crate::ooxml::opc::phys_pkg::PhysPkgReader;
 pub struct SerializedPart {
     /// The partname (URI) of this part
     pub partname: PackURI,
-    
+
     /// The content type of this part
     pub content_type: String,
-    
+
     /// The relationship type that refers to this part
     pub reltype: String,
-    
+
     /// The binary content of this part
     pub blob: Vec<u8>,
-    
+
     /// Serialized relationships from this part
     pub srels: Vec<SerializedRelationship>,
 }
@@ -43,16 +42,16 @@ pub struct SerializedPart {
 pub struct SerializedRelationship {
     /// Base URI for resolving relative references
     pub base_uri: String,
-    
+
     /// Relationship ID (e.g., "rId1")
     pub r_id: String,
-    
+
     /// Relationship type URI
     pub reltype: String,
-    
+
     /// Target reference (relative URI or external URL)
     pub target_ref: String,
-    
+
     /// Target mode (Internal or External)
     pub target_mode: String,
 }
@@ -71,11 +70,10 @@ impl SerializedRelationship {
     pub fn target_partname(&self) -> Result<PackURI> {
         if self.is_external() {
             return Err(OpcError::InvalidRelationship(
-                "Cannot get target_partname for external relationship".to_string()
+                "Cannot get target_partname for external relationship".to_string(),
             ));
         }
-        PackURI::from_rel_ref(&self.base_uri, &self.target_ref)
-            .map_err(OpcError::InvalidPackUri)
+        PackURI::from_rel_ref(&self.base_uri, &self.target_ref).map_err(OpcError::InvalidPackUri)
     }
 }
 
@@ -86,7 +84,7 @@ impl SerializedRelationship {
 struct ContentTypeMap {
     /// Maps file extensions to default content types
     defaults: HashMap<String, String>,
-    
+
     /// Maps specific partnames to override content types
     overrides: HashMap<String, String>,
 }
@@ -107,7 +105,7 @@ impl ContentTypeMap {
         let mut map = Self::new();
         let mut reader = Reader::from_reader(xml);
         reader.config_mut().trim_text(true);
-        
+
         let mut buf = Vec::new();
 
         loop {
@@ -118,7 +116,7 @@ impl ContentTypeMap {
                             // Parse Default element: <Default Extension="xml" ContentType="application/xml"/>
                             let mut extension = None;
                             let mut content_type = None;
-                            
+
                             for attr in e.attributes() {
                                 let attr = attr?;
                                 match attr.key.as_ref() {
@@ -131,7 +129,7 @@ impl ContentTypeMap {
                                     _ => {}
                                 }
                             }
-                            
+
                             if let (Some(ext), Some(ct)) = (extension, content_type) {
                                 map.add_default(ext, ct);
                             }
@@ -140,7 +138,7 @@ impl ContentTypeMap {
                             // Parse Override element: <Override PartName="/word/document.xml" ContentType="..."/>
                             let mut partname = None;
                             let mut content_type = None;
-                            
+
                             for attr in e.attributes() {
                                 let attr = attr?;
                                 match attr.key.as_ref() {
@@ -153,7 +151,7 @@ impl ContentTypeMap {
                                     _ => {}
                                 }
                             }
-                            
+
                             if let (Some(pn), Some(ct)) = (partname, content_type) {
                                 map.add_override(pn, ct);
                             }
@@ -162,7 +160,12 @@ impl ContentTypeMap {
                     }
                 }
                 Ok(Event::Eof) => break,
-                Err(e) => return Err(OpcError::XmlError(format!("Content types parse error: {}", e))),
+                Err(e) => {
+                    return Err(OpcError::XmlError(format!(
+                        "Content types parse error: {}",
+                        e
+                    )))
+                }
                 _ => {}
             }
             buf.clear();
@@ -208,7 +211,7 @@ impl ContentTypeMap {
 pub struct PackageReader {
     /// Package-level relationships
     pkg_srels: Vec<SerializedRelationship>,
-    
+
     /// All serialized parts in the package
     sparts: Vec<SerializedPart>,
 }
@@ -252,7 +255,7 @@ impl PackageReader {
         let mut srels = Vec::new();
         let mut reader = Reader::from_reader(&rels_xml[..]);
         reader.config_mut().trim_text(true);
-        
+
         let mut buf = Vec::new();
 
         loop {
@@ -263,7 +266,7 @@ impl PackageReader {
                         let mut reltype = None;
                         let mut target_ref = None;
                         let mut target_mode = target_mode::INTERNAL.to_string();
-                        
+
                         for attr in e.attributes() {
                             let attr = attr?;
                             match attr.key.as_ref() {
@@ -274,7 +277,7 @@ impl PackageReader {
                                 _ => {}
                             }
                         }
-                        
+
                         if let (Some(id), Some(rt), Some(tr)) = (r_id, reltype, target_ref) {
                             srels.push(SerializedRelationship {
                                 base_uri: base_uri.clone(),
@@ -308,7 +311,13 @@ impl PackageReader {
         let mut sparts = Vec::new();
         let mut visited = HashMap::new();
 
-        Self::walk_parts(phys_reader, pkg_srels, content_types, &mut visited, &mut sparts)?;
+        Self::walk_parts(
+            phys_reader,
+            pkg_srels,
+            content_types,
+            &mut visited,
+            &mut sparts,
+        )?;
 
         Ok(sparts)
     }
@@ -388,12 +397,14 @@ mod tests {
             </Types>"#;
 
         let ct_map = ContentTypeMap::from_xml(xml).unwrap();
-        
+
         let uri = PackURI::new("/test.xml").unwrap();
         assert_eq!(ct_map.get(&uri).unwrap(), "application/xml");
 
         let uri = PackURI::new("/word/document.xml").unwrap();
-        assert_eq!(ct_map.get(&uri).unwrap(), "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml");
+        assert_eq!(
+            ct_map.get(&uri).unwrap(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+        );
     }
 }
-

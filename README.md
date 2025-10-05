@@ -13,6 +13,10 @@ A high-performance Rust library for parsing Microsoft Office file formats, inclu
 ### OOXML (Modern Office Formats)
 - ✅ Full Open Packaging Conventions (OPC) implementation
 - ✅ Parse .docx, .xlsx, .pptx files
+- ✅ High-level Word document (.docx) API
+  - Extract text content
+  - Count paragraphs and tables
+  - Access document structure
 - ✅ Content type management
 - ✅ Relationship resolution
 - ✅ Efficient ZIP-based package reading
@@ -39,13 +43,35 @@ litchi = "0.0.1"
 
 ## Usage
 
-### Parsing OOXML Documents
+### Parsing Word Documents (.docx)
+
+```rust
+use litchi::ooxml::docx::Package;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Open a .docx file
+    let package = Package::open("document.docx")?;
+    let document = package.document()?;
+    
+    // Extract all text
+    let text = document.text()?;
+    println!("Document text: {}", text);
+    
+    // Get document statistics
+    println!("Paragraphs: {}", document.paragraph_count()?);
+    println!("Tables: {}", document.table_count()?);
+    
+    Ok(())
+}
+```
+
+### Low-Level OOXML/OPC API
 
 ```rust
 use litchi::ooxml::OpcPackage;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Open a .docx file
+    // Open any OOXML file (.docx, .xlsx, .pptx)
     let package = OpcPackage::open("document.docx")?;
     
     // Get the main document part
@@ -89,7 +115,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 Run the included examples:
 
 ```bash
-# Parse a .docx file and display package information
+# Parse a .docx file using the high-level OOXML API
+cargo run --example parse_docx_ooxml document.docx
+
+# Parse a .docx file and display package information (low-level OPC API)
 cargo run --example parse_docx document.docx
 
 # Extract XML content from a .docx file
@@ -121,14 +150,22 @@ src/
 │   ├── metadata.rs # Directory and stream metadata
 │   └── consts.rs  # OLE constants
 └── ooxml/         # OOXML format support
-    └── opc/       # Open Packaging Conventions
-        ├── constants.rs   # Content types, namespaces, relationship types
-        ├── packuri.rs     # Package URI handling
-        ├── rel.rs         # Relationships management
-        ├── part.rs        # Part implementations
-        ├── phys_pkg.rs    # Physical package (ZIP) reading
-        ├── pkgreader.rs   # Package reader with content type mapping
-        └── package.rs     # Main OpcPackage API
+    ├── shared.rs  # Shared utilities (Length, RGBColor)
+    ├── error.rs   # Error types
+    ├── opc/       # Open Packaging Conventions (low-level)
+    │   ├── constants.rs   # Content types, namespaces, relationship types
+    │   ├── packuri.rs     # Package URI handling
+    │   ├── rel.rs         # Relationships management
+    │   ├── part.rs        # Part implementations
+    │   ├── phys_pkg.rs    # Physical package (ZIP) reading
+    │   ├── pkgreader.rs   # Package reader with content type mapping
+    │   └── package.rs     # Main OpcPackage API
+    ├── docx/      # Word document support
+    │   ├── package.rs     # Word package wrapper
+    │   ├── document.rs    # Document API
+    │   └── parts/         # Document-specific parts
+    ├── xlsx/      # Excel spreadsheet support (placeholder)
+    └── pptx/      # PowerPoint presentation support (placeholder)
 ```
 
 ## Design Philosophy
@@ -141,9 +178,20 @@ src/
 
 ## Roadmap
 
-- [ ] Document content extraction APIs
-- [ ] Spreadsheet parsing
-- [ ] Presentation parsing
+### Completed
+- [x] OPC (Open Packaging Conventions) implementation
+- [x] Basic Word document (.docx) API
+- [x] Text extraction from Word documents
+- [x] Document statistics (paragraphs, tables)
+
+### In Progress
+- [ ] Full Word document API (runs, styles, formatting)
+- [ ] Paragraph and table iteration
+- [ ] Style and formatting access
+
+### Planned
+- [ ] Excel spreadsheet (.xlsx) parsing
+- [ ] PowerPoint presentation (.pptx) parsing
 - [ ] Document writing/modification
 - [ ] Advanced XML element querying
 - [ ] Streaming API for large files

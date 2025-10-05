@@ -1,16 +1,15 @@
+use crate::ooxml::opc::error::{OpcError, Result};
+use crate::ooxml::opc::packuri::PackURI;
+use crate::ooxml::opc::rel::Relationships;
+use memchr::memmem;
+use quick_xml::events::Event;
+use quick_xml::Reader;
 /// Open Packaging Convention (OPC) objects related to package parts.
 ///
 /// This module provides the Part trait and XmlPart implementation for representing
 /// parts within an OPC package. Parts are the fundamental units of content in an
 /// OPC package, each with a unique partname, content type, and optional relationships.
-
 use std::collections::HashMap;
-use quick_xml::Reader;
-use quick_xml::events::Event;
-use memchr::memmem;
-use crate::ooxml::opc::error::{OpcError, Result};
-use crate::ooxml::opc::packuri::PackURI;
-use crate::ooxml::opc::rel::Relationships;
 
 /// Trait representing a part in an OPC package.
 ///
@@ -63,7 +62,7 @@ pub trait Part {
         // Fast byte-level search for r:id attribute references
         let blob = self.blob();
         let pattern = format!(r#"r:id="{}""#, r_id);
-        
+
         // Use memmem from memchr for fast substring searching
         let finder = memmem::Finder::new(pattern.as_bytes());
         finder.find_iter(blob).count()
@@ -78,13 +77,13 @@ pub trait Part {
 pub struct BlobPart {
     /// The partname (URI) of this part
     partname: PackURI,
-    
+
     /// The content type of this part
     content_type: String,
-    
+
     /// The binary content of this part
     blob: Vec<u8>,
-    
+
     /// Relationships from this part to other parts
     rels: Relationships,
 }
@@ -143,16 +142,16 @@ impl Part for BlobPart {
 pub struct XmlPart {
     /// The partname (URI) of this part
     partname: PackURI,
-    
+
     /// The content type of this part
     content_type: String,
-    
+
     /// The XML content as raw bytes (UTF-8 encoded)
     xml_bytes: Vec<u8>,
-    
+
     /// Relationships from this part to other parts
     rels: Relationships,
-    
+
     /// Cached parsed elements (optional, for frequently accessed data)
     /// Maps element paths to their string values for quick lookup
     element_cache: HashMap<String, String>,
@@ -181,7 +180,7 @@ impl XmlPart {
         // Validate that it's valid UTF-8 XML
         std::str::from_utf8(&xml_bytes)
             .map_err(|e| OpcError::XmlError(format!("Invalid UTF-8 in XML: {}", e)))?;
-        
+
         Ok(Self::new(partname, content_type, xml_bytes))
     }
 
@@ -234,7 +233,8 @@ impl XmlPart {
                         in_target_element = false;
                         if !text_content.is_empty() {
                             // Cache the result
-                            self.element_cache.insert(element_name.to_string(), text_content.clone());
+                            self.element_cache
+                                .insert(element_name.to_string(), text_content.clone());
                             return Ok(Some(text_content));
                         }
                     }
@@ -332,11 +332,7 @@ impl PartFactory {
     ///
     /// # Returns
     /// A boxed Part trait object
-    pub fn load(
-        partname: PackURI,
-        content_type: String,
-        blob: Vec<u8>,
-    ) -> Result<Box<dyn Part>> {
+    pub fn load(partname: PackURI, content_type: String, blob: Vec<u8>) -> Result<Box<dyn Part>> {
         // Determine if this is an XML part based on content type
         if Self::is_xml_content_type(&content_type) {
             Ok(Box::new(XmlPart::load(partname, content_type, blob)?))
@@ -382,8 +378,9 @@ mod tests {
     #[test]
     fn test_is_xml_content_type() {
         assert!(PartFactory::is_xml_content_type("application/xml"));
-        assert!(PartFactory::is_xml_content_type("application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"));
+        assert!(PartFactory::is_xml_content_type(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+        ));
         assert!(!PartFactory::is_xml_content_type("image/png"));
     }
 }
-

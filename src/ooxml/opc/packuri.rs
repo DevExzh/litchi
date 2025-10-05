@@ -3,7 +3,6 @@
 /// A PackURI represents a part name within an OPC package, following the URI format
 /// defined by the Open Packaging Conventions specification.
 
-
 /// Represents a package URI, which is a partname within an OPC package.
 ///
 /// PackURIs always begin with a forward slash and use forward slashes as path separators,
@@ -55,7 +54,7 @@ impl PackURI {
         if self.uri == "/" {
             return "/";
         }
-        
+
         if let Some(pos) = self.uri.rfind('/') {
             if pos == 0 {
                 "/"
@@ -165,7 +164,7 @@ impl PackURI {
 
         // Build relative path
         let mut result = String::new();
-        
+
         // Add "../" for each part in from_parts after common prefix
         for _ in common..from_parts.len() {
             result.push_str("../");
@@ -188,14 +187,14 @@ impl PackURI {
     pub fn rels_uri(&self) -> Result<PackURI, String> {
         let filename = self.filename();
         let base_uri = self.base_uri();
-        
+
         let rels_filename = format!("{}.rels", filename);
         let rels_uri_str = if base_uri == "/" {
             format!("/_rels/{}", rels_filename)
         } else {
             format!("{}/_rels/{}", base_uri, rels_filename)
         };
-        
+
         Self::new(rels_uri_str)
     }
 
@@ -216,7 +215,7 @@ impl PackURI {
     /// Helper function to normalize a path (resolve ".." and ".")
     fn normalize_path(path: &str) -> String {
         let mut parts = Vec::new();
-        
+
         for part in path.split('/') {
             match part {
                 "" | "." => {
@@ -317,4 +316,3 @@ mod tests {
         assert_eq!(root.membername(), "");
     }
 }
-

@@ -1,12 +1,3 @@
-/// Objects that implement reading and writing OPC packages.
-///
-/// This module provides the main OpcPackage type, which represents an Open Packaging
-/// Convention package in memory. It manages parts, relationships, and provides
-/// high-level operations for working with office documents.
-
-use std::collections::HashMap;
-use std::io::{Read, Seek};
-use std::path::Path;
 use crate::ooxml::opc::constants::relationship_type;
 use crate::ooxml::opc::error::{OpcError, Result};
 use crate::ooxml::opc::packuri::{PackURI, PACKAGE_URI};
@@ -14,6 +5,14 @@ use crate::ooxml::opc::part::{Part, PartFactory};
 use crate::ooxml::opc::phys_pkg::PhysPkgReader;
 use crate::ooxml::opc::pkgreader::PackageReader;
 use crate::ooxml::opc::rel::Relationships;
+/// Objects that implement reading and writing OPC packages.
+///
+/// This module provides the main OpcPackage type, which represents an Open Packaging
+/// Convention package in memory. It manages parts, relationships, and provides
+/// high-level operations for working with office documents.
+use std::collections::HashMap;
+use std::io::{Read, Seek};
+use std::path::Path;
 
 /// Main API class for working with OPC packages.
 ///
@@ -23,7 +22,7 @@ use crate::ooxml::opc::rel::Relationships;
 pub struct OpcPackage {
     /// Package-level relationships
     rels: Relationships,
-    
+
     /// All parts in the package, indexed by partname
     /// Using Box<dyn Part> for trait objects to allow different part types
     parts: HashMap<String, Box<dyn Part>>,
@@ -81,7 +80,7 @@ impl OpcPackage {
 
         // First pass: Create all parts
         let mut parts_map: HashMap<String, Box<dyn Part>> = HashMap::new();
-        
+
         for spart in pkg_reader.iter_sparts() {
             let part = PartFactory::load(
                 spart.partname.clone(),
@@ -100,7 +99,7 @@ impl OpcPackage {
                 srel.is_external(),
             );
         }
-        
+
         // Load part relationships
         for spart in pkg_reader.iter_sparts() {
             if let Some(part) = parts_map.get_mut(&spart.partname.to_string()) {
@@ -125,7 +124,9 @@ impl OpcPackage {
     /// For Excel, the workbook.xml part.
     /// For PowerPoint, the presentation.xml part.
     pub fn main_document_part(&self) -> Result<&dyn Part> {
-        let rel = self.rels.part_with_reltype(relationship_type::OFFICE_DOCUMENT)?;
+        let rel = self
+            .rels
+            .part_with_reltype(relationship_type::OFFICE_DOCUMENT)?;
         let partname = rel.target_partname()?;
         self.get_part(&partname)
     }
@@ -227,7 +228,7 @@ impl OpcPackage {
             if n > 10000 {
                 // Safety limit to prevent infinite loops
                 return Err(OpcError::InvalidPackUri(
-                    "Too many parts, cannot find next partname".to_string()
+                    "Too many parts, cannot find next partname".to_string(),
                 ));
             }
         }
@@ -277,10 +278,14 @@ mod tests {
 
             // Add word/document.xml
             writer.start_file("word/document.xml", options).unwrap();
-            writer.write_all(br#"<?xml version="1.0"?>
+            writer
+                .write_all(
+                    br#"<?xml version="1.0"?>
 <document xmlns="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
     <body><p><t>Test</t></p></body>
-</document>"#).unwrap();
+</document>"#,
+                )
+                .unwrap();
 
             writer.finish().unwrap();
         }
@@ -303,7 +308,9 @@ mod tests {
         let pkg = OpcPackage::from_reader(cursor).unwrap();
 
         let main_part = pkg.main_document_part().unwrap();
-        assert_eq!(main_part.content_type(), "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml");
+        assert_eq!(
+            main_part.content_type(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+        );
     }
 }
-

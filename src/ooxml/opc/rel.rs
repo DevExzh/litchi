@@ -1,11 +1,10 @@
+use crate::ooxml::opc::error::{OpcError, Result};
+use crate::ooxml::opc::packuri::PackURI;
 /// Relationship-related objects for OPC packages.
 ///
 /// This module provides types for managing relationships between parts in an OPC package,
 /// including internal and external relationships.
-
 use std::collections::HashMap;
-use crate::ooxml::opc::error::{OpcError, Result};
-use crate::ooxml::opc::packuri::PackURI;
 
 /// A single relationship from a source part to a target.
 ///
@@ -16,16 +15,16 @@ use crate::ooxml::opc::packuri::PackURI;
 pub struct Relationship {
     /// Relationship ID (e.g., "rId1", "rId2")
     r_id: String,
-    
+
     /// Relationship type URI
     reltype: String,
-    
+
     /// Target reference - either a part URI or external URL
     target_ref: String,
-    
+
     /// Base URI for resolving relative references
     base_uri: String,
-    
+
     /// Whether this is an external relationship
     is_external: bool,
 }
@@ -88,11 +87,10 @@ impl Relationship {
     pub fn target_partname(&self) -> Result<PackURI> {
         if self.is_external {
             return Err(OpcError::InvalidRelationship(
-                "Cannot get target_partname for external relationship".to_string()
+                "Cannot get target_partname for external relationship".to_string(),
             ));
         }
-        PackURI::from_rel_ref(&self.base_uri, &self.target_ref)
-            .map_err(OpcError::InvalidPackUri)
+        PackURI::from_rel_ref(&self.base_uri, &self.target_ref).map_err(OpcError::InvalidPackUri)
     }
 }
 
@@ -104,7 +102,7 @@ impl Relationship {
 pub struct Relationships {
     /// Base URI for resolving relative references
     base_uri: String,
-    
+
     /// Map of relationship ID to Relationship
     rels: HashMap<String, Relationship>,
 }
@@ -196,7 +194,12 @@ impl Relationships {
 
         // Create new relationship with next available rId
         let r_id = self.next_r_id();
-        self.add_relationship(reltype.to_string(), target_ref.to_string(), r_id.clone(), true);
+        self.add_relationship(
+            reltype.to_string(),
+            target_ref.to_string(),
+            r_id.clone(),
+            true,
+        );
         r_id
     }
 
@@ -206,7 +209,9 @@ impl Relationships {
     /// if any exist. Uses efficient integer parsing with atoi_simd.
     fn next_r_id(&self) -> String {
         // Find the highest existing rId number and any gaps
-        let mut used_numbers: Vec<u32> = self.rels.keys()
+        let mut used_numbers: Vec<u32> = self
+            .rels
+            .keys()
             .filter_map(|r_id| {
                 // Extract number from "rId123" format using fast byte searching
                 if r_id.len() > 3 && &r_id[..3] == "rId" {
@@ -238,18 +243,22 @@ impl Relationships {
     /// Returns an error if no relationship of the type is found,
     /// or if multiple relationships of the type exist.
     pub fn part_with_reltype(&self, reltype: &str) -> Result<&Relationship> {
-        let matching: Vec<&Relationship> = self.rels.values()
+        let matching: Vec<&Relationship> = self
+            .rels
+            .values()
             .filter(|rel| rel.reltype() == reltype)
             .collect();
 
         match matching.len() {
-            0 => Err(OpcError::RelationshipNotFound(
-                format!("No relationship of type '{}'", reltype)
-            )),
+            0 => Err(OpcError::RelationshipNotFound(format!(
+                "No relationship of type '{}'",
+                reltype
+            ))),
             1 => Ok(matching[0]),
-            _ => Err(OpcError::InvalidRelationship(
-                format!("Multiple relationships of type '{}'", reltype)
-            )),
+            _ => Err(OpcError::InvalidRelationship(format!(
+                "Multiple relationships of type '{}'",
+                reltype
+            ))),
         }
     }
 
@@ -305,7 +314,7 @@ mod tests {
     #[test]
     fn test_next_r_id() {
         let mut rels = Relationships::new("/word".to_string());
-        
+
         let r_id1 = rels.next_r_id();
         assert_eq!(r_id1, "rId1");
 
@@ -323,7 +332,7 @@ mod tests {
     #[test]
     fn test_get_or_add() {
         let mut rels = Relationships::new("/word".to_string());
-        
+
         let rel1 = rels.get_or_add("type1", "target1");
         assert_eq!(rel1.r_id(), "rId1");
 
@@ -336,4 +345,3 @@ mod tests {
         assert_eq!(rel3.r_id(), "rId2");
     }
 }
-
