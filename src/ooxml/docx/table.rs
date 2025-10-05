@@ -3,6 +3,7 @@ use crate::ooxml::docx::paragraph::Paragraph;
 use crate::ooxml::error::{OoxmlError, Result};
 use quick_xml::events::Event;
 use quick_xml::Reader;
+use smallvec::SmallVec;
 
 /// A table in a Word document.
 ///
@@ -71,15 +72,20 @@ impl Table {
     }
 
     /// Get all rows in this table.
-    pub fn rows(&self) -> Result<Vec<Row>> {
+    ///
+    /// # Performance
+    ///
+    /// Uses SmallVec for efficient storage of typically small row collections.
+    pub fn rows(&self) -> Result<SmallVec<[Row; 16]>> {
         let mut reader = Reader::from_reader(&self.xml_bytes[..]);
         reader.config_mut().trim_text(true);
 
-        let mut rows = Vec::new();
-        let mut current_row_xml = Vec::new();
+        // Use SmallVec for efficient storage of row collections
+        let mut rows = SmallVec::new();
+        let mut current_row_xml = Vec::with_capacity(2048); // Pre-allocate for row XML
         let mut in_row = false;
         let mut depth = 0;
-        let mut buf = Vec::new();
+        let mut buf = Vec::with_capacity(512); // Reusable buffer
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -204,15 +210,20 @@ impl Row {
     }
 
     /// Get all cells in this row.
-    pub fn cells(&self) -> Result<Vec<Cell>> {
+    ///
+    /// # Performance
+    ///
+    /// Uses SmallVec for efficient storage of typically small cell collections.
+    pub fn cells(&self) -> Result<SmallVec<[Cell; 16]>> {
         let mut reader = Reader::from_reader(&self.xml_bytes[..]);
         reader.config_mut().trim_text(true);
 
-        let mut cells = Vec::new();
-        let mut current_cell_xml = Vec::new();
+        // Use SmallVec for efficient storage of cell collections
+        let mut cells = SmallVec::new();
+        let mut current_cell_xml = Vec::with_capacity(2048); // Pre-allocate for cell XML
         let mut in_cell = false;
         let mut depth = 0;
-        let mut buf = Vec::new();
+        let mut buf = Vec::with_capacity(512); // Reusable buffer
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -336,15 +347,20 @@ impl Cell {
     }
 
     /// Get all paragraphs in this cell.
-    pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
+    ///
+    /// # Performance
+    ///
+    /// Uses SmallVec for efficient storage of typically small paragraph collections.
+    pub fn paragraphs(&self) -> Result<SmallVec<[Paragraph; 8]>> {
         let mut reader = Reader::from_reader(&self.xml_bytes[..]);
         reader.config_mut().trim_text(true);
 
-        let mut paragraphs = Vec::new();
-        let mut current_para_xml = Vec::new();
+        // Use SmallVec for efficient storage of paragraph collections
+        let mut paragraphs = SmallVec::new();
+        let mut current_para_xml = Vec::with_capacity(1024); // Pre-allocate for paragraph XML
         let mut in_para = false;
         let mut depth = 0;
-        let mut buf = Vec::new();
+        let mut buf = Vec::with_capacity(512); // Reusable buffer
 
         loop {
             match reader.read_event_into(&mut buf) {

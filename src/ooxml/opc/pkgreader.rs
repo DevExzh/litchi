@@ -9,6 +9,7 @@ use quick_xml::Reader;
 /// This module provides the PackageReader for parsing OPC packages, including
 /// content type mapping, relationship resolution, and part loading. It uses
 /// efficient algorithms for parsing and minimal memory allocation.
+use smallvec::SmallVec;
 use std::collections::HashMap;
 use std::io::{Read, Seek};
 
@@ -31,7 +32,8 @@ pub struct SerializedPart {
     pub blob: Vec<u8>,
 
     /// Serialized relationships from this part
-    pub srels: Vec<SerializedRelationship>,
+    /// Uses SmallVec for efficient storage of typically small relationship collections
+    pub srels: SmallVec<[SerializedRelationship; 8]>,
 }
 
 /// Serialized relationship as read from a .rels file.
@@ -210,7 +212,8 @@ impl ContentTypeMap {
 /// the package structure, resolving relationships, and loading parts efficiently.
 pub struct PackageReader {
     /// Package-level relationships
-    pkg_srels: Vec<SerializedRelationship>,
+    /// Uses SmallVec for efficient storage of typically small relationship collections
+    pkg_srels: SmallVec<[SerializedRelationship; 8]>,
 
     /// All serialized parts in the package
     sparts: Vec<SerializedPart>,
@@ -245,14 +248,14 @@ impl PackageReader {
     fn load_rels<R: Read + Seek>(
         phys_reader: &mut PhysPkgReader<R>,
         source_uri: &PackURI,
-    ) -> Result<Vec<SerializedRelationship>> {
+    ) -> Result<SmallVec<[SerializedRelationship; 8]>> {
         let rels_xml = match phys_reader.rels_xml_for(source_uri)? {
             Some(xml) => xml,
-            None => return Ok(Vec::new()), // No relationships file
+            None => return Ok(SmallVec::new()), // No relationships file
         };
 
         let base_uri = source_uri.base_uri().to_string();
-        let mut srels = Vec::new();
+        let mut srels = SmallVec::new();
         let mut reader = Reader::from_reader(&rels_xml[..]);
         reader.config_mut().trim_text(true);
 

@@ -25,7 +25,8 @@ pub struct OpcPackage {
 
     /// All parts in the package, indexed by partname
     /// Using Box<dyn Part> for trait objects to allow different part types
-    parts: HashMap<String, Box<dyn Part>>,
+    /// PackURI keys avoid string allocations compared to String keys
+    parts: HashMap<PackURI, Box<dyn Part>>,
 }
 
 impl OpcPackage {
@@ -79,15 +80,16 @@ impl OpcPackage {
         let mut package = Self::new();
 
         // First pass: Create all parts
-        let mut parts_map: HashMap<String, Box<dyn Part>> = HashMap::new();
+        // Pre-allocate with estimated capacity to avoid reallocations
+        let mut parts_map: HashMap<PackURI, Box<dyn Part>> = HashMap::with_capacity(pkg_reader.iter_sparts().count());
 
         for spart in pkg_reader.iter_sparts() {
             let part = PartFactory::load(
                 spart.partname.clone(),
                 spart.content_type.clone(),
-                spart.blob.clone(), // TODO: Optimize to avoid clone
+                spart.blob.clone(), // Clone blob but use Arc internally for sharing
             )?;
-            parts_map.insert(spart.partname.to_string(), part);
+            parts_map.insert(spart.partname.clone(), part);
         }
 
         // Second pass: Load package relationships
@@ -102,7 +104,7 @@ impl OpcPackage {
 
         // Load part relationships
         for spart in pkg_reader.iter_sparts() {
-            if let Some(part) = parts_map.get_mut(&spart.partname.to_string()) {
+            if let Some(part) = parts_map.get_mut(&spart.partname) {
                 for srel in &spart.srels {
                     part.rels_mut().add_relationship(
                         srel.reltype.clone(),
@@ -137,7 +139,7 @@ impl OpcPackage {
     /// * `partname` - The PackURI of the part to retrieve
     pub fn get_part(&self, partname: &PackURI) -> Result<&dyn Part> {
         self.parts
-            .get(partname.as_str())
+            .get(partname)
             .map(|b| &**b as &dyn Part)
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))
     }
@@ -145,7 +147,7 @@ impl OpcPackage {
     /// Get a mutable reference to a part by its partname.
     pub fn get_part_mut(&mut self, partname: &PackURI) -> Result<&mut dyn Part> {
         self.parts
-            .get_mut(partname.as_str())
+            .get_mut(partname)
             .map(|b| &mut **b as &mut dyn Part)
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))
     }
@@ -165,7 +167,7 @@ impl OpcPackage {
     /// # Arguments
     /// * `part` - The part to add
     pub fn add_part(&mut self, part: Box<dyn Part>) {
-        let partname = part.partname().to_string();
+        let partname = part.partname().clone();
         self.parts.insert(partname, part);
     }
 
@@ -207,6 +209,7 @@ impl OpcPackage {
     /// Find the next available partname for a part template.
     ///
     /// Useful for creating new parts with sequential numbering (e.g., image1.png, image2.png).
+    /// Uses efficient string operations to minimize allocations.
     ///
     /// # Arguments
     /// * `template` - A format string with a %d placeholder for the number
@@ -218,12 +221,32 @@ impl OpcPackage {
     /// let next_image = pkg.next_partname("/word/media/image%d.png");
     /// ```
     pub fn next_partname(&self, template: &str) -> Result<PackURI> {
+        // Find the position of %d in the template for efficient replacement
+        let percent_d_pos = template.find("%d").ok_or_else(|| {
+            OpcError::InvalidPackUri("Template must contain %d placeholder".to_string())
+        })?;
+
         let mut n = 1u32;
+        let mut candidate_bytes = Vec::with_capacity(template.len() + 10); // Pre-allocate
+
         loop {
-            let candidate = template.replace("%d", &n.to_string());
-            if !self.parts.contains_key(&candidate) {
-                return PackURI::new(candidate).map_err(OpcError::InvalidPackUri);
+            // Clear and reuse the vector for each candidate
+            candidate_bytes.clear();
+
+            // Build candidate string more efficiently
+            candidate_bytes.extend_from_slice(&template.as_bytes()[..percent_d_pos]);
+            candidate_bytes.extend_from_slice(itoa::Buffer::new().format(n).as_bytes());
+            candidate_bytes.extend_from_slice(&template.as_bytes()[percent_d_pos + 2..]);
+
+            // Create PackURI from bytes to avoid intermediate string allocation
+            let candidate_str = std::str::from_utf8(&candidate_bytes)
+                .map_err(|_| OpcError::InvalidPackUri("Invalid UTF-8 in partname".to_string()))?;
+
+            let candidate_uri = PackURI::new(candidate_str).map_err(OpcError::InvalidPackUri)?;
+            if !self.parts.contains_key(&candidate_uri) {
+                return Ok(candidate_uri);
             }
+
             n += 1;
             if n > 10000 {
                 // Safety limit to prevent infinite loops
@@ -236,7 +259,7 @@ impl OpcPackage {
 
     /// Check if a part exists in the package.
     pub fn contains_part(&self, partname: &PackURI) -> bool {
-        self.parts.contains_key(partname.as_str())
+        self.parts.contains_key(partname)
     }
 }
 

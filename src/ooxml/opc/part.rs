@@ -10,6 +10,7 @@ use quick_xml::Reader;
 /// parts within an OPC package. Parts are the fundamental units of content in an
 /// OPC package, each with a unique partname, content type, and optional relationships.
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Trait representing a part in an OPC package.
 ///
@@ -24,6 +25,7 @@ pub trait Part {
     fn content_type(&self) -> &str;
 
     /// Get the binary content of this part.
+    /// Returns a reference to the blob data for efficient access.
     fn blob(&self) -> &[u8];
 
     /// Get the relationships for this part.
@@ -65,14 +67,15 @@ pub trait Part {
 
         // Use memmem from memchr for fast substring searching
         let finder = memmem::Finder::new(pattern.as_bytes());
-        finder.find_iter(blob).count()
+        finder.find_iter(&blob).count()
     }
 }
 
 /// A basic implementation of a Part that stores binary content.
 ///
 /// This is the default part type for non-XML content. It stores the
-/// content as a byte vector and manages relationships.
+/// content as a byte vector and manages relationships. Uses Arc for
+/// efficient sharing of blob data.
 #[derive(Debug)]
 pub struct BlobPart {
     /// The partname (URI) of this part
@@ -81,8 +84,8 @@ pub struct BlobPart {
     /// The content type of this part
     content_type: String,
 
-    /// The binary content of this part
-    blob: Vec<u8>,
+    /// The binary content of this part (shared via Arc for efficiency)
+    blob: Arc<Vec<u8>>,
 
     /// Relationships from this part to other parts
     rels: Relationships,
@@ -100,7 +103,7 @@ impl BlobPart {
         Self {
             partname,
             content_type,
-            blob,
+            blob: Arc::new(blob),
             rels,
         }
     }
@@ -137,7 +140,8 @@ impl Part for BlobPart {
 ///
 /// XmlPart extends the basic Part functionality with XML parsing capabilities.
 /// It stores the raw XML as bytes and provides methods for efficient XML processing
-/// using quick-xml with zero-copy parsing where possible.
+/// using quick-xml with zero-copy parsing where possible. Uses Arc for efficient
+/// sharing of XML data.
 #[derive(Debug)]
 pub struct XmlPart {
     /// The partname (URI) of this part
@@ -146,8 +150,8 @@ pub struct XmlPart {
     /// The content type of this part
     content_type: String,
 
-    /// The XML content as raw bytes (UTF-8 encoded)
-    xml_bytes: Vec<u8>,
+    /// The XML content as raw bytes (UTF-8 encoded, shared via Arc)
+    xml_bytes: Arc<Vec<u8>>,
 
     /// Relationships from this part to other parts
     rels: Relationships,
@@ -169,7 +173,7 @@ impl XmlPart {
         Self {
             partname,
             content_type,
-            xml_bytes,
+            xml_bytes: Arc::new(xml_bytes),
             rels,
             element_cache: HashMap::new(),
         }
@@ -189,7 +193,7 @@ impl XmlPart {
     /// Returns a quick-xml Reader configured for efficient parsing.
     /// The reader uses zero-copy parsing where possible.
     pub fn reader(&self) -> Reader<&[u8]> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let mut reader = Reader::from_reader(&**self.xml_bytes);
         reader.config_mut().trim_text(true);
         reader
     }
@@ -290,7 +294,7 @@ impl XmlPart {
     ///
     /// Performs zero-copy conversion if possible.
     pub fn xml_str(&self) -> Result<&str> {
-        std::str::from_utf8(&self.xml_bytes).map_err(Into::into)
+        std::str::from_utf8(&**self.xml_bytes).map_err(Into::into)
     }
 }
 
@@ -328,7 +332,7 @@ impl PartFactory {
     /// # Arguments
     /// * `partname` - The partname (URI) of the part
     /// * `content_type` - The content type of the part
-    /// * `blob` - The raw binary content
+    /// * `blob` - The raw binary content (consumed by this function)
     ///
     /// # Returns
     /// A boxed Part trait object

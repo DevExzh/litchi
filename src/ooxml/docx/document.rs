@@ -117,7 +117,7 @@ impl<'a> Document<'a> {
     ///
     /// for para in doc.paragraphs()? {
     ///     println!("Paragraph: {}", para.text()?);
-    ///     
+    ///
     ///     // Access runs within the paragraph
     ///     for run in para.runs()? {
     ///         println!("  Run: {} (bold: {:?})", run.text()?, run.bold()?);
@@ -126,7 +126,8 @@ impl<'a> Document<'a> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
-        self.part.paragraphs()
+        // Convert SmallVec to Vec for API compatibility
+        Ok(self.part.paragraphs()?.into_iter().collect())
     }
 
     /// Get all tables in the document.
@@ -144,7 +145,7 @@ impl<'a> Document<'a> {
     ///
     /// for table in doc.tables()? {
     ///     println!("Table with {} rows", table.row_count()?);
-    ///     
+    ///
     ///     for (row_idx, row) in table.rows()?.iter().enumerate() {
     ///         for (col_idx, cell) in row.cells()?.iter().enumerate() {
     ///             println!("Cell [{},{}]: {}", row_idx, col_idx, cell.text()?);
@@ -154,7 +155,8 @@ impl<'a> Document<'a> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn tables(&self) -> Result<Vec<Table>> {
-        self.part.tables()
+        // Convert SmallVec to Vec for API compatibility
+        Ok(self.part.tables()?.into_iter().collect())
     }
 
     // TODO: Add more methods:

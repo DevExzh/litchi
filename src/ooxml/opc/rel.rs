@@ -145,7 +145,7 @@ impl Relationships {
         );
         self.rels.insert(r_id.clone(), rel);
         // Safe to unwrap since we just inserted it
-        self.rels.get(&r_id).unwrap()
+        self.rels.get(r_id.as_str()).unwrap()
     }
 
     /// Get a relationship by its ID.

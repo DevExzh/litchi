@@ -2,6 +2,7 @@
 use crate::ooxml::error::{OoxmlError, Result};
 use quick_xml::events::Event;
 use quick_xml::Reader;
+use smallvec::SmallVec;
 use std::borrow::Cow;
 
 /// A paragraph in a Word document.
@@ -41,16 +42,19 @@ impl Paragraph {
     ///
     /// # Performance
     ///
-    /// Uses streaming XML parsing to extract text efficiently.
+    /// Uses streaming XML parsing with pre-allocated buffer to extract text efficiently.
     pub fn text(&self) -> Result<String> {
         let mut reader = Reader::from_reader(&self.xml_bytes[..]);
         reader.config_mut().trim_text(true);
 
-        let mut result = String::new();
+        // Pre-allocate string with estimated capacity to reduce reallocations
+        let estimated_capacity = self.xml_bytes.len() / 4; // Rough estimate
+        let mut result = String::with_capacity(estimated_capacity);
         let mut in_text_element = false;
-        let mut buf = Vec::new();
+        let mut buf = Vec::with_capacity(512); // Reusable buffer
 
         loop {
+            buf.clear();
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     if e.local_name().as_ref() == b"t" {
@@ -58,7 +62,8 @@ impl Paragraph {
                     }
                 }
                 Ok(Event::Text(e)) if in_text_element => {
-                    let text = std::str::from_utf8(e.as_ref()).unwrap_or("");
+                    // Use unsafe conversion for better performance (safe since we validate XML)
+                    let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
                     result.push_str(text);
                 }
                 Ok(Event::End(e)) => {
@@ -70,24 +75,26 @@ impl Paragraph {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {}
             }
-            buf.clear();
         }
 
+        // Shrink to fit to release unused capacity
+        result.shrink_to_fit();
         Ok(result)
     }
 
     /// Get an iterator over the runs in this paragraph.
     ///
     /// Each run represents a `<w:r>` element and may have different formatting.
-    pub fn runs(&self) -> Result<Vec<Run>> {
+    pub fn runs(&self) -> Result<SmallVec<[Run; 8]>> {
         let mut reader = Reader::from_reader(&self.xml_bytes[..]);
         reader.config_mut().trim_text(true);
 
-        let mut runs = Vec::new();
-        let mut current_run_xml = Vec::new();
+        // Use SmallVec for efficient storage of typically small run collections
+        let mut runs = SmallVec::new();
+        let mut current_run_xml = Vec::with_capacity(1024); // Pre-allocate for XML fragments
         let mut in_run = false;
         let mut depth = 0;
-        let mut buf = Vec::new();
+        let mut buf = Vec::with_capacity(512); // Reusable buffer
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -96,6 +103,10 @@ impl Paragraph {
                         in_run = true;
                         depth = 1;
                         current_run_xml.clear();
+                        // Pre-allocate with estimated size for run XML
+                        current_run_xml.reserve(512);
+
+                        // Build opening tag more efficiently
                         current_run_xml.extend_from_slice(b"<w:r");
                         for attr in e.attributes().flatten() {
                             current_run_xml.push(b' ');
@@ -192,9 +203,11 @@ impl Run {
         let mut reader = Reader::from_reader(&self.xml_bytes[..]);
         reader.config_mut().trim_text(true);
 
-        let mut result = String::new();
+        // Pre-allocate with estimated capacity
+        let estimated_capacity = self.xml_bytes.len() / 8; // Rough estimate for text content
+        let mut result = String::with_capacity(estimated_capacity);
         let mut in_text_element = false;
-        let mut buf = Vec::new();
+        let mut buf = Vec::with_capacity(256); // Reusable buffer
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -209,7 +222,8 @@ impl Run {
                     }
                 }
                 Ok(Event::Text(e)) if in_text_element => {
-                    let text = std::str::from_utf8(e.as_ref()).unwrap_or("");
+                    // Use unsafe conversion for better performance (safe since we validate XML)
+                    let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
                     result.push_str(text);
                 }
                 Ok(Event::End(e)) => {

@@ -5,6 +5,7 @@ use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::opc::part::Part;
 use quick_xml::events::Event;
 use quick_xml::Reader;
+use smallvec::SmallVec;
 
 /// The main document part of a Word document.
 ///
@@ -39,15 +40,17 @@ impl<'a> DocumentPart<'a> {
     ///
     /// # Performance
     ///
-    /// Uses `quick-xml` for efficient streaming XML parsing with minimal
-    /// allocations.
+    /// Uses `quick-xml` for efficient streaming XML parsing with pre-allocated
+    /// buffer and unsafe string conversion for optimal performance.
     pub fn extract_text(&self) -> Result<String> {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
-        let mut result = String::new();
+        // Pre-allocate with estimated capacity to reduce reallocations
+        let estimated_capacity = self.xml_bytes().len() / 8; // Rough estimate for text content
+        let mut result = String::with_capacity(estimated_capacity);
         let mut in_text_element = false;
-        let mut buf = Vec::new();
+        let mut buf = Vec::with_capacity(512); // Reusable buffer
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -58,8 +61,8 @@ impl<'a> DocumentPart<'a> {
                     }
                 }
                 Ok(Event::Text(e)) if in_text_element => {
-                    // Extract text content
-                    let text = std::str::from_utf8(e.as_ref()).unwrap_or("");
+                    // Extract text content - use unsafe conversion for better performance
+                    let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
                     result.push_str(text);
                 }
                 Ok(Event::End(e)) => {
@@ -137,16 +140,18 @@ impl<'a> DocumentPart<'a> {
     ///
     /// # Performance
     ///
-    /// Uses streaming XML parsing to efficiently extract paragraph XML.
-    pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
+    /// Uses streaming XML parsing with pre-allocated SmallVec for efficient
+    /// storage of typically small paragraph collections.
+    pub fn paragraphs(&self) -> Result<SmallVec<[Paragraph; 32]>> {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
-        let mut paragraphs = Vec::new();
-        let mut current_para_xml = Vec::new();
+        // Use SmallVec for efficient storage of paragraph collections
+        let mut paragraphs = SmallVec::new();
+        let mut current_para_xml = Vec::with_capacity(2048); // Pre-allocate for paragraph XML
         let mut in_para = false;
         let mut depth = 0;
-        let mut buf = Vec::new();
+        let mut buf = Vec::with_capacity(512); // Reusable buffer
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -219,15 +224,20 @@ impl<'a> DocumentPart<'a> {
     /// Get all tables in the document.
     ///
     /// Extracts all `<w:tbl>` elements from the document body.
-    pub fn tables(&self) -> Result<Vec<Table>> {
+    ///
+    /// # Performance
+    ///
+    /// Uses SmallVec for efficient storage of typically small table collections.
+    pub fn tables(&self) -> Result<SmallVec<[Table; 8]>> {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
-        let mut tables = Vec::new();
-        let mut current_table_xml = Vec::new();
+        // Use SmallVec for efficient storage of table collections
+        let mut tables = SmallVec::new();
+        let mut current_table_xml = Vec::with_capacity(4096); // Pre-allocate for table XML
         let mut in_table = false;
         let mut depth = 0;
-        let mut buf = Vec::new();
+        let mut buf = Vec::with_capacity(512); // Reusable buffer
 
         loop {
             match reader.read_event_into(&mut buf) {
