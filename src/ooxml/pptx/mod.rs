@@ -3,29 +3,65 @@
 //! This module provides parsing and manipulation of Microsoft PowerPoint presentations
 //! in the Office Open XML (OOXML) format (.pptx files).
 //!
-//! # Status
+//! The implementation follows the structure and API design of the python-pptx library,
+//! adapted for Rust with performance optimizations and zero-copy parsing where possible.
 //!
-//! This module is currently a placeholder for future PowerPoint support.
-//! The architecture will follow a similar pattern to the `docx` module:
+//! # Architecture
 //!
-//! - `Package`: The overall .pptx file package
+//! The module is organized around these key types:
+//! - `Package`: The overall .pptx file package (entry point)
 //! - `Presentation`: The main presentation content and API
-//! - `Slide`: Individual slide content
-//! - Various part types: `SlideMasterPart`, `ThemePart`, etc.
+//! - `Slide`: Individual slide content and API
+//! - `SlideMaster`: Slide master for themes and default formatting
+//! - `SlideLayout`: Layout templates for slides
+//! - `PresentationPart`, `SlidePart`, etc.: Lower-level part wrappers
 //!
-//! # Future Example
+//! # Example: Reading a Presentation
 //!
-//! ```rust,ignore
+//! ```rust,no_run
 //! use litchi::ooxml::pptx::Package;
 //!
 //! // Open a presentation
-//! let package = Package::open("presentation.pptx")?;
-//! let pres = package.presentation()?;
+//! let pkg = Package::open("presentation.pptx")?;
+//! let mut pres = pkg.presentation()?;
 //!
-//! // Access slides
-//! for slide in pres.slides() {
-//!     println!("Slide title: {}", slide.title());
+//! // Get presentation info
+//! println!("Slides: {}", pres.slide_count()?);
+//! if let (Some(w), Some(h)) = (pres.slide_width()?, pres.slide_height()?) {
+//!     println!("Slide size: {}x{} EMUs", w, h);
 //! }
+//!
+//! // Access slides and extract text
+//! for (idx, slide) in pres.slides()?.iter_mut().enumerate() {
+//!     println!("\nSlide {}: {}", idx + 1, slide.name()?);
+//!     println!("Content:\n{}", slide.text()?);
+//! }
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Example: Accessing Slide Masters
+//!
+//! ```rust,no_run
+//! use litchi::ooxml::pptx::Package;
+//!
+//! let pkg = Package::open("presentation.pptx")?;
+//! let mut pres = pkg.presentation()?;
+//!
+//! // Get slide masters
+//! for master in pres.slide_masters()?.iter_mut() {
+//!     println!("Master: {}", master.name()?);
+//!     let layout_rids = master.slide_layout_rids()?;
+//!     println!("  Has {} layouts", layout_rids.len());
+//! }
+//! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-// TODO: Implement PowerPoint support
+pub mod package;
+pub mod parts;
+pub mod presentation;
+pub mod shapes;
+pub mod slide;
+
+pub use package::Package;
+pub use presentation::Presentation;
+pub use slide::{Slide, SlideLayout, SlideMaster};

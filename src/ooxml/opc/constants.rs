@@ -95,12 +95,20 @@ pub mod content_type {
     // PresentationML content types
     pub const PML_PRESENTATION_MAIN: &str =
         "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml";
+    pub const PML_PRES_MACRO_MAIN: &str =
+        "application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml";
     pub const PML_SLIDE: &str =
         "application/vnd.openxmlformats-officedocument.presentationml.slide+xml";
     pub const PML_SLIDE_LAYOUT: &str =
         "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml";
     pub const PML_SLIDE_MASTER: &str =
         "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml";
+    pub const PML_NOTES_SLIDE: &str =
+        "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml";
+    pub const PML_NOTES_MASTER: &str =
+        "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml";
+    pub const PML_HANDOUT_MASTER: &str =
+        "application/vnd.openxmlformats-officedocument.presentationml.handoutMaster+xml";
 
     // Generic XML
     pub const XML: &str = "application/xml";
@@ -204,4 +212,26 @@ pub mod relationship_type {
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject";
     pub const PACKAGE: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package";
+
+    // PresentationML relationships
+    pub const SLIDE: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide";
+    pub const SLIDE_LAYOUT: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout";
+    pub const SLIDE_MASTER: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster";
+    pub const NOTES_SLIDE: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide";
+    pub const NOTES_MASTER: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster";
+    pub const HANDOUT_MASTER: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/handoutMaster";
+    pub const COMMENT_AUTHORS: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/commentAuthors";
+    pub const PRES_PROPS: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps";
+    pub const VIEW_PROPS: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps";
+    pub const TABLE_STYLES: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles";
 }
