@@ -6,11 +6,51 @@
 //! # Features
 //!
 //! - **OLE2 Parser**: Parse legacy Microsoft Office files (.doc, .xls, .ppt)
-//! - **OOXML Parser**: Parse modern Office files (.docx, .xlsx, .pptx) - Coming soon
+//! - **DOC Reader**: Parse legacy Word documents (.doc)
+//! - **OOXML Parser**: Parse modern Office files (.docx, .xlsx, .pptx)
 //! - **Zero-copy parsing**: Minimizes memory allocations for better performance
 //! - **Metadata extraction**: Extract document properties and metadata
 //!
-//! # Example
+//! # Example - Reading a DOC file
+//!
+//! ```no_run
+//! use litchi::ole::doc::Package;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! // Open a .doc file
+//! let mut pkg = Package::open("document.doc")?;
+//! let doc = pkg.document()?;
+//!
+//! // Extract all text
+//! let text = doc.text()?;
+//! println!("Document text: {}", text);
+//!
+//! // Access paragraphs
+//! for para in doc.paragraphs()? {
+//!     println!("Paragraph: {}", para.text()?);
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Example - Reading a DOCX file
+//!
+//! ```no_run
+//! use litchi::ooxml::docx::Package;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! // Open a .docx file
+//! let pkg = Package::open("document.docx")?;
+//! let doc = pkg.document()?;
+//!
+//! // Extract all text
+//! let text = doc.text()?;
+//! println!("Document text: {}", text);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Example - Low-level OLE access
 //!
 //! ```no_run
 //! use std::fs::File;
@@ -30,12 +70,6 @@
 //! // Open a specific stream
 //! let data = ole.open_stream(&["WordDocument"])?;
 //! println!("Stream size: {} bytes", data.len());
-//!
-//! // Extract metadata
-//! let metadata = ole.get_metadata()?;
-//! if let Some(title) = metadata.title {
-//!     println!("Title: {}", title);
-//! }
 //! # Ok(())
 //! # }
 //! ```
@@ -44,10 +78,13 @@
 ///
 /// This module provides functionality to parse OLE2 structured storage files,
 /// which are used by legacy Microsoft Office formats (.doc, .xls, .ppt).
+///
+/// The `ole` module also contains the `doc` submodule for parsing legacy
+/// Word documents, since .doc files are OLE2-based.
 pub mod ole;
 
 /// OOXML (Office Open XML) file format parser
 ///
 /// This module provides functionality to parse modern Office formats
-/// (.docx, .xlsx, .pptx). Currently under development.
+/// (.docx, .xlsx, .pptx).
 pub mod ooxml;

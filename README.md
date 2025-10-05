@@ -10,6 +10,19 @@ A high-performance Rust library for parsing Microsoft Office file formats, inclu
 - ✅ Read streams and storages
 - ✅ Support for .doc, .xls, .ppt files
 
+### DOC (Legacy Word Documents)
+- ✅ Parse legacy Word documents (.doc)
+- ✅ File Information Block (FIB) parsing
+- ✅ Text extraction via piece table
+- ✅ Support for both ANSI (Windows-1252) and Unicode (UTF-16LE) text
+- ✅ Character formatting (bold, italic, underline, strikethrough, etc.)
+- ✅ Font properties (size, color, highlighting)
+- ✅ Text effects (superscript, subscript, small caps, all caps)
+- ✅ Table structure parsing with properties
+- ✅ Cell and row formatting
+- ✅ Paragraph and run enumeration
+- ✅ Document structure access
+
 ### OOXML (Modern Office Formats)
 - ✅ Full Open Packaging Conventions (OPC) implementation
 - ✅ Parse .docx, .xlsx, .pptx files
@@ -46,7 +59,35 @@ litchi = "0.0.1"
 
 ## Usage
 
-### Parsing Word Documents (.docx)
+### Parsing Legacy Word Documents (.doc)
+
+```rust
+use litchi::ole::doc::Package;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Open a .doc file
+    let mut package = Package::open("document.doc")?;
+    let document = package.document()?;
+    
+    // Extract all text
+    let text = document.text()?;
+    println!("Document text: {}", text);
+    
+    // Get document information
+    let fib = document.fib();
+    println!("Format version: 0x{:04X}", fib.version());
+    println!("Encrypted: {}", fib.is_encrypted());
+    
+    // Iterate through paragraphs
+    for para in document.paragraphs()? {
+        println!("Paragraph: {}", para.text()?);
+    }
+    
+    Ok(())
+}
+```
+
+### Parsing Modern Word Documents (.docx)
 
 ```rust
 use litchi::ooxml::docx::Package;
@@ -142,6 +183,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 Run the included examples:
 
 ```bash
+# Parse a legacy Word document (.doc)
+cargo run --example parse_doc document.doc
+
 # Comprehensive docx parsing with formatting and tables
 cargo run --example docx_comprehensive document.docx
 
@@ -154,7 +198,7 @@ cargo run --example parse_docx document.docx
 # Extract XML content from a .docx file
 cargo run --example extract_xml_content document.docx
 
-# Parse a .doc file (OLE2)
+# Parse OLE2 file structure (low-level)
 cargo run --example test_ole document.doc
 ```
 
@@ -178,7 +222,17 @@ src/
 ├── ole/           # OLE2 format support
 │   ├── file.rs    # OLE file reading
 │   ├── metadata.rs # Directory and stream metadata
-│   └── consts.rs  # OLE constants
+│   ├── consts.rs  # OLE constants
+│   └── doc/       # Legacy Word document support
+│       ├── package.rs     # DOC package wrapper
+│       ├── document.rs    # Document API
+│       ├── paragraph.rs   # Paragraph and Run structures
+│       ├── table.rs       # Table structures
+│       └── parts/         # Binary structure parsers
+│           ├── fib.rs     # File Information Block
+│           ├── text.rs    # Text extraction
+│           ├── chp.rs     # Character Properties
+│           └── tap.rs     # Table Properties
 └── ooxml/         # OOXML format support
     ├── shared.rs  # Shared utilities (Length, RGBColor)
     ├── error.rs   # Error types
@@ -190,7 +244,7 @@ src/
     │   ├── phys_pkg.rs    # Physical package (ZIP) reading
     │   ├── pkgreader.rs   # Package reader with content type mapping
     │   └── package.rs     # Main OpcPackage API
-    ├── docx/      # Word document support
+    ├── docx/      # Modern Word document support
     │   ├── package.rs     # Word package wrapper
     │   ├── document.rs    # Document API
     │   └── parts/         # Document-specific parts
@@ -217,15 +271,31 @@ src/
   - [x] Table, row, and cell iteration
   - [x] Text extraction from paragraphs and cells
 - [x] Document statistics (paragraphs, tables)
+- [x] Legacy Word document (.doc) reading
+  - [x] File Information Block (FIB) parsing
+  - [x] Text extraction via piece table
+  - [x] ANSI and Unicode text support
+  - [x] Character formatting (bold, italic, underline, etc.)
+  - [x] Font properties and text effects
+  - [x] Table structure with properties
+  - [x] Cell and row formatting
+  - [x] Paragraph and run enumeration
 
 ### Planned
-- [ ] Additional Word formatting
+- [ ] Additional DOC features
+  - [ ] Paragraph formatting (alignment, indentation, spacing)
+  - [ ] Style definitions and style hierarchy
+  - [ ] Embedded objects and images
+  - [ ] Headers and footers parsing
+- [ ] Additional DOCX formatting
   - [ ] Paragraph alignment and indentation
   - [ ] Styles and style hierarchy
   - [ ] Text color and highlighting
   - [ ] More underline styles (double, wavy, etc.)
 - [ ] Excel spreadsheet (.xlsx) parsing
+- [ ] Legacy Excel (.xls) parsing
 - [ ] PowerPoint presentation (.pptx) parsing
+- [ ] Legacy PowerPoint (.ppt) parsing
 - [ ] Document writing/modification
 - [ ] Advanced XML element querying
 - [ ] Streaming API for large files
@@ -234,7 +304,18 @@ src/
 
 Licensed under the Apache License, Version 2.0.
 
+## Documentation
+
+- **[OLE Implementation Guide](OLE_IMPLEMENTATION.md)** - Details on OLE2 file format support
+- **[DOC Implementation Guide](DOC_IMPLEMENTATION.md)** - Details on legacy Word document support
+- **[OOXML Implementation Guide](OOXML_IMPLEMENTATION.md)** - Details on OOXML format support
+- **[OOXML API Guide](OOXML_API_GUIDE.md)** - Comprehensive API documentation for OOXML
+- **[DOCX Reading Features](DOCX_READING_FEATURES.md)** - Guide to reading DOCX files
+
 ## Acknowledgments
 
-This implementation is inspired by the excellent [python-docx](https://github.com/python-openxml/python-docx) library, adapted for Rust with performance optimizations.
+This implementation is inspired by:
+- [python-docx](https://github.com/python-openxml/python-docx) - Python library for DOCX files
+- [Apache POI](https://poi.apache.org/) - Java library for Microsoft Office formats
+- Microsoft's official file format specifications
 
