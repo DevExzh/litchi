@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use super::consts::*;
-use super::file::{OleFile, OleError};
+use super::file::{OleError, OleFile};
+use std::collections::HashMap;
 use std::io::{Read, Seek};
 
 /// Metadata extracted from OLE property streams
@@ -80,7 +80,9 @@ impl<R: Read + Seek> OleFile<R> {
 /// to [MS-OLEPS] specification.
 fn parse_property_stream(data: &[u8]) -> Result<HashMap<u32, PropertyValue>, OleError> {
     if data.len() < 48 {
-        return Err(OleError::InvalidFormat("Property stream too short".to_string()));
+        return Err(OleError::InvalidFormat(
+            "Property stream too short".to_string(),
+        ));
     }
 
     let mut properties = HashMap::new();
@@ -89,7 +91,9 @@ fn parse_property_stream(data: &[u8]) -> Result<HashMap<u32, PropertyValue>, Ole
     let section_offset = u32::from_le_bytes([data[44], data[45], data[46], data[47]]) as usize;
 
     if section_offset + 8 > data.len() {
-        return Err(OleError::InvalidFormat("Invalid section offset".to_string()));
+        return Err(OleError::InvalidFormat(
+            "Invalid section offset".to_string(),
+        ));
     }
 
     // Read section size and property count
@@ -126,12 +130,13 @@ fn parse_property_stream(data: &[u8]) -> Result<HashMap<u32, PropertyValue>, Ole
         ]);
 
         // Offset to property value
-        let value_offset = section_offset + u32::from_le_bytes([
-            data[prop_offset + 4],
-            data[prop_offset + 5],
-            data[prop_offset + 6],
-            data[prop_offset + 7],
-        ]) as usize;
+        let value_offset = section_offset
+            + u32::from_le_bytes([
+                data[prop_offset + 4],
+                data[prop_offset + 5],
+                data[prop_offset + 6],
+                data[prop_offset + 7],
+            ]) as usize;
 
         if value_offset + 4 > data.len() {
             continue;
@@ -150,7 +155,11 @@ fn parse_property_stream(data: &[u8]) -> Result<HashMap<u32, PropertyValue>, Ole
 }
 
 /// Parse a single property value based on its type
-fn parse_property_value(data: &[u8], offset: usize, prop_type: u16) -> Result<PropertyValue, OleError> {
+fn parse_property_value(
+    data: &[u8],
+    offset: usize,
+    prop_type: u16,
+) -> Result<PropertyValue, OleError> {
     match prop_type {
         VT_I2 => {
             // 16-bit signed integer
@@ -418,4 +427,3 @@ fn extract_string(value: &PropertyValue) -> Option<String> {
         _ => None,
     }
 }
-

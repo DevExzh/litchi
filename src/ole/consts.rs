@@ -93,4 +93,3 @@ pub const VT_VECTOR: u16 = 0x1000;
 
 /// Common document type: Microsoft Word
 pub const WORD_CLSID: &str = "00020900-0000-0000-C000-000000000046";
-

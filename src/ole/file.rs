@@ -1,8 +1,8 @@
-use std::io::{self, Read, Seek, SeekFrom};
 use super::consts::*;
+use std::io::{self, Read, Seek, SeekFrom};
 
 /// Main OLE file parser structure
-/// 
+///
 /// This struct represents an OLE2 structured storage file and provides
 /// methods to access its contents (streams and storages).
 pub struct OleFile<R: Read + Seek> {
@@ -119,12 +119,18 @@ impl<R: Read + Seek> OleFile<R> {
         let byte_order = u16::from_le_bytes([header[0x1C], header[0x1D]]);
         let sector_shift = u16::from_le_bytes([header[0x1E], header[0x1F]]);
         let mini_sector_shift = u16::from_le_bytes([header[0x20], header[0x21]]);
-        let first_dir_sector = u32::from_le_bytes([header[0x30], header[0x31], header[0x32], header[0x33]]);
-        let mini_stream_cutoff = u32::from_le_bytes([header[0x38], header[0x39], header[0x3A], header[0x3B]]);
-        let first_minifat_sector = u32::from_le_bytes([header[0x3C], header[0x3D], header[0x3E], header[0x3F]]);
-        let num_minifat_sectors = u32::from_le_bytes([header[0x40], header[0x41], header[0x42], header[0x43]]);
-        let first_difat_sector = u32::from_le_bytes([header[0x44], header[0x45], header[0x46], header[0x47]]);
-        let num_difat_sectors = u32::from_le_bytes([header[0x48], header[0x49], header[0x4A], header[0x4B]]);
+        let first_dir_sector =
+            u32::from_le_bytes([header[0x30], header[0x31], header[0x32], header[0x33]]);
+        let mini_stream_cutoff =
+            u32::from_le_bytes([header[0x38], header[0x39], header[0x3A], header[0x3B]]);
+        let first_minifat_sector =
+            u32::from_le_bytes([header[0x3C], header[0x3D], header[0x3E], header[0x3F]]);
+        let num_minifat_sectors =
+            u32::from_le_bytes([header[0x40], header[0x41], header[0x42], header[0x43]]);
+        let first_difat_sector =
+            u32::from_le_bytes([header[0x44], header[0x45], header[0x46], header[0x47]]);
+        let num_difat_sectors =
+            u32::from_le_bytes([header[0x48], header[0x49], header[0x4A], header[0x4B]]);
 
         // Validate byte order (must be little-endian)
         if byte_order != 0xFFFE {
@@ -209,7 +215,7 @@ impl<R: Read + Seek> OleFile<R> {
 
             for _ in 0..num_difat_sectors {
                 let sector_data = self.read_sector(difat_sector)?;
-                
+
                 // Read FAT sector indexes from DIFAT sector
                 for i in 0..entries_per_sector {
                     let offset = i * 4;
@@ -246,7 +252,7 @@ impl<R: Read + Seek> OleFile<R> {
 
         for &sector_id in &fat_sectors {
             let sector_data = self.read_sector(sector_id)?;
-            
+
             // Parse sector as array of u32 (little-endian)
             for i in 0..entries_per_sector {
                 let offset = i * 4;
@@ -267,7 +273,7 @@ impl<R: Read + Seek> OleFile<R> {
     fn load_minifat(&mut self, first_minifat_sector: u32) -> Result<(), OleError> {
         // Read the MiniFAT stream using the FAT
         let minifat_data = self.read_stream_from_fat(first_minifat_sector)?;
-        
+
         // Parse as array of u32 (little-endian)
         let entries_count = minifat_data.len() / 4;
         self.minifat.reserve(entries_count);
@@ -290,7 +296,7 @@ impl<R: Read + Seek> OleFile<R> {
     fn load_directory(&mut self) -> Result<(), OleError> {
         // Read the entire directory stream
         let dir_data = self.read_stream_from_fat(self.first_dir_sector)?;
-        
+
         // Each directory entry is 128 bytes
         let num_entries = dir_data.len() / DIRENTRY_SIZE;
         self.dir_entries = vec![None; num_entries];
@@ -300,7 +306,7 @@ impl<R: Read + Seek> OleFile<R> {
             let root = self.parse_directory_entry(&dir_data[0..DIRENTRY_SIZE], 0)?;
             let root_child_sid = root.sid_child;
             self.root = Some(root);
-            
+
             // Build storage tree starting from root's children
             self.build_storage_tree(root_child_sid, &dir_data)?;
         }
@@ -313,7 +319,7 @@ impl<R: Read + Seek> OleFile<R> {
         // Name: 64 bytes UTF-16LE
         let name_len = u16::from_le_bytes([data[64], data[65]]) as usize;
         let name_bytes = &data[0..name_len.saturating_sub(2).min(64)];
-        
+
         // Decode UTF-16LE to String
         let name = decode_utf16le(name_bytes);
 
@@ -334,7 +340,7 @@ impl<R: Read + Seek> OleFile<R> {
         // Size: 8 bytes at offset 120 (but for 512-byte sectors, only low 4 bytes)
         let size_low = u32::from_le_bytes([data[120], data[121], data[122], data[123]]);
         let size_high = u32::from_le_bytes([data[124], data[125], data[126], data[127]]);
-        
+
         let size = if self.sector_size == 512 {
             size_low as u64
         } else {
@@ -342,8 +348,7 @@ impl<R: Read + Seek> OleFile<R> {
         };
 
         // Determine if stream should use MiniFAT
-        let is_minifat = size < self.mini_stream_cutoff as u64 
-            && entry_type == STGTY_STREAM;
+        let is_minifat = size < self.mini_stream_cutoff as u64 && entry_type == STGTY_STREAM;
 
         Ok(DirectoryEntry {
             sid,
@@ -368,13 +373,16 @@ impl<R: Read + Seek> OleFile<R> {
 
         let sid = child_sid as usize;
         if sid >= dir_data.len() / DIRENTRY_SIZE {
-            return Err(OleError::CorruptedFile("Invalid directory entry index".to_string()));
+            return Err(OleError::CorruptedFile(
+                "Invalid directory entry index".to_string(),
+            ));
         }
 
         // Parse this entry if not already parsed
         if self.dir_entries[sid].is_none() {
             let offset = sid * DIRENTRY_SIZE;
-            let entry = self.parse_directory_entry(&dir_data[offset..offset + DIRENTRY_SIZE], sid as u32)?;
+            let entry =
+                self.parse_directory_entry(&dir_data[offset..offset + DIRENTRY_SIZE], sid as u32)?;
             self.dir_entries[sid] = Some(entry);
         }
 
@@ -419,7 +427,9 @@ impl<R: Read + Seek> OleFile<R> {
             }
 
             if sector >= self.fat.len() as u32 {
-                return Err(OleError::CorruptedFile("Invalid sector index in FAT".to_string()));
+                return Err(OleError::CorruptedFile(
+                    "Invalid sector index in FAT".to_string(),
+                ));
             }
 
             // Read this sector
@@ -434,7 +444,11 @@ impl<R: Read + Seek> OleFile<R> {
     }
 
     /// Read a stream by following the MiniFAT chain
-    fn read_stream_from_minifat(&mut self, start_sector: u32, size: u64) -> Result<Vec<u8>, OleError> {
+    fn read_stream_from_minifat(
+        &mut self,
+        start_sector: u32,
+        size: u64,
+    ) -> Result<Vec<u8>, OleError> {
         // Ensure ministream is loaded
         if self.ministream.is_none() {
             if let Some(ref root) = self.root {
@@ -456,13 +470,17 @@ impl<R: Read + Seek> OleFile<R> {
             }
 
             if sector >= self.minifat.len() as u32 {
-                return Err(OleError::CorruptedFile("Invalid sector index in MiniFAT".to_string()));
+                return Err(OleError::CorruptedFile(
+                    "Invalid sector index in MiniFAT".to_string(),
+                ));
             }
 
             // Calculate position in ministream
             let position = (sector as usize) * self.mini_sector_size;
             if position + self.mini_sector_size > ministream.len() {
-                return Err(OleError::CorruptedFile("Mini sector out of bounds".to_string()));
+                return Err(OleError::CorruptedFile(
+                    "Mini sector out of bounds".to_string(),
+                ));
             }
 
             // Read this mini sector
@@ -489,7 +507,12 @@ impl<R: Read + Seek> OleFile<R> {
     }
 
     /// Recursively collect streams from directory tree
-    fn collect_streams(&self, entry: &DirectoryEntry, path: &mut Vec<String>, streams: &mut Vec<Vec<String>>) {
+    fn collect_streams(
+        &self,
+        entry: &DirectoryEntry,
+        path: &mut Vec<String>,
+        streams: &mut Vec<Vec<String>>,
+    ) {
         // Add current entry to path
         let mut current_path = path.clone();
         if !entry.name.is_empty() && entry.entry_type != STGTY_ROOT {
@@ -573,7 +596,7 @@ impl<R: Read + Seek> OleFile<R> {
         // Traverse path
         for (i, &name) in path.iter().enumerate() {
             let entry = self.find_child_by_name(current_sid, name)?;
-            
+
             // If this is the last component, return it
             if i == path.len() - 1 {
                 return Ok(entry);
@@ -632,7 +655,7 @@ impl<R: Read + Seek> OleFile<R> {
 /// Decode UTF-16LE bytes to String
 fn decode_utf16le(bytes: &[u8]) -> String {
     let mut utf16_chars = Vec::new();
-    
+
     for chunk in bytes.chunks_exact(2) {
         let code_unit = u16::from_le_bytes([chunk[0], chunk[1]]);
         utf16_chars.push(code_unit);
@@ -676,4 +699,3 @@ fn format_clsid(bytes: &[u8]) -> String {
 pub fn is_ole_file(data: &[u8]) -> bool {
     data.len() >= MINIMAL_OLEFILE_SIZE && &data[0..8] == MAGIC
 }
-

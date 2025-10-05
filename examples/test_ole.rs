@@ -1,9 +1,9 @@
+use litchi::ole::{is_ole_file, OleFile};
 use std::fs::File;
-use litchi::ole::{OleFile, is_ole_file};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== OLE File Parser Test ===\n");
-    
+
     // Test 1: Check if file is OLE
     println!("1. Checking if test.doc is an OLE file...");
     let file_data = std::fs::read("test.doc")?;
@@ -13,20 +13,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("   ✗ File is NOT an OLE file\n");
         return Ok(());
     }
-    
+
     // Test 2: Open and parse the file
     println!("2. Opening and parsing OLE file...");
     let file = File::open("test.doc")?;
     let mut ole = OleFile::open(file)?;
     println!("   ✓ Successfully opened and parsed\n");
-    
+
     // Test 3: Get root entry name
     println!("3. Root entry information:");
     if let Some(root_name) = ole.get_root_name() {
         println!("   Root entry name: \"{}\"", root_name);
     }
     println!();
-    
+
     // Test 4: List all streams
     println!("4. Listing all streams in the file:");
     let streams = ole.list_streams();
@@ -36,10 +36,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("   [{}] {}", i + 1, path);
     }
     println!();
-    
+
     // Test 5: Try to read a specific stream
     println!("5. Attempting to read common Office streams:");
-    
+
     // Try WordDocument stream (for .doc files)
     if ole.exists(&["WordDocument"]) {
         println!("   Found WordDocument stream");
@@ -60,7 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("   WordDocument stream not found (may not be a Word document)");
     }
     println!();
-    
+
     // Test 6: Try to extract metadata
     println!("6. Extracting metadata:");
     match ole.get_metadata() {
@@ -100,9 +100,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => println!("   ✗ Failed to extract metadata: {}", e),
     }
     println!();
-    
+
     println!("=== Test completed successfully! ===");
-    
+
     Ok(())
 }
-

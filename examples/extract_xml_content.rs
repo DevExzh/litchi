@@ -4,7 +4,6 @@
 /// - Downcasting parts to XmlPart
 /// - Efficient XML parsing and content extraction
 /// - Using quick-xml for zero-copy parsing
-
 use litchi::ooxml::OpcPackage;
 use std::env;
 
@@ -27,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(main_part) => {
             println!("\n📄 Main Document:");
             println!("   Partname: {}", main_part.partname());
-            
+
             // Get the XML content as a string
             if let Ok(xml_str) = std::str::from_utf8(main_part.blob()) {
                 println!("\n📝 XML Content (first 500 chars):");
@@ -45,17 +44,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // If it's an XML part, we can parse it
             println!("\n🔍 XML Structure Analysis:");
             println!("   Searching for common WordprocessingML elements...");
-            
+
             // Use quick-xml to count elements
-            use quick_xml::Reader;
             use quick_xml::events::Event;
-            
+            use quick_xml::Reader;
+
             let mut reader = Reader::from_reader(main_part.blob());
             reader.config_mut().trim_text(true);
-            
-            let mut element_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+
+            let mut element_counts: std::collections::HashMap<String, usize> =
+                std::collections::HashMap::new();
             let mut buf = Vec::new();
-            
+
             loop {
                 match reader.read_event_into(&mut buf) {
                     Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
@@ -71,12 +71,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 buf.clear();
             }
-            
+
             // Display element statistics
             println!("\n📊 Element Statistics:");
             let mut counts: Vec<_> = element_counts.iter().collect();
             counts.sort_by(|a, b| b.1.cmp(a.1));
-            
+
             for (name, count) in counts.iter().take(10) {
                 println!("   {}: {}", name, count);
             }
@@ -91,12 +91,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Examine other XML parts
     println!("\n🗂️  Other XML Parts:");
-    let xml_parts: Vec<_> = package.iter_parts()
+    let xml_parts: Vec<_> = package
+        .iter_parts()
         .filter(|part| {
             part.content_type().ends_with("+xml") || part.content_type().ends_with("/xml")
         })
         .collect();
-    
+
     println!("   Found {} XML parts total", xml_parts.len());
     for part in xml_parts.iter().take(5) {
         println!("   - {}", part.partname());
@@ -109,4 +110,3 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n✅ Done!");
     Ok(())
 }
-

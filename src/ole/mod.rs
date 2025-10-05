@@ -8,5 +8,5 @@ mod file;
 mod metadata;
 
 // Re-export public types for convenient access
-pub use file::{OleFile, OleError, DirectoryEntry, is_ole_file};
+pub use file::{is_ole_file, DirectoryEntry, OleError, OleFile};
 pub use metadata::{OleMetadata, PropertyValue};

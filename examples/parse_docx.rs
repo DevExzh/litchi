@@ -6,7 +6,6 @@
 /// - Accessing the main document part
 /// - Iterating over parts and relationships
 /// - Efficient XML parsing with zero-copy where possible
-
 use litchi::ooxml::OpcPackage;
 use std::env;
 
@@ -25,17 +24,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Open the OPC package (uses efficient buffered I/O)
     let package = OpcPackage::open(file_path)?;
-    
+
     println!("\n📦 Package Information:");
     println!("   Total parts: {}", package.part_count());
 
     // Display package-level relationships
     println!("\n🔗 Package Relationships:");
     for rel in package.rels().iter() {
-        println!("   {} -> {} ({})", 
+        println!(
+            "   {} -> {} ({})",
             rel.r_id(),
             rel.target_ref(),
-            if rel.is_external() { "external" } else { "internal" }
+            if rel.is_external() {
+                "external"
+            } else {
+                "internal"
+            }
         );
         println!("      Type: {}", rel.reltype());
     }
@@ -47,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("   Partname: {}", main_part.partname());
             println!("   Content Type: {}", main_part.content_type());
             println!("   Size: {} bytes", main_part.blob().len());
-            
+
             // Display part relationships
             let rels_count = main_part.rels().len();
             if rels_count > 0 {
@@ -68,13 +72,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("   {}. {}", i + 1, part.partname());
         println!("      Type: {}", part.content_type());
         println!("      Size: {} bytes", part.blob().len());
-        
+
         // Show extension
         let ext = part.partname().ext();
         if !ext.is_empty() {
             println!("      Extension: .{}", ext);
         }
-        
+
         println!();
     }
 
@@ -87,4 +91,3 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-
