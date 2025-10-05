@@ -1,4 +1,6 @@
 /// DocumentPart - the main document.xml part of a Word document.
+use crate::ooxml::docx::paragraph::Paragraph;
+use crate::ooxml::docx::table::Table;
 use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::opc::part::Part;
 use quick_xml::events::Event;
@@ -127,6 +129,184 @@ impl<'a> DocumentPart<'a> {
         }
 
         Ok(count)
+    }
+
+    /// Get all paragraphs in the document.
+    ///
+    /// Extracts all `<w:p>` elements from the document body.
+    ///
+    /// # Performance
+    ///
+    /// Uses streaming XML parsing to efficiently extract paragraph XML.
+    pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
+        let mut reader = Reader::from_reader(self.xml_bytes());
+        reader.config_mut().trim_text(true);
+
+        let mut paragraphs = Vec::new();
+        let mut current_para_xml = Vec::new();
+        let mut in_para = false;
+        let mut depth = 0;
+        let mut buf = Vec::new();
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(Event::Start(e)) => {
+                    if e.local_name().as_ref() == b"p" && !in_para {
+                        in_para = true;
+                        depth = 1;
+                        current_para_xml.clear();
+                        current_para_xml.extend_from_slice(b"<w:p");
+                        for attr in e.attributes() {
+                            if let Ok(attr) = attr {
+                                current_para_xml.push(b' ');
+                                current_para_xml.extend_from_slice(attr.key.as_ref());
+                                current_para_xml.extend_from_slice(b"=\"");
+                                current_para_xml.extend_from_slice(&attr.value);
+                                current_para_xml.push(b'"');
+                            }
+                        }
+                        current_para_xml.push(b'>');
+                    } else if in_para {
+                        depth += 1;
+                        current_para_xml.push(b'<');
+                        current_para_xml.extend_from_slice(e.name().as_ref());
+                        for attr in e.attributes() {
+                            if let Ok(attr) = attr {
+                                current_para_xml.push(b' ');
+                                current_para_xml.extend_from_slice(attr.key.as_ref());
+                                current_para_xml.extend_from_slice(b"=\"");
+                                current_para_xml.extend_from_slice(&attr.value);
+                                current_para_xml.push(b'"');
+                            }
+                        }
+                        current_para_xml.push(b'>');
+                    }
+                }
+                Ok(Event::End(e)) => {
+                    if in_para {
+                        current_para_xml.extend_from_slice(b"</");
+                        current_para_xml.extend_from_slice(e.name().as_ref());
+                        current_para_xml.push(b'>');
+
+                        depth -= 1;
+                        if depth == 0 && e.local_name().as_ref() == b"p" {
+                            paragraphs.push(Paragraph::new(current_para_xml.clone()));
+                            in_para = false;
+                        }
+                    }
+                }
+                Ok(Event::Text(e)) if in_para => {
+                    current_para_xml.extend_from_slice(e.as_ref());
+                }
+                Ok(Event::Empty(e)) if in_para => {
+                    current_para_xml.push(b'<');
+                    current_para_xml.extend_from_slice(e.name().as_ref());
+                    for attr in e.attributes() {
+                        if let Ok(attr) = attr {
+                            current_para_xml.push(b' ');
+                            current_para_xml.extend_from_slice(attr.key.as_ref());
+                            current_para_xml.extend_from_slice(b"=\"");
+                            current_para_xml.extend_from_slice(&attr.value);
+                            current_para_xml.push(b'"');
+                        }
+                    }
+                    current_para_xml.extend_from_slice(b"/>");
+                }
+                Ok(Event::Eof) => break,
+                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+                _ => {}
+            }
+            buf.clear();
+        }
+
+        Ok(paragraphs)
+    }
+
+    /// Get all tables in the document.
+    ///
+    /// Extracts all `<w:tbl>` elements from the document body.
+    pub fn tables(&self) -> Result<Vec<Table>> {
+        let mut reader = Reader::from_reader(self.xml_bytes());
+        reader.config_mut().trim_text(true);
+
+        let mut tables = Vec::new();
+        let mut current_table_xml = Vec::new();
+        let mut in_table = false;
+        let mut depth = 0;
+        let mut buf = Vec::new();
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(Event::Start(e)) => {
+                    if e.local_name().as_ref() == b"tbl" && !in_table {
+                        in_table = true;
+                        depth = 1;
+                        current_table_xml.clear();
+                        current_table_xml.extend_from_slice(b"<w:tbl");
+                        for attr in e.attributes() {
+                            if let Ok(attr) = attr {
+                                current_table_xml.push(b' ');
+                                current_table_xml.extend_from_slice(attr.key.as_ref());
+                                current_table_xml.extend_from_slice(b"=\"");
+                                current_table_xml.extend_from_slice(&attr.value);
+                                current_table_xml.push(b'"');
+                            }
+                        }
+                        current_table_xml.push(b'>');
+                    } else if in_table {
+                        depth += 1;
+                        current_table_xml.push(b'<');
+                        current_table_xml.extend_from_slice(e.name().as_ref());
+                        for attr in e.attributes() {
+                            if let Ok(attr) = attr {
+                                current_table_xml.push(b' ');
+                                current_table_xml.extend_from_slice(attr.key.as_ref());
+                                current_table_xml.extend_from_slice(b"=\"");
+                                current_table_xml.extend_from_slice(&attr.value);
+                                current_table_xml.push(b'"');
+                            }
+                        }
+                        current_table_xml.push(b'>');
+                    }
+                }
+                Ok(Event::End(e)) => {
+                    if in_table {
+                        current_table_xml.extend_from_slice(b"</");
+                        current_table_xml.extend_from_slice(e.name().as_ref());
+                        current_table_xml.push(b'>');
+
+                        depth -= 1;
+                        if depth == 0 && e.local_name().as_ref() == b"tbl" {
+                            tables.push(Table::new(current_table_xml.clone()));
+                            in_table = false;
+                        }
+                    }
+                }
+                Ok(Event::Text(e)) if in_table => {
+                    current_table_xml.extend_from_slice(e.as_ref());
+                }
+                Ok(Event::Empty(e)) if in_table => {
+                    current_table_xml.push(b'<');
+                    current_table_xml.extend_from_slice(e.name().as_ref());
+                    for attr in e.attributes() {
+                        if let Ok(attr) = attr {
+                            current_table_xml.push(b' ');
+                            current_table_xml.extend_from_slice(attr.key.as_ref());
+                            current_table_xml.extend_from_slice(b"=\"");
+                            current_table_xml.extend_from_slice(&attr.value);
+                            current_table_xml.push(b'"');
+                        }
+                    }
+                    current_table_xml.extend_from_slice(b"/>");
+                }
+                Ok(Event::Eof) => break,
+                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+                _ => {}
+            }
+            buf.clear();
+        }
+
+        Ok(tables)
     }
 }
 

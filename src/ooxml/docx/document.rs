@@ -1,5 +1,7 @@
-use crate::ooxml::docx::parts::DocumentPart;
 /// Document - the main API for working with Word document content.
+use crate::ooxml::docx::paragraph::Paragraph;
+use crate::ooxml::docx::parts::DocumentPart;
+use crate::ooxml::docx::table::Table;
 use crate::ooxml::error::Result;
 
 /// A Word document.
@@ -100,51 +102,72 @@ impl<'a> Document<'a> {
         &self.part
     }
 
+    /// Get all paragraphs in the document.
+    ///
+    /// Returns a vector of `Paragraph` objects representing all `<w:p>`
+    /// elements in the document body.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::docx::Package;
+    ///
+    /// let pkg = Package::open("document.docx")?;
+    /// let doc = pkg.document()?;
+    ///
+    /// for para in doc.paragraphs()? {
+    ///     println!("Paragraph: {}", para.text()?);
+    ///     
+    ///     // Access runs within the paragraph
+    ///     for run in para.runs()? {
+    ///         println!("  Run: {} (bold: {:?})", run.text()?, run.bold()?);
+    ///     }
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
+        self.part.paragraphs()
+    }
+
+    /// Get all tables in the document.
+    ///
+    /// Returns a vector of `Table` objects representing all `<w:tbl>`
+    /// elements in the document body.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::docx::Package;
+    ///
+    /// let pkg = Package::open("document.docx")?;
+    /// let doc = pkg.document()?;
+    ///
+    /// for table in doc.tables()? {
+    ///     println!("Table with {} rows", table.row_count()?);
+    ///     
+    ///     for (row_idx, row) in table.rows()?.iter().enumerate() {
+    ///         for (col_idx, cell) in row.cells()?.iter().enumerate() {
+    ///             println!("Cell [{},{}]: {}", row_idx, col_idx, cell.text()?);
+    ///         }
+    ///     }
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn tables(&self) -> Result<Vec<Table>> {
+        self.part.tables()
+    }
+
     // TODO: Add more methods:
-    // - paragraphs() -> Iterator<Paragraph>
-    // - tables() -> Iterator<Table>
     // - sections() -> Iterator<Section>
     // - styles() -> Styles
-    // - add_paragraph() -> Paragraph
-    // - add_table() -> Table
-    // - save()
+    // - add_paragraph() -> Paragraph (writing support)
+    // - add_table() -> Table (writing support)
+    // - save() (writing support)
 }
 
-/// A paragraph in a Word document.
-///
-/// Represents a `<w:p>` element in the document XML.
-///
-/// # Future API
-///
-/// ```rust,ignore
-/// impl Paragraph {
-///     pub fn text(&self) -> String;
-///     pub fn runs(&self) -> impl Iterator<Item = Run>;
-///     pub fn style(&self) -> Option<&str>;
-///     pub fn add_run(&mut self, text: &str) -> Run;
-/// }
-/// ```
-pub struct Paragraph {
-    // TODO: Implement paragraph structure
-}
-
-/// A table in a Word document.
-///
-/// Represents a `<w:tbl>` element in the document XML.
-///
-/// # Future API
-///
-/// ```rust,ignore
-/// impl Table {
-///     pub fn rows(&self) -> impl Iterator<Item = Row>;
-///     pub fn row_count(&self) -> usize;
-///     pub fn column_count(&self) -> usize;
-///     pub fn cell(&self, row: usize, col: usize) -> Option<Cell>;
-/// }
-/// ```
-pub struct Table {
-    // TODO: Implement table structure
-}
+// Note: Paragraph, Run, Table, Row, Cell are now in separate modules:
+// - paragraph.rs: Paragraph and Run
+// - table.rs: Table, Row, Cell
 
 /// A section in a Word document.
 ///

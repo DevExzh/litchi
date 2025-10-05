@@ -13,10 +13,13 @@ A high-performance Rust library for parsing Microsoft Office file formats, inclu
 ### OOXML (Modern Office Formats)
 - ✅ Full Open Packaging Conventions (OPC) implementation
 - ✅ Parse .docx, .xlsx, .pptx files
-- ✅ High-level Word document (.docx) API
-  - Extract text content
-  - Count paragraphs and tables
-  - Access document structure
+- ✅ Comprehensive Word document (.docx) API
+  - **Full paragraph iteration** with run-level access
+  - **Run formatting**: bold, italic, underline, font name, font size
+  - **Table iteration**: rows, cells, and nested content
+  - **Text extraction**: fast text content extraction
+  - Document statistics (paragraph count, table count)
+  - Access to document structure
 - ✅ Content type management
 - ✅ Relationship resolution
 - ✅ Efficient ZIP-based package reading
@@ -60,6 +63,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get document statistics
     println!("Paragraphs: {}", document.paragraph_count()?);
     println!("Tables: {}", document.table_count()?);
+    
+    // Iterate through paragraphs and runs with formatting
+    for para in document.paragraphs()? {
+        println!("Paragraph: {}", para.text()?);
+        
+        for run in para.runs()? {
+            println!("  Run: \"{}\"", run.text()?);
+            println!("    Bold: {:?}", run.bold()?);
+            println!("    Italic: {:?}", run.italic()?);
+            println!("    Font: {:?}", run.font_name()?);
+        }
+    }
+    
+    // Iterate through tables
+    for table in document.tables()? {
+        println!("Table: {} rows × {} cols", 
+                 table.row_count()?, table.column_count()?);
+        
+        for row in table.rows()? {
+            for cell in row.cells()? {
+                println!("Cell: {}", cell.text()?);
+            }
+        }
+    }
     
     Ok(())
 }
@@ -115,6 +142,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 Run the included examples:
 
 ```bash
+# Comprehensive docx parsing with formatting and tables
+cargo run --example docx_comprehensive document.docx
+
 # Parse a .docx file using the high-level OOXML API
 cargo run --example parse_docx_ooxml document.docx
 
@@ -180,16 +210,20 @@ src/
 
 ### Completed
 - [x] OPC (Open Packaging Conventions) implementation
-- [x] Basic Word document (.docx) API
-- [x] Text extraction from Word documents
+- [x] Full Word document (.docx) reading API
+  - [x] Paragraph iteration
+  - [x] Run iteration with formatting (bold, italic, underline)
+  - [x] Font properties (name, size)
+  - [x] Table, row, and cell iteration
+  - [x] Text extraction from paragraphs and cells
 - [x] Document statistics (paragraphs, tables)
 
-### In Progress
-- [ ] Full Word document API (runs, styles, formatting)
-- [ ] Paragraph and table iteration
-- [ ] Style and formatting access
-
 ### Planned
+- [ ] Additional Word formatting
+  - [ ] Paragraph alignment and indentation
+  - [ ] Styles and style hierarchy
+  - [ ] Text color and highlighting
+  - [ ] More underline styles (double, wavy, etc.)
 - [ ] Excel spreadsheet (.xlsx) parsing
 - [ ] PowerPoint presentation (.pptx) parsing
 - [ ] Document writing/modification
