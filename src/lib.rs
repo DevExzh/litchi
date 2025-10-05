@@ -7,6 +7,7 @@
 //!
 //! - **OLE2 Parser**: Parse legacy Microsoft Office files (.doc, .xls, .ppt)
 //! - **DOC Reader**: Parse legacy Word documents (.doc)
+//! - **PPT Reader**: Parse legacy PowerPoint presentations (.ppt)
 //! - **OOXML Parser**: Parse modern Office files (.docx, .xlsx, .pptx)
 //! - **Zero-copy parsing**: Minimizes memory allocations for better performance
 //! - **Metadata extraction**: Extract document properties and metadata
@@ -50,6 +51,28 @@
 //! # }
 //! ```
 //!
+//! # Example - Reading a PPT file
+//!
+//! ```no_run
+//! use litchi::ole::ppt::Package;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! // Open a .ppt file
+//! let mut pkg = Package::open("presentation.ppt")?;
+//! let pres = pkg.presentation()?;
+//!
+//! // Extract all text
+//! let text = pres.text()?;
+//! println!("Presentation text: {}", text);
+//!
+//! // Access slides
+//! for slide in pres.slides()? {
+//!     println!("Slide: {}", slide.text()?);
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
 //! # Example - Low-level OLE access
 //!
 //! ```no_run
@@ -88,3 +111,9 @@ pub mod ole;
 /// This module provides functionality to parse modern Office formats
 /// (.docx, .xlsx, .pptx).
 pub mod ooxml;
+
+// Re-export commonly used types for convenience
+pub use ole::{doc, ppt};
+
+// Re-export shape types for PPT
+pub use ole::ppt::{shapes, Shape, TextBox, Placeholder, PlaceholderType, PlaceholderSize, AutoShape};
