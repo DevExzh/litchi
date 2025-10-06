@@ -31,6 +31,14 @@ impl EscherTextboxWrapper {
         // Extract text from text records
         let text = Self::extract_text_from_records(&child_records)?;
 
+        // If no text records were found, this might be raw text data
+        // that should be handled by the fallback in parse_text_record
+        if text.is_empty() && !child_records.is_empty() {
+            return Err(super::package::PptError::InvalidFormat(
+                "No text records found in Escher textbox data".to_string()
+            ));
+        }
+
         Ok(Self {
             data,
             child_records,

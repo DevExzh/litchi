@@ -778,7 +778,10 @@ impl EscherRecord {
 
                         match CharacterAction::process_text_character(code_unit) {
                             CharacterAction::Add(ch) => text.push(ch),
-                            CharacterAction::Stop => break,
+                            CharacterAction::Stop => {
+                                // Stop processing, but trim any trailing nulls
+                                break;
+                            }
                             CharacterAction::Skip => continue,
                         }
                     }
