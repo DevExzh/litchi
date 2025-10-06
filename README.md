@@ -28,42 +28,36 @@ let slide_count = pres.slide_count()?;
 
 ### 📄 Word Document Support
 
-#### Legacy (.doc) - Complete Implementation
+#### Legacy (.doc) - Basic Implementation
 - ✅ **File Information Block (FIB) parsing** - Based on Apache POI's HWPF
-- ✅ **Text extraction via piece table** - Handles complex binary structures
-- ✅ **Character formatting** - Bold, italic, underline, strikethrough, font size, color
-- ✅ **Font properties** - Font index, size, color, highlighting
-- ✅ **Text effects** - Superscript, subscript, small caps, all caps
-- ✅ **Table structure parsing** - Complete table, row, and cell support
-- ✅ **Table properties** - Justification, row height, cell formatting, borders
+- ✅ **Text extraction via piece table** - Basic text content extraction
+- ✅ **Basic character formatting** - Bold, italic, underline, font size, color
+- ✅ **Basic table structure** - Simple table, row, and cell access
 - ✅ **Paragraph enumeration** - Access to paragraphs and text runs
 - ✅ **ANSI & Unicode support** - Windows-1252 and UTF-16LE text decoding
 
-#### Modern (.docx) - Complete Implementation
-- ✅ **Full paragraph iteration** with run-level access
-- ✅ **Run formatting** - Bold, italic, underline, font name, font size
-- ✅ **Table iteration** - Rows, cells, and nested content
-- ✅ **Text extraction** - Fast text content extraction from XML
-- ✅ **Document statistics** - Paragraph count, table count, structure info
+#### Modern (.docx) - Basic Implementation
+- ✅ **Basic paragraph iteration** with run-level access
+- ✅ **Basic run formatting** - Bold, italic, underline, font name, font size
+- ✅ **Basic table iteration** - Simple table structure access
+- ✅ **Text extraction** - Basic text content extraction from XML
+- ✅ **Document statistics** - Paragraph count, table count
 
 ### 📊 PowerPoint Presentation Support
 
-#### Legacy (.ppt) - Complete Implementation
-- ✅ **Complete POI-based parsing** - Full Apache POI compatibility
-- ✅ **Text extraction** - From slides, text boxes, and shapes
-- ✅ **Placeholder support** - Proper OEPlaceholderAtom parsing
-- ✅ **Text property system** - TextProp/TextPropCollection implementation
-- ✅ **EscherTextboxWrapper** - Child record parsing from Escher data
-- ✅ **StyleTextPropAtom parsing** - Complete styling information extraction
+#### Legacy (.ppt) - Basic Implementation
+- ✅ **Basic POI-based parsing** - Essential Apache POI compatibility
+- ✅ **Text extraction** - From slides and text boxes
+- ✅ **Basic placeholder support** - Simple OEPlaceholderAtom parsing
+- ✅ **Basic text properties** - TextProp/TextPropCollection implementation
+- ✅ **Basic Escher parsing** - Child record parsing from Escher data
 
-#### Modern (.pptx) - Complete Implementation
-- ✅ **Full presentation API** - Slides, slide masters, layouts
-- ✅ **Shape support** - Text shapes, pictures, tables, graphic frames
-- ✅ **Text frame parsing** - Paragraph and text run extraction
-- ✅ **Table parsing** - Complete table structure from DrawingML
-- ✅ **Picture support** - Image relationship tracking
-- ✅ **Placeholder detection** - Identifies placeholder shapes
-- ✅ **Position and size** - EMU-based geometry information
+#### Modern (.pptx) - Basic Implementation
+- ✅ **Basic presentation API** - Slides and basic slide access
+- ✅ **Basic shape support** - Text shapes and pictures
+- ✅ **Basic text frame parsing** - Simple paragraph and text run extraction
+- ✅ **Basic table parsing** - Simple table structure access
+- ✅ **Basic picture support** - Image relationship tracking
 
 ### 🔧 Low-Level APIs (Advanced Use)
 
@@ -462,22 +456,135 @@ src/
 
 ### ✅ Completed (Production-Ready)
 - [x] **Unified API** with automatic format detection
-- [x] **Complete DOC support** - Full Apache POI HWPF parity
-- [x] **Complete DOCX support** - Full document parsing with formatting
-- [x] **Complete PPT support** - Full Apache POI HSLF parity
-- [x] **Complete PPTX support** - Full presentation parsing with shapes
+- [x] **Basic DOC support** - Essential text extraction and formatting
+- [x] **Basic DOCX support** - Essential document parsing with basic formatting
+- [x] **Basic PPT support** - Essential slide text extraction
+- [x] **Basic PPTX support** - Essential presentation parsing with basic shapes
 - [x] **Memory-efficient parsing** - `from_bytes()` methods for all formats
-- [x] **Shape API for PPTX** - Text shapes, tables, pictures, placeholders
-- [x] **Character formatting** - Bold, italic, underline, colors, fonts
-- [x] **Table support** - Complete table, row, cell parsing with properties
+- [x] **Basic character formatting** - Bold, italic, underline, colors, fonts
+- [x] **Basic table support** - Simple table, row, cell parsing
 
-### 🚧 Future Enhancements
-- [ ] **Excel support** - .xlsx and .xls parsing
-- [ ] **Advanced formatting** - Styles, themes, complex layouts
-- [ ] **Document writing** - Create and modify Office documents
+### 🚧 Current Limitations
+- **Text extraction only** - No document creation or modification capabilities
+- **Basic formatting support** - Missing advanced formatting, styles, themes
+- **No Excel support** - .xls and .xlsx files not supported
+- **No Outlook support** - .msg files not supported
+- **No Publisher support** - .pub files not supported
+- **No Visio support** - .vsd and .vsdx files not supported
+- **No formula evaluation** - Cannot calculate Excel formulas
+- **No charts/graphs** - Cannot extract or process embedded charts
+- **No headers/footers** - Word/PowerPoint headers and footers not supported
+- **No embedded objects** - Cannot extract embedded files/objects
+
+### 🚧 Immediate Enhancements (DOC/DOCX/PPT/PPTX)
+
+#### 📄 Enhanced Word Document Support (DOC/DOCX)
+- [ ] **Headers and footers** - Extract and process document headers/footers
+- [ ] **Document sections** - Parse section breaks and properties
+- [ ] **Page formatting** - Margins, page size, orientation, columns
+- [ ] **Advanced text formatting** - Spacing, indentation, line height, tabs
+- [ ] **Lists and numbering** - Bulleted and numbered lists
+- [ ] **Hyperlinks** - Extract and process document hyperlinks
+- [ ] **Bookmarks** - Parse bookmark locations and references
+- [ ] **Fields** - Extract field codes and results (dates, page numbers, etc.)
+- [ ] **Comments** - Extract document comments and annotations
+- [ ] **Revisions** - Track changes and revision history
+- [ ] **Document properties** - Custom properties and metadata extraction
+- [ ] **Embedded objects** - Extract embedded Excel, PowerPoint, images
+- [ ] **Drawing objects** - Shapes, diagrams, and drawing elements
+- [ ] **Styles and themes** - Document themes, character/paragraph styles
+
+#### 📊 Enhanced PowerPoint Presentation Support (PPT/PPTX)
+- [ ] **Slide masters and layouts** - Master slide and layout parsing
+- [ ] **Animation and transitions** - Slide animations and transitions
+- [ ] **Notes and comments** - Speaker notes and slide comments
+- [ ] **Hyperlinks** - Extract and process presentation hyperlinks
+- [ ] **Media objects** - Audio, video, and other embedded media
+- [ ] **Charts and graphs** - Extract embedded charts and data
+- [ ] **SmartArt** - Parse SmartArt diagrams and structures
+- [ ] **Headers and footers** - Presentation headers and footers
+- [ ] **Slide numbers** - Extract slide numbering information
+- [ ] **Custom shows** - Parse custom presentation shows
+- [ ] **Slide properties** - Background, theme, and layout properties
+- [ ] **Embedded objects** - Extract embedded files and objects
+
+#### 📊 Excel Spreadsheet Support
+- [ ] **Excel .xls (HSSF) support** - Parse Excel 97-2003 binary format files
+- [ ] **Excel .xlsx (XSSF) support** - Parse Excel 2007+ OOXML format files
+- [ ] **Formula evaluation** - Calculate Excel formulas and expressions
+- [ ] **Cell formatting** - Number formats, borders, background colors, fonts
+- [ ] **Named ranges** - Support for Excel named ranges and references
+- [ ] **Charts and graphs** - Extract and process Excel chart data
+- [ ] **Pivot tables** - Parse Excel pivot table structures
+- [ ] **Conditional formatting** - Extract conditional formatting rules
+- [ ] **Data validation** - Parse data validation constraints
+- [ ] **Merged cells** - Handle merged cell ranges correctly
+- [ ] **Excel streaming API** - Process very large Excel files efficiently
+
+#### 📧 Outlook MSG Support
+- [ ] **Outlook .msg parsing** - Extract email properties, headers, body content
+- [ ] **Email attachments** - Extract and process embedded attachments
+- [ ] **Email metadata** - From, To, CC, BCC, Subject, Date fields
+- [ ] **Email body formats** - Plain text, HTML, and RTF body extraction
+- [ ] **Email headers** - Process email headers and custom properties
+
+#### 📄 Publisher Document Support
+- [ ] **Publisher .pub parsing** - Extract text and layout from Publisher files
+- [ ] **Publisher text extraction** - Extract text content from PUB documents
+- [ ] **Publisher layout info** - Parse page layout and formatting information
+
+#### 🎯 Visio Diagram Support
+- [ ] **Visio .vsd parsing** - Parse legacy Visio binary format files
+- [ ] **Visio .vsdx parsing** - Parse modern Visio OOXML format files
+- [ ] **Visio shapes** - Extract shapes, connectors, and diagram elements
+- [ ] **Visio text extraction** - Extract text from Visio diagrams
+- [ ] **Visio metadata** - Parse Visio document properties
+
+#### ✏️ Document Creation and Writing
+- [ ] **Document writing API** - Create new Office documents programmatically
+- [ ] **Word document creation** - Generate .doc and .docx files from scratch
+- [ ] **Excel workbook creation** - Create .xls and .xlsx files with data
+- [ ] **PowerPoint presentation creation** - Generate .ppt and .pptx presentations
+- [ ] **Content modification** - Modify existing Office documents
+
+#### 🎨 Advanced Formatting and Styling
+- [ ] **Style sheets** - Extract and apply document styles and themes
+- [ ] **Advanced text formatting** - Complex text effects, spacing, indentation
+- [ ] **Theme support** - Office theme colors, fonts, and effects
+- [ ] **Table styling** - Advanced table formatting and borders
+- [ ] **Conditional formatting** - Word/PowerPoint conditional formatting
+
+#### 🖼️ Media and Image Processing
 - [ ] **Image extraction** - Extract embedded images from documents
-- [ ] **Streaming API** - Process very large files efficiently
-- [ ] **Advanced queries** - XPath-like XML querying capabilities
+- [ ] **Image conversion** - Convert Office images to standard formats
+- [ ] **Media embedding** - Extract audio/video from presentations
+- [ ] **Chart extraction** - Extract charts as images or data
+
+#### 🔍 Advanced Query and Processing
+- [ ] **XPath-like queries** - Query document structure using XPath expressions
+- [ ] **Content search** - Full-text search across document content
+- [ ] **Regular expressions** - Regex-based content matching
+- [ ] **Metadata extraction** - Comprehensive document metadata parsing
+- [ ] **Custom properties** - Extract custom document properties
+
+#### ⚡ Performance and Scalability
+- [ ] **Streaming API** - Process very large files without loading entirely in memory
+- [ ] **Parallel processing** - Multi-threaded document processing
+- [ ] **Memory mapping** - Memory-mapped file I/O for large documents
+- [ ] **Incremental parsing** - Parse documents incrementally for better performance
+- [ ] **Compression support** - Handle compressed Office files efficiently
+
+#### 🔒 Security and Encryption
+- [ ] **Password protection** - Support for password-protected Office files
+- [ ] **Digital signatures** - Verify and extract digital signatures
+- [ ] **Encryption handling** - Decrypt encrypted Office documents
+- [ ] **Macro extraction** - Extract VBA macros from Office files
+
+#### 🌐 Internationalization
+- [ ] **Unicode support** - Enhanced Unicode and internationalization support
+- [ ] **Font fallback** - Better font handling for international text
+- [ ] **Language detection** - Detect document language automatically
+- [ ] **Locale-specific formatting** - Handle locale-specific number and date formats
 
 ## License
 
