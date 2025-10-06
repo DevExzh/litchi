@@ -22,6 +22,43 @@ pub struct PptRecord {
     pub children: Vec<PptRecord>,
 }
 
+/// Actions for processing UTF-16LE text characters.
+#[derive(Debug, Clone, Copy)]
+enum TextCharAction {
+    /// Add the character to the result
+    Add(char),
+    /// Stop processing (null terminator found)
+    Stop,
+    /// Skip this character (invalid)
+    Skip,
+}
+
+impl TextCharAction {
+    /// Process a UTF-16LE code unit and determine the appropriate action.
+    fn process_utf16_char(code_unit: u16) -> Self {
+        match code_unit {
+            // Null terminator - stop processing
+            0 => TextCharAction::Stop,
+            // ASCII range (0x00-0x7F) - add as character
+            0x01..=0x7F => {
+                if let Some(ch) = char::from_u32(code_unit as u32) {
+                    TextCharAction::Add(ch)
+                } else {
+                    TextCharAction::Skip
+                }
+            }
+            // Unicode range (0x80 and above) - try to decode as Unicode
+            0x80.. => {
+                if let Some(ch) = char::from_u32(code_unit as u32) {
+                    TextCharAction::Add(ch)
+                } else {
+                    TextCharAction::Skip
+                }
+            }
+        }
+    }
+}
+
 impl PptRecord {
     /// Parse a PPT record from binary data.
     ///
@@ -54,7 +91,7 @@ impl PptRecord {
         let instance = version_instance & 0x0FFF;        // Low 12 bits for instance
 
         let record_type_enum = PptRecordType::from(record_type);
-        let total_size = 8 + data_length as usize;
+        let _total_size = 8 + data_length as usize;
 
         // Improved bounds checking: allow for truncated records at end of data
         // Only fail if we don't have the complete header or if the record claims
@@ -188,14 +225,14 @@ impl PptRecord {
         }
 
         // Find Environment record
-        if let Some(env) = self.find_child(PptRecordType::Environment) {
+        if let Some(_env) = self.find_child(PptRecordType::Environment) {
             // Parse environment information
             // This would include slide size, color scheme, etc.
             info.has_environment = true;
         }
 
         // Find PPDrawingGroup record
-        if let Some(pp_drawing_group) = self.find_child(PptRecordType::PPDrawingGroup) {
+        if let Some(_pp_drawing_group) = self.find_child(PptRecordType::PPDrawingGroup) {
             info.has_drawing_group = true;
         }
 
@@ -341,6 +378,7 @@ impl PptRecord {
         Ok(text)
     }
 
+
     /// Convert UTF-16LE bytes to String (lossy conversion).
     /// This follows POI's StringUtil.getFromUnicodeLE logic.
     /// Optimized for performance with minimal allocations.
@@ -359,21 +397,11 @@ impl PptRecord {
             let code_unit = unsafe { u16::from_le_bytes(*(&bytes[i..i + 2] as *const [u8] as *const [u8; 2])) };
             i += 2;
 
-            // Stop at null terminator
-            if code_unit == 0 {
-                break;
-            }
-
-            // Handle basic ASCII range and common Unicode characters
-            if code_unit <= 0x7F {
-                if let Some(ch) = char::from_u32(code_unit as u32) {
-                    result.push(ch);
-                }
-            } else if code_unit >= 0x80 {
-                // For non-ASCII characters, try to decode as Unicode
-                if let Some(ch) = char::from_u32(code_unit as u32) {
-                    result.push(ch);
-                }
+            // Use match expression for cleaner character processing
+            match TextCharAction::process_utf16_char(code_unit) {
+                TextCharAction::Add(ch) => result.push(ch),
+                TextCharAction::Stop => break,
+                TextCharAction::Skip => continue,
             }
         }
 
@@ -575,23 +603,37 @@ impl PptRecordParser {
                     break; // Stop parsing if we can't parse a record
                 }
             } else {
-                // This is a PPT record, skip for now (would need full PPT record parser)
-                let data_length = if offset + 6 <= slide_data.len() {
-                    u32::from_le_bytes([
-                        slide_data[offset + 2],
-                        slide_data[offset + 3],
-                        slide_data[offset + 4],
-                        slide_data[offset + 5],
-                    ])
-                } else {
-                    break;
-                };
+                // This is a PPT record - parse it using PptRecord parser
+                match PptRecord::parse(slide_data, offset) {
+                    Ok((ppt_record, consumed)) => {
+                        // Extract text from PPT record
+                        if let Ok(ppt_text) = ppt_record.extract_text() {
+                            if !ppt_text.is_empty() {
+                                text_parts.push(ppt_text);
+                            }
+                        }
+                        offset += consumed;
+                    }
+                    Err(_) => {
+                        // If parsing fails, try to skip the record gracefully
+                        let data_length = if offset + 6 <= slide_data.len() {
+                            u32::from_le_bytes([
+                                slide_data[offset + 2],
+                                slide_data[offset + 3],
+                                slide_data[offset + 4],
+                                slide_data[offset + 5],
+                            ])
+                        } else {
+                            break;
+                        };
 
-                let total_size = 8 + data_length as usize;
-                if offset + total_size > slide_data.len() {
-                    break;
+                        let total_size = 8 + data_length as usize;
+                        if offset + total_size > slide_data.len() {
+                            break;
+                        }
+                        offset += total_size;
+                    }
                 }
-                offset += total_size;
             }
         }
 

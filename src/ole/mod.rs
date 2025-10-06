@@ -7,6 +7,18 @@ mod file;
 /// Metadata extraction from OLE property streams
 mod metadata;
 
+/// Shared binary parsing utilities
+///
+/// Common binary parsing functions used across DOC, PPT, and other OLE formats.
+/// Based on Apache POI's LittleEndian and utility classes.
+pub mod binary;
+
+/// Shared SPRM (Single Property Modifier) parsing
+///
+/// SPRM parsing logic shared between DOC and PPT formats.
+/// Based on Apache POI's SPRM handling.
+pub mod sprm;
+
 /// Legacy Word document (.doc) reader
 ///
 /// This module provides functionality to parse Microsoft Word documents

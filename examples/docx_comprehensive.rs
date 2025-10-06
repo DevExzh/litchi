@@ -60,7 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Iterate through runs
         let runs = para.runs()?;
-        if runs.len() > 0 {
+        if !runs.is_empty() {
             println!("  Runs: {}", runs.len());
             for (run_idx, run) in runs.iter().enumerate().take(3) {
                 let run_text = run.text()?;

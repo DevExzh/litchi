@@ -4,6 +4,9 @@
 /// for titles, bullet points, and other text elements in PowerPoint slides.
 use super::shape::{Shape, ShapeProperties, ShapeContainer};
 
+/// Type alias for text formatting tuple to reduce complexity.
+type TextFormattingResult = (Option<u16>, Option<u32>, bool, bool, bool);
+
 /// A text box shape in a PowerPoint presentation.
 #[derive(Debug, Clone)]
 pub struct TextBox {
@@ -83,7 +86,7 @@ impl TextBox {
 
     /// Extract text formatting information from Escher records.
     /// This follows POI's text formatting parsing logic.
-    fn extract_text_formatting(record: &super::escher::EscherRecord) -> super::super::package::Result<(Option<u16>, Option<u32>, bool, bool, bool)> {
+    fn extract_text_formatting(record: &super::escher::EscherRecord) -> super::super::package::Result<TextFormattingResult> {
         let mut font_size = None;
         let mut font_color = None;
         let mut bold = false;
@@ -92,7 +95,7 @@ impl TextBox {
 
         // Extract from Escher properties if available (Options record)
         if !record.properties.is_empty() {
-            let prop_values = record.extract_property_values();
+            let _prop_values = record.extract_property_values();
 
             // Check for font size (0x20000)
             if let Some(size_prop) = record.find_property(0x20000u32) {
@@ -125,7 +128,8 @@ impl TextBox {
     }
 
     /// Parse StyleTextPropAtom record for text formatting.
-    /// This is a simplified implementation of POI's StyleTextPropAtom parsing.
+    ///
+    /// Based on POI's StyleTextPropAtom parsing using TextPropCollection.
     fn parse_style_text_prop_atom(
         record: &super::escher::EscherRecord,
         font_size: &mut Option<u16>,
@@ -134,31 +138,35 @@ impl TextBox {
         italic: &mut bool,
         underline: &mut bool,
     ) -> super::super::package::Result<()> {
-        // StyleTextPropAtom contains paragraph and character style collections
-        // For now, implement basic parsing of character styles
-
         if record.data.len() < 4 {
             return Ok(()); // Not enough data
         }
 
-        // Skip header and parse character styles
-        // POI has complex logic here involving TextPropCollection parsing
-        // This is a simplified implementation
+        // Use the proper text_prop module to parse StyleTextPropAtom
+        // This follows POI's TextPropCollection parsing logic
+        let (_paragraph_styles, character_styles) = super::super::text_prop::parse_style_text_prop_atom(
+            &record.data,
+            100, // Default text length - will be adjusted by actual text length
+        );
 
-        // Look for common character properties in the data
-        // Font size (2 bytes, little-endian)
-        if record.data.len() >= 6 {
-            let size_val = u16::from_le_bytes([record.data[4], record.data[5]]);
-            if size_val > 0 {
-                *font_size = Some(size_val);
+        // Extract formatting from the first character style collection
+        if let Some(char_style) = character_styles.first() {
+            // Font size
+            if let Some(size) = char_style.get_value("font.size") {
+                *font_size = Some(size as u16);
             }
-        }
 
-        // Font color (4 bytes, little-endian) - if present
-        if record.data.len() >= 10 {
-            let color_val = u32::from_le_bytes([record.data[6], record.data[7], record.data[8], record.data[9]]);
-            if color_val != 0 {
-                *font_color = Some(color_val);
+            // Font color
+            if let Some(color) = char_style.get_value("font.color") {
+                *font_color = Some(color as u32);
+            }
+
+            // Character flags (bold, italic, underline)
+            if let Some(flags) = char_style.get_value("char.flags") {
+                let (b, i, u) = super::super::text_prop::extract_char_flags(flags);
+                *bold = b;
+                *italic = i;
+                *underline = u;
             }
         }
 
@@ -177,28 +185,25 @@ impl TextBox {
 
         // For now, implement basic font extraction from text-related child records
         for child in &record.children {
-            match child.record_type {
-                super::escher::EscherRecordType::TextProperties => {
-                    // Try to extract font info from text properties
-                    if child.data.len() >= 8 {
-                        // Extract font size if available
-                        if font_size.is_none() {
-                            let size_val = u16::from_le_bytes([child.data[0], child.data[1]]);
-                            if size_val > 0 {
-                                *font_size = Some(size_val);
-                            }
+            if child.record_type == super::escher::EscherRecordType::TextProperties {
+                // Try to extract font info from text properties
+                if child.data.len() >= 8 {
+                    // Extract font size if available
+                    if font_size.is_none() {
+                        let size_val = u16::from_le_bytes([child.data[0], child.data[1]]);
+                        if size_val > 0 {
+                            *font_size = Some(size_val);
                         }
+                    }
 
-                        // Extract font color if available
-                        if font_color.is_none() && child.data.len() >= 8 {
-                            let color_val = u32::from_le_bytes([child.data[4], child.data[5], child.data[6], child.data[7]]);
-                            if color_val != 0 {
-                                *font_color = Some(color_val);
-                            }
+                    // Extract font color if available
+                    if font_color.is_none() && child.data.len() >= 8 {
+                        let color_val = u32::from_le_bytes([child.data[4], child.data[5], child.data[6], child.data[7]]);
+                        if color_val != 0 {
+                            *font_color = Some(color_val);
                         }
                     }
                 }
-                _ => {} // Ignore other record types for now
             }
         }
 
@@ -332,6 +337,7 @@ mod tests {
     use super::super::shape::ShapeType;
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_textbox_creation() {
         let mut props = ShapeProperties::default();
         props.id = 1001;
@@ -349,6 +355,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_textbox_text_operations() {
         let mut props = ShapeProperties::default();
         props.shape_type = ShapeType::TextBox;
@@ -361,6 +368,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_textbox_formatting() {
         let mut props = ShapeProperties::default();
         props.shape_type = ShapeType::TextBox;

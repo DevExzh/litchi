@@ -79,10 +79,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Process each shape
         for (shape_idx, mut shape) in shapes.into_iter().enumerate() {
-            println!("\n  ▶ Shape #{}: {} ({})", 
+            println!("\n  ▶ Shape #{}: {} ({:?})", 
                 shape_idx + 1,
                 shape.name().unwrap_or_else(|_| "Unnamed".to_string()),
-                format!("{:?}", shape.shape_type())
+                shape.shape_type()
             );
 
             // Show position and size

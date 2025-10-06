@@ -320,6 +320,46 @@ pub struct EscherRecord {
     pub properties: Vec<EscherProperty>,
 }
 
+/// Actions to take when processing text characters in UTF-16LE decoding.
+#[derive(Debug, Clone, Copy)]
+enum CharacterAction {
+    /// Add the character to the text
+    Add(char),
+    /// Stop processing (control character encountered)
+    Stop,
+    /// Skip this character (invalid or unhandled)
+    Skip,
+}
+
+impl CharacterAction {
+    /// Process a UTF-16LE code unit and determine the appropriate action.
+    /// This replaces the previous if-else chain with a more idiomatic match expression.
+    fn process_text_character(code_unit: u16) -> Self {
+            match code_unit {
+            // Null terminator - stop processing
+            0 => CharacterAction::Stop,
+            // Vertical tab (often used as paragraph separator) - stop processing
+            0x0B => CharacterAction::Stop,
+            // ASCII range (0x01-0x7F) - add as character (excluding 0 and 0x0B)
+            0x01..=0x0A | 0x0C..=0x7F => {
+                if let Some(ch) = char::from_u32(code_unit as u32) {
+                    CharacterAction::Add(ch)
+                } else {
+                    CharacterAction::Skip
+                }
+            }
+            // Unicode range (0x80 and above) - try to decode as Unicode
+            0x80.. => {
+                if let Some(ch) = char::from_u32(code_unit as u32) {
+                    CharacterAction::Add(ch)
+                } else {
+                    CharacterAction::Skip
+                }
+            }
+        }
+    }
+}
+
 impl EscherRecord {
     /// Parse an Escher record from binary data.
     /// Optimized for performance with minimal allocations.
@@ -465,7 +505,7 @@ impl EscherRecord {
                 0x01C4 => values.text_anchor = Some(property.data as u16),
 
                 // Transform properties
-                0x0000 => values.rotation = Some(property.data as u32),
+                0x0000 => values.rotation = Some(property.data),
                 0x0001 => values.lock_aspect_ratio = Some(property.data != 0),
 
                 _ => {} // Ignore unknown properties for now
@@ -613,24 +653,22 @@ impl EscherRecord {
     /// Parse line properties (color, width, style).
     fn parse_line_properties(line_props: &EscherRecord, props: &mut ShapeProperties) -> Result<()> {
         // Line properties record contains line-related data
-        if !line_props.data.is_empty() {
-            if line_props.data.len() >= 8 {
-                // Extract line color and width
-                let color = u32::from_le_bytes([
-                    line_props.data[0], line_props.data[1],
-                    line_props.data[2], line_props.data[3]
-                ]);
-                let width = u16::from_le_bytes([line_props.data[4], line_props.data[5]]);
+        if !line_props.data.is_empty() && line_props.data.len() >= 8 {
+            // Extract line color and width
+            let color = u32::from_le_bytes([
+                line_props.data[0], line_props.data[1],
+                line_props.data[2], line_props.data[3]
+            ]);
+            let width = u16::from_le_bytes([line_props.data[4], line_props.data[5]]);
 
-                props.line_color = Some(color);
-                props.line_width = Some(width);
-            }
+            props.line_color = Some(color);
+            props.line_width = Some(width);
         }
         Ok(())
     }
 
     /// Parse shadow properties (color, offset, blur).
-    fn parse_shadow_properties(shadow_props: &EscherRecord, _props: &mut ShapeProperties) -> Result<()> {
+    fn parse_shadow_properties(_shadow_props: &EscherRecord, _props: &mut ShapeProperties) -> Result<()> {
         // Shadow properties record contains shadow-related data
         // POI would parse this for shadow effects
         // For now, this is a placeholder implementation
@@ -639,32 +677,55 @@ impl EscherRecord {
 
     /// Extract placeholder information from this record.
     /// This follows POI's OEPlaceholderAtom parsing logic.
+    ///
+    /// OEPlaceholderAtom format (from POI's EscherPlaceholder.fillFields):
+    /// - position (4 bytes at offset 8) - placement ID
+    /// - placementId (1 byte at offset 12) - placeholder ID
+    /// - size (1 byte at offset 13) - placeholder size
+    /// - unused (2 bytes at offset 14)
+    ///
+    /// Returns (placeholder_id, placeholder_size, placement_id)
     pub fn extract_placeholder_info(&self) -> Result<Option<(u16, u8, u16)>> {
         // Look for PlaceholderData record (OEPlaceholderAtom)
         if let Some(placeholder_data) = self.find_child(EscherRecordType::PlaceholderData) {
-            // POI's OEPlaceholderAtom structure:
-            // - placeholderId (1 byte)
-            // - placeholderSize (1 byte)
-            // - placementId (2 bytes, little-endian)
+            // POI's OEPlaceholderAtom structure (8 bytes):
+            // Offset 0-3: position/placementId (4 bytes, little-endian) - i32
+            // Offset 4: placeholderId (1 byte)
+            // Offset 5: size (1 byte)  
+            // Offset 6-7: unused (2 bytes)
 
-            if placeholder_data.data.len() >= 6 {
-                let placeholder_id = placeholder_data.data[0] as u16;
-                let placeholder_size = placeholder_data.data[1];
-                let placement_id = u16::from_le_bytes([placeholder_data.data[4], placeholder_data.data[5]]);
+            if placeholder_data.data.len() >= 8 {
+                // Position/placement ID (4 bytes)
+                let placement_id = u32::from_le_bytes([
+                    placeholder_data.data[0],
+                    placeholder_data.data[1],
+                    placeholder_data.data[2],
+                    placeholder_data.data[3],
+                ]) as u16; // Convert to u16 for compatibility
+
+                // Placeholder ID (1 byte at offset 4)
+                let placeholder_id = placeholder_data.data[4] as u16;
+
+                // Placeholder size (1 byte at offset 5)
+                let placeholder_size = placeholder_data.data[5];
 
                 return Ok(Some((placeholder_id, placeholder_size, placement_id)));
             }
         }
 
         // Also check if this record itself is a PlaceholderData record
-        if self.record_type == EscherRecordType::PlaceholderData {
-            if self.data.len() >= 6 {
-                let placeholder_id = self.data[0] as u16;
-                let placeholder_size = self.data[1];
-                let placement_id = u16::from_le_bytes([self.data[4], self.data[5]]);
+        if self.record_type == EscherRecordType::PlaceholderData && self.data.len() >= 8 {
+            let placement_id = u32::from_le_bytes([
+                self.data[0],
+                self.data[1],
+                self.data[2],
+                self.data[3],
+            ]) as u16;
 
-                return Ok(Some((placeholder_id, placeholder_size, placement_id)));
-            }
+            let placeholder_id = self.data[4] as u16;
+            let placeholder_size = self.data[5];
+
+            return Ok(Some((placeholder_id, placeholder_size, placement_id)));
         }
 
         Ok(None)
@@ -680,65 +741,53 @@ impl EscherRecord {
         }
     }
 
+
     /// Parse text record data according to MS-ODRAW text record format.
     /// Based on POI's EscherTextboxWrapper and related text parsing.
+    ///
+    /// This properly parses child PPT records (TextCharsAtom, TextBytesAtom, etc.)
+    /// from the Escher textbox data.
     fn parse_text_record(text_record: &EscherRecord) -> Result<String> {
         let text_data = &text_record.data;
 
-        if text_data.len() < 4 {
+        if text_data.is_empty() {
             return Ok(String::new());
         }
 
-        // Text record format varies, but typically contains:
-        // - Text header information
-        // - UTF-16LE encoded text data
-        // - Formatting information
+        // Use EscherTextboxWrapper to properly parse the textbox data
+        // This follows POI's approach of wrapping the Escher textbox and
+        // extracting child PPT records
+        match super::super::escher_textbox::EscherTextboxWrapper::new(text_data.to_vec()) {
+            Ok(wrapper) => Ok(wrapper.text().to_string()),
+            Err(_) => {
+                // Fallback: try simple UTF-16LE decoding for backward compatibility
+                if text_data.len() >= 2 {
+                    let start_offset = if text_data.len() >= 2 &&
+                        text_data[0] == 0xFF && text_data[1] == 0xFE {
+                        2 // Skip BOM
+                    } else {
+                        0
+                    };
 
-        // Skip header bytes and look for actual text content
-        // In POI, this involves parsing TextSpecInfoAtom and related structures
-        // For now, implement a basic UTF-16LE decoder
+                    let mut text = String::new();
+                    let mut i = start_offset;
 
-        if text_data.len() >= 2 {
-            // Skip BOM if present and try to decode as UTF-16LE
-            let start_offset = if text_data.len() >= 2 &&
-                text_data[0] == 0xFF && text_data[1] == 0xFE {
-                2 // Skip BOM
-            } else {
-                0
-            };
+                    while i + 1 < text_data.len() {
+                        let code_unit = u16::from_le_bytes([text_data[i], text_data[i + 1]]);
+                        i += 2;
 
-            // Simple UTF-16LE decoding (ignoring surrogate pairs for now)
-            let mut text = String::new();
-            let mut i = start_offset;
-
-            while i + 1 < text_data.len() {
-                let code_unit = u16::from_le_bytes([text_data[i], text_data[i + 1]]);
-                i += 2;
-
-                // Handle basic ASCII range and common Unicode characters
-                if code_unit <= 0x7F {
-                    if let Some(ch) = char::from_u32(code_unit as u32) {
-                        text.push(ch);
+                        match CharacterAction::process_text_character(code_unit) {
+                            CharacterAction::Add(ch) => text.push(ch),
+                            CharacterAction::Stop => break,
+                            CharacterAction::Skip => continue,
+                        }
                     }
-                } else if code_unit >= 0x80 {
-                    // For non-ASCII characters, try to decode as Unicode
-                    if let Some(ch) = char::from_u32(code_unit as u32) {
-                        text.push(ch);
-                    }
-                }
 
-                // Stop at null terminator or other control characters
-                if code_unit == 0 || code_unit == 0x0B { // VT (vertical tab) often used as paragraph separator
-                    break;
+                    Ok(text.trim_end_matches('\u{0}').to_string())
+                } else {
+                    Ok(String::new())
                 }
             }
-
-            // Trim null terminators from the end
-            let text = text.trim_end_matches('\u{0}').to_string();
-
-            Ok(text)
-        } else {
-            Ok(String::new())
         }
     }
 
@@ -791,11 +840,9 @@ impl EscherParser {
             }
 
             // Also store by shape ID if this record has shape properties
-            if record.record_type == EscherRecordType::ShapeProperties {
-                if record.data.len() >= 4 {
-                    let shape_id = u32::from_le_bytes([record.data[2], record.data[3], 0, 0]);
-                    self.shape_records.insert(shape_id, record.clone());
-                }
+            if record.record_type == EscherRecordType::ShapeProperties && record.data.len() >= 4 {
+                let shape_id = u32::from_le_bytes([record.data[2], record.data[3], 0, 0]);
+                self.shape_records.insert(shape_id, record.clone());
             }
 
             // Also store PlaceholderData records for easy access
@@ -948,7 +995,7 @@ mod tests {
             properties: Vec::new(),
         };
 
-        let mut container = EscherRecord {
+        let container = EscherRecord {
             record_type: EscherRecordType::Container,
             version: 1,
             instance: 0,

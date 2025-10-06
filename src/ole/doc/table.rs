@@ -29,11 +29,13 @@ pub struct Table {
 
 impl Table {
     /// Create a new Table.
+    #[allow(dead_code)]
     pub(crate) fn new(rows: Vec<Row>) -> Self {
         Self { rows, properties: None }
     }
 
     /// Create a new Table with properties.
+    #[allow(dead_code)]
     pub(crate) fn with_properties(rows: Vec<Row>, properties: TableProperties) -> Self {
         Self {
             rows,
@@ -105,6 +107,7 @@ pub struct Row {
 
 impl Row {
     /// Create a new Row.
+    #[allow(unused)]
     pub(crate) fn new(cells: Vec<Cell>) -> Self {
         Self {
             cells,
@@ -113,6 +116,7 @@ impl Row {
     }
 
     /// Create a new Row with properties.
+    #[allow(unused)]
     pub(crate) fn with_properties(cells: Vec<Cell>, properties: TableProperties) -> Self {
         Self {
             cells,
@@ -161,6 +165,7 @@ pub struct Cell {
 
 impl Cell {
     /// Create a new Cell.
+    #[allow(unused)]
     pub(crate) fn new(text: String) -> Self {
         Self {
             text: text.clone(),
@@ -170,6 +175,7 @@ impl Cell {
     }
 
     /// Create a new Cell with paragraphs and properties.
+    #[allow(unused)]
     pub(crate) fn with_properties(
         paragraphs: Vec<Paragraph>,
         properties: Option<CellProperties>,

@@ -129,7 +129,7 @@ impl AutoShape {
     }
 
     /// Create an auto shape from an existing container.
-    pub fn from_container(mut container: ShapeContainer) -> Self {
+    pub fn from_container(container: ShapeContainer) -> Self {
         // Extract auto shape type from raw data or use default
         let auto_shape_type = AutoShapeType::Rectangle; // TODO: Parse from data
 
@@ -235,6 +235,7 @@ mod tests {
     use super::super::shape::ShapeType;
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_autoshape_creation() {
         let mut props = ShapeProperties::default();
         props.id = 3001;
@@ -252,6 +253,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_autoshape_type_operations() {
         let mut props = ShapeProperties::default();
         props.shape_type = ShapeType::AutoShape;
@@ -268,6 +270,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_autoshape_shape_classification() {
         let mut props = ShapeProperties::default();
         props.shape_type = ShapeType::AutoShape;

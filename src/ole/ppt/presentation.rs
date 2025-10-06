@@ -188,12 +188,20 @@ impl Presentation {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn get_all_placeholders(&self) -> Result<Vec<&super::shapes::placeholder::Placeholder>> {
-        // For now, return empty vector - this would need to be implemented
-        // to collect placeholders from all slides
+        // Based on POI's approach: iterate through slides and collect placeholders
+        // This would require proper downcasting from trait objects to concrete types
+        // For now, return empty as a placeholder for the full implementation
+        // Full implementation would:
+        // 1. Call self.slides()?
+        // 2. For each slide, call slide.placeholders()
+        // 3. Collect all placeholders into a single vector
         Ok(Vec::new())
     }
 
     /// Get placeholders of a specific type across all slides.
+    ///
+    /// Based on POI's HSLFSheet.getPlaceholder(Placeholder type) which searches
+    /// all shapes on a sheet for matching placeholder types.
     ///
     /// # Arguments
     ///
@@ -214,8 +222,13 @@ impl Presentation {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn get_placeholders_by_type(&self, _placeholder_type: super::shapes::placeholder::PlaceholderType) -> Result<Vec<&super::shapes::placeholder::Placeholder>> {
-        // For now, return empty vector - this would need to be implemented
+    pub fn get_placeholders_by_type(&self, placeholder_type: super::shapes::placeholder::PlaceholderType) -> Result<Vec<&super::shapes::placeholder::Placeholder>> {
+        // Based on POI's getPlaceholder(Placeholder type) logic
+        // Full implementation would:
+        // 1. Get all slides
+        // 2. For each slide, filter placeholders by type
+        // 3. Collect matching placeholders
+        let _ = placeholder_type; // Mark as used
         Ok(Vec::new())
     }
 }

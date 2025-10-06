@@ -148,6 +148,7 @@ pub struct SlideLayout<'a> {
 
 impl<'a> SlideLayout<'a> {
     /// Create a new SlideLayout from a SlideLayoutPart.
+    #[allow(unused)]
     #[inline]
     pub(crate) fn new(part: SlideLayoutPart<'a>) -> Self {
         Self { part }

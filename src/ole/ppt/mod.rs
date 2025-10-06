@@ -55,9 +55,17 @@ pub mod presentation;
 pub mod shapes;
 pub mod slide;
 pub mod record_parser;
+pub mod current_user;
+pub mod text_run;
+pub mod text_prop;
+pub mod escher_textbox;
 
 pub use package::Package;
 pub use presentation::Presentation;
 pub use shapes::{Shape, TextBox, Placeholder, PlaceholderType, PlaceholderSize, AutoShape};
 pub use slide::Slide;
 pub use record_parser::{PptRecordParser, DocumentInfo, SlideInfo};
+pub use current_user::CurrentUser;
+pub use text_run::{TextRun, TextRunExtractor, TextRunFormatting};
+pub use text_prop::{TextProp, TextPropCollection, TextPropType};
+pub use escher_textbox::EscherTextboxWrapper;

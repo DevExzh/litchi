@@ -67,7 +67,7 @@ pub trait Part {
 
         // Use memmem from memchr for fast substring searching
         let finder = memmem::Finder::new(pattern.as_bytes());
-        finder.find_iter(&blob).count()
+        finder.find_iter(blob).count()
     }
 }
 
@@ -294,7 +294,7 @@ impl XmlPart {
     ///
     /// Performs zero-copy conversion if possible.
     pub fn xml_str(&self) -> Result<&str> {
-        std::str::from_utf8(&**self.xml_bytes).map_err(Into::into)
+        std::str::from_utf8(&self.xml_bytes).map_err(Into::into)
     }
 }
 

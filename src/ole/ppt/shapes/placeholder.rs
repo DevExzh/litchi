@@ -179,7 +179,7 @@ impl Placeholder {
         };
 
         // Extract additional placeholder properties from Escher data
-        let mut container = ShapeContainer::new(properties, record.data.clone());
+        let container = ShapeContainer::new(properties, record.data.clone());
 
         Ok(Self {
             container,
@@ -191,14 +191,34 @@ impl Placeholder {
     }
 
     /// Create a placeholder from an existing container.
+    ///
+    /// Based on POI's HSLFPlaceholder which extracts placeholder info from
+    /// the shape's client data records (OEPlaceholderAtom).
     pub fn from_container(container: ShapeContainer) -> Self {
-        // For now, use default values - in a full implementation,
-        // we'd parse the raw data to extract placeholder information
+        // Try to extract placeholder information from the raw data
+        // The raw data may contain an OEPlaceholderAtom record
+        let (placeholder_type, size, index) = if !container.raw_data.is_empty() {
+            // Parse as Escher record to find OEPlaceholderAtom
+            if let Ok((escher_record, _)) = super::escher::EscherRecord::parse(&container.raw_data, 0) {
+                if let Ok(Some((poi_id, size_val, index_val))) = escher_record.extract_placeholder_info() {
+                    // Map POI placeholder ID to our type
+                    let ph_type = Self::map_poi_placeholder_id_to_type(poi_id).unwrap_or(PlaceholderType::Body);
+                    (ph_type, Some(size_val), Some(index_val))
+                } else {
+                    (PlaceholderType::Body, None, None)
+                }
+            } else {
+                (PlaceholderType::Body, None, None)
+            }
+        } else {
+            (PlaceholderType::Body, None, None)
+        };
+
         Self {
             container,
-            placeholder_type: PlaceholderType::Body,
-            size: None,
-            index: None,
+            placeholder_type,
+            size,
+            index,
             raw_placeholder_data: None,
         }
     }
@@ -360,6 +380,7 @@ mod tests {
     use super::super::shape::ShapeType;
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_placeholder_creation() {
         let mut props = ShapeProperties::default();
         props.id = 2001;
@@ -378,6 +399,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_placeholder_type_operations() {
         let mut props = ShapeProperties::default();
         props.shape_type = ShapeType::Placeholder;
@@ -395,6 +417,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_placeholder_media_check() {
         let mut props = ShapeProperties::default();
         props.shape_type = ShapeType::Placeholder;

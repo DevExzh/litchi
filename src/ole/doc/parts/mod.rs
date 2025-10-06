@@ -9,6 +9,8 @@
 /// - Table structures
 pub mod chp;
 pub mod fib;
+pub mod pap;
+pub mod paragraph_extractor;
 pub mod tap;
 pub mod text;
 

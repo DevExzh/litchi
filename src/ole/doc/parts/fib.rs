@@ -24,8 +24,6 @@ const FIB_BASE_SIZE: usize = 32;
 /// - Bytes 32+: Variable length fields pointing to data structures
 #[derive(Debug, Clone)]
 pub struct FileInformationBlock {
-    /// Magic identifier (should be 0xA5EC for Word files)
-    magic: u16,
     /// File format version
     nfib: u16,
     /// Flags including encryption, table stream selection, etc.
@@ -78,7 +76,6 @@ impl FileInformationBlock {
         let data = word_document.to_vec();
 
         Ok(Self {
-            magic,
             nfib,
             flags,
             which_table_stream,

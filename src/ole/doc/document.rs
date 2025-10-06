@@ -1,8 +1,9 @@
 /// Document - the main API for working with Word document content.
 use super::package::{DocError, Result};
-use super::paragraph::Paragraph;
+use super::paragraph::{Paragraph, Run};
 use super::parts::fib::FileInformationBlock;
 use super::parts::text::TextExtractor;
+use super::parts::paragraph_extractor::ParagraphExtractor;
 use super::table::Table;
 use super::super::OleFile;
 use std::fs::File;
@@ -155,13 +156,33 @@ impl Document {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
-        // TODO: Implement proper paragraph extraction from binary structures
-        // For now, split text into lines as a simple approximation
+        // Use the proper paragraph extractor to parse from binary structures
         let text = self.text()?;
-        Ok(text
-            .lines()
-            .map(|line| Paragraph::new(line.to_string()))
-            .collect())
+        let para_extractor = ParagraphExtractor::new(
+            &self.fib,
+            &self.word_document,
+            &self.table_stream,
+            text,
+        )?;
+
+        let extracted_paras = para_extractor.extract_paragraphs()?;
+
+        // Convert to Paragraph objects
+        let mut paragraphs = Vec::with_capacity(extracted_paras.len());
+        for (para_text, _para_props, runs) in extracted_paras {
+            // Create runs for the paragraph
+            let run_objects: Vec<Run> = runs
+                .into_iter()
+                .map(|(text, props)| Run::new(text, props))
+                .collect();
+
+            // Create paragraph with runs
+            let mut para = Paragraph::new(para_text);
+            para.set_runs(run_objects);
+            paragraphs.push(para);
+        }
+
+        Ok(paragraphs)
     }
 
     /// Get all tables in the document.

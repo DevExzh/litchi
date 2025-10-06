@@ -1,0 +1,269 @@
+/// Shared SPRM (Single Property Modifier) parsing.
+///
+/// SPRMs are variable-length records used in both DOC and PPT formats
+/// to modify properties. This module provides common SPRM parsing logic
+/// based on Apache POI's SPRM handling.
+/// SPRM operation types (extracted from SPRM value).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SprmOperation {
+    /// Toggle (0)
+    Toggle,
+    /// One byte operand (1)
+    Byte,
+    /// Two byte operand (2)
+    Word,
+    /// Four byte operand (3)
+    DWord,
+    /// Two byte operand (4)
+    Word2,
+    /// Two byte operand (5)
+    Word3,
+    /// Variable length operand (6)
+    Variable,
+    /// Three byte operand (7)
+    ThreeByte,
+}
+
+impl From<u8> for SprmOperation {
+    fn from(value: u8) -> Self {
+        match value & 0x07 {
+            0 => SprmOperation::Toggle,
+            1 => SprmOperation::Byte,
+            2 => SprmOperation::Word,
+            3 => SprmOperation::DWord,
+            4 => SprmOperation::Word2,
+            5 => SprmOperation::Word3,
+            6 => SprmOperation::Variable,
+            7 => SprmOperation::ThreeByte,
+            _ => unreachable!(),
+        }
+    }
+}
+
+/// An SPRM (Single Property Modifier).
+///
+/// Based on Apache POI's SprmBuffer and related classes.
+#[derive(Debug, Clone)]
+pub struct Sprm {
+    /// SPRM opcode
+    pub opcode: u16,
+    /// SPRM operation type
+    pub operation: SprmOperation,
+    /// SPRM operand data
+    pub operand: Vec<u8>,
+}
+
+impl Sprm {
+    /// Get the operand as a byte.
+    #[inline]
+    pub fn operand_byte(&self) -> Option<u8> {
+        self.operand.first().copied()
+    }
+
+    /// Get the operand as a word (u16).
+    #[inline]
+    pub fn operand_word(&self) -> Option<u16> {
+        if self.operand.len() >= 2 {
+            Some(u16::from_le_bytes([self.operand[0], self.operand[1]]))
+        } else {
+            None
+        }
+    }
+
+    /// Get the operand as a signed word (i16).
+    #[inline]
+    pub fn operand_i16(&self) -> Option<i16> {
+        if self.operand.len() >= 2 {
+            Some(i16::from_le_bytes([self.operand[0], self.operand[1]]))
+        } else {
+            None
+        }
+    }
+
+    /// Get the operand as a dword (u32).
+    #[inline]
+    pub fn operand_dword(&self) -> Option<u32> {
+        if self.operand.len() >= 4 {
+            Some(u32::from_le_bytes([
+                self.operand[0],
+                self.operand[1],
+                self.operand[2],
+                self.operand[3],
+            ]))
+        } else {
+            None
+        }
+    }
+
+    /// Get the operand as raw bytes.
+    #[inline]
+    pub fn operand_bytes(&self) -> &[u8] {
+        &self.operand
+    }
+}
+
+/// Parse SPRMs from a byte array (grpprl - group of SPRMs).
+///
+/// Based on Apache POI's SprmBuffer.findSprms() and related methods.
+///
+/// # Arguments
+///
+/// * `grpprl` - The byte array containing SPRMs
+///
+/// # Returns
+///
+/// A vector of parsed SPRMs
+pub fn parse_sprms(grpprl: &[u8]) -> Vec<Sprm> {
+    let mut sprms = Vec::new();
+    let mut offset = 0;
+
+    while offset + 2 <= grpprl.len() {
+        // Read SPRM opcode (2 bytes in Word 97+)
+        let opcode = u16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]);
+        offset += 2;
+
+        // Determine operation type from opcode
+        let operation = SprmOperation::from((opcode & 0x07) as u8);
+
+        // Determine operand size based on operation type
+        let operand_size = match operation {
+            SprmOperation::Toggle => 1,
+            SprmOperation::Byte => 1,
+            SprmOperation::Word | SprmOperation::Word2 | SprmOperation::Word3 => 2,
+            SprmOperation::DWord => 4,
+            SprmOperation::ThreeByte => 3,
+            SprmOperation::Variable => {
+                // Variable length - read size from first byte
+                if offset < grpprl.len() {
+                    grpprl[offset] as usize
+                } else {
+                    break;
+                }
+            }
+        };
+
+        // Read operand data
+        if offset + operand_size > grpprl.len() {
+            break;
+        }
+
+        let operand = grpprl[offset..offset + operand_size].to_vec();
+        offset += operand_size;
+
+        sprms.push(Sprm {
+            opcode,
+            operation,
+            operand,
+        });
+    }
+
+    sprms
+}
+
+/// Find a specific SPRM by opcode in a list of SPRMs.
+///
+/// # Arguments
+///
+/// * `sprms` - The list of SPRMs to search
+/// * `opcode` - The SPRM opcode to find
+///
+/// # Returns
+///
+/// Reference to the first matching SPRM, or None if not found
+#[inline]
+pub fn find_sprm(sprms: &[Sprm], opcode: u16) -> Option<&Sprm> {
+    sprms.iter().find(|sprm| sprm.opcode == opcode)
+}
+
+/// Get a boolean value from an SPRM operand.
+///
+/// Based on Apache POI's SPRM boolean handling.
+#[inline]
+pub fn get_bool_from_sprm(sprm: &Sprm) -> bool {
+    sprm.operand_byte().unwrap_or(0) != 0
+}
+
+/// Get an integer value from an SPRM operand.
+#[inline]
+pub fn get_int_from_sprm(sprm: &Sprm) -> Option<i32> {
+    match sprm.operation {
+        SprmOperation::Byte | SprmOperation::Toggle => sprm.operand_byte().map(|b| b as i32),
+        SprmOperation::Word | SprmOperation::Word2 | SprmOperation::Word3 => {
+            sprm.operand_i16().map(|w| w as i32)
+        }
+        SprmOperation::DWord => sprm.operand_dword().map(|d| d as i32),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sprm_operation_from() {
+        assert_eq!(SprmOperation::from(0), SprmOperation::Toggle);
+        assert_eq!(SprmOperation::from(1), SprmOperation::Byte);
+        assert_eq!(SprmOperation::from(2), SprmOperation::Word);
+    }
+
+    #[test]
+    fn test_parse_sprms() {
+        // Create a simple SPRM buffer
+        // SPRM 1: opcode 0x0835 (bold, byte operand), operand = 0x01
+        // SPRM 2: opcode 0x4A43 (font size, word operand), operand = 0x0018 (24 = 12pt)
+        let grpprl = vec![
+            0x35, 0x08, // opcode 0x0835 (operation type = 1, byte)
+            0x01, // operand = 1 (true)
+            0x43, 0x4A, // opcode 0x4A43 (operation type = 2, word)
+            0x18, 0x00, // operand = 24
+        ];
+
+        let sprms = parse_sprms(&grpprl);
+        assert_eq!(sprms.len(), 2);
+
+        assert_eq!(sprms[0].opcode, 0x0835);
+        assert_eq!(sprms[0].operand_byte(), Some(1));
+
+        assert_eq!(sprms[1].opcode, 0x4A43);
+        assert_eq!(sprms[1].operand_word(), Some(24));
+    }
+
+    #[test]
+    fn test_find_sprm() {
+        let sprms = vec![
+            Sprm {
+                opcode: 0x0835,
+                operation: SprmOperation::Byte,
+                operand: vec![1],
+            },
+            Sprm {
+                opcode: 0x4A43,
+                operation: SprmOperation::Word,
+                operand: vec![24, 0],
+            },
+        ];
+
+        assert!(find_sprm(&sprms, 0x0835).is_some());
+        assert!(find_sprm(&sprms, 0x4A43).is_some());
+        assert!(find_sprm(&sprms, 0xFFFF).is_none());
+    }
+
+    #[test]
+    fn test_get_bool_from_sprm() {
+        let sprm = Sprm {
+            opcode: 0x0835,
+            operation: SprmOperation::Byte,
+            operand: vec![1],
+        };
+        assert!(get_bool_from_sprm(&sprm));
+
+        let sprm_false = Sprm {
+            opcode: 0x0835,
+            operation: SprmOperation::Byte,
+            operand: vec![0],
+        };
+        assert!(!get_bool_from_sprm(&sprm_false));
+    }
+}
+

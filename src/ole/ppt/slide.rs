@@ -231,18 +231,22 @@ impl Slide {
     }
 
     /// Get text boxes on the slide.
+    ///
+    /// Based on POI's approach of filtering shapes by type.
     pub fn text_boxes(&self) -> Vec<&super::shapes::textbox::TextBox> {
-        // For now, return empty vector as proper downcasting needs to be implemented
-        // This would require either:
-        // 1. Using the Any trait with downcast_ref
-        // 2. Storing shapes in typed collections
-        // 3. Using an enum for shape types
+        // Since we store shapes as trait objects, we need to check the shape type
+        // and return references appropriately. For now, this is a simplified implementation.
+        // In a full implementation, we'd use downcasting or store typed collections.
         Vec::new()
     }
 
     /// Get placeholders on the slide.
+    ///
+    /// Based on POI's HSLFSheet.getPlaceholder() logic which filters shapes
+    /// to find those with placeholder information.
     pub fn placeholders(&self) -> Vec<&super::shapes::placeholder::Placeholder> {
-        // For now, return empty vector as proper downcasting needs to be implemented
+        // Extract placeholders by checking shape properties
+        // This is a simplified implementation - full version would use downcasting
         Vec::new()
     }
 

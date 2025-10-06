@@ -40,6 +40,7 @@ impl Paragraph {
     /// # Arguments
     ///
     /// * `runs` - The runs within this paragraph
+    #[allow(unused)]
     pub(crate) fn with_runs(runs: Vec<Run>) -> Self {
         let text = runs.iter().map(|r| r.text.as_str()).collect::<String>();
         Self { text, runs }
@@ -59,6 +60,11 @@ impl Paragraph {
     /// Each run represents a region of text with uniform formatting.
     pub fn runs(&self) -> Result<Vec<Run>> {
         Ok(self.runs.clone())
+    }
+
+    /// Set the runs for this paragraph (internal use).
+    pub(crate) fn set_runs(&mut self, runs: Vec<Run>) {
+        self.runs = runs;
     }
 }
 
@@ -195,6 +201,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_run_with_formatting() {
         let mut props = CharacterProperties::default();
         props.is_bold = Some(true);
