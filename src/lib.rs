@@ -126,6 +126,12 @@ pub mod presentation;
 /// Unified Excel spreadsheet API (placeholder for future functionality)
 pub mod sheet;
 
+/// Markdown conversion module
+///
+/// Provides functionality to convert Office documents and presentations to Markdown.
+/// Use the [`markdown::ToMarkdown`] trait on Document or Presentation types.
+pub mod markdown;
+
 // Low-level format-specific modules (advanced use)
 /// OLE2 format parser (legacy .doc, .ppt files)
 ///

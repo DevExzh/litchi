@@ -59,6 +59,14 @@ let slide_count = pres.slide_count()?;
 - ✅ **Basic table parsing** - Simple table structure access
 - ✅ **Basic picture support** - Image relationship tracking
 
+### 📝 Markdown Conversion
+- ✅ **Document to Markdown** - Convert Word documents to Markdown format
+- ✅ **Presentation to Markdown** - Convert PowerPoint slides to Markdown
+- ✅ **Style preservation** - Bold, italic, and other text formatting
+- ✅ **Table conversion** - Smart handling of tables (Markdown or HTML)
+- ✅ **Configurable output** - Extensive options for customization
+- ✅ **High performance** - Memory-efficient with minimal allocations
+
 ### 🔧 Low-Level APIs (Advanced Use)
 
 #### OLE2 (Legacy Office Formats)
@@ -92,6 +100,39 @@ Litchi is engineered for maximum performance and reliability:
 - **Memory safety** - Zero unsafe code in parsing logic, compile-time guarantees
 - **Thread safety** - Safe concurrent access patterns where applicable
 - **Comprehensive testing** - Unit tests for all parsing components
+
+## Quick Examples
+
+### Word Document to Markdown
+
+```rust
+use litchi::{Document, markdown::ToMarkdown};
+
+let doc = Document::open("report.docx")?;
+let markdown = doc.to_markdown()?;
+println!("{}", markdown);
+
+// Or with custom options
+use litchi::markdown::{MarkdownOptions, TableStyle};
+
+let options = MarkdownOptions::new()
+    .with_styles(true)                      // Include bold, italic, etc.
+    .with_table_style(TableStyle::Markdown) // Use markdown tables
+    .with_metadata(false);                  // Don't include metadata
+
+let markdown = doc.to_markdown_with_options(&options)?;
+```
+
+### PowerPoint Presentation to Markdown
+
+```rust
+use litchi::{Presentation, markdown::ToMarkdown};
+
+let pres = Presentation::open("slides.pptx")?;
+let markdown = pres.to_markdown()?;
+// Slides are separated by horizontal rules (---)
+println!("{}", markdown);
+```
 
 ## Installation
 
