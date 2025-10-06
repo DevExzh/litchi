@@ -3,7 +3,7 @@ use super::package::{PptError, Result};
 use super::slide::Slide;
 use super::record_parser::PptRecordParser;
 use super::super::OleFile;
-use std::fs::File;
+use std::io::{Read, Seek};
 
 /// A PowerPoint presentation (.ppt).
 ///
@@ -38,7 +38,7 @@ impl Presentation {
     /// Create a new Presentation from an OLE file.
     ///
     /// This is typically called internally by `Package::presentation()`.
-    pub(crate) fn from_ole(ole: &mut OleFile<File>) -> Result<Self> {
+    pub(crate) fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self> {
         // Read the PowerPoint Document stream (main presentation stream)
         let powerpoint_document = ole
             .open_stream(&["PowerPoint Document"])

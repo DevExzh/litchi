@@ -96,14 +96,7 @@ fn parse_property_stream(data: &[u8]) -> Result<HashMap<u32, PropertyValue>, Ole
         ));
     }
 
-    // Read section size and property count
-    let _section_size = u32::from_le_bytes([
-        data[section_offset],
-        data[section_offset + 1],
-        data[section_offset + 2],
-        data[section_offset + 3],
-    ]) as usize;
-
+    // Read property count (section size at offset 0 is not used)
     let num_props = u32::from_le_bytes([
         data[section_offset + 4],
         data[section_offset + 5],

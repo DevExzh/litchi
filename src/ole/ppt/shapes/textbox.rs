@@ -95,8 +95,6 @@ impl TextBox {
 
         // Extract from Escher properties if available (Options record)
         if !record.properties.is_empty() {
-            let _prop_values = record.extract_property_values();
-
             // Check for font size (0x20000)
             if let Some(size_prop) = record.find_property(0x20000u32) {
                 font_size = Some((size_prop.data & 0xFFFF) as u16);

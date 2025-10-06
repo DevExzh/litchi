@@ -33,12 +33,10 @@ impl ParagraphExtractor {
     /// # Arguments
     ///
     /// * `fib` - File Information Block
-    /// * `word_document` - WordDocument stream data
     /// * `table_stream` - Table stream (0Table or 1Table) data
     /// * `text` - Extracted document text
     pub fn new(
         fib: &FileInformationBlock,
-        _word_document: &[u8],
         table_stream: &[u8],
         text: String,
     ) -> Result<Self> {

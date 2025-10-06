@@ -91,7 +91,6 @@ impl PptRecord {
         let instance = version_instance & 0x0FFF;        // Low 12 bits for instance
 
         let record_type_enum = PptRecordType::from(record_type);
-        let _total_size = 8 + data_length as usize;
 
         // Improved bounds checking: allow for truncated records at end of data
         // Only fail if we don't have the complete header or if the record claims

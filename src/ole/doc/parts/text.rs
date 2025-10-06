@@ -245,8 +245,10 @@ impl TextExtractor {
             offset += PIECE_DESCRIPTOR_SIZE;
 
             // Parse PieceDescriptor (matches Apache POI's PieceDescriptor constructor)
+            // Note: descriptor flags parsed but not currently used
             let _descriptor = u16::from_le_bytes([piece_data[0], piece_data[1]]);
             let mut fc = u32::from_le_bytes([piece_data[2], piece_data[3], piece_data[4], piece_data[5]]);
+            // Note: PRM (Property Modifier) parsed but not currently used - may be needed for advanced formatting
             let _prm = u16::from_le_bytes([piece_data[6], piece_data[7]]);
 
             // Extract encoding information from fc (bit 30 indicates encoding)

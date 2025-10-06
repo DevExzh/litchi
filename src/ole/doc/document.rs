@@ -6,7 +6,7 @@ use super::parts::text::TextExtractor;
 use super::parts::paragraph_extractor::ParagraphExtractor;
 use super::table::Table;
 use super::super::OleFile;
-use std::fs::File;
+use std::io::{Read, Seek};
 
 /// A Word document (.doc).
 ///
@@ -33,11 +33,9 @@ use std::fs::File;
 pub struct Document {
     /// File Information Block from WordDocument stream
     fib: FileInformationBlock,
-    /// The main document text
-    word_document: Vec<u8>,
-    /// The table stream (0Table or 1Table)
+    /// The table stream (0Table or 1Table) - contains formatting and structure
     table_stream: Vec<u8>,
-    /// Text extractor
+    /// Text extractor - holds the extracted document text
     text_extractor: TextExtractor,
 }
 
@@ -45,7 +43,7 @@ impl Document {
     /// Create a new Document from an OLE file.
     ///
     /// This is typically called internally by `Package::document()`.
-    pub(crate) fn from_ole(ole: &mut OleFile<File>) -> Result<Self> {
+    pub(crate) fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self> {
         // Read the WordDocument stream (main document stream)
         let word_document = ole
             .open_stream(&["WordDocument"])
@@ -67,7 +65,6 @@ impl Document {
 
         Ok(Self {
             fib,
-            word_document,
             table_stream,
             text_extractor,
         })
@@ -160,7 +157,6 @@ impl Document {
         let text = self.text()?;
         let para_extractor = ParagraphExtractor::new(
             &self.fib,
-            &self.word_document,
             &self.table_stream,
             text,
         )?;

@@ -2,7 +2,7 @@
 use super::document::Document;
 use super::super::{OleError, OleFile};
 use std::fs::File;
-use std::io;
+use std::io::{self, Read, Seek};
 use std::path::Path;
 
 /// Error types for DOC file parsing.
@@ -70,12 +70,12 @@ pub type Result<T> = std::result::Result<T, DocError>;
 /// println!("{}", text);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-pub struct Package {
+pub struct Package<R: Read + Seek = File> {
     /// The underlying OLE file
-    ole: OleFile<File>,
+    ole: OleFile<R>,
 }
 
-impl Package {
+impl Package<File> {
     /// Open a .doc package from a file path.
     ///
     /// # Arguments
@@ -92,9 +92,11 @@ impl Package {
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let file = File::open(path)?;
-        Self::from_reader(file)
+        Package::from_reader(file)
     }
+}
 
+impl<R: Read + Seek> Package<R> {
     /// Create a Package from any reader that implements Read + Seek.
     ///
     /// # Arguments
@@ -105,13 +107,13 @@ impl Package {
     ///
     /// ```rust,no_run
     /// use std::fs::File;
-    /// use litchi::doc::Package;
+    /// use litchi::ole::doc::Package;
     ///
     /// let file = File::open("document.doc")?;
     /// let pkg = Package::from_reader(file)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn from_reader(reader: File) -> Result<Self> {
+    pub fn from_reader(reader: R) -> Result<Self> {
         let ole = OleFile::open(reader)?;
 
         // Verify it's a Word document by checking for the WordDocument stream
@@ -146,7 +148,7 @@ impl Package {
     ///
     /// This provides access to lower-level OLE operations and streams.
     #[inline]
-    pub fn ole_file(&mut self) -> &mut OleFile<File> {
+    pub fn ole_file(&mut self) -> &mut OleFile<R> {
         &mut self.ole
     }
 }

@@ -1,26 +1,25 @@
-//! Litchi - A Rust library for parsing Microsoft Office file formats
+//! Litchi - High-performance Rust library for Microsoft Office file formats
 //!
-//! This library provides efficient parsing of OLE2 (Object Linking and Embedding)
-//! and OOXML (Office Open XML) file formats used by Microsoft Office.
+//! Litchi provides a unified, user-friendly API for parsing Microsoft Office documents
+//! in both legacy (OLE2) and modern (OOXML) formats. The library automatically detects
+//! file formats and provides consistent interfaces for working with documents and presentations.
 //!
 //! # Features
 //!
-//! - **OLE2 Parser**: Parse legacy Microsoft Office files (.doc, .xls, .ppt)
-//! - **DOC Reader**: Parse legacy Word documents (.doc)
-//! - **PPT Reader**: Parse legacy PowerPoint presentations (.ppt)
-//! - **OOXML Parser**: Parse modern Office files (.docx, .xlsx, .pptx)
-//! - **Zero-copy parsing**: Minimizes memory allocations for better performance
-//! - **Metadata extraction**: Extract document properties and metadata
+//! - **Unified API**: Work with .doc and .docx files using the same interface
+//! - **Format Auto-detection**: No need to specify file format - it's detected automatically
+//! - **High Performance**: Zero-copy parsing with SIMD optimizations where possible
+//! - **Production Ready**: Clean API inspired by python-docx and python-pptx
+//! - **Type Safe**: Leverages Rust's type system for safety and correctness
 //!
-//! # Example - Reading a DOC file
+//! # Quick Start - Word Documents
 //!
 //! ```no_run
-//! use litchi::ole::doc::Package;
+//! use litchi::Document;
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! // Open a .doc file
-//! let mut pkg = Package::open("document.doc")?;
-//! let doc = pkg.document()?;
+//! # fn main() -> Result<(), litchi::Error> {
+//! // Open any Word document (.doc or .docx) - format auto-detected
+//! let doc = Document::open("document.doc")?;
 //!
 //! // Extract all text
 //! let text = doc.text()?;
@@ -29,91 +28,114 @@
 //! // Access paragraphs
 //! for para in doc.paragraphs()? {
 //!     println!("Paragraph: {}", para.text()?);
+//!     
+//!     // Access runs with formatting
+//!     for run in para.runs()? {
+//!         println!("  Text: {}", run.text()?);
+//!         if run.bold()? == Some(true) {
+//!             println!("    (bold)");
+//!         }
+//!     }
+//! }
+//!
+//! // Access tables
+//! for table in doc.tables()? {
+//!     println!("Table with {} rows", table.row_count()?);
+//!     for row in table.rows()? {
+//!         for cell in row.cells()? {
+//!             println!("  Cell: {}", cell.text()?);
+//!         }
+//!     }
 //! }
 //! # Ok(())
 //! # }
 //! ```
 //!
-//! # Example - Reading a DOCX file
+//! # Quick Start - PowerPoint Presentations
 //!
 //! ```no_run
-//! use litchi::ooxml::docx::Package;
+//! use litchi::Presentation;
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! // Open a .docx file
-//! let pkg = Package::open("document.docx")?;
-//! let doc = pkg.document()?;
-//!
-//! // Extract all text
-//! let text = doc.text()?;
-//! println!("Document text: {}", text);
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! # Example - Reading a PPT file
-//!
-//! ```no_run
-//! use litchi::ole::ppt::Package;
-//!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! // Open a .ppt file
-//! let mut pkg = Package::open("presentation.ppt")?;
-//! let pres = pkg.presentation()?;
+//! # fn main() -> Result<(), litchi::Error> {
+//! // Open any PowerPoint presentation (.ppt or .pptx) - format auto-detected
+//! let pres = Presentation::open("presentation.ppt")?;
 //!
 //! // Extract all text
 //! let text = pres.text()?;
 //! println!("Presentation text: {}", text);
 //!
-//! // Access slides
-//! for slide in pres.slides()? {
-//!     println!("Slide: {}", slide.text()?);
+//! // Get slide count
+//! println!("Total slides: {}", pres.slide_count()?);
+//!
+//! // Access individual slides
+//! for (i, slide) in pres.slides()?.iter().enumerate() {
+//!     println!("Slide {}: {}", i + 1, slide.text()?);
 //! }
 //! # Ok(())
 //! # }
 //! ```
 //!
-//! # Example - Low-level OLE access
+//! # Architecture
 //!
-//! ```no_run
-//! use std::fs::File;
-//! use litchi::ole::OleFile;
+//! The library is organized into several layers:
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! // Open an OLE file
-//! let file = File::open("document.doc")?;
-//! let mut ole = OleFile::open(file)?;
+//! ## High-Level API (Recommended)
 //!
-//! // List all streams
-//! let streams = ole.list_streams();
-//! for stream in streams {
-//!     println!("Stream: {:?}", stream);
-//! }
+//! - [`Document`] - Unified Word document interface (.doc and .docx)
+//! - [`Presentation`] - Unified PowerPoint interface (.ppt and .pptx)
 //!
-//! // Open a specific stream
-//! let data = ole.open_stream(&["WordDocument"])?;
-//! println!("Stream size: {} bytes", data.len());
-//! # Ok(())
-//! # }
-//! ```
+//! These automatically detect file formats and provide a consistent API.
+//!
+//! ## Common Types
+//!
+//! - [`common::Error`] - Unified error type
+//! - [`common::Result`] - Result type alias
+//! - [`common::ShapeType`] - Common shape types
+//! - [`common::RGBColor`] - Color representation
+//! - [`common::Length`] - Measurement with units
+//!
+//! ## Low-Level Modules (Advanced Use)
+//!
+//! - [`ole`] - Direct access to OLE2 format parsers
+//! - [`ooxml`] - Direct access to OOXML format parsers
+//!
+//! Most users should use the high-level API and only access low-level modules
+//! when format-specific features are needed.
 
-/// OLE2 (Object Linking and Embedding) file format parser
+/// Common types, traits, and utilities shared across formats
+pub mod common;
+
+/// Unified Word document API
 ///
-/// This module provides functionality to parse OLE2 structured storage files,
-/// which are used by legacy Microsoft Office formats (.doc, .xls, .ppt).
+/// Provides format-agnostic interface for both .doc and .docx files.
+/// Use [`Document::open()`] to get started.
+pub mod document;
+
+/// Unified PowerPoint presentation API
 ///
-/// The `ole` module also contains the `doc` submodule for parsing legacy
-/// Word documents, since .doc files are OLE2-based.
+/// Provides format-agnostic interface for both .ppt and .pptx files.
+/// Use [`Presentation::open()`] to get started.
+pub mod presentation;
+
+// Low-level format-specific modules (advanced use)
+/// OLE2 format parser (legacy .doc, .ppt files)
+///
+/// This module provides direct access to OLE2 parsing functionality.
+/// Most users should use the high-level [`Document`] and [`Presentation`]
+/// APIs instead, which automatically handle format detection.
 pub mod ole;
 
-/// OOXML (Office Open XML) file format parser
+/// OOXML format parser (modern .docx, .pptx files)
 ///
-/// This module provides functionality to parse modern Office formats
-/// (.docx, .xlsx, .pptx).
+/// This module provides direct access to OOXML parsing functionality.
+/// Most users should use the high-level [`Document`] and [`Presentation`]
+/// APIs instead, which automatically handle format detection.
 pub mod ooxml;
 
-// Re-export commonly used types for convenience
-pub use ole::{doc, ppt};
+// Re-export high-level APIs
+pub use common::{Error, Result};
+pub use document::Document;
+pub use presentation::Presentation;
 
-// Re-export shape types for PPT
-pub use ole::ppt::{shapes, Shape, TextBox, Placeholder, PlaceholderType, PlaceholderSize, AutoShape};
+// Re-export commonly used types
+pub use common::{Length, RGBColor, PlaceholderType, ShapeType};

@@ -4,6 +4,7 @@ use crate::ooxml::docx::parts::DocumentPart;
 use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::opc::constants::content_type as ct;
 use crate::ooxml::opc::OpcPackage;
+use std::io::{Read, Seek};
 use std::path::Path;
 
 /// A Word (.docx) package.
@@ -45,6 +46,42 @@ impl Package {
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let opc = OpcPackage::open(path)?;
+
+        // Verify it's a Word document by checking the main part's content type
+        let main_part = opc
+            .main_document_part()
+            .map_err(|e| OoxmlError::PartNotFound(format!("main document part: {}", e)))?;
+
+        let content_type = main_part.content_type();
+        if content_type != ct::WML_DOCUMENT_MAIN {
+            return Err(OoxmlError::InvalidContentType {
+                expected: ct::WML_DOCUMENT_MAIN.to_string(),
+                got: content_type.to_string(),
+            });
+        }
+
+        Ok(Self { opc })
+    }
+
+    /// Create a .docx package from a reader.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader` - A reader containing the .docx file data (must implement Read + Seek)
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::docx::Package;
+    /// use std::io::Cursor;
+    ///
+    /// let data = std::fs::read("document.docx")?;
+    /// let cursor = Cursor::new(data);
+    /// let pkg = Package::from_reader(cursor)?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn from_reader<R: Read + Seek>(reader: R) -> Result<Self> {
+        let opc = OpcPackage::from_reader(reader)?;
 
         // Verify it's a Word document by checking the main part's content type
         let main_part = opc

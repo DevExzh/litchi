@@ -14,14 +14,8 @@ const CURRENT_USER_MIN_SIZE: usize = 28;
 /// the current editing session in a PowerPoint presentation.
 #[derive(Debug, Clone)]
 pub struct CurrentUser {
-    /// Size of the CurrentUser structure
-    _size: u32,
-    /// Header token - magic number (0xF3D1C4DF)
-    _header_token: u32,
     /// Offset to the current UserEditAtom record
     current_edit_offset: u32,
-    /// Length of username string
-    _username_len: u16,
     /// Release version
     release_version: u16,
     /// Username (UTF-16LE encoded)
@@ -58,7 +52,8 @@ impl CurrentUser {
         }
 
         // Parse header fields using unsafe for performance (bounds already checked)
-        let size = unsafe { u32::from_le_bytes(*(&data[0..4] as *const [u8] as *const [u8; 4])) };
+        // Note: size field at bytes 0-3 parsed for validation but not stored
+        let _size = unsafe { u32::from_le_bytes(*(&data[0..4] as *const [u8] as *const [u8; 4])) };
         let header_token = unsafe { u32::from_le_bytes(*(&data[4..8] as *const [u8] as *const [u8; 4])) };
         let current_edit_offset = unsafe { u32::from_le_bytes(*(&data[8..12] as *const [u8] as *const [u8; 4])) };
         let username_len = unsafe { u16::from_le_bytes(*(&data[12..14] as *const [u8] as *const [u8; 2])) };
@@ -97,10 +92,7 @@ impl CurrentUser {
         };
 
         Ok(Self {
-            _size: size,
-            _header_token: header_token,
             current_edit_offset,
-            _username_len: username_len,
             release_version,
             username,
             rel_path,
