@@ -12,6 +12,10 @@ pub enum Error {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// Parse error occurred
+    #[error("Parse error: {0}")]
+    ParseError(String),
+
     /// Invalid file format
     #[error("Invalid format: {0}")]
     InvalidFormat(String),

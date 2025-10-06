@@ -111,11 +111,20 @@ pub mod common;
 /// Use [`Document::open()`] to get started.
 pub mod document;
 
+/// Image processing and conversion module
+///
+/// Provides functionality to parse and convert Office Drawing formats
+/// (EMF, WMF, PICT) to modern image standards (PNG, JPEG, WebP).
+pub mod images;
+
 /// Unified PowerPoint presentation API
 ///
 /// Provides format-agnostic interface for both .ppt and .pptx files.
 /// Use [`Presentation::open()`] to get started.
 pub mod presentation;
+
+/// Unified Excel spreadsheet API (placeholder for future functionality)
+pub mod sheet;
 
 // Low-level format-specific modules (advanced use)
 /// OLE2 format parser (legacy .doc, .ppt files)
