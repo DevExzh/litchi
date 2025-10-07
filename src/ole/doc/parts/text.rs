@@ -62,15 +62,14 @@ impl TextExtractor {
         table_stream: &[u8],
     ) -> Result<String> {
         // Get the CLX (piece table) location from FIB
-        // CLX is at FibRgFcLcb index 1 (fcClx, lcbClx)
+        // CLX is at FibRgFcLcb index 33 (fcClx, lcbClx) according to Apache POI's FIBFieldHandler
         let (clx_offset, clx_length) = fib
-            .get_table_pointer(1)
+            .get_table_pointer(33)
             .ok_or_else(|| DocError::Corrupted("CLX pointer not found in FIB".to_string()))?;
 
         if clx_length == 0 {
             // No piece table means text starts at offset 0x200 or 0x800
             // This is a simplified doc or Word 6.0 format
-            eprintln!("No CLX found, falling back to simple text extraction");
             return Self::extract_text_simple(word_document);
         }
 
@@ -97,10 +96,9 @@ impl TextExtractor {
 
         // Try to parse the piece table from CLX
         match Self::parse_piece_table(clx_data, word_document) {
-            Ok(text) => Ok(text),
-            Err(_) => {
-                // If CLX parsing fails, fall back to simple text extraction
-                eprintln!("CLX parsing failed, falling back to simple text extraction");
+            Ok(text) if !text.is_empty() => Ok(text),
+            _ => {
+                // If CLX parsing fails or returns empty, fall back to simple text extraction
                 Self::extract_text_simple(word_document)
             }
         }
@@ -185,31 +183,32 @@ impl TextExtractor {
         }
 
         // If we reach here, no piece table was found in the CLX
-        // This might be an older document format or the CLX structure is different
-        eprintln!("No piece table found in CLX structure, falling back to simple text extraction");
-        Ok(String::new()) // Return empty string to trigger fallback
+        // Return empty string to trigger fallback
+        Ok(String::new())
     }
 
     /// Parse a PlexOfCps structure (Property List with Character Positions).
     ///
-    /// Format: [4-byte count] + [count * (8-byte CP pair + 8-byte PieceDescriptor)]
+    /// Based on Apache POI's PlexOfCps implementation:
+    /// Format: [CP0] [CP1] ... [CP_n] [Struct0] [Struct1] ... [Struct_{n-1}]
+    /// - For n pieces, there are (n+1) CPs (4 bytes each)
+    /// - Followed by n PieceDescriptor structs (8 bytes each)
+    /// - Number of pieces: n = (size - 4) / (4 + 8)
     fn parse_plex_of_cps(plex_data: &[u8]) -> Result<Vec<PieceDescriptor>> {
         if plex_data.len() < 4 {
             return Ok(Vec::new());
         }
 
-        let num_pieces = u32::from_le_bytes([
-            plex_data[0], plex_data[1], plex_data[2], plex_data[3]
-        ]) as usize;
+        // Calculate number of pieces using Apache POI's formula:
+        // _iMac = (cb - 4) / (4 + cbStruct)
+        let num_pieces = (plex_data.len() - 4) / (4 + PIECE_DESCRIPTOR_SIZE);
 
         if num_pieces == 0 {
             return Ok(Vec::new());
         }
 
-        // Each entry: 4 bytes CP start + 4 bytes CP end + 8 bytes PieceDescriptor
-        let entry_size = 4 + 4 + PIECE_DESCRIPTOR_SIZE;
-        let expected_size = 4 + num_pieces * entry_size;
-
+        // Validate size
+        let expected_size = 4 + num_pieces * (4 + PIECE_DESCRIPTOR_SIZE);
         if plex_data.len() < expected_size {
             return Err(DocError::Corrupted(format!(
                 "PlexOfCps truncated: expected {} bytes, got {}",
@@ -218,23 +217,25 @@ impl TextExtractor {
         }
 
         let mut pieces = Vec::with_capacity(num_pieces);
-        let mut offset = 4; // Skip the initial 4-byte count
 
+        // Read all CPs first (they're at the beginning)
+        let mut cps = Vec::with_capacity(num_pieces + 1);
+        for i in 0..=num_pieces {
+            let offset = i * 4;
+            let cp = u32::from_le_bytes([
+                plex_data[offset],
+                plex_data[offset + 1],
+                plex_data[offset + 2],
+                plex_data[offset + 3]
+            ]);
+            cps.push(cp);
+        }
+
+        // Now read all PieceDescriptors (they're after all the CPs)
+        let struct_offset = (num_pieces + 1) * 4;
         for i in 0..num_pieces {
-            // Read CP start and end (character positions)
-            let cp_start = u32::from_le_bytes([
-                plex_data[offset], plex_data[offset + 1],
-                plex_data[offset + 2], plex_data[offset + 3]
-            ]);
-            offset += 4;
+            let offset = struct_offset + i * PIECE_DESCRIPTOR_SIZE;
 
-            let cp_end = u32::from_le_bytes([
-                plex_data[offset], plex_data[offset + 1],
-                plex_data[offset + 2], plex_data[offset + 3]
-            ]);
-            offset += 4;
-
-            // Read PieceDescriptor (8 bytes)
             if offset + PIECE_DESCRIPTOR_SIZE > plex_data.len() {
                 return Err(DocError::Corrupted(format!(
                     "PieceDescriptor {} truncated", i
@@ -242,28 +243,26 @@ impl TextExtractor {
             }
 
             let piece_data = &plex_data[offset..offset + PIECE_DESCRIPTOR_SIZE];
-            offset += PIECE_DESCRIPTOR_SIZE;
 
             // Parse PieceDescriptor (matches Apache POI's PieceDescriptor constructor)
-            // Note: descriptor flags parsed but not currently used
             let _descriptor = u16::from_le_bytes([piece_data[0], piece_data[1]]);
             let mut fc = u32::from_le_bytes([piece_data[2], piece_data[3], piece_data[4], piece_data[5]]);
-            // Note: PRM (Property Modifier) parsed but not currently used - may be needed for advanced formatting
             let _prm = u16::from_le_bytes([piece_data[6], piece_data[7]]);
 
             // Extract encoding information from fc (bit 30 indicates encoding)
-            // If bit 30 is set, this is ANSI encoding and fc needs to be adjusted
+            // From Apache POI PieceDescriptor.java lines 69-76:
+            // If bit 30 is clear, this is Unicode (UTF-16LE)
+            // If bit 30 is set, this is compressed ANSI (Windows-1252)
             let is_ansi = (fc & 0x40000000) != 0;
             if is_ansi {
-                fc &= 0x3FFFFFFF; // Clear the encoding bit
+                fc &= !0x40000000; // Clear the encoding bit
                 fc /= 2; // Adjust for ANSI (1 byte per character vs 2 bytes for Unicode)
             }
-            let file_pos = fc;
 
             pieces.push(PieceDescriptor {
-                cp_start,
-                cp_end,
-                file_pos: file_pos as usize,
+                cp_start: cps[i],
+                cp_end: cps[i + 1],
+                file_pos: fc as usize,
                 is_ansi,
             });
         }
@@ -440,20 +439,28 @@ mod tests {
         // Test that the CLX structure constants are correct
         assert_eq!(PIECE_DESCRIPTOR_SIZE, 8);
 
-        // Test basic parsing of a minimal CLX structure
-        // This would be: [4-byte count=1] + [4-byte CP start] + [4-byte CP end] + [8-byte PieceDescriptor]
-        let minimal_clx = [
-            0x01, 0x00, 0x00, 0x00, // count = 1
+        // Test basic parsing of a minimal PlexOfCps structure
+        // Format: [CP0] [CP1] [Struct0]
+        // For 1 piece: 2 CPs (8 bytes) + 1 PieceDescriptor (8 bytes) = 16 bytes
+        let minimal_plex = [
+            // CPs (2 of them for 1 piece)
             0x00, 0x00, 0x00, 0x00, // cp_start = 0
             0x10, 0x00, 0x00, 0x00, // cp_end = 16 (16 characters)
-            0x00, 0x00, 0x00, 0x00, // descriptor (unused)
-            0x00, 0x00, 0x00, 0x00, // fc = 0
-            0x00, 0x00, 0x00, 0x00, // prm (unused)
+            // PieceDescriptor (8 bytes)
+            0x00, 0x00,             // descriptor
+            0x00, 0x00, 0x00, 0x00, // fc = 0 (Unicode at position 0)
+            0x00, 0x00,             // prm
         ];
 
-        // This should not crash, even if the parsing logic might need adjustment
-        // The important thing is that it doesn't crash on unknown CLX structures
-        assert!(minimal_clx.len() >= 4);
+        // Should parse successfully
+        let result = TextExtractor::parse_plex_of_cps(&minimal_plex);
+        assert!(result.is_ok());
+        let pieces = result.unwrap();
+        assert_eq!(pieces.len(), 1);
+        assert_eq!(pieces[0].cp_start, 0);
+        assert_eq!(pieces[0].cp_end, 16);
+        assert_eq!(pieces[0].file_pos, 0);
+        assert_eq!(pieces[0].is_ansi, false); // Bit 30 not set = Unicode
     }
 }
 
