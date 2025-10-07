@@ -177,7 +177,7 @@ impl Default for ShapeProperties {
 ///
 /// This trait defines the common interface that all shape implementations
 /// must provide, including access to properties and basic operations.
-pub trait Shape {
+pub trait Shape: std::any::Any {
     /// Get the shape's properties.
     fn properties(&self) -> &ShapeProperties;
 
@@ -213,6 +213,9 @@ pub trait Shape {
 
     /// Clone the shape as a boxed trait object.
     fn clone_box(&self) -> Box<dyn Shape>;
+
+    /// Get the shape as an Any reference for downcasting.
+    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 impl Clone for Box<dyn Shape> {
@@ -291,6 +294,10 @@ impl Shape for ShapeContainer {
 
     fn clone_box(&self) -> Box<dyn Shape> {
         Box::new(self.clone())
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 

@@ -233,21 +233,24 @@ impl Slide {
     /// Get text boxes on the slide.
     ///
     /// Based on POI's approach of filtering shapes by type.
+    /// This method iterates through all shapes and returns those that are TextBox instances.
     pub fn text_boxes(&self) -> Vec<&super::shapes::textbox::TextBox> {
-        // Since we store shapes as trait objects, we need to check the shape type
-        // and return references appropriately. For now, this is a simplified implementation.
-        // In a full implementation, we'd use downcasting or store typed collections.
-        Vec::new()
+        self.shapes
+            .iter()
+            .filter_map(|shape| shape.as_ref().as_any().downcast_ref::<super::shapes::textbox::TextBox>())
+            .collect()
     }
 
     /// Get placeholders on the slide.
     ///
     /// Based on POI's HSLFSheet.getPlaceholder() logic which filters shapes
     /// to find those with placeholder information.
+    /// This method iterates through all shapes and returns those that are Placeholder instances.
     pub fn placeholders(&self) -> Vec<&super::shapes::placeholder::Placeholder> {
-        // Extract placeholders by checking shape properties
-        // This is a simplified implementation - full version would use downcasting
-        Vec::new()
+        self.shapes
+            .iter()
+            .filter_map(|shape| shape.as_ref().as_any().downcast_ref::<super::shapes::placeholder::Placeholder>())
+            .collect()
     }
 
     /// Get a placeholder by index.
@@ -325,5 +328,18 @@ mod tests {
         let slide = Slide::new(data, 0).unwrap();
         let text = slide.text().unwrap();
         assert!(text.contains("Slide 1"));
+    }
+
+    #[test]
+    fn test_text_boxes_and_placeholders_empty() {
+        let data = vec![];
+        let slide = Slide::new(data, 0).unwrap();
+
+        // Since we don't have proper shape parsing yet, these should return empty vectors
+        let text_boxes = slide.text_boxes();
+        let placeholders = slide.placeholders();
+
+        assert!(text_boxes.is_empty());
+        assert!(placeholders.is_empty());
     }
 }
