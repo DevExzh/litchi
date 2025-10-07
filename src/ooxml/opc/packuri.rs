@@ -119,11 +119,10 @@ impl PackURI {
         }
 
         // Parse the numeric suffix if found
-        if let Some(start) = digit_start {
-            if start > 0 && start < name_part.len() {
+        if let Some(start) = digit_start
+            && start > 0 && start < name_part.len() {
                 return name_part[start..].parse::<u32>().ok();
             }
-        }
 
         None
     }

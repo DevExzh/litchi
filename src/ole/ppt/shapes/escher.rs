@@ -880,11 +880,10 @@ impl EscherParser {
         let mut shapes = Vec::new();
 
         for record in self.records.values() {
-            if matches!(record.record_type, EscherRecordType::ShapeProperties) {
-                if let Ok(shape_props) = record.extract_shape_properties() {
+            if matches!(record.record_type, EscherRecordType::ShapeProperties)
+                && let Ok(shape_props) = record.extract_shape_properties() {
                     shapes.push(shape_props);
                 }
-            }
         }
 
         Ok(shapes)

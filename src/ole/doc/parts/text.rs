@@ -327,7 +327,7 @@ impl TextExtractor {
             } else {
                 // 16-bit Unicode (UTF-16LE)
                 // Make sure we have complete UTF-16LE pairs
-                let utf16_data = if text_data.len() % 2 == 0 {
+                let utf16_data = if text_data.len().is_multiple_of(2) {
                     text_data
                 } else {
                     &text_data[..text_data.len() & !1] // Truncate to even length

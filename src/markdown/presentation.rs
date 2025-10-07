@@ -2,7 +2,6 @@
 ///
 /// This module implements the `ToMarkdown` trait for PowerPoint presentation types,
 /// including Presentation and Slide.
-
 use crate::common::{Error, Result};
 use crate::presentation::{Presentation, Slide};
 use super::config::MarkdownOptions;

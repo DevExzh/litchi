@@ -33,7 +33,6 @@
 /// }
 /// # Ok::<(), litchi::common::Error>(())
 /// ```
-
 use crate::common::{Error, Result};
 use crate::ole;
 use crate::ooxml;
@@ -263,10 +262,8 @@ impl Presentation {
                 let slides = pres.slides().map_err(Error::from)?;
                 let mut texts = Vec::new();
                 for slide in slides {
-                    if let Ok(text) = slide.text() {
-                        if !text.is_empty() {
-                            texts.push(text);
-                        }
+                    if let Ok(text) = slide.text() && !text.is_empty() {
+                        texts.push(text);
                     }
                 }
                 Ok(texts.join("\n\n"))

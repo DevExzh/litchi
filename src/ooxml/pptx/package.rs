@@ -131,7 +131,7 @@ impl Package {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn presentation(&self) -> Result<Presentation> {
+    pub fn presentation(&self) -> Result<Presentation<'_>> {
         let main_part = self
             .opc
             .main_document_part()

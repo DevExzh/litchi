@@ -90,7 +90,7 @@ impl Table {
 
     /// Check if the first row is a header row.
     pub fn has_header_row(&self) -> bool {
-        self.properties.as_ref().map_or(false, |p| p.is_header_row)
+        self.properties.as_ref().is_some_and(|p| p.is_header_row)
     }
 }
 
@@ -146,7 +146,7 @@ impl Row {
 
     /// Check if this is a header row.
     pub fn is_header(&self) -> bool {
-        self.row_properties.as_ref().map_or(false, |p| p.is_header_row)
+        self.row_properties.as_ref().is_some_and(|p| p.is_header_row)
     }
 }
 

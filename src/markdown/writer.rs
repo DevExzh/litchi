@@ -2,7 +2,6 @@
 ///
 /// This module provides the `MarkdownWriter` struct which handles the actual
 /// conversion of document elements to Markdown format.
-
 use crate::common::{Error, Result};
 use crate::document::{Paragraph, Run, Table};
 use super::config::{MarkdownOptions, TableStyle};

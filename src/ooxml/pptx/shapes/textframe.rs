@@ -17,6 +17,11 @@ use quick_xml::Reader;
 /// for para in text_frame.paragraphs()? {
 ///     println!("Paragraph: {}", para.text()?);
 /// }
+///
+/// // Check for embedded formulas
+/// for formula in text_frame.omml_formulas()? {
+///     println!("Found OMML formula: {}", formula);
+/// }
 /// ```
 #[derive(Debug, Clone)]
 pub struct TextFrame {
@@ -147,6 +152,27 @@ impl TextFrame {
         }
 
         Ok(paragraphs)
+    }
+
+    /// Extract all OMML formulas from this text frame.
+    ///
+    /// Returns a vector of OMML formula strings found in any paragraph within this text frame.
+    pub fn omml_formulas(&self) -> Result<Vec<String>> {
+        let mut formulas = Vec::new();
+        for para in self.paragraphs()? {
+            // For PPTX, we need to check if the paragraph contains OMML formulas
+            // This is a simplified approach - in a full implementation, we would
+            // need to parse the paragraph XML for OMML content similar to how
+            // we do it for DOCX runs
+            if let Ok(text) = para.text() {
+                // Look for OMML-like patterns in the text (simplified heuristic)
+                if text.contains("oMath") || text.contains("m:oMath") {
+                    // In a full implementation, we would extract the actual OMML XML
+                    formulas.push(text);
+                }
+            }
+        }
+        Ok(formulas)
     }
 }
 

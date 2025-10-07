@@ -57,17 +57,15 @@ impl<R: Read + Seek> OleFile<R> {
         let mut metadata = OleMetadata::default();
 
         // Try to parse SummaryInformation stream
-        if let Ok(data) = self.open_stream(&["\u{0005}SummaryInformation"]) {
-            if let Ok(props) = parse_property_stream(&data) {
-                extract_summary_info(&mut metadata, &props);
-            }
+        if let Ok(data) = self.open_stream(&["\u{0005}SummaryInformation"])
+            && let Ok(props) = parse_property_stream(&data) {
+            extract_summary_info(&mut metadata, &props);
         }
 
         // Try to parse DocumentSummaryInformation stream
-        if let Ok(data) = self.open_stream(&["\u{0005}DocumentSummaryInformation"]) {
-            if let Ok(props) = parse_property_stream(&data) {
-                extract_document_summary_info(&mut metadata, &props);
-            }
+        if let Ok(data) = self.open_stream(&["\u{0005}DocumentSummaryInformation"])
+            && let Ok(props) = parse_property_stream(&data) {
+            extract_document_summary_info(&mut metadata, &props);
         }
 
         Ok(metadata)

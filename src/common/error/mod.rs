@@ -2,7 +2,6 @@
 ///
 /// This module provides a unified error type that encompasses errors from both
 /// OLE2 and OOXML parsing, presenting a consistent API to users.
-
 use thiserror::Error;
 
 /// Main error type for Litchi operations.

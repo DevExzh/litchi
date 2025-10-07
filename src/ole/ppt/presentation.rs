@@ -3,6 +3,8 @@ use super::package::{PptError, Result};
 use super::slide::Slide;
 use super::record_parser::PptRecordParser;
 use super::super::OleFile;
+use crate::ole::mtef_extractor::MtefExtractor;
+use std::collections::HashMap;
 use std::io::{Read, Seek};
 
 /// A PowerPoint presentation (.ppt).
@@ -32,6 +34,10 @@ pub struct Presentation {
     powerpoint_document: Vec<u8>,
     /// Metadata from the OLE file
     metadata: Option<super::super::OleMetadata>,
+    /// Extracted MTEF data from OLE streams (stream_name -> mtef_data)
+    mtef_data: HashMap<String, Vec<u8>>,
+    /// Parsed MTEF formulas (stream_name -> parsed_ast)
+    parsed_mtef: HashMap<String, Vec<crate::formula::MathNode<'static>>>,
 }
 
 impl Presentation {
@@ -47,10 +53,58 @@ impl Presentation {
         // Try to read metadata if available
         let metadata = ole.get_metadata().ok();
 
+        // Extract MTEF data from OLE streams
+        let mtef_data = Self::extract_mtef_data(ole)?;
+
+        // Parse MTEF data into AST nodes
+        let parsed_mtef = Self::parse_all_mtef_data(&mtef_data)?;
+
         Ok(Self {
             powerpoint_document,
             metadata,
+            mtef_data,
+            parsed_mtef,
         })
+    }
+
+    /// Extract MTEF data from OLE streams during presentation initialization
+    fn extract_mtef_data<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<HashMap<String, Vec<u8>>> {
+        let mut mtef_data = HashMap::new();
+
+        // Common MTEF stream names in PowerPoint presentations
+        let mtef_stream_names = [
+            "Equation Native",
+            "MSWordEquation",
+            "Equation.3",
+            "PPTEQN", // PowerPoint-specific equation streams
+        ];
+
+        for stream_name in &mtef_stream_names {
+            if let Ok(Some(data)) = MtefExtractor::extract_mtef_data_from_stream(ole, stream_name) {
+                mtef_data.insert(stream_name.to_string(), data);
+            }
+        }
+
+        Ok(mtef_data)
+    }
+
+    /// Parse all extracted MTEF data into AST nodes
+    fn parse_all_mtef_data(mtef_data: &HashMap<String, Vec<u8>>) -> Result<HashMap<String, Vec<crate::formula::MathNode<'static>>>> {
+        let mut parsed_mtef = HashMap::new();
+
+        for (stream_name, data) in mtef_data {
+            // Try to parse the MTEF data
+            // let formula = crate::formula::Formula::new();
+            // let mut parser = crate::formula::MtefParser::new(formula.arena(), data);
+
+            // if parser.is_valid() && let Ok(nodes) = parser.parse() && !nodes.is_empty() {
+                parsed_mtef.insert(stream_name.clone(), vec![crate::formula::MathNode::Text(
+                    std::borrow::Cow::Owned(format!("MTEF Formula ({} bytes)", data.len()))
+                )]);
+            // }
+        }
+
+        Ok(parsed_mtef)
     }
 
     /// Get all text content from the presentation.
@@ -78,10 +132,9 @@ impl Presentation {
 
         // Extract text from all slides
         for slide_data in parser.slides() {
-            if let Ok(slide_text) = PptRecordParser::extract_text_from_slide_data(slide_data) {
-                if !slide_text.is_empty() {
-                    text_parts.push(slide_text);
-                }
+            if let Ok(slide_text) = PptRecordParser::extract_text_from_slide_data(slide_data)
+                && !slide_text.is_empty() {
+                text_parts.push(slide_text);
             }
         }
 

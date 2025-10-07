@@ -113,7 +113,7 @@ impl Package {
     /// let doc = pkg.document()?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn document(&self) -> Result<Document> {
+    pub fn document(&self) -> Result<Document<'_>> {
         let main_part = self
             .opc
             .main_document_part()

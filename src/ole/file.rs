@@ -625,17 +625,13 @@ impl<R: Read + Seek> OleFile<R> {
         }
 
         // Search left subtree
-        if entry.sid_left != NOSTREAM {
-            if let Ok(found) = self.find_child_by_name(entry.sid_left, name) {
-                return Ok(found);
-            }
+        if entry.sid_left != NOSTREAM && let Ok(found) = self.find_child_by_name(entry.sid_left, name) {
+            return Ok(found);
         }
 
         // Search right subtree
-        if entry.sid_right != NOSTREAM {
-            if let Ok(found) = self.find_child_by_name(entry.sid_right, name) {
-                return Ok(found);
-            }
+        if entry.sid_right != NOSTREAM && let Ok(found) = self.find_child_by_name(entry.sid_right, name) {
+            return Ok(found);
         }
 
         Err(OleError::StreamNotFound)

@@ -29,6 +29,18 @@ pub struct TextRunFormatting {
 /// A text run with formatting.
 ///
 /// Based on Apache POI's RichTextRun.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// let run = TextRun::new("x^2 + y^2 = z^2".to_string(), 0);
+/// println!("Text: {}", run.text);
+///
+/// // Check for embedded MTEF formulas
+/// if let Some(formula_ast) = run.mtef_formula_ast() {
+///     println!("MTEF formula AST with {} nodes", formula_ast.len());
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct TextRun {
     /// Text content
@@ -39,6 +51,8 @@ pub struct TextRun {
     pub start_index: usize,
     /// Length in characters
     pub length: usize,
+    /// Parsed MTEF formula AST (if this run contains a formula)
+    mtef_formula_ast: Option<Vec<crate::formula::MathNode<'static>>>,
 }
 
 impl TextRun {
@@ -50,6 +64,7 @@ impl TextRun {
             formatting: TextRunFormatting::default(),
             start_index,
             length,
+            mtef_formula_ast: None,
         }
     }
 
@@ -61,7 +76,47 @@ impl TextRun {
             formatting,
             start_index,
             length,
+            mtef_formula_ast: None,
         }
+    }
+
+    /// Create a text run with MTEF formula AST.
+    pub fn with_mtef_formula(
+        text: String,
+        start_index: usize,
+        formatting: TextRunFormatting,
+        mtef_ast: Vec<crate::formula::MathNode<'static>>,
+    ) -> Self {
+        let length = text.chars().count();
+        Self {
+            text,
+            formatting,
+            start_index,
+            length,
+            mtef_formula_ast: Some(mtef_ast),
+        }
+    }
+
+    /// Check if this text run contains an MTEF formula.
+    ///
+    /// Returns true if this run contains a parsed MTEF formula AST.
+    pub fn has_mtef_formula(&self) -> bool {
+        self.mtef_formula_ast.is_some()
+    }
+
+    /// Get the MTEF formula AST if this run contains a formula.
+    ///
+    /// Returns the parsed MTEF formula as AST nodes if this run contains a MathType equation,
+    /// None otherwise.
+    pub fn mtef_formula_ast(&self) -> Option<&Vec<crate::formula::MathNode<'static>>> {
+        self.mtef_formula_ast.as_ref()
+    }
+
+    /// Get a mutable reference to the MTEF formula AST.
+    ///
+    /// This allows for modification of the formula AST if needed.
+    pub fn mtef_formula_ast_mut(&mut self) -> &mut Option<Vec<crate::formula::MathNode<'static>>> {
+        &mut self.mtef_formula_ast
     }
 }
 

@@ -167,6 +167,19 @@ impl Paragraph {
 
         Ok(runs)
     }
+
+    /// Extract all OMML formulas from this paragraph.
+    ///
+    /// Returns a vector of OMML formula strings found in any run within this paragraph.
+    pub fn omml_formulas(&self) -> Result<Vec<String>> {
+        let mut formulas = Vec::new();
+        for run in self.runs()? {
+            if let Some(formula) = run.omml_formula()? {
+                formulas.push(formula);
+            }
+        }
+        Ok(formulas)
+    }
 }
 
 /// A run within a paragraph.
@@ -181,6 +194,11 @@ impl Paragraph {
 /// println!("Text: {}", run.text()?);
 /// println!("Bold: {:?}", run.bold()?);
 /// println!("Italic: {:?}", run.italic()?);
+///
+/// // Check for embedded formulas
+/// if let Some(omml) = run.omml_formula()? {
+///     println!("OMML formula: {}", omml);
+/// }
 /// ```
 #[derive(Debug, Clone)]
 pub struct Run {
@@ -357,13 +375,11 @@ impl Run {
                         in_r_pr = true;
                     } else if in_r_pr && name.as_ref() == b"sz" {
                         for attr in e.attributes().flatten() {
-                            if attr.key.as_ref() == b"val" {
-                                if let Ok(value) = std::str::from_utf8(&attr.value) {
-                                    if let Ok(size) = value.parse::<u32>() {
+                            if attr.key.as_ref() == b"val"
+                                && let Ok(value) = std::str::from_utf8(&attr.value)
+                                    && let Ok(size) = value.parse::<u32>() {
                                         return Ok(Some(size));
                                     }
-                                }
-                            }
                         }
                     }
                 }
@@ -380,6 +396,77 @@ impl Run {
         }
 
         Ok(None)
+    }
+
+    /// Check if this run contains an OMML formula.
+    ///
+    /// Returns the OMML XML content if this run contains a mathematical formula,
+    /// None otherwise. This method looks for `<m:oMath>` elements embedded in the run.
+    pub fn omml_formula(&self) -> Result<Option<String>> {
+        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        reader.config_mut().trim_text(true);
+
+        let mut in_omath = false;
+        let mut omml_content = String::new();
+        let mut buf = Vec::new();
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                    let name = e.local_name();
+                    if name.as_ref() == b"oMath" {
+                        in_omath = true;
+                        omml_content.push('<');
+                        omml_content.push_str(std::str::from_utf8(name.as_ref()).unwrap());
+                        for attr in e.attributes().flatten() {
+                            omml_content.push(' ');
+                            omml_content.push_str(std::str::from_utf8(attr.key.as_ref()).unwrap());
+                            omml_content.push_str("=\"");
+                            omml_content.push_str(&attr.unescape_value().unwrap_or(Cow::Borrowed("")));
+                            omml_content.push('"');
+                        }
+                        omml_content.push('>');
+                    } else if in_omath {
+                        // Include nested elements in the OMML content
+                        omml_content.push('<');
+                        omml_content.push_str(std::str::from_utf8(name.as_ref()).unwrap());
+                        for attr in e.attributes().flatten() {
+                            omml_content.push(' ');
+                            omml_content.push_str(std::str::from_utf8(attr.key.as_ref()).unwrap());
+                            omml_content.push_str("=\"");
+                            omml_content.push_str(&attr.unescape_value().unwrap_or(Cow::Borrowed("")));
+                            omml_content.push('"');
+                        }
+                        if name.as_ref() == b"oMath" {
+                            omml_content.push('/');
+                            in_omath = false;
+                        }
+                        omml_content.push('>');
+                    }
+                }
+                Ok(Event::Text(e)) if in_omath => {
+                    // Extract text content - OMML doesn't typically use entities that need unescaping
+                    let text = std::str::from_utf8(e.as_ref())
+                        .map_err(|_| OoxmlError::Xml("Invalid UTF-8 in OMML text".to_string()))?;
+                    omml_content.push_str(text);
+                }
+                Ok(Event::End(e)) if in_omath => {
+                    omml_content.push_str("</");
+                    omml_content.push_str(std::str::from_utf8(e.name().as_ref()).unwrap());
+                    omml_content.push('>');
+                }
+                Ok(Event::Eof) => break,
+                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+                _ => {}
+            }
+            buf.clear();
+        }
+
+        if omml_content.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(omml_content))
+        }
     }
 
     /// Helper to extract boolean properties from run properties.
@@ -450,7 +537,7 @@ mod tests {
         </w:r>"#;
 
         let run = Run::new(xml.to_vec());
-        assert_eq!(run.bold().unwrap(), Some(true));
+        assert!(run.bold().unwrap().unwrap_or(false));
     }
 
     #[test]
@@ -461,6 +548,6 @@ mod tests {
         </w:r>"#;
 
         let run = Run::new(xml.to_vec());
-        assert_eq!(run.italic().unwrap(), Some(true));
+        assert!(run.italic().unwrap().unwrap_or(false));
     }
 }

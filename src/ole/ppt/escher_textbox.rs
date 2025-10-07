@@ -84,11 +84,10 @@ impl EscherTextboxWrapper {
         for record in records {
             match record.record_type {
                 PptRecordType::TextCharsAtom | PptRecordType::TextBytesAtom => {
-                    if let Ok(text) = record.extract_text() {
-                        if !text.is_empty() {
+                    if let Ok(text) = record.extract_text()
+                        && !text.is_empty() {
                             text_parts.push(text);
                         }
-                    }
                 }
                 _ => {}
             }

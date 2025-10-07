@@ -350,11 +350,10 @@ impl PptRecord {
 
         // Recursively extract text from children
         for child in &self.children {
-            if let Ok(child_text) = child.extract_text() {
-                if !child_text.is_empty() {
+            if let Ok(child_text) = child.extract_text()
+                && !child_text.is_empty() {
                     text_parts.push(child_text);
                 }
-            }
         }
 
         Ok(text_parts.join("\n"))
@@ -511,11 +510,10 @@ impl PptRecordParser {
                     offset += consumed;
 
                     // If this is a slide record, extract slide data
-                    if record.record_type == PptRecordType::Slide {
-                        if let Some(slide_data) = record.extract_slide_data() {
+                    if record.record_type == PptRecordType::Slide
+                        && let Some(slide_data) = record.extract_slide_data() {
                             self.slides.push(slide_data);
                         }
-                    }
 
                     // Prevent infinite loops by ensuring we make progress
                     if consumed == 0 {
@@ -561,11 +559,10 @@ impl PptRecordParser {
         let mut text_parts = Vec::new();
 
         for record in &self.records {
-            if let Ok(record_text) = record.extract_text() {
-                if !record_text.is_empty() {
+            if let Ok(record_text) = record.extract_text()
+                && !record_text.is_empty() {
                     text_parts.push(record_text);
                 }
-            }
         }
 
         if text_parts.is_empty() {
@@ -606,11 +603,10 @@ impl PptRecordParser {
                 match PptRecord::parse(slide_data, offset) {
                     Ok((ppt_record, consumed)) => {
                         // Extract text from PPT record
-                        if let Ok(ppt_text) = ppt_record.extract_text() {
-                            if !ppt_text.is_empty() {
+                        if let Ok(ppt_text) = ppt_record.extract_text()
+                            && !ppt_text.is_empty() {
                                 text_parts.push(ppt_text);
                             }
-                        }
                         offset += consumed;
                     }
                     Err(_) => {

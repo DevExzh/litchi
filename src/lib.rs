@@ -147,6 +147,11 @@ pub mod ole;
 /// APIs instead, which automatically handle format detection.
 pub mod ooxml;
 
+/// Formula module
+///
+/// This module provides functionality to parse and convert mathematical formulas between different formats.
+pub mod formula;
+
 // Re-export high-level APIs
 pub use common::{Error, Result};
 pub use document::Document;

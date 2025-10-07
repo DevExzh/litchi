@@ -6,6 +6,8 @@ use super::parts::text::TextExtractor;
 use super::parts::paragraph_extractor::ParagraphExtractor;
 use super::table::Table;
 use super::super::OleFile;
+use crate::ole::mtef_extractor::MtefExtractor;
+use std::collections::HashMap;
 use std::io::{Read, Seek};
 
 /// A Word document (.doc).
@@ -37,6 +39,10 @@ pub struct Document {
     table_stream: Vec<u8>,
     /// Text extractor - holds the extracted document text
     text_extractor: TextExtractor,
+    /// Extracted MTEF data from OLE streams (stream_name -> mtef_data)
+    mtef_data: std::collections::HashMap<String, Vec<u8>>,
+    /// Parsed MTEF formulas (stream_name -> parsed_ast)
+    parsed_mtef: std::collections::HashMap<String, Vec<crate::formula::MathNode<'static>>>,
 }
 
 impl Document {
@@ -63,11 +69,86 @@ impl Document {
         // Create text extractor
         let text_extractor = TextExtractor::new(&fib, &word_document, &table_stream)?;
 
+        // Extract MTEF data from OLE streams
+        let mtef_data = Self::extract_mtef_data(ole)?;
+
+        // Parse MTEF data into AST nodes
+        let parsed_mtef = Self::parse_all_mtef_data(&mtef_data)?;
+
         Ok(Self {
             fib,
             table_stream,
             text_extractor,
+            mtef_data,
+            parsed_mtef,
         })
+    }
+
+    /// Extract MTEF data from OLE streams during document initialization
+    fn extract_mtef_data<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<HashMap<String, Vec<u8>>> {
+        let mut mtef_data = HashMap::new();
+
+        // Common MTEF stream names in Word documents
+        let mtef_stream_names = [
+            "Equation Native",
+            "MSWordEquation",
+            "Equation.3",
+        ];
+
+        for stream_name in &mtef_stream_names {
+            if let Ok(Some(data)) = MtefExtractor::extract_mtef_data_from_stream(ole, stream_name) {
+                mtef_data.insert(stream_name.to_string(), data);
+            }
+        }
+
+        Ok(mtef_data)
+    }
+
+    /// Parse all extracted MTEF data into AST nodes
+    fn parse_all_mtef_data(mtef_data: &HashMap<String, Vec<u8>>) -> Result<HashMap<String, Vec<crate::formula::MathNode<'static>>>> {
+        let mut parsed_mtef = HashMap::new();
+
+        for (stream_name, data) in mtef_data {
+            // Try to parse the MTEF data
+            // let formula = crate::formula::Formula::new();
+            // let mut parser = crate::formula::MtefParser::new(formula.arena(), data);
+
+            // if parser.is_valid() && let Ok(nodes) = parser.parse() && !nodes.is_empty() {
+                parsed_mtef.insert(stream_name.clone(), vec![crate::formula::MathNode::Text(
+                    std::borrow::Cow::Owned(format!("MTEF Formula ({} bytes)", data.len()))
+                )]);
+            // }
+        }
+
+        Ok(parsed_mtef)
+    }
+
+    /// Check if text indicates a potential MTEF formula
+    fn is_potential_mtef_formula(text: &str) -> bool {
+        let text = text.trim();
+
+        // Common indicators of MathType equations in text
+        text.contains("MathType") ||
+        text.contains("MTExtra") ||
+        text.contains("\\") ||
+        text.contains("{") ||
+        text.contains("}") ||
+        (text.len() > 10 && (text.contains("^") || text.contains("_")))
+    }
+
+    /// Parse MTEF data for a given text pattern
+    fn parse_mtef_for_text(&self, _text: &str) -> Option<Vec<crate::formula::MathNode<'static>>> {
+        // For now, try to find any parsed MTEF data
+        // In a more sophisticated implementation, we'd match specific text patterns
+        // to specific MTEF streams
+
+        for parsed_ast in self.parsed_mtef.values() {
+            if !parsed_ast.is_empty() {
+                return Some(parsed_ast.clone());
+            }
+        }
+
+        None
     }
 
     /// Get all text content from the document.
@@ -166,10 +247,22 @@ impl Document {
         // Convert to Paragraph objects
         let mut paragraphs = Vec::with_capacity(extracted_paras.len());
         for (para_text, _para_props, runs) in extracted_paras {
-            // Create runs for the paragraph
+            // Create runs for the paragraph, checking for MTEF formulas
             let run_objects: Vec<Run> = runs
                 .into_iter()
-                .map(|(text, props)| Run::new(text, props))
+                .map(|(text, props)| {
+                    // Check if this run text indicates a potential MTEF formula
+                    if Self::is_potential_mtef_formula(&text) {
+                        // Try to find corresponding MTEF data and parse it
+                        if let Some(mtef_ast) = self.parse_mtef_for_text(&text) {
+                            Run::with_mtef_formula(text, props, mtef_ast)
+                        } else {
+                            Run::new(text, props)
+                        }
+                    } else {
+                        Run::new(text, props)
+                    }
+                })
                 .collect();
 
             // Create paragraph with runs

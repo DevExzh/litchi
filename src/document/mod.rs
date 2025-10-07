@@ -44,7 +44,6 @@
 /// }
 /// # Ok::<(), litchi::common::Error>(())
 /// ```
-
 use crate::common::{Error, Result};
 use crate::ole;
 use crate::ooxml;

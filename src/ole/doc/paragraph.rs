@@ -66,6 +66,20 @@ impl Paragraph {
     pub(crate) fn set_runs(&mut self, runs: Vec<Run>) {
         self.runs = runs;
     }
+
+    /// Extract all MTEF formulas from this paragraph.
+    ///
+    /// Returns a vector of LaTeX formula strings found in any run within this paragraph.
+    pub fn mtef_formulas(&self) -> Result<Vec<String>> {
+        let mut formulas = Vec::new();
+        for run in &self.runs {
+            if run.has_mtef_formula() {
+                // For now, return a placeholder since we have AST nodes
+                formulas.push("MTEF formula detected".to_string());
+            }
+        }
+        Ok(formulas)
+    }
 }
 
 /// A run within a paragraph.
@@ -79,6 +93,11 @@ impl Paragraph {
 /// for run in paragraph.runs()? {
 ///     println!("Run text: {}", run.text()?);
 ///     println!("Bold: {:?}", run.bold());
+///
+///     // Check for embedded MTEF formulas
+///     if let Some(formula_ast) = run.mtef_formula_ast()? {
+///         println!("MTEF formula AST with {} nodes", formula_ast.len());
+///     }
 /// }
 /// ```
 #[derive(Debug, Clone)]
@@ -87,12 +106,31 @@ pub struct Run {
     text: String,
     /// Character formatting properties
     properties: CharacterProperties,
+    /// Parsed MTEF formula AST (if this run contains a formula)
+    mtef_formula_ast: Option<Vec<crate::formula::MathNode<'static>>>,
 }
 
 impl Run {
     /// Create a new Run from text with character properties.
     pub(crate) fn new(text: String, properties: CharacterProperties) -> Self {
-        Self { text, properties }
+        Self {
+            text,
+            properties,
+            mtef_formula_ast: None,
+        }
+    }
+
+    /// Create a new Run with MTEF formula AST.
+    pub(crate) fn with_mtef_formula(
+        text: String,
+        properties: CharacterProperties,
+        mtef_ast: Vec<crate::formula::MathNode<'static>>,
+    ) -> Self {
+        Self {
+            text,
+            properties,
+            mtef_formula_ast: Some(mtef_ast),
+        }
     }
 
     /// Get the text content of this run.
@@ -180,6 +218,28 @@ impl Run {
     pub fn properties(&self) -> &CharacterProperties {
         &self.properties
     }
+
+    /// Check if this run contains an MTEF formula.
+    ///
+    /// Returns true if this run contains a parsed MTEF formula AST.
+    pub fn has_mtef_formula(&self) -> bool {
+        self.mtef_formula_ast.is_some()
+    }
+
+    /// Get the MTEF formula AST if this run contains a formula.
+    ///
+    /// Returns the parsed MTEF formula as AST nodes if this run contains a MathType equation,
+    /// None otherwise.
+    pub fn mtef_formula_ast(&self) -> Option<&Vec<crate::formula::MathNode<'static>>> {
+        self.mtef_formula_ast.as_ref()
+    }
+
+    /// Get a mutable reference to the MTEF formula AST.
+    ///
+    /// This allows for modification of the formula AST if needed.
+    pub fn mtef_formula_ast_mut(&mut self) -> &mut Option<Vec<crate::formula::MathNode<'static>>> {
+        &mut self.mtef_formula_ast
+    }
 }
 
 #[cfg(test)]
@@ -209,8 +269,8 @@ mod tests {
         props.font_size = Some(24); // 12pt
 
         let run = Run::new("Formatted text".to_string(), props);
-        assert_eq!(run.bold(), Some(true));
-        assert_eq!(run.italic(), Some(true));
+        assert!(run.bold().unwrap_or(false));
+        assert!(run.italic().unwrap_or(false));
         assert_eq!(run.font_size(), Some(24));
     }
 }

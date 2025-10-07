@@ -1,7 +1,6 @@
 /// Common style and formatting types.
 ///
 /// This module provides unified style types used across different Office formats.
-
 use std::fmt;
 
 /// RGB color representation.

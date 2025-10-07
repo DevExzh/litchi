@@ -2,7 +2,6 @@
 ///
 /// This module defines the `ToMarkdown` trait that enables types to be
 /// converted to Markdown format.
-
 use crate::common::Result;
 use super::config::MarkdownOptions;
 

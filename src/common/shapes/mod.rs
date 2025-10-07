@@ -2,7 +2,6 @@
 ///
 /// This module provides unified shape types used by both legacy (.ppt) and
 /// modern (.pptx) presentation formats.
-
 use std::fmt;
 
 /// Types of shapes in presentations.
