@@ -4,6 +4,7 @@ use super::paragraph::{Paragraph, Run};
 use super::parts::fib::FileInformationBlock;
 use super::parts::text::TextExtractor;
 use super::parts::paragraph_extractor::ParagraphExtractor;
+use super::parts::fields::FieldsTable;
 use super::table::Table;
 use super::super::OleFile;
 use crate::ole::mtef_extractor::MtefExtractor;
@@ -35,10 +36,14 @@ use std::io::{Read, Seek};
 pub struct Document {
     /// File Information Block from WordDocument stream
     fib: FileInformationBlock,
+    /// The WordDocument stream - main document binary data
+    word_document: Vec<u8>,
     /// The table stream (0Table or 1Table) - contains formatting and structure
     table_stream: Vec<u8>,
     /// Text extractor - holds the extracted document text
     text_extractor: TextExtractor,
+    /// Fields table - contains field information (embedded equations, hyperlinks, etc.)
+    fields_table: Option<FieldsTable>,
     /// Extracted MTEF data from OLE streams (stream_name -> mtef_data)
     mtef_data: std::collections::HashMap<String, Vec<u8>>,
     /// Parsed MTEF formulas (stream_name -> parsed_ast)
@@ -69,6 +74,9 @@ impl Document {
         // Create text extractor
         let text_extractor = TextExtractor::new(&fib, &word_document, &table_stream)?;
 
+        // Parse fields table to identify embedded equations
+        let fields_table = FieldsTable::parse(&fib, &table_stream).ok();
+
         // Extract MTEF data from OLE streams
         let mtef_data = Self::extract_mtef_data(ole)?;
 
@@ -77,31 +85,45 @@ impl Document {
 
         Ok(Self {
             fib,
+            word_document,
             table_stream,
             text_extractor,
+            fields_table,
             mtef_data,
             parsed_mtef,
         })
     }
 
     /// Extract MTEF data from OLE streams during document initialization
+    ///
+    /// This method extracts embedded equation objects from the ObjectPool directory.
+    /// Each embedded equation is stored as a separate OLE object within ObjectPool.
     fn extract_mtef_data<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<HashMap<String, Vec<u8>>> {
-        let mut mtef_data = HashMap::new();
+        // Extract all MTEF formulas from ObjectPool (the primary location for embedded equations)
+        let mtef_data = MtefExtractor::extract_all_mtef_from_objectpool(ole)
+            .map_err(|e| DocError::InvalidFormat(format!("Failed to extract MTEF data: {}", e)))?;
 
-        // Common MTEF stream names in Word documents
-        let mtef_stream_names = [
+        eprintln!("DEBUG: Extracted {} MTEF objects from ObjectPool", mtef_data.len());
+        for key in mtef_data.keys() {
+            eprintln!("DEBUG:   - {}", key);
+        }
+
+        // Also try direct stream names for compatibility with older formats
+        let mut all_mtef = mtef_data;
+        let direct_stream_names = [
             "Equation Native",
             "MSWordEquation",
             "Equation.3",
         ];
 
-        for stream_name in &mtef_stream_names {
+        for stream_name in &direct_stream_names {
             if let Ok(Some(data)) = MtefExtractor::extract_mtef_data_from_stream(ole, stream_name) {
-                mtef_data.insert(stream_name.to_string(), data);
+                eprintln!("DEBUG: Found direct stream: {}", stream_name);
+                all_mtef.insert(stream_name.to_string(), data);
             }
         }
 
-        Ok(mtef_data)
+        Ok(all_mtef)
     }
 
     /// Parse all extracted MTEF data into AST nodes
@@ -109,15 +131,53 @@ impl Document {
         let mut parsed_mtef = HashMap::new();
 
         for (stream_name, data) in mtef_data {
-            // Try to parse the MTEF data
-            // let formula = crate::formula::Formula::new();
-            // let mut parser = crate::formula::MtefParser::new(formula.arena(), data);
+            // Create a formula arena for parsing
+            let formula = crate::formula::Formula::new();
+            
+            // Clone data to extend its lifetime for the parser
+            // We'll need to leak the arena to make the parsed nodes 'static
+            // This is necessary because we're storing them in the Document
+            let arena_box = Box::new(formula);
+            let arena_ptr = Box::leak(arena_box);
+            
+            // Create a buffer that will live as long as we need
+            let data_box = data.clone().into_boxed_slice();
+            let data_ptr: &'static [u8] = Box::leak(data_box);
+            
+            // Parse the MTEF data
+            let mut parser = crate::formula::MtefParser::new(arena_ptr.arena(), data_ptr);
+            
+            eprintln!("DEBUG: Parsing MTEF stream '{}', {} bytes, is_valid={}", stream_name, data.len(), parser.is_valid());
 
-            // if parser.is_valid() && let Ok(nodes) = parser.parse() && !nodes.is_empty() {
+            if parser.is_valid() {
+                match parser.parse() {
+                    Ok(nodes) if !nodes.is_empty() => {
+                        // Successfully parsed - store the AST nodes
+                        parsed_mtef.insert(stream_name.clone(), nodes);
+                    }
+                    Ok(_) => {
+                        // Empty result - skip
+                    }
+                    Err(e) => {
+                        // Parse error - store placeholder text
+                        // We need to create a new arena for the placeholder
+                        let placeholder_formula = crate::formula::Formula::new();
+                        let placeholder_arena = Box::leak(Box::new(placeholder_formula));
+                        let error_text = placeholder_arena.arena().alloc_str(&format!("[Formula parsing error: {}]", e));
+                        parsed_mtef.insert(stream_name.clone(), vec![crate::formula::MathNode::Text(
+                            std::borrow::Cow::Borrowed(error_text)
+                        )]);
+                    }
+                }
+            } else {
+                // Invalid MTEF format - store placeholder
+                let placeholder_formula = crate::formula::Formula::new();
+                let placeholder_arena = Box::leak(Box::new(placeholder_formula));
+                let error_text = placeholder_arena.arena().alloc_str(&format!("[Invalid MTEF format ({} bytes)]", data.len()));
                 parsed_mtef.insert(stream_name.clone(), vec![crate::formula::MathNode::Text(
-                    std::borrow::Cow::Owned(format!("MTEF Formula ({} bytes)", data.len()))
+                    std::borrow::Cow::Borrowed(error_text)
                 )]);
-            // }
+            }
         }
 
         Ok(parsed_mtef)
@@ -239,6 +299,7 @@ impl Document {
         let para_extractor = ParagraphExtractor::new(
             &self.fib,
             &self.table_stream,
+            &self.word_document,
             text,
         )?;
 
@@ -247,21 +308,40 @@ impl Document {
         // Convert to Paragraph objects
         let mut paragraphs = Vec::with_capacity(extracted_paras.len());
         for (para_text, _para_props, runs) in extracted_paras {
-            // Create runs for the paragraph, checking for MTEF formulas
+            // Create runs for the paragraph, checking for MTEF formulas and OLE2 objects
             let run_objects: Vec<Run> = runs
                 .into_iter()
                 .map(|(text, props)| {
-                    // Check if this run text indicates a potential MTEF formula
-                    if Self::is_potential_mtef_formula(&text) {
-                        // Try to find corresponding MTEF data and parse it
-                        if let Some(mtef_ast) = self.parse_mtef_for_text(&text) {
-                            Run::with_mtef_formula(text, props, mtef_ast)
+                    // Check if this run is an OLE2 embedded object (e.g., equation)
+                    if props.is_ole2 {
+                        eprintln!("DEBUG: Found OLE2 run with text: '{}'", text);
+                        // Use pic_offset to find the corresponding MTEF data
+                        if let Some(pic_offset) = props.pic_offset {
+                            let object_name = format!("_{}", pic_offset);
+                            eprintln!("DEBUG:   Trying to match object_name: {}", object_name);
+                            if let Some(mtef_ast) = self.parsed_mtef.get(&object_name) {
+                                // Found matching formula - create run with MTEF AST
+                                eprintln!("DEBUG:   ✓ Found matching MTEF AST!");
+                                return Run::with_mtef_formula(text, props, mtef_ast.clone());
+                            } else {
+                                eprintln!("DEBUG:   ✗ No matching MTEF AST found");
+                            }
                         } else {
-                            Run::new(text, props)
+                            eprintln!("DEBUG:   No pic_offset available");
                         }
-                    } else {
-                        Run::new(text, props)
+                        
+                        // Fallback: check if text indicates MTEF formula
+                        if Self::is_potential_mtef_formula(&text) {
+                            eprintln!("DEBUG:   Text appears to be formula");
+                            if let Some(mtef_ast) = self.parse_mtef_for_text(&text) {
+                                eprintln!("DEBUG:   ✓ Parsed MTEF from text");
+                                return Run::with_mtef_formula(text, props, mtef_ast);
+                            }
+                        }
                     }
+                    
+                    // Regular run without formula
+                    Run::new(text, props)
                 })
                 .collect();
 

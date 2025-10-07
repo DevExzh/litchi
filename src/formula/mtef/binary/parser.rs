@@ -75,13 +75,13 @@ impl<'arena> MtefBinaryParser<'arena> {
             return Err(MtefError::InvalidFormat("Invalid OLE header length".to_string()));
         }
 
-        if ole_header.version != 0x00020000 {
-            return Err(MtefError::InvalidFormat("Invalid OLE version".to_string()));
+        // Accept both 0x00020000 and 0x00000200 as valid versions (observed in real files)
+        if ole_header.version != 0x00020000 && ole_header.version != 0x00000200 {
+            return Err(MtefError::InvalidFormat(format!("Invalid OLE version: 0x{:08X}", ole_header.version)));
         }
 
-        if ole_header.format != 0xC2D3 {
-            return Err(MtefError::InvalidFormat("Invalid clipboard format".to_string()));
-        }
+        // Note: The clipboard format can vary (0xC2D3, 0xC1B0, 0xC1E1, 0xC1AE, etc.)
+        // so we don't validate it strictly. The MTEF signature check below is sufficient.
 
         let mut parser = Self {
             arena,
@@ -101,23 +101,27 @@ impl<'arena> MtefBinaryParser<'arena> {
     }
 
     fn read_mtef_header(&mut self) -> Result<(), MtefError> {
-        if self.data.len() < self.pos + 8 {
+        if self.data.len() < self.pos + 5 {
             return Err(MtefError::UnexpectedEof);
         }
 
-        // Read and validate MTEF header signature using memchr for efficiency
-        if self.pos + 4 > self.data.len() {
-            return Err(MtefError::UnexpectedEof);
-        }
+        // Check if we have the full MTEF signature "(\x04mt" (0x28 0x04 0x6D 0x74)
+        // or if this is a headerless/embedded format that starts directly with the version
+        let has_signature = self.pos + 4 <= self.data.len() &&
+                           self.data[self.pos] == 0x28 &&
+                           self.data[self.pos + 1] == 0x04 &&
+                           self.data[self.pos + 2] == 0x6D &&
+                           self.data[self.pos + 3] == 0x74;
 
-        // Check signature bytes efficiently
-        if self.data[self.pos] != 0x28 || self.data[self.pos + 1] != 0x04 ||
-           self.data[self.pos + 2] != 0x6D || self.data[self.pos + 3] != 0x74 {
-            return Err(MtefError::InvalidFormat("Invalid MTEF signature".to_string()));
+        if has_signature {
+            // Full format with signature
+            self.pos += 4;
+            self.mtef_version = self.read_u8()?;
+        } else {
+            // Headerless/embedded format - starts directly with version byte
+            // This format is used in some embedded equations
+            self.mtef_version = self.read_u8()?;
         }
-        self.pos += 4;
-
-        self.mtef_version = self.read_u8()?;
 
         // Handle different MTEF versions
         match self.mtef_version {

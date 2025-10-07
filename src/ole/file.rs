@@ -506,6 +506,72 @@ impl<R: Read + Seek> OleFile<R> {
         streams
     }
 
+    /// List all entries (streams and storages) in a directory
+    ///
+    /// # Arguments
+    /// * `path` - Path to the directory as a slice of strings (empty for root)
+    ///
+    /// # Returns
+    /// * `Result<Vec<DirectoryEntry>, OleError>` - List of directory entries
+    pub fn list_directory_entries(&self, path: &[&str]) -> Result<Vec<DirectoryEntry>, OleError> {
+        let mut entries = Vec::new();
+
+        // Get the directory entry
+        let dir_entry = if path.is_empty() {
+            self.root.as_ref().ok_or(OleError::StreamNotFound)?
+        } else {
+            &self.find_entry(path)?
+        };
+
+        // Ensure it's a storage/directory
+        if dir_entry.entry_type != STGTY_STORAGE && dir_entry.entry_type != STGTY_ROOT {
+            return Err(OleError::InvalidFormat("Not a directory".to_string()));
+        }
+
+        // Collect children
+        if dir_entry.sid_child != NOSTREAM {
+            self.collect_directory_children(dir_entry.sid_child, &mut entries);
+        }
+
+        Ok(entries)
+    }
+
+    /// Recursively collect all children from a directory
+    fn collect_directory_children(&self, sid: u32, entries: &mut Vec<DirectoryEntry>) {
+        if sid == NOSTREAM || sid as usize >= self.dir_entries.len() {
+            return;
+        }
+
+        if let Some(ref entry) = self.dir_entries[sid as usize] {
+            // Traverse left
+            if entry.sid_left != NOSTREAM {
+                self.collect_directory_children(entry.sid_left, entries);
+            }
+
+            // Add current entry
+            entries.push(entry.clone());
+
+            // Traverse right
+            if entry.sid_right != NOSTREAM {
+                self.collect_directory_children(entry.sid_right, entries);
+            }
+        }
+    }
+
+    /// Check if a directory exists at the given path
+    ///
+    /// # Arguments
+    /// * `path` - Path to check as a slice of strings
+    ///
+    /// # Returns
+    /// * `bool` - True if directory exists
+    pub fn directory_exists(&self, path: &[&str]) -> bool {
+        match self.find_entry(path) {
+            Ok(entry) => entry.entry_type == STGTY_STORAGE || entry.entry_type == STGTY_ROOT,
+            Err(_) => false,
+        }
+    }
+
     /// Recursively collect streams from directory tree
     fn collect_streams(
         &self,

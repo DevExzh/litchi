@@ -13,4 +13,8 @@ pub mod pap;
 pub mod paragraph_extractor;
 pub mod tap;
 pub mod text;
+pub mod fields;
+pub mod fkp;
+pub mod chp_bin_table;
+pub mod piece_table;
 

@@ -52,20 +52,9 @@ impl<'arena> MtefExtractor<'arena> {
                 return Ok(None);
             }
 
-            // The MTEF data starts after the OLE header
-            let mtef_start = 28;
-            if mtef_start >= data.len() {
-                return Ok(None);
-            }
-
-            // Extract the MTEF data portion
-            let mtef_size = ole_header.size as usize;
-            if mtef_start + mtef_size > data.len() {
-                // If size field is incorrect, take all remaining data
-                Ok(Some(data[mtef_start..].to_vec()))
-            } else {
-                Ok(Some(data[mtef_start..mtef_start + mtef_size].to_vec()))
-            }
+            // Return the full data including the OLE header
+            // The MTEF parser will handle parsing both the OLE header and MTEF data
+            Ok(Some(data.to_vec()))
         } else {
             Ok(None)
         }
@@ -85,6 +74,117 @@ impl<'arena> MtefExtractor<'arena> {
             }
         }
         Ok(None)
+    }
+
+    /// Extract all MTEF formulas from embedded OLE objects in ObjectPool
+    ///
+    /// In Word documents, embedded equations are stored as OLE objects in the ObjectPool directory.
+    /// Each object has a stream name like "_1234567890" and contains an "Equation Native" stream.
+    ///
+    /// # Arguments
+    ///
+    /// * `ole_file` - The OLE file to extract from
+    ///
+    /// # Returns
+    ///
+    /// Returns a HashMap mapping object IDs to their MTEF binary data
+    pub fn extract_all_mtef_from_objectpool<R: Read + Seek>(
+        ole_file: &mut OleFile<R>,
+    ) -> Result<std::collections::HashMap<String, Vec<u8>>, MtefExtractionError> {
+        use std::collections::HashMap;
+
+        let mut mtef_map = HashMap::new();
+
+        // Check if ObjectPool directory exists
+        if !ole_file.directory_exists(&["ObjectPool"]) {
+            eprintln!("DEBUG: ObjectPool directory does not exist");
+            return Ok(mtef_map);
+        }
+        eprintln!("DEBUG: ObjectPool directory exists");
+
+        // List all entries in ObjectPool
+        let entries = ole_file
+            .list_directory_entries(&["ObjectPool"])
+            .map_err(|e| MtefExtractionError::IoError(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
+
+        eprintln!("DEBUG: Found {} entries in ObjectPool", entries.len());
+
+        // Process each entry in ObjectPool
+        for entry in entries {
+            eprintln!("DEBUG:   Entry: name='{}', type={}", entry.name, entry.entry_type);
+            
+            // Skip if not a storage (embedded OLE objects are storages)
+            if entry.entry_type != 1 { // STGTY_STORAGE = 1
+                eprintln!("DEBUG:     Skipped (not a storage)");
+                continue;
+            }
+
+            // Object names typically start with "_"
+            if !entry.name.starts_with('_') {
+                eprintln!("DEBUG:     Skipped (name doesn't start with '_')");
+                continue;
+            }
+
+            eprintln!("DEBUG:     Processing as potential MTEF object");
+
+            // Try to extract "Equation Native" stream from this embedded object
+            let equation_stream_path = ["ObjectPool", &entry.name, "Equation Native"];
+            if let Ok(Some(mtef_data)) = Self::extract_mtef_data_from_stream(ole_file, &equation_stream_path.join("/")) {
+                eprintln!("DEBUG:     ✓ Found MTEF data via equation_stream_path");
+                mtef_map.insert(entry.name.clone(), mtef_data);
+            } else {
+                eprintln!("DEBUG:     Trying alternative paths");
+                // Try alternative paths for embedded equations
+                let alt_paths = [
+                    vec!["ObjectPool", &entry.name, "Equation Native"],
+                    vec!["ObjectPool", &entry.name, "\x01Ole10Native"],
+                    vec!["ObjectPool", &entry.name, "CONTENTS"],
+                ];
+
+                for path in &alt_paths {
+                    eprintln!("DEBUG:       Trying: {:?}", path);
+                    if let Ok(data) = ole_file.open_stream(path) {
+                        eprintln!("DEBUG:       Found data ({} bytes)", data.len());
+                        
+                        // Dump first 40 bytes for debugging
+                        if data.len() >= 40 {
+                            eprint!("DEBUG:       First 40 bytes: ");
+                            for i in 0..40 {
+                                eprint!("{:02X} ", data[i]);
+                            }
+                            eprintln!();
+                        }
+                        
+                        // Check if this looks like MTEF data
+                        if Self::is_mtef_data(&data) {
+                            eprintln!("DEBUG:       ✓ Validated as MTEF data");
+                            mtef_map.insert(entry.name.clone(), data);
+                            break;
+                        } else {
+                            eprintln!("DEBUG:       ✗ Not valid MTEF data");
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(mtef_map)
+    }
+
+    /// Check if data looks like MTEF format
+    ///
+    /// MTEF data starts with a 28-byte OLE header followed by MTEF header
+    fn is_mtef_data(data: &[u8]) -> bool {
+        if data.len() < 28 {
+            return false;
+        }
+
+        // Check OLE header
+        if let Ok(header) = OleHeader::from_bytes(&data[0..28]) {
+            header.is_valid()
+        } else {
+            false
+        }
     }
 
     /// Parse MTEF binary data into formula AST nodes
@@ -170,10 +270,12 @@ impl OleHeader {
     }
 
     /// Validate the OLE header
+    ///
+    /// Note: The format field can vary (0xC16D, 0xC19B, 0xC1C7, 0xC2D3, etc.)
+    /// so we only check cb_hdr and version fields for validation.
     fn is_valid(&self) -> bool {
         self.cb_hdr == 28 &&
-        self.version == 0x00020000 &&
-        self.format == 0xC2D3
+        (self.version == 0x00020000 || self.version == 0x00000200)
     }
 }
 

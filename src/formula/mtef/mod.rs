@@ -25,7 +25,19 @@ pub struct MtefParser<'arena> {
 impl<'arena> MtefParser<'arena> {
     /// Create a new MTEF parser
     pub fn new(arena: &'arena bumpalo::Bump, data: &'arena [u8]) -> Self {
-        let binary_parser = binary::MtefBinaryParser::new(arena, data).ok();
+        let binary_parser = match binary::MtefBinaryParser::new(arena, data) {
+            Ok(parser) => Some(parser),
+            Err(e) => {
+                eprintln!("DEBUG: MTEF parser validation failed ({} bytes): {}", data.len(), e);
+                if data.len() >= 28 {
+                    eprintln!("DEBUG:   OLE header bytes: {:02X?}", &data[0..28]);
+                    if data.len() >= 40 {
+                        eprintln!("DEBUG:   Bytes 28-40: {:02X?}", &data[28..40]);
+                    }
+                }
+                None
+            }
+        };
         Self {
             arena,
             binary_parser,

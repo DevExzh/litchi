@@ -36,6 +36,10 @@ pub struct CharacterProperties {
     pub is_all_caps: Option<bool>,
     /// Hidden text
     pub is_hidden: Option<bool>,
+    /// OLE2 object flag (SPRM_FOLE2 = 0x080A)
+    pub is_ole2: bool,
+    /// Picture offset for embedded objects
+    pub pic_offset: Option<u32>,
 }
 
 /// Underline styles supported in DOC format.
@@ -111,6 +115,14 @@ impl CharacterProperties {
     pub fn from_sprm(grpprl: &[u8]) -> Result<Self> {
         let mut chp = Self::default();
         let mut offset = 0;
+        
+        static mut CALL_COUNT: usize = 0;
+        unsafe {
+            CALL_COUNT += 1;
+            if CALL_COUNT <= 5 {
+                eprintln!("DEBUG: CharacterProperties::from_sprm called with {} bytes", grpprl.len());
+            }
+        }
 
         while offset < grpprl.len() {
             if offset + 1 > grpprl.len() {
@@ -120,6 +132,15 @@ impl CharacterProperties {
             // Read SPRM opcode (can be 1 or 2 bytes depending on Word version)
             let sprm = u16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]);
             offset += 2;
+            
+            // Debug: Log every SPRM encountered
+            static mut SPRM_COUNT: usize = 0;
+            unsafe {
+                SPRM_COUNT += 1;
+                if SPRM_COUNT <= 50 {
+                    eprintln!("DEBUG: SPRM opcode: 0x{:04X}", sprm);
+                }
+            }
 
             // Parse SPRM based on opcode
             match sprm {
@@ -250,6 +271,28 @@ impl CharacterProperties {
                             _ => VerticalPosition::Normal,
                         };
                         offset += 1;
+                    }
+                }
+                // OLE2 object flag (SPRM_FOLE2)
+                0x080A => {
+                    if offset < grpprl.len() {
+                        let operand = grpprl[offset];
+                        chp.is_ole2 = operand != 0;
+                        eprintln!("DEBUG: Found SPRM_FOLE2, operand=0x{:02X}, is_ole2={}", operand, chp.is_ole2);
+                        offset += 1;
+                    }
+                }
+                // Object location/pic offset (SPRM_OBJLOCATION = 0x680E)
+                0x680E => {
+                    if offset + 3 < grpprl.len() {
+                        chp.pic_offset = Some(u32::from_le_bytes([
+                            grpprl[offset],
+                            grpprl[offset + 1],
+                            grpprl[offset + 2],
+                            grpprl[offset + 3],
+                        ]));
+                        eprintln!("DEBUG: Found SPRM_OBJLOCATION, pic_offset={:?}", chp.pic_offset);
+                        offset += 4;
                     }
                 }
                 // Unknown SPRM - skip based on size

@@ -116,10 +116,25 @@ impl Sprm {
 pub fn parse_sprms(grpprl: &[u8]) -> Vec<Sprm> {
     let mut sprms = Vec::new();
     let mut offset = 0;
+    
+    static mut CALL_COUNT: usize = 0;
+    unsafe {
+        CALL_COUNT += 1;
+        if CALL_COUNT <= 5 {
+            eprintln!("DEBUG: parse_sprms called with {} bytes", grpprl.len());
+        }
+    }
 
     while offset + 2 <= grpprl.len() {
         // Read SPRM opcode (2 bytes in Word 97+)
         let opcode = u16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]);
+        
+        unsafe {
+            if CALL_COUNT <= 5 {
+                eprintln!("DEBUG:   SPRM opcode: 0x{:04X}", opcode);
+            }
+        }
+        
         offset += 2;
 
         // Extract size code from opcode (bits 13-15, POI's BITFIELD_SIZECODE = 0xe000)
@@ -127,9 +142,14 @@ pub fn parse_sprms(grpprl: &[u8]) -> Vec<Sprm> {
         let operation = SprmOperation::from(size_code);
 
         // Determine operand size based on size code (matching POI's initSize method)
+        // From POI SprmOperation.initSize():
+        //   case 0: case 1: return 3;  // 2 byte opcode + 1 byte operand
+        //   case 2: case 4: case 5: return 4;  // 2 byte opcode + 2 byte operand
+        //   case 3: return 6;  // 2 byte opcode + 4 byte operand
+        //   case 6: variable length
+        //   case 7: return 5;  // 2 byte opcode + 3 byte operand
         let operand_size = match size_code {
-            0 => 0, // Toggle - no operand
-            1 => 1, // 1 byte operand
+            0 | 1 => 1, // 1 byte operand
             2 | 4 | 5 => 2, // 2 byte operand
             3 => 4, // 4 byte operand
             6 => {
