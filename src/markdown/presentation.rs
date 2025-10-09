@@ -2,41 +2,104 @@
 ///
 /// This module implements the `ToMarkdown` trait for PowerPoint presentation types,
 /// including Presentation and Slide.
-use crate::common::{Error, Result};
+use crate::common::Result;
 use crate::presentation::{Presentation, Slide};
 use super::config::MarkdownOptions;
 use super::traits::ToMarkdown;
-use std::fmt::Write as FmtWrite;
+use super::writer::MarkdownWriter;
+use crate::ole::ppt::shapes::shape::Shape;
 
 impl ToMarkdown for Presentation {
-    fn to_markdown_with_options(&self, _options: &MarkdownOptions) -> Result<String> {
-        let mut output = String::with_capacity(4096);
+    fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
+        let mut writer = MarkdownWriter::new(options.clone());
 
         // TODO: Add metadata support when Presentation metadata API is available
-        // if _options.include_metadata {
-        //     output.push_str("---\n");
-        //     output.push_str(&format!("slides: {}\n", self.slide_count()?));
-        //     output.push_str("---\n\n");
+        // if options.include_metadata {
+        //     writer.write_metadata(...)?;
         // }
 
         let slides = self.slides()?;
         for (i, slide) in slides.iter().enumerate() {
             if i > 0 {
                 // Separate slides with horizontal rule
-                output.push_str("\n\n---\n\n");
+                writer.push_str("\n\n---\n\n");
             }
 
-            // Add slide number as heading
-            writeln!(output, "# Slide {}", i + 1).map_err(|e| Error::Other(e.to_string()))?;
-            output.push('\n');
+            // Format slide header with title placeholder if available
+            let slide_title = extract_slide_title(slide)?;
+            let header_text = if slide_title.is_empty() {
+                format!("# Slide {}", i + 1)
+            } else {
+                format!("# Slide {} {}", i + 1, slide_title)
+            };
 
-            // Add slide content
-            let text = slide.text()?;
-            output.push_str(&text);
+            writer.write_fmt(format_args!("{}\n", header_text))?;
+            writer.push('\n');
+
+            // Add slide content with proper markdown formatting
+            write_slide_content(&mut writer, slide, options)?;
         }
 
-        Ok(output)
+        Ok(writer.finish())
     }
+}
+
+/// Extract the title from a slide by looking for title placeholders.
+fn extract_slide_title(slide: &Slide) -> Result<String> {
+    match slide {
+        Slide::Ppt(ppt_slide) => {
+            // For PPT slides, look for title placeholders
+            // This is a simplified implementation - in practice we'd check placeholder types
+            let placeholders = ppt_slide.placeholders();
+            for placeholder in placeholders {
+                // Check if this is a title placeholder (type 1 in PowerPoint)
+                // For now, we'll assume the first placeholder is the title
+                // TODO: Check placeholder type when the API supports it
+                let text = placeholder.text()?;
+                if !text.is_empty() {
+                    return Ok(text);
+                }
+            }
+            Ok(String::new())
+        }
+        Slide::Pptx(pptx_data) => {
+            // For PPTX slides, use the slide name if available
+            // In a full implementation, we'd parse the slide content to find title placeholders
+            Ok(pptx_data.name.clone().unwrap_or_default())
+        }
+    }
+}
+
+/// Write slide content with proper markdown formatting.
+fn write_slide_content(writer: &mut MarkdownWriter, slide: &Slide, _options: &MarkdownOptions) -> Result<()> {
+    match slide {
+        Slide::Ppt(ppt_slide) => {
+            // For PPT slides, process shapes and extract content
+            let shapes = ppt_slide.shapes()?;
+
+            for shape in shapes {
+                // For now, just extract text content
+                // In a full implementation, we'd handle different shape types (tables, etc.)
+                let shape_text = shape.text()?;
+                if !shape_text.is_empty() {
+                    // Write the text directly as it's already formatted
+                    writer.push_str(&shape_text);
+                    writer.push_str("\n\n");
+                }
+            }
+        }
+        Slide::Pptx(_) => {
+            // For PPTX slides, we have limited access to structured content
+            // Just write the plain text for now
+            let text = slide.text()?;
+            if !text.is_empty() {
+                writer.push_str(&text);
+                writer.push_str("\n\n");
+            }
+        }
+    }
+
+    Ok(())
 }
 
 impl ToMarkdown for Slide {

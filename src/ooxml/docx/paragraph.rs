@@ -182,6 +182,17 @@ impl Paragraph {
     }
 }
 
+/// Vertical text position (superscript/subscript).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerticalPosition {
+    /// Normal position
+    Normal,
+    /// Superscript
+    Superscript,
+    /// Subscript
+    Subscript,
+}
+
 /// A run within a paragraph.
 ///
 /// Represents a `<w:r>` element. A run is a region of text with a single
@@ -299,6 +310,58 @@ impl Run {
                         in_r_pr = true;
                     } else if in_r_pr && name.as_ref() == b"u" {
                         return Ok(Some(true));
+                    }
+                }
+                Ok(Event::End(e)) => {
+                    if e.local_name().as_ref() == b"rPr" {
+                        in_r_pr = false;
+                    }
+                }
+                Ok(Event::Eof) => break,
+                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+                _ => {}
+            }
+            buf.clear();
+        }
+
+        Ok(None)
+    }
+
+    /// Check if this run is strikethrough.
+    ///
+    /// Returns `Some(true)` if strikethrough is present,
+    /// `None` if not specified.
+    pub fn strikethrough(&self) -> Result<Option<bool>> {
+        self.get_bool_property(b"strike")
+    }
+
+    /// Get the vertical position of this run (superscript/subscript).
+    ///
+    /// Returns the vertical positioning if specified, None if normal.
+    pub fn vertical_position(&self) -> Result<Option<VerticalPosition>> {
+        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        reader.config_mut().trim_text(true);
+
+        let mut in_r_pr = false;
+        let mut buf = Vec::new();
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                    let name = e.local_name();
+                    if name.as_ref() == b"rPr" {
+                        in_r_pr = true;
+                    } else if in_r_pr && name.as_ref() == b"vertAlign" {
+                        for attr in e.attributes().flatten() {
+                            if attr.key.as_ref() == b"val" {
+                                let value = attr.value.as_ref();
+                                match value {
+                                    b"superscript" => return Ok(Some(VerticalPosition::Superscript)),
+                                    b"subscript" => return Ok(Some(VerticalPosition::Subscript)),
+                                    _ => {}
+                                }
+                            }
+                        }
                     }
                 }
                 Ok(Event::End(e)) => {

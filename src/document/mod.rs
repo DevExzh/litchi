@@ -407,6 +407,39 @@ impl Run {
             Run::Docx(r) => r.italic().map_err(Error::from),
         }
     }
+
+    /// Check if the run is strikethrough.
+    pub fn strikethrough(&self) -> Result<Option<bool>> {
+        match self {
+            Run::Doc(r) => Ok(r.strikethrough()),
+            Run::Docx(r) => r.strikethrough().map_err(Error::from),
+        }
+    }
+
+    /// Get the vertical position of the run (superscript/subscript).
+    ///
+    /// Returns the vertical positioning if specified, None if normal.
+    pub fn vertical_position(&self) -> Result<Option<crate::ole::doc::parts::chp::VerticalPosition>> {
+        match self {
+            Run::Doc(r) => {
+                use crate::ole::doc::parts::chp::VerticalPosition;
+                let pos = match r.properties().vertical_position {
+                    VerticalPosition::Normal => None,
+                    pos => Some(pos),
+                };
+                Ok(pos)
+            }
+            Run::Docx(r) => {
+                use crate::ooxml::docx::paragraph::VerticalPosition as OoxmlVerticalPosition;
+                use crate::ole::doc::parts::chp::VerticalPosition as OleVerticalPosition;
+                match r.vertical_position().map_err(Error::from)? {
+                    Some(OoxmlVerticalPosition::Superscript) => Ok(Some(OleVerticalPosition::Superscript)),
+                    Some(OoxmlVerticalPosition::Subscript) => Ok(Some(OleVerticalPosition::Subscript)),
+                    Some(OoxmlVerticalPosition::Normal) | None => Ok(None),
+                }
+            }
+        }
+    }
 }
 
 /// A table in a Word document.

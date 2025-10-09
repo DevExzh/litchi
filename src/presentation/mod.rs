@@ -43,8 +43,8 @@ use std::path::Path;
 /// Extracted data from a PPTX slide (to avoid lifetime issues).
 #[derive(Debug, Clone)]
 pub struct PptxSlideData {
-    text: String,
-    name: Option<String>,
+    pub text: String,
+    pub name: Option<String>,
 }
 
 /// A PowerPoint presentation that can be either .ppt or .pptx format.

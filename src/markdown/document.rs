@@ -17,13 +17,21 @@ impl ToMarkdown for Document {
         //     writer.write_metadata(...)?;
         // }
 
+        // Get all paragraphs and tables
+        let paragraphs = self.paragraphs()?;
+        let tables = self.tables()?;
+
+        // For performance, pre-allocate based on estimated content size
+        let estimated_size = paragraphs.len() * 100 + tables.len() * 500; // Rough estimates
+        writer.reserve(estimated_size);
+
         // Write paragraphs
-        for para in self.paragraphs()? {
+        for para in paragraphs {
             writer.write_paragraph(&para)?;
         }
 
         // Write tables
-        for table in self.tables()? {
+        for table in tables {
             writer.write_table(&table)?;
         }
 

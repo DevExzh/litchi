@@ -29,7 +29,7 @@
 
 pub mod ast;
 mod omml;
-mod latex;
+pub mod latex;
 mod mtef;
 
 // Re-export public API

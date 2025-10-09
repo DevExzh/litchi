@@ -106,5 +106,5 @@ mod document;
 mod presentation;
 
 // Re-export public API
-pub use config::{MarkdownOptions, TableStyle};
+pub use config::{MarkdownOptions, TableStyle, FormulaStyle, ScriptStyle, StrikethroughStyle};
 pub use traits::ToMarkdown;
