@@ -13,6 +13,12 @@
 pub mod parser;
 pub mod converter;
 
+/// Common data types for PICT format
+mod types;
+
+/// Data manipulation and compression utilities
+mod data;
+
 pub use parser::{PictParser, PictVersion};
 pub use converter::{PictConverter, PictToRasterOptions};
 

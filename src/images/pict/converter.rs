@@ -4,6 +4,8 @@
 
 use super::parser::PictParser;
 use crate::common::error::{Error, Result};
+use super::data::{get_bitmap_pixel, stretch_coordinates, unpack_bits};
+use super::types::{PictBitmap, PictRect};
 use image::{DynamicImage, ImageBuffer, ImageFormat, Rgba, RgbaImage};
 use std::io::Cursor;
 
@@ -26,6 +28,32 @@ impl Default for PictToRasterOptions {
             background_color: Rgba([255, 255, 255, 255]),
         }
     }
+}
+
+/// Convert Rect fields from big-endian to native endianness
+#[inline]
+pub fn rect_to_native(rect: &mut super::types::PictRect) {
+    rect.top = i16::from_be(rect.top);
+    rect.left = i16::from_be(rect.left);
+    rect.bottom = i16::from_be(rect.bottom);
+    rect.right = i16::from_be(rect.right);
+}
+
+/// Convert Bitmap fields from big-endian to native endianness
+#[inline]
+pub fn bitmap_to_native(bitmap: &mut super::types::PictBitmap) {
+    bitmap.row_bytes = i16::from_be(bitmap.row_bytes);
+    rect_to_native(&mut bitmap.bounds);
+    rect_to_native(&mut bitmap.src_rect);
+    rect_to_native(&mut bitmap.dst_rect);
+    bitmap.mode = i16::from_be(bitmap.mode);
+}
+
+/// Convert Region fields from big-endian to native endianness
+#[inline]
+pub fn region_to_native(region: &mut super::types::PictRegion) {
+    region.region_size = i16::from_be(region.region_size);
+    rect_to_native(&mut region.rect);
 }
 
 /// PICT to raster converter
@@ -101,18 +129,136 @@ impl PictConverter {
 
     /// Parse DirectBitsRect data
     ///
-    /// This is a complex structure containing PixMap and bitmap data
+    /// Handles PackBitsRect (0x0098) and PackedDirectBitsRect (0x009B) opcodes.
+    /// These contain compressed bitmap data that needs to be decompressed and rendered.
     fn parse_direct_bits(&self, data: &[u8]) -> Option<DynamicImage> {
-        // DirectBitsRect structure is complex
-        // For now, attempt basic parsing
-        if data.len() < 50 {
+        if data.len() < std::mem::size_of::<PictBitmap>() {
             return None;
         }
 
-        // Try to extract raw bitmap data and construct an image
-        // This is simplified and may not work for all PICT files
-        // Full implementation would require parsing PixMap structure
-        None
+        // Parse the bitmap header (big-endian format)
+        let mut bitmap: PictBitmap = unsafe {
+            std::ptr::read_unaligned(data.as_ptr() as *const PictBitmap)
+        };
+
+        // Convert from big-endian to native endianness
+        bitmap_to_native(&mut bitmap);
+
+        // Calculate dimensions
+        let width = (bitmap.bounds.right - bitmap.bounds.left) as u32;
+        let height = (bitmap.bounds.bottom - bitmap.bounds.top) as u32;
+
+        if width == 0 || height == 0 || width > 8192 || height > 8192 {
+            return None;
+        }
+
+        // Calculate bitmap data size
+        let _row_bytes = bitmap.row_bytes as usize;
+        let bitmap_data_start = std::mem::size_of::<PictBitmap>();
+        let bitmap_data_end = data.len();
+
+        if bitmap_data_start >= bitmap_data_end {
+            return None;
+        }
+
+        let compressed_data = &data[bitmap_data_start..];
+
+        // Create output image
+        let mut img = ImageBuffer::new(width, height);
+
+        // Decompress and render each row
+        let mut data_offset = 0;
+        let expected_row_size = (width as usize + 7) / 8; // Round up for byte alignment
+
+        for y in 0..height as usize {
+            if data_offset >= compressed_data.len() {
+                break;
+            }
+
+            // Read the byte count for this row
+            if data_offset + 1 >= compressed_data.len() {
+                break;
+            }
+            let byte_count = compressed_data[data_offset] as usize;
+            data_offset += 1;
+
+            // Skip the compressed data for this row (we'll decompress it)
+            let row_compressed_start = data_offset;
+            let row_compressed_end = std::cmp::min(data_offset + byte_count, compressed_data.len());
+            data_offset = row_compressed_end;
+
+            if byte_count == 0 {
+                continue;
+            }
+
+            // Decompress this row
+            let row_compressed = &compressed_data[row_compressed_start..row_compressed_end];
+            match unpack_bits(row_compressed, expected_row_size) {
+                Ok(unpacked_row) => {
+                    // Render the unpacked row to the image
+                    self.render_bitmap_row(&unpacked_row, &bitmap, y as i32, &mut img);
+                }
+                Err(_) => {
+                    // If decompression fails, skip this row
+                    continue;
+                }
+            }
+        }
+
+        Some(DynamicImage::ImageRgba8(img))
+    }
+
+    /// Render a single decompressed bitmap row to the image
+    fn render_bitmap_row(
+        &self,
+        unpacked_row: &[u8],
+        bitmap: &PictBitmap,
+        y: i32,
+        img: &mut ImageBuffer<Rgba<u8>, Vec<u8>>,
+    ) {
+        let width = (bitmap.bounds.right - bitmap.bounds.left) as u32;
+        let _height = (bitmap.bounds.bottom - bitmap.bounds.top) as u32;
+
+        // Calculate source and destination rectangles relative to image bounds
+        let src_width = bitmap.src_rect.right - bitmap.src_rect.left;
+        let src_height = bitmap.src_rect.bottom - bitmap.src_rect.top;
+        let dst_width = bitmap.dst_rect.right - bitmap.dst_rect.left;
+        let dst_height = bitmap.dst_rect.bottom - bitmap.dst_rect.top;
+
+        // Create adjusted rectangles relative to bitmap bounds
+        let src_rect = PictRect {
+            left: bitmap.src_rect.left - bitmap.bounds.left,
+            top: bitmap.src_rect.top - bitmap.bounds.top,
+            right: bitmap.src_rect.left - bitmap.bounds.left + src_width,
+            bottom: bitmap.src_rect.top - bitmap.bounds.top + src_height,
+        };
+
+        let dst_rect = PictRect {
+            left: bitmap.dst_rect.left - self.parser.header.frame.1,
+            top: bitmap.dst_rect.top - self.parser.header.frame.0,
+            right: bitmap.dst_rect.left - self.parser.header.frame.1 + dst_width,
+            bottom: bitmap.dst_rect.top - self.parser.header.frame.0 + dst_height,
+        };
+
+        // Render each pixel in the destination row
+        for x in 0..width as i32 {
+            let mut src_x = 0;
+            let mut src_y = 0;
+
+            stretch_coordinates(&dst_rect, &src_rect, x, y, &mut src_x, &mut src_y);
+
+            let color_u32 = get_bitmap_pixel(unpacked_row, &bitmap.bounds, src_x, src_y);
+            let color = Rgba([
+                ((color_u32 >> 16) & 0xFF) as u8, // R
+                ((color_u32 >> 8) & 0xFF) as u8,  // G
+                (color_u32 & 0xFF) as u8,         // B
+                ((color_u32 >> 24) & 0xFF) as u8, // A
+            ]);
+
+            if x < img.width() as i32 && y < img.height() as i32 {
+                img.put_pixel(x as u32, y as u32, color);
+            }
+        }
     }
 
     /// Parse CompressedQuickTime data
