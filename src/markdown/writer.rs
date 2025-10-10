@@ -2,7 +2,7 @@
 ///
 /// This module provides the `MarkdownWriter` struct which handles the actual
 /// conversion of document elements to Markdown format.
-use crate::common::{Error, Result};
+use crate::common::{Error, Result, Metadata};
 use crate::document::{Paragraph, Run, Table};
 use super::config::{MarkdownOptions, TableStyle};
 use std::fmt::Write as FmtWrite;
@@ -414,6 +414,25 @@ impl MarkdownWriter {
     /// Reserve additional capacity in the buffer.
     pub fn reserve(&mut self, additional: usize) {
         self.buffer.reserve(additional);
+    }
+
+    /// Write document metadata as YAML front matter.
+    ///
+    /// If metadata is available and include_metadata is enabled,
+    /// this writes the metadata as YAML front matter at the beginning of the document.
+    pub fn write_metadata(&mut self, metadata: &Metadata) -> Result<()> {
+        if !self.options.include_metadata {
+            return Ok(());
+        }
+
+        let yaml_front_matter = metadata.to_yaml_front_matter()
+            .map_err(|e| Error::Other(format!("Failed to generate YAML front matter: {}", e)))?;
+
+        if !yaml_front_matter.is_empty() {
+            self.buffer.push_str(&yaml_front_matter);
+        }
+
+        Ok(())
     }
 
     /// Detect if a paragraph is a list item and extract list information.

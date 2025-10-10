@@ -12,10 +12,11 @@ impl ToMarkdown for Document {
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
         let mut writer = MarkdownWriter::new(options.clone());
 
-        // TODO: Add metadata support when Document metadata API is available
-        // if options.include_metadata {
-        //     writer.write_metadata(...)?;
-        // }
+        // Write metadata as YAML front matter if enabled
+        if options.include_metadata {
+            let metadata = self.metadata()?;
+            writer.write_metadata(&metadata)?;
+        }
 
         // Get all paragraphs and tables
         let paragraphs = self.paragraphs()?;
