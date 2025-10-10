@@ -21,7 +21,7 @@ itoa = "1.0"
 smallvec = "1.13"
 rayon = "1.11"
 # Image processing
-image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+image = { version = "0.25", features = ["default-formats", "rayon"] }
 bytemuck = { version = "1.14", features = ["derive"] }
 flate2 = "1.0"
 base64 = "0.22"
