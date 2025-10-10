@@ -168,8 +168,9 @@ impl Document {
                     std::mem::transmute::<ooxml::docx::Document<'_>, ooxml::docx::Document<'static>>(doc)
                 };
 
-                // TODO: Extract metadata from OOXML core properties
-                let metadata = crate::common::Metadata::default();
+                // Extract metadata from OOXML core properties
+                let metadata = crate::ooxml::metadata::extract_metadata(&package.opc_package())
+                    .unwrap_or_else(|_| crate::common::Metadata::default());
 
                 Ok(Self {
                     inner: DocumentImpl::Docx(Box::new(doc_ref), metadata),
@@ -247,8 +248,9 @@ impl Document {
                     std::mem::transmute::<ooxml::docx::Document<'_>, ooxml::docx::Document<'static>>(doc)
                 };
 
-                // TODO: Extract metadata from OOXML core properties
-                let metadata = crate::common::Metadata::default();
+                // Extract metadata from OOXML core properties
+                let metadata = crate::ooxml::metadata::extract_metadata(&package.opc_package())
+                    .unwrap_or_else(|_| crate::common::Metadata::default());
 
                 Ok(Self {
                     inner: DocumentImpl::Docx(Box::new(doc_ref), metadata),

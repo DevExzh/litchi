@@ -1,5 +1,6 @@
 pub mod docx;
 pub mod error;
+pub mod metadata;
 /// Office Open XML (OOXML) format implementation.
 ///
 /// This module provides parsing and manipulation of Office Open XML documents,
@@ -19,6 +20,7 @@ pub mod error;
 ///    - `docx`: Word documents
 ///    - `xlsx`: Excel spreadsheets (placeholder)
 ///    - `pptx`: PowerPoint presentations (placeholder)
+///    - `metadata`: Core properties/metadata extraction
 ///
 /// # Example: Working with Word Documents
 ///

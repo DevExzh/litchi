@@ -46,6 +46,10 @@ pub struct Metadata {
     pub company: Option<String>,
     /// Manager name
     pub manager: Option<String>,
+    /// Content status (draft, final, etc.)
+    pub content_status: Option<String>,
+    /// Last printed time
+    pub last_printed_time: Option<DateTime<Utc>>,
     /// Security level
     pub security: Option<u32>,
     /// Codepage for text encoding
@@ -115,6 +119,8 @@ impl From<crate::ole::OleMetadata> for Metadata {
             category: ole_metadata.category,
             company: ole_metadata.company,
             manager: ole_metadata.manager,
+            content_status: None, // OLE doesn't have this field
+            last_printed_time: ole_metadata.last_printed_time,
             security: ole_metadata.security,
             codepage: ole_metadata.codepage,
         }
