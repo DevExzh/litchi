@@ -152,6 +152,13 @@ pub mod ooxml;
 /// This module provides functionality to parse and convert mathematical formulas between different formats.
 pub mod formula;
 
+/// iWork Archive Format Support
+///
+/// Provides support for parsing Apple's iWork file formats
+/// (Pages, Keynote, Numbers) which use the IWA (iWork Archive) format.
+/// Use [`iwa::Document::open()`] to get started.
+pub mod iwa;
+
 // Re-export high-level APIs
 pub use common::{Error, Result};
 pub use document::Document;

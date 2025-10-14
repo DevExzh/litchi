@@ -1,0 +1,379 @@
+//! iWork Bundle Structure Parser
+//!
+//! iWork documents are stored as bundles (directories) containing:
+//! - `Index.zip`: Archive of IWA files with serialized objects
+//! - `Data/`: Directory containing media assets
+//! - `Metadata/`: Document metadata and properties
+//! - Preview images at root level
+
+use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::io::{Read, Cursor};
+
+use zip::ZipArchive;
+
+use crate::iwa::archive::{Archive, ArchiveObject};
+use crate::iwa::snappy::SnappyStream;
+use crate::iwa::{Error, Result};
+
+/// Represents an iWork document bundle
+#[derive(Debug)]
+pub struct Bundle {
+    /// Path to the bundle directory
+    bundle_path: PathBuf,
+    /// Parsed IWA archives from Index.zip
+    archives: HashMap<String, Archive>,
+    /// Metadata from Metadata/ directory
+    metadata: BundleMetadata,
+}
+
+impl Bundle {
+    /// Open an iWork bundle from a path (directory or zip file)
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let bundle_path = path.as_ref().to_path_buf();
+
+        if bundle_path.is_dir() {
+            // Traditional bundle directory structure
+            Self::open_directory_bundle(&bundle_path)
+        } else if bundle_path.is_file() {
+            // Single file bundle (zip archive)
+            Self::open_file_bundle(&bundle_path)
+        } else {
+            return Err(Error::Bundle("Path does not exist".to_string()));
+        }
+    }
+
+    /// Open a traditional directory-based bundle
+    fn open_directory_bundle(bundle_path: &Path) -> Result<Self> {
+        // Check for required bundle structure
+        Self::validate_bundle_structure(bundle_path)?;
+
+        // Parse Index.zip
+        let archives = Self::parse_index_zip(bundle_path)?;
+
+        // Parse metadata
+        let metadata = Self::parse_metadata(bundle_path)?;
+
+        Ok(Bundle {
+            bundle_path: bundle_path.to_path_buf(),
+            archives,
+            metadata,
+        })
+    }
+
+    /// Open a single-file bundle (zip archive)
+    fn open_file_bundle(bundle_path: &Path) -> Result<Self> {
+        // Parse the zip file directly
+        let archives = Self::parse_zip_bundle(bundle_path)?;
+
+        // For single-file bundles, metadata is typically embedded
+        let metadata = BundleMetadata {
+            has_properties: true, // Assume it has properties
+            has_build_version_history: true,
+            has_document_identifier: true,
+            detected_application: None,
+        };
+
+        Ok(Bundle {
+            bundle_path: bundle_path.to_path_buf(),
+            archives,
+            metadata,
+        })
+    }
+
+    /// Validate that the path contains a valid iWork bundle structure
+    fn validate_bundle_structure(bundle_path: &Path) -> Result<()> {
+        // Check for Index.zip
+        let index_zip = bundle_path.join("Index.zip");
+        if !index_zip.exists() {
+            return Err(Error::Bundle("Index.zip not found in bundle".to_string()));
+        }
+
+        // Check for Metadata directory (optional but common)
+        let metadata_dir = bundle_path.join("Metadata");
+        if !metadata_dir.exists() || !metadata_dir.is_dir() {
+            // Some bundles might not have metadata, continue anyway
+        }
+
+        Ok(())
+    }
+
+    /// Parse Index.zip and extract all IWA files
+    fn parse_index_zip(bundle_path: &Path) -> Result<HashMap<String, Archive>> {
+        let index_zip_path = bundle_path.join("Index.zip");
+        let file = fs::File::open(&index_zip_path)
+            .map_err(|e| Error::Io(e))?;
+
+        let mut zip_archive = ZipArchive::new(file)
+            .map_err(|e| Error::Bundle(format!("Failed to open Index.zip: {}", e)))?;
+
+        Self::parse_iwa_files_from_zip(&mut zip_archive)
+    }
+
+    /// Parse a single-file bundle (zip archive) and extract all IWA files
+    fn parse_zip_bundle(bundle_path: &Path) -> Result<HashMap<String, Archive>> {
+        let file = fs::File::open(bundle_path)
+            .map_err(|e| Error::Io(e))?;
+
+        let mut zip_archive = ZipArchive::new(file)
+            .map_err(|e| Error::Bundle(format!("Failed to open bundle file: {}", e)))?;
+
+        Self::parse_iwa_files_from_zip(&mut zip_archive)
+    }
+
+    /// Parse IWA files from a zip archive
+    fn parse_iwa_files_from_zip(zip_archive: &mut ZipArchive<fs::File>) -> Result<HashMap<String, Archive>> {
+        let mut archives = HashMap::new();
+
+        for i in 0..zip_archive.len() {
+            let mut zip_file = zip_archive.by_index(i)
+                .map_err(|e| Error::Bundle(format!("Failed to read zip entry: {}", e)))?;
+
+            if zip_file.name().ends_with(".iwa") {
+                let mut compressed_data = Vec::new();
+                zip_file.read_to_end(&mut compressed_data)
+                    .map_err(|e| Error::Io(e))?;
+
+                // Decompress IWA file
+                let mut cursor = Cursor::new(&compressed_data);
+                let decompressed = SnappyStream::decompress(&mut cursor)?;
+
+                // Parse archive
+                let archive = Archive::parse(decompressed.data())?;
+                let name = zip_file.name().to_string();
+                archives.insert(name, archive);
+            }
+        }
+
+        Ok(archives)
+    }
+
+    /// Parse metadata from Metadata/ directory
+    fn parse_metadata(bundle_path: &Path) -> Result<BundleMetadata> {
+        let metadata_dir = bundle_path.join("Metadata");
+        let mut metadata = BundleMetadata::default();
+
+        if !metadata_dir.exists() {
+            return Ok(metadata);
+        }
+
+        // Try to parse Properties.plist
+        let properties_path = metadata_dir.join("Properties.plist");
+        if properties_path.exists() {
+            // For now, just check if it exists
+            // Full plist parsing would require additional dependencies
+            metadata.has_properties = true;
+        }
+
+        // Try to parse BuildVersionHistory.plist
+        let build_version_path = metadata_dir.join("BuildVersionHistory.plist");
+        if build_version_path.exists() {
+            metadata.has_build_version_history = true;
+        }
+
+        // Check for DocumentIdentifier
+        let doc_id_path = metadata_dir.join("DocumentIdentifier");
+        if doc_id_path.exists() {
+            metadata.has_document_identifier = true;
+        }
+
+        Ok(metadata)
+    }
+
+    /// Get all archives in the bundle
+    pub fn archives(&self) -> &HashMap<String, Archive> {
+        &self.archives
+    }
+
+    /// Get a specific archive by name
+    pub fn get_archive(&self, name: &str) -> Option<&Archive> {
+        self.archives.get(name)
+    }
+
+    /// Get bundle metadata
+    pub fn metadata(&self) -> &BundleMetadata {
+        &self.metadata
+    }
+
+    /// Get the bundle path
+    pub fn path(&self) -> &Path {
+        &self.bundle_path
+    }
+
+    /// Extract all text content from the bundle
+    pub fn extract_text(&self) -> Result<String> {
+        let mut text_parts = Vec::new();
+
+        for (_archive_name, archive) in &self.archives {
+            for object in &archive.objects {
+                text_parts.extend(object.extract_text());
+            }
+        }
+
+        // Join all text parts with newlines
+        Ok(text_parts.join("\n"))
+    }
+
+    /// Get all objects across all archives
+    pub fn all_objects(&self) -> Vec<(&str, &ArchiveObject)> {
+        let mut objects = Vec::new();
+        for (archive_name, archive) in &self.archives {
+            for object in &archive.objects {
+                objects.push((archive_name.as_str(), object));
+            }
+        }
+        objects
+    }
+
+    /// Find objects by message type
+    pub fn find_objects_by_type(&self, message_type: u32) -> Vec<(&str, &ArchiveObject)> {
+        let mut matching_objects = Vec::new();
+
+        for (archive_name, archive) in &self.archives {
+            for object in &archive.objects {
+                if object.messages.iter().any(|msg| msg.type_ == message_type) {
+                    matching_objects.push((archive_name.as_str(), object));
+                }
+            }
+        }
+
+        matching_objects
+    }
+}
+
+/// Metadata associated with an iWork bundle
+#[derive(Debug, Clone, Default)]
+pub struct BundleMetadata {
+    /// Whether Properties.plist exists
+    pub has_properties: bool,
+    /// Whether BuildVersionHistory.plist exists
+    pub has_build_version_history: bool,
+    /// Whether DocumentIdentifier exists
+    pub has_document_identifier: bool,
+    /// Application type detected from the bundle
+    pub detected_application: Option<String>,
+}
+
+impl BundleMetadata {
+    /// Get a summary of the metadata
+    pub fn summary(&self) -> String {
+        format!(
+            "Properties: {}, BuildVersion: {}, DocumentID: {}, App: {}",
+            self.has_properties,
+            self.has_build_version_history,
+            self.has_document_identifier,
+            self.detected_application.as_deref().unwrap_or("unknown")
+        )
+    }
+}
+
+/// Detect the application type from a bundle path
+pub fn detect_application_type<P: AsRef<Path>>(bundle_path: P) -> Result<String> {
+    let path = bundle_path.as_ref();
+
+    // Check file extension or directory structure
+    if let Some(extension) = path.extension() {
+        match extension.to_str() {
+            Some("pages") => return Ok("Pages".to_string()),
+            Some("key") => return Ok("Keynote".to_string()),
+            Some("numbers") => return Ok("Numbers".to_string()),
+            _ => {}
+        }
+    }
+
+    // Check for application-specific files in Index.zip
+    if path.is_dir() {
+        let index_zip = path.join("Index.zip");
+        if index_zip.exists() {
+            // This would require opening the zip and checking for app-specific files
+            // For now, return "Unknown"
+        }
+    }
+
+    Ok("Unknown".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bundle_validation() {
+        // Test with a non-existent directory
+        let bundle_path = std::path::Path::new("non_existent_bundle");
+        assert!(Bundle::open(&bundle_path).is_err());
+
+        // Test with existing iWork bundle
+        let bundle_path = std::path::Path::new("test.pages");
+        if bundle_path.exists() {
+            let result = Bundle::open(&bundle_path);
+            assert!(result.is_ok(), "Failed to open test.pages: {:?}", result.err());
+        }
+    }
+
+    #[test]
+    fn test_bundle_parsing() {
+        let bundle_path = std::path::Path::new("test.pages");
+        if !bundle_path.exists() {
+            // Skip test if test file doesn't exist
+            return;
+        }
+
+        let bundle = Bundle::open(&bundle_path).expect("Failed to open test.pages");
+
+        // Verify bundle has expected structure
+        assert!(!bundle.archives().is_empty(), "Bundle should contain archives");
+
+        // Check for common iWork files
+        assert!(bundle.get_archive("Index/Document.iwa").is_some(),
+                "Bundle should contain Document.iwa");
+        assert!(bundle.get_archive("Index/Metadata.iwa").is_some(),
+                "Bundle should contain Metadata.iwa");
+
+        // Verify metadata exists
+        let metadata = bundle.metadata();
+        assert!(metadata.has_properties || metadata.has_build_version_history,
+                "Bundle should have some metadata");
+
+        // Test text extraction (will be empty for now as protobuf decoding isn't implemented)
+        let text_result = bundle.extract_text();
+        assert!(text_result.is_ok());
+    }
+
+    #[test]
+    fn test_numbers_bundle_parsing() {
+        let bundle_path = std::path::Path::new("test.numbers");
+        if !bundle_path.exists() {
+            // Skip test if test file doesn't exist
+            return;
+        }
+
+        let bundle = Bundle::open(&bundle_path).expect("Failed to open test.numbers");
+
+        // Verify bundle has expected structure
+        assert!(!bundle.archives().is_empty(), "Bundle should contain archives");
+
+        // Check for common Numbers files
+        assert!(bundle.get_archive("Index/Document.iwa").is_some(),
+                "Bundle should contain Document.iwa");
+        assert!(bundle.get_archive("Index/CalculationEngine.iwa").is_some(),
+                "Numbers bundle should contain CalculationEngine.iwa");
+    }
+
+    #[test]
+    fn test_metadata_summary() {
+        let metadata = BundleMetadata {
+            has_properties: true,
+            has_build_version_history: true,
+            has_document_identifier: false,
+            detected_application: Some("Pages".to_string()),
+        };
+
+        let summary = metadata.summary();
+        assert!(summary.contains("Properties: true"));
+        assert!(summary.contains("BuildVersion: true"));
+        assert!(summary.contains("DocumentID: false"));
+        assert!(summary.contains("App: Pages"));
+    }
+}

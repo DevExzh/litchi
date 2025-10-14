@@ -36,3 +36,13 @@ serde_yaml = "0.9"
 encoding_rs = "0.8"
 # Date time support
 chrono = { version = "0", features = ["serde"] }
+# Snappy compression for iWork IWA files
+snap = "1.1"
+# Lazy static initialization
+once_cell = "1.19"
+# Protobuf support for iWork formats
+prost = "0.13"
+prost-types = "0.13"
+
+[build-dependencies]
+prost-build = "0.13"
