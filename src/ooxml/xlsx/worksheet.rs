@@ -49,7 +49,7 @@ impl<'a> Worksheet<'a> {
     /// Load worksheet data from the XML.
     pub fn load_data(&mut self) -> SheetResult<()> {
         // Get the worksheet part using the relationship ID
-        let worksheet_uri = PackURI::new(&format!("/xl/worksheets/sheet{}.xml", self.info.sheet_id))?;
+        let worksheet_uri = PackURI::new(format!("/xl/worksheets/sheet{}.xml", self.info.sheet_id))?;
 
         let worksheet_part = self.workbook.package().get_part(&worksheet_uri)?;
         let content = std::str::from_utf8(worksheet_part.blob())?;
@@ -63,14 +63,13 @@ impl<'a> Worksheet<'a> {
     /// Parse worksheet XML to extract cell data.
     fn parse_worksheet_xml(&mut self, content: &str) -> SheetResult<()> {
         // Find the sheetData section
-        if let Some(sheet_data_start) = content.find("<sheetData>") {
-            if let Some(sheet_data_end) = content[sheet_data_start..].find("</sheetData>") {
+        if let Some(sheet_data_start) = content.find("<sheetData>")
+            && let Some(sheet_data_end) = content[sheet_data_start..].find("</sheetData>") {
                 let sheet_data_content = &content[sheet_data_start..sheet_data_start + sheet_data_end];
 
                 // Parse individual rows and cells
                 self.parse_sheet_data(sheet_data_content)?;
             }
-        }
 
         Ok(())
     }
@@ -97,7 +96,7 @@ impl<'a> Worksheet<'a> {
                         max_col = max_col.max(col_num);
 
                         self.cells.entry(row_num)
-                            .or_insert_with(HashMap::new)
+                            .or_default()
                             .insert(col_num, value);
                     }
                 }
@@ -161,11 +160,7 @@ impl<'a> Worksheet<'a> {
         // Extract cell reference (e.g., "A1")
         let reference = if let Some(r_start) = cell_content.find("r=\"") {
             let r_content = &cell_content[r_start + 3..];
-            if let Some(quote_pos) = r_content.find('"') {
-                Some(r_content[..quote_pos].to_string())
-            } else {
-                None
-            }
+            r_content.find('"').map(|quote_pos| r_content[..quote_pos].to_string())
         } else {
             None
         };
@@ -181,11 +176,7 @@ impl<'a> Worksheet<'a> {
         // Extract cell type
         let cell_type = if let Some(t_start) = cell_content.find("t=\"") {
             let t_content = &cell_content[t_start + 3..];
-            if let Some(quote_pos) = t_content.find('"') {
-                Some(t_content[..quote_pos].to_string())
-            } else {
-                None
-            }
+            t_content.find('"').map(|quote_pos| t_content[..quote_pos].to_string())
         } else {
             None
         };
@@ -193,11 +184,7 @@ impl<'a> Worksheet<'a> {
         // Extract value
         let value = if let Some(v_start) = cell_content.find("<v>") {
             let v_start_pos = v_start + 3;
-            if let Some(v_end) = cell_content[v_start_pos..].find("</v>") {
-                Some(cell_content[v_start_pos..v_start_pos + v_end].to_string())
-            } else {
-                None
-            }
+            cell_content[v_start_pos..].find("</v>").map(|v_end| cell_content[v_start_pos..v_start_pos + v_end].to_string())
         } else {
             None
         };
@@ -245,13 +232,11 @@ impl<'a> Worksheet<'a> {
         match cell_value {
             CellValue::String(s) if s.starts_with("SHARED_STRING_") => {
                 // Extract the index from the shared string reference
-                if let Some(index_str) = s.strip_prefix("SHARED_STRING_") {
-                    if let Ok(index) = atoi_simd::parse(index_str.as_bytes()) {
-                        if let Some(shared_string) = self.workbook.shared_strings().get(index) {
+                if let Some(index_str) = s.strip_prefix("SHARED_STRING_")
+                    && let Ok(index) = atoi_simd::parse(index_str.as_bytes())
+                        && let Some(shared_string) = self.workbook.shared_strings().get(index) {
                             return CellValue::String(shared_string.to_string());
                         }
-                    }
-                }
                 CellValue::Error("Invalid shared string reference".to_string())
             }
             other => other,

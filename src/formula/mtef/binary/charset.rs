@@ -507,7 +507,7 @@ pub fn lookup_character(typeface: usize, character: u16, math_attr: i32) -> Opti
 
 /// Lookup a function name in the function mapping table
 pub fn lookup_function(function_name: &str) -> Option<&'static str> {
-    FUNCTION_LOOKUP_TABLE.get(function_name).map(|v| *v)
+    FUNCTION_LOOKUP_TABLE.get(function_name).copied()
 }
 
 /// Get embellishment template for a given embellishment type

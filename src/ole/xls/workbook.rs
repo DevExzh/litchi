@@ -82,7 +82,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     ) -> XlsResult<()> {
         // Collect all records first for easier processing
         let mut records = Vec::new();
-        while let Some(record_result) = record_iter.next() {
+        for record_result in record_iter.by_ref() {
             records.push(record_result?);
         }
 
@@ -179,7 +179,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     ) -> XlsResult<XlsWorksheet> {
         let mut worksheet = XlsWorksheet::with_shared_strings(name.to_string(), shared_strings);
 
-        while let Some(record_result) = record_iter.next() {
+        for record_result in record_iter.by_ref() {
             let record = record_result?;
 
             match record.header.record_type {

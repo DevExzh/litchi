@@ -105,18 +105,15 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
 
         // Gather function name from consecutive characters with typeface 130
         while let Some(obj) = current {
-            if let MtefRecordType::Char = obj.tag {
-                if let Some(char_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefChar>() {
-                    if char_obj.typeface == 130 && (char_obj.character as u8).is_ascii_alphabetic() {
-                        if let Some(ch) = char::from_u32(char_obj.character as u32) {
+            if let MtefRecordType::Char = obj.tag
+                && let Some(char_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefChar>()
+                    && char_obj.typeface == 130 && (char_obj.character as u8).is_ascii_alphabetic()
+                        && let Some(ch) = char::from_u32(char_obj.character as u32) {
                             function_name.push(ch);
                             skip_count += 1;
                             current = obj.next.as_deref();
                             continue;
                         }
-                    }
-                }
-            }
             break;
         }
 
@@ -145,16 +142,14 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         while let Some(obj) = current {
             match obj.tag {
                 MtefRecordType::Char => {
-                    if let Some(char_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefChar>() {
-                        if char_obj.typeface == 129 {
-                            if let Some(ch) = char::from_u32(char_obj.character as u32) {
+                    if let Some(char_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefChar>()
+                        && char_obj.typeface == 129
+                            && let Some(ch) = char::from_u32(char_obj.character as u32) {
                                 text_run.push(ch);
                                 skip_count += 1;
                                 current = obj.next.as_deref();
                                 continue;
                             }
-                        }
-                    }
                     break;
                 }
                 MtefRecordType::Size | MtefRecordType::Full | MtefRecordType::Sub |

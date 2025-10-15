@@ -7,9 +7,6 @@
 /// - org.apache.poi.hwpf.model.FormattedDiskPage
 /// - org.apache.poi.hwpf.model.CHPFormattedDiskPage
 /// - [MS-DOC] 2.4.3 PnFkp* (Page Number FKP)
-
-use super::super::package::Result;
-
 /// Size of an FKP page in bytes (always 512)
 const FKP_PAGE_SIZE: usize = 512;
 

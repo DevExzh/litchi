@@ -58,7 +58,7 @@ impl SnappyStream {
             // Read compressed chunk
             let mut compressed = vec![0u8; length as usize];
             reader.read_exact(&mut compressed)
-                .map_err(|e| Error::Io(e))?;
+                .map_err(Error::Io)?;
 
             let mut chunk_decompressed = Vec::new();
             let mut buffer_size = 1024; // Start with 1KB

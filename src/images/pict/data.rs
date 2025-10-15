@@ -48,7 +48,7 @@ pub fn unpack_bits(compressed: &[u8], expected_size: usize) -> Result<Vec<u8>> {
             if bytes_done + run_length > expected_size {
                 return Err(Error::ParseError("PackBits decompression exceeded expected size".into()));
             }
-            output.extend(std::iter::repeat(byte).take(run_length));
+            output.extend(std::iter::repeat_n(byte, run_length));
             bytes_done += run_length;
         } else {
             // Literal bytes: copy (code + 1) bytes directly

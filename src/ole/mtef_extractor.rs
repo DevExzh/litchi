@@ -105,7 +105,7 @@ impl<'arena> MtefExtractor<'arena> {
         // List all entries in ObjectPool
         let entries = ole_file
             .list_directory_entries(&["ObjectPool"])
-            .map_err(|e| MtefExtractionError::IoError(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
+            .map_err(|e| MtefExtractionError::IoError(std::io::Error::other(e.to_string())))?;
 
         eprintln!("DEBUG: Found {} entries in ObjectPool", entries.len());
 

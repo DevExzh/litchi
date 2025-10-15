@@ -48,11 +48,10 @@ impl ParagraphExtractor {
         // Debug: Print all FIB table pointers to find CLX
         eprintln!("DEBUG: FIB table pointers with non-zero length:");
         for i in 0..50 {
-            if let Some((offset, length)) = fib.get_table_pointer(i) {
-                if length > 0 {
+            if let Some((offset, length)) = fib.get_table_pointer(i)
+                && length > 0 {
                     eprintln!("DEBUG:   Index {}: offset={}, length={}", i, offset, length);
                 }
-            }
         }
         
         // Get PAP bin table location from FIB

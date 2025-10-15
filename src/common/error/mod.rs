@@ -61,6 +61,7 @@ impl From<crate::ole::OleError> for Error {
         match err {
             crate::ole::OleError::Io(e) => Error::Io(e),
             crate::ole::OleError::InvalidFormat(s) => Error::InvalidFormat(s),
+            crate::ole::OleError::InvalidData(s) => Error::InvalidFormat(s),
             crate::ole::OleError::NotOleFile => Error::NotOfficeFile,
             crate::ole::OleError::CorruptedFile(s) => Error::CorruptedFile(s),
             crate::ole::OleError::StreamNotFound => Error::ComponentNotFound("Stream not found".to_string()),

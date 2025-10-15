@@ -198,7 +198,7 @@ impl TemplateParser {
 
         // Fraction: \frac{numerator}{denominator}
         if latex.starts_with("\\frac{")
-            && latex.find("}{").is_some()
+            && latex.contains("}{")
                 && latex[latex.find("}{").unwrap() + 2..].find('}').is_some() {
 
                     // Try to find the actual nodes from args
@@ -557,8 +557,7 @@ impl TemplateParser {
             TMPL_INTER => Some(LargeOperator::Intersection), // 20: intersection
             TMPL_IINTOP => Some(LargeOperator::Integral),  // 21: single integral with limits
             TMPL_IIINTOP => Some(LargeOperator::Sum),      // 22: single sum with limits
-            TMPL_OINTOP => Some(LargeOperator::Limit),     // 23: limit
-            TMPL_LIM => Some(LargeOperator::Limit),        // Alternative limit
+            TMPL_OINTOP => Some(LargeOperator::Integral),  // 23: contour integral
             _ => None,
         }
     }

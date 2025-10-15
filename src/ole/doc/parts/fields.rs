@@ -185,10 +185,10 @@ impl FieldsTable {
         // Each field consists of: BEGIN marker, optional SEPARATOR marker, END marker
         let mut i = 0;
         while i < plcf.count() {
-            if let Some((cp, cp_end)) = plcf.range(i) {
-                if let Some(fld_data) = plcf.property(i) {
-                    if let Some(descriptor) = FieldDescriptor::from_bytes(fld_data) {
-                        if descriptor.is_begin() {
+            if let Some((cp, cp_end)) = plcf.range(i)
+                && let Some(fld_data) = plcf.property(i)
+                    && let Some(descriptor) = FieldDescriptor::from_bytes(fld_data)
+                        && descriptor.is_begin() {
                             // Found field begin - look for separator and end
                             let start_cp = cp;
                             let field_type = FieldType::from(descriptor.field_type);
@@ -199,9 +199,9 @@ impl FieldsTable {
                             // Scan forward for separator and end markers
                             let mut j = i + 1;
                             while j < plcf.count() {
-                                if let Some((sep_cp, _)) = plcf.range(j) {
-                                    if let Some(next_fld) = plcf.property(j) {
-                                        if let Some(next_desc) = FieldDescriptor::from_bytes(next_fld) {
+                                if let Some((sep_cp, _)) = plcf.range(j)
+                                    && let Some(next_fld) = plcf.property(j)
+                                        && let Some(next_desc) = FieldDescriptor::from_bytes(next_fld) {
                                             if next_desc.is_separator() {
                                                 separator_cp = Some(sep_cp);
                                                 has_separator = true;
@@ -211,8 +211,6 @@ impl FieldsTable {
                                                 break;
                                             }
                                         }
-                                    }
-                                }
                                 j += 1;
                             }
 
@@ -225,9 +223,6 @@ impl FieldsTable {
                                 has_separator,
                             });
                         }
-                    }
-                }
-            }
             i += 1;
         }
 

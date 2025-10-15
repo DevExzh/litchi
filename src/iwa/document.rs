@@ -52,7 +52,7 @@ impl Document {
         // Extract text from all archives in the bundle
         let mut all_text = Vec::new();
 
-        for (_archive_name, archive) in self.bundle.archives() {
+        for archive in self.bundle.archives().values() {
             for object in &archive.objects {
                 // Extract text from successfully decoded messages
                 all_text.extend(object.extract_text());

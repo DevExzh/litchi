@@ -199,9 +199,3 @@ pub fn is_standard_function(name: &str) -> bool {
         "det" | "dim" | "deg" | "gcd" | "hom" | "ker"
     )
 }
-
-/// Check if text needs escaping for LaTeX
-pub fn needs_escape(text: &str) -> bool {
-    text.chars().any(|c| matches!(c, ' ' | '#' | '$' | '%' | '&' | '_' | '{' | '}' | '~' | '^' | '\\'))
-}
-

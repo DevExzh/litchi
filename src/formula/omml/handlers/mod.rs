@@ -46,8 +46,6 @@ pub use eq_arr::EqArrHandler;
 pub use spacing::SpacingHandler;
 pub use char_handler::CharHandler;
 pub use components::{NumeratorHandler, DenominatorHandler, DegreeHandler, BaseHandler, LowerLimitHandler, UpperLimitHandler, IntegrandHandler, LimUppHandler, LimLowHandler};
-pub use matrix_cell::MatrixCellHandler;
-pub use eq_arr_pr::EqArrPrHandler;
 pub use limit::LimitHandler;
 pub use pre_script::PreScriptHandler;
 pub use post_script::PostScriptHandler;

@@ -46,6 +46,12 @@ pub struct MessageRegistry {
     types: HashMap<u32, MessageType>,
 }
 
+impl Default for MessageRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MessageRegistry {
     /// Create a new empty registry
     pub fn new() -> Self {

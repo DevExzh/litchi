@@ -6,7 +6,6 @@ use crate::formula::mtef::constants::*;
 use super::headers::*;
 use super::objects::*;
 use crate::formula::mtef::MtefError;
-use smallvec::SmallVec;
 
 /// Binary MTEF parser
 pub struct MtefBinaryParser<'arena> {
@@ -213,7 +212,7 @@ impl<'arena> MtefBinaryParser<'arena> {
             let curr_tag = if self.mtef_version == 5 {
                 self.data[self.pos]
             } else {
-                (self.data[self.pos] & 0x0F) as u8
+                self.data[self.pos] & 0x0F
             };
 
             // END tag handling - return immediately
@@ -361,12 +360,10 @@ impl<'arena> MtefBinaryParser<'arena> {
             } else {
                 None
             }
+        } else if attrs & crate::formula::mtef::constants::XF_EMBELL != 0 {
+            Some(Box::new(self.parse_embell()?))
         } else {
-            if attrs & crate::formula::mtef::constants::XF_EMBELL != 0 {
-                Some(Box::new(self.parse_embell()?))
-            } else {
-                None
-            }
+            None
         };
 
         Ok(MtefChar {
@@ -505,7 +502,7 @@ impl<'arena> MtefBinaryParser<'arena> {
         let mut col_parts = [0u8; 16];
 
         // Row partition consists of (rows+1) two-bit values
-        let row_bytes = (2 * (rows as usize + 1) + 7) / 8;
+        let row_bytes = (2 * (rows as usize + 1)).div_ceil(8);
         for i in 0..row_bytes {
             if i < row_parts.len() {
                 row_parts[i] = self.read_u8()?;
@@ -513,7 +510,7 @@ impl<'arena> MtefBinaryParser<'arena> {
         }
 
         // Col partition consists of (cols+1) two-bit values
-        let col_bytes = (2 * (cols as usize + 1) + 7) / 8;
+        let col_bytes = (2 * (cols as usize + 1)).div_ceil(8);
         for i in 0..col_bytes {
             if i < col_parts.len() {
                 col_parts[i] = self.read_u8()?;
@@ -562,7 +559,7 @@ impl<'arena> MtefBinaryParser<'arena> {
         let tag = if self.mtef_version == 5 {
             self.data[self.pos]
         } else {
-            (self.data[self.pos] & 0x0F) as u8
+            self.data[self.pos] & 0x0F
         };
         if tag == crate::formula::mtef::constants::RULER {
             self.pos += 1; // Skip the ruler tag
@@ -631,7 +628,7 @@ impl<'arena> MtefBinaryParser<'arena> {
         let tag = self.read_u8()? & 0x0F;
 
         // FULL or SUB or SUB2 or SYM or SUBSYM
-        if tag >= FULL && tag <= SUBSYM {
+        if (FULL..=SUBSYM).contains(&tag) {
             return Ok(MtefSize {
                 r#type: tag as i32,
                 lsize: (tag - FULL) as i32,

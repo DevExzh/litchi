@@ -22,14 +22,13 @@ pub fn parse_worksheet_xml(content: &str) -> Result<HashMap<u32, HashMap<u32, Ce
     let mut cells = HashMap::with_capacity(INITIAL_ROW_CAPACITY);
 
     // Find the sheetData section using optimized search
-    if let Some(sheet_data_start) = memchr::memmem::find(content.as_bytes(), b"<sheetData>") {
-        if let Some(sheet_data_end) = memchr::memmem::find(&content.as_bytes()[sheet_data_start..], b"</sheetData>") {
+    if let Some(sheet_data_start) = memchr::memmem::find(content.as_bytes(), b"<sheetData>")
+        && let Some(sheet_data_end) = memchr::memmem::find(&content.as_bytes()[sheet_data_start..], b"</sheetData>") {
             let sheet_data_content = &content[sheet_data_start..sheet_data_start + sheet_data_end];
 
             // Parse individual rows and cells
             parse_sheet_data(sheet_data_content, &mut cells)?;
         }
-    }
 
     Ok(cells)
 }
@@ -68,11 +67,7 @@ pub fn parse_row_xml(row_content: &str) -> Result<Option<(u32, Vec<(u32, CellVal
         let r_content = &row_content[r_start + 3..];
         if let Some(quote_pos) = memchr::memchr(b'"', r_content.as_bytes()) {
             // Performance: Use atoi_simd for fast integer parsing
-            if let Ok(num) = atoi_simd::parse(&r_content.as_bytes()[..quote_pos]) {
-                Some(num)
-            } else {
-                None
-            }
+            atoi_simd::parse(&r_content.as_bytes()[..quote_pos]).ok()
         } else {
             None
         }
@@ -113,11 +108,7 @@ pub fn parse_cell_xml(cell_content: &str) -> Result<Option<(u32, CellValue)>> {
     // Extract cell reference (e.g., "A1") - optimized attribute parsing
     let reference = if let Some(r_start) = memchr::memmem::find(cell_content.as_bytes(), b"r=\"") {
         let r_content = &cell_content[r_start + 3..];
-        if let Some(quote_pos) = memchr::memchr(b'"', r_content.as_bytes()) {
-            Some(&r_content[..quote_pos])
-        } else {
-            None
-        }
+        memchr::memchr(b'"', r_content.as_bytes()).map(|quote_pos| &r_content[..quote_pos])
     } else {
         None
     };
@@ -133,11 +124,7 @@ pub fn parse_cell_xml(cell_content: &str) -> Result<Option<(u32, CellValue)>> {
     // Extract cell type - optimized attribute parsing
     let cell_type = if let Some(t_start) = memchr::memmem::find(cell_content.as_bytes(), b"t=\"") {
         let t_content = &cell_content[t_start + 3..];
-        if let Some(quote_pos) = memchr::memchr(b'"', t_content.as_bytes()) {
-            Some(&t_content[..quote_pos])
-        } else {
-            None
-        }
+        memchr::memchr(b'"', t_content.as_bytes()).map(|quote_pos| &t_content[..quote_pos])
     } else {
         None
     };
@@ -145,16 +132,12 @@ pub fn parse_cell_xml(cell_content: &str) -> Result<Option<(u32, CellValue)>> {
     // Extract value - optimized tag search
     let value = if let Some(v_start) = memchr::memmem::find(cell_content.as_bytes(), b"<v>") {
         let v_start_pos = v_start + 3;
-        if let Some(v_end) = memchr::memmem::find(&cell_content.as_bytes()[v_start_pos..], b"</v>") {
-            Some(&cell_content[v_start_pos..v_start_pos + v_end])
-        } else {
-            None
-        }
+        memchr::memmem::find(&cell_content.as_bytes()[v_start_pos..], b"</v>").map(|v_end| &cell_content[v_start_pos..v_start_pos + v_end])
     } else {
         None
     };
 
-    let cell_value = match (cell_type.as_deref(), value.as_deref()) {
+    let cell_value = match (cell_type, value) {
         (Some("str"), Some(v)) => CellValue::String(v.to_string()),
         (Some("s"), Some(v)) => {
             // Shared string reference - this will be resolved later

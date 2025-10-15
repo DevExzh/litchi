@@ -87,7 +87,7 @@ impl XlsbWorkbook {
 
     /// Read shared strings from SST
     fn read_shared_strings(iter: &mut XlsbRecordIter<impl Read>, strings: &mut Vec<String>) -> XlsbResult<()> {
-        while let Some(record) = iter.next() {
+        for record in iter.by_ref() {
             let record = record?;
             // println!("DEBUG SST: Record type 0x{:04X}, data len {}", record.header.record_type, record.data.len());
             match record.header.record_type {
@@ -124,7 +124,7 @@ impl XlsbWorkbook {
         worksheet_names: &mut Vec<String>,
         is_1904: &mut bool
     ) -> XlsbResult<()> {
-        while let Some(record) = iter.next() {
+        for record in iter.by_ref() {
             let record = record?;
             // println!("DEBUG: Record type 0x{:04X}, data len {}", record.header.record_type, record.data.len());
             match record.header.record_type {

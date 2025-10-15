@@ -24,7 +24,7 @@ impl NaryHandler {
         let chr_val = get_attribute_value(&attrs, "chr");
         if let Some(chr) = chr_val {
             context.properties.chr = Some(chr);
-            context.operator = parse_large_operator(Some(&context.properties.chr.as_ref().unwrap()));
+            context.operator = parse_large_operator(Some(context.properties.chr.as_ref().unwrap()));
         }
     }
 

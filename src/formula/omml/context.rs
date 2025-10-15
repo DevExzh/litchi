@@ -4,7 +4,6 @@
 
 use crate::formula::ast::{MathNode, LargeOperator, AccentType, Fence, MatrixFence};
 use crate::formula::omml::elements::*;
-use crate::formula::omml::utils::extend_vec_efficient;
 
 /// High-performance text buffer for collecting text content
 #[derive(Debug)]

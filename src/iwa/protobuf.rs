@@ -238,11 +238,10 @@ impl DecodedMessage for KeynoteSlideWrapper {
 
     fn extract_text(&self) -> Vec<String> {
         let mut text = Vec::new();
-        if let Some(ref name) = self.0.name {
-            if !name.is_empty() {
+        if let Some(ref name) = self.0.name
+            && !name.is_empty() {
                 text.push(name.clone());
             }
-        }
         // if let Some(ref note) = self.0.note {
         //     // Note is a reference, not direct text - we can't extract text from it here
         //     // without additional processing

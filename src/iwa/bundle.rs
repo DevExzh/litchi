@@ -40,7 +40,7 @@ impl Bundle {
             // Single file bundle (zip archive)
             Self::open_file_bundle(&bundle_path)
         } else {
-            return Err(Error::Bundle("Path does not exist".to_string()));
+            Err(Error::Bundle("Path does not exist".to_string()))
         }
     }
 
@@ -103,7 +103,7 @@ impl Bundle {
     fn parse_index_zip(bundle_path: &Path) -> Result<HashMap<String, Archive>> {
         let index_zip_path = bundle_path.join("Index.zip");
         let file = fs::File::open(&index_zip_path)
-            .map_err(|e| Error::Io(e))?;
+            .map_err(Error::Io)?;
 
         let mut zip_archive = ZipArchive::new(file)
             .map_err(|e| Error::Bundle(format!("Failed to open Index.zip: {}", e)))?;
@@ -114,7 +114,7 @@ impl Bundle {
     /// Parse a single-file bundle (zip archive) and extract all IWA files
     fn parse_zip_bundle(bundle_path: &Path) -> Result<HashMap<String, Archive>> {
         let file = fs::File::open(bundle_path)
-            .map_err(|e| Error::Io(e))?;
+            .map_err(Error::Io)?;
 
         let mut zip_archive = ZipArchive::new(file)
             .map_err(|e| Error::Bundle(format!("Failed to open bundle file: {}", e)))?;
@@ -133,7 +133,7 @@ impl Bundle {
             if zip_file.name().ends_with(".iwa") {
                 let mut compressed_data = Vec::new();
                 zip_file.read_to_end(&mut compressed_data)
-                    .map_err(|e| Error::Io(e))?;
+                    .map_err(Error::Io)?;
 
                 // Decompress IWA file
                 let mut cursor = Cursor::new(&compressed_data);
@@ -205,7 +205,7 @@ impl Bundle {
     pub fn extract_text(&self) -> Result<String> {
         let mut text_parts = Vec::new();
 
-        for (_archive_name, archive) in &self.archives {
+        for archive in self.archives.values() {
             for object in &archive.objects {
                 text_parts.extend(object.extract_text());
             }

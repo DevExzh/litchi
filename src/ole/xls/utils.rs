@@ -48,7 +48,7 @@ pub fn parse_string_record(data: &[u8], encoding: &XlsEncoding) -> XlsResult<Str
 
     // For BIFF8, handle UTF-16
     if matches!(encoding, XlsEncoding::Utf16Le) && high_byte {
-        if len % 2 != 0 {
+        if !len.is_multiple_of(2) {
             return Err(XlsError::Encoding("Invalid UTF-16 string length".to_string()));
         }
         let utf16_data: Vec<u16> = string_data.chunks(2)
@@ -114,7 +114,7 @@ pub fn parse_unicode_string(data: &[u8], encoding: &XlsEncoding) -> XlsResult<(S
 
     let string = if matches!(encoding, XlsEncoding::Utf16Le) && high_byte {
         // UTF-16 LE
-        if cch % 2 != 0 {
+        if !cch.is_multiple_of(2) {
             return Err(XlsError::Encoding("Invalid UTF-16 string length".to_string()));
         }
         let utf16_data: Vec<u16> = string_data.chunks(2)

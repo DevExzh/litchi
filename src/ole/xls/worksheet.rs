@@ -55,7 +55,7 @@ impl XlsWorksheet {
 
     /// Get shared strings reference
     pub fn shared_strings(&self) -> Option<&[String]> {
-        self.shared_strings.as_ref().map(|v| v.as_slice())
+        self.shared_strings.as_deref()
     }
 
     /// Get cell at position

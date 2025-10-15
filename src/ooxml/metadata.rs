@@ -42,16 +42,15 @@ pub fn extract_metadata(package: &OpcPackage) -> Result<Metadata> {
 ///
 /// Core properties are typically located at "/docProps/core.xml" and have
 /// the content type "application/vnd.openxmlformats-package.core-properties+xml".
-fn find_core_properties_part<'a>(package: &'a OpcPackage) -> Result<&'a dyn crate::ooxml::opc::part::Part> {
+fn find_core_properties_part(package: &OpcPackage) -> Result<&dyn crate::ooxml::opc::part::Part> {
     // Try the standard location first
     let standard_uri = PackURI::new("/docProps/core.xml")
         .map_err(|e| OoxmlError::Other(format!("Invalid core properties URI: {}", e)))?;
 
-    if let Ok(part) = package.get_part(&standard_uri) {
-        if part.content_type() == ct::OPC_CORE_PROPERTIES {
+    if let Ok(part) = package.get_part(&standard_uri)
+        && part.content_type() == ct::OPC_CORE_PROPERTIES {
             return Ok(part);
         }
-    }
 
     // Fallback: search through all parts for core properties content type
     for part in package.iter_parts() {
@@ -109,11 +108,10 @@ fn parse_core_properties_xml(xml: &str) -> Result<Metadata> {
                         }
                     }
                     b"cp:revision" => {
-                        if let Some(text) = read_text_element(&mut reader, &mut buf)? {
-                            if let Ok(rev) = text.parse::<u32>() {
+                        if let Some(text) = read_text_element(&mut reader, &mut buf)?
+                            && let Ok(rev) = text.parse::<u32>() {
                                 metadata.revision = Some(rev.to_string());
                             }
-                        }
                     }
                     b"cp:category" => {
                         if let Some(text) = read_text_element(&mut reader, &mut buf)? {
@@ -126,25 +124,22 @@ fn parse_core_properties_xml(xml: &str) -> Result<Metadata> {
                         }
                     }
                     b"dcterms:created" | b"cp:created" => {
-                        if let Some(text) = read_text_element(&mut reader, &mut buf)? {
-                            if let Ok(dt) = parse_datetime(&text) {
+                        if let Some(text) = read_text_element(&mut reader, &mut buf)?
+                            && let Ok(dt) = parse_datetime(&text) {
                                 metadata.created = Some(dt);
                             }
-                        }
                     }
                     b"dcterms:modified" | b"cp:modified" => {
-                        if let Some(text) = read_text_element(&mut reader, &mut buf)? {
-                            if let Ok(dt) = parse_datetime(&text) {
+                        if let Some(text) = read_text_element(&mut reader, &mut buf)?
+                            && let Ok(dt) = parse_datetime(&text) {
                                 metadata.modified = Some(dt);
                             }
-                        }
                     }
                     b"cp:lastPrinted" => {
-                        if let Some(text) = read_text_element(&mut reader, &mut buf)? {
-                            if let Ok(dt) = parse_datetime(&text) {
+                        if let Some(text) = read_text_element(&mut reader, &mut buf)?
+                            && let Ok(dt) = parse_datetime(&text) {
                                 metadata.last_printed_time = Some(dt);
                             }
-                        }
                     }
                     _ => {
                         // Skip unknown elements

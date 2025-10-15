@@ -168,7 +168,7 @@ impl PictConverter {
 
         // Decompress and render each row
         let mut data_offset = 0;
-        let expected_row_size = (width as usize + 7) / 8; // Round up for byte alignment
+        let expected_row_size = (width as usize).div_ceil(8); // Round up for byte alignment
 
         for y in 0..height as usize {
             if data_offset >= compressed_data.len() {

@@ -147,7 +147,7 @@ impl BofRecord {
         };
 
         let version = BiffVersion::from_bof_version(biff_version)
-            .ok_or_else(|| XlsError::UnsupportedBiffVersion(biff_version))?;
+            .ok_or(XlsError::UnsupportedBiffVersion(biff_version))?;
 
         let is_1904_date_system = dt == 1;
 
@@ -300,7 +300,7 @@ impl XlsEncoding {
         match self {
             XlsEncoding::Utf16Le => {
                 // UTF-16 LE decoding
-                if data.len() % 2 != 0 {
+                if !data.len().is_multiple_of(2) {
                     return Err(XlsError::Encoding("Invalid UTF-16 data length".to_string()));
                 }
                 let utf16_data: Vec<u16> = data.chunks(2)

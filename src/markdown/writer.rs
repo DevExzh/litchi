@@ -95,7 +95,7 @@ impl MarkdownWriter {
 
         // Pre-calculate buffer size needed to minimize reallocations
         let mut needed_capacity = text.len();
-        if let Some(_) = vertical_pos {
+        if vertical_pos.is_some() {
             needed_capacity += 11; // <sup></sup> or <sub></sub>
         }
         if strikethrough {
@@ -397,7 +397,7 @@ impl MarkdownWriter {
 
     /// Append text to the buffer.
     pub fn push_str(&mut self, text: &str) {
-        self.buffer.push_str(&text);
+        self.buffer.push_str(text);
     }
 
     /// Append a single character to the buffer.
@@ -471,33 +471,30 @@ impl MarkdownWriter {
     /// Extract ordered list marker and content.
     fn extract_ordered_list_marker<'a>(&self, text: &'a str) -> Option<(&'a str, &'a str)> {
         // Match patterns like: "1. ", "2) ", "(1) ", etc.
-        if let Some(pos) = text.find('.') {
-            if pos > 0 && text[..pos].chars().all(|c| c.is_ascii_digit()) {
+        if let Some(pos) = text.find('.')
+            && pos > 0 && text[..pos].chars().all(|c| c.is_ascii_digit()) {
                 let marker_end = pos + 1;
                 if text.len() > marker_end && text.as_bytes()[marker_end] == b' ' {
                     return Some((&text[..marker_end], &text[marker_end + 1..]));
                 }
             }
-        }
 
-        if let Some(pos) = text.find(')') {
-            if pos > 0 && text[..pos].chars().all(|c| c.is_ascii_digit()) {
+        if let Some(pos) = text.find(')')
+            && pos > 0 && text[..pos].chars().all(|c| c.is_ascii_digit()) {
                 let marker_end = pos + 1;
                 if text.len() > marker_end && text.as_bytes()[marker_end] == b' ' {
                     return Some((&text[..marker_end], &text[marker_end + 1..]));
                 }
             }
-        }
 
         // Check for parenthesized numbers: (1) (2) (3)
-        if text.starts_with('(') {
-            if let Some(end_pos) = text.find(") ") {
+        if text.starts_with('(')
+            && let Some(end_pos) = text.find(") ") {
                 let inner = &text[1..end_pos];
                 if inner.chars().all(|c| c.is_ascii_digit()) {
                     return Some((&text[..end_pos + 1], &text[end_pos + 2..]));
                 }
             }
-        }
 
         None
     }
@@ -507,11 +504,10 @@ impl MarkdownWriter {
         let markers = ["-", "*", "•"];
 
         for &marker in &markers {
-            if let Some(remaining) = text.strip_prefix(marker) {
-                if remaining.starts_with(' ') || remaining.starts_with('\t') {
+            if let Some(remaining) = text.strip_prefix(marker)
+                && (remaining.starts_with(' ') || remaining.starts_with('\t')) {
                     return Some((marker, remaining.trim_start()));
                 }
-            }
         }
 
         None
@@ -529,17 +525,16 @@ impl MarkdownWriter {
     /// Returns the markdown representation of the formula if one is found, None otherwise.
     fn extract_formula_from_run(&self, run: &Run) -> Result<Option<String>> {
         // Try OOXML OMML formulas first
-        if let crate::document::Run::Docx(docx_run) = run {
-            if let Some(_omml_xml) = docx_run.omml_formula()? {
+        if let crate::document::Run::Docx(docx_run) = run
+            && let Some(_omml_xml) = docx_run.omml_formula()? {
                 // For now, return a placeholder. In a full implementation,
                 // this would parse the OMML XML and convert to LaTeX/markdown
                 return Ok(Some(self.format_formula_placeholder("OMML formula detected")));
             }
-        }
 
         // Try OLE MTEF formulas
-        if let crate::document::Run::Doc(ole_run) = run {
-            if ole_run.has_mtef_formula() {
+        if let crate::document::Run::Doc(ole_run) = run
+            && ole_run.has_mtef_formula() {
                 // Get the MTEF formula AST
                 if let Some(mtef_ast) = ole_run.mtef_formula_ast() {
                     // Convert MTEF AST to LaTeX
@@ -550,7 +545,6 @@ impl MarkdownWriter {
                     return Ok(Some(self.format_formula("[Formula]", true)));
                 }
             }
-        }
 
         Ok(None)
     }

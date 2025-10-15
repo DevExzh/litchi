@@ -22,18 +22,17 @@ pub fn parse_workbook_xml(content: &str) -> Result<(Vec<WorksheetInfo>, usize)> 
     let bytes = content.as_bytes();
 
     // Look for <sheets> section - optimized search
-    if let Some(sheets_start) = memchr::memmem::find(bytes, b"<sheets>") {
-        if let Some(sheets_end) = memchr::memmem::find(&bytes[sheets_start..], b"</sheets>") {
+    if let Some(sheets_start) = memchr::memmem::find(bytes, b"<sheets>")
+        && let Some(sheets_end) = memchr::memmem::find(&bytes[sheets_start..], b"</sheets>") {
             let sheets_content = &content[sheets_start..sheets_start + sheets_end];
 
             // Parse individual sheet entries - optimized parsing
             parse_sheets_section(sheets_content, &mut sheets)?;
         }
-    }
 
     // Look for active sheet - optimized search
-    if let Some(book_views_start) = memchr::memmem::find(bytes, b"<bookViews>") {
-        if let Some(book_views_end) = memchr::memmem::find(&bytes[book_views_start..], b"</bookViews>") {
+    if let Some(book_views_start) = memchr::memmem::find(bytes, b"<bookViews>")
+        && let Some(book_views_end) = memchr::memmem::find(&bytes[book_views_start..], b"</bookViews>") {
             let book_views_content = &content[book_views_start..book_views_start + book_views_end];
 
             if let Some(active_tab_start) = memchr::memmem::find(book_views_content.as_bytes(), b"activeTab=\"") {
@@ -46,7 +45,6 @@ pub fn parse_workbook_xml(content: &str) -> Result<(Vec<WorksheetInfo>, usize)> 
                 }
             }
         }
-    }
 
     let final_active_sheet_index = active_sheet_id.min(sheets.len().saturating_sub(1));
     Ok((sheets, final_active_sheet_index))
@@ -81,11 +79,7 @@ pub fn parse_sheet_xml(sheet_xml: &str) -> Result<Option<WorksheetInfo>> {
     // Extract name attribute - optimized attribute parsing
     let name = if let Some(name_start) = memchr::memmem::find(bytes, b"name=\"") {
         let name_content = &sheet_xml[name_start + 6..];
-        if let Some(quote_pos) = memchr::memchr(b'"', name_content.as_bytes()) {
-            Some(name_content[..quote_pos].to_string())
-        } else {
-            None
-        }
+        memchr::memchr(b'"', name_content.as_bytes()).map(|quote_pos| name_content[..quote_pos].to_string())
     } else {
         None
     };
@@ -93,11 +87,7 @@ pub fn parse_sheet_xml(sheet_xml: &str) -> Result<Option<WorksheetInfo>> {
     // Extract relationship ID - optimized attribute parsing
     let relationship_id = if let Some(r_start) = memchr::memmem::find(bytes, b"r:id=\"") {
         let r_content = &sheet_xml[r_start + 6..];
-        if let Some(quote_pos) = memchr::memchr(b'"', r_content.as_bytes()) {
-            Some(r_content[..quote_pos].to_string())
-        } else {
-            None
-        }
+        memchr::memchr(b'"', r_content.as_bytes()).map(|quote_pos| r_content[..quote_pos].to_string())
     } else {
         None
     };

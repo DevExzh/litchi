@@ -169,7 +169,7 @@ impl Document {
                 };
 
                 // Extract metadata from OOXML core properties
-                let metadata = crate::ooxml::metadata::extract_metadata(&package.opc_package())
+                let metadata = crate::ooxml::metadata::extract_metadata(package.opc_package())
                     .unwrap_or_else(|_| crate::common::Metadata::default());
 
                 Ok(Self {
@@ -249,7 +249,7 @@ impl Document {
                 };
 
                 // Extract metadata from OOXML core properties
-                let metadata = crate::ooxml::metadata::extract_metadata(&package.opc_package())
+                let metadata = crate::ooxml::metadata::extract_metadata(package.opc_package())
                     .unwrap_or_else(|_| crate::common::Metadata::default());
 
                 Ok(Self {

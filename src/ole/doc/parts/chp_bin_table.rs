@@ -9,11 +9,9 @@
 /// - org.apache.poi.hwpf.model.CHPBinTable
 /// - org.apache.poi.hwpf.model.CHPFormattedDiskPage
 /// - [MS-DOC] 2.8.5 PlcfBteChpx
-
 use super::fkp::ChpxFkp;
 use super::chp::CharacterProperties;
 use super::piece_table::PieceTable;
-use super::super::package::Result;
 use crate::ole::sprm::parse_sprms;
 
 /// A character run with properties.
@@ -223,18 +221,3 @@ impl ChpBinTable {
             .collect()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_chp_bin_table_size_calculation() {
-        // For n=1: size = 8*1 + 4 = 12
-        assert_eq!((12 - 4) / 8, 1);
-        
-        // For n=10: size = 8*10 + 4 = 84
-        assert_eq!((84 - 4) / 8, 10);
-    }
-}
-

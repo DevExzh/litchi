@@ -34,6 +34,12 @@ pub struct ObjectIndex {
     fragment_objects: HashMap<String, Vec<u64>>,
 }
 
+impl Default for ObjectIndex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ObjectIndex {
     /// Create an empty object index
     pub fn new() -> Self {
@@ -90,7 +96,7 @@ impl ObjectIndex {
 
                 self.entries.insert(identifier, entry);
                 self.fragment_objects.entry(archive_name.to_string())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(identifier);
             }
         }
@@ -193,6 +199,12 @@ pub struct ReferenceGraph {
     outgoing_refs: HashMap<u64, Vec<u64>>,
 }
 
+impl Default for ReferenceGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ReferenceGraph {
     /// Create an empty reference graph
     pub fn new() -> Self {
@@ -205,10 +217,10 @@ impl ReferenceGraph {
     /// Add a reference from source to target
     pub fn add_reference(&mut self, source_id: u64, target_id: u64) {
         self.outgoing_refs.entry(source_id)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(target_id);
         self.incoming_refs.entry(target_id)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(source_id);
     }
 
