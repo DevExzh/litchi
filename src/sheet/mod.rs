@@ -254,3 +254,64 @@ pub fn open_xlsb_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn Workboo
     let workbook = crate::ooxml::xlsb::XlsbWorkbook::new(cursor)?;
     Ok(Box::new(workbook))
 }
+
+/// Text-based format support (CSV, TSV, PRN, etc.)
+pub mod text;
+
+/// Open a CSV workbook from a file path.
+pub fn open_csv_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn Workbook>> {
+    let workbook = crate::sheet::text::TextWorkbook::open(path)?;
+    Ok(Box::new(workbook))
+}
+
+/// Open a CSV workbook from bytes.
+pub fn open_csv_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn Workbook>> {
+    let workbook = crate::sheet::text::TextWorkbook::from_bytes(bytes, crate::sheet::text::TextConfig::default())?;
+    Ok(Box::new(workbook))
+}
+
+/// Open a TSV workbook from a file path.
+pub fn open_tsv_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn Workbook>> {
+    let config = crate::sheet::text::TextConfig::tsv();
+    let workbook = crate::sheet::text::TextWorkbook::from_path_with_config(path, config)?;
+    Ok(Box::new(workbook))
+}
+
+/// Open a TSV workbook from bytes.
+pub fn open_tsv_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn Workbook>> {
+    let config = crate::sheet::text::TextConfig::tsv();
+    let workbook = crate::sheet::text::TextWorkbook::from_bytes(bytes, config)?;
+    Ok(Box::new(workbook))
+}
+
+/// Open a PRN workbook from a file path.
+pub fn open_prn_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn Workbook>> {
+    let config = crate::sheet::text::TextConfig::prn();
+    let workbook = crate::sheet::text::TextWorkbook::from_path_with_config(path, config)?;
+    Ok(Box::new(workbook))
+}
+
+/// Open a PRN workbook from bytes.
+pub fn open_prn_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn Workbook>> {
+    let config = crate::sheet::text::TextConfig::prn();
+    let workbook = crate::sheet::text::TextWorkbook::from_bytes(bytes, config)?;
+    Ok(Box::new(workbook))
+}
+
+/// Open a text workbook with custom configuration from a file path.
+pub fn open_text_workbook_with_config<P: AsRef<std::path::Path>>(
+    path: P,
+    config: crate::sheet::text::TextConfig
+) -> Result<Box<dyn Workbook>> {
+    let workbook = crate::sheet::text::TextWorkbook::from_path_with_config(path, config)?;
+    Ok(Box::new(workbook))
+}
+
+/// Open a text workbook with custom configuration from bytes.
+pub fn open_text_workbook_from_bytes_with_config(
+    bytes: &[u8],
+    config: crate::sheet::text::TextConfig
+) -> Result<Box<dyn Workbook>> {
+    let workbook = crate::sheet::text::TextWorkbook::from_bytes(bytes, config)?;
+    Ok(Box::new(workbook))
+}
