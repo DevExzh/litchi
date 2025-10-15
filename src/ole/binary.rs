@@ -3,35 +3,41 @@
 /// This module provides common binary parsing functions used across
 /// DOC, PPT, and other OLE-based formats. Based on Apache POI's
 /// LittleEndian and similar utility classes.
+
+use crate::ole::OleError;
+
 /// Read a little-endian u16 from a byte slice at the given offset.
-/// 
-/// # Safety
-/// 
-/// This function uses unsafe code for performance but includes bounds checking.
+///
 #[inline]
-pub fn read_u16_le(data: &[u8], offset: usize) -> Option<u16> {
+pub fn read_u16_le(data: &[u8], offset: usize) -> Result<u16, OleError> {
     if offset + 2 > data.len() {
-        return None;
+        return Err(OleError::InvalidData("Not enough data for u16".to_string()));
     }
-    Some(u16::from_le_bytes([data[offset], data[offset + 1]]))
+    Ok(u16::from_le_bytes([data[offset], data[offset + 1]]))
+}
+
+/// Read a little-endian u16 from a byte slice starting at offset 0.
+#[inline]
+pub fn read_u16_le_at(data: &[u8], offset: usize) -> Result<u16, OleError> {
+    read_u16_le(data, offset)
 }
 
 /// Read a little-endian i16 from a byte slice at the given offset.
 #[inline]
-pub fn read_i16_le(data: &[u8], offset: usize) -> Option<i16> {
+pub fn read_i16_le(data: &[u8], offset: usize) -> Result<i16, OleError> {
     if offset + 2 > data.len() {
-        return None;
+        return Err(OleError::InvalidData("Not enough data for i16".to_string()));
     }
-    Some(i16::from_le_bytes([data[offset], data[offset + 1]]))
+    Ok(i16::from_le_bytes([data[offset], data[offset + 1]]))
 }
 
 /// Read a little-endian u32 from a byte slice at the given offset.
 #[inline]
-pub fn read_u32_le(data: &[u8], offset: usize) -> Option<u32> {
+pub fn read_u32_le(data: &[u8], offset: usize) -> Result<u32, OleError> {
     if offset + 4 > data.len() {
-        return None;
+        return Err(OleError::InvalidData("Not enough data for u32".to_string()));
     }
-    Some(u32::from_le_bytes([
+    Ok(u32::from_le_bytes([
         data[offset],
         data[offset + 1],
         data[offset + 2],
@@ -39,18 +45,48 @@ pub fn read_u32_le(data: &[u8], offset: usize) -> Option<u32> {
     ]))
 }
 
+/// Read a little-endian u32 from a byte slice starting at offset 0.
+#[inline]
+pub fn read_u32_le_at(data: &[u8], offset: usize) -> Result<u32, OleError> {
+    read_u32_le(data, offset)
+}
+
 /// Read a little-endian i32 from a byte slice at the given offset.
 #[inline]
-pub fn read_i32_le(data: &[u8], offset: usize) -> Option<i32> {
+pub fn read_i32_le(data: &[u8], offset: usize) -> Result<i32, OleError> {
     if offset + 4 > data.len() {
-        return None;
+        return Err(OleError::InvalidData("Not enough data for i32".to_string()));
     }
-    Some(i32::from_le_bytes([
+    Ok(i32::from_le_bytes([
         data[offset],
         data[offset + 1],
         data[offset + 2],
         data[offset + 3],
     ]))
+}
+
+/// Read a little-endian f64 from a byte slice at the given offset.
+#[inline]
+pub fn read_f64_le(data: &[u8], offset: usize) -> Result<f64, OleError> {
+    if offset + 8 > data.len() {
+        return Err(OleError::InvalidData("Not enough data for f64".to_string()));
+    }
+    Ok(f64::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
+    ]))
+}
+
+/// Read a little-endian f64 from a byte slice starting at offset 0.
+#[inline]
+pub fn read_f64_le_at(data: &[u8], offset: usize) -> Result<f64, OleError> {
+    read_f64_le(data, offset)
 }
 
 /// Parse UTF-16LE string from binary data with null terminator handling.
@@ -219,7 +255,7 @@ impl PlcfParser {
         let mut positions = Vec::with_capacity(n + 1);
         for i in 0..=n {
             let offset = i * 4;
-            if let Some(cp) = read_u32_le(data, offset) {
+            if let Ok(cp) = read_u32_le(data, offset) {
                 positions.push(cp);
             } else {
                 return None;
@@ -280,16 +316,16 @@ mod tests {
     #[test]
     fn test_read_u16_le() {
         let data = [0x34, 0x12, 0x78, 0x56];
-        assert_eq!(read_u16_le(&data, 0), Some(0x1234));
-        assert_eq!(read_u16_le(&data, 2), Some(0x5678));
-        assert_eq!(read_u16_le(&data, 3), None);
+        assert!(read_u16_le(&data, 0).is_ok_and(|v| v == 0x1234));
+        assert!(read_u16_le(&data, 2).is_ok_and(|v| v == 0x5678));
+        assert!(read_u16_le(&data, 3).is_err());
     }
 
     #[test]
     fn test_read_u32_le() {
         let data = [0x78, 0x56, 0x34, 0x12];
-        assert_eq!(read_u32_le(&data, 0), Some(0x12345678));
-        assert_eq!(read_u32_le(&data, 1), None);
+        assert!(read_u32_le(&data, 0).is_ok_and(|v| v == 0x12345678));
+        assert!(read_u32_le(&data, 1).is_err());
     }
 
     #[test]

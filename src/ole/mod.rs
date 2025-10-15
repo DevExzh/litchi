@@ -34,6 +34,13 @@ pub mod doc;
 /// in the legacy binary format (.ppt files), which are OLE2-based files.
 pub mod ppt;
 
+/// Legacy Excel spreadsheet (.xls) reader
+///
+/// This module provides functionality to parse Microsoft Excel spreadsheets
+/// in the legacy binary format (.xls files), which are OLE2-based files.
+pub mod xls;
+
 // Re-export public types for convenient access
 pub use file::{is_ole_file, DirectoryEntry, OleError, OleFile};
 pub use metadata::{OleMetadata, PropertyValue};
+pub use xls::{XlsError, XlsWorkbook};

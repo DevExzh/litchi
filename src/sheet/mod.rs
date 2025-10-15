@@ -194,3 +194,63 @@ pub fn open_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn Workbook>> {
     let workbook = crate::ooxml::xlsx::Workbook::new(package)?;
     Ok(Box::new(workbook))
 }
+
+/// Open an XLS workbook from a file path.
+pub fn open_xls_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<crate::ole::xls::XlsWorkbook<std::fs::File>> {
+    use std::fs::File;
+    let file = File::open(path)?;
+    let workbook = crate::ole::xls::XlsWorkbook::new(file)?;
+    Ok(workbook)
+}
+
+/// Open an XLS workbook from bytes.
+pub fn open_xls_workbook_from_bytes(bytes: &[u8]) -> Result<crate::ole::xls::XlsWorkbook<std::io::Cursor<&[u8]>>> {
+    use std::io::Cursor;
+    let cursor = Cursor::new(bytes);
+    let workbook = crate::ole::xls::XlsWorkbook::new(cursor)?;
+    Ok(workbook)
+}
+
+/// Open an XLS workbook as a trait object from a file path.
+pub fn open_xls_workbook_dyn<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn Workbook>> {
+    let workbook = open_xls_workbook(path)?;
+    Ok(Box::new(workbook))
+}
+
+/// Open an XLS workbook as a trait object from bytes.
+pub fn open_xls_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn Workbook>> {
+    use std::io::Cursor;
+    let cursor = Cursor::new(bytes.to_vec());
+    let workbook = crate::ole::xls::XlsWorkbook::new(cursor)?;
+    Ok(Box::new(workbook))
+}
+
+/// Open an XLSB workbook from a file path.
+pub fn open_xlsb_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<crate::ooxml::xlsb::XlsbWorkbook> {
+    use std::fs::File;
+    let file = File::open(path)?;
+    let workbook = crate::ooxml::xlsb::XlsbWorkbook::new(file)?;
+    Ok(workbook)
+}
+
+/// Open an XLSB workbook from bytes.
+pub fn open_xlsb_workbook_from_bytes(bytes: &[u8]) -> Result<crate::ooxml::xlsb::XlsbWorkbook> {
+    use std::io::Cursor;
+    let cursor = Cursor::new(bytes);
+    let workbook = crate::ooxml::xlsb::XlsbWorkbook::new(cursor)?;
+    Ok(workbook)
+}
+
+/// Open an XLSB workbook as a trait object from a file path.
+pub fn open_xlsb_workbook_dyn<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn Workbook>> {
+    let workbook = open_xlsb_workbook(path)?;
+    Ok(Box::new(workbook))
+}
+
+/// Open an XLSB workbook as a trait object from bytes.
+pub fn open_xlsb_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn Workbook>> {
+    use std::io::Cursor;
+    let cursor = Cursor::new(bytes.to_vec());
+    let workbook = crate::ooxml::xlsb::XlsbWorkbook::new(cursor)?;
+    Ok(Box::new(workbook))
+}

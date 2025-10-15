@@ -4,7 +4,7 @@ pub mod metadata;
 /// Office Open XML (OOXML) format implementation.
 ///
 /// This module provides parsing and manipulation of Office Open XML documents,
-/// including Word (.docx), Excel (.xlsx), and PowerPoint (.pptx) files.
+/// including Word (.docx), Excel (.xlsx, .xlsb), and PowerPoint (.pptx) files.
 ///
 /// The implementation is based on the Open Packaging Conventions (OPC) and
 /// follows the structure of the python-docx library, adapted for Rust with
@@ -18,7 +18,8 @@ pub mod metadata;
 /// 2. **Shared Utilities** (`shared`, `error`): Common types used across formats
 /// 3. **Format-Specific Modules**:
 ///    - `docx`: Word documents
-///    - `xlsx`: Excel spreadsheets (placeholder)
+///    - `xlsx`: Excel spreadsheets
+///    - `xlsb`: Excel binary spreadsheets
 ///    - `pptx`: PowerPoint presentations (placeholder)
 ///    - `metadata`: Core properties/metadata extraction
 ///
@@ -39,6 +40,7 @@ pub mod metadata;
 pub mod opc;
 pub mod pptx;
 pub mod shared;
+pub mod xlsb;
 pub mod xlsx;
 
 // Re-export commonly used types from OPC layer

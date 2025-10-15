@@ -5,6 +5,7 @@ use std::io::{self, Read, Seek, SeekFrom};
 ///
 /// This struct represents an OLE2 structured storage file and provides
 /// methods to access its contents (streams and storages).
+#[derive(Debug)]
 pub struct OleFile<R: Read + Seek> {
     /// File handle or reader
     reader: R,
@@ -62,6 +63,7 @@ pub struct DirectoryEntry {
 pub enum OleError {
     Io(io::Error),
     InvalidFormat(String),
+    InvalidData(String),
     NotOleFile,
     CorruptedFile(String),
     StreamNotFound,
@@ -78,6 +80,7 @@ impl std::fmt::Display for OleError {
         match self {
             OleError::Io(e) => write!(f, "IO error: {}", e),
             OleError::InvalidFormat(s) => write!(f, "Invalid format: {}", s),
+            OleError::InvalidData(s) => write!(f, "Invalid data: {}", s),
             OleError::NotOleFile => write!(f, "Not an OLE file"),
             OleError::CorruptedFile(s) => write!(f, "Corrupted file: {}", s),
             OleError::StreamNotFound => write!(f, "Stream not found"),
