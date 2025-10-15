@@ -159,6 +159,13 @@ pub mod formula;
 /// Use [`iwa::Document::open()`] to get started.
 pub mod iwa;
 
+/// OpenDocument Format (ODF) Support
+///
+/// Provides unified APIs for working with OpenDocument files (.odt, .ods, .odp).
+/// The format is automatically detected and handled transparently.
+/// Use [`odf::Document`], [`odf::Spreadsheet`], or [`odf::Presentation`] to get started.
+pub mod odf;
+
 // Re-export high-level APIs
 pub use common::{Error, Result};
 pub use document::Document;
