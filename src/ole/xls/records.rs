@@ -389,7 +389,7 @@ impl SharedStringTable {
         }
 
         // Read SST header: cstTotal (4 bytes) and cstUnique (4 bytes)
-        let cst_total = binary::read_u32_le(data, 0)? as usize;
+        let _cst_total = binary::read_u32_le(data, 0)? as usize; // Total number of strings - kept for future validation
         let cst_unique = binary::read_u32_le(data, 4)? as usize;
 
         let mut strings = Vec::with_capacity(cst_unique.min(10000)); // Cap for safety

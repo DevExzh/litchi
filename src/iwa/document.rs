@@ -341,7 +341,7 @@ mod tests {
             return;
         }
 
-        let doc_result = Document::open(&doc_path);
+        let doc_result = Document::open(doc_path);
         assert!(doc_result.is_ok(), "Failed to open Pages document: {:?}", doc_result.err());
 
         let doc = doc_result.unwrap();
@@ -370,7 +370,7 @@ mod tests {
             return;
         }
 
-        let doc_result = Document::open(&doc_path);
+        let doc_result = Document::open(doc_path);
         assert!(doc_result.is_ok(), "Failed to open Numbers document: {:?}", doc_result.err());
 
         let doc = doc_result.unwrap();
@@ -383,7 +383,7 @@ mod tests {
         assert!(!objects.is_empty(), "Document should contain objects");
 
         // Test specialized Numbers interface
-        let numbers_result = NumbersDocument::open(&doc_path);
+        let numbers_result = NumbersDocument::open(doc_path);
         assert!(numbers_result.is_ok(), "Failed to open as NumbersDocument");
 
         let numbers_doc = numbers_result.unwrap();
@@ -401,7 +401,7 @@ mod tests {
             return;
         }
 
-        let pages_result = PagesDocument::open(&doc_path);
+        let pages_result = PagesDocument::open(doc_path);
         // For now, the test file may not be detected as Pages due to limited registry
         // This is acceptable - the important thing is that the bundle parsing works
         if pages_result.is_err() {

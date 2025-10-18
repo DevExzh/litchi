@@ -76,7 +76,7 @@ impl Document {
         // Also parse styles from content.xml (automatic styles)
         if let Ok(content_registry) = StyleElements::parse_styles(content.xml_content()) {
             // Merge content styles into main registry (content styles take precedence)
-            for (name, style) in content_registry.styles {
+            for (_name, style) in content_registry.styles {
                 style_registry.add_style(style);
             }
         }

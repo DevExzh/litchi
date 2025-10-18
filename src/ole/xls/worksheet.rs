@@ -47,7 +47,7 @@ impl XlsWorksheet {
     }
 
     /// Set worksheet dimensions
-    pub fn set_dimensions(&mut self, first_row: u32, last_row: u32, first_col: u32, last_col: u32) {
+    pub fn set_dimensions(&mut self, _first_row: u32, last_row: u32, _first_col: u32, last_col: u32) {
         // Adjust max_row and max_col based on dimensions
         self.max_row = self.max_row.max(last_row.saturating_sub(1));
         self.max_col = self.max_col.max(last_col.saturating_sub(1));

@@ -337,6 +337,6 @@ mod tests {
         let _extractor = MtefExtractor::new(formula.arena());
 
         // Just test that it can be created
-        assert!(true);
+        // Test passed - no assertions needed
     }
 }

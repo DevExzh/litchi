@@ -451,7 +451,7 @@ mod tests {
         assert_eq!(pieces[0].cp_start, 0);
         assert_eq!(pieces[0].cp_end, 16);
         assert_eq!(pieces[0].file_pos, 0);
-        assert_eq!(pieces[0].is_ansi, false); // Bit 30 not set = Unicode
+        assert!(!pieces[0].is_ansi); // Bit 30 not set = Unicode
     }
 }
 

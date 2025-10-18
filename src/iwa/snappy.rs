@@ -180,7 +180,7 @@ mod tests {
 
                     // Verify it's valid protobuf data (starts with a varint length)
                     let data = decompressed.data();
-                    assert!(data.len() >= 1, "Decompressed data too small");
+                    assert!(!data.is_empty(), "Decompressed data too small");
 
                     break; // Test with first IWA file found
                 }

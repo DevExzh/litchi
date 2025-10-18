@@ -245,7 +245,7 @@ mod tests {
         let mut data = Vec::new();
 
         // Field 1: identifier = 123
-        data.extend(varint::encode_varint((1 << 3) | 0)); // tag: field 1, wire type 0
+        data.extend(varint::encode_varint(1 << 3)); // tag: field 1, wire type 0
         data.extend(varint::encode_varint(123));
 
         // Field 2: message_infos (simplified)

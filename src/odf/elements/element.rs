@@ -288,7 +288,7 @@ impl Element {
                     }
                 }
                 Ok(Event::End(ref e)) => {
-                    let tag_name = String::from_utf8(e.name().as_ref().to_vec())
+                    let _tag_name = String::from_utf8(e.name().as_ref().to_vec()) // Tag name for debugging - kept for future use
                         .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in tag name".to_string()))?;
 
                     if let Some(element) = stack.pop() {

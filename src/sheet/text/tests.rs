@@ -93,14 +93,14 @@ fn test_empty_cells() {
 
 #[test]
 fn test_type_inference() {
-    let csv_data = "int,float,bool,string\n42,3.14,true,hello\n,2.0,false,";
+    let csv_data = "int,float,bool,string\n42,3.15,true,hello\n,2.0,false,";
     let workbook = TextWorkbook::from_bytes(csv_data.as_bytes(), TextConfig::default()).unwrap();
 
     let worksheet = workbook.active_worksheet().unwrap();
     let row2 = worksheet.row(1).unwrap();
 
     assert_eq!(row2[0], CellValue::Int(42));
-    assert_eq!(row2[1], CellValue::Float(3.14));
+    assert_eq!(row2[1], CellValue::Float(3.15));
     assert_eq!(row2[2], CellValue::Bool(true));
     assert_eq!(row2[3], CellValue::String("hello".to_string()));
 

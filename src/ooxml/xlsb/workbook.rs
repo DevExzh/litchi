@@ -141,7 +141,7 @@ impl XlsbWorkbook {
                             // println!("DEBUG: Parsed sheet name: {}", bundle_sh.name);
                             worksheet_names.push(bundle_sh.name);
                         }
-                        Err(e) => {
+                        Err(_e) => {
                             // println!("DEBUG: Failed to parse BundleSheetRecord: {:?}", e);
                         }
                     }

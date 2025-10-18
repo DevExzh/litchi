@@ -51,7 +51,6 @@ impl Manifest {
         let mut reader = Reader::from_str(xml_content);
         let mut buf = Vec::new();
 
-        let mut mimetype = String::new();
         let mut entries = HashMap::new();
 
         loop {
@@ -76,7 +75,7 @@ impl Manifest {
         }
 
         // Extract mimetype from root document entry
-        mimetype = entries.get("/")
+        let mimetype = entries.get("/")
             .map(|entry| entry.media_type.clone())
             .unwrap_or_else(|| "application/vnd.oasis.opendocument.text".to_string());
 

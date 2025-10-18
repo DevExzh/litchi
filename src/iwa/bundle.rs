@@ -354,12 +354,12 @@ mod tests {
     fn test_bundle_validation() {
         // Test with a non-existent directory
         let bundle_path = std::path::Path::new("non_existent_bundle");
-        assert!(Bundle::open(&bundle_path).is_err());
+        assert!(Bundle::open(bundle_path).is_err());
 
         // Test with existing iWork bundle
         let bundle_path = std::path::Path::new("test.pages");
         if bundle_path.exists() {
-            let result = Bundle::open(&bundle_path);
+            let result = Bundle::open(bundle_path);
             assert!(result.is_ok(), "Failed to open test.pages: {:?}", result.err());
         }
     }
@@ -372,7 +372,7 @@ mod tests {
             return;
         }
 
-        let bundle = Bundle::open(&bundle_path).expect("Failed to open test.pages");
+        let bundle = Bundle::open(bundle_path).expect("Failed to open test.pages");
 
         // Verify bundle has expected structure
         assert!(!bundle.archives().is_empty(), "Bundle should contain archives");
@@ -401,7 +401,7 @@ mod tests {
             return;
         }
 
-        let bundle = Bundle::open(&bundle_path).expect("Failed to open test.numbers");
+        let bundle = Bundle::open(bundle_path).expect("Failed to open test.numbers");
 
         // Verify bundle has expected structure
         assert!(!bundle.archives().is_empty(), "Bundle should contain archives");
