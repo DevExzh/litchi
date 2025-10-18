@@ -201,7 +201,10 @@ impl<'arena> MtefBinaryParser<'arena> {
         const MAX_ITERATIONS: usize = 10000;
 
         loop {
+            // Lenient EOF handling: if we reach the end of data, treat it as implicit END tag
+            // This matches rtf2latex2e behavior and handles slightly truncated MTEF data
             if self.pos >= self.data.len() {
+                // Return what we've parsed so far
                 break;
             }
 
@@ -212,11 +215,6 @@ impl<'arena> MtefBinaryParser<'arena> {
                     "Too many objects parsed (>{}), possible infinite loop at position {}",
                     MAX_ITERATIONS, start_pos
                 )));
-            }
-
-            // Read tag byte with bounds check
-            if self.pos >= self.data.len() {
-                break;
             }
 
             // Get current tag based on MTEF version
@@ -256,43 +254,92 @@ impl<'arena> MtefBinaryParser<'arena> {
             };
 
             // Parse the object based on its type
+            // Handle EOF gracefully by catching errors and breaking the loop
             let obj_ptr: Option<Box<dyn MtefObject>> = match record_type {
-                MtefRecordType::Char => Some(Box::new(self.parse_char()?)),
-                MtefRecordType::Tmpl => Some(Box::new(self.parse_template()?)),
-                MtefRecordType::Line => Some(Box::new(self.parse_line()?)),
-                MtefRecordType::Pile => Some(Box::new(self.parse_pile()?)),
-                MtefRecordType::Matrix => Some(Box::new(self.parse_matrix()?)),
-                MtefRecordType::Embell => Some(Box::new(self.parse_embell()?)),
-                MtefRecordType::Ruler => Some(Box::new(self.parse_ruler()?)),
-                MtefRecordType::Font => Some(Box::new(self.parse_font()?)),
+                MtefRecordType::Char => match self.parse_char() {
+                    Ok(obj) => Some(Box::new(obj)),
+                    Err(MtefError::UnexpectedEof) => break, // EOF hit, return what we have
+                    Err(e) => return Err(e),
+                },
+                MtefRecordType::Tmpl => match self.parse_template() {
+                    Ok(obj) => Some(Box::new(obj)),
+                    Err(MtefError::UnexpectedEof) => break,
+                    Err(e) => return Err(e),
+                },
+                MtefRecordType::Line => match self.parse_line() {
+                    Ok(obj) => Some(Box::new(obj)),
+                    Err(MtefError::UnexpectedEof) => break,
+                    Err(e) => return Err(e),
+                },
+                MtefRecordType::Pile => match self.parse_pile() {
+                    Ok(obj) => Some(Box::new(obj)),
+                    Err(MtefError::UnexpectedEof) => break,
+                    Err(e) => return Err(e),
+                },
+                MtefRecordType::Matrix => match self.parse_matrix() {
+                    Ok(obj) => Some(Box::new(obj)),
+                    Err(MtefError::UnexpectedEof) => break,
+                    Err(e) => return Err(e),
+                },
+                MtefRecordType::Embell => match self.parse_embell() {
+                    Ok(obj) => Some(Box::new(obj)),
+                    Err(MtefError::UnexpectedEof) => break,
+                    Err(e) => return Err(e),
+                },
+                MtefRecordType::Ruler => match self.parse_ruler() {
+                    Ok(obj) => Some(Box::new(obj)),
+                    Err(MtefError::UnexpectedEof) => break,
+                    Err(e) => return Err(e),
+                },
+                MtefRecordType::Font => match self.parse_font() {
+                    Ok(obj) => Some(Box::new(obj)),
+                    Err(MtefError::UnexpectedEof) => break,
+                    Err(e) => return Err(e),
+                },
                 MtefRecordType::Size | MtefRecordType::Full | MtefRecordType::Sub |
                 MtefRecordType::Sub2 | MtefRecordType::Sym | MtefRecordType::SubSym => {
-                    Some(Box::new(self.parse_size()?))
+                    match self.parse_size() {
+                        Ok(obj) => Some(Box::new(obj)),
+                        Err(MtefError::UnexpectedEof) => break,
+                        Err(e) => return Err(e),
+                    }
                 }
                 MtefRecordType::ColorDef => {
                     // Skip color definition - just skip the tag
-                    self.pos += 1;
+                    if self.pos < self.data.len() {
+                        self.pos += 1;
+                    }
                     None
                 }
                 MtefRecordType::FontDef => {
-                    self.skip_font_def()?;
+                    if self.skip_font_def().is_err() {
+                        break; // EOF hit
+                    }
                     None
                 }
                 MtefRecordType::EqnPrefs => {
-                    self.skip_eqn_prefs()?;
+                    if self.skip_eqn_prefs().is_err() {
+                        break; // EOF hit
+                    }
                     None
                 }
                 MtefRecordType::EncodingDef => {
-                    self.skip_encoding_def()?;
+                    if self.skip_encoding_def().is_err() {
+                        break; // EOF hit
+                    }
                     None
                 }
                 MtefRecordType::Future => {
-                    self.skip_future_record()?;
+                    if self.skip_future_record().is_err() {
+                        break; // EOF hit
+                    }
                     None
                 }
                 _ => {
                     // Unknown record type - skip it
-                    self.skip_unknown_record()?;
+                    if self.skip_unknown_record().is_err() {
+                        break; // EOF hit
+                    }
                     None
                 }
             };

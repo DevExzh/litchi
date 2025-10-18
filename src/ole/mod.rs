@@ -7,7 +7,7 @@ mod file;
 /// Metadata extraction from OLE property streams
 mod metadata;
 
-/// MTEF extractor for OLE documents
+/// MTEF extractor for OLE documents (internal use only)
 mod mtef_extractor;
 
 /// Shared binary parsing utilities for OLE formats.

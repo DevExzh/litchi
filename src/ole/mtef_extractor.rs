@@ -2,8 +2,12 @@
 //
 // This module provides functionality to extract and parse MTEF binary data
 // from OLE streams in legacy Office documents (.doc, .ppt, etc.).
-
-use zerocopy::FromBytes;
+//
+// MTEF data in OLE2 documents is stored in streams named "Equation Native".
+// The stream format is:
+// - 28 bytes: EQNOLEFILEHDR (OLE header)
+// - 5 bytes: MTEF header (version, platform, product, version major, version minor)
+// - N bytes: MTEF byte stream (formula data)
 
 use crate::formula::{MtefParser, MathNode};
 use crate::ole::file::OleFile;
@@ -11,77 +15,115 @@ use std::io::{Read, Seek};
 
 /// MTEF extractor for OLE documents
 pub struct MtefExtractor<'arena> {
+    #[allow(dead_code)] // Kept for future use in instance methods
     arena: &'arena bumpalo::Bump,
 }
 
 impl<'arena> MtefExtractor<'arena> {
     /// Create a new MTEF extractor
+    #[allow(dead_code)] // Public API for future use
     pub fn new(arena: &'arena bumpalo::Bump) -> Self {
         Self { arena }
     }
 
-    /// Extract MTEF data from an OLE stream
+    /// Extract MTEF data from an OLE stream path (internal use only)
     ///
-    /// MTEF data is stored in streams named "Equation Native" in OLE documents.
-    /// The format is: 28-byte OLE header + MTEF header + MTEF records + optional WMF
+    /// MTEF data is stored in streams named "Equation Native" within OLE storages.
+    /// The stream format is:
+    /// - 28 bytes: EQNOLEFILEHDR (OLE header)
+    /// - Remaining bytes: MTEF data (5-byte header + MTEF byte stream)
     ///
     /// # Arguments
     ///
     /// * `ole_file` - The OLE file to extract from
-    /// * `stream_name` - Name of the stream containing MTEF data (typically "Equation Native")
+    /// * `stream_path` - Path components to the stream (e.g., &["ObjectPool", "_1234567890", "Equation Native"])
     ///
     /// # Returns
     ///
-    /// Returns the MTEF binary data if found, None otherwise
-    pub fn extract_mtef_data_from_stream<R: Read + Seek>(
+    /// Returns the MTEF binary data (including OLE header) if found and valid, None otherwise
+    pub(crate) fn extract_mtef_from_stream<R: Read + Seek>(
         ole_file: &mut OleFile<R>,
-        stream_name: &str,
+        stream_path: &[&str],
     ) -> Result<Option<Vec<u8>>, MtefExtractionError> {
         // Try to open the stream
-        if let Ok(data) = ole_file.open_stream(&[stream_name]) {
-            if data.is_empty() {
-                return Ok(None);
-            }
+        let data = match ole_file.open_stream(stream_path) {
+            Ok(d) => d,
+            Err(_) => return Ok(None),
+        };
 
-            // Validate that we have at least the OLE header (28 bytes)
-            if data.len() < 28 {
-                return Ok(None);
-            }
-
-            // Validate OLE header
-            let ole_header = OleHeader::from_bytes(&data[0..28])?;
-            if !ole_header.is_valid() {
-                return Ok(None);
-            }
-
-            // Return the full data including the OLE header
-            // The MTEF parser will handle parsing both the OLE header and MTEF data
-            Ok(Some(data.to_vec()))
-        } else {
-            Ok(None)
+        // Validate minimum size (28-byte OLE header + 5-byte MTEF header)
+        if data.len() < 33 {
+            return Ok(None);
         }
+
+        // Validate OLE header and extract proper data size
+        if !Self::validate_ole_header(&data) {
+            return Ok(None);
+        }
+
+        // Parse cbObject field (u32 little-endian at offset 8)
+        // This tells us the size of MTEF data after the 28-byte header
+        let cb_object = u32::from_le_bytes([data[8], data[9], data[10], data[11]]) as usize;
+        
+        // Calculate total size: OLE header (28) + MTEF data (cbObject)
+        let total_size = 28 + cb_object;
+        
+        // Ensure we don't read past the actual data
+        let actual_size = total_size.min(data.len());
+        
+        // Return only the valid portion (OLE header + exact MTEF data)
+        Ok(Some(data[..actual_size].to_vec()))
     }
 
-    /// Extract MTEF data from multiple possible stream names
+    /// Validate the OLE header manually to avoid zerocopy alignment issues
     ///
-    /// Some documents may use different stream names for MTEF data.
-    /// This method tries common stream names used for equation storage.
-    pub fn extract_mtef_data<R: Read + Seek>(
-        ole_file: &mut OleFile<R>,
-        possible_names: &[&str],
-    ) -> Result<Option<Vec<u8>>, MtefExtractionError> {
-        for name in possible_names {
-            if let Some(data) = Self::extract_mtef_data_from_stream(ole_file, name)? {
-                return Ok(Some(data));
-            }
+    /// The OLE header (EQNOLEFILEHDR) is 28 bytes with the following structure:
+    /// - Offset 0x00-0x01 (2 bytes): cb_hdr = 28 (header size)
+    /// - Offset 0x02-0x05 (4 bytes): version (typically 0x00020000)
+    /// - Offset 0x06-0x07 (2 bytes): format (varies, e.g., 0xC16D, 0xC19B, 0xC1C7, 0xC2D3)
+    /// - Offset 0x08-0x0B (4 bytes): cbObject (size of MTEF data after header)
+    /// - Offset 0x0C-0x1B (16 bytes): reserved
+    fn validate_ole_header(data: &[u8]) -> bool {
+        if data.len() < 28 {
+            return false;
         }
-        Ok(None)
+
+        // Parse cb_hdr (u16 little-endian at offset 0)
+        let cb_hdr = u16::from_le_bytes([data[0], data[1]]);
+        if cb_hdr != 28 {
+            return false;
+        }
+
+        // Parse version (u32 little-endian at offset 2)
+        let version = u32::from_le_bytes([data[2], data[3], data[4], data[5]]);
+        // Accept both common version formats
+        if version != 0x00020000 && version != 0x00000200 {
+            return false;
+        }
+
+        // Parse format (u16 little-endian at offset 6)
+        let format = u16::from_le_bytes([data[6], data[7]]);
+        // Format can vary; common values are 0xC16D, 0xC19B, 0xC1C7, 0xC2D3
+        // We accept any format in the 0xC1xx-0xC2xx range
+        if !(0xC100..=0xC2FF).contains(&format) {
+            return false;
+        }
+
+        // Parse cbObject (u32 little-endian at offset 8)
+        let cb_object = u32::from_le_bytes([data[8], data[9], data[10], data[11]]);
+        // Check that the object size is reasonable
+        if cb_object == 0 || cb_object as usize > data.len() - 28 {
+            return false;
+        }
+
+        true
     }
 
     /// Extract all MTEF formulas from embedded OLE objects in ObjectPool
     ///
     /// In Word documents, embedded equations are stored as OLE objects in the ObjectPool directory.
-    /// Each object has a stream name like "_1234567890" and contains an "Equation Native" stream.
+    /// Each embedded object is a storage (directory) with a name like "_1234567890".
+    /// Within each storage, there should be a stream named "Equation Native" containing the MTEF data.
     ///
     /// # Arguments
     ///
@@ -89,8 +131,8 @@ impl<'arena> MtefExtractor<'arena> {
     ///
     /// # Returns
     ///
-    /// Returns a HashMap mapping object IDs to their MTEF binary data
-    pub fn extract_all_mtef_from_objectpool<R: Read + Seek>(
+    /// Returns a HashMap mapping object IDs to their MTEF binary data (including OLE header)
+    pub(crate) fn extract_all_mtef_from_objectpool<R: Read + Seek>(
         ole_file: &mut OleFile<R>,
     ) -> Result<std::collections::HashMap<String, Vec<u8>>, MtefExtractionError> {
         use std::collections::HashMap;
@@ -99,92 +141,104 @@ impl<'arena> MtefExtractor<'arena> {
 
         // Check if ObjectPool directory exists
         if !ole_file.directory_exists(&["ObjectPool"]) {
-            eprintln!("DEBUG: ObjectPool directory does not exist");
             return Ok(mtef_map);
         }
-        eprintln!("DEBUG: ObjectPool directory exists");
 
         // List all entries in ObjectPool
         let entries = ole_file
             .list_directory_entries(&["ObjectPool"])
             .map_err(|e| MtefExtractionError::IoError(std::io::Error::other(e.to_string())))?;
 
-        eprintln!("DEBUG: Found {} entries in ObjectPool", entries.len());
-
         // Process each entry in ObjectPool
         for entry in entries {
-            eprintln!("DEBUG:   Entry: name='{}', type={}", entry.name, entry.entry_type);
-            
             // Skip if not a storage (embedded OLE objects are storages)
-            if entry.entry_type != 1 { // STGTY_STORAGE = 1
-                eprintln!("DEBUG:     Skipped (not a storage)");
+            // STGTY_STORAGE = 1
+            if entry.entry_type != 1 {
                 continue;
             }
 
             // Object names typically start with "_"
             if !entry.name.starts_with('_') {
-                eprintln!("DEBUG:     Skipped (name doesn't start with '_')");
                 continue;
             }
 
-            eprintln!("DEBUG:     Processing as potential MTEF object");
-
             // Try to extract "Equation Native" stream from this embedded object
-            let equation_stream_path = ["ObjectPool", &entry.name, "Equation Native"];
-            if let Ok(Some(mtef_data)) = Self::extract_mtef_data_from_stream(ole_file, &equation_stream_path.join("/")) {
-                eprintln!("DEBUG:     ✓ Found MTEF data via equation_stream_path");
+            // The stream path is: ObjectPool/<object_name>/Equation Native
+            if let Ok(Some(mtef_data)) = Self::extract_mtef_from_stream(
+                ole_file,
+                &["ObjectPool", &entry.name, "Equation Native"],
+            ) {
                 mtef_map.insert(entry.name.clone(), mtef_data);
-            } else {
-                eprintln!("DEBUG:     Trying alternative paths");
-                // Try alternative paths for embedded equations
-                let alt_paths = [
-                    vec!["ObjectPool", &entry.name, "Equation Native"],
-                    vec!["ObjectPool", &entry.name, "\x01Ole10Native"],
-                    vec!["ObjectPool", &entry.name, "CONTENTS"],
-                ];
-
-                for path in &alt_paths {
-                    eprintln!("DEBUG:       Trying: {:?}", path);
-                    if let Ok(data) = ole_file.open_stream(path) {
-                        eprintln!("DEBUG:       Found data ({} bytes)", data.len());
-                        
-                        // Dump first 40 bytes for debugging
-                        if data.len() >= 40 {
-                            eprint!("DEBUG:       First 40 bytes: ");
-                            for i in 0..40 {
-                                eprint!("{:02X} ", data[i]);
-                            }
-                            eprintln!();
-                        }
-                        
-                        // Check if this looks like MTEF data
-                        if Self::is_mtef_data(&data) {
-                            eprintln!("DEBUG:       ✓ Validated as MTEF data");
-                            mtef_map.insert(entry.name.clone(), data);
-                            break;
-                        } else {
-                            eprintln!("DEBUG:       ✗ Not valid MTEF data");
-                        }
-                    }
-                }
             }
         }
 
         Ok(mtef_map)
     }
 
-    /// Check if data looks like MTEF format
+    /// Extract all MTEF formulas from a PowerPoint presentation
     ///
-    /// MTEF data starts with a 28-byte OLE header followed by MTEF header
-    fn is_mtef_data(data: &[u8]) -> bool {
-        if data.len() < 28 {
-            return false;
+    /// In PPT files, MTEF formulas follow a similar pattern to Word documents.
+    /// Equations are stored as OLE objects in storage directories that are children of the root storage.
+    /// These are typically named with patterns like "MBD[hexadecimal]" or "Equation Native".
+    ///
+    /// # Arguments
+    ///
+    /// * `ole_file` - The OLE file to extract from
+    ///
+    /// # Returns
+    ///
+    /// Returns a HashMap mapping storage names to their MTEF binary data (including OLE header)
+    pub(crate) fn extract_all_mtef_from_ppt<R: Read + Seek>(
+        ole_file: &mut OleFile<R>,
+    ) -> Result<std::collections::HashMap<String, Vec<u8>>, MtefExtractionError> {
+        use std::collections::HashMap;
+
+        let mut mtef_map = HashMap::new();
+
+        // Get all root-level entries
+        let entries = ole_file
+            .list_directory_entries(&[])
+            .map_err(|e| MtefExtractionError::IoError(std::io::Error::other(e.to_string())))?;
+
+        // Process each entry at root level
+        for entry in entries {
+            // Skip if not a storage
+            if entry.entry_type != 1 {
+                continue;
+            }
+
+            // Look for storages that might contain equations
+            // Common patterns: "MBD[hex]", "Equation Native", or names starting with "_"
+            let is_equation_storage = entry.name.starts_with("MBD") 
+                || entry.name == "Equation Native"
+                || entry.name.starts_with('_');
+
+            if !is_equation_storage {
+                continue;
+            }
+
+            // Try to extract "Equation Native" stream from this storage
+            if let Ok(Some(mtef_data)) = Self::extract_mtef_from_stream(
+                ole_file,
+                &[&entry.name, "Equation Native"],
+            ) {
+                mtef_map.insert(entry.name.clone(), mtef_data);
+                continue;
+            }
+
+            // Try alternative stream names
+            for stream_name in &["CONTENTS", "\x01Ole", "\x01Ole10Native"] {
+                if let Ok(Some(mtef_data)) = Self::extract_mtef_from_stream(
+                    ole_file,
+                    &[&entry.name, stream_name],
+                ) {
+                    mtef_map.insert(entry.name.clone(), mtef_data);
+                    break;
+                }
+            }
         }
 
-        // Check OLE header
-        OleHeader::read_from_bytes(&data[0..28])
-            .map(|header| header.is_valid())
-            .unwrap_or(false)
+        Ok(mtef_map)
     }
 
     /// Parse MTEF binary data into formula AST nodes
@@ -196,6 +250,7 @@ impl<'arena> MtefExtractor<'arena> {
     /// # Returns
     ///
     /// Returns a vector of MathNode AST nodes representing the parsed formula
+    #[allow(dead_code)] // Public API for future use
     pub fn parse_mtef_to_ast(&self, mtef_data: Vec<u8>) -> Result<Vec<MathNode<'arena>>, MtefExtractionError> {
         // We need to create a reference with the arena lifetime
         // This is a bit of a hack, but we know the data will live long enough
@@ -214,65 +269,41 @@ impl<'arena> MtefExtractor<'arena> {
     /// Extract and parse MTEF data from an OLE file
     ///
     /// This is a convenience method that combines extraction and parsing.
+    /// It tries each stream name in order and returns the first valid MTEF data found.
     ///
     /// # Arguments
     ///
     /// * `ole_file` - The OLE file to extract from
-    /// * `stream_names` - Possible stream names to check
+    /// * `stream_names` - Possible stream names to check (e.g., &["Equation Native", "MSWordEquation"])
     ///
     /// # Returns
     ///
     /// Returns parsed formula AST nodes if MTEF data is found and valid
+    #[allow(dead_code)] // Public API for future use
     pub fn extract_and_parse_mtef<R: Read + Seek>(
         &self,
         ole_file: &mut OleFile<R>,
         stream_names: &[&str],
     ) -> Result<Option<Vec<MathNode<'arena>>>, MtefExtractionError> {
-        if let Some(mtef_data) = Self::extract_mtef_data(ole_file, stream_names)? {
-            // Copy the data to extend its lifetime for the parser
-            let data_copy = mtef_data.to_vec();
-            Ok(Some(self.parse_mtef_to_ast(data_copy)?))
-        } else {
-            Ok(None)
+        // Try each stream name in order
+        for stream_name in stream_names {
+            if let Some(mtef_data) = Self::extract_mtef_from_stream(ole_file, &[stream_name])? {
+                // Found valid MTEF data - parse it
+                return Ok(Some(self.parse_mtef_to_ast(mtef_data)?));
+            }
         }
+        
+        // No valid MTEF data found in any of the stream names
+        Ok(None)
     }
 }
 
-/// OLE header structure (28 bytes)
-#[derive(Debug, Clone, FromBytes)]
-#[repr(C)]
-struct OleHeader {
-    pub cb_hdr: u16,        // Total header length = 28
-    pub version: u32,       // Version number (0x00020000)
-    pub format: u16,        // Clipboard format (0xC2D3)
-    pub size: u32,          // "MTEF header + MTEF data" length
-    pub reserved: [u32; 4], // Reserved fields
-}
-
-impl OleHeader {
-    /// Create OLE header from byte slice
-    fn from_bytes(data: &[u8]) -> Result<Self, MtefExtractionError> {
-        if data.len() < 28 {
-            return Err(MtefExtractionError::InvalidOleHeader);
-        }
-
-        Self::read_from_bytes(data).map_err(|_| MtefExtractionError::InvalidOleHeader)
-    }
-
-    /// Validate the OLE header
-    ///
-    /// Note: The format field can vary (0xC16D, 0xC19B, 0xC1C7, 0xC2D3, etc.)
-    /// so we only check cb_hdr and version fields for validation.
-    fn is_valid(&self) -> bool {
-        self.cb_hdr == 28 &&
-        (self.version == 0x00020000 || self.version == 0x00000200)
-    }
-}
 
 /// Errors that can occur during MTEF extraction
 #[derive(Debug)]
 pub enum MtefExtractionError {
     IoError(std::io::Error),
+    #[allow(dead_code)] // Kept for completeness
     InvalidOleHeader,
     ParseError(String),
 }
@@ -320,15 +351,17 @@ mod tests {
             0x00, 0x00, 0x00, 0x00,
         ];
 
-        let header = OleHeader::from_bytes(&valid_data).unwrap();
-        assert!(header.is_valid());
+        assert!(MtefExtractor::validate_ole_header(&valid_data));
 
-        // Invalid OLE header
+        // Invalid OLE header (wrong cb_hdr)
         let mut invalid_data = valid_data.clone();
         invalid_data[0] = 0x10; // Invalid cb_hdr
+        assert!(!MtefExtractor::validate_ole_header(&invalid_data));
 
-        let header = OleHeader::from_bytes(&invalid_data).unwrap();
-        assert!(!header.is_valid());
+        // Invalid version
+        let mut invalid_version = valid_data.clone();
+        invalid_version[2] = 0xFF;
+        assert!(!MtefExtractor::validate_ole_header(&invalid_version));
     }
 
     #[test]

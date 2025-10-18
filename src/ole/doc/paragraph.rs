@@ -67,18 +67,33 @@ impl Paragraph {
         self.runs = runs;
     }
 
-    /// Extract all MTEF formulas from this paragraph.
+    /// Extract all MTEF formulas from this paragraph as LaTeX.
     ///
     /// Returns a vector of LaTeX formula strings found in any run within this paragraph.
-    pub fn mtef_formulas(&self) -> Result<Vec<String>> {
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// for para in document.paragraphs()? {
+    ///     let formulas = para.formulas_as_latex()?;
+    ///     for formula in formulas {
+    ///         println!("Formula: {}", formula);
+    ///     }
+    /// }
+    /// ```
+    pub fn formulas_as_latex(&self) -> Result<Vec<String>> {
         let mut formulas = Vec::new();
         for run in &self.runs {
-            if run.has_mtef_formula() {
-                // For now, return a placeholder since we have AST nodes
-                formulas.push("MTEF formula detected".to_string());
+            if let Some(latex) = run.formula_as_latex()? {
+                formulas.push(latex);
             }
         }
         Ok(formulas)
+    }
+
+    /// Check if this paragraph contains any formulas.
+    pub fn has_formulas(&self) -> bool {
+        self.runs.iter().any(|r| r.has_mtef_formula())
     }
 }
 
@@ -239,6 +254,40 @@ impl Run {
     /// This allows for modification of the formula AST if needed.
     pub fn mtef_formula_ast_mut(&mut self) -> &mut Option<Vec<crate::formula::MathNode<'static>>> {
         &mut self.mtef_formula_ast
+    }
+
+    /// Get the MTEF formula as LaTeX string if this run contains a formula.
+    ///
+    /// Converts the formula AST to LaTeX format for easy display and processing.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// for run in paragraph.runs()? {
+    ///     if let Some(latex) = run.formula_as_latex()? {
+    ///         println!("Formula: {}", latex);
+    ///     }
+    /// }
+    /// ```
+    pub fn formula_as_latex(&self) -> Result<Option<String>> {
+        if let Some(ast) = &self.mtef_formula_ast {
+            use crate::formula::LatexConverter;
+            let mut converter = LatexConverter::new();
+            match converter.convert_nodes(ast) {
+                Ok(latex) => Ok(Some(latex.to_string())),
+                Err(e) => {
+                    // Return error message as placeholder
+                    Ok(Some(format!("[Formula conversion error: {}]", e)))
+                }
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Check if this run is an OLE2 embedded object (like an equation or image).
+    pub fn is_ole_object(&self) -> bool {
+        self.properties.is_ole2
     }
 }
 

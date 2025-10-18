@@ -164,6 +164,7 @@ impl ChpBinTable {
             return CharacterProperties::default();
         }
 
+        // Parse SPRMs (always 2-byte opcodes per Apache POI)
         let sprms = parse_sprms(grpprl);
         let mut props = CharacterProperties::default();
 
@@ -188,10 +189,16 @@ impl ChpBinTable {
                     eprintln!("DEBUG: Found SPRM_FOLE2 in FKP, operand=0x{:02X}, operand_len={}, is_ole2={}", 
                              operand, sprm.operand.len(), props.is_ole2);
                 }
+                0x6A03 => {
+                    // Picture location (sprmCPicLocation)
+                    // This is the FILE character position (fc) of the picture/object data
+                    props.pic_offset = sprm.operand_dword();
+                    eprintln!("DEBUG: Found sprmCPicLocation (0x6A03) in FKP, pic_offset={:?}", props.pic_offset);
+                }
                 0x680E => {
                     // Object location/pic offset (SPRM_OBJLOCATION)
                     props.pic_offset = sprm.operand_dword();
-                    eprintln!("DEBUG: Found SPRM_OBJLOCATION in FKP, pic_offset={:?}", props.pic_offset);
+                    eprintln!("DEBUG: Found SPRM_OBJLOCATION (0x680E) in FKP, pic_offset={:?}", props.pic_offset);
                 }
                 _ => {}
             }

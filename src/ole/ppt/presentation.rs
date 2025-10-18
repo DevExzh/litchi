@@ -35,8 +35,10 @@ pub struct Presentation {
     /// Metadata from the OLE file
     metadata: Option<super::super::OleMetadata>,
     /// Extracted MTEF data from OLE streams (stream_name -> mtef_data)
+    #[allow(dead_code)] // Stored for debugging and raw access
     mtef_data: HashMap<String, Vec<u8>>,
     /// Parsed MTEF formulas (stream_name -> parsed_ast)
+    #[allow(dead_code)] // Stored for future formula rendering features
     parsed_mtef: HashMap<String, Vec<crate::formula::MathNode<'static>>>,
 }
 
@@ -69,21 +71,9 @@ impl Presentation {
 
     /// Extract MTEF data from OLE streams during presentation initialization
     fn extract_mtef_data<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<HashMap<String, Vec<u8>>> {
-        let mut mtef_data = HashMap::new();
-
-        // Common MTEF stream names in PowerPoint presentations
-        let mtef_stream_names = [
-            "Equation Native",
-            "MSWordEquation",
-            "Equation.3",
-            "PPTEQN", // PowerPoint-specific equation streams
-        ];
-
-        for stream_name in &mtef_stream_names {
-            if let Ok(Some(data)) = MtefExtractor::extract_mtef_data_from_stream(ole, stream_name) {
-                mtef_data.insert(stream_name.to_string(), data);
-            }
-        }
+        // Use the PPT-specific extractor which handles the PowerPoint storage hierarchy
+        let mtef_data = MtefExtractor::extract_all_mtef_from_ppt(ole)
+            .map_err(|e| PptError::InvalidFormat(format!("Failed to extract MTEF data: {}", e)))?;
 
         Ok(mtef_data)
     }

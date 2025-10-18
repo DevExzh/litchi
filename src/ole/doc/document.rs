@@ -43,8 +43,10 @@ pub struct Document {
     /// Text extractor - holds the extracted document text
     text_extractor: TextExtractor,
     /// Fields table - contains field information (embedded equations, hyperlinks, etc.)
+    #[allow(dead_code)] // Stored for future field extraction features
     fields_table: Option<FieldsTable>,
     /// Extracted MTEF data from OLE streams (stream_name -> mtef_data)
+    #[allow(dead_code)] // Stored for debugging and raw access
     mtef_data: std::collections::HashMap<String, Vec<u8>>,
     /// Parsed MTEF formulas (stream_name -> parsed_ast)
     parsed_mtef: std::collections::HashMap<String, Vec<crate::formula::MathNode<'static>>>,
@@ -103,11 +105,6 @@ impl Document {
         let mtef_data = MtefExtractor::extract_all_mtef_from_objectpool(ole)
             .map_err(|e| DocError::InvalidFormat(format!("Failed to extract MTEF data: {}", e)))?;
 
-        eprintln!("DEBUG: Extracted {} MTEF objects from ObjectPool", mtef_data.len());
-        for key in mtef_data.keys() {
-            eprintln!("DEBUG:   - {}", key);
-        }
-
         // Also try direct stream names for compatibility with older formats
         let mut all_mtef = mtef_data;
         let direct_stream_names = [
@@ -117,8 +114,7 @@ impl Document {
         ];
 
         for stream_name in &direct_stream_names {
-            if let Ok(Some(data)) = MtefExtractor::extract_mtef_data_from_stream(ole, stream_name) {
-                eprintln!("DEBUG: Found direct stream: {}", stream_name);
+            if let Ok(Some(data)) = MtefExtractor::extract_mtef_from_stream(ole, &[stream_name]) {
                 all_mtef.insert(stream_name.to_string(), data);
             }
         }
@@ -312,32 +308,22 @@ impl Document {
             let run_objects: Vec<Run> = runs
                 .into_iter()
                 .map(|(text, props)| {
-                    // Check if this run is an OLE2 embedded object (e.g., equation)
-                    if props.is_ole2 {
-                        eprintln!("DEBUG: Found OLE2 run with text: '{}'", text);
-                        // Use pic_offset to find the corresponding MTEF data
-                        if let Some(pic_offset) = props.pic_offset {
+                    // Primary matching: Use pic_offset to find MTEF data (most reliable)
+                    if let Some(pic_offset) = props.pic_offset {
+                        // Skip zero offsets as they're likely invalid
+                        if pic_offset > 0 {
                             let object_name = format!("_{}", pic_offset);
-                            eprintln!("DEBUG:   Trying to match object_name: {}", object_name);
                             if let Some(mtef_ast) = self.parsed_mtef.get(&object_name) {
                                 // Found matching formula - create run with MTEF AST
-                                eprintln!("DEBUG:   ✓ Found matching MTEF AST!");
                                 return Run::with_mtef_formula(text, props, mtef_ast.clone());
-                            } else {
-                                eprintln!("DEBUG:   ✗ No matching MTEF AST found");
-                            }
-                        } else {
-                            eprintln!("DEBUG:   No pic_offset available");
-                        }
-                        
-                        // Fallback: check if text indicates MTEF formula
-                        if Self::is_potential_mtef_formula(&text) {
-                            eprintln!("DEBUG:   Text appears to be formula");
-                            if let Some(mtef_ast) = self.parse_mtef_for_text(&text) {
-                                eprintln!("DEBUG:   ✓ Parsed MTEF from text");
-                                return Run::with_mtef_formula(text, props, mtef_ast);
                             }
                         }
+                    }
+                    
+                    // Secondary matching: Check if this is an OLE2 object without pic_offset
+                    if props.is_ole2 && Self::is_potential_mtef_formula(&text) 
+                        && let Some(mtef_ast) = self.parse_mtef_for_text(&text) {
+                        return Run::with_mtef_formula(text, props, mtef_ast);
                     }
                     
                     // Regular run without formula

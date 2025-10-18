@@ -329,6 +329,7 @@ impl ParagraphExtractor {
         // In memory structures, this often contains inline SPRM data
 
         // For now, try to parse as SPRM data directly
+        // Parse SPRMs (always 2-byte opcodes per Apache POI)
         let sprms = parse_sprms(prop_data);
 
         // Apply SPRMs to create paragraph properties

@@ -88,7 +88,10 @@ impl Sprm {
 
 /// Parse SPRMs from a byte array (grpprl - group of SPRMs).
 ///
-/// Based on Apache POI's SprmBuffer.findSprms() and related methods.
+/// Based on Apache POI's SprmBuffer.findSprms() and SprmIterator.
+///
+/// **Important:** Apache POI always uses 2-byte SPRM opcodes for all Word versions,
+/// including Word 6/7. This is the standard format used by Microsoft Word.
 ///
 /// # Arguments
 ///
@@ -98,16 +101,13 @@ impl Sprm {
 ///
 /// A vector of parsed SPRMs
 pub fn parse_sprms(grpprl: &[u8]) -> Vec<Sprm> {
+    parse_sprms_two_byte(grpprl)
+}
+
+/// Parse SPRMs using 2-byte opcodes (Word 97+).
+fn parse_sprms_two_byte(grpprl: &[u8]) -> Vec<Sprm> {
     let mut sprms = Vec::new();
     let mut offset = 0;
-    
-    static mut CALL_COUNT: usize = 0;
-    unsafe {
-        CALL_COUNT += 1;
-        if CALL_COUNT <= 5 {
-            eprintln!("DEBUG: parse_sprms called with {} bytes", grpprl.len());
-        }
-    }
 
     while offset + 2 <= grpprl.len() {
         // Read SPRM opcode (2 bytes in Word 97+)
@@ -235,14 +235,9 @@ mod tests {
         let sprms = parse_sprms(&grpprl);
         assert_eq!(sprms.len(), 2);
 
-        // The DOC implementation manually handles these opcodes,
-        // so the generic SPRM parser may not be used for them.
-        // This test is mainly for verifying the parsing logic works.
-        assert_eq!(sprms.len(), 2);
-        assert_eq!(sprms[0].opcode, 0x0835);
-        // Note: The second opcode appears as 0x4301 due to byte order in test data
-        // This is expected for this test case
-        assert_eq!(sprms[1].opcode, 0x4301);
+        // Verify the opcodes were correctly parsed (little-endian)
+        assert_eq!(sprms[0].opcode, 0x0835); // Bold
+        assert_eq!(sprms[1].opcode, 0x4A43); // Font size (0x43, 0x4A bytes → 0x4A43 LE)
     }
 
     #[test]

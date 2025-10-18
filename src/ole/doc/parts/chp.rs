@@ -108,7 +108,10 @@ impl CharacterProperties {
     /// Parse character properties from SPRM (Single Property Modifier) data.
     ///
     /// SPRMs are variable-length records that modify properties.
-    /// Format: opcode (1 or 2 bytes) + operand (variable length)
+    /// Format: 2-byte opcode + variable-length operand
+    ///
+    /// Based on Apache POI's CharacterSprmUncompressor and SprmIterator.
+    /// Note: POI always uses 2-byte SPRMs regardless of Word version.
     ///
     /// # Arguments
     ///
@@ -116,32 +119,11 @@ impl CharacterProperties {
     pub fn from_sprm(grpprl: &[u8]) -> Result<Self> {
         let mut chp = Self::default();
         let mut offset = 0;
-        
-        static mut CALL_COUNT: usize = 0;
-        unsafe {
-            CALL_COUNT += 1;
-            if CALL_COUNT <= 5 {
-                eprintln!("DEBUG: CharacterProperties::from_sprm called with {} bytes", grpprl.len());
-            }
-        }
 
-        while offset < grpprl.len() {
-            if offset + 1 > grpprl.len() {
-                break;
-            }
-
-            // Read SPRM opcode (can be 1 or 2 bytes depending on Word version)
+        while offset + 1 < grpprl.len() {
+            // Read SPRM opcode (always 2 bytes, little-endian per POI)
             let sprm = read_u16_le(grpprl, offset).unwrap_or(0);
             offset += 2;
-            
-            // Debug: Log every SPRM encountered
-            static mut SPRM_COUNT: usize = 0;
-            unsafe {
-                SPRM_COUNT += 1;
-                if SPRM_COUNT <= 50 {
-                    eprintln!("DEBUG: SPRM opcode: 0x{:04X}", sprm);
-                }
-            }
 
             // Parse SPRM based on opcode
             match sprm {
@@ -274,20 +256,64 @@ impl CharacterProperties {
                         offset += 1;
                     }
                 }
-                // OLE2 object flag (SPRM_FOLE2)
+                // OLE2 object flag (sprmCFOle2 = 0x080A)
                 0x080A => {
                     if offset < grpprl.len() {
                         let operand = grpprl[offset];
                         chp.is_ole2 = operand != 0;
-                        eprintln!("DEBUG: Found SPRM_FOLE2, operand=0x{:02X}, is_ole2={}", operand, chp.is_ole2);
+                        eprintln!("DEBUG: Found sprmCFOle2, operand=0x{:02X}, is_ole2={}", operand, chp.is_ole2);
                         offset += 1;
+                    }
+                }
+                // Object flag (sprmCFObj = 0x0856)
+                0x0856 => {
+                    if offset < grpprl.len() {
+                        let operand = grpprl[offset];
+                        chp.is_ole2 = operand != 0;
+                        eprintln!("DEBUG: Found sprmCFObj, operand=0x{:02X}, is_ole2={}", operand, chp.is_ole2);
+                        offset += 1;
+                    }
+                }
+                // Special character flag (sprmCFSpec = 0x0855)
+                // Special characters include embedded objects
+                0x0855 => {
+                    if offset < grpprl.len() {
+                        let operand = grpprl[offset];
+                        if operand != 0 {
+                            eprintln!("DEBUG: Found sprmCFSpec (special char), operand=0x{:02X}", operand);
+                            // Special characters can be objects - mark as potential OLE2
+                            // Will be confirmed by picture data
+                        }
+                        offset += 1;
+                    }
+                }
+                // Data/field flag (sprmCFData = 0x0806)
+                0x0806 => {
+                    if offset < grpprl.len() {
+                        let operand = grpprl[offset];
+                        eprintln!("DEBUG: Found sprmCFData, operand=0x{:02X}", operand);
+                        offset += 1;
+                    }
+                }
+                // Picture location (sprmCPicLocation = 0x6A03)
+                // This is the FILE character position (fc) of the picture/object data
+                0x6A03 => {
+                    eprintln!("DEBUG CHP: MATCHED sprmCPicLocation (0x6A03)! offset={}, grpprl.len()={}", offset, grpprl.len());
+                    if offset + 3 < grpprl.len() {
+                        let fc = read_u32_le(grpprl, offset).unwrap_or(0);
+                        chp.pic_offset = Some(fc);
+                        eprintln!("DEBUG CHP: Set pic_offset to fc=0x{:X} ({})", fc, fc);
+                        offset += 4;
+                    } else {
+                        eprintln!("DEBUG CHP: Not enough bytes for pic_offset! offset={}, needed={}, have={}", offset, offset+4, grpprl.len());
                     }
                 }
                 // Object location/pic offset (SPRM_OBJLOCATION = 0x680E)
                 0x680E => {
                     if offset + 3 < grpprl.len() {
-                        chp.pic_offset = Some(read_u32_le(grpprl, offset).unwrap_or(0));
-                        eprintln!("DEBUG: Found SPRM_OBJLOCATION, pic_offset={:?}", chp.pic_offset);
+                        let fc = read_u32_le(grpprl, offset).unwrap_or(0);
+                        chp.pic_offset = Some(fc);
+                        eprintln!("DEBUG: Found SPRM_OBJLOCATION (0x680E), fc/pic_offset={:?}", chp.pic_offset);
                         offset += 4;
                     }
                 }

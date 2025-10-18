@@ -96,12 +96,35 @@ impl FileInformationBlock {
     /// Get the file format version.
     ///
     /// Common values:
+    /// - 0x0065 (101): Word 6.0
+    /// - 0x0067 (103): Word 95 (7.0)
     /// - 0x00C1 (193): Word 97 through Word 2003
     /// - 0x0101 (257): Word 2007
     /// - 0x0112 (274): Word 2010+
+    ///
+    /// Note: All Word versions use 2-byte SPRM opcodes in the binary format,
+    /// regardless of the file version. This is consistent with Apache POI's implementation.
     #[inline]
     pub fn version(&self) -> u16 {
         self.nfib
+    }
+
+    /// Get a human-readable description of the Word version.
+    pub fn version_name(&self) -> &'static str {
+        match self.nfib {
+            0x0021 => "Word 1.0",
+            0x0045 => "Word 2.0",
+            0x0065 => "Word 6.0",
+            0x0067 => "Word 95 (7.0)",
+            0x00C1 => "Word 97",
+            0x00D9 => "Word 2000",
+            0x0101 => "Word 2002/2003",
+            0x010C => "Word 2007",
+            0x0112 => "Word 2010",
+            0x0113 => "Word 2013",
+            _ if self.nfib >= 0x00C1 => "Word 97+",
+            _ => "Unknown",
+        }
     }
 
     /// Get which table stream to use.
