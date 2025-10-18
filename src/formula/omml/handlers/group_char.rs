@@ -45,7 +45,9 @@ impl GroupCharHandler {
         parent_context: Option<&mut ElementContext<'arena>>,
         arena: &'arena bumpalo::Bump,
     ) {
-        let base = if context.children.is_empty() {
+        let base = if let Some(ref base_content) = context.base {
+            base_content.clone()
+        } else if context.children.is_empty() {
             Vec::new()
         } else {
             context.children.clone()

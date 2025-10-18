@@ -17,17 +17,13 @@ impl AccentHandler {
     ) {
         let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
 
-        // Parse accent character from chr attribute using SIMD-accelerated parsing
-        let acc_val = get_attribute_value(&attrs, "chr");
-        context.accent_type = acc_val.as_deref().and_then(|s| parse_accent_type(Some(s)));
-
         // Parse accent position from pos attribute
         let pos_val = get_attribute_value(&attrs, "pos");
         if let Some(pos_str) = pos_val {
             context.properties.accent_position = Some(pos_str);
         }
 
-        // Parse accent properties
+        // Parse accent properties (though chr is now handled as child element)
         context.properties = parse_accent_properties(&attrs);
     }
 
@@ -43,11 +39,7 @@ impl AccentHandler {
         });
 
         if let Some(accent_type) = accent_type {
-            let base = if context.children.is_empty() {
-                Vec::new()
-            } else {
-                context.children.clone()
-            };
+            let base = context.base.clone().unwrap_or_else(|| context.children.clone());
 
             // Parse position using the dedicated position parsing function
             let position = context.properties.accent_position

@@ -1,27 +1,38 @@
-// OMML (Office Math Markup Language) Parser
-//
-// This module parses Microsoft Office Math Markup Language (OMML) into our AST.
-// OMML is used in modern Office documents (.docx, .pptx, etc.) to represent
-// mathematical formulas.
-//
-// This implementation provides comprehensive OMML parsing with:
-// - High-performance streaming XML parsing
-// - Modular element handlers for different OMML constructs
-// - Comprehensive attribute parsing
-// - Memory-efficient arena-based allocation
-// - Support for all OMML elements and properties
-//
-// Reference: https://devblogs.microsoft.com/math-in-office/officemath/
-
+/// OMML element types and context
 mod elements;
+/// OMML attribute parsing
+///
+/// This module handles parsing of OMML element attributes and properties.
 mod attributes;
+/// OMML element handlers
+///
+/// This module contains handlers for specific OMML elements that require
+/// complex parsing logic. Each handler is organized into separate modules
+/// for better maintainability.
 mod handlers;
+/// OMML property parsing
+///
+/// This module handles parsing of OMML property elements and attributes.
+/// Properties control styling, spacing, alignment, and other formatting aspects.
 mod properties;
+/// OMML utility functions and performance optimizations
+///
+/// This module provides utility functions for OMML parsing, including
+/// performance optimizations, string processing, and helper functions.
 mod utils;
+/// Performance-optimized lookup tables for OMML parsing
+///
+/// This module provides compile-time generated perfect hash function (PHF)
+/// lookup tables for fast element and attribute name resolution.
 mod lookup;
+/// OMML Parser Implementation
+///
+/// This module contains the main OMML parsing logic with performance optimizations.
 mod parser;
+/// OMML Error Types
+///
+/// This module defines all error types that can occur during OMML parsing.
 mod error;
-mod context;
 
 use crate::formula::ast::MathNode;
 
@@ -260,7 +271,7 @@ mod tests {
         let xml = r#"<m:oMath>
             <m:acc>
                 <m:accPr>
-                    <m:chr>&#175;</m:chr>
+                    <m:chr m:val="¯"/>
                 </m:accPr>
                 <m:e><m:r><m:t>x</m:t></m:r></m:e>
             </m:acc>
@@ -290,10 +301,10 @@ mod tests {
         let nodes = parser.parse(xml).unwrap();
         assert!(!nodes.is_empty());
         match &nodes[0] {
-            MathNode::Over { .. } => {
-                // Bar is represented as Over node
+            MathNode::Bar { .. } => {
+                // Bar is represented as Bar node
             }
-            _ => panic!("Expected over node"),
+            _ => panic!("Expected bar node"),
         }
     }
 
@@ -596,10 +607,10 @@ mod tests {
         let nodes = parser.parse(xml).unwrap();
         assert!(!nodes.is_empty());
         match &nodes[0] {
-            MathNode::Matrix { rows, .. } => {
+            MathNode::EqArray { rows, .. } => {
                 assert!(!rows.is_empty());
             }
-            _ => panic!("Expected matrix node"),
+            _ => panic!("Expected equation array node"),
         }
     }
 
@@ -621,10 +632,10 @@ mod tests {
         let nodes = parser.parse(xml).unwrap();
         assert!(!nodes.is_empty());
         match &nodes[0] {
-            MathNode::Over { .. } => {
-                // Group char is represented as Over node
+            MathNode::GroupChar { .. } => {
+                // Group char is represented as GroupChar node
             }
-            _ => panic!("Expected over node"),
+            _ => panic!("Expected group char node"),
         }
     }
 
@@ -685,8 +696,8 @@ mod tests {
         let parser = OmmlParser::new(formula.arena());
 
         let xml = r#"<m:oMath></m:oMath>"#;
-        let nodes = parser.parse(xml).unwrap();
-        assert!(nodes.is_empty());
+        let result = parser.parse(xml);
+        assert!(result.is_err()); // Empty math should fail validation
     }
 
     #[test]
@@ -694,9 +705,9 @@ mod tests {
         let formula = Formula::new();
         let parser = OmmlParser::new(formula.arena());
 
-        let xml = r#"<m:oMath><invalid></m:oMath>"#;
+        let xml = r#"<m:oMath><invalid /></m:oMath>"#;
         let result = parser.parse(xml);
-        assert!(result.is_ok()); // Should handle unknown elements gracefully
+        assert!(result.is_err()); // Unknown elements should result in empty math which fails validation
     }
 
     #[test]

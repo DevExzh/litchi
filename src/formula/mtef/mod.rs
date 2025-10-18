@@ -1,15 +1,3 @@
-// MTEF (MathType Equation Format) Parser
-//
-// This module parses the binary MathType Equation Format (MTEF) used in
-// legacy OLE documents (.doc, .ppt, etc.) into our formula AST.
-//
-// MTEF is a private data stream format developed by Design Science for
-// storing mathematical equations.
-//
-// References:
-// - http://rtf2latex2e.sourceforge.net/MTEF5.html
-// - rtf2latex2e source code
-
 mod binary;
 mod constants;
 mod templates;

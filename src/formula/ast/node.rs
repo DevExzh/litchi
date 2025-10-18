@@ -1,5 +1,3 @@
-// Math node definitions
-
 use super::types::*;
 use std::borrow::Cow;
 

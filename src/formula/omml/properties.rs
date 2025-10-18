@@ -1,12 +1,8 @@
-// OMML property parsing
-//
-// This module handles parsing of OMML property elements and attributes.
-// Properties control styling, spacing, alignment, and other formatting aspects.
-
 use crate::formula::omml::elements::ElementProperties;
 use crate::formula::omml::attributes::*;
 
 /// Parse run properties (m:rPr)
+#[allow(dead_code)] // Used indirectly through property parsing
 pub fn parse_run_properties(attrs: &[quick_xml::events::attributes::Attribute]) -> ElementProperties {
     let mut properties = ElementProperties::default();
 
@@ -15,20 +11,23 @@ pub fn parse_run_properties(attrs: &[quick_xml::events::attributes::Attribute]) 
             && let Ok(value) = std::str::from_utf8(&attr.value) {
                 match key {
                     "scr" | "m:scr" => {
-                        // Script/style type
+                        // Script/style type (normal, bold, italic, etc.)
+                        properties.math_variant = Some(value.to_string());
                         properties.style = Some(value.to_string());
                     }
                     "sty" | "m:sty" => {
                         // Math style (display/text)
-                        properties.style = Some(value.to_string());
+                        properties.display_style = Some(matches!(value, "d" | "display" | "1" | "true"));
+                        properties.run_math_style = Some(value.to_string());
                     }
                     "nor" | "m:nor" => {
-                        // Normal text
+                        // Normal text font
                         properties.font = Some(value.to_string());
+                        properties.run_normal_text = Some(value.to_string());
                     }
                     "lit" | "m:lit" => {
                         // Literal text flag
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.run_literal = Some(matches!(value, "1" | "true"));
                     }
                     _ => {}
                 }
@@ -47,8 +46,8 @@ pub fn parse_fraction_properties(attrs: &[quick_xml::events::attributes::Attribu
             && let Ok(value) = std::str::from_utf8(&attr.value) {
                 match key {
                     "type" | "m:type" => {
-                        // Fraction type (bar, noBar, etc.)
-                        properties.style = Some(value.to_string());
+                        // Fraction type (bar, noBar, skewed)
+                        properties.fraction_type = Some(value.to_string());
                     }
                     _ => {}
                 }
@@ -80,11 +79,11 @@ pub fn parse_delimiter_properties(attrs: &[quick_xml::events::attributes::Attrib
                     }
                     "grow" | "m:grow" => {
                         // Grow to fit content
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.delimiter_grow = Some(matches!(value, "1" | "true"));
                     }
                     "shp" | "m:shp" => {
-                        // Shape (centered, match, etc.)
-                        properties.alignment = Some(value.to_string());
+                        // Shape (centered, match)
+                        properties.delimiter_shape = Some(value.to_string());
                     }
                     _ => {}
                 }
@@ -108,15 +107,19 @@ pub fn parse_nary_properties(attrs: &[quick_xml::events::attributes::Attribute])
                     }
                     "grow" | "m:grow" => {
                         // Grow to fit content
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.nary_operator_grow = Some(matches!(value, "1" | "true"));
                     }
                     "subHide" | "m:subHide" => {
                         // Hide subscript
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.nary_hide_sub = Some(matches!(value, "1" | "true"));
                     }
                     "supHide" | "m:supHide" => {
                         // Hide superscript
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.nary_hide_sup = Some(matches!(value, "1" | "true"));
+                    }
+                    "limLoc" | "m:limLoc" => {
+                        // Limit location (undOvr, subSup)
+                        properties.style = Some(value.to_string());
                     }
                     _ => {}
                 }
@@ -156,26 +159,26 @@ pub fn parse_matrix_properties(attrs: &[quick_xml::events::attributes::Attribute
                 match key {
                     "baseJc" | "m:baseJc" => {
                         // Baseline justification
-                        properties.alignment = Some(value.to_string());
+                        properties.matrix_alignment = Some(value.to_string());
                     }
                     "plcHide" | "m:plcHide" => {
                         // Hide placeholder
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.hide = Some(matches!(value, "1" | "true"));
                     }
                     "rSp" | "m:rSp" => {
                         // Row spacing
-                        properties.spacing = Some(value.to_string());
+                        properties.matrix_row_spacing = Some(value.to_string());
                     }
                     "cSp" | "m:cSp" => {
                         // Column spacing
-                        properties.spacing = Some(value.to_string());
+                        properties.matrix_column_spacing = Some(value.to_string());
                     }
                     "cGp" | "m:cGp" => {
                         // Column gap
                         properties.spacing = Some(value.to_string());
                     }
                     "mcs" | "m:mcs" => {
-                        // Matrix column spacing
+                        // Matrix column spacing (complex structure)
                         properties.spacing = Some(value.to_string());
                     }
                     "mcsJc" | "m:mcsJc" => {
@@ -204,11 +207,11 @@ pub fn parse_group_char_properties(attrs: &[quick_xml::events::attributes::Attri
                     }
                     "pos" | "m:pos" => {
                         // Position (top/bot)
-                        properties.alignment = Some(value.to_string());
+                        properties.accent_position = Some(value.to_string());
                     }
                     "vertJc" | "m:vertJc" => {
                         // Vertical justification
-                        properties.alignment = Some(value.to_string());
+                        properties.vertical_alignment = Some(value.to_string());
                     }
                     _ => {}
                 }
@@ -228,23 +231,23 @@ pub fn parse_eq_arr_properties(attrs: &[quick_xml::events::attributes::Attribute
                 match key {
                     "baseJc" | "m:baseJc" => {
                         // Baseline justification
-                        properties.alignment = Some(value.to_string());
+                        properties.eq_arr_base_alignment = Some(value.to_string());
                     }
                     "maxDist" | "m:maxDist" => {
                         // Maximum distance
-                        properties.spacing = Some(value.to_string());
+                        properties.eq_arr_max_distance = Some(value.to_string());
                     }
                     "objDist" | "m:objDist" => {
                         // Object distance
-                        properties.spacing = Some(value.to_string());
+                        properties.eq_arr_object_distance = Some(value.to_string());
                     }
                     "rSp" | "m:rSp" => {
                         // Row spacing
-                        properties.spacing = Some(value.to_string());
+                        properties.eq_arr_row_spacing = Some(value.to_string());
                     }
                     "rSpRule" | "m:rSpRule" => {
                         // Row spacing rule
-                        properties.spacing = Some(value.to_string());
+                        properties.eq_arr_row_spacing_rule = Some(value.to_string());
                     }
                     _ => {}
                 }
@@ -284,7 +287,7 @@ pub fn parse_bar_properties(attrs: &[quick_xml::events::attributes::Attribute]) 
                 match key {
                     "pos" | "m:pos" => {
                         // Position (top/bot)
-                        properties.alignment = Some(value.to_string());
+                        properties.accent_position = Some(value.to_string());
                     }
                     _ => {}
                 }
@@ -304,23 +307,23 @@ pub fn parse_box_properties(attrs: &[quick_xml::events::attributes::Attribute]) 
                 match key {
                     "opEmu" | "m:opEmu" => {
                         // Operator emulation
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.box_operator_emulation = Some(matches!(value, "1" | "true"));
                     }
                     "noBreak" | "m:noBreak" => {
                         // No break
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.box_no_break = Some(matches!(value, "1" | "true"));
                     }
                     "diff" | "m:diff" => {
                         // Differential
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.box_differential = Some(matches!(value, "1" | "true"));
                     }
                     "brk" | "m:brk" => {
                         // Break
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.box_break = Some(matches!(value, "1" | "true"));
                     }
                     "aln" | "m:aln" => {
                         // Alignment
-                        properties.alignment = Some(value.to_string());
+                        properties.box_alignment = Some(value.to_string());
                     }
                     _ => {}
                 }
@@ -339,28 +342,30 @@ pub fn parse_border_box_properties(attrs: &[quick_xml::events::attributes::Attri
             && let Ok(value) = std::str::from_utf8(&attr.value) {
                 match key {
                     "hideTop" | "m:hideTop" => {
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.border_hide_top = Some(matches!(value, "1" | "true"));
                     }
                     "hideBot" | "m:hideBot" => {
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.border_hide_bottom = Some(matches!(value, "1" | "true"));
                     }
                     "hideLeft" | "m:hideLeft" => {
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.border_hide_left = Some(matches!(value, "1" | "true"));
                     }
                     "hideRight" | "m:hideRight" => {
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.border_hide_right = Some(matches!(value, "1" | "true"));
                     }
                     "strikeH" | "m:strikeH" => {
-                        properties.strike_through = Some(value == "1" || value == "true");
+                        properties.border_strike_horizontal = Some(matches!(value, "1" | "true"));
                     }
                     "strikeV" | "m:strikeV" => {
-                        properties.double_strike_through = Some(value == "1" || value == "true");
+                        properties.border_strike_vertical = Some(matches!(value, "1" | "true"));
                     }
                     "strikeBLTR" | "m:strikeBLTR" => {
                         // Strike bottom-left to top-right
+                        properties.border_strike_bltr = Some(matches!(value, "1" | "true"));
                     }
                     "strikeTLBR" | "m:strikeTLBR" => {
                         // Strike top-left to bottom-right
+                        properties.border_strike_tlbr = Some(matches!(value, "1" | "true"));
                     }
                     _ => {}
                 }
@@ -380,23 +385,43 @@ pub fn parse_phantom_properties(attrs: &[quick_xml::events::attributes::Attribut
                 match key {
                     "show" | "m:show" => {
                         // Show phantom content
-                        properties.hide = Some(!(value == "1" || value == "true"));
+                        properties.phantom_show = Some(matches!(value, "1" | "true"));
                     }
                     "zeroWid" | "m:zeroWid" => {
                         // Zero width
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.phantom_zero_width = Some(matches!(value, "1" | "true"));
                     }
                     "zeroAsc" | "m:zeroAsc" => {
                         // Zero ascent
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.phantom_zero_ascent = Some(matches!(value, "1" | "true"));
                     }
                     "zeroDesc" | "m:zeroDesc" => {
                         // Zero descent
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.phantom_zero_descent = Some(matches!(value, "1" | "true"));
                     }
                     "transp" | "m:transp" => {
                         // Transparent
-                        properties.hide = Some(value == "1" || value == "true");
+                        properties.phantom_transparent = Some(matches!(value, "1" | "true"));
+                    }
+                    _ => {}
+                }
+            }
+    }
+
+    properties
+}
+
+/// Parse radical properties (m:radPr)
+pub fn parse_radical_properties(attrs: &[quick_xml::events::attributes::Attribute]) -> ElementProperties {
+    let mut properties = ElementProperties::default();
+
+    for attr in attrs {
+        if let Ok(key) = std::str::from_utf8(attr.key.as_ref())
+            && let Ok(value) = std::str::from_utf8(&attr.value) {
+                match key {
+                    "degHide" | "m:degHide" => {
+                        // Hide degree
+                        properties.radical_hide_degree = Some(matches!(value, "1" | "true"));
                     }
                     _ => {}
                 }
@@ -416,6 +441,198 @@ pub fn parse_spacing_properties(attrs: &[quick_xml::events::attributes::Attribut
                 match key {
                     "val" | "m:val" => {
                         properties.spacing = Some(value.to_string());
+                    }
+                    _ => {}
+                }
+            }
+    }
+
+    properties
+}
+
+/// Parse subscript properties (m:sSubPr)
+#[allow(dead_code)] // Part of the property parsing API, used in element-specific property handling
+pub fn parse_subscript_properties(attrs: &[quick_xml::events::attributes::Attribute]) -> ElementProperties {
+    let mut properties = ElementProperties::default();
+
+    for attr in attrs {
+        if let Ok(key) = std::str::from_utf8(attr.key.as_ref())
+            && let Ok(value) = std::str::from_utf8(&attr.value) {
+                match key {
+                    "degHide" | "m:degHide" => {
+                        // Hide degree/subscript
+                        properties.hide = Some(matches!(value, "1" | "true"));
+                    }
+                    _ => {}
+                }
+            }
+    }
+
+    properties
+}
+
+/// Parse superscript properties (m:sSupPr)
+#[allow(dead_code)] // Part of the property parsing API, used in element-specific property handling
+pub fn parse_superscript_properties(attrs: &[quick_xml::events::attributes::Attribute]) -> ElementProperties {
+    let mut properties = ElementProperties::default();
+
+    for attr in attrs {
+        if let Ok(key) = std::str::from_utf8(attr.key.as_ref())
+            && let Ok(value) = std::str::from_utf8(&attr.value) {
+                match key {
+                    "degHide" | "m:degHide" => {
+                        // Hide degree/superscript
+                        properties.hide = Some(matches!(value, "1" | "true"));
+                    }
+                    _ => {}
+                }
+            }
+    }
+
+    properties
+}
+
+/// Parse sub-sup properties (m:sSubSupPr)
+#[allow(dead_code)] // Part of the property parsing API, used in element-specific property handling
+pub fn parse_subsup_properties(attrs: &[quick_xml::events::attributes::Attribute]) -> ElementProperties {
+    let mut properties = ElementProperties::default();
+
+    for attr in attrs {
+        if let Ok(key) = std::str::from_utf8(attr.key.as_ref())
+            && let Ok(value) = std::str::from_utf8(&attr.value) {
+                match key {
+                    "subHide" | "m:subHide" => {
+                        // Hide subscript
+                        properties.nary_hide_sub = Some(matches!(value, "1" | "true"));
+                    }
+                    "supHide" | "m:supHide" => {
+                        // Hide superscript
+                        properties.nary_hide_sup = Some(matches!(value, "1" | "true"));
+                    }
+                    "aln" | "m:aln" => {
+                        // Alignment
+                        properties.alignment = Some(value.to_string());
+                    }
+                    _ => {}
+                }
+            }
+    }
+
+    properties
+}
+
+/// Parse prescript properties (m:sPrePr)
+#[allow(dead_code)] // Part of the property parsing API, used in element-specific property handling
+pub fn parse_prescript_properties(attrs: &[quick_xml::events::attributes::Attribute]) -> ElementProperties {
+    let mut properties = ElementProperties::default();
+
+    for attr in attrs {
+        if let Ok(key) = std::str::from_utf8(attr.key.as_ref())
+            && let Ok(value) = std::str::from_utf8(&attr.value) {
+                match key {
+                    "subHide" | "m:subHide" => {
+                        // Hide prescript subscript
+                        properties.nary_hide_sub = Some(matches!(value, "1" | "true"));
+                    }
+                    "supHide" | "m:supHide" => {
+                        // Hide prescript superscript
+                        properties.nary_hide_sup = Some(matches!(value, "1" | "true"));
+                    }
+                    _ => {}
+                }
+            }
+    }
+
+    properties
+}
+
+/// Parse function properties (m:funcPr)
+#[allow(dead_code)] // Part of the property parsing API, used in element-specific property handling
+pub fn parse_function_properties(attrs: &[quick_xml::events::attributes::Attribute]) -> ElementProperties {
+    let mut properties = ElementProperties::default();
+
+    for attr in attrs {
+        if let Ok(key) = std::str::from_utf8(attr.key.as_ref())
+            && let Ok(value) = std::str::from_utf8(&attr.value) {
+                match key {
+                    "type" | "m:type" => {
+                        // Function type
+                        properties.style = Some(value.to_string());
+                    }
+                    _ => {}
+                }
+            }
+    }
+
+    properties
+}
+
+/// Parse upper limit properties (m:limUppPr)
+#[allow(dead_code)] // Part of the property parsing API, used in element-specific property handling
+pub fn parse_upper_limit_properties(attrs: &[quick_xml::events::attributes::Attribute]) -> ElementProperties {
+    let mut properties = ElementProperties::default();
+
+    for attr in attrs {
+        if let Ok(key) = std::str::from_utf8(attr.key.as_ref())
+            && let Ok(value) = std::str::from_utf8(&attr.value) {
+                match key {
+                    "limLoc" | "m:limLoc" => {
+                        // Limit location (undOvr, subSup)
+                        properties.style = Some(value.to_string());
+                    }
+                    _ => {}
+                }
+            }
+    }
+
+    properties
+}
+
+/// Parse lower limit properties (m:limLowPr)
+#[allow(dead_code)] // Part of the property parsing API, used in element-specific property handling
+pub fn parse_lower_limit_properties(attrs: &[quick_xml::events::attributes::Attribute]) -> ElementProperties {
+    let mut properties = ElementProperties::default();
+
+    for attr in attrs {
+        if let Ok(key) = std::str::from_utf8(attr.key.as_ref())
+            && let Ok(value) = std::str::from_utf8(&attr.value) {
+                match key {
+                    "limLoc" | "m:limLoc" => {
+                        // Limit location (undOvr, subSup)
+                        properties.style = Some(value.to_string());
+                    }
+                    _ => {}
+                }
+            }
+    }
+
+    properties
+}
+
+/// Parse control properties (m:ctrlPr)
+#[allow(dead_code)] // Part of the property parsing API, used in element-specific property handling
+pub fn parse_control_properties(attrs: &[quick_xml::events::attributes::Attribute]) -> ElementProperties {
+    let mut properties = ElementProperties::default();
+
+    for attr in attrs {
+        if let Ok(key) = std::str::from_utf8(attr.key.as_ref())
+            && let Ok(value) = std::str::from_utf8(&attr.value) {
+                match key {
+                    "ascii" | "m:ascii" => {
+                        // ASCII font
+                        properties.font = Some(value.to_string());
+                    }
+                    "hAnsi" | "m:hAnsi" => {
+                        // High ANSI font
+                        properties.font = Some(value.to_string());
+                    }
+                    "cs" | "m:cs" => {
+                        // Complex script font
+                        properties.font = Some(value.to_string());
+                    }
+                    "eastAsia" | "m:eastAsia" => {
+                        // East Asia font
+                        properties.font = Some(value.to_string());
                     }
                     _ => {}
                 }

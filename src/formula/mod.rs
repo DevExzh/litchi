@@ -27,9 +27,45 @@
 // let latex = converter.convert(&formula)?;
 // ```
 
+/// Abstract Syntax Tree for Mathematical Formulas
+///
+/// This module defines a comprehensive AST for representing mathematical formulas
+/// that can be parsed from OMML, LaTeX, and MTEF formats and converted between them.
+///
+/// The design is inspired by the plurimath Ruby project but adapted for Rust's
+/// type system and performance characteristics.
 pub mod ast;
+/// OMML (Office Math Markup Language) Parser
+///
+/// This module parses Microsoft Office Math Markup Language (OMML) into our AST.
+/// OMML is used in modern Office documents (.docx, .pptx, etc.) to represent
+/// mathematical formulas.
+///
+/// This implementation provides comprehensive OMML parsing with:
+/// - High-performance streaming XML parsing
+/// - Modular element handlers for different OMML constructs
+/// - Comprehensive attribute parsing
+/// - Memory-efficient arena-based allocation
+/// - Support for all OMML elements and properties
+///
+/// Reference: https://devblogs.microsoft.com/math-in-office/officemath/
 mod omml;
+/// LaTeX Converter
+///
+/// This module converts our formula AST to LaTeX format.
+/// LaTeX is a widely-used typesetting system for mathematical formulas.
 pub mod latex;
+/// MTEF (MathType Equation Format) Parser
+///
+/// This module parses the binary MathType Equation Format (MTEF) used in
+/// legacy OLE documents (.doc, .ppt, etc.) into our formula AST.
+///
+/// MTEF is a private data stream format developed by Design Science for
+/// storing mathematical equations.
+///
+/// References:
+/// - http://rtf2latex2e.sourceforge.net/MTEF5.html
+/// - rtf2latex2e source code
 mod mtef;
 
 // Re-export public API

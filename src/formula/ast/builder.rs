@@ -1,5 +1,3 @@
-// Builder for constructing formula nodes efficiently
-
 use super::node::MathNode;
 use bumpalo::Bump;
 use std::borrow::Cow;

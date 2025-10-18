@@ -1,8 +1,4 @@
-// OMML Parser Implementation
-//
-// This module contains the main OMML parsing logic with performance optimizations.
-
-use crate::formula::ast::MathNode;
+use crate::formula::ast::{MathNode, StrikeStyle};
 use crate::formula::omml::elements::*;
 use crate::formula::omml::attributes::*;
 use crate::formula::omml::properties::*;
@@ -156,6 +152,12 @@ impl<'arena> OmmlParser<'arena> {
         let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
         stats.record_attribute();
 
+        // Store raw attributes for property element handlers
+        // SAFETY: The attributes are valid for the duration of the XML parsing
+        context.attributes = unsafe { 
+            std::mem::transmute::<Vec<quick_xml::events::attributes::Attribute<'_>>, Vec<quick_xml::events::attributes::Attribute<'_>>>(attrs.clone())
+        };
+
         // Use batch attribute parsing with PHF lookups and caching for better performance
         let mut cache = AttributeCache::new(&attrs);
         context.properties = parse_attributes_batch_with_cache(&mut cache);
@@ -208,7 +210,7 @@ impl<'arena> OmmlParser<'arena> {
                     "fPr" | "m:fPr" => parse_fraction_properties(&attrs),
                     "naryPr" | "m:naryPr" => parse_nary_properties(&attrs),
                     "accPr" | "m:accPr" => parse_accent_properties(&attrs),
-                    "radPr" | "m:radPr" => parse_general_properties(&attrs),
+                    "radPr" | "m:radPr" => parse_radical_properties(&attrs),
                     "sSupPr" | "m:sSupPr" => parse_general_properties(&attrs),
                     "sSubPr" | "m:sSubPr" => parse_general_properties(&attrs),
                     "funcPr" | "m:funcPr" => parse_general_properties(&attrs),
@@ -239,8 +241,8 @@ impl<'arena> OmmlParser<'arena> {
         name: &[u8],
         stack: &mut ElementStack<'arena>,
         result: &mut Vec<MathNode<'arena>>,
-        context_pool: &mut ContextPool<'arena>,
-        stats: &mut PerformanceStats,
+        _context_pool: &mut ContextPool<'arena>,
+        _stats: &mut PerformanceStats,
     ) -> Result<(), OmmlError> {
         if stack.is_empty() {
             return Ok(());
@@ -261,9 +263,38 @@ impl<'arena> OmmlParser<'arena> {
                 result.extend(context.children);
             }
             ElementType::Run => {
-                // Pass children up to parent
-                if let Some(parent) = parent_context {
-                    extend_vec_efficient(&mut parent.children, context.children);
+                // Check if run has any properties - if so, create a Run node
+                let has_properties = context.properties.run_literal.is_some()
+                    || context.properties.math_variant.is_some()
+                    || context.properties.run_normal_text.is_some()
+                    || context.properties.color.is_some()
+                    || context.properties.underline.is_some()
+                    || context.properties.overline.is_some()
+                    || context.properties.strike_through.is_some()
+                    || context.properties.double_strike_through.is_some();
+
+                if has_properties {
+                    // Create a Run node with properties
+                    let run_node = MathNode::Run {
+                        content: context.children.clone(),
+                        literal: context.properties.run_literal,
+                        style: context.properties.math_variant.as_ref().and_then(|s| parse_style_value(s)),
+                        font: context.properties.run_normal_text.as_ref().map(|s| std::borrow::Cow::Borrowed(self.arena.alloc_str(s))),
+                        color: context.properties.color.as_ref().map(|s| std::borrow::Cow::Borrowed(self.arena.alloc_str(s))),
+                        underline: context.properties.underline.as_ref().and_then(|s| parse_line_style(Some(s))),
+                        overline: context.properties.overline.as_ref().and_then(|s| parse_line_style(Some(s))),
+                        strike_through: context.properties.strike_through.and_then(|b| if b { Some(StrikeStyle::Single) } else { None }),
+                        double_strike_through: context.properties.double_strike_through,
+                    };
+
+                    if let Some(parent) = parent_context {
+                        parent.children.push(run_node);
+                    }
+                } else {
+                    // No properties - pass children up directly
+                    if let Some(parent) = parent_context {
+                        extend_vec_efficient(&mut parent.children, context.children);
+                    }
                 }
             }
             ElementType::Text => {
@@ -274,7 +305,7 @@ impl<'arena> OmmlParser<'arena> {
                     if let Some(parent) = parent_context {
                         parent.children.push(node);
                     }
-                    stats.record_text_node();
+                    // Text node recorded
                 }
             }
             ElementType::Delimiter => {
@@ -386,6 +417,27 @@ impl<'arena> OmmlParser<'arena> {
             ElementType::Properties if name_str == "ctrlPr" || name_str == "m:ctrlPr" => {
                 CtrlPropsHandler::handle_end(&mut context, parent_context, self.arena);
             }
+            ElementType::Properties if name_str == "groupChrPr" || name_str == "m:groupChrPr" => {
+                GroupChrPrHandler::handle_end(&mut context, parent_context, self.arena);
+            }
+            ElementType::Position => {
+                PosHandler::handle_end(&mut context, parent_context, self.arena);
+            }
+            ElementType::VerticalAlignment => {
+                VertJcHandler::handle_end(&mut context, parent_context, self.arena);
+            }
+            ElementType::Lit => {
+                LitHandler::handle_end(&mut context, parent_context, self.arena);
+            }
+            ElementType::Scr => {
+                ScrHandler::handle_end(&mut context, parent_context, self.arena);
+            }
+            ElementType::Sty => {
+                StyHandler::handle_end(&mut context, parent_context, self.arena);
+            }
+            ElementType::Nor => {
+                NorHandler::handle_end(&mut context, parent_context, self.arena);
+            }
             // Handle property elements - store properties in parent and pass children up
             ElementType::Properties => {
                 if let Some(parent) = parent_context {
@@ -475,6 +527,13 @@ impl<'arena> OmmlParser<'arena> {
         // Parse attributes
         let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
         stats.record_attribute();
+
+        // Store raw attributes for property element handlers
+        // SAFETY: The attributes are valid for the duration of the XML parsing
+        context.attributes = unsafe { 
+            std::mem::transmute::<Vec<quick_xml::events::attributes::Attribute<'_>>, Vec<quick_xml::events::attributes::Attribute<'_>>>(attrs.clone())
+        };
+
         context.properties = parse_attributes_batch(&attrs);
 
         // Handle element-specific start logic
@@ -600,6 +659,9 @@ impl<'arena> OmmlParser<'arena> {
             }
             ElementType::Spacing => {
                 SpacingHandler::handle_end(&mut context, parent_context, self.arena);
+            }
+            ElementType::Character => {
+                CharHandler::handle_end(name.as_ref(), &mut context, parent_context, self.arena);
             }
             _ => {
                 // For unknown or unhandled self-closing elements, do nothing

@@ -82,6 +82,7 @@ impl EqArrHandler {
             None
         };
 
+        // Create equation array node
         let node = MathNode::EqArray { rows, properties };
 
         if let Some(parent) = parent_context {

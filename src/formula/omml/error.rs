@@ -1,7 +1,3 @@
-// OMML Error Types
-//
-// This module defines all error types that can occur during OMML parsing.
-
 /// Errors that can occur during OMML parsing
 #[derive(Debug)]
 pub enum OmmlError {

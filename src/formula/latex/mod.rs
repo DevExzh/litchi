@@ -1,14 +1,3 @@
-// LaTeX Converter
-//
-// This module converts our formula AST to LaTeX format.
-// LaTeX is a widely-used typesetting system for mathematical formulas.
-//
-// Features:
-// - High-performance conversion with SIMD optimizations
-// - Memory-efficient with minimal allocations
-// - Comprehensive symbol and operator support
-// - Proper matrix and fence handling
-
 mod operators;
 mod templates;
 mod matrix;

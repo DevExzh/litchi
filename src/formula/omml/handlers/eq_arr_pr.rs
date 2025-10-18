@@ -3,8 +3,10 @@
 use crate::formula::omml::elements::ElementContext;
 
 /// Handler for equation array properties elements
+#[allow(dead_code)] // Handler implementation, reserved for property parsing
 pub struct EqArrPrHandler;
 
+#[allow(dead_code)] // Handler implementation
 impl EqArrPrHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,

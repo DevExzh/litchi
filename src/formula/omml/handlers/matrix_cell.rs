@@ -3,8 +3,10 @@
 use crate::formula::omml::elements::ElementContext;
 
 /// Handler for matrix cell elements
+#[allow(dead_code)] // Handler implementation, used by matrix row handler
 pub struct MatrixCellHandler;
 
+#[allow(dead_code)] // Handler implementation
 impl MatrixCellHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,

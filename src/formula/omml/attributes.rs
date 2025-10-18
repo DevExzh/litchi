@@ -1,8 +1,3 @@
-// OMML attribute parsing
-//
-// This module handles parsing of OMML element attributes and properties.
-// Uses SIMD acceleration for high-performance numeric parsing.
-
 use crate::formula::ast::{
     *, LineStyle, StrikeStyle, ShapeType, BreakType, VerticalAlignment, Position, FractionType
 };
@@ -26,11 +21,13 @@ pub fn parse_bool_fast(value: &str) -> Option<bool> {
 }
 
 /// Fast alignment parsing with lookup
+#[allow(dead_code)] // Reserved for future optimizations
 pub fn parse_alignment_fast(value: &str) -> Option<Alignment> {
     parse_alignment_value(value)
 }
 
 /// Fast style parsing with lookup
+#[allow(dead_code)] // Reserved for future optimizations
 pub fn parse_style_fast(value: &str) -> Option<StyleType> {
     parse_style_value(value)
 }
@@ -94,11 +91,14 @@ pub fn parse_matrix_fence(mcs: Option<&str>) -> Option<MatrixFence> {
 }
 
 /// Parse style type from OMML attribute values
+#[allow(dead_code)] // Reserved for future use in property parsing
 pub fn parse_style_type(scr: Option<&str>) -> Option<StyleType> {
     scr.and_then(parse_style_fast)
 }
 
 /// Parse element properties from OMML attributes
+/// This is a general-purpose property parser used as a fallback
+#[allow(dead_code)] // Used indirectly through batch parsing functions
 pub fn parse_element_properties(attrs: &[quick_xml::events::attributes::Attribute]) -> ElementProperties {
     let mut properties = ElementProperties::default();
 
@@ -172,60 +172,80 @@ pub fn get_attribute_value_float(attrs: &[quick_xml::events::attributes::Attribu
 }
 
 /// Extract attribute value as boolean with fast lookup
+/// Part of the attribute extraction API for element handlers
+#[allow(dead_code)]
 pub fn get_attribute_value_bool(attrs: &[quick_xml::events::attributes::Attribute], key: &str) -> Option<bool> {
     get_attribute_value(attrs, key)
         .and_then(|s| parse_bool_fast(&s))
 }
 
 /// Extract attribute value as space type
+/// Part of the attribute extraction API for spacing elements
+#[allow(dead_code)]
 pub fn get_attribute_value_space(attrs: &[quick_xml::events::attributes::Attribute], key: &str) -> Option<SpaceType> {
     get_attribute_value(attrs, key)
         .and_then(|s| parse_space_type(Some(&s)))
 }
 
 /// Extract attribute value as alignment
+/// Part of the attribute extraction API for positioning
+#[allow(dead_code)]
 pub fn get_attribute_value_alignment(attrs: &[quick_xml::events::attributes::Attribute], key: &str) -> Option<Alignment> {
     get_attribute_value(attrs, key)
         .and_then(|s| parse_alignment_value(&s))
 }
 
 /// Extract attribute value as vertical alignment
+/// Part of the attribute extraction API for vertical positioning
+#[allow(dead_code)]
 pub fn get_attribute_value_vertical_alignment(attrs: &[quick_xml::events::attributes::Attribute], key: &str) -> Option<VerticalAlignment> {
     get_attribute_value(attrs, key)
         .and_then(|s| parse_vertical_alignment(Some(&s)))
 }
 
 /// Extract attribute value as position
+/// Part of the attribute extraction API for position properties
+#[allow(dead_code)]
 pub fn get_attribute_value_position(attrs: &[quick_xml::events::attributes::Attribute], key: &str) -> Option<Position> {
     get_attribute_value(attrs, key)
         .and_then(|s| parse_position_type(Some(&s)))
 }
 
 /// Extract attribute value as fraction type
+/// Part of the attribute extraction API for fraction elements
+#[allow(dead_code)]
 pub fn get_attribute_value_fraction_type(attrs: &[quick_xml::events::attributes::Attribute], key: &str) -> Option<FractionType> {
     get_attribute_value(attrs, key)
         .and_then(|s| parse_fraction_type(Some(&s)))
 }
 
 /// Extract attribute value as shape type
+/// Part of the attribute extraction API for shape properties
+#[allow(dead_code)]
 pub fn get_attribute_value_shape(attrs: &[quick_xml::events::attributes::Attribute], key: &str) -> Option<ShapeType> {
     get_attribute_value(attrs, key)
         .and_then(|s| parse_shape_type(Some(&s)))
 }
 
 /// Extract attribute value as break type
+/// Part of the attribute extraction API for break properties
+#[allow(dead_code)]
 pub fn get_attribute_value_break(attrs: &[quick_xml::events::attributes::Attribute], key: &str) -> Option<BreakType> {
     get_attribute_value(attrs, key)
         .and_then(|s| parse_break_type(Some(&s)))
 }
 
 /// Extract attribute value as line style
+/// Part of the attribute extraction API for line styling
+#[allow(dead_code)]
 pub fn get_attribute_value_line_style(attrs: &[quick_xml::events::attributes::Attribute], key: &str) -> Option<LineStyle> {
     get_attribute_value(attrs, key)
         .and_then(|s| parse_line_style(Some(&s)))
 }
 
 /// Extract attribute value as strike style
+/// Part of the attribute extraction API for strike-through styling
+#[allow(dead_code)]
 pub fn get_attribute_value_strike_style(attrs: &[quick_xml::events::attributes::Attribute], key: &str) -> Option<StrikeStyle> {
     get_attribute_value(attrs, key)
         .and_then(|s| parse_strike_style(Some(&s)))
@@ -245,6 +265,7 @@ pub fn parse_space_type(val: Option<&str>) -> Option<SpaceType> {
 }
 
 /// Parse alignment type from OMML attribute values
+#[allow(dead_code)] // API for future alignment parsing enhancements
 pub fn parse_alignment_type(val: Option<&str>) -> Option<String> {
     match val {
         Some("left") | Some("l") => Some("left".to_string()),
@@ -263,6 +284,7 @@ pub fn parse_alignment_type(val: Option<&str>) -> Option<String> {
 
 
 /// Parse operator form from OMML attribute values
+#[allow(dead_code)] // API for future operator property parsing
 pub fn parse_operator_form(val: Option<&str>) -> Option<String> {
     match val {
         Some("pre") | Some("prefix") => Some("prefix".to_string()),
@@ -310,6 +332,7 @@ pub fn parse_script_level(val: Option<&str>) -> Option<i32> {
 
 
 /// Parse boolean attribute with multiple possible true values
+#[allow(dead_code)] // API for general attribute parsing
 pub fn parse_bool_attribute(val: Option<&str>) -> Option<bool> {
     match val {
         Some("1") | Some("true") | Some("on") | Some("yes") => Some(true),
@@ -319,16 +342,19 @@ pub fn parse_bool_attribute(val: Option<&str>) -> Option<bool> {
 }
 
 /// Parse color attribute (hex, named colors, etc.)
+#[allow(dead_code)] // API for color attribute parsing
 pub fn parse_color_attribute(val: Option<&str>) -> Option<String> {
     val.map(|s| s.to_string())
 }
 
 /// Parse font size attribute
+#[allow(dead_code)] // API for font size parsing
 pub fn parse_font_size(val: Option<&str>) -> Option<String> {
     val.map(|s| s.to_string())
 }
 
 /// Parse underline style
+#[allow(dead_code)] // API for underline style parsing
 pub fn parse_underline_style(val: Option<&str>) -> Option<String> {
     match val {
         Some("single") | Some("s") => Some("single".to_string()),
@@ -355,6 +381,7 @@ pub fn parse_line_style(val: Option<&str>) -> Option<LineStyle> {
 }
 
 /// Parse strike style
+#[allow(dead_code)] // API for strike-through style parsing
 pub fn parse_strike_style(val: Option<&str>) -> Option<StrikeStyle> {
     match val {
         Some("single") | Some("s") => Some(StrikeStyle::Single),
@@ -364,6 +391,7 @@ pub fn parse_strike_style(val: Option<&str>) -> Option<StrikeStyle> {
 }
 
 /// Parse shape type
+#[allow(dead_code)] // API for shape type parsing
 pub fn parse_shape_type(val: Option<&str>) -> Option<ShapeType> {
     match val {
         Some("centered") | Some("cen") => Some(ShapeType::Centered),
@@ -373,6 +401,7 @@ pub fn parse_shape_type(val: Option<&str>) -> Option<ShapeType> {
 }
 
 /// Parse break type
+#[allow(dead_code)] // API for break type parsing
 pub fn parse_break_type(val: Option<&str>) -> Option<BreakType> {
     match val {
         Some("line") | Some("ln") => Some(BreakType::Line),
@@ -383,6 +412,7 @@ pub fn parse_break_type(val: Option<&str>) -> Option<BreakType> {
 }
 
 /// Parse vertical alignment
+#[allow(dead_code)] // API for vertical alignment parsing
 pub fn parse_vertical_alignment(val: Option<&str>) -> Option<VerticalAlignment> {
     match val {
         Some("top") | Some("t") => Some(VerticalAlignment::Top),
@@ -395,6 +425,7 @@ pub fn parse_vertical_alignment(val: Option<&str>) -> Option<VerticalAlignment> 
 }
 
 /// Parse position type
+#[allow(dead_code)] // API for position type parsing
 pub fn parse_position_type(val: Option<&str>) -> Option<Position> {
     match val {
         Some("pre") | Some("prefix") => Some(Position::Prefix),
@@ -407,6 +438,7 @@ pub fn parse_position_type(val: Option<&str>) -> Option<Position> {
 }
 
 /// Parse fraction type
+#[allow(dead_code)] // API for fraction type parsing
 pub fn parse_fraction_type(val: Option<&str>) -> Option<FractionType> {
     match val {
         Some("bar") | Some("normal") => Some(FractionType::Bar),
@@ -417,6 +449,7 @@ pub fn parse_fraction_type(val: Option<&str>) -> Option<FractionType> {
 }
 
 /// Parse overline style
+#[allow(dead_code)] // API for overline style parsing
 pub fn parse_overline_style(val: Option<&str>) -> Option<String> {
     parse_underline_style(val) // Same as underline for overline
 }
@@ -446,56 +479,81 @@ impl<'a> AttributeCache<'a> {
         value
     }
 
+    /// Get attribute as boolean
+    #[allow(dead_code)] // Part of the AttributeCache API
     pub fn get_bool(&mut self, key: &str) -> Option<bool> {
         self.get(key).and_then(|s| parse_bool_fast(&s))
     }
 
+    /// Get attribute as integer with SIMD acceleration
+    #[allow(dead_code)] // Part of the AttributeCache API
     pub fn get_int(&mut self, key: &str) -> Option<i32> {
         self.get(key).and_then(|s| parse_int_simd(&s))
     }
 
+    /// Get attribute as float with SIMD acceleration
+    #[allow(dead_code)] // Part of the AttributeCache API
     pub fn get_float(&mut self, key: &str) -> Option<f32> {
         self.get(key).and_then(|s| parse_float_simd(&s))
     }
 
+    /// Get attribute as space type
+    #[allow(dead_code)] // Part of the AttributeCache API
     pub fn get_space(&mut self, key: &str) -> Option<SpaceType> {
         self.get(key).and_then(|s| parse_space_type(Some(&s)))
     }
 
+    /// Get attribute as alignment
+    #[allow(dead_code)] // Part of the AttributeCache API
     pub fn get_alignment(&mut self, key: &str) -> Option<Alignment> {
         self.get(key).and_then(|s| parse_alignment_value(&s))
     }
 
+    /// Get attribute as vertical alignment
+    #[allow(dead_code)] // Part of the AttributeCache API
     pub fn get_vertical_alignment(&mut self, key: &str) -> Option<VerticalAlignment> {
         self.get(key).and_then(|s| parse_vertical_alignment(Some(&s)))
     }
 
+    /// Get attribute as position type
+    #[allow(dead_code)] // Part of the AttributeCache API
     pub fn get_position(&mut self, key: &str) -> Option<Position> {
         self.get(key).and_then(|s| parse_position_type(Some(&s)))
     }
 
+    /// Get attribute as fraction type
+    #[allow(dead_code)] // Part of the AttributeCache API
     pub fn get_fraction_type(&mut self, key: &str) -> Option<FractionType> {
         self.get(key).and_then(|s| parse_fraction_type(Some(&s)))
     }
 
+    /// Get attribute as shape type
+    #[allow(dead_code)] // Part of the AttributeCache API
     pub fn get_shape(&mut self, key: &str) -> Option<ShapeType> {
         self.get(key).and_then(|s| parse_shape_type(Some(&s)))
     }
 
+    /// Get attribute as break type
+    #[allow(dead_code)] // Part of the AttributeCache API
     pub fn get_break(&mut self, key: &str) -> Option<BreakType> {
         self.get(key).and_then(|s| parse_break_type(Some(&s)))
     }
 
+    /// Get attribute as line style
+    #[allow(dead_code)] // Part of the AttributeCache API
     pub fn get_line_style(&mut self, key: &str) -> Option<LineStyle> {
         self.get(key).and_then(|s| parse_line_style(Some(&s)))
     }
 
+    /// Get attribute as strike style
+    #[allow(dead_code)] // Part of the AttributeCache API
     pub fn get_strike_style(&mut self, key: &str) -> Option<StrikeStyle> {
         self.get(key).and_then(|s| parse_strike_style(Some(&s)))
     }
 }
 
 /// Batch attribute parsing for performance
+#[allow(clippy::field_reassign_with_default)]
 pub fn parse_attributes_batch(attrs: &[quick_xml::events::attributes::Attribute]) -> ElementProperties {
     let mut cache = AttributeCache::new(attrs);
     let mut properties = ElementProperties::default();
@@ -599,6 +657,7 @@ pub fn parse_attributes_batch(attrs: &[quick_xml::events::attributes::Attribute]
 }
 
 /// Batch attribute parsing with caching for performance
+#[allow(clippy::field_reassign_with_default)]
 pub fn parse_attributes_batch_with_cache(cache: &mut AttributeCache) -> ElementProperties {
     let mut properties = ElementProperties::default();
 

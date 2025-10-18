@@ -1,9 +1,3 @@
-// OMML element handlers
-//
-// This module contains handlers for specific OMML elements that require
-// complex parsing logic. Each handler is organized into separate modules
-// for better maintainability.
-
 mod delim;
 mod bar;
 mod accent;
@@ -27,7 +21,16 @@ mod limit;
 mod pre_script;
 mod post_script;
 mod run_props;
+mod lit;
+mod scr;
+mod sty;
+mod nor;
+mod chr;
+mod pos;
+mod vert_jc;
+mod group_chr_pr;
 mod ctrl_props;
+
 
 pub use delim::DelimiterHandler;
 pub use bar::BarHandler;
@@ -50,4 +53,11 @@ pub use limit::LimitHandler;
 pub use pre_script::PreScriptHandler;
 pub use post_script::PostScriptHandler;
 pub use run_props::RunPropsHandler;
+pub use lit::LitHandler;
+pub use scr::ScrHandler;
+pub use sty::StyHandler;
+pub use nor::NorHandler;
+pub use pos::PosHandler;
+pub use vert_jc::VertJcHandler;
+pub use group_chr_pr::GroupChrPrHandler;
 pub use ctrl_props::CtrlPropsHandler;

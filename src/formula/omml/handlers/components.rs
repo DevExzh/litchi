@@ -83,6 +83,14 @@ impl BaseHandler {
                 ElementType::Accent | ElementType::Bar | ElementType::GroupChar => {
                     parent.base = Some(context.children.clone());
                 }
+                ElementType::Nary => {
+                    // For n-ary operators, the e element is the integrand
+                    parent.integrand = Some(context.children.clone());
+                }
+                ElementType::EqArr => {
+                    // For equation arrays, each e element is a row
+                    parent.eq_array_rows.push(context.children.clone());
+                }
                 _ => {
                     // Pass children up for other contexts
                     extend_vec_efficient(&mut parent.children, context.children.clone());

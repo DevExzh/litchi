@@ -1,8 +1,3 @@
-// Performance-optimized lookup tables for OMML parsing
-//
-// This module provides compile-time generated perfect hash function (PHF)
-// lookup tables for fast element and attribute name resolution.
-
 use super::elements::ElementType;
 use phf::{phf_map, phf_set};
 use crate::formula::ast::{Operator, AccentType, LargeOperator, PredefinedSymbol, FunctionName, Alignment, StyleType};
@@ -96,6 +91,14 @@ pub static ELEMENT_TYPES: phf::Map<&'static str, ElementType> = phf_map! {
     // Properties and styles
     "rPr" => ElementType::Properties,
     "m:rPr" => ElementType::Properties,
+    "lit" => ElementType::Lit,
+    "m:lit" => ElementType::Lit,
+    "scr" => ElementType::Scr,
+    "m:scr" => ElementType::Scr,
+    "sty" => ElementType::Sty,
+    "m:sty" => ElementType::Sty,
+    "nor" => ElementType::Nor,
+    "m:nor" => ElementType::Nor,
     "fPr" => ElementType::Properties,
     "m:fPr" => ElementType::Properties,
     "dPr" => ElementType::Properties,
@@ -128,6 +131,10 @@ pub static ELEMENT_TYPES: phf::Map<&'static str, ElementType> = phf_map! {
     // Characters and content
     "chr" => ElementType::Character,
     "m:chr" => ElementType::Character,
+    "pos" => ElementType::Position,
+    "m:pos" => ElementType::Position,
+    "vertJc" => ElementType::VerticalAlignment,
+    "m:vertJc" => ElementType::VerticalAlignment,
     "begChr" => ElementType::Character,
     "m:begChr" => ElementType::Character,
     "endChr" => ElementType::Character,
@@ -139,6 +146,7 @@ pub static ELEMENT_TYPES: phf::Map<&'static str, ElementType> = phf_map! {
 };
 
 /// Fast operator character to operator lookup
+#[allow(dead_code)] // Reserved for operator parsing
 pub static OPERATORS: phf::Map<&'static str, Operator> = phf_map! {
     // Basic operators
     "+" => Operator::Plus,
@@ -260,6 +268,7 @@ pub static LARGE_OPERATORS: phf::Map<&'static str, LargeOperator> = phf_map! {
 };
 
 /// Fast predefined symbol lookup
+#[allow(dead_code)] // Reserved for symbol parsing
 pub static PREDEFINED_SYMBOLS: phf::Map<&'static str, PredefinedSymbol> = phf_map! {
     // Greek lowercase
     "α" => PredefinedSymbol::Alpha,
@@ -325,6 +334,7 @@ pub static PREDEFINED_SYMBOLS: phf::Map<&'static str, PredefinedSymbol> = phf_ma
 };
 
 /// Fast function name lookup
+#[allow(dead_code)] // Reserved for function parsing
 pub static FUNCTIONS: phf::Map<&'static str, FunctionName> = phf_map! {
     "sin" => FunctionName::Sin,
     "cos" => FunctionName::Cos,
@@ -420,6 +430,7 @@ pub fn get_element_type(name: &str) -> ElementType {
 }
 
 /// Get operator from character
+#[allow(dead_code)] // Part of the lookup API
 pub fn get_operator(chr: &str) -> Option<Operator> {
     OPERATORS.get(chr).copied()
 }
@@ -435,11 +446,13 @@ pub fn get_large_operator(chr: &str) -> Option<LargeOperator> {
 }
 
 /// Get predefined symbol from character
+#[allow(dead_code)] // Part of the lookup API
 pub fn get_predefined_symbol(chr: &str) -> Option<PredefinedSymbol> {
     PREDEFINED_SYMBOLS.get(chr).copied()
 }
 
 /// Get function name from string
+#[allow(dead_code)] // Part of the lookup API
 pub fn get_function_name(name: &str) -> Option<FunctionName> {
     FUNCTIONS.get(name).copied()
 }

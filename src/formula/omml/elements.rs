@@ -1,9 +1,11 @@
-// OMML element types and context
-
 use crate::formula::ast::{MathNode, Fence, LargeOperator, AccentType, MatrixFence};
 
 /// Element types in OMML
+///
+/// This enum represents all possible OMML elements that can appear in
+/// Office Math Markup Language documents.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)] // Some variants constructed indirectly or reserved for future use
 pub enum ElementType {
     Math,
     Run,
@@ -46,11 +48,22 @@ pub enum ElementType {
     PreScript,
     PostScript,
     Character,
+    Position,
+    VerticalAlignment,
+    Lit,
+    Scr,
+    Sty,
+    Nor,
     Unknown,
 }
 
 /// Properties for OMML elements
+///
+/// This struct contains all possible properties that can be specified in OMML elements.
+/// Not all properties are used by all elements; each element type uses only the relevant
+/// properties for its specific purpose.
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)] // Many fields are used conditionally based on element type
 pub struct ElementProperties {
     // Style and formatting
     pub style: Option<String>,
@@ -192,6 +205,9 @@ impl TextBuffer {
         &self.buffer
     }
 
+    /// Convert into owned String (used for final text extraction)
+    #[inline]
+    #[allow(dead_code)]
     pub fn into_string(self) -> String {
         self.buffer
     }
@@ -210,6 +226,7 @@ pub struct ElementContext<'arena> {
     pub children: Vec<MathNode<'arena>>,
     pub text: TextBuffer,
     pub properties: ElementProperties,
+    pub attributes: Vec<quick_xml::events::attributes::Attribute<'static>>,
 
     // Core mathematical components
     pub base: Option<Vec<MathNode<'arena>>>,
@@ -255,6 +272,7 @@ impl<'arena> ElementContext<'arena> {
             children: Vec::new(),
             text: TextBuffer::new(),
             properties: ElementProperties::default(),
+            attributes: Vec::new(),
             base: None,
             numerator: None,
             denominator: None,
@@ -285,6 +303,7 @@ impl<'arena> ElementContext<'arena> {
         self.children.clear();
         self.text.clear();
         self.properties = ElementProperties::default();
+        self.attributes.clear();
         self.base = None;
         self.numerator = None;
         self.denominator = None;
@@ -311,6 +330,7 @@ impl<'arena> ElementContext<'arena> {
 
     /// Check if the context has any content
     #[inline]
+    #[allow(dead_code)]
     pub fn has_content(&self) -> bool {
         !self.children.is_empty()
             || !self.text.is_empty()
@@ -332,6 +352,7 @@ impl<'arena> ElementContext<'arena> {
 
     /// Get the total number of child nodes across all collections
     #[inline]
+    #[allow(dead_code)]
     pub fn total_child_count(&self) -> usize {
         self.children.len()
             + self.pre_scripts.len()
@@ -343,22 +364,32 @@ impl<'arena> ElementContext<'arena> {
     }
 
     /// Reserve capacity for expected number of children
+    /// Used for performance optimization when the number of children is known in advance
+    #[inline]
+    #[allow(dead_code)]
     pub fn reserve_children(&mut self, capacity: usize) {
         self.children.reserve(capacity);
     }
 
     /// Reserve capacity for matrix rows
+    /// Used when parsing matrix structures to avoid reallocations
+    #[inline]
+    #[allow(dead_code)]
     pub fn reserve_matrix_rows(&mut self, capacity: usize) {
         self.matrix_rows.reserve(capacity);
     }
 
     /// Reserve capacity for equation array rows
+    /// Used when parsing equation arrays to avoid reallocations
+    #[inline]
+    #[allow(dead_code)]
     pub fn reserve_eq_array_rows(&mut self, capacity: usize) {
         self.eq_array_rows.reserve(capacity);
     }
 
     /// Check if this is a structural element (contains other elements)
     #[inline]
+    #[allow(dead_code)]
     pub fn is_structural(&self) -> bool {
         matches!(
             self.element_type,
@@ -384,6 +415,7 @@ impl<'arena> ElementContext<'arena> {
 
     /// Check if this is a leaf element (contains only text/symbols)
     #[inline]
+    #[allow(dead_code)]
     pub fn is_leaf(&self) -> bool {
         matches!(
             self.element_type,

@@ -1,13 +1,8 @@
-// Abstract Syntax Tree for Mathematical Formulas
-//
-// This module defines a comprehensive AST for representing mathematical formulas
-// that can be parsed from OMML, LaTeX, and MTEF formats and converted between them.
-//
-// The design is inspired by the plurimath Ruby project but adapted for Rust's
-// type system and performance characteristics.
-
+/// Type definitions for mathematical formula nodes
 mod types;
+/// Math node definitions
 mod node;
+/// Builder for constructing formula nodes efficiently
 mod builder;
 
 pub use types::*;

@@ -1,5 +1,3 @@
-// Type definitions for mathematical formula nodes
-
 use std::borrow::Cow;
 
 /// Mathematical operators
