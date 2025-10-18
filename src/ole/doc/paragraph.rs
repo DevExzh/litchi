@@ -19,7 +19,8 @@ pub struct Paragraph {
     text: String,
     /// Runs within this paragraph
     runs: Vec<Run>,
-    // TODO: Add paragraph formatting properties (PAP)
+    /// Paragraph formatting properties (PAP)
+    properties: super::parts::pap::ParagraphProperties,
 }
 
 impl Paragraph {
@@ -32,6 +33,7 @@ impl Paragraph {
         Self {
             text: text.clone(),
             runs: vec![Run::new(text, CharacterProperties::default())],
+            properties: super::parts::pap::ParagraphProperties::default(),
         }
     }
 
@@ -43,7 +45,23 @@ impl Paragraph {
     #[allow(unused)]
     pub(crate) fn with_runs(runs: Vec<Run>) -> Self {
         let text = runs.iter().map(|r| r.text.as_str()).collect::<String>();
-        Self { text, runs }
+        Self { 
+            text, 
+            runs,
+            properties: super::parts::pap::ParagraphProperties::default(),
+        }
+    }
+
+    /// Create a new Paragraph with text and properties.
+    pub(crate) fn with_properties(
+        text: String,
+        properties: super::parts::pap::ParagraphProperties,
+    ) -> Self {
+        Self {
+            text,
+            runs: Vec::new(),
+            properties,
+        }
     }
 
     /// Get the text content of this paragraph.
@@ -65,6 +83,16 @@ impl Paragraph {
     /// Set the runs for this paragraph (internal use).
     pub(crate) fn set_runs(&mut self, runs: Vec<Run>) {
         self.runs = runs;
+    }
+
+    /// Set the paragraph properties (internal use).
+    pub(crate) fn set_properties(&mut self, properties: super::parts::pap::ParagraphProperties) {
+        self.properties = properties;
+    }
+
+    /// Get the paragraph properties.
+    pub fn properties(&self) -> &super::parts::pap::ParagraphProperties {
+        &self.properties
     }
 
     /// Extract all MTEF formulas from this paragraph as LaTeX.

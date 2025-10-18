@@ -66,35 +66,78 @@ impl ChpBinTable {
         }
 
         // Calculate number of BTE entries
+        // PlcfBteChpx structure: array of (n+1) FCs followed by n PnFkpChpx structures
+        // Each FC is 4 bytes, each PnFkpChpx is 4 bytes
         // Size = (n+1)*4 + n*4 = 8n + 4
         // So n = (size - 4) / 8
         let n = (plcf_bte_chpx_data.len() - 4) / 8;
         
-        eprintln!("DEBUG: ChpBinTable parsing {} BTE entries", n);
+        eprintln!("DEBUG: ChpBinTable parsing {} BTE entries from {} bytes", n, plcf_bte_chpx_data.len());
+        
+        // Debug: show first few FC values and PN values
+        if n >= 5 {
+            eprintln!("DEBUG: First 5 FC values:");
+            for i in 0..=5 {
+                let fc_offset = i * 4;
+                if fc_offset + 4 <= plcf_bte_chpx_data.len() {
+                    let fc = read_u32_le(plcf_bte_chpx_data, fc_offset).unwrap_or(0);
+                    eprintln!("  aFc[{}] = {} (0x{:08X})", i, fc, fc);
+                }
+            }
+            eprintln!("DEBUG: First 5 PN values:");
+            for i in 0..5 {
+                let pn_offset = (n + 1) * 4 + i * 4;
+                if pn_offset + 4 <= plcf_bte_chpx_data.len() {
+                    let pn_raw = read_u32_le(plcf_bte_chpx_data, pn_offset).unwrap_or(0);
+                    let pn = pn_raw & 0x3FFFFF;
+                    eprintln!("  aPnBteChpx[{}] = {} (raw: 0x{:08X})", i, pn, pn_raw);
+                }
+            }
+        }
 
         let mut all_runs = Vec::new();
 
         // Parse each BTE entry
         for i in 0..n {
-            // Read PN from PnBteChpx array (starts after FC array)
+            // Read PN from PnFkpChpx array (starts after FC array)
             let pn_offset = (n + 1) * 4 + i * 4;
             if pn_offset + 4 > plcf_bte_chpx_data.len() {
                 continue;
             }
 
-            let pn = read_u32_le(plcf_bte_chpx_data, pn_offset).unwrap_or(0);
+            let pn_raw = read_u32_le(plcf_bte_chpx_data, pn_offset).unwrap_or(0);
+            
+            if i < 5 {
+                eprintln!("DEBUG: BTE {}: Reading from offset {} (n={}, pn_offset={}+{}*4), raw_bytes=[{:02X} {:02X} {:02X} {:02X}], pn_raw=0x{:08X}",
+                         i, pn_offset, n, (n+1)*4, i,
+                         plcf_bte_chpx_data[pn_offset],
+                         plcf_bte_chpx_data[pn_offset+1],
+                         plcf_bte_chpx_data[pn_offset+2],
+                         plcf_bte_chpx_data[pn_offset+3],
+                         pn_raw);
+            }
+            
+            // PnFkpChpx structure (from [MS-DOC]):
+            // - Bits 0-21 (22 bits): pn (Page Number)
+            // - Bits 22-31 (10 bits): unused (MUST be ignored)
+            // The ChpxFkp structure begins at offset pn * 512 in WordDocument stream
+            let pn = pn_raw & 0x3FFFFF; // Mask to get 22-bit page number
 
-            // PN (Page Number) format (from POI's CHPBinTable.java line 97-98):
-            // pageOffset = SMALLER_BIG_BLOCK_SIZE * pageNum
-            // where SMALLER_BIG_BLOCK_SIZE = 512
+            // PN (Page Number) format:
+            // pageOffset = 512 * pn
             // FKP pages are stored in the WordDocument stream, not table stream!
-            if pn == 0 || pn == 0xFFFFFFFF {
+            if pn == 0 || pn == 0x3FFFFF {
                 // Invalid PN
-                eprintln!("DEBUG: Skipping BTE {} with invalid PN {}", i, pn);
+                eprintln!("DEBUG: Skipping BTE {} with invalid PN 0x{:08X} (masked: 0x{:08X})", i, pn_raw, pn);
                 continue;
             }
             
             let page_offset = (pn as usize) * 512;
+            
+            // Debug specific PNs we know should be valid
+            if pn == 133 || pn == 159 || pn == 204 || pn == 217 {
+                eprintln!("DEBUG: BTE {}: Found valid PN={} (0x{:02X}), page_offset={}", i, pn, pn, page_offset);
+            }
             
             if i < 5 {
                 eprintln!("DEBUG: BTE {}: PN=0x{:08X}, page_offset={}", i, pn, page_offset);

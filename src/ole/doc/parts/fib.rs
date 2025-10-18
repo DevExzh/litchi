@@ -190,6 +190,181 @@ impl FileInformationBlock {
     pub fn raw_data(&self) -> &[u8] {
         &self.data
     }
+
+    /// Get character count for a subdocument.
+    ///
+    /// Character counts are stored in the FibRgLw97 structure.
+    /// FibRgLw97 starts at offset 64 (after FibBase=32, csw=2, FibRgW97=28, cslw=2).
+    /// Within FibRgLw97, character counts start at offset 0xC (after cbMac, reserved1, reserved2).
+    /// Each count is a 4-byte little-endian integer.
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - Subdocument index:
+    ///   - 0: ccpText (main document) at FibRgLw97+0xC = FIB offset 0x4C (76)
+    ///   - 1: ccpFtn (footnotes) at FibRgLw97+0x10 = FIB offset 0x50 (80)
+    ///   - 2: ccpHdd (headers/footers) at FibRgLw97+0x14 = FIB offset 0x54 (84)
+    ///   - 3: ccpMcr (macros) at FibRgLw97+0x18 = FIB offset 0x58 (88)
+    ///   - 4: ccpAtn (annotations/comments) at FibRgLw97+0x1C = FIB offset 0x5C (92)
+    ///   - 5: ccpEdn (endnotes) at FibRgLw97+0x20 = FIB offset 0x60 (96)
+    ///   - 6: ccpTxbx (text boxes) at FibRgLw97+0x24 = FIB offset 0x64 (100)
+    ///   - 7: ccpHdrTxbx (header text boxes) at FibRgLw97+0x28 = FIB offset 0x68 (104)
+    ///
+    /// # Returns
+    ///
+    /// Character count, or 0 if out of bounds
+    fn get_character_count(&self, index: usize) -> u32 {
+        // FibRgLw97 starts at offset 64, character counts start at +0xC
+        let offset = 64 + 0xC + (index * 4);
+        if offset + 4 > self.data.len() {
+            return 0;
+        }
+        U32::<LE>::read_from_bytes(&self.data[offset..offset + 4])
+            .map(|v| v.get())
+            .unwrap_or(0)
+    }
+
+    /// Get the main document character position range.
+    ///
+    /// Returns (start_cp, end_cp) for the main document text.
+    pub fn get_main_doc_range(&self) -> (u32, u32) {
+        let ccp_text = self.get_character_count(0);
+        (0, ccp_text)
+    }
+
+    /// Get the footnote subdocument character position range.
+    ///
+    /// Returns Some((start_cp, end_cp)) if footnotes exist, None otherwise.
+    pub fn get_footnote_range(&self) -> Option<(u32, u32)> {
+        let base = self.get_character_count(0);
+        let ccp_ftn = self.get_character_count(1);
+        if ccp_ftn > 0 {
+            Some((base, base + ccp_ftn))
+        } else {
+            None
+        }
+    }
+
+    /// Get the header/footer subdocument character position range.
+    ///
+    /// Returns Some((start_cp, end_cp)) if headers/footers exist, None otherwise.
+    pub fn get_header_range(&self) -> Option<(u32, u32)> {
+        let base = self.get_character_count(0) + self.get_character_count(1);
+        let ccp_hdd = self.get_character_count(2);
+        if ccp_hdd > 0 {
+            Some((base, base + ccp_hdd))
+        } else {
+            None
+        }
+    }
+
+    /// Get the annotations/comments subdocument character position range.
+    ///
+    /// Returns Some((start_cp, end_cp)) if comments exist, None otherwise.
+    pub fn get_comment_range(&self) -> Option<(u32, u32)> {
+        let base = self.get_character_count(0) 
+                  + self.get_character_count(1) 
+                  + self.get_character_count(2)
+                  + self.get_character_count(3); // Skip macros
+        let ccp_atn = self.get_character_count(4);
+        if ccp_atn > 0 {
+            Some((base, base + ccp_atn))
+        } else {
+            None
+        }
+    }
+
+    /// Get the endnotes subdocument character position range.
+    ///
+    /// Returns Some((start_cp, end_cp)) if endnotes exist, None otherwise.
+    pub fn get_endnote_range(&self) -> Option<(u32, u32)> {
+        let base = self.get_character_count(0) 
+                  + self.get_character_count(1) 
+                  + self.get_character_count(2)
+                  + self.get_character_count(3)
+                  + self.get_character_count(4);
+        let ccp_edn = self.get_character_count(5);
+        if ccp_edn > 0 {
+            Some((base, base + ccp_edn))
+        } else {
+            None
+        }
+    }
+
+    /// Get the text box subdocument character position range.
+    ///
+    /// Returns Some((start_cp, end_cp)) if text boxes exist, None otherwise.
+    pub fn get_textbox_range(&self) -> Option<(u32, u32)> {
+        let base = self.get_character_count(0) 
+                  + self.get_character_count(1) 
+                  + self.get_character_count(2)
+                  + self.get_character_count(3)
+                  + self.get_character_count(4)
+                  + self.get_character_count(5);
+        let ccp_txbx = self.get_character_count(6);
+        if ccp_txbx > 0 {
+            Some((base, base + ccp_txbx))
+        } else {
+            None
+        }
+    }
+
+    /// Get the header text box subdocument character position range.
+    ///
+    /// Returns Some((start_cp, end_cp)) if header text boxes exist, None otherwise.
+    pub fn get_header_textbox_range(&self) -> Option<(u32, u32)> {
+        let base = self.get_character_count(0) 
+                  + self.get_character_count(1) 
+                  + self.get_character_count(2)
+                  + self.get_character_count(3)
+                  + self.get_character_count(4)
+                  + self.get_character_count(5)
+                  + self.get_character_count(6);
+        let ccp_hdr_txbx = self.get_character_count(7);
+        if ccp_hdr_txbx > 0 {
+            Some((base, base + ccp_hdr_txbx))
+        } else {
+            None
+        }
+    }
+
+    /// Get all subdocument ranges that exist in this document.
+    ///
+    /// Returns a vector of (name, start_cp, end_cp) tuples for all non-empty subdocuments.
+    pub fn get_all_subdoc_ranges(&self) -> Vec<(&'static str, u32, u32)> {
+        let mut ranges = Vec::new();
+        
+        let (start, end) = self.get_main_doc_range();
+        if end > start {
+            ranges.push(("Main Document", start, end));
+        }
+        
+        if let Some((start, end)) = self.get_footnote_range() {
+            ranges.push(("Footnotes", start, end));
+        }
+        
+        if let Some((start, end)) = self.get_header_range() {
+            ranges.push(("Headers/Footers", start, end));
+        }
+        
+        if let Some((start, end)) = self.get_comment_range() {
+            ranges.push(("Comments", start, end));
+        }
+        
+        if let Some((start, end)) = self.get_endnote_range() {
+            ranges.push(("Endnotes", start, end));
+        }
+        
+        if let Some((start, end)) = self.get_textbox_range() {
+            ranges.push(("Text Boxes", start, end));
+        }
+        
+        if let Some((start, end)) = self.get_header_textbox_range() {
+            ranges.push(("Header Text Boxes", start, end));
+        }
+        
+        ranges
+    }
 }
 
 #[cfg(test)]

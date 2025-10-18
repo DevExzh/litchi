@@ -45,6 +45,12 @@ pub struct ParagraphProperties {
     pub borders: Borders,
     /// Background shading
     pub shading: Option<Shading>,
+    /// Paragraph is inside a table
+    pub in_table: bool,
+    /// Paragraph is a table row end marker
+    pub is_table_row_end: bool,
+    /// Table nesting level (0 = not in table, 1+ = nested level)
+    pub table_level: i32,
 }
 
 /// Paragraph justification/alignment.

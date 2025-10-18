@@ -28,6 +28,8 @@ pub struct ParagraphExtractor {
     text: String,
     /// Text piece character positions
     text_ranges: Vec<(u32, u32, usize)>, // (cp_start, cp_end, text_offset)
+    /// Character position range to extract (for subdocuments)
+    cp_range: Option<(u32, u32)>,
 }
 
 impl ParagraphExtractor {
@@ -55,8 +57,8 @@ impl ParagraphExtractor {
         }
         
         // Get PAP bin table location from FIB
-        // Index 2 in FibRgFcLcb97 is fcPlcfBtePapx/lcbPlcfBtePapx
-        let pap_plcf = if let Some((offset, length)) = fib.get_table_pointer(2) {
+        // Index 13 in FibRgFcLcb97 is fcPlcfBtePapx/lcbPlcfBtePapx (PLCFBTEPAPX)
+        let pap_plcf = if let Some((offset, length)) = fib.get_table_pointer(13) {
             eprintln!("DEBUG: PAP table pointer: offset={}, length={}", offset, length);
             if length > 0 && (offset as usize) < table_stream.len() {
                 let pap_data = &table_stream[offset as usize..];
@@ -110,9 +112,9 @@ impl ParagraphExtractor {
         };
 
         // Get CHP bin table location from FIB and parse it properly with FKP
-        // Index 1 in FibRgFcLcb97 is fcPlcfBteChpx/lcbPlcfBteChpx
+        // Index 12 in FibRgFcLcb97 is fcPlcfBteChpx/lcbPlcfBteChpx (PLCFBTECHPX)
         // Requires piece table for FC-to-CP conversion
-        let chp_bin_table = if let (Some((offset, length)), Some(pt)) = (fib.get_table_pointer(1), &piece_table) {
+        let chp_bin_table = if let (Some((offset, length)), Some(pt)) = (fib.get_table_pointer(12), &piece_table) {
             eprintln!("DEBUG: CHP table pointer: offset={}, length={}", offset, length);
             if length > 0 && (offset as usize) < table_stream.len() {
                 let chp_data = &table_stream[offset as usize..];
@@ -153,7 +155,31 @@ impl ParagraphExtractor {
             chp_bin_table,
             text,
             text_ranges,
+            cp_range: None,
         })
+    }
+
+    /// Create a new paragraph extractor for a specific character position range.
+    ///
+    /// This is used to extract paragraphs from subdocuments (footnotes, headers, etc.).
+    ///
+    /// # Arguments
+    ///
+    /// * `fib` - File Information Block
+    /// * `table_stream` - Table stream (0Table or 1Table) data
+    /// * `word_document` - WordDocument stream data
+    /// * `text` - Extracted document text
+    /// * `cp_range` - Character position range (start_cp, end_cp)
+    pub fn new_with_range(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+        word_document: &[u8],
+        text: String,
+        cp_range: (u32, u32),
+    ) -> Result<Self> {
+        let mut extractor = Self::new(fib, table_stream, word_document, text)?;
+        extractor.cp_range = Some(cp_range);
+        Ok(extractor)
     }
 
     /// Build mapping from character positions to text offsets.
@@ -180,7 +206,17 @@ impl ParagraphExtractor {
         if let Some(ref pap_plcf) = self.pap_plcf {
             // Iterate through paragraph boundaries
             for i in 0..pap_plcf.count() {
-                if let Some((para_start, para_end)) = pap_plcf.range(i) {
+                if let Some((mut para_start, mut para_end)) = pap_plcf.range(i) {
+                    // Filter by CP range if specified (for subdocuments)
+                    if let Some((range_start, range_end)) = self.cp_range {
+                        // Skip paragraphs outside our range
+                        if para_end <= range_start || para_start >= range_end {
+                            continue;
+                        }
+                        // Clamp paragraph boundaries to our range
+                        para_start = para_start.max(range_start);
+                        para_end = para_end.min(range_end);
+                    }
                     // Extract paragraph text
                     let para_text = self.extract_text_range(para_start, para_end);
 
@@ -357,6 +393,18 @@ impl ParagraphExtractor {
                 0x8411 | 0x0011 => {
                     // Right indent
                     props.indent_right = sprm.operand_i16().map(|v| v as i32);
+                }
+                0x2416 => {
+                    // sprmPFInTable - paragraph is in a table
+                    props.in_table = sprm.operand_byte().unwrap_or(0) != 0;
+                }
+                0x2417 => {
+                    // sprmPFTtp - table row end marker (table trailer paragraph)
+                    props.is_table_row_end = sprm.operand_byte().unwrap_or(0) != 0;
+                }
+                0x6649 => {
+                    // sprmPItap - table nesting level (4-byte operand)
+                    props.table_level = sprm.operand_dword().unwrap_or(0) as i32;
                 }
                 _ => {}
             }

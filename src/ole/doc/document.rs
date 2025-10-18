@@ -5,6 +5,8 @@ use super::parts::fib::FileInformationBlock;
 use super::parts::text::TextExtractor;
 use super::parts::paragraph_extractor::ParagraphExtractor;
 use super::parts::fields::FieldsTable;
+use super::parts::pap::ParagraphProperties;
+use super::parts::chp::CharacterProperties;
 use super::table::Table;
 use super::super::OleFile;
 use crate::ole::mtef_extractor::MtefExtractor;
@@ -274,7 +276,7 @@ impl Document {
     /// Get all paragraphs in the document.
     ///
     /// Returns a vector of `Paragraph` objects representing paragraphs
-    /// in the document.
+    /// from all subdocuments (main, headers, footers, footnotes, etc.).
     ///
     /// # Examples
     ///
@@ -290,20 +292,55 @@ impl Document {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
-        // Use the proper paragraph extractor to parse from binary structures
+        let mut all_paragraphs = Vec::new();
         let text = self.text()?;
-        let para_extractor = ParagraphExtractor::new(
-            &self.fib,
-            &self.table_stream,
-            &self.word_document,
-            text,
-        )?;
-
-        let extracted_paras = para_extractor.extract_paragraphs()?;
-
-        // Convert to Paragraph objects
-        let mut paragraphs = Vec::with_capacity(extracted_paras.len());
-        for (para_text, _para_props, runs) in extracted_paras {
+        
+        // Get all subdocument ranges from FIB
+        let subdoc_ranges = self.fib.get_all_subdoc_ranges();
+        
+        eprintln!("DEBUG: Found {} subdocument ranges", subdoc_ranges.len());
+        for (name, start, end) in &subdoc_ranges {
+            eprintln!("DEBUG:   {}: CP range {}..{} ({} chars)", name, start, end, end - start);
+        }
+        
+        // Parse each subdocument range
+        for (subdoc_name, start_cp, end_cp) in subdoc_ranges {
+            if start_cp >= end_cp {
+                continue;
+            }
+            
+            eprintln!("DEBUG: Parsing subdocument '{}' (CP {}..{})", subdoc_name, start_cp, end_cp);
+            
+            // Create extractor for this CP range
+            let para_extractor = ParagraphExtractor::new_with_range(
+                &self.fib,
+                &self.table_stream,
+                &self.word_document,
+                text.clone(),
+                (start_cp, end_cp),
+            )?;
+            
+            let extracted_paras = para_extractor.extract_paragraphs()?;
+            eprintln!("DEBUG:   Extracted {} paragraphs from '{}'", extracted_paras.len(), subdoc_name);
+            
+            // Convert to Paragraph objects and add to result
+            self.convert_to_paragraphs(extracted_paras, &mut all_paragraphs);
+        }
+        
+        eprintln!("DEBUG: Total paragraphs extracted: {}", all_paragraphs.len());
+        Ok(all_paragraphs)
+    }
+    
+    /// Convert extracted paragraph data to Paragraph objects.
+    ///
+    /// This is a helper method used by paragraphs() to convert the raw extracted
+    /// paragraph data into high-level Paragraph objects with formula matching.
+    fn convert_to_paragraphs(
+        &self,
+        extracted_paras: Vec<(String, ParagraphProperties, Vec<(String, CharacterProperties)>)>,
+        output: &mut Vec<Paragraph>,
+    ) {
+        for (para_text, para_props, runs) in extracted_paras {
             // Create runs for the paragraph, checking for MTEF formulas and OLE2 objects
             let run_objects: Vec<Run> = runs
                 .into_iter()
@@ -331,13 +368,12 @@ impl Document {
                 })
                 .collect();
 
-            // Create paragraph with runs
+            // Create paragraph with runs and properties
             let mut para = Paragraph::new(para_text);
             para.set_runs(run_objects);
-            paragraphs.push(para);
+            para.set_properties(para_props);
+            output.push(para);
         }
-
-        Ok(paragraphs)
     }
 
     /// Get all tables in the document.
