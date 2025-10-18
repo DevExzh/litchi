@@ -32,7 +32,7 @@ pub mod document;
 
 /// Re-export commonly used types
 pub use archive::{ArchiveInfo, MessageInfo};
-pub use bundle::Bundle;
+pub use bundle::{Bundle, BundleMetadata};
 pub use document::Document;
 pub use snappy::SnappyStream;
 

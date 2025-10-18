@@ -172,4 +172,4 @@ pub use document::Document;
 pub use presentation::Presentation;
 
 // Re-export commonly used types
-pub use common::{Length, RGBColor, PlaceholderType, ShapeType};
+pub use common::{Length, RGBColor, PlaceholderType, ShapeType, FileFormat, detect_file_format, detect_file_format_from_bytes};

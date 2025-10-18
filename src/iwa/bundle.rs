@@ -44,6 +44,49 @@ impl Bundle {
         }
     }
 
+    /// Open an iWork bundle from raw bytes (single-file zip archive)
+    ///
+    /// This function can parse iWork documents that are stored as ZIP archives
+    /// directly from memory, without requiring file system access.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - Raw bytes of the iWork ZIP archive
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Self>` - Parsed bundle on success, error on failure
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::iwa::Bundle;
+    /// use std::fs;
+    ///
+    /// let data = fs::read("document.pages")?;
+    /// let bundle = Bundle::from_bytes(&data)?;
+    /// println!("Archives: {}", bundle.archives().len());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        // Parse the ZIP archive directly from bytes
+        let archives = Self::parse_zip_bytes(bytes)?;
+
+        // For single-file bundles, metadata is typically embedded
+        let metadata = BundleMetadata {
+            has_properties: true, // Assume it has properties
+            has_build_version_history: true,
+            has_document_identifier: true,
+            detected_application: None,
+        };
+
+        Ok(Bundle {
+            bundle_path: std::path::PathBuf::from("<bytes>"), // Placeholder path
+            archives,
+            metadata,
+        })
+    }
+
     /// Open a traditional directory-based bundle
     fn open_directory_bundle(bundle_path: &Path) -> Result<Self> {
         // Check for required bundle structure
@@ -122,8 +165,17 @@ impl Bundle {
         Self::parse_iwa_files_from_zip(&mut zip_archive)
     }
 
+    /// Parse a ZIP archive from raw bytes and extract all IWA files
+    fn parse_zip_bytes(bytes: &[u8]) -> Result<HashMap<String, Archive>> {
+        let cursor = Cursor::new(bytes);
+        let mut zip_archive = ZipArchive::new(cursor)
+            .map_err(|e| Error::Bundle(format!("Failed to open ZIP archive from bytes: {}", e)))?;
+
+        Self::parse_iwa_files_from_zip(&mut zip_archive)
+    }
+
     /// Parse IWA files from a zip archive
-    fn parse_iwa_files_from_zip(zip_archive: &mut ZipArchive<fs::File>) -> Result<HashMap<String, Archive>> {
+    fn parse_iwa_files_from_zip<R: Read + std::io::Seek>(zip_archive: &mut ZipArchive<R>) -> Result<HashMap<String, Archive>> {
         let mut archives = HashMap::new();
 
         for i in 0..zip_archive.len() {
