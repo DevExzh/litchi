@@ -1,29 +1,45 @@
-// Character set handling and lookup tables
-//
-// Based on rtf2latex2e character mapping and lookup logic
+//! Character set handling and lookup tables
+//!
+//! This module provides character mapping and lookup functionality for MTEF typefaces.
+//! Based on rtf2latex2e character mapping logic.
+//!
+//! MTEF uses typeface codes (typically 129-160) to identify different character sets
+//! (Greek, symbols, text, functions, etc.). This module maps typeface/character
+//! combinations to their LaTeX equivalents.
 
 use crate::formula::mtef::constants::*;
 
 /// Character set attributes for typeface handling
+///
+/// Each typeface slot has attributes controlling how characters are interpreted
+/// and rendered (math vs text mode, lookup requirements, etc.).
 #[derive(Debug, Clone)]
 pub struct CharsetAttributes {
-    pub math_attr: i32,        // Math attribute (0=text, 1=math, 2=force math, 3=force text)
-    pub do_lookup: bool,       // Whether to do character lookup
-    pub use_codepoint: bool,   // Whether to use codepoint as fallback
+    /// Math attribute (0=text, 1=math, 2=force text, 3=force math)
+    pub math_attr: i32,
+    /// Whether to perform character lookup in translation tables
+    pub do_lookup: bool,
+    /// Whether to use Unicode codepoint as fallback if lookup fails
+    pub use_codepoint: bool,
 }
 
 /// Character set information for each typeface slot
-/// This structure is kept for future typeface validation and debugging
-#[allow(dead_code)]
+///
+/// Combines attributes with a descriptive name for debugging and validation.
+/// This structure is kept for future typeface validation and extended debugging features.
+#[allow(dead_code)]  // Kept for future typeface validation and debugging infrastructure
 #[derive(Debug, Clone)]
 pub struct CharsetInfo {
+    /// Character set attributes
     pub attributes: CharsetAttributes,
+    /// Typeface name for debugging
     pub name: &'static str,
 }
 
 /// Typeface names (index 0-31, corresponding to typeface 129-160)
-/// Based on rtf2latex2e typeFaceName array
-#[allow(dead_code)]
+///
+/// Based on rtf2latex2e typeFaceName array. These names are used for
+/// debugging and logging purposes via the `get_typeface_name` function.
 const TYPEFACE_NAMES: &[&str] = &[
     "ZERO", "TEXT", "FUNCTION", "VARIABLE", "LCGREEK", "UCGREEK", "SYMBOL",
     "VECTOR", "NUMBER", "USER1", "USER2", "MTEXTRA", "UNKNOWN", "UNKNOWN",
@@ -31,6 +47,25 @@ const TYPEFACE_NAMES: &[&str] = &[
     "UNKNOWN", "TEXT_FE", "EXPAND", "MARKER", "SPACE", "UNKNOWN", "UNKNOWN",
     "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN"
 ];
+
+/// Get typeface name for debugging
+///
+/// Returns the descriptive name for a given typeface index (0-31).
+/// Useful for logging and error messages during MTEF parsing.
+///
+/// # Example
+/// ```ignore
+/// let name = get_typeface_name(1); // Returns "TEXT"
+/// eprintln!("Processing typeface: {}", name);
+/// ```
+#[allow(dead_code)]  // Kept for debugging and future error reporting
+pub fn get_typeface_name(typeface_index: usize) -> &'static str {
+    if typeface_index < TYPEFACE_NAMES.len() {
+        TYPEFACE_NAMES[typeface_index]
+    } else {
+        "UNKNOWN"
+    }
+}
 
 /// Default character set attributes for each typeface slot
 const DEFAULT_CHARSET_ATTRIBUTES: &[CharsetAttributes] = &[

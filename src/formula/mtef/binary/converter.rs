@@ -1,14 +1,27 @@
-// MTEF to AST conversion logic
-//
-// Based on rtf2latex2e Eqn_TranslateObjects and related conversion functions
+//! MTEF to AST conversion logic
+//!
+//! This module implements the conversion from parsed MTEF objects to formula AST nodes.
+//! Based on rtf2latex2e Eqn_TranslateObjects and related conversion functions.
+//!
+//! The conversion process involves:
+//! - Character translation using typeface lookup tables
+//! - Template parsing and AST node construction
+//! - Embellishment application
+//! - Mode switching (math/text) based on typeface attributes
 
 use super::charset::*;
 use super::objects::*;
-use crate::formula::mtef::templates::TemplateParser;
+use crate::formula::mtef::templates::{TemplateParser, TemplateArgs};
 use crate::formula::ast::{MathNode, Fence, MatrixFence, LargeOperator, LineStyle};
 use crate::formula::mtef::constants::*;
 use crate::formula::mtef::MtefError;
 use std::borrow::Cow;
+
+/// Type alias for subscript/superscript parsing result (base, subscript, superscript)
+type SubSupResult<'a> = Result<(Vec<MathNode<'a>>, Vec<MathNode<'a>>, Vec<MathNode<'a>>), MtefError>;
+
+/// Type alias for large operator parsing result (lower_limit, upper_limit, integrand)
+type LargeOpResult<'a> = Result<(Option<Vec<MathNode<'a>>>, Option<Vec<MathNode<'a>>>, Vec<MathNode<'a>>), MtefError>;
 
 /// Implementation of AST conversion methods for MtefBinaryParser
 impl<'arena> super::parser::MtefBinaryParser<'arena> {
@@ -450,10 +463,10 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         }
     }
 
-    fn parse_template_arguments(&self, obj_list: &MtefObjectList) -> Result<smallvec::SmallVec<[smallvec::SmallVec<[MathNode<'arena>; 8]>; 4]>, MtefError> {
+    fn parse_template_arguments(&self, obj_list: &MtefObjectList) -> Result<TemplateArgs<'arena>, MtefError> {
         // Parse template arguments from subobjects
         // This follows the rtf2latex2e pattern where arguments are separated by LINE objects
-        let mut args = smallvec::SmallVec::new();
+        let mut args = TemplateArgs::new();
         let mut current_arg = smallvec::SmallVec::new();
         let mut current = Some(obj_list);
 
@@ -581,7 +594,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         Ok((base, superscript))
     }
 
-    fn parse_subsup_subobjects(&self, obj_list: &MtefObjectList) -> Result<(Vec<MathNode<'arena>>, Vec<MathNode<'arena>>, Vec<MathNode<'arena>>), MtefError> {
+    fn parse_subsup_subobjects(&self, obj_list: &MtefObjectList) -> SubSupResult<'arena> {
         // Parse LINE objects as base, subscript, and superscript
         let mut base = Vec::new();
         let mut subscript = Vec::new();
@@ -969,7 +982,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         }
     }
 
-    fn parse_large_op_subobjects(&self, obj_list: &MtefObjectList) -> Result<(Option<Vec<MathNode<'arena>>>, Option<Vec<MathNode<'arena>>>, Vec<MathNode<'arena>>), MtefError> {
+    fn parse_large_op_subobjects(&self, obj_list: &MtefObjectList) -> LargeOpResult<'arena> {
         // Parse subobjects for large operators: lower_limit, upper_limit, integrand
         let mut lower_limit = None;
         let mut upper_limit = None;

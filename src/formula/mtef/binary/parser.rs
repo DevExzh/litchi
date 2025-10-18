@@ -1,6 +1,11 @@
-// MTEF Binary Parser - Main parsing logic
-//
-// Based on rtf2latex2e Eqn_GetObjectList and related parsing functions
+//! MTEF Binary Parser - Main parsing logic
+//!
+//! This module implements the core MTEF binary parsing functionality.
+//! Based on rtf2latex2e Eqn_GetObjectList and related parsing functions.
+//!
+//! The parser reads MTEF binary data sequentially, parsing different record types
+//! (characters, templates, lines, etc.) and building a linked list of objects
+//! that can be converted to AST nodes.
 
 use crate::formula::mtef::constants::*;
 use super::objects::*;
@@ -8,18 +13,32 @@ use crate::formula::mtef::MtefError;
 use zerocopy::{FromBytes, LE, I16, U16};
 
 /// Binary MTEF parser
-#[allow(dead_code)]
+///
+/// Maintains parser state including current position, version information,
+/// and math/text mode context.
 pub struct MtefBinaryParser<'arena> {
+    /// Arena allocator for lifetime-managed memory
+    /// Part of parser infrastructure, kept for future arena-based node allocation
+    #[allow(dead_code)]
     arena: &'arena bumpalo::Bump,
+    /// MTEF binary data being parsed
     data: &'arena [u8],
+    /// Current position in the data stream
     pos: usize,
+    /// MTEF version number (typically 5)
     pub mtef_version: u8,
+    /// Platform identifier (0=Mac, 1=Windows)
     pub platform: u8,
+    /// Product identifier
     pub product: u8,
+    /// Product version
     pub version: u8,
+    /// Product sub-version
     pub version_sub: u8,
+    /// Inline mode flag (0=display, 1=inline)
     pub inline: u8,
-    pub mode: i32, // Current math/text mode (EQN_MODE_TEXT, EQN_MODE_INLINE, EQN_MODE_DISPLAY)
+    /// Current math/text mode (EQN_MODE_TEXT, EQN_MODE_INLINE, EQN_MODE_DISPLAY)
+    pub mode: i32,
 }
 
 impl<'arena> MtefBinaryParser<'arena> {

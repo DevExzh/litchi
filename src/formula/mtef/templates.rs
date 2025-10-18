@@ -1,18 +1,34 @@
-// MTEF template parsing based on rtf2latex2e template system
+//! MTEF template parsing based on rtf2latex2e template system
+//!
+//! This module provides template definitions and parsing logic for MTEF templates.
+//! Templates represent structured mathematical constructs like fractions, roots,
+//! integrals, fences, etc.
+//!
+//! Based on rtf2latex2e Profile_TEMPLATES_5 template system.
 
-use super::constants::*;
 use crate::formula::ast::{MathNode, Operator, Fence, LargeOperator};
 use smallvec::SmallVec;
+
+/// Template argument list type - a small vector of node vectors
+pub type TemplateArgs<'a> = SmallVec<[SmallVec<[MathNode<'a>; 8]>; 4]>;
 
 /// Template parser helper methods - based on rtf2latex2e Profile_TEMPLATES_5
 pub struct TemplateParser;
 
 /// Template definition structure
+///
+/// Defines a specific MTEF template with its selector, variation, and LaTeX template string.
+/// The description field is used for documentation and debugging purposes.
 #[derive(Debug)]
 pub struct TemplateDef {
+    /// Template selector (identifies template type)
     pub selector: u8,
+    /// Template variation (specific form within type)
     pub variation: u16,
+    /// Human-readable description (used for documentation and debugging)
+    #[allow(dead_code)]
     pub description: &'static str,
+    /// LaTeX template string with argument placeholders
     pub template: &'static str,
 }
 
@@ -113,15 +129,13 @@ impl TemplateParser {
     }
 
     /// Parse template arguments and apply formatting
-    /// Parse template arguments using the rtf2latex2e template format
-    pub fn parse_template_arguments<'a>(template: &str, args: &SmallVec<[SmallVec<[MathNode<'a>; 8]>; 4]>) -> MathNode<'a> {
-        // Parse the template string and substitute arguments
-        // Template format: LaTeX commands with placeholders like #1[M], #2[L], etc.
-        // [STARTSUB], [ENDSUB], [STARTSUP], [ENDSUP] are script markers
-
+    ///
+    /// Parses the template string using rtf2latex2e template format and substitutes
+    /// the provided arguments. Template format uses LaTeX commands with placeholders
+    /// like #1[M], #2[L], etc. and special markers [STARTSUB], [ENDSUB], etc.
+    pub fn parse_template_arguments<'a>(template: &str, args: &TemplateArgs<'a>) -> MathNode<'a> {
         let mut result = String::new();
         let mut chars = template.chars().peekable();
-        let _arg_nodes: Vec<String> = Vec::new();
 
         while let Some(ch) = chars.next() {
             if ch == '#' {
@@ -193,7 +207,10 @@ impl TemplateParser {
     }
 
     /// Parse LaTeX string back to AST nodes for common patterns
-    fn parse_latex_to_ast<'a>(latex: &str, args: &SmallVec<[SmallVec<[MathNode<'a>; 8]>; 4]>) -> MathNode<'a> {
+    ///
+    /// Recognizes common LaTeX constructs (fractions, roots, operators, etc.)
+    /// and converts them back to proper AST nodes instead of plain text.
+    fn parse_latex_to_ast<'a>(latex: &str, args: &TemplateArgs<'a>) -> MathNode<'a> {
         let latex = latex.trim();
 
         // Fraction: \frac{numerator}{denominator}
@@ -222,7 +239,7 @@ impl TemplateParser {
         // Root: \sqrt[index]{base} or \sqrt{base}
         if latex.starts_with("\\sqrt") {
             if latex.starts_with("\\sqrt[") {
-                if let Some(rel_pos) = &latex[6..].find("]{") {
+                if let Some(rel_pos) = latex.strip_prefix("\\sqrt[").and_then(|s| s.find("]{")) {
                     let abs_pos = 6 + rel_pos;
                     if latex[abs_pos + 2..].find('}').is_some() {
                         let mut base = Vec::new();
@@ -419,6 +436,9 @@ impl TemplateParser {
     }
 
     /// Parse a slash template (inline fraction)
+    ///
+    /// Public API for potential external use or future MTEF features
+    #[allow(dead_code)]  // Part of public template parsing API
     pub fn parse_slash<'a>(
         numerator: Vec<MathNode<'a>>,
         denominator: Vec<MathNode<'a>>,
@@ -477,6 +497,9 @@ impl TemplateParser {
     }
 
     /// Parse an underscript template
+    ///
+    /// Public API for potential external use or future MTEF features
+    #[allow(dead_code)]  // Part of public template parsing API
     pub fn parse_below<'a>(
         base: Vec<MathNode<'a>>,
         script: Vec<MathNode<'a>>,
@@ -489,6 +512,9 @@ impl TemplateParser {
     }
 
     /// Parse an overscript template
+    ///
+    /// Public API for potential external use or future MTEF features
+    #[allow(dead_code)]  // Part of public template parsing API
     pub fn parse_above<'a>(
         base: Vec<MathNode<'a>>,
         script: Vec<MathNode<'a>>,
@@ -501,6 +527,9 @@ impl TemplateParser {
     }
 
     /// Parse an underscript-overscript template
+    ///
+    /// Public API for potential external use or future MTEF features
+    #[allow(dead_code)]  // Part of public template parsing API
     pub fn parse_below_above<'a>(
         base: Vec<MathNode<'a>>,
         below: Vec<MathNode<'a>>,
@@ -545,29 +574,40 @@ impl TemplateParser {
     }
 
     /// Get large operator from template selector
+    ///
+    /// Maps MTEF template selectors to corresponding large operator types.
+    /// Some selectors may map to the same operator type (e.g., multiple integral variants).
+    ///
+    /// Public API for template system, may be used by custom template handlers
+    #[allow(dead_code)]  // Part of public template mapping API
     pub fn large_op_from_selector(selector: u8) -> Option<LargeOperator> {
         match selector {
-            TMPL_INTOP => Some(LargeOperator::Integral),   // 15: integrals (single, double, triple, contour)
-            TMPL_SUM => Some(LargeOperator::Sum),          // 16: sum
-            TMPL_PROD => Some(LargeOperator::Product),     // 17: product
-            TMPL_COPROD => Some(LargeOperator::Coproduct), // 18: coproduct
-            TMPL_UNION => Some(LargeOperator::Union),      // 19: union
-            TMPL_INTER => Some(LargeOperator::Intersection), // 20: intersection
-            TMPL_IINTOP => Some(LargeOperator::Integral),  // 21: single integral with limits
-            TMPL_IIINTOP => Some(LargeOperator::Sum),      // 22: single sum with limits
-            TMPL_OINTOP => Some(LargeOperator::Integral),  // 23: contour integral
+            15 => Some(LargeOperator::Integral),   // TMPL_INTOP: integrals (single, double, triple, contour)
+            16 => Some(LargeOperator::Sum),        // TMPL_SUM: summation
+            17 => Some(LargeOperator::Product),    // TMPL_PROD: product
+            18 => Some(LargeOperator::Coproduct),  // TMPL_COPROD: coproduct
+            19 => Some(LargeOperator::Union),      // TMPL_UNION: union
+            20 => Some(LargeOperator::Intersection), // TMPL_INTER: intersection
+            21 => Some(LargeOperator::Integral),   // TMPL_IINTOP: single integral with limits
+            22 => Some(LargeOperator::Sum),        // TMPL_IIINTOP: single sum with limits
+            23 => Some(LargeOperator::Integral),   // TMPL_OINTOP: contour integral / limit template
             _ => None,
         }
     }
 
     /// Get fence from template selector
+    ///
+    /// Maps MTEF template selectors to corresponding fence types.
+    ///
+    /// Public API for template system, may be used by custom template handlers
+    #[allow(dead_code)]  // Part of public template mapping API
     pub fn fence_from_selector(selector: u8) -> Option<Fence> {
         match selector {
-            TMPL_PAREN => Some(Fence::Paren),
-            TMPL_BRACKET => Some(Fence::Bracket),
-            TMPL_BRACE => Some(Fence::Brace),
-            TMPL_BAR => Some(Fence::Pipe),
-            TMPL_DBAR => Some(Fence::DoublePipe),
+            1 => Some(Fence::Paren),      // TMPL_PAREN: parentheses
+            3 => Some(Fence::Bracket),    // TMPL_BRACKET: square brackets
+            2 => Some(Fence::Brace),      // TMPL_BRACE: curly braces
+            4 => Some(Fence::Pipe),       // TMPL_BAR: vertical bars
+            5 => Some(Fence::DoublePipe), // TMPL_DBAR: double vertical bars
             _ => None,
         }
     }

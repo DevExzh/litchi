@@ -1,29 +1,54 @@
-// OLE and MTEF header structures
-//
-// Based on rtf2latex2e EQN_OLE_FILE_HDR and related structures
+//! OLE and MTEF header structures
+//!
+//! This module defines the binary header structures for MTEF equation data.
+//! Based on rtf2latex2e EQN_OLE_FILE_HDR and related structures.
+//!
+//! MTEF data embedded in OLE documents starts with a 28-byte OLE header,
+//! followed by the MTEF header and equation data.
 
 use zerocopy::FromBytes;
 
 /// MTEF OLE file header (28 bytes)
+///
+/// This header precedes MTEF equation data when embedded in OLE documents.
+/// The structure matches the EQN_OLE_FILE_HDR from rtf2latex2e.
+///
+/// Note: This structure is kept for reference and future zerocopy-based parsing.
+/// Current implementation uses manual parsing for better error handling.
+#[allow(dead_code)]  // Kept for reference and future zerocopy parsing
 #[derive(Debug, Clone, FromBytes)]
 #[repr(C)]
-#[allow(dead_code)]
 pub struct OleFileHeader {
-    pub cb_hdr: u16,        // Total header length = 28
-    pub version: u32,       // Version number (0x00020000)
-    pub format: u16,        // Clipboard format (0xC2D3)
-    pub size: u32,          // "MTEF header + MTEF data" length
-    pub reserved: [u32; 4], // Reserved fields
+    /// Total header length (should be 28)
+    pub cb_hdr: u16,
+    /// Version number (typically 0x00020000)
+    pub version: u32,
+    /// Clipboard format code (varies by application)
+    pub format: u16,
+    /// Length of MTEF header plus MTEF data
+    pub size: u32,
+    /// Reserved fields (should be zero)
+    pub reserved: [u32; 4],
 }
 
-/// MTEF header (8 bytes)
-/// Kept for future use when more detailed header parsing is needed
-#[allow(dead_code)]
+/// MTEF header (variable length, minimum 5 bytes)
+///
+/// The MTEF header starts with a signature and version information.
+/// This structure is used for reference but actual parsing is done
+/// manually in the parser to handle version differences.
+///
+/// Note: Kept for reference and documentation. Parser uses manual parsing
+/// to handle different MTEF versions (1-5) with varying header layouts.
+#[allow(dead_code)]  // Kept for reference and documentation
 #[derive(Debug, Clone, FromBytes)]
 #[repr(C)]
 pub struct MtefHeader {
-    pub signature: [u8; 4], // 0x28 0x04 0x6D 0x74
-    pub major_ver: u8,      // 5
-    pub minor_ver: u8,      // 1
-    pub product_flag: u16,  // Product flags
+    /// Signature bytes: "(", 0x04, "m", "t" or just version byte for headerless format
+    pub signature: [u8; 4],
+    /// MTEF major version (typically 5)
+    pub major_ver: u8,
+    /// Platform identifier (0=Mac, 1=Windows)
+    pub minor_ver: u8,
+    /// Product and version flags
+    pub product_flag: u16,
 }
