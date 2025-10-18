@@ -13,6 +13,8 @@ pub struct CharsetAttributes {
 }
 
 /// Character set information for each typeface slot
+/// This structure is kept for future typeface validation and debugging
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct CharsetInfo {
     pub attributes: CharsetAttributes,

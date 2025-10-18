@@ -9,11 +9,13 @@ use crate::ole::binary;
 
 /// Dimensions of a worksheet
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub struct Dimensions {
     pub start: (u32, u32),
     pub end: (u32, u32),
 }
 
+#[allow(dead_code)]
 impl Dimensions {
     pub fn len(&self) -> usize {
         ((self.end.0 - self.start.0 + 1) * (self.end.1 - self.start.1 + 1)) as usize
@@ -21,6 +23,7 @@ impl Dimensions {
 }
 
 /// XLSB cells reader
+#[allow(dead_code)]
 pub struct XlsbCellsReader<RS>
 where
     RS: Read + Seek,
@@ -74,6 +77,7 @@ where
         })
     }
 
+    #[allow(dead_code)]
     pub fn dimensions(&self) -> Dimensions {
         self.dimensions
     }

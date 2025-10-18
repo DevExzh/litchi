@@ -12,6 +12,7 @@ use std::io::Cursor;
 use std::path::Path;
 
 /// An OpenDocument text document (.odt)
+#[allow(dead_code)]
 pub struct Document {
     package: Package<Cursor<Vec<u8>>>,
     content: Content,

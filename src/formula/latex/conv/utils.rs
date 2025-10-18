@@ -8,6 +8,7 @@ use memchr::memchr;
 
 /// Fast check if a string represents a valid number using SIMD
 #[inline]
+#[allow(dead_code)]
 pub fn is_valid_number_fast(s: &str) -> bool {
     if s.is_empty() {
         return false;
@@ -58,6 +59,7 @@ pub fn contains_latex_special_simd(text: &str) -> bool {
 /// SIMD-accelerated LaTeX special character escaping
 /// Returns true if escaping was needed
 #[inline]
+#[allow(dead_code)]
 pub fn escape_latex_special_chars(text: &str, buffer: &mut String) -> bool {
     if !contains_latex_special_simd(text) {
         buffer.push_str(text);
@@ -104,6 +106,7 @@ pub fn needs_latex_protection(text: &str) -> bool {
 
 /// Check if base needs grouping for scripts (subscript/superscript)
 #[inline]
+#[allow(dead_code)]
 pub fn needs_grouping_for_scripts(nodes: &[MathNode]) -> bool {
     nodes.len() > 1
 }

@@ -67,6 +67,7 @@ pub fn parse_string_record(data: &[u8], encoding: &XlsEncoding) -> XlsResult<Str
 }
 
 /// Parse a Unicode string from SST or other records
+#[allow(dead_code)]
 pub fn parse_unicode_string(data: &[u8], encoding: &XlsEncoding) -> XlsResult<(String, usize)> {
     if data.len() < 3 {
         return Err(XlsError::InvalidLength {
@@ -266,6 +267,7 @@ pub fn parse_cell_reference(ref_str: &str) -> Option<(u32, u32)> {
 }
 
 /// Convert serial date to datetime
+#[allow(dead_code)]
 pub fn excel_date_to_datetime(serial: f64, is_1904: bool) -> Option<chrono::NaiveDateTime> {
     use chrono::{NaiveDate, Duration};
 

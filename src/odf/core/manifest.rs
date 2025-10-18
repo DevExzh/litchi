@@ -9,6 +9,7 @@ use std::io::{Read, Seek};
 
 /// ODF manifest (META-INF/manifest.xml)
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Manifest {
     pub mimetype: String,
     pub entries: HashMap<String, ManifestEntry>,
@@ -16,6 +17,7 @@ pub struct Manifest {
 
 /// Entry in the ODF manifest
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ManifestEntry {
     pub full_path: String,
     pub media_type: String,
@@ -121,21 +123,25 @@ impl Manifest {
     }
 
     /// Get media type for a path
+    #[allow(dead_code)]
     pub fn get_media_type(&self, path: &str) -> Option<&str> {
         self.entries.get(path).map(|entry| entry.media_type.as_str())
     }
 
     /// Check if a path exists in manifest
+    #[allow(dead_code)]
     pub fn has_path(&self, path: &str) -> bool {
         self.entries.contains_key(path)
     }
 
     /// Get all paths in manifest
+    #[allow(dead_code)]
     pub fn paths(&self) -> impl Iterator<Item = &String> {
         self.entries.keys()
     }
 
     /// Get entry for a path
+    #[allow(dead_code)]
     pub fn get_entry(&self, path: &str) -> Option<&ManifestEntry> {
         self.entries.get(path)
     }

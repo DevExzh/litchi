@@ -8,12 +8,14 @@ use crate::common::Result;
 
 /// A drawing page (slide) element
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct DrawPage {
     element: Element,
 }
 
 impl DrawPage {
     /// Create a new drawing page
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             element: Element::new("draw:page"),
@@ -21,16 +23,19 @@ impl DrawPage {
     }
 
     /// Get the page name
+    #[allow(dead_code)]
     pub fn name(&self) -> Option<&str> {
         self.element.get_attribute("draw:name")
     }
 
     /// Set the page name
+    #[allow(dead_code)]
     pub fn set_name(&mut self, name: &str) {
         self.element.set_attribute("draw:name", name);
     }
 
     /// Get the style name
+    #[allow(dead_code)]
     pub fn style_name(&self) -> Option<&str> {
         self.element.get_attribute("draw:style-name")
     }
@@ -38,10 +43,12 @@ impl DrawPage {
 
 /// A text box element
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct TextBox {
     element: Element,
 }
 
+#[allow(dead_code)]
 impl TextBox {
     /// Create a new text box
     pub fn new() -> Self {
@@ -58,10 +65,12 @@ impl TextBox {
 
 /// An image element
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Image {
     element: Element,
 }
 
+#[allow(dead_code)]
 impl Image {
     /// Create a new image
     pub fn new() -> Self {

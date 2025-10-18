@@ -439,6 +439,7 @@ impl TextElements {
     }
 
     /// Parse all headings from XML content
+    #[allow(dead_code)]
     pub fn parse_headings(xml_content: &str) -> Result<Vec<Heading>> {
         let paragraphs = Self::parse_paragraphs(xml_content)?;
         let mut headings = Vec::new();

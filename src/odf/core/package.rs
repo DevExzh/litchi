@@ -68,6 +68,7 @@ impl<R: Read + Seek> Package<R> {
     }
 
     /// List all files in the package
+    #[allow(dead_code)]
     pub fn files(&mut self) -> Result<Vec<String>> {
         let mut files = Vec::new();
         for i in 0..self.archive.len() {

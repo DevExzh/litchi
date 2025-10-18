@@ -7,10 +7,12 @@ use super::element::{Element, ElementBase};
 
 /// An office document element
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Document {
     element: Element,
 }
 
+#[allow(dead_code)]
 impl Document {
     /// Create a new office document
     pub fn new() -> Self {
@@ -27,10 +29,12 @@ impl Document {
 
 /// An office body element
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Body {
     element: Element,
 }
 
+#[allow(dead_code)]
 impl Body {
     /// Create a new office body
     pub fn new() -> Self {

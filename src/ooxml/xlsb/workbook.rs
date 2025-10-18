@@ -8,6 +8,7 @@ use crate::ooxml::xlsb::records::{XlsbRecordIter, record_types};
 use crate::ooxml::opc::OpcPackage;
 
 /// XLSB workbook implementation
+#[allow(dead_code)]
 pub struct XlsbWorkbook {
     package: OpcPackage,
     worksheets: Vec<XlsbWorksheet>,
@@ -207,7 +208,7 @@ impl Workbook for XlsbWorkbook {
         Err(format!("Worksheet '{}' not found", name).into())
     }
 
-    fn worksheets(&self) -> Box<dyn WorksheetIterator + '_> {
+    fn worksheets<'a>(&'a self) -> Box<dyn WorksheetIterator<'a> + 'a> {
         Box::new(XlsbWorksheetIterator {
             workbook: self,
             index: 0,

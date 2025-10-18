@@ -482,6 +482,7 @@ impl TableElements {
     }
 
     /// Parse table from XML content with proper handling of repeated cells
+    #[allow(dead_code)]
     pub fn parse_table_with_expansion(xml_content: &str, table_name: Option<&str>) -> Result<Option<Table>> {
         let tables = Self::parse_tables(xml_content)?;
 

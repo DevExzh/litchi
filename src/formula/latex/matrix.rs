@@ -32,6 +32,7 @@ pub fn matrix_fence_to_env(fence_type: MatrixFence) -> &'static str {
 ///
 /// # Performance
 /// Pre-allocates buffer capacity and uses efficient string operations.
+#[allow(dead_code)]
 pub fn convert_matrix(
     buffer: &mut String,
     rows: &[Vec<Vec<MathNode>>],
@@ -81,6 +82,7 @@ pub fn convert_matrix(
 }
 
 /// Estimate capacity needed for matrix conversion to avoid reallocations
+#[allow(dead_code)]
 pub fn estimate_matrix_capacity(rows: &[Vec<Vec<MathNode>>]) -> usize {
     if rows.is_empty() {
         return 0;
@@ -118,6 +120,7 @@ pub fn estimate_matrix_capacity(rows: &[Vec<Vec<MathNode>>]) -> usize {
 /// # Performance
 /// Pre-allocates buffer capacity and uses efficient string operations.
 /// When alignments are specified, uses array environment for precise control.
+#[allow(dead_code)]
 pub fn convert_matrix_with_alignment(
     buffer: &mut String,
     rows: &[Vec<Vec<MathNode>>],

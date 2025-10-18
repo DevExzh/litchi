@@ -3,7 +3,7 @@
 //! iWork applications use integer type IDs to identify different protobuf message types.
 //! This registry provides mappings from type IDs to message names for different applications.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 use once_cell::sync::Lazy;
 
 /// Application type for iWork documents
@@ -19,15 +19,15 @@ pub enum Application {
     Common,
 }
 
-impl Application {
-    /// Get application from string representation
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for Application {
+    type Err = &'static str;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "pages" => Some(Self::Pages),
-            "keynote" => Some(Self::Keynote),
-            "numbers" => Some(Self::Numbers),
-            "common" => Some(Self::Common),
-            _ => None,
+            "pages" => Ok(Self::Pages),
+            "keynote" => Ok(Self::Keynote),
+            "numbers" => Ok(Self::Numbers),
+            "common" => Ok(Self::Common),
+            _ => Err("Invalid input")
         }
     }
 }
@@ -278,10 +278,10 @@ mod tests {
 
     #[test]
     fn test_application_from_string() {
-        assert_eq!(Application::from_str("pages"), Some(Application::Pages));
-        assert_eq!(Application::from_str("Pages"), Some(Application::Pages));
-        assert_eq!(Application::from_str("keynote"), Some(Application::Keynote));
-        assert_eq!(Application::from_str("numbers"), Some(Application::Numbers));
-        assert_eq!(Application::from_str("unknown"), None);
+        assert_eq!(Application::from_str("pages"), Ok(Application::Pages));
+        assert_eq!(Application::from_str("Pages"), Ok(Application::Pages));
+        assert_eq!(Application::from_str("keynote"), Ok(Application::Keynote));
+        assert_eq!(Application::from_str("numbers"), Ok(Application::Numbers));
+        assert_eq!(Application::from_str("unknown"), Err("Invalid input"));
     }
 }

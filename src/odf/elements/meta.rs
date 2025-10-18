@@ -7,10 +7,12 @@ use super::element::{Element, ElementBase};
 
 /// A metadata element
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Meta {
     element: Element,
 }
 
+#[allow(dead_code)]
 impl Meta {
     /// Create new metadata
     pub fn new() -> Self {

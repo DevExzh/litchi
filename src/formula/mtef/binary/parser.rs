@@ -3,12 +3,12 @@
 // Based on rtf2latex2e Eqn_GetObjectList and related parsing functions
 
 use crate::formula::mtef::constants::*;
-use super::headers::*;
 use super::objects::*;
 use crate::formula::mtef::MtefError;
 use zerocopy::{FromBytes, LE, I16, U16};
 
 /// Binary MTEF parser
+#[allow(dead_code)]
 pub struct MtefBinaryParser<'arena> {
     arena: &'arena bumpalo::Bump,
     data: &'arena [u8],
@@ -57,17 +57,18 @@ impl<'arena> MtefBinaryParser<'arena> {
             return Err(MtefError::InvalidFormat("Data too short for OLE header".to_string()));
         }
 
-        // Parse OLE header
-        let ole_header = OleFileHeader::read_from_bytes(&data[..28])
-            .map_err(|_| MtefError::InvalidFormat("Failed to parse OLE header".to_string()))?;
-
-        if ole_header.cb_hdr != 28 {
-            return Err(MtefError::InvalidFormat("Invalid OLE header length".to_string()));
+        // Parse OLE header manually for better compatibility
+        // Read fields in little-endian order
+        let cb_hdr = u16::from_le_bytes([data[0], data[1]]);
+        let version = u32::from_le_bytes([data[2], data[3], data[4], data[5]]);
+        
+        if cb_hdr != 28 {
+            return Err(MtefError::InvalidFormat(format!("Invalid OLE header length: {}", cb_hdr)));
         }
 
         // Accept both 0x00020000 and 0x00000200 as valid versions (observed in real files)
-        if ole_header.version != 0x00020000 && ole_header.version != 0x00000200 {
-            return Err(MtefError::InvalidFormat(format!("Invalid OLE version: 0x{:08X}", ole_header.version)));
+        if version != 0x00020000 && version != 0x00000200 {
+            return Err(MtefError::InvalidFormat(format!("Invalid OLE version: 0x{:08X}", version)));
         }
 
         // Note: The clipboard format can vary (0xC2D3, 0xC1B0, 0xC1E1, 0xC1AE, etc.)

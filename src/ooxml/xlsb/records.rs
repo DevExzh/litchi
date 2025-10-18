@@ -106,6 +106,7 @@ impl<R: Read> Iterator for XlsbRecordIter<R> {
 
 
 /// XLSB record types (matching pyxlsb2 constants)
+#[allow(dead_code)]
 pub mod record_types {
     pub const WORKBOOK_PROP: u16 = 153; // 0x99
     pub const BUNDLE_SH: u16 = 156; // 0x9C
@@ -203,6 +204,7 @@ impl WorkbookPropRecord {
 
 /// Bundle sheet record (worksheet metadata)
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct BundleSheetRecord {
     pub id: u32,
     pub name: String,
@@ -283,12 +285,14 @@ impl SstItemRecord {
 
 /// Row header record
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct RowHeaderRecord {
     pub row: u32,
     pub first_col: u16,
     pub last_col: u16,
 }
 
+#[allow(dead_code)]
 impl RowHeaderRecord {
     pub fn parse(data: &[u8]) -> XlsbResult<Self> {
         if data.len() < 8 {

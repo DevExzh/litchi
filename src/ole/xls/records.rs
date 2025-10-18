@@ -123,6 +123,7 @@ impl BiffVersion {
         }
     }
 
+    #[allow(dead_code)]
     pub fn supports_unicode(&self) -> bool {
         matches!(self, BiffVersion::Biff8)
     }
@@ -249,6 +250,7 @@ impl SheetType {
 
 /// BoundSheet8 record (worksheet metadata)
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct BoundSheetRecord {
     pub position: u32,
     pub visible: SheetVisible,
@@ -461,6 +463,7 @@ impl SharedStringTable {
     }
 
     /// Parse a single string entry from SST data
+    #[allow(dead_code)]
     fn parse_string_entry(data: &[u8], encoding: &XlsEncoding) -> XlsResult<(String, usize)> {
         if data.len() < 3 {
             return Err(XlsError::InvalidLength {
@@ -481,7 +484,7 @@ impl SharedStringTable {
             if offset + 2 > data.len() {
                 return Err(XlsError::InvalidData("Incomplete rich text header".to_string()));
             }
-            let _cRun = binary::read_u16_le(data, offset)?;
+            let _c_run = binary::read_u16_le(data, offset)?;
             offset += 2;
             consumed += 2;
         }
@@ -491,7 +494,7 @@ impl SharedStringTable {
             if offset + 4 > data.len() {
                 return Err(XlsError::InvalidData("Incomplete phonetic header".to_string()));
             }
-            let _cchPhonetic = binary::read_u32_le(data, offset)?;
+            let _cch_phonetic = binary::read_u32_le(data, offset)?;
             offset += 4;
             consumed += 4;
         }
@@ -541,11 +544,13 @@ impl SharedStringTable {
 
 /// XF (Extended Format) record - cell formatting
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ExtendedFormat {
     pub font_index: u16,
     pub format_index: u16,
 }
 
+#[allow(dead_code)]
 impl ExtendedFormat {
     pub fn parse(data: &[u8]) -> XlsResult<Self> {
         if data.len() < 4 {

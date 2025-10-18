@@ -25,6 +25,7 @@ impl XmlPart {
     }
 
     /// Get the XML content as bytes (zero-copy)
+    #[allow(dead_code)]
     pub fn as_bytes(&self) -> &[u8] {
         self.content.as_bytes()
     }
@@ -49,6 +50,7 @@ impl Content {
     }
 
     /// Extract paragraphs from the document body
+    #[allow(dead_code)]
     pub fn extract_paragraphs(&self) -> Result<Vec<crate::odf::elements::text::Paragraph>> {
         use quick_xml::events::Event;
         use quick_xml::Reader;
@@ -158,6 +160,7 @@ impl Meta {
     }
 
     /// Get the raw XML content
+    #[allow(dead_code)]
     pub fn xml_content(&self) -> &str {
         self.xml.content()
     }

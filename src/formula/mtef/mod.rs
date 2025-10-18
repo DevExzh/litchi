@@ -6,6 +6,8 @@ use crate::formula::ast::MathNode;
 
 /// MTEF parser using proper binary parsing
 pub struct MtefParser<'arena> {
+    // Arena for lifetime-managed allocations - kept for future use
+    #[allow(dead_code)]
     arena: &'arena bumpalo::Bump,
     binary_parser: Option<binary::MtefBinaryParser<'arena>>,
 }
@@ -107,19 +109,19 @@ mod tests {
 
     #[test]
     fn test_mtef_parser_with_valid_header() {
-        // Create a minimal valid MTEF header
+        // Create a minimal valid MTEF header with proper structure
         let data = vec![
             // OLE header (28 bytes)
             0x1C, 0x00, // cb_hdr = 28
             0x00, 0x00, 0x02, 0x00, // version = 0x00020000 (little endian)
             0xD3, 0xC2, // format = 0xC2D3
-            0x09, 0x00, 0x00, 0x00, // size = 9 (MTEF header only)
-            0x00, 0x00, 0x00, 0x00, // reserved
-            0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00,
-            // MTEF header (9 bytes: 4 sig + 1 ver + 1 plat + 1 prod + 1 ver + 1 sub + 1 app_key + 1 inline)
-            0x28, 0x04, 0x6D, 0x74, // signature
+            0x0B, 0x00, 0x00, 0x00, // size = 11 (MTEF header + minimal content)
+            0x00, 0x00, 0x00, 0x00, // reserved[0]
+            0x00, 0x00, 0x00, 0x00, // reserved[1]
+            0x00, 0x00, 0x00, 0x00, // reserved[2]
+            0x00, 0x00, 0x00, 0x00, // reserved[3]
+            // MTEF header with signature
+            0x28, 0x04, 0x6D, 0x74, // signature "(04mt"
             0x05, // version = 5
             0x01, // platform = 1 (Windows)
             0x01, // product = 1 (MathType)
@@ -127,6 +129,9 @@ mod tests {
             0x00, // version_sub = 0
             0x00, // application_key (empty null-terminated string)
             0x00, // inline = 0
+            // Minimal MTEF content (SIZE + END tags)
+            0x09, // SIZE tag
+            0x00, // END tag
         ];
 
         let formula = Formula::new();

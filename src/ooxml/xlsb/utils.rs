@@ -65,6 +65,7 @@ pub fn parse_cell_reference(ref_str: &str) -> XlsbResult<(u32, u32)> {
 }
 
 /// Convert serial date to datetime
+#[allow(dead_code)]
 pub fn excel_date_to_datetime(serial: f64, is_1904: bool) -> Option<chrono::NaiveDateTime> {
     use chrono::{NaiveDate, Duration};
 

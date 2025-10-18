@@ -34,6 +34,7 @@ struct EmfPoint {
 /// EMF SIZE structure
 #[derive(Debug, Clone, FromBytes)]
 #[repr(C)]
+#[allow(dead_code)]
 struct EmfSize {
     cx: i32,
     cy: i32,

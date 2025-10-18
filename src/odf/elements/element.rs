@@ -10,12 +10,14 @@ use std::collections::HashMap;
 
 /// Property definition for element attributes
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct PropDef {
     pub name: String,
     pub attr: String,
     pub family: String,
 }
 
+#[allow(dead_code)]
 impl PropDef {
     pub fn new(name: &str, attr: &str) -> Self {
         Self {
@@ -35,6 +37,7 @@ impl PropDef {
 }
 
 /// Base trait for all ODF elements
+#[allow(dead_code)]
 pub trait ElementBase {
     /// Get the tag name of this element
     fn tag_name(&self) -> &str;
@@ -414,8 +417,10 @@ impl ElementBase for Element {
 }
 
 /// Helper for creating elements with specific tag names
+#[allow(dead_code)]
 pub struct ElementFactory;
 
+#[allow(dead_code)]
 impl ElementFactory {
     /// Create a text paragraph element
     pub fn paragraph() -> Element {

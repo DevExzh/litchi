@@ -7,6 +7,7 @@ use zerocopy::FromBytes;
 /// MTEF OLE file header (28 bytes)
 #[derive(Debug, Clone, FromBytes)]
 #[repr(C)]
+#[allow(dead_code)]
 pub struct OleFileHeader {
     pub cb_hdr: u16,        // Total header length = 28
     pub version: u32,       // Version number (0x00020000)
@@ -16,6 +17,8 @@ pub struct OleFileHeader {
 }
 
 /// MTEF header (8 bytes)
+/// Kept for future use when more detailed header parsing is needed
+#[allow(dead_code)]
 #[derive(Debug, Clone, FromBytes)]
 #[repr(C)]
 pub struct MtefHeader {
