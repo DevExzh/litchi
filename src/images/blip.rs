@@ -9,7 +9,9 @@
 // - https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-odraw/5dc1b9ed-818c-436f-8a4f-905a7ebb1ba9
 
 use crate::common::error::Result;
+use crate::ole::binary::{read_u16_le, read_u32_le};
 use std::io::Read;
+use zerocopy::FromBytes;
 
 /// Type of BLIP record
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -98,12 +100,12 @@ impl RecordHeader {
         }
 
         // Read version and instance from first 2 bytes
-        let ver_inst = u16::from_le_bytes([data[0], data[1]]);
+        let ver_inst = read_u16_le(&data, 0).unwrap_or(0);
         let version = (ver_inst & 0x0F) as u8;
         let instance = (ver_inst >> 4) & 0xFFF;
 
-        let record_type = u16::from_le_bytes([data[2], data[3]]);
-        let length = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+        let record_type = read_u16_le(&data, 2).unwrap_or(0);
+        let length = read_u32_le(&data, 4).unwrap_or(0);
 
         Ok(Self {
             version,
@@ -146,6 +148,32 @@ pub struct MetafileBlip {
     pub picture_data: Vec<u8>,
 }
 
+/// Raw metafile metadata for zerocopy parsing (34 bytes)
+#[derive(Debug, Clone, FromBytes)]
+#[repr(C)]
+struct RawMetafileMetadata {
+    /// Uncompressed size in bytes
+    pub uncompressed_size: u32,
+    /// Bounds left
+    pub bounds_left: i32,
+    /// Bounds top
+    pub bounds_top: i32,
+    /// Bounds right
+    pub bounds_right: i32,
+    /// Bounds bottom
+    pub bounds_bottom: i32,
+    /// Size width in EMU
+    pub size_width: i32,
+    /// Size height in EMU
+    pub size_height: i32,
+    /// Compressed size in bytes
+    pub compressed_size: u32,
+    /// Compression flag
+    pub compression: u8,
+    /// Filter byte
+    pub filter: u8,
+}
+
 impl MetafileBlip {
     /// Parse a metafile BLIP record
     ///
@@ -185,80 +213,19 @@ impl MetafileBlip {
             None
         };
 
-        // Parse metadata
+        // Parse metadata using zerocopy
         if offset + 34 > data.len() {
             return Err(crate::common::error::Error::ParseError(
                 "Insufficient data for metafile metadata".into(),
             ));
         }
 
-        let uncompressed_size = u32::from_le_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        offset += 4;
-
-        let bounds_x1 = i32::from_le_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        offset += 4;
-        let bounds_y1 = i32::from_le_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        offset += 4;
-        let bounds_x2 = i32::from_le_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        offset += 4;
-        let bounds_y2 = i32::from_le_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        offset += 4;
-
-        let size_w = i32::from_le_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        offset += 4;
-        let size_h = i32::from_le_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        offset += 4;
-
-        let compressed_size = u32::from_le_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        offset += 4;
-
-        let compression = data[offset];
-        offset += 1;
-        let filter = data[offset];
-        offset += 1;
+        let metadata = RawMetafileMetadata::read_from_bytes(&data[offset..offset + 34])
+            .map_err(|_| crate::common::error::Error::ParseError("Invalid metafile metadata format".into()))?;
+        offset += 34;
 
         // Extract picture data
-        let pic_data_len = compressed_size as usize;
+        let pic_data_len = metadata.compressed_size as usize;
         if offset + pic_data_len > data.len() {
             return Err(crate::common::error::Error::ParseError(
                 "Insufficient data for picture data".into(),
@@ -270,12 +237,17 @@ impl MetafileBlip {
             header,
             uid,
             secondary_uid,
-            uncompressed_size,
-            bounds: (bounds_x1, bounds_y1, bounds_x2, bounds_y2),
-            size_emu: (size_w, size_h),
-            compressed_size,
-            compression,
-            filter,
+            uncompressed_size: metadata.uncompressed_size,
+            bounds: (
+                metadata.bounds_left,
+                metadata.bounds_top,
+                metadata.bounds_right,
+                metadata.bounds_bottom,
+            ),
+            size_emu: (metadata.size_width, metadata.size_height),
+            compressed_size: metadata.compressed_size,
+            compression: metadata.compression,
+            filter: metadata.filter,
             picture_data,
         })
     }

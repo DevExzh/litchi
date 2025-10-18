@@ -5,6 +5,7 @@
 //! data including cell values, formatting, formulas, and metadata.
 
 use std::io::{Read, Seek, SeekFrom};
+use zerocopy::{FromBytes, LE, U16};
 
 use crate::ole::binary;
 use crate::ole::xls::error::{XlsError, XlsResult};
@@ -22,8 +23,12 @@ impl RecordHeader {
     pub fn read<R: Read>(reader: &mut R) -> XlsResult<Self> {
         let mut buf = [0u8; 4];
         reader.read_exact(&mut buf)?;
-        let record_type = u16::from_le_bytes([buf[0], buf[1]]);
-        let data_len = u16::from_le_bytes([buf[2], buf[3]]);
+        let record_type = U16::<LE>::read_from_bytes(&buf[0..2])
+            .map(|v| v.get())
+            .unwrap_or(0);
+        let data_len = U16::<LE>::read_from_bytes(&buf[2..4])
+            .map(|v| v.get())
+            .unwrap_or(0);
 
         Ok(RecordHeader {
             record_type,
@@ -303,8 +308,10 @@ impl XlsEncoding {
                 if !data.len().is_multiple_of(2) {
                     return Err(XlsError::Encoding("Invalid UTF-16 data length".to_string()));
                 }
-                let utf16_data: Vec<u16> = data.chunks(2)
-                    .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+                let utf16_data: Vec<u16> = data.chunks_exact(2)
+                    .map(|chunk| U16::<LE>::read_from_bytes(chunk)
+                        .map(|v| v.get())
+                        .unwrap_or(0))
                     .collect();
                 String::from_utf16(&utf16_data)
                     .map_err(|e| XlsError::Encoding(format!("UTF-16 decoding error: {}", e)))
@@ -436,7 +443,9 @@ impl SharedStringTable {
                 // UTF-16 LE
                 String::from_utf16(&string_data
                     .chunks_exact(2)
-                    .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+                    .map(|chunk| U16::<LE>::read_from_bytes(chunk)
+                        .map(|v| v.get())
+                        .unwrap_or(0))
                     .collect::<Vec<_>>())
                     .unwrap_or_default()
             } else {
@@ -504,7 +513,9 @@ impl SharedStringTable {
             // Convert UTF-16 LE to String
             let utf16_words: Vec<u16> = string_data
                 .chunks_exact(2)
-                .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+                .map(|chunk| U16::<LE>::read_from_bytes(chunk)
+                    .map(|v| v.get())
+                    .unwrap_or(0))
                 .collect();
 
             match String::from_utf16(&utf16_words) {

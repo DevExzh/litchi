@@ -1,10 +1,6 @@
-/// Shared binary parsing utilities for OLE formats.
-///
-/// This module provides common binary parsing functions used across
-/// DOC, PPT, and other OLE-based formats. Based on Apache POI's
-/// LittleEndian and similar utility classes.
-
 use crate::ole::OleError;
+use bytes::Bytes;
+use zerocopy::{FromBytes, LE, U16, U32, I16, I32, F64};
 
 /// Read a little-endian u16 from a byte slice at the given offset.
 ///
@@ -13,7 +9,9 @@ pub fn read_u16_le(data: &[u8], offset: usize) -> Result<u16, OleError> {
     if offset + 2 > data.len() {
         return Err(OleError::InvalidData("Not enough data for u16".to_string()));
     }
-    Ok(u16::from_le_bytes([data[offset], data[offset + 1]]))
+    U16::<LE>::read_from_bytes(&data[offset..offset + 2])
+        .map(|v| v.get())
+        .or_else(|_| Err(OleError::InvalidData("Failed to read u16".to_string())))
 }
 
 /// Read a little-endian u16 from a byte slice starting at offset 0.
@@ -28,7 +26,9 @@ pub fn read_i16_le(data: &[u8], offset: usize) -> Result<i16, OleError> {
     if offset + 2 > data.len() {
         return Err(OleError::InvalidData("Not enough data for i16".to_string()));
     }
-    Ok(i16::from_le_bytes([data[offset], data[offset + 1]]))
+    I16::<LE>::read_from_bytes(&data[offset..offset + 2])
+        .map(|v| v.get())
+        .or_else(|_| Err(OleError::InvalidData("Failed to read i16".to_string())))
 }
 
 /// Read a little-endian u32 from a byte slice at the given offset.
@@ -37,12 +37,9 @@ pub fn read_u32_le(data: &[u8], offset: usize) -> Result<u32, OleError> {
     if offset + 4 > data.len() {
         return Err(OleError::InvalidData("Not enough data for u32".to_string()));
     }
-    Ok(u32::from_le_bytes([
-        data[offset],
-        data[offset + 1],
-        data[offset + 2],
-        data[offset + 3],
-    ]))
+    U32::<LE>::read_from_bytes(&data[offset..offset + 4])
+        .map(|v| v.get())
+        .or_else(|_| Err(OleError::InvalidData("Failed to read u32".to_string())))
 }
 
 /// Read a little-endian u32 from a byte slice starting at offset 0.
@@ -57,12 +54,9 @@ pub fn read_i32_le(data: &[u8], offset: usize) -> Result<i32, OleError> {
     if offset + 4 > data.len() {
         return Err(OleError::InvalidData("Not enough data for i32".to_string()));
     }
-    Ok(i32::from_le_bytes([
-        data[offset],
-        data[offset + 1],
-        data[offset + 2],
-        data[offset + 3],
-    ]))
+    I32::<LE>::read_from_bytes(&data[offset..offset + 4])
+        .map(|v| v.get())
+        .or_else(|_| Err(OleError::InvalidData("Failed to read i32".to_string())))
 }
 
 /// Read a little-endian f64 from a byte slice at the given offset.
@@ -71,16 +65,9 @@ pub fn read_f64_le(data: &[u8], offset: usize) -> Result<f64, OleError> {
     if offset + 8 > data.len() {
         return Err(OleError::InvalidData("Not enough data for f64".to_string()));
     }
-    Ok(f64::from_le_bytes([
-        data[offset],
-        data[offset + 1],
-        data[offset + 2],
-        data[offset + 3],
-        data[offset + 4],
-        data[offset + 5],
-        data[offset + 6],
-        data[offset + 7],
-    ]))
+    F64::<LE>::read_from_bytes(&data[offset..offset + 8])
+        .map(|v| v.get())
+        .or_else(|_| Err(OleError::InvalidData("Failed to read f64".to_string())))
 }
 
 /// Read a little-endian f64 from a byte slice starting at offset 0.
@@ -103,7 +90,9 @@ pub fn parse_utf16le_string(data: &[u8]) -> String {
 
     let mut i = 0;
     while i + 1 < data.len() {
-        let code_unit = u16::from_le_bytes([data[i], data[i + 1]]);
+        let code_unit = U16::<LE>::read_from_bytes(&data[i..i + 2])
+            .map(|v| v.get())
+            .unwrap_or(0);
         i += 2;
 
         // Stop at null terminator
@@ -135,7 +124,9 @@ pub fn parse_utf16le_string_len(data: &[u8], offset: usize, char_count: usize) -
     let end = offset + byte_count;
 
     while pos + 1 < end {
-        let code_unit = u16::from_le_bytes([data[pos], data[pos + 1]]);
+        let code_unit = U16::<LE>::read_from_bytes(&data[pos..pos + 2])
+            .map(|v| v.get())
+            .unwrap_or(0);
         pos += 2;
 
         if let Some(ch) = char::from_u32(code_unit as u32) {
@@ -213,8 +204,10 @@ fn windows_1252_to_char(byte: u8) -> char {
 pub struct PlcfParser {
     /// Character positions (CP array)
     positions: Vec<u32>,
-    /// Property data for each position
-    properties: Vec<Vec<u8>>,
+    /// Property data buffer containing all property elements
+    properties_data: Bytes,
+    /// Offsets into properties_data for each property element
+    properties_offsets: Vec<(usize, usize)>, // (offset, length) pairs
 }
 
 impl PlcfParser {
@@ -247,7 +240,8 @@ impl PlcfParser {
         if n == 0 {
             return Some(Self {
                 positions: Vec::new(),
-                properties: Vec::new(),
+                properties_data: Bytes::new(),
+                properties_offsets: Vec::new(),
             });
         }
 
@@ -262,28 +256,32 @@ impl PlcfParser {
             }
         }
 
-        // Read property data
+        // Read property data into a single Bytes buffer
         let props_start = (n + 1) * 4;
-        let mut properties = Vec::with_capacity(n);
+        let props_end = props_start + (n * element_size);
+        if props_end > data.len() {
+            return None;
+        }
+
+        let properties_data = Bytes::copy_from_slice(&data[props_start..props_end]);
+        let mut properties_offsets = Vec::with_capacity(n);
+
         for i in 0..n {
-            let offset = props_start + (i * element_size);
-            if offset + element_size <= data.len() {
-                properties.push(data[offset..offset + element_size].to_vec());
-            } else {
-                return None;
-            }
+            let offset = i * element_size;
+            properties_offsets.push((offset, element_size));
         }
 
         Some(Self {
             positions,
-            properties,
+            properties_data,
+            properties_offsets,
         })
     }
 
     /// Get the number of elements in the PLCF.
     #[inline]
     pub fn count(&self) -> usize {
-        self.properties.len()
+        self.properties_offsets.len()
     }
 
     /// Get character position at index.
@@ -295,14 +293,16 @@ impl PlcfParser {
     /// Get property data at index.
     #[inline]
     pub fn property(&self, index: usize) -> Option<&[u8]> {
-        self.properties.get(index).map(|v| v.as_slice())
+        self.properties_offsets.get(index).map(|(offset, len)| {
+            &self.properties_data[*offset..*offset + *len]
+        })
     }
 
     /// Get character range for element at index.
     ///
     /// Returns (start_cp, end_cp) tuple.
     pub fn range(&self, index: usize) -> Option<(u32, u32)> {
-        if index >= self.properties.len() {
+        if index >= self.properties_offsets.len() {
             return None;
         }
         Some((self.positions[index], self.positions[index + 1]))

@@ -6,6 +6,7 @@
 /// - Text color and highlighting
 /// - Superscript/subscript
 use super::super::package::Result;
+use super::super::super::binary::{read_u16_le, read_u32_le};
 
 /// Character Properties structure.
 ///
@@ -130,7 +131,7 @@ impl CharacterProperties {
             }
 
             // Read SPRM opcode (can be 1 or 2 bytes depending on Word version)
-            let sprm = u16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]);
+            let sprm = read_u16_le(&grpprl, offset).unwrap_or(0);
             offset += 2;
             
             // Debug: Log every SPRM encountered
@@ -185,14 +186,14 @@ impl CharacterProperties {
                 // Font size in half-points (sprmCHps)
                 0x4A43 | 0x0043 => {
                     if offset + 1 < grpprl.len() {
-                        chp.font_size = Some(u16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]));
+                        chp.font_size = Some(read_u16_le(&grpprl, offset).unwrap_or(0));
                         offset += 2;
                     }
                 }
                 // Font (sprmCRgFtc0) - ASCII font
                 0x4A4F | 0x004F => {
                     if offset + 1 < grpprl.len() {
-                        chp.font_index = Some(u16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]));
+                        chp.font_index = Some(read_u16_le(&grpprl, offset).unwrap_or(0));
                         offset += 2;
                     }
                 }
@@ -285,12 +286,7 @@ impl CharacterProperties {
                 // Object location/pic offset (SPRM_OBJLOCATION = 0x680E)
                 0x680E => {
                     if offset + 3 < grpprl.len() {
-                        chp.pic_offset = Some(u32::from_le_bytes([
-                            grpprl[offset],
-                            grpprl[offset + 1],
-                            grpprl[offset + 2],
-                            grpprl[offset + 3],
-                        ]));
+                        chp.pic_offset = Some(read_u32_le(&grpprl, offset).unwrap_or(0));
                         eprintln!("DEBUG: Found SPRM_OBJLOCATION, pic_offset={:?}", chp.pic_offset);
                         offset += 4;
                     }

@@ -4,6 +4,7 @@
 /// to modify properties. This module provides common SPRM parsing logic
 /// based on Apache POI's SPRM handling.
 /// SPRM operation types based on size code (from POI's SprmOperation).
+use crate::ole::binary::{read_u16_le, read_i16_le, read_u32_le};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SprmOperation {
     /// Size code 0 - toggle (no operand)
@@ -63,36 +64,19 @@ impl Sprm {
     /// Get the operand as a word (u16).
     #[inline]
     pub fn operand_word(&self) -> Option<u16> {
-        if self.operand.len() >= 2 {
-            Some(u16::from_le_bytes([self.operand[0], self.operand[1]]))
-        } else {
-            None
-        }
+        read_u16_le(&self.operand, 0).ok()
     }
 
     /// Get the operand as a signed word (i16).
     #[inline]
     pub fn operand_i16(&self) -> Option<i16> {
-        if self.operand.len() >= 2 {
-            Some(i16::from_le_bytes([self.operand[0], self.operand[1]]))
-        } else {
-            None
-        }
+        read_i16_le(&self.operand, 0).ok()
     }
 
     /// Get the operand as a dword (u32).
     #[inline]
     pub fn operand_dword(&self) -> Option<u32> {
-        if self.operand.len() >= 4 {
-            Some(u32::from_le_bytes([
-                self.operand[0],
-                self.operand[1],
-                self.operand[2],
-                self.operand[3],
-            ]))
-        } else {
-            None
-        }
+        read_u32_le(&self.operand, 0).ok()
     }
 
     /// Get the operand as raw bytes.
@@ -127,14 +111,8 @@ pub fn parse_sprms(grpprl: &[u8]) -> Vec<Sprm> {
 
     while offset + 2 <= grpprl.len() {
         // Read SPRM opcode (2 bytes in Word 97+)
-        let opcode = u16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]);
-        
-        unsafe {
-            if CALL_COUNT <= 5 {
-                eprintln!("DEBUG:   SPRM opcode: 0x{:04X}", opcode);
-            }
-        }
-        
+        let opcode = read_u16_le(&grpprl, offset).unwrap_or(0);
+
         offset += 2;
 
         // Extract size code from opcode (bits 13-15, POI's BITFIELD_SIZECODE = 0xe000)
@@ -159,7 +137,7 @@ pub fn parse_sprms(grpprl: &[u8]) -> Vec<Sprm> {
                     if opcode == 0xc615 || opcode == 0xd608 {
                         // Long SPRM - operand size in next 2 bytes
                         if offset + 3 <= grpprl.len() {
-                            u16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]) as usize
+                            read_u16_le(&grpprl, offset).unwrap_or(0) as usize
                         } else {
                             break;
                         }

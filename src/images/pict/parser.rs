@@ -3,6 +3,7 @@
 // Parses Macintosh PICT format records and extracts relevant information
 
 use crate::common::error::{Error, Result};
+use zerocopy::{FromBytes, BE, I16, U16};
 
 /// PICT file version
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,21 +53,35 @@ impl PictHeader {
         }
 
         // Parse picture size (used in version 1, may be 0 in version 2)
-        let _pic_size = u16::from_be_bytes([data[offset], data[offset + 1]]);
+        let _pic_size = U16::<BE>::read_from_bytes(&data[offset..offset + 2])
+            .map_err(|_| Error::ParseError("Failed to read pic size".into()))?
+            .get();
         offset += 2;
 
         // Parse picture frame (top, left, bottom, right) - big-endian
-        let top = i16::from_be_bytes([data[offset], data[offset + 1]]);
-        let left = i16::from_be_bytes([data[offset + 2], data[offset + 3]]);
-        let bottom = i16::from_be_bytes([data[offset + 4], data[offset + 5]]);
-        let right = i16::from_be_bytes([data[offset + 6], data[offset + 7]]);
+        let top = I16::<BE>::read_from_bytes(&data[offset..offset + 2])
+            .map_err(|_| Error::ParseError("Failed to read top".into()))?
+            .get();
+        let left = I16::<BE>::read_from_bytes(&data[offset + 2..offset + 4])
+            .map_err(|_| Error::ParseError("Failed to read left".into()))?
+            .get();
+        let bottom = I16::<BE>::read_from_bytes(&data[offset + 4..offset + 6])
+            .map_err(|_| Error::ParseError("Failed to read bottom".into()))?
+            .get();
+        let right = I16::<BE>::read_from_bytes(&data[offset + 6..offset + 8])
+            .map_err(|_| Error::ParseError("Failed to read right".into()))?
+            .get();
         offset += 8;
 
         // Determine version
         // Version 2 files have a version opcode (0x0011) followed by 0x02FF
         let version = if offset + 4 <= data.len() {
-            let op1 = u16::from_be_bytes([data[offset], data[offset + 1]]);
-            let op2 = u16::from_be_bytes([data[offset + 2], data[offset + 3]]);
+            let op1 = U16::<BE>::read_from_bytes(&data[offset..offset + 2])
+                .map_err(|_| Error::ParseError("Failed to read op1".into()))?
+                .get();
+            let op2 = U16::<BE>::read_from_bytes(&data[offset + 2..offset + 4])
+                .map_err(|_| Error::ParseError("Failed to read op2".into()))?
+                .get();
             
             if op1 == 0x0011 && op2 == 0x02FF {
                 PictVersion::V2
@@ -94,8 +109,12 @@ impl PictHeader {
         // After it, we should see valid PICT data
         // Check if byte 512-513 looks like a reasonable picture size
         // or if bytes 522-523 look like a version opcode (0x0011)
-        let potential_size = u16::from_be_bytes([data[512], data[513]]);
-        let potential_opcode = u16::from_be_bytes([data[522], data[523]]);
+        let potential_size = U16::<BE>::read_from_bytes(&data[512..514])
+            .map(|v| v.get())
+            .unwrap_or(0);
+        let potential_opcode = U16::<BE>::read_from_bytes(&data[522..524])
+            .map(|v| v.get())
+            .unwrap_or(0);
 
         // If we see version opcode at expected position, likely has 512 header
         potential_opcode == 0x0011 || potential_size < 0x4000
@@ -204,7 +223,9 @@ impl PictParser {
                 break;
             }
 
-            let opcode = u16::from_be_bytes([data[offset], data[offset + 1]]);
+            let opcode = U16::<BE>::read_from_bytes(&data[offset..offset + 2])
+                .map_err(|_| Error::ParseError("Failed to read opcode".into()))?
+                .get();
             offset += 2;
 
             // Handle EndPic
@@ -257,7 +278,9 @@ impl PictParser {
                 if offset + 2 > data.len() {
                     return Err(Error::ParseError("Insufficient data for opcode size".into()));
                 }
-                let size = u16::from_be_bytes([data[offset], data[offset + 1]]) as usize;
+                let size = U16::<BE>::read_from_bytes(&data[offset..offset + 2])
+                    .map_err(|_| Error::ParseError("Failed to read size".into()))?
+                    .get() as usize;
                 Ok(size + 2) // Include size field itself
             }
             
@@ -267,7 +290,9 @@ impl PictParser {
                     return Ok(0);
                 }
                 // Many opcodes have a 2-byte size field
-                let size = u16::from_be_bytes([data[offset], data[offset + 1]]) as usize;
+                let size = U16::<BE>::read_from_bytes(&data[offset..offset + 2])
+                    .map_err(|_| Error::ParseError("Failed to read size".into()))?
+                    .get() as usize;
                 Ok(size.min(data.len() - offset))
             }
         }

@@ -6,6 +6,7 @@ use crate::formula::mtef::constants::*;
 use super::headers::*;
 use super::objects::*;
 use crate::formula::mtef::MtefError;
+use zerocopy::{FromBytes, LE, I16, U16};
 
 /// Binary MTEF parser
 pub struct MtefBinaryParser<'arena> {
@@ -57,18 +58,8 @@ impl<'arena> MtefBinaryParser<'arena> {
         }
 
         // Parse OLE header
-        let ole_header = OleFileHeader {
-            cb_hdr: u16::from_le_bytes([data[0], data[1]]),
-            version: u32::from_le_bytes([data[2], data[3], data[4], data[5]]),
-            format: u16::from_le_bytes([data[6], data[7]]),
-            size: u32::from_le_bytes([data[8], data[9], data[10], data[11]]),
-            reserved: [
-                u32::from_le_bytes([data[12], data[13], data[14], data[15]]),
-                u32::from_le_bytes([data[16], data[17], data[18], data[19]]),
-                u32::from_le_bytes([data[20], data[21], data[22], data[23]]),
-                u32::from_le_bytes([data[24], data[25], data[26], data[27]]),
-            ],
-        };
+        let ole_header = OleFileHeader::read_from_bytes(&data[..28])
+            .map_err(|_| MtefError::InvalidFormat("Failed to parse OLE header".to_string()))?;
 
         if ole_header.cb_hdr != 28 {
             return Err(MtefError::InvalidFormat("Invalid OLE header length".to_string()));
@@ -748,10 +739,9 @@ impl<'arena> MtefBinaryParser<'arena> {
         if self.pos + 2 > self.data.len() {
             return Err(MtefError::UnexpectedEof);
         }
-        let val = i16::from_le_bytes([
-            unsafe { *self.data.get_unchecked(self.pos) },
-            unsafe { *self.data.get_unchecked(self.pos + 1) }
-        ]);
+        let val = I16::<LE>::read_from_bytes(&self.data[self.pos..self.pos + 2])
+            .map_err(|_| MtefError::InvalidFormat("Failed to read i16".to_string()))?
+            .get();
         self.pos += 2;
         Ok(val)
     }
@@ -761,10 +751,9 @@ impl<'arena> MtefBinaryParser<'arena> {
         if self.pos + 2 > self.data.len() {
             return Err(MtefError::UnexpectedEof);
         }
-        let val = u16::from_le_bytes([
-            unsafe { *self.data.get_unchecked(self.pos) },
-            unsafe { *self.data.get_unchecked(self.pos + 1) }
-        ]);
+        let val = U16::<LE>::read_from_bytes(&self.data[self.pos..self.pos + 2])
+            .map_err(|_| MtefError::InvalidFormat("Failed to read u16".to_string()))?
+            .get();
         self.pos += 2;
         Ok(val)
     }

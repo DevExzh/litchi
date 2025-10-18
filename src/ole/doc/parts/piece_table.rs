@@ -11,7 +11,7 @@
 /// - org.apache.poi.hwpf.model.PieceDescriptor
 /// - [MS-DOC] 2.4.1 Clx (Complex file information)
 /// - [MS-DOC] 2.9.179 Pcd (Piece Descriptor)
-use crate::ole::binary::PlcfParser;
+use crate::ole::binary::{PlcfParser, read_u32_le, read_u16_le};
 
 /// A text piece - maps a range of CPs to an FC in the WordDocument stream.
 ///
@@ -123,7 +123,7 @@ impl PieceTable {
                 return None;
             }
             // Read size as SHORT (2 bytes) - POI line 56
-            let size = u16::from_le_bytes([clx_data[offset], clx_data[offset + 1]]) as usize;
+            let size = read_u16_le(&clx_data, offset).unwrap_or(0) as usize;
             offset += 2;
             
             if offset + size > clx_data.len() {
@@ -145,12 +145,7 @@ impl PieceTable {
         }
 
         // Read lcb as INT (4 bytes) - POI line 70
-        let lcb = u32::from_le_bytes([
-            clx_data[offset],
-            clx_data[offset + 1],
-            clx_data[offset + 2],
-            clx_data[offset + 3],
-        ]) as usize;
+        let lcb = read_u32_le(&clx_data, offset).unwrap_or(0) as usize;
         offset += 4;
 
         if offset + lcb > clx_data.len() {
@@ -179,12 +174,7 @@ impl PieceTable {
             // Bytes 2-5: fc (File Character position)
             // Bytes 6-7: prm (Property modifier - for paragraph/character properties)
             
-            let fc_raw = u32::from_le_bytes([
-                pcd_data[2],
-                pcd_data[3],
-                pcd_data[4],
-                pcd_data[5],
-            ]);
+            let fc_raw = read_u32_le(&pcd_data, 2).unwrap_or(0);
 
             // FC encoding (from POI's PieceDescriptor.java):
             // - Bit 30 (0x40000000): if CLEAR (0), text is Unicode (UTF-16LE)

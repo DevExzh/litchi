@@ -5,6 +5,7 @@
 use super::parser::{WmfParser, WmfRecord};
 use crate::common::error::{Error, Result};
 use crate::images::svg::*;
+use crate::ole::binary::read_i16_le;
 use rayon::prelude::*;
 
 /// WMF to SVG converter
@@ -89,10 +90,10 @@ impl WmfSvgConverter {
         }
 
         // WMF uses 16-bit coordinates in big-endian (words)
-        let bottom = i16::from_le_bytes([record.params[0], record.params[1]]) as f64;
-        let right = i16::from_le_bytes([record.params[2], record.params[3]]) as f64;
-        let top = i16::from_le_bytes([record.params[4], record.params[5]]) as f64;
-        let left = i16::from_le_bytes([record.params[6], record.params[7]]) as f64;
+        let bottom = read_i16_le(&record.params, 0).unwrap_or(0) as f64;
+        let right = read_i16_le(&record.params, 2).unwrap_or(0) as f64;
+        let top = read_i16_le(&record.params, 4).unwrap_or(0) as f64;
+        let left = read_i16_le(&record.params, 6).unwrap_or(0) as f64;
 
         Ok(Some(SvgElement::Rect(SvgRect {
             x: left,
@@ -111,10 +112,10 @@ impl WmfSvgConverter {
             return Ok(None);
         }
 
-        let bottom = i16::from_le_bytes([record.params[0], record.params[1]]) as f64;
-        let right = i16::from_le_bytes([record.params[2], record.params[3]]) as f64;
-        let top = i16::from_le_bytes([record.params[4], record.params[5]]) as f64;
-        let left = i16::from_le_bytes([record.params[6], record.params[7]]) as f64;
+        let bottom = read_i16_le(&record.params, 0).unwrap_or(0) as f64;
+        let right = read_i16_le(&record.params, 2).unwrap_or(0) as f64;
+        let top = read_i16_le(&record.params, 4).unwrap_or(0) as f64;
+        let left = read_i16_le(&record.params, 6).unwrap_or(0) as f64;
 
         let cx = (left + right) / 2.0;
         let cy = (top + bottom) / 2.0;
@@ -138,7 +139,7 @@ impl WmfSvgConverter {
             return Ok(None);
         }
 
-        let count = i16::from_le_bytes([record.params[0], record.params[1]]) as usize;
+        let count = read_i16_le(&record.params, 0).unwrap_or(0) as usize;
 
         if record.params.len() < 2 + count * 4 {
             return Ok(None);
@@ -151,14 +152,8 @@ impl WmfSvgConverter {
             .into_par_iter()
             .map(|i| {
                 let offset = 2 + i * 4;
-                let x = i16::from_le_bytes([
-                    record.params[offset],
-                    record.params[offset + 1],
-                ]) as f64;
-                let y = i16::from_le_bytes([
-                    record.params[offset + 2],
-                    record.params[offset + 3],
-                ]) as f64;
+                let x = read_i16_le(&record.params, offset).unwrap_or(0) as f64;
+                let y = read_i16_le(&record.params, offset + 2).unwrap_or(0) as f64;
                 (x, y)
             })
             .collect();
@@ -186,7 +181,7 @@ impl WmfSvgConverter {
             return Ok(None);
         }
 
-        let count = i16::from_le_bytes([record.params[0], record.params[1]]) as usize;
+        let count = read_i16_le(&record.params, 0).unwrap_or(0) as usize;
 
         if record.params.len() < 2 + count * 4 {
             return Ok(None);
@@ -199,14 +194,8 @@ impl WmfSvgConverter {
             .into_par_iter()
             .map(|i| {
                 let offset = 2 + i * 4;
-                let x = i16::from_le_bytes([
-                    record.params[offset],
-                    record.params[offset + 1],
-                ]) as f64;
-                let y = i16::from_le_bytes([
-                    record.params[offset + 2],
-                    record.params[offset + 3],
-                ]) as f64;
+                let x = read_i16_le(&record.params, offset).unwrap_or(0) as f64;
+                let y = read_i16_le(&record.params, offset + 2).unwrap_or(0) as f64;
                 (x, y)
             })
             .collect();
@@ -251,12 +240,12 @@ impl WmfSvgConverter {
             return Ok(None);
         }
 
-        let corner_height = i16::from_le_bytes([record.params[0], record.params[1]]) as f64;
-        let corner_width = i16::from_le_bytes([record.params[2], record.params[3]]) as f64;
-        let bottom = i16::from_le_bytes([record.params[4], record.params[5]]) as f64;
-        let right = i16::from_le_bytes([record.params[6], record.params[7]]) as f64;
-        let top = i16::from_le_bytes([record.params[8], record.params[9]]) as f64;
-        let left = i16::from_le_bytes([record.params[10], record.params[11]]) as f64;
+        let corner_height = read_i16_le(&record.params, 0).unwrap_or(0) as f64;
+        let corner_width = read_i16_le(&record.params, 2).unwrap_or(0) as f64;
+        let bottom = read_i16_le(&record.params, 4).unwrap_or(0) as f64;
+        let right = read_i16_le(&record.params, 6).unwrap_or(0) as f64;
+        let top = read_i16_le(&record.params, 8).unwrap_or(0) as f64;
+        let left = read_i16_le(&record.params, 10).unwrap_or(0) as f64;
 
         let rx = corner_width / 2.0;
         let ry = corner_height / 2.0;
@@ -320,8 +309,8 @@ impl WmfSvgConverter {
             return Ok(None);
         }
 
-        let y = i16::from_le_bytes([record.params[0], record.params[1]]) as f64;
-        let x = i16::from_le_bytes([record.params[2], record.params[3]]) as f64;
+        let y = read_i16_le(&record.params, 0).unwrap_or(0) as f64;
+        let x = read_i16_le(&record.params, 2).unwrap_or(0) as f64;
 
         Ok(Some(SvgElement::Path(
             SvgPath::new(vec![
@@ -340,10 +329,10 @@ impl WmfSvgConverter {
         }
 
         // Parse destination rectangle (simplified)
-        let dest_height = i16::from_le_bytes([record.params[6], record.params[7]]) as f64;
-        let dest_width = i16::from_le_bytes([record.params[8], record.params[9]]) as f64;
-        let dest_y = i16::from_le_bytes([record.params[10], record.params[11]]) as f64;
-        let dest_x = i16::from_le_bytes([record.params[12], record.params[13]]) as f64;
+        let dest_height = read_i16_le(&record.params, 6).unwrap_or(0) as f64;
+        let dest_width = read_i16_le(&record.params, 8).unwrap_or(0) as f64;
+        let dest_y = read_i16_le(&record.params, 10).unwrap_or(0) as f64;
+        let dest_x = read_i16_le(&record.params, 12).unwrap_or(0) as f64;
 
         // Try to extract DIB data
         if let Ok(png_data) = self.extract_and_convert_dib(&record.params[20..]) {
@@ -367,10 +356,10 @@ impl WmfSvgConverter {
 
         // Similar to StretchDIB but with different parameter layout
         if let Ok(png_data) = self.extract_and_convert_dib(&record.params[18..]) {
-            let dest_x = i16::from_le_bytes([record.params[6], record.params[7]]) as f64;
-            let dest_y = i16::from_le_bytes([record.params[8], record.params[9]]) as f64;
-            let dest_width = i16::from_le_bytes([record.params[10], record.params[11]]) as f64;
-            let dest_height = i16::from_le_bytes([record.params[12], record.params[13]]) as f64;
+            let dest_x = read_i16_le(&record.params, 6).unwrap_or(0) as f64;
+            let dest_y = read_i16_le(&record.params, 8).unwrap_or(0) as f64;
+            let dest_width = read_i16_le(&record.params, 10).unwrap_or(0) as f64;
+            let dest_height = read_i16_le(&record.params, 12).unwrap_or(0) as f64;
 
             return Ok(Some(SvgElement::Image(SvgImage::from_png_data(
                 dest_x,
@@ -391,10 +380,10 @@ impl WmfSvgConverter {
         }
 
         if let Ok(png_data) = self.extract_and_convert_dib(&record.params[14..]) {
-            let dest_x = i16::from_le_bytes([record.params[4], record.params[5]]) as f64;
-            let dest_y = i16::from_le_bytes([record.params[6], record.params[7]]) as f64;
-            let width = i16::from_le_bytes([record.params[8], record.params[9]]) as f64;
-            let height = i16::from_le_bytes([record.params[10], record.params[11]]) as f64;
+            let dest_x = read_i16_le(&record.params, 4).unwrap_or(0) as f64;
+            let dest_y = read_i16_le(&record.params, 6).unwrap_or(0) as f64;
+            let width = read_i16_le(&record.params, 8).unwrap_or(0) as f64;
+            let height = read_i16_le(&record.params, 10).unwrap_or(0) as f64;
 
             return Ok(Some(SvgElement::Image(SvgImage::from_png_data(
                 dest_x,

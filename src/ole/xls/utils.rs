@@ -3,6 +3,7 @@
 use crate::ole::binary;
 use crate::ole::xls::error::{XlsError, XlsResult};
 use crate::ole::xls::records::{XlsEncoding, FormulaValue};
+use zerocopy::{FromBytes, LE, U16};
 
 /// Parse a short string (used in sheet names, etc.)
 pub fn parse_short_string(data: &[u8], encoding: &XlsEncoding) -> XlsResult<String> {
@@ -51,8 +52,10 @@ pub fn parse_string_record(data: &[u8], encoding: &XlsEncoding) -> XlsResult<Str
         if !len.is_multiple_of(2) {
             return Err(XlsError::Encoding("Invalid UTF-16 string length".to_string()));
         }
-        let utf16_data: Vec<u16> = string_data.chunks(2)
-            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+        let utf16_data: Vec<u16> = string_data.chunks_exact(2)
+            .map(|chunk| U16::<LE>::read_from_bytes(chunk)
+                .map(|v| v.get())
+                .unwrap_or(0))
             .collect();
         Ok(String::from_utf16(&utf16_data)
             .map_err(|e| XlsError::Encoding(format!("UTF-16 decoding error: {}", e)))?)
@@ -117,8 +120,10 @@ pub fn parse_unicode_string(data: &[u8], encoding: &XlsEncoding) -> XlsResult<(S
         if !cch.is_multiple_of(2) {
             return Err(XlsError::Encoding("Invalid UTF-16 string length".to_string()));
         }
-        let utf16_data: Vec<u16> = string_data.chunks(2)
-            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+        let utf16_data: Vec<u16> = string_data.chunks_exact(2)
+            .map(|chunk| U16::<LE>::read_from_bytes(chunk)
+                .map(|v| v.get())
+                .unwrap_or(0))
             .collect();
         String::from_utf16(&utf16_data)
             .map_err(|e| XlsError::Encoding(format!("UTF-16 decoding error: {}", e)))?

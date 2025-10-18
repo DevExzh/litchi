@@ -4,6 +4,7 @@
 /// including the offset to the current user edit record. This follows Apache POI's
 /// CurrentUserAtom implementation.
 use super::package::{PptError, Result};
+use zerocopy::FromBytes;
 
 /// Minimum size of CurrentUser stream in bytes
 const CURRENT_USER_MIN_SIZE: usize = 28;
@@ -22,6 +23,20 @@ pub struct CurrentUser {
     username: String,
     /// Relative path to the presentation
     rel_path: String,
+}
+
+/// CurrentUser header structure (first 16 bytes after size field)
+#[derive(Debug, Clone, FromBytes)]
+#[repr(C)]
+struct CurrentUserHeader {
+    /// Header token (must be 0xF3D1C4DF)
+    header_token: u32,
+    /// Offset to the current UserEditAtom record
+    current_edit_offset: u32,
+    /// Username length in characters
+    username_len: u16,
+    /// Release version
+    release_version: u16,
 }
 
 impl CurrentUser {
@@ -51,21 +66,21 @@ impl CurrentUser {
             ));
         }
 
-        // Parse header fields using unsafe for performance (bounds already checked)
-        // Note: size field at bytes 0-3 parsed for validation but not stored
-        let _size = unsafe { u32::from_le_bytes(*(&data[0..4] as *const [u8] as *const [u8; 4])) };
-        let header_token = unsafe { u32::from_le_bytes(*(&data[4..8] as *const [u8] as *const [u8; 4])) };
-        let current_edit_offset = unsafe { u32::from_le_bytes(*(&data[8..12] as *const [u8] as *const [u8; 4])) };
-        let username_len = unsafe { u16::from_le_bytes(*(&data[12..14] as *const [u8] as *const [u8; 2])) };
-        let release_version = unsafe { u16::from_le_bytes(*(&data[14..16] as *const [u8] as *const [u8; 2])) };
+        // Parse header using zerocopy (bytes 4-19)
+        let header = CurrentUserHeader::read_from_bytes(&data[4..20])
+            .map_err(|_| PptError::Corrupted("Invalid CurrentUser header format".to_string()))?;
 
         // Validate header token (magic number)
-        if header_token != 0xF3D1C4DF {
+        if header.header_token != 0xF3D1C4DF {
             return Err(PptError::InvalidFormat(format!(
                 "Invalid CurrentUser header token: 0x{:08X}",
-                header_token
+                header.header_token
             )));
         }
+
+        let current_edit_offset = header.current_edit_offset;
+        let username_len = header.username_len;
+        let release_version = header.release_version;
 
         // Parse username (UTF-16LE encoded)
         let username = if username_len > 0 && data.len() >= 20 {

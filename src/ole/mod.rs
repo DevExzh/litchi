@@ -10,10 +10,11 @@ mod metadata;
 /// MTEF extractor for OLE documents
 mod mtef_extractor;
 
-/// Shared binary parsing utilities
+/// Shared binary parsing utilities for OLE formats.
 ///
-/// Common binary parsing functions used across DOC, PPT, and other OLE formats.
-/// Based on Apache POI's LittleEndian and utility classes.
+/// This module provides common binary parsing functions used across
+/// DOC, PPT, and other OLE-based formats. Based on Apache POI's
+/// LittleEndian and similar utility classes.
 pub mod binary;
 
 /// Shared SPRM (Single Property Modifier) parsing

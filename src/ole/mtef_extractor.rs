@@ -3,6 +3,8 @@
 // This module provides functionality to extract and parse MTEF binary data
 // from OLE streams in legacy Office documents (.doc, .ppt, etc.).
 
+use zerocopy::FromBytes;
+
 use crate::formula::{MtefParser, MathNode};
 use crate::ole::file::OleFile;
 use std::io::{Read, Seek};
@@ -180,11 +182,9 @@ impl<'arena> MtefExtractor<'arena> {
         }
 
         // Check OLE header
-        if let Ok(header) = OleHeader::from_bytes(&data[0..28]) {
-            header.is_valid()
-        } else {
-            false
-        }
+        OleHeader::read_from_bytes(&data[0..28])
+            .map(|header| header.is_valid())
+            .unwrap_or(false)
     }
 
     /// Parse MTEF binary data into formula AST nodes
@@ -239,7 +239,8 @@ impl<'arena> MtefExtractor<'arena> {
 }
 
 /// OLE header structure (28 bytes)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, FromBytes)]
+#[repr(C)]
 struct OleHeader {
     pub cb_hdr: u16,        // Total header length = 28
     pub version: u32,       // Version number (0x00020000)
@@ -255,18 +256,7 @@ impl OleHeader {
             return Err(MtefExtractionError::InvalidOleHeader);
         }
 
-        Ok(Self {
-            cb_hdr: u16::from_le_bytes([data[0], data[1]]),
-            version: u32::from_le_bytes([data[2], data[3], data[4], data[5]]),
-            format: u16::from_le_bytes([data[6], data[7]]),
-            size: u32::from_le_bytes([data[8], data[9], data[10], data[11]]),
-            reserved: [
-                u32::from_le_bytes([data[12], data[13], data[14], data[15]]),
-                u32::from_le_bytes([data[16], data[17], data[18], data[19]]),
-                u32::from_le_bytes([data[20], data[21], data[22], data[23]]),
-                u32::from_le_bytes([data[24], data[25], data[26], data[27]]),
-            ],
-        })
+        Self::read_from_bytes(data).map_err(|_| MtefExtractionError::InvalidOleHeader)
     }
 
     /// Validate the OLE header

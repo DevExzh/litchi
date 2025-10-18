@@ -2,7 +2,7 @@
 ///
 /// Based on Apache POI's TextPropCollection and TextProp classes.
 /// This module handles the complex structure of text styling in PPT files.
-use crate::ole::binary::read_u16_le;
+use crate::ole::binary::{read_u16_le, read_i32_le, read_u32_le, read_i16_le};
 
 /// Text property definition.
 ///
@@ -103,13 +103,7 @@ pub fn parse_paragraph_properties(data: &[u8], offset: &mut usize, mask: u32) ->
 
             let value = match size {
                 2 => read_u16_le(data, *offset).unwrap_or(0) as i32,
-                4 => {
-                    if *offset + 4 <= data.len() {
-                        i32::from_le_bytes([data[*offset], data[*offset + 1], data[*offset + 2], data[*offset + 3]])
-                    } else {
-                        0
-                    }
-                }
+                4 => read_i32_le(data, *offset).unwrap_or(0),
                 _ => 0,
             };
 
@@ -150,13 +144,7 @@ pub fn parse_character_properties(data: &[u8], offset: &mut usize, mask: u32) ->
 
             let value = match size {
                 2 => read_u16_le(data, *offset).unwrap_or(0) as i32,
-                4 => {
-                    if *offset + 4 <= data.len() {
-                        i32::from_le_bytes([data[*offset], data[*offset + 1], data[*offset + 2], data[*offset + 3]])
-                    } else {
-                        0
-                    }
-                }
+                4 => read_i32_le(data, *offset).unwrap_or(0),
                 _ => 0,
             };
 
@@ -189,7 +177,7 @@ pub fn parse_style_text_prop_atom(data: &[u8], text_length: usize) -> (Vec<TextP
     let mut para_chars_covered = 0u32;
     while para_chars_covered < text_length as u32 && offset + 6 <= data.len() {
         // Read character count (4 bytes in POI's implementation)
-        let char_count = u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
+        let char_count = read_u32_le(&data, offset).unwrap_or(0);
         offset += 4;
 
         if char_count == 0 {
@@ -197,14 +185,14 @@ pub fn parse_style_text_prop_atom(data: &[u8], text_length: usize) -> (Vec<TextP
         }
 
         // Read indent level (2 bytes)
-        let indent_level = i16::from_le_bytes([data[offset], data[offset + 1]]);
+        let indent_level = read_i16_le(&data, offset).unwrap_or(0);
         offset += 2;
 
         // Read mask (4 bytes)
         if offset + 4 > data.len() {
             break;
         }
-        let mask = u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
+        let mask = read_u32_le(&data, offset).unwrap_or(0);
         offset += 4;
 
         // Parse properties based on mask
@@ -222,7 +210,7 @@ pub fn parse_style_text_prop_atom(data: &[u8], text_length: usize) -> (Vec<TextP
     let mut char_chars_covered = 0u32;
     while char_chars_covered < text_length as u32 && offset + 6 <= data.len() {
         // Read character count (4 bytes)
-        let char_count = u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
+        let char_count = read_u32_le(&data, offset).unwrap_or(0);
         offset += 4;
 
         if char_count == 0 {
@@ -233,7 +221,7 @@ pub fn parse_style_text_prop_atom(data: &[u8], text_length: usize) -> (Vec<TextP
         if offset + 4 > data.len() {
             break;
         }
-        let mask = u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
+        let mask = read_u32_le(&data, offset).unwrap_or(0);
         offset += 4;
 
         // Parse properties based on mask

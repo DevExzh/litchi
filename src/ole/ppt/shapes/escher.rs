@@ -8,6 +8,7 @@
 use super::shape::{ShapeProperties, ShapeType};
 use super::super::package::{PptError, Result};
 use std::collections::HashMap;
+use zerocopy::{byteorder::{U16, U32, I32, LittleEndian}, FromBytes};
 
 /// Escher property types for Office Drawing properties
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -165,9 +166,13 @@ impl EscherProperty {
                 break; // Not enough data for property header
             }
 
-            // Use unsafe for performance - we already checked bounds
-            let prop_id = unsafe { u16::from_le_bytes(*(&data[offset..offset + 2] as *const [u8] as *const [u8; 2])) };
-            let prop_data = unsafe { u32::from_le_bytes(*(&data[offset + 2..offset + 6] as *const [u8] as *const [u8; 4])) };
+            // Use zerocopy for safe, zero-copy parsing
+            let prop_id = U16::<LittleEndian>::read_from_bytes(&data[offset..offset + 2])
+                .map(|v| v.get())
+                .unwrap_or(0);
+            let prop_data = U32::<LittleEndian>::read_from_bytes(&data[offset + 2..offset + 6])
+                .map(|v| v.get())
+                .unwrap_or(0);
 
             let is_complex = (prop_id & 0x8000) != 0;
 
@@ -377,13 +382,19 @@ impl EscherRecord {
             return Err(PptError::Corrupted("Not enough data for Escher record header".to_string()));
         }
 
-        // Read record header (8 bytes) - little-endian format using unsafe for performance
-        let record_type = unsafe { u16::from_le_bytes(*(&data[offset..offset + 2] as *const [u8] as *const [u8; 2])) };
-        let data_length = unsafe { u32::from_le_bytes(*(&data[offset + 2..offset + 6] as *const [u8] as *const [u8; 4])) };
+        // Read record header (8 bytes) - little-endian format using zerocopy for safe parsing
+        let record_type = U16::<LittleEndian>::read_from_bytes(&data[offset..offset + 2])
+            .map(|v| v.get())
+            .unwrap_or(0);
+        let data_length = U32::<LittleEndian>::read_from_bytes(&data[offset + 2..offset + 6])
+            .map(|v| v.get())
+            .unwrap_or(0);
 
         // Version and instance are packed in the same 16-bit field
         // Format: VVVV VVVV IIII IIII (V = version bits, I = instance bits)
-        let version_instance = unsafe { u16::from_le_bytes(*(&data[offset + 6..offset + 8] as *const [u8] as *const [u8; 2])) };
+        let version_instance = U16::<LittleEndian>::read_from_bytes(&data[offset + 6..offset + 8])
+            .map(|v| v.get())
+            .unwrap_or(0);
         let version = (version_instance >> 4) & 0x0FFF;  // High 12 bits for version
         let instance = version_instance & 0x0FFF;        // Low 12 bits for instance
 
@@ -418,7 +429,9 @@ impl EscherRecord {
         if matches!(record_type_enum, EscherRecordType::Options) && data_length > 0 {
             // Options record format: number of properties (2 bytes) + property data
             if record.data.len() >= 2 {
-                let num_properties = unsafe { u16::from_le_bytes(*(&record.data[0..2] as *const [u8] as *const [u8; 2])) };
+                let num_properties = U16::<LittleEndian>::read_from_bytes(&record.data[0..2])
+                    .map(|v| v.get())
+                    .unwrap_or(0);
                 let property_data = &record.data[2..];
 
                 if let Ok(mut properties) = EscherProperty::parse_properties(property_data, num_properties) {
@@ -542,24 +555,26 @@ impl EscherRecord {
         // Transform record should have at least 16 bytes for position and size
         if transform.data.len() >= 16 {
             // Parse position (x, y) - 8 bytes each
-            props.x = i32::from_le_bytes([
-                transform.data[0], transform.data[1], transform.data[2], transform.data[3]
-            ]);
-            props.y = i32::from_le_bytes([
-                transform.data[4], transform.data[5], transform.data[6], transform.data[7]
-            ]);
+            props.x = I32::<LittleEndian>::read_from_bytes(&transform.data[0..4])
+                .map(|v| v.get())
+                .unwrap_or(0);
+            props.y = I32::<LittleEndian>::read_from_bytes(&transform.data[4..8])
+                .map(|v| v.get())
+                .unwrap_or(0);
 
             // Parse size (width, height) - 8 bytes each
-            props.width = i32::from_le_bytes([
-                transform.data[8], transform.data[9], transform.data[10], transform.data[11]
-            ]);
-            props.height = i32::from_le_bytes([
-                transform.data[12], transform.data[13], transform.data[14], transform.data[15]
-            ]);
+            props.width = I32::<LittleEndian>::read_from_bytes(&transform.data[8..12])
+                .map(|v| v.get())
+                .unwrap_or(0);
+            props.height = I32::<LittleEndian>::read_from_bytes(&transform.data[12..16])
+                .map(|v| v.get())
+                .unwrap_or(0);
 
             // Parse rotation if available (2 bytes)
             if transform.data.len() >= 18 {
-                props.rotation = u16::from_le_bytes([transform.data[16], transform.data[17]]);
+                props.rotation = U16::<LittleEndian>::read_from_bytes(&transform.data[16..18])
+                    .map(|v| v.get())
+                    .unwrap_or(0);
             }
         }
 
@@ -571,17 +586,23 @@ impl EscherRecord {
     fn parse_shape_properties_record(shape_props: &EscherRecord, props: &mut ShapeProperties) -> Result<()> {
         if shape_props.data.len() >= 4 { // Shape properties should have at least 4 bytes
             // First 2 bytes: shape type
-            let shape_type_id = u16::from_le_bytes([shape_props.data[0], shape_props.data[1]]);
+            let shape_type_id = U16::<LittleEndian>::read_from_bytes(&shape_props.data[0..2])
+                .map(|v| v.get())
+                .unwrap_or(0);
             props.shape_type = ShapeType::from(shape_type_id);
 
             // Next 2 bytes: shape ID (not 4 bytes as I initially thought)
             if shape_props.data.len() >= 4 {
-                props.id = u16::from_le_bytes([shape_props.data[2], shape_props.data[3]]) as u32;
+                props.id = U16::<LittleEndian>::read_from_bytes(&shape_props.data[2..4])
+                    .map(|v| v.get() as u32)
+                    .unwrap_or(0);
             }
 
             // Parse flags if available (2 bytes)
             if shape_props.data.len() >= 6 {
-                let flags = u16::from_le_bytes([shape_props.data[4], shape_props.data[5]]);
+                let flags = U16::<LittleEndian>::read_from_bytes(&shape_props.data[4..6])
+                    .map(|v| v.get())
+                    .unwrap_or(0);
                 props.hidden = (flags & 0x0001) != 0; // Hidden flag
             }
         }
@@ -640,10 +661,9 @@ impl EscherRecord {
             // This is a simplified implementation
             if fill_props.data.len() >= 4 {
                 // Extract fill color if available
-                let color = u32::from_le_bytes([
-                    fill_props.data[0], fill_props.data[1],
-                    fill_props.data[2], fill_props.data[3]
-                ]);
+                let color = U32::<LittleEndian>::read_from_bytes(&fill_props.data[0..4])
+                    .map(|v| v.get())
+                    .unwrap_or(0);
                 props.fill_color = Some(color);
             }
         }
@@ -655,11 +675,12 @@ impl EscherRecord {
         // Line properties record contains line-related data
         if !line_props.data.is_empty() && line_props.data.len() >= 8 {
             // Extract line color and width
-            let color = u32::from_le_bytes([
-                line_props.data[0], line_props.data[1],
-                line_props.data[2], line_props.data[3]
-            ]);
-            let width = u16::from_le_bytes([line_props.data[4], line_props.data[5]]);
+            let color = U32::<LittleEndian>::read_from_bytes(&line_props.data[0..4])
+                .map(|v| v.get())
+                .unwrap_or(0);
+            let width = U16::<LittleEndian>::read_from_bytes(&line_props.data[4..6])
+                .map(|v| v.get())
+                .unwrap_or(0);
 
             props.line_color = Some(color);
             props.line_width = Some(width);
@@ -696,12 +717,9 @@ impl EscherRecord {
 
             if placeholder_data.data.len() >= 8 {
                 // Position/placement ID (4 bytes)
-                let placement_id = u32::from_le_bytes([
-                    placeholder_data.data[0],
-                    placeholder_data.data[1],
-                    placeholder_data.data[2],
-                    placeholder_data.data[3],
-                ]) as u16; // Convert to u16 for compatibility
+                let placement_id = U32::<LittleEndian>::read_from_bytes(&placeholder_data.data[0..4])
+                    .map(|v| v.get() as u16)
+                    .unwrap_or(0); // Convert to u16 for compatibility
 
                 // Placeholder ID (1 byte at offset 4)
                 let placeholder_id = placeholder_data.data[4] as u16;
@@ -715,12 +733,9 @@ impl EscherRecord {
 
         // Also check if this record itself is a PlaceholderData record
         if self.record_type == EscherRecordType::PlaceholderData && self.data.len() >= 8 {
-            let placement_id = u32::from_le_bytes([
-                self.data[0],
-                self.data[1],
-                self.data[2],
-                self.data[3],
-            ]) as u16;
+            let placement_id = U32::<LittleEndian>::read_from_bytes(&self.data[0..4])
+                .map(|v| v.get() as u16)
+                .unwrap_or(0);
 
             let placeholder_id = self.data[4] as u16;
             let placeholder_size = self.data[5];
@@ -773,7 +788,9 @@ impl EscherRecord {
                     let mut i = start_offset;
 
                     while i + 1 < text_data.len() {
-                        let code_unit = u16::from_le_bytes([text_data[i], text_data[i + 1]]);
+                        let code_unit = U16::<LittleEndian>::read_from_bytes(&text_data[i..i + 2])
+                            .map(|v| v.get())
+                            .unwrap_or(0);
                         i += 2;
 
                         match CharacterAction::process_text_character(code_unit) {
@@ -844,7 +861,9 @@ impl EscherParser {
 
             // Also store by shape ID if this record has shape properties
             if record.record_type == EscherRecordType::ShapeProperties && record.data.len() >= 4 {
-                let shape_id = u32::from_le_bytes([record.data[2], record.data[3], 0, 0]);
+                let shape_id = U16::<LittleEndian>::read_from_bytes(&record.data[2..4])
+                    .map(|v| v.get() as u32)
+                    .unwrap_or(0);
                 self.shape_records.insert(shape_id, record.clone());
             }
 

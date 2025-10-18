@@ -3,6 +3,7 @@
 // Parses Enhanced Metafile records and extracts relevant information
 
 use crate::common::error::{Error, Result};
+use zerocopy::FromBytes;
 
 /// EMF record types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,6 +82,58 @@ pub struct EmfHeader {
     pub device_height_mm: i32,
 }
 
+/// Raw EMF header structure for zerocopy parsing (88 bytes total)
+#[derive(Debug, Clone, FromBytes)]
+#[repr(C)]
+struct RawEmfHeader {
+    /// Record type (must be 0x00000001)
+    record_type: u32,
+    /// Record size
+    record_size: u32,
+    /// Bounds left
+    bounds_left: i32,
+    /// Bounds top
+    bounds_top: i32,
+    /// Bounds right
+    bounds_right: i32,
+    /// Bounds bottom
+    bounds_bottom: i32,
+    /// Frame left
+    frame_left: i32,
+    /// Frame top
+    frame_top: i32,
+    /// Frame right
+    frame_right: i32,
+    /// Frame bottom
+    frame_bottom: i32,
+    /// Signature (must be 0x464D4520 "EMF ")
+    signature: u32,
+    /// Version
+    version: u32,
+    /// Size of the file in bytes
+    size: u32,
+    /// Number of records
+    num_records: u32,
+    /// Number of handles in handle table
+    num_handles: u16,
+    /// Reserved field
+    reserved: u16,
+    /// Size of description string
+    description_size: u32,
+    /// Offset to description string
+    description_offset: u32,
+    /// Number of palette entries
+    num_palette: u32,
+    /// Width of reference device in pixels
+    device_width: i32,
+    /// Height of reference device in pixels
+    device_height: i32,
+    /// Width of reference device in millimeters
+    device_width_mm: i32,
+    /// Height of reference device in millimeters
+    device_height_mm: i32,
+}
+
 impl EmfHeader {
     /// Parse EMF header from data
     pub fn parse(data: &[u8]) -> Result<Self> {
@@ -88,66 +141,52 @@ impl EmfHeader {
             return Err(Error::ParseError("EMF header too short".into()));
         }
 
-        // Parse record type and size
-        let record_type = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-        if record_type != 0x00000001 {
+        // Parse header using zerocopy
+        let raw_header = RawEmfHeader::read_from_bytes(data)
+            .map_err(|_| Error::ParseError("Invalid EMF header format".into()))?;
+
+        // Validate record type
+        if raw_header.record_type != 0x00000001 {
             return Err(Error::ParseError(format!(
                 "Invalid EMF header record type: 0x{:08X}",
-                record_type
+                raw_header.record_type
             )));
         }
 
-        let _record_size = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
-
-        // Parse bounds (4 i32 values)
-        let bounds_left = i32::from_le_bytes([data[8], data[9], data[10], data[11]]);
-        let bounds_top = i32::from_le_bytes([data[12], data[13], data[14], data[15]]);
-        let bounds_right = i32::from_le_bytes([data[16], data[17], data[18], data[19]]);
-        let bounds_bottom = i32::from_le_bytes([data[20], data[21], data[22], data[23]]);
-
-        // Parse frame (4 i32 values)
-        let frame_left = i32::from_le_bytes([data[24], data[25], data[26], data[27]]);
-        let frame_top = i32::from_le_bytes([data[28], data[29], data[30], data[31]]);
-        let frame_right = i32::from_le_bytes([data[32], data[33], data[34], data[35]]);
-        let frame_bottom = i32::from_le_bytes([data[36], data[37], data[38], data[39]]);
-
-        let signature = u32::from_le_bytes([data[40], data[41], data[42], data[43]]);
-        if signature != 0x464D4520 {
+        // Validate signature
+        if raw_header.signature != 0x464D4520 {
             // "EMF " in little-endian
             return Err(Error::ParseError(format!(
                 "Invalid EMF signature: 0x{:08X}",
-                signature
+                raw_header.signature
             )));
         }
 
-        let version = u32::from_le_bytes([data[44], data[45], data[46], data[47]]);
-        let size = u32::from_le_bytes([data[48], data[49], data[50], data[51]]);
-        let num_records = u32::from_le_bytes([data[52], data[53], data[54], data[55]]);
-        let num_handles = u16::from_le_bytes([data[56], data[57]]);
-        let _reserved = u16::from_le_bytes([data[58], data[59]]);
-        let description_size = u32::from_le_bytes([data[60], data[61], data[62], data[63]]);
-        let description_offset = u32::from_le_bytes([data[64], data[65], data[66], data[67]]);
-        let num_palette = u32::from_le_bytes([data[68], data[69], data[70], data[71]]);
-        let device_width = i32::from_le_bytes([data[72], data[73], data[74], data[75]]);
-        let device_height = i32::from_le_bytes([data[76], data[77], data[78], data[79]]);
-        let device_width_mm = i32::from_le_bytes([data[80], data[81], data[82], data[83]]);
-        let device_height_mm = i32::from_le_bytes([data[84], data[85], data[86], data[87]]);
-
         Ok(Self {
-            bounds: (bounds_left, bounds_top, bounds_right, bounds_bottom),
-            frame: (frame_left, frame_top, frame_right, frame_bottom),
-            signature,
-            version,
-            size,
-            num_records,
-            num_handles,
-            description_size: description_size as u16,
-            description_offset,
-            num_palette,
-            device_width,
-            device_height,
-            device_width_mm,
-            device_height_mm,
+            bounds: (
+                raw_header.bounds_left,
+                raw_header.bounds_top,
+                raw_header.bounds_right,
+                raw_header.bounds_bottom,
+            ),
+            frame: (
+                raw_header.frame_left,
+                raw_header.frame_top,
+                raw_header.frame_right,
+                raw_header.frame_bottom,
+            ),
+            signature: raw_header.signature,
+            version: raw_header.version,
+            size: raw_header.size,
+            num_records: raw_header.num_records,
+            num_handles: raw_header.num_handles,
+            description_size: raw_header.description_size as u16,
+            description_offset: raw_header.description_offset,
+            num_palette: raw_header.num_palette,
+            device_width: raw_header.device_width,
+            device_height: raw_header.device_height,
+            device_width_mm: raw_header.device_width_mm,
+            device_height_mm: raw_header.device_height_mm,
         })
     }
 
@@ -184,6 +223,16 @@ pub struct EmfRecord {
     pub data: Vec<u8>,
 }
 
+/// Raw EMF record header for zerocopy parsing (8 bytes)
+#[derive(Debug, Clone, zerocopy::FromBytes)]
+#[repr(C)]
+struct RawEmfRecordHeader {
+    /// Record type
+    record_type: u32,
+    /// Record size in bytes
+    size: u32,
+}
+
 impl EmfRecord {
     /// Parse an EMF record from data
     pub fn parse(data: &[u8], offset: usize) -> Result<(Self, usize)> {
@@ -191,18 +240,12 @@ impl EmfRecord {
             return Err(Error::ParseError("Insufficient data for EMF record".into()));
         }
 
-        let record_type = u32::from_le_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        let size = u32::from_le_bytes([
-            data[offset + 4],
-            data[offset + 5],
-            data[offset + 6],
-            data[offset + 7],
-        ]);
+        // Parse record header using zerocopy
+        let header = RawEmfRecordHeader::read_from_bytes(&data[offset..offset + 8])
+            .map_err(|_| Error::ParseError("Invalid EMF record header".into()))?;
+
+        let record_type = header.record_type;
+        let size = header.size;
 
         if size < 8 || offset + size as usize > data.len() {
             return Err(Error::ParseError(format!(

@@ -3,6 +3,7 @@ use super::file::{OleError, OleFile};
 use std::collections::HashMap;
 use std::io::{Read, Seek};
 use chrono::{DateTime, Duration, Utc};
+use zerocopy::{FromBytes, LE, U16, U32, I16, I32};
 
 /// Metadata extracted from OLE property streams
 ///
@@ -109,7 +110,9 @@ fn parse_property_stream(data: &[u8]) -> Result<HashMap<u32, PropertyValue>, Ole
     }
 
     // Skip header (28 bytes) and format ID (20 bytes)
-    let section_offset = u32::from_le_bytes([data[44], data[45], data[46], data[47]]) as usize;
+    let section_offset = U32::<LE>::read_from_bytes(&data[44..48])
+        .map(|v| v.get() as usize)
+        .unwrap_or(0);
 
     if section_offset + 8 > data.len() {
         return Err(OleError::InvalidFormat(
@@ -118,12 +121,9 @@ fn parse_property_stream(data: &[u8]) -> Result<HashMap<u32, PropertyValue>, Ole
     }
 
     // Read property count (section size at offset 0 is not used)
-    let num_props = u32::from_le_bytes([
-        data[section_offset + 4],
-        data[section_offset + 5],
-        data[section_offset + 6],
-        data[section_offset + 7],
-    ]);
+    let num_props = U32::<LE>::read_from_bytes(&data[section_offset + 4..section_offset + 8])
+        .map(|v| v.get())
+        .unwrap_or(0);
 
     // Limit properties to prevent DoS
     let num_props = num_props.min(1000);
@@ -139,28 +139,24 @@ fn parse_property_stream(data: &[u8]) -> Result<HashMap<u32, PropertyValue>, Ole
         }
 
         // Property ID
-        let prop_id = u32::from_le_bytes([
-            data[prop_offset],
-            data[prop_offset + 1],
-            data[prop_offset + 2],
-            data[prop_offset + 3],
-        ]);
+        let prop_id = U32::<LE>::read_from_bytes(&data[prop_offset..prop_offset + 4])
+            .map(|v| v.get())
+            .unwrap_or(0);
 
         // Offset to property value
         let value_offset = section_offset
-            + u32::from_le_bytes([
-                data[prop_offset + 4],
-                data[prop_offset + 5],
-                data[prop_offset + 6],
-                data[prop_offset + 7],
-            ]) as usize;
+            + U32::<LE>::read_from_bytes(&data[prop_offset + 4..prop_offset + 8])
+                .map(|v| v.get() as usize)
+                .unwrap_or(0);
 
         if value_offset + 4 > data.len() {
             continue;
         }
 
         // Property type
-        let prop_type = u16::from_le_bytes([data[value_offset], data[value_offset + 1]]);
+        let prop_type = U16::<LE>::read_from_bytes(&data[value_offset..value_offset + 2])
+            .map(|v| v.get())
+            .unwrap_or(0);
 
         // Parse property value based on type
         if let Ok(value) = parse_property_value(data, value_offset + 4, prop_type) {
@@ -183,7 +179,9 @@ fn parse_property_value(
             if offset + 2 > data.len() {
                 return Err(OleError::InvalidFormat("Buffer overflow".to_string()));
             }
-            let value = i16::from_le_bytes([data[offset], data[offset + 1]]);
+            let value = I16::<LE>::read_from_bytes(&data[offset..offset + 2])
+                .map(|v| v.get())
+                .unwrap_or(0);
             Ok(PropertyValue::I2(value))
         }
         VT_I4 | VT_INT | VT_ERROR => {
@@ -191,12 +189,9 @@ fn parse_property_value(
             if offset + 4 > data.len() {
                 return Err(OleError::InvalidFormat("Buffer overflow".to_string()));
             }
-            let value = i32::from_le_bytes([
-                data[offset],
-                data[offset + 1],
-                data[offset + 2],
-                data[offset + 3],
-            ]);
+            let value = I32::<LE>::read_from_bytes(&data[offset..offset + 4])
+                .map(|v| v.get())
+                .unwrap_or(0);
             Ok(PropertyValue::I4(value))
         }
         VT_UI2 => {
@@ -204,7 +199,9 @@ fn parse_property_value(
             if offset + 2 > data.len() {
                 return Err(OleError::InvalidFormat("Buffer overflow".to_string()));
             }
-            let value = u16::from_le_bytes([data[offset], data[offset + 1]]);
+            let value = U16::<LE>::read_from_bytes(&data[offset..offset + 2])
+                .map(|v| v.get())
+                .unwrap_or(0);
             Ok(PropertyValue::UI2(value))
         }
         VT_UI4 | VT_UINT => {
@@ -212,12 +209,9 @@ fn parse_property_value(
             if offset + 4 > data.len() {
                 return Err(OleError::InvalidFormat("Buffer overflow".to_string()));
             }
-            let value = u32::from_le_bytes([
-                data[offset],
-                data[offset + 1],
-                data[offset + 2],
-                data[offset + 3],
-            ]);
+            let value = U32::<LE>::read_from_bytes(&data[offset..offset + 4])
+                .map(|v| v.get())
+                .unwrap_or(0);
             Ok(PropertyValue::UI4(value))
         }
         VT_LPSTR | VT_BSTR => {
@@ -225,12 +219,9 @@ fn parse_property_value(
             if offset + 4 > data.len() {
                 return Err(OleError::InvalidFormat("Buffer overflow".to_string()));
             }
-            let str_len = u32::from_le_bytes([
-                data[offset],
-                data[offset + 1],
-                data[offset + 2],
-                data[offset + 3],
-            ]) as usize;
+            let str_len = U32::<LE>::read_from_bytes(&data[offset..offset + 4])
+                .map(|v| v.get() as usize)
+                .unwrap_or(0);
 
             if offset + 4 + str_len > data.len() {
                 return Err(OleError::InvalidFormat("String overflow".to_string()));
@@ -246,12 +237,9 @@ fn parse_property_value(
             if offset + 4 > data.len() {
                 return Err(OleError::InvalidFormat("Buffer overflow".to_string()));
             }
-            let char_count = u32::from_le_bytes([
-                data[offset],
-                data[offset + 1],
-                data[offset + 2],
-                data[offset + 3],
-            ]) as usize;
+            let char_count = U32::<LE>::read_from_bytes(&data[offset..offset + 4])
+                .map(|v| v.get() as usize)
+                .unwrap_or(0);
 
             let byte_len = char_count * 2;
             if offset + 4 + byte_len > data.len() {
@@ -262,7 +250,9 @@ fn parse_property_value(
             let mut utf16_chars = Vec::new();
             for i in 0..char_count {
                 let byte_offset = offset + 4 + i * 2;
-                let code_unit = u16::from_le_bytes([data[byte_offset], data[byte_offset + 1]]);
+                let code_unit = U16::<LE>::read_from_bytes(&data[byte_offset..byte_offset + 2])
+                    .map(|v| v.get())
+                    .unwrap_or(0);
                 if code_unit == 0 {
                     break;
                 }
@@ -277,18 +267,12 @@ fn parse_property_value(
             if offset + 8 > data.len() {
                 return Err(OleError::InvalidFormat("Buffer overflow".to_string()));
             }
-            let low = u32::from_le_bytes([
-                data[offset],
-                data[offset + 1],
-                data[offset + 2],
-                data[offset + 3],
-            ]) as u64;
-            let high = u32::from_le_bytes([
-                data[offset + 4],
-                data[offset + 5],
-                data[offset + 6],
-                data[offset + 7],
-            ]) as u64;
+            let low = U32::<LE>::read_from_bytes(&data[offset..offset + 4])
+                .map(|v| v.get() as u64)
+                .unwrap_or(0);
+            let high = U32::<LE>::read_from_bytes(&data[offset + 4..offset + 8])
+                .map(|v| v.get() as u64)
+                .unwrap_or(0);
             let filetime = low | (high << 32);
             Ok(PropertyValue::Filetime(filetime))
         }
@@ -297,7 +281,9 @@ fn parse_property_value(
             if offset + 2 > data.len() {
                 return Err(OleError::InvalidFormat("Buffer overflow".to_string()));
             }
-            let value = u16::from_le_bytes([data[offset], data[offset + 1]]);
+            let value = U16::<LE>::read_from_bytes(&data[offset..offset + 2])
+                .map(|v| v.get())
+                .unwrap_or(0);
             Ok(PropertyValue::Bool(value != 0))
         }
         VT_BLOB => {
@@ -305,12 +291,9 @@ fn parse_property_value(
             if offset + 4 > data.len() {
                 return Err(OleError::InvalidFormat("Buffer overflow".to_string()));
             }
-            let blob_len = u32::from_le_bytes([
-                data[offset],
-                data[offset + 1],
-                data[offset + 2],
-                data[offset + 3],
-            ]) as usize;
+            let blob_len = U32::<LE>::read_from_bytes(&data[offset..offset + 4])
+                .map(|v| v.get() as usize)
+                .unwrap_or(0);
 
             if offset + 4 + blob_len > data.len() {
                 return Err(OleError::InvalidFormat("Blob overflow".to_string()));

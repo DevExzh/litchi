@@ -7,7 +7,7 @@ license = "Apache-2.0"
 repository = "https://github.com/DevExzh/litchi"
 documentation = "https://docs.rs/litchi"
 readme = "README.md"
-keywords = ["ole", "ooxml", "excel", "word", "powerpoint", "visio"]
+keywords = ["ole", "ooxml", "iwork", "odf", "excel", "word", "powerpoint"]
 categories = ["data-formats", "office", "document-processing"]
 
 [dependencies]
@@ -24,24 +24,26 @@ smallvec = "1.15"
 rayon = "1.11"
 # Image processing
 image = { version = "0.25", features = ["default-formats", "rayon"] }
-bytemuck = { version = "1.24", features = ["derive"] }
-flate2 = "1.1"
+bytes = { version = "1", features = ["serde"] }
+zerocopy = "0.8"
+zerocopy-derive = "0.8"
+flate2 = { version = "1", features = ["zlib-rs"], default-features = false }
 base64 = "0.22"
 # Formula parsing and conversion
 rowan = "0.16"
-bumpalo = { version = "3.19", features = ["collections"] }
+bumpalo = { version = "3", features = ["collections"] }
 phf = { version = "0.13", features = ["macros"] }
 # YAML serialization for front matter
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
 serde-saphyr = "0"
 # Character encoding conversion for OLE strings
 encoding_rs = "0.8"
 # Date time support
 chrono = { version = "0", features = ["serde"] }
 # Snappy compression for iWork IWA files
-snap = "1.1"
+snap = "1"
 # Lazy static initialization
-once_cell = "1.21"
+once_cell = "1"
 # Protobuf support for iWork formats
 prost = { version = "0.14", features = ["derive"] }
 prost-types = "0.14"

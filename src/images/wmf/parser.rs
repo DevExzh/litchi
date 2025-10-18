@@ -3,6 +3,7 @@
 // Parses Windows Metafile records and extracts relevant information
 
 use crate::common::error::{Error, Result};
+use zerocopy::FromBytes;
 
 /// WMF file type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,31 +53,25 @@ impl WmfPlaceableHeader {
             return Err(Error::ParseError("WMF placeable header too short".into()));
         }
 
-        let key = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-        if key != Self::PLACEABLE_KEY {
+        // Parse header using zerocopy
+        let raw_header = RawWmfPlaceableHeader::read_from_bytes(data)
+            .map_err(|_| Error::ParseError("Invalid WMF placeable header format".into()))?;
+
+        if raw_header.key != Self::PLACEABLE_KEY {
             return Err(Error::ParseError(format!(
                 "Invalid WMF placeable key: 0x{:08X}",
-                key
+                raw_header.key
             )));
         }
 
-        let _handle = u16::from_le_bytes([data[4], data[5]]);
-        let left = i16::from_le_bytes([data[6], data[7]]);
-        let top = i16::from_le_bytes([data[8], data[9]]);
-        let right = i16::from_le_bytes([data[10], data[11]]);
-        let bottom = i16::from_le_bytes([data[12], data[13]]);
-        let inch = u16::from_le_bytes([data[14], data[15]]);
-        let _reserved = u32::from_le_bytes([data[16], data[17], data[18], data[19]]);
-        let checksum = u16::from_le_bytes([data[20], data[21]]);
-
         Ok(Self {
-            key,
-            left,
-            top,
-            right,
-            bottom,
-            inch,
-            checksum,
+            key: raw_header.key,
+            left: raw_header.left,
+            top: raw_header.top,
+            right: raw_header.right,
+            bottom: raw_header.bottom,
+            inch: raw_header.inch,
+            checksum: raw_header.checksum,
         })
     }
 
@@ -110,6 +105,60 @@ pub struct WmfHeader {
     pub num_params: u16,
 }
 
+/// Raw WMF placeable header for zerocopy parsing (22 bytes total)
+#[derive(Debug, Clone, FromBytes)]
+#[repr(C)]
+struct RawWmfPlaceableHeader {
+    /// Key (should be 0x9AC6CDD7)
+    key: u32,
+    /// Handle
+    handle: u16,
+    /// Left coordinate
+    left: i16,
+    /// Top coordinate
+    top: i16,
+    /// Right coordinate
+    right: i16,
+    /// Bottom coordinate
+    bottom: i16,
+    /// Units per inch
+    inch: u16,
+    /// Reserved field
+    reserved: u32,
+    /// Checksum
+    checksum: u16,
+}
+
+/// Raw WMF standard header for zerocopy parsing (18 bytes total)
+#[derive(Debug, Clone, FromBytes)]
+#[repr(C)]
+struct RawWmfHeader {
+    /// File type (1 = memory, 2 = disk)
+    file_type: u16,
+    /// Header size in words (always 9)
+    header_size: u16,
+    /// Windows version
+    version: u16,
+    /// Size of file in words
+    file_size: u32,
+    /// Number of objects
+    num_objects: u16,
+    /// Size of largest record in words
+    max_record: u32,
+    /// Not used (always 0)
+    num_params: u16,
+}
+
+/// Raw WMF record header for zerocopy parsing (6 bytes total)
+#[derive(Debug, Clone, FromBytes)]
+#[repr(C)]
+struct RawWmfRecordHeader {
+    /// Record size in words
+    size: u32,
+    /// Record function
+    function: u16,
+}
+
 impl WmfHeader {
     /// Parse WMF standard header
     pub fn parse(data: &[u8]) -> Result<Self> {
@@ -117,22 +166,18 @@ impl WmfHeader {
             return Err(Error::ParseError("WMF header too short".into()));
         }
 
-        let file_type = u16::from_le_bytes([data[0], data[1]]);
-        let header_size = u16::from_le_bytes([data[2], data[3]]);
-        let version = u16::from_le_bytes([data[4], data[5]]);
-        let file_size = u32::from_le_bytes([data[6], data[7], data[8], data[9]]);
-        let num_objects = u16::from_le_bytes([data[10], data[11]]);
-        let max_record = u32::from_le_bytes([data[12], data[13], data[14], data[15]]);
-        let num_params = u16::from_le_bytes([data[16], data[17]]);
+        // Parse header using zerocopy
+        let raw_header = RawWmfHeader::read_from_bytes(data)
+            .map_err(|_| Error::ParseError("Invalid WMF header format".into()))?;
 
         Ok(Self {
-            file_type,
-            header_size,
-            version,
-            file_size,
-            num_objects,
-            max_record,
-            num_params,
+            file_type: raw_header.file_type,
+            header_size: raw_header.header_size,
+            version: raw_header.version,
+            file_size: raw_header.file_size,
+            num_objects: raw_header.num_objects,
+            max_record: raw_header.max_record,
+            num_params: raw_header.num_params,
         })
     }
 }
@@ -155,13 +200,12 @@ impl WmfRecord {
             return Err(Error::ParseError("Insufficient data for WMF record".into()));
         }
 
-        let size = u32::from_le_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        let function = u16::from_le_bytes([data[offset + 4], data[offset + 5]]);
+        // Parse record header using zerocopy
+        let header = RawWmfRecordHeader::read_from_bytes(&data[offset..offset + 6])
+            .map_err(|_| Error::ParseError("Invalid WMF record header".into()))?;
+
+        let size = header.size;
+        let function = header.function;
 
         // Size is in words (16-bit), convert to bytes
         let size_bytes = (size as usize) * 2;

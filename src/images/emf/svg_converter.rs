@@ -6,10 +6,66 @@ use super::parser::{EmfParser, EmfRecord};
 use crate::common::error::{Error, Result};
 use crate::images::svg::*;
 use rayon::prelude::*;
+use zerocopy::FromBytes;
 
 /// EMF to SVG converter
 pub struct EmfSvgConverter {
     parser: EmfParser,
+}
+
+/// EMF RECT structure (Windows RECT)
+#[derive(Debug, Clone, FromBytes)]
+#[repr(C)]
+struct EmfRect {
+    left: i32,
+    top: i32,
+    right: i32,
+    bottom: i32,
+}
+
+/// EMF POINT structure
+#[derive(Debug, Clone, FromBytes)]
+#[repr(C)]
+struct EmfPoint {
+    x: i32,
+    y: i32,
+}
+
+/// EMF SIZE structure
+#[derive(Debug, Clone, FromBytes)]
+#[repr(C)]
+struct EmfSize {
+    cx: i32,
+    cy: i32,
+}
+
+/// EMR_STRETCHDIBITS record data
+#[derive(Debug, Clone, FromBytes)]
+#[repr(C)]
+struct EmfStretchDibits {
+    bounds: EmfRect,
+    x_dest: i32,
+    y_dest: i32,
+    x_src: i32,
+    y_src: i32,
+    cx_src: i32,
+    cy_src: i32,
+    off_bmi_src: u32,
+    cb_bmi_src: u32,
+    off_bits_src: u32,
+    cb_bits_src: u32,
+    usage_src: u32,
+    dw_rop: u32,
+    cx_dest: i32,
+    cy_dest: i32,
+}
+
+/// Polygon/polyline record header (bounds + count)
+#[derive(Debug, Clone, FromBytes)]
+#[repr(C)]
+struct EmfPolygonHeader {
+    bounds: EmfRect,
+    count: u32,
 }
 
 impl EmfSvgConverter {
@@ -88,40 +144,14 @@ impl EmfSvgConverter {
 
     /// Parse EMR_RECTANGLE record
     fn parse_rectangle(&self, record: &EmfRecord) -> Result<Option<SvgElement>> {
-        if record.data.len() < 16 {
-            return Ok(None);
-        }
-
-        let left = i32::from_le_bytes([
-            record.data[0],
-            record.data[1],
-            record.data[2],
-            record.data[3],
-        ]);
-        let top = i32::from_le_bytes([
-            record.data[4],
-            record.data[5],
-            record.data[6],
-            record.data[7],
-        ]);
-        let right = i32::from_le_bytes([
-            record.data[8],
-            record.data[9],
-            record.data[10],
-            record.data[11],
-        ]);
-        let bottom = i32::from_le_bytes([
-            record.data[12],
-            record.data[13],
-            record.data[14],
-            record.data[15],
-        ]);
+        let rect = EmfRect::read_from_bytes(&record.data)
+            .map_err(|_| Error::ParseError("Invalid RECT data in EMR_RECTANGLE".into()))?;
 
         Ok(Some(SvgElement::Rect(SvgRect {
-            x: left as f64,
-            y: top as f64,
-            width: (right - left) as f64,
-            height: (bottom - top) as f64,
+            x: rect.left as f64,
+            y: rect.top as f64,
+            width: (rect.right - rect.left) as f64,
+            height: (rect.bottom - rect.top) as f64,
             fill: None,
             stroke: Some("#000000".to_string()),
             stroke_width: 1.0,
@@ -130,34 +160,13 @@ impl EmfSvgConverter {
 
     /// Parse EMR_ELLIPSE record
     fn parse_ellipse(&self, record: &EmfRecord) -> Result<Option<SvgElement>> {
-        if record.data.len() < 16 {
-            return Ok(None);
-        }
+        let rect = EmfRect::read_from_bytes(&record.data)
+            .map_err(|_| Error::ParseError("Invalid RECT data in EMR_ELLIPSE".into()))?;
 
-        let left = i32::from_le_bytes([
-            record.data[0],
-            record.data[1],
-            record.data[2],
-            record.data[3],
-        ]) as f64;
-        let top = i32::from_le_bytes([
-            record.data[4],
-            record.data[5],
-            record.data[6],
-            record.data[7],
-        ]) as f64;
-        let right = i32::from_le_bytes([
-            record.data[8],
-            record.data[9],
-            record.data[10],
-            record.data[11],
-        ]) as f64;
-        let bottom = i32::from_le_bytes([
-            record.data[12],
-            record.data[13],
-            record.data[14],
-            record.data[15],
-        ]) as f64;
+        let left = rect.left as f64;
+        let top = rect.top as f64;
+        let right = rect.right as f64;
+        let bottom = rect.bottom as f64;
 
         let cx = (left + right) / 2.0;
         let cy = (top + bottom) / 2.0;
@@ -181,13 +190,9 @@ impl EmfSvgConverter {
             return Ok(None);
         }
 
-        // Bounds (16 bytes) + count (4 bytes)
-        let count = u32::from_le_bytes([
-            record.data[16],
-            record.data[17],
-            record.data[18],
-            record.data[19],
-        ]) as usize;
+        let header = EmfPolygonHeader::read_from_bytes(&record.data)
+            .map_err(|_| Error::ParseError("Invalid header data in EMR_POLYGON".into()))?;
+        let count = header.count as usize;
 
         if record.data.len() < 20 + count * 8 {
             return Ok(None);
@@ -195,21 +200,15 @@ impl EmfSvgConverter {
 
         let mut commands = Vec::with_capacity(count + 1);
 
-        // Parse points using SIMD-friendly iteration
+        // Parse points using zerocopy
+        let points_data = &record.data[20..20 + count * 8];
         for i in 0..count {
-            let offset = 20 + i * 8;
-            let x = i32::from_le_bytes([
-                record.data[offset],
-                record.data[offset + 1],
-                record.data[offset + 2],
-                record.data[offset + 3],
-            ]) as f64;
-            let y = i32::from_le_bytes([
-                record.data[offset + 4],
-                record.data[offset + 5],
-                record.data[offset + 6],
-                record.data[offset + 7],
-            ]) as f64;
+            let point_data = &points_data[i * 8..(i + 1) * 8];
+            let point = EmfPoint::read_from_bytes(point_data)
+                .map_err(|_| Error::ParseError("Invalid point data in EMR_POLYGON".into()))?;
+
+            let x = point.x as f64;
+            let y = point.y as f64;
 
             if i == 0 {
                 commands.push(PathCommand::MoveTo { x, y });
@@ -233,12 +232,9 @@ impl EmfSvgConverter {
             return Ok(None);
         }
 
-        let count = u32::from_le_bytes([
-            record.data[16],
-            record.data[17],
-            record.data[18],
-            record.data[19],
-        ]) as usize;
+        let header = EmfPolygonHeader::read_from_bytes(&record.data)
+            .map_err(|_| Error::ParseError("Invalid header data in EMR_POLYLINE".into()))?;
+        let count = header.count as usize;
 
         if record.data.len() < 20 + count * 8 {
             return Ok(None);
@@ -246,20 +242,15 @@ impl EmfSvgConverter {
 
         let mut commands = Vec::with_capacity(count);
 
+        // Parse points using zerocopy
+        let points_data = &record.data[20..20 + count * 8];
         for i in 0..count {
-            let offset = 20 + i * 8;
-            let x = i32::from_le_bytes([
-                record.data[offset],
-                record.data[offset + 1],
-                record.data[offset + 2],
-                record.data[offset + 3],
-            ]) as f64;
-            let y = i32::from_le_bytes([
-                record.data[offset + 4],
-                record.data[offset + 5],
-                record.data[offset + 6],
-                record.data[offset + 7],
-            ]) as f64;
+            let point_data = &points_data[i * 8..(i + 1) * 8];
+            let point = EmfPoint::read_from_bytes(point_data)
+                .map_err(|_| Error::ParseError("Invalid point data in EMR_POLYLINE".into()))?;
+
+            let x = point.x as f64;
+            let y = point.y as f64;
 
             if i == 0 {
                 commands.push(PathCommand::MoveTo { x, y });
@@ -281,12 +272,9 @@ impl EmfSvgConverter {
             return Ok(None);
         }
 
-        let count = u32::from_le_bytes([
-            record.data[16],
-            record.data[17],
-            record.data[18],
-            record.data[19],
-        ]) as usize;
+        let header = EmfPolygonHeader::read_from_bytes(&record.data)
+            .map_err(|_| Error::ParseError("Invalid header data in EMR_POLYBEZIER".into()))?;
+        let count = header.count as usize;
 
         if record.data.len() < 20 + count * 8 || count < 4 {
             return Ok(None);
@@ -294,70 +282,34 @@ impl EmfSvgConverter {
 
         let mut commands = Vec::new();
 
-        // First point is MoveTo
-        let x0 = i32::from_le_bytes([
-            record.data[20],
-            record.data[21],
-            record.data[22],
-            record.data[23],
-        ]) as f64;
-        let y0 = i32::from_le_bytes([
-            record.data[24],
-            record.data[25],
-            record.data[26],
-            record.data[27],
-        ]) as f64;
+        // Parse points using zerocopy
+        let points_data = &record.data[20..20 + count * 8];
+        let mut points = Vec::with_capacity(count);
 
-        commands.push(PathCommand::MoveTo { x: x0, y: y0 });
+        for i in 0..count {
+            let point_data = &points_data[i * 8..(i + 1) * 8];
+            let point = EmfPoint::read_from_bytes(point_data)
+                .map_err(|_| Error::ParseError("Invalid point data in EMR_POLYBEZIER".into()))?;
+            points.push(point);
+        }
+
+        // First point is MoveTo
+        commands.push(PathCommand::MoveTo {
+            x: points[0].x as f64,
+            y: points[0].y as f64,
+        });
 
         // Process Bezier curves (groups of 3 points)
         let mut i = 1;
         while i + 2 < count {
-            let offset1 = 20 + i * 8;
-            let offset2 = 20 + (i + 1) * 8;
-            let offset3 = 20 + (i + 2) * 8;
-
-            let x1 = i32::from_le_bytes([
-                record.data[offset1],
-                record.data[offset1 + 1],
-                record.data[offset1 + 2],
-                record.data[offset1 + 3],
-            ]) as f64;
-            let y1 = i32::from_le_bytes([
-                record.data[offset1 + 4],
-                record.data[offset1 + 5],
-                record.data[offset1 + 6],
-                record.data[offset1 + 7],
-            ]) as f64;
-
-            let x2 = i32::from_le_bytes([
-                record.data[offset2],
-                record.data[offset2 + 1],
-                record.data[offset2 + 2],
-                record.data[offset2 + 3],
-            ]) as f64;
-            let y2 = i32::from_le_bytes([
-                record.data[offset2 + 4],
-                record.data[offset2 + 5],
-                record.data[offset2 + 6],
-                record.data[offset2 + 7],
-            ]) as f64;
-
-            let x = i32::from_le_bytes([
-                record.data[offset3],
-                record.data[offset3 + 1],
-                record.data[offset3 + 2],
-                record.data[offset3 + 3],
-            ]) as f64;
-            let y = i32::from_le_bytes([
-                record.data[offset3 + 4],
-                record.data[offset3 + 5],
-                record.data[offset3 + 6],
-                record.data[offset3 + 7],
-            ]) as f64;
-
-            commands.push(PathCommand::CubicBezier { x1, y1, x2, y2, x, y });
-
+            commands.push(PathCommand::CubicBezier {
+                x1: points[i].x as f64,
+                y1: points[i].y as f64,
+                x2: points[i + 1].x as f64,
+                y2: points[i + 1].y as f64,
+                x: points[i + 2].x as f64,
+                y: points[i + 2].y as f64,
+            });
             i += 3;
         }
 
@@ -374,18 +326,11 @@ impl EmfSvgConverter {
             return Ok(None);
         }
 
-        let x = i32::from_le_bytes([
-            record.data[0],
-            record.data[1],
-            record.data[2],
-            record.data[3],
-        ]) as f64;
-        let y = i32::from_le_bytes([
-            record.data[4],
-            record.data[5],
-            record.data[6],
-            record.data[7],
-        ]) as f64;
+        let point = EmfPoint::read_from_bytes(&record.data)
+            .map_err(|_| Error::ParseError("Invalid point data in EMR_LINETO".into()))?;
+
+        let x = point.x as f64;
+        let y = point.y as f64;
 
         // LineTo requires current position, which we'd need to track
         // For simplicity, create a line from origin
@@ -401,44 +346,21 @@ impl EmfSvgConverter {
     /// Parse EMR_STRETCHDIBITS record (embedded bitmap)
     fn parse_stretchdibits(&self, record: &EmfRecord) -> Result<Option<SvgElement>> {
         // This is complex - extract DIB and convert to PNG, then embed
-        if record.data.len() < 80 {
+        if record.data.len() < std::mem::size_of::<EmfStretchDibits>() {
             return Ok(None);
         }
 
-        // Parse bounds and offsets
-        let dest_x = i32::from_le_bytes([
-            record.data[0],
-            record.data[1],
-            record.data[2],
-            record.data[3],
-        ]) as f64;
-        let dest_y = i32::from_le_bytes([
-            record.data[4],
-            record.data[5],
-            record.data[6],
-            record.data[7],
-        ]) as f64;
-        let dest_width = i32::from_le_bytes([
-            record.data[8],
-            record.data[9],
-            record.data[10],
-            record.data[11],
-        ]) as f64;
-        let dest_height = i32::from_le_bytes([
-            record.data[12],
-            record.data[13],
-            record.data[14],
-            record.data[15],
-        ]) as f64;
+        let stretch = EmfStretchDibits::read_from_bytes(&record.data)
+            .map_err(|_| Error::ParseError("Invalid EMR_STRETCHDIBITS data".into()))?;
 
         // Try to extract and convert DIB data
         // This is simplified - full implementation would parse DIB structure
-        if let Ok(png_data) = self.extract_and_convert_dib(&record.data[80..]) {
+        if let Ok(png_data) = self.extract_and_convert_dib(&record.data[std::mem::size_of::<EmfStretchDibits>()..]) {
             return Ok(Some(SvgElement::Image(SvgImage::from_png_data(
-                dest_x,
-                dest_y,
-                dest_width,
-                dest_height,
+                stretch.x_dest as f64,
+                stretch.y_dest as f64,
+                stretch.cx_dest as f64,
+                stretch.cy_dest as f64,
                 &png_data,
             ))));
         }

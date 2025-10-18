@@ -12,6 +12,7 @@
 use super::fkp::ChpxFkp;
 use super::chp::CharacterProperties;
 use super::piece_table::PieceTable;
+use crate::ole::binary::read_u32_le;
 use crate::ole::sprm::parse_sprms;
 
 /// A character run with properties.
@@ -81,12 +82,7 @@ impl ChpBinTable {
                 continue;
             }
 
-            let pn = u32::from_le_bytes([
-                plcf_bte_chpx_data[pn_offset],
-                plcf_bte_chpx_data[pn_offset + 1],
-                plcf_bte_chpx_data[pn_offset + 2],
-                plcf_bte_chpx_data[pn_offset + 3],
-            ]);
+            let pn = read_u32_le(&plcf_bte_chpx_data, pn_offset).unwrap_or(0);
 
             // PN (Page Number) format (from POI's CHPBinTable.java line 97-98):
             // pageOffset = SMALLER_BIG_BLOCK_SIZE * pageNum

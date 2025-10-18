@@ -7,6 +7,7 @@
 /// - Pointers to various data structures
 /// - Document flags and properties
 use super::super::package::{DocError, Result};
+use zerocopy::{FromBytes, LE, U16, U32};
 
 /// Minimum FIB size in bytes (the base FIB structure)
 const FIB_BASE_SIZE: usize = 32;
@@ -54,10 +55,18 @@ impl FileInformationBlock {
         }
 
         // Read the base FIB fields (little-endian)
-        let magic = u16::from_le_bytes([word_document[0], word_document[1]]);
-        let nfib = u16::from_le_bytes([word_document[2], word_document[3]]);
-        let lid = u16::from_le_bytes([word_document[6], word_document[7]]);
-        let flags = u16::from_le_bytes([word_document[10], word_document[11]]);
+        let magic = U16::<LE>::read_from_bytes(&word_document[0..2])
+            .map(|v| v.get())
+            .unwrap_or(0);
+        let nfib = U16::<LE>::read_from_bytes(&word_document[2..4])
+            .map(|v| v.get())
+            .unwrap_or(0);
+        let lid = U16::<LE>::read_from_bytes(&word_document[6..8])
+            .map(|v| v.get())
+            .unwrap_or(0);
+        let flags = U16::<LE>::read_from_bytes(&word_document[10..12])
+            .map(|v| v.get())
+            .unwrap_or(0);
 
         // Validate magic number
         if magic != 0xA5EC && magic != 0xA5DC {
@@ -142,19 +151,13 @@ impl FileInformationBlock {
             return None;
         }
 
-        let offset = u32::from_le_bytes([
-            self.data[entry_offset],
-            self.data[entry_offset + 1],
-            self.data[entry_offset + 2],
-            self.data[entry_offset + 3],
-        ]);
+        let offset = U32::<LE>::read_from_bytes(&self.data[entry_offset..entry_offset + 4])
+            .map(|v| v.get())
+            .unwrap_or(0);
 
-        let length = u32::from_le_bytes([
-            self.data[entry_offset + 4],
-            self.data[entry_offset + 5],
-            self.data[entry_offset + 6],
-            self.data[entry_offset + 7],
-        ]);
+        let length = U32::<LE>::read_from_bytes(&self.data[entry_offset + 4..entry_offset + 8])
+            .map(|v| v.get())
+            .unwrap_or(0);
 
         Some((offset, length))
     }

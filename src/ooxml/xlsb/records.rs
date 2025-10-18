@@ -5,6 +5,7 @@
 //! and use a binary record format with variable-length encoding.
 
 use std::io::Read;
+use bytes::Bytes;
 use crate::ole::binary;
 use crate::ooxml::xlsb::error::{XlsbError, XlsbResult};
 
@@ -64,7 +65,7 @@ impl XlsbRecordHeader {
 #[derive(Debug, Clone)]
 pub struct XlsbRecord {
     pub header: XlsbRecordHeader,
-    pub data: Vec<u8>,
+    pub data: Bytes,
 }
 
 impl XlsbRecord {
@@ -72,8 +73,9 @@ impl XlsbRecord {
     pub fn read<R: Read>(reader: &mut R) -> XlsbResult<Self> {
         let header = XlsbRecordHeader::read(reader)?;
 
-        let mut data = vec![0u8; header.data_len];
-        reader.read_exact(&mut data)?;
+        let mut data_buf = vec![0u8; header.data_len];
+        reader.read_exact(&mut data_buf)?;
+        let data = Bytes::from(data_buf);
 
         Ok(XlsbRecord { header, data })
     }

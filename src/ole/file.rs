@@ -1,5 +1,41 @@
 use super::consts::*;
 use std::io::{self, Read, Seek, SeekFrom};
+use zerocopy::{FromBytes, LE, U16, U32, U64};
+
+/// Raw OLE directory entry structure (128 bytes)
+///
+/// This represents the on-disk format of a directory entry.
+/// Based on Microsoft OLE2 specification.
+#[derive(Debug, Clone, FromBytes)]
+#[repr(C)]
+struct RawDirectoryEntry {
+    /// Entry name in UTF-16LE (64 bytes, null-padded)
+    name: [u8; 64],
+    /// Length of name in bytes (including null terminator)
+    name_len: U16<LE>,
+    /// Entry type (1 = storage, 2 = stream, 5 = root)
+    entry_type: u8,
+    /// Node color (0 = red, 1 = black)
+    node_color: u8,
+    /// Left sibling SID
+    sid_left: U32<LE>,
+    /// Right sibling SID
+    sid_right: U32<LE>,
+    /// Child SID
+    sid_child: U32<LE>,
+    /// CLSID (16 bytes)
+    clsid: [u8; 16],
+    /// State bits
+    state_bits: U32<LE>,
+    /// Creation time (FILETIME)
+    creation_time: U64<LE>,
+    /// Modified time (FILETIME)
+    modified_time: U64<LE>,
+    /// Starting sector
+    start_sector: U32<LE>,
+    /// Stream size
+    stream_size: U64<LE>,
+}
 
 /// Main OLE file parser structure
 ///
@@ -118,22 +154,36 @@ impl<R: Read + Seek> OleFile<R> {
         }
 
         // Parse header fields (little-endian)
-        let dll_version = u16::from_le_bytes([header[0x1A], header[0x1B]]);
-        let byte_order = u16::from_le_bytes([header[0x1C], header[0x1D]]);
-        let sector_shift = u16::from_le_bytes([header[0x1E], header[0x1F]]);
-        let mini_sector_shift = u16::from_le_bytes([header[0x20], header[0x21]]);
-        let first_dir_sector =
-            u32::from_le_bytes([header[0x30], header[0x31], header[0x32], header[0x33]]);
-        let mini_stream_cutoff =
-            u32::from_le_bytes([header[0x38], header[0x39], header[0x3A], header[0x3B]]);
-        let first_minifat_sector =
-            u32::from_le_bytes([header[0x3C], header[0x3D], header[0x3E], header[0x3F]]);
-        let num_minifat_sectors =
-            u32::from_le_bytes([header[0x40], header[0x41], header[0x42], header[0x43]]);
-        let first_difat_sector =
-            u32::from_le_bytes([header[0x44], header[0x45], header[0x46], header[0x47]]);
-        let num_difat_sectors =
-            u32::from_le_bytes([header[0x48], header[0x49], header[0x4A], header[0x4B]]);
+        let dll_version = U16::<LE>::read_from_bytes(&header[0x1A..0x1C])
+            .map(|v| v.get())
+            .unwrap_or(0);
+        let byte_order = U16::<LE>::read_from_bytes(&header[0x1C..0x1E])
+            .map(|v| v.get())
+            .unwrap_or(0);
+        let sector_shift = U16::<LE>::read_from_bytes(&header[0x1E..0x20])
+            .map(|v| v.get())
+            .unwrap_or(0);
+        let mini_sector_shift = U16::<LE>::read_from_bytes(&header[0x20..0x22])
+            .map(|v| v.get())
+            .unwrap_or(0);
+        let first_dir_sector = U32::<LE>::read_from_bytes(&header[0x30..0x34])
+            .map(|v| v.get())
+            .unwrap_or(0);
+        let mini_stream_cutoff = U32::<LE>::read_from_bytes(&header[0x38..0x3C])
+            .map(|v| v.get())
+            .unwrap_or(0);
+        let first_minifat_sector = U32::<LE>::read_from_bytes(&header[0x3C..0x40])
+            .map(|v| v.get())
+            .unwrap_or(0);
+        let num_minifat_sectors = U32::<LE>::read_from_bytes(&header[0x40..0x44])
+            .map(|v| v.get())
+            .unwrap_or(0);
+        let first_difat_sector = U32::<LE>::read_from_bytes(&header[0x44..0x48])
+            .map(|v| v.get())
+            .unwrap_or(0);
+        let num_difat_sectors = U32::<LE>::read_from_bytes(&header[0x48..0x4C])
+            .map(|v| v.get())
+            .unwrap_or(0);
 
         // Validate byte order (must be little-endian)
         if byte_order != 0xFFFE {
@@ -199,12 +249,9 @@ impl<R: Read + Seek> OleFile<R> {
             if offset + 4 > 512 {
                 break;
             }
-            let sector = u32::from_le_bytes([
-                header[offset],
-                header[offset + 1],
-                header[offset + 2],
-                header[offset + 3],
-            ]);
+            let sector = U32::<LE>::read_from_bytes(&header[offset..offset + 4])
+                .map(|v| v.get())
+                .unwrap_or(0);
             if sector == FREESECT || sector == ENDOFCHAIN {
                 break;
             }
@@ -222,12 +269,9 @@ impl<R: Read + Seek> OleFile<R> {
                 // Read FAT sector indexes from DIFAT sector
                 for i in 0..entries_per_sector {
                     let offset = i * 4;
-                    let sector = u32::from_le_bytes([
-                        sector_data[offset],
-                        sector_data[offset + 1],
-                        sector_data[offset + 2],
-                        sector_data[offset + 3],
-                    ]);
+                    let sector = U32::<LE>::read_from_bytes(&sector_data[offset..offset + 4])
+                        .map(|v| v.get())
+                        .unwrap_or(0);
                     if sector == FREESECT || sector == ENDOFCHAIN {
                         break;
                     }
@@ -236,12 +280,9 @@ impl<R: Read + Seek> OleFile<R> {
 
                 // Get next DIFAT sector
                 let next_offset = entries_per_sector * 4;
-                difat_sector = u32::from_le_bytes([
-                    sector_data[next_offset],
-                    sector_data[next_offset + 1],
-                    sector_data[next_offset + 2],
-                    sector_data[next_offset + 3],
-                ]);
+                difat_sector = U32::<LE>::read_from_bytes(&sector_data[next_offset..next_offset + 4])
+                    .map(|v| v.get())
+                    .unwrap_or(0);
 
                 if difat_sector == ENDOFCHAIN || difat_sector == FREESECT {
                     break;
@@ -259,12 +300,9 @@ impl<R: Read + Seek> OleFile<R> {
             // Parse sector as array of u32 (little-endian)
             for i in 0..entries_per_sector {
                 let offset = i * 4;
-                let entry = u32::from_le_bytes([
-                    sector_data[offset],
-                    sector_data[offset + 1],
-                    sector_data[offset + 2],
-                    sector_data[offset + 3],
-                ]);
+                let entry = U32::<LE>::read_from_bytes(&sector_data[offset..offset + 4])
+                    .map(|v| v.get())
+                    .unwrap_or(0);
                 self.fat.push(entry);
             }
         }
@@ -283,13 +321,9 @@ impl<R: Read + Seek> OleFile<R> {
 
         for i in 0..entries_count {
             let offset = i * 4;
-            let entry = u32::from_le_bytes([
-                minifat_data[offset],
-                minifat_data[offset + 1],
-                minifat_data[offset + 2],
-                minifat_data[offset + 3],
-            ]);
-            self.minifat.push(entry);
+            let entry = U32::<LE>::read_from_bytes(&minifat_data[offset..offset + 4])
+                .map_err(|_| OleError::InvalidFormat("Failed to read u32".to_string()))?;
+            self.minifat.push(entry.get());
         }
 
         Ok(())
@@ -319,49 +353,37 @@ impl<R: Read + Seek> OleFile<R> {
 
     /// Parse a single directory entry from 128 bytes
     fn parse_directory_entry(&self, data: &[u8], sid: u32) -> Result<DirectoryEntry, OleError> {
-        // Name: 64 bytes UTF-16LE
-        let name_len = u16::from_le_bytes([data[64], data[65]]) as usize;
-        let name_bytes = &data[0..name_len.saturating_sub(2).min(64)];
+        // Parse the raw directory entry
+        let raw = RawDirectoryEntry::read_from_bytes(data)
+            .map_err(|_| OleError::InvalidFormat("Failed to parse directory entry".to_string()))?;
 
-        // Decode UTF-16LE to String
+        // Decode name from UTF-16LE
+        let name_len = raw.name_len.get() as usize;
+        let name_bytes = &raw.name[0..name_len.saturating_sub(2).min(64)];
         let name = decode_utf16le(name_bytes);
 
-        // Entry type: 1 byte at offset 66
-        let entry_type = data[66];
+        // Format CLSID
+        let clsid = format_clsid(&raw.clsid);
 
-        // Red-black tree pointers
-        let sid_left = u32::from_le_bytes([data[68], data[69], data[70], data[71]]);
-        let sid_right = u32::from_le_bytes([data[72], data[73], data[74], data[75]]);
-        let sid_child = u32::from_le_bytes([data[76], data[77], data[78], data[79]]);
-
-        // CLSID: 16 bytes at offset 80
-        let clsid = format_clsid(&data[80..96]);
-
-        // Start sector: 4 bytes at offset 116
-        let start_sector = u32::from_le_bytes([data[116], data[117], data[118], data[119]]);
-
-        // Size: 8 bytes at offset 120 (but for 512-byte sectors, only low 4 bytes)
-        let size_low = u32::from_le_bytes([data[120], data[121], data[122], data[123]]);
-        let size_high = u32::from_le_bytes([data[124], data[125], data[126], data[127]]);
-
+        // Handle size based on sector size (512-byte sectors only use low 32 bits)
         let size = if self.sector_size == 512 {
-            size_low as u64
+            raw.stream_size.get() & 0xFFFFFFFF
         } else {
-            (size_low as u64) | ((size_high as u64) << 32)
+            raw.stream_size.get()
         };
 
         // Determine if stream should use MiniFAT
-        let is_minifat = size < self.mini_stream_cutoff as u64 && entry_type == STGTY_STREAM;
+        let is_minifat = size < self.mini_stream_cutoff as u64 && raw.entry_type == STGTY_STREAM;
 
         Ok(DirectoryEntry {
             sid,
             name,
-            entry_type,
-            sid_left,
-            sid_right,
-            sid_child,
+            entry_type: raw.entry_type,
+            sid_left: raw.sid_left.get(),
+            sid_right: raw.sid_right.get(),
+            sid_child: raw.sid_child.get(),
             clsid,
-            start_sector,
+            start_sector: raw.start_sector.get(),
             size,
             is_minifat,
             children: Vec::new(),
@@ -722,7 +744,9 @@ fn decode_utf16le(bytes: &[u8]) -> String {
     let mut utf16_chars = Vec::new();
 
     for chunk in bytes.chunks_exact(2) {
-        let code_unit = u16::from_le_bytes([chunk[0], chunk[1]]);
+        let code_unit = U16::<LE>::read_from_bytes(chunk)
+            .map(|v| v.get())
+            .unwrap_or(0);
         utf16_chars.push(code_unit);
     }
 
@@ -746,9 +770,15 @@ fn format_clsid(bytes: &[u8]) -> String {
     // Format as: {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}
     format!(
         "{:08X}-{:04X}-{:04X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}",
-        u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
-        u16::from_le_bytes([bytes[4], bytes[5]]),
-        u16::from_le_bytes([bytes[6], bytes[7]]),
+        U32::<LE>::read_from_bytes(&bytes[0..4])
+            .map(|v| v.get())
+            .unwrap_or(0),
+        U16::<LE>::read_from_bytes(&bytes[4..6])
+            .map(|v| v.get())
+            .unwrap_or(0),
+        U16::<LE>::read_from_bytes(&bytes[6..8])
+            .map(|v| v.get())
+            .unwrap_or(0),
         bytes[8],
         bytes[9],
         bytes[10],

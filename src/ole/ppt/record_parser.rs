@@ -4,6 +4,7 @@
 /// according to the MS-PPT specification, following POI's HSLF record parsing logic.
 use super::super::consts::PptRecordType;
 use super::package::{PptError, Result};
+use zerocopy::{byteorder::{U16, U32, LittleEndian}, FromBytes};
 
 /// A PPT record containing binary data and metadata.
 #[derive(Debug, Clone)]
@@ -75,18 +76,19 @@ impl PptRecord {
             return Err(PptError::Corrupted("Not enough data for PPT record header".to_string()));
         }
 
-        // Read record header (8 bytes) - little-endian format
-        let record_type = u16::from_le_bytes([data[offset], data[offset + 1]]);
-        let data_length = u32::from_le_bytes([
-            data[offset + 2],
-            data[offset + 3],
-            data[offset + 4],
-            data[offset + 5],
-        ]);
+        // Read record header (8 bytes) - little-endian format using zerocopy for zero-copy parsing
+        let record_type = U16::<LittleEndian>::read_from_bytes(&data[offset..offset + 2])
+            .map(|v| v.get())
+            .unwrap_or(0);
+        let data_length = U32::<LittleEndian>::read_from_bytes(&data[offset + 2..offset + 6])
+            .map(|v| v.get())
+            .unwrap_or(0);
 
         // Version and instance are packed in the same 16-bit field
         // Format: VVVV VVVV IIII IIII (V = version bits, I = instance bits)
-        let version_instance = u16::from_le_bytes([data[offset + 6], data[offset + 7]]);
+        let version_instance = U16::<LittleEndian>::read_from_bytes(&data[offset + 6..offset + 8])
+            .map(|v| v.get())
+            .unwrap_or(0);
         let version = (version_instance >> 4) & 0x0FFF;  // High 12 bits for version
         let instance = version_instance & 0x0FFF;        // Low 12 bits for instance
 
@@ -194,17 +196,19 @@ impl PptRecord {
             return Some(ppdrawing.data.clone());
         }
 
-        // For Slide records, check if they contain Escher data directly
-        if self.record_type == PptRecordType::Slide {
-            // Slide records may contain Escher data in their data section
-            if !self.data.is_empty() && self.data.len() > 8 {
-                // Check if the data contains Escher records (records >= 0xF000)
-                let first_record_type = u16::from_le_bytes([self.data[0], self.data[1]]);
-                if first_record_type >= 0xF000 {
-                    return Some(self.data.clone());
+            // For Slide records, check if they contain Escher data directly
+            if self.record_type == PptRecordType::Slide {
+                // Slide records may contain Escher data in their data section
+                if !self.data.is_empty() && self.data.len() > 8 {
+                    // Check if the data contains Escher records (records >= 0xF000)
+                    let first_record_type = U16::<LittleEndian>::read_from_bytes(&self.data[0..2])
+                        .map(|v| v.get())
+                        .unwrap_or(0);
+                    if first_record_type >= 0xF000 {
+                        return Some(self.data.clone());
+                    }
                 }
             }
-        }
 
         None
     }
@@ -245,27 +249,27 @@ impl PptRecord {
 
         if record.data.len() >= 20 { // DocumentAtom should have at least 20 bytes
             // Parse slide size information
-            info.slide_width = u32::from_le_bytes([
-                record.data[0], record.data[1], record.data[2], record.data[3]
-            ]);
-            info.slide_height = u32::from_le_bytes([
-                record.data[4], record.data[5], record.data[6], record.data[7]
-            ]);
+            info.slide_width = U32::<LittleEndian>::read_from_bytes(&record.data[0..4])
+                .map(|v| v.get())
+                .unwrap_or(0);
+            info.slide_height = U32::<LittleEndian>::read_from_bytes(&record.data[4..8])
+                .map(|v| v.get())
+                .unwrap_or(0);
 
             // Parse slide count
-            info.slide_count = u32::from_le_bytes([
-                record.data[8], record.data[9], record.data[10], record.data[11]
-            ]) as usize;
+            info.slide_count = U32::<LittleEndian>::read_from_bytes(&record.data[8..12])
+                .map(|v| v.get() as usize)
+                .unwrap_or(0);
 
             // Parse notes count
-            info.notes_count = u32::from_le_bytes([
-                record.data[12], record.data[13], record.data[14], record.data[15]
-            ]) as usize;
+            info.notes_count = U32::<LittleEndian>::read_from_bytes(&record.data[12..16])
+                .map(|v| v.get() as usize)
+                .unwrap_or(0);
 
             // Parse master count (usually 1)
-            info.master_count = u32::from_le_bytes([
-                record.data[16], record.data[17], record.data[18], record.data[19]
-            ]) as usize;
+            info.master_count = U32::<LittleEndian>::read_from_bytes(&record.data[16..20])
+                .map(|v| v.get() as usize)
+                .unwrap_or(0);
         }
 
         info
@@ -305,19 +309,19 @@ impl PptRecord {
 
         if record.data.len() >= 12 { // SlideAtom should have at least 12 bytes
             // Parse slide layout (master slide reference)
-            info.layout_id = u32::from_le_bytes([
-                record.data[0], record.data[1], record.data[2], record.data[3]
-            ]);
+            info.layout_id = U32::<LittleEndian>::read_from_bytes(&record.data[0..4])
+                .map(|v| v.get())
+                .unwrap_or(0);
 
             // Parse master slide ID
-            info.master_id = u32::from_le_bytes([
-                record.data[4], record.data[5], record.data[6], record.data[7]
-            ]);
+            info.master_id = U32::<LittleEndian>::read_from_bytes(&record.data[4..8])
+                .map(|v| v.get())
+                .unwrap_or(0);
 
             // Parse notes ID
-            info.notes_id = u32::from_le_bytes([
-                record.data[8], record.data[9], record.data[10], record.data[11]
-            ]);
+            info.notes_id = U32::<LittleEndian>::read_from_bytes(&record.data[8..12])
+                .map(|v| v.get())
+                .unwrap_or(0);
         }
 
         info
@@ -392,7 +396,9 @@ impl PptRecord {
         // Process in chunks of 2 bytes for better performance
         let mut i = 0;
         while i + 1 < bytes.len() {
-            let code_unit = unsafe { u16::from_le_bytes(*(&bytes[i..i + 2] as *const [u8] as *const [u8; 2])) };
+            let code_unit = U16::<LittleEndian>::read_from_bytes(&bytes[i..i + 2])
+                .map(|v| v.get())
+                .unwrap_or(0);
             i += 2;
 
             // Use match expression for cleaner character processing
@@ -585,7 +591,9 @@ impl PptRecordParser {
         let mut offset = 0;
         while offset + 8 <= slide_data.len() {
             // Check if this is an Escher record (records >= 0xF000)
-            let record_type = u16::from_le_bytes([slide_data[offset], slide_data[offset + 1]]);
+            let record_type = U16::<LittleEndian>::read_from_bytes(&slide_data[offset..offset + 2])
+                .map(|v| v.get())
+                .unwrap_or(0);
             if record_type >= 0xF000 {
                 // This is an Escher record, parse it
                 if let Ok((record, consumed)) = super::shapes::escher::EscherRecord::parse(slide_data, offset) {
@@ -612,12 +620,9 @@ impl PptRecordParser {
                     Err(_) => {
                         // If parsing fails, try to skip the record gracefully
                         let data_length = if offset + 6 <= slide_data.len() {
-                            u32::from_le_bytes([
-                                slide_data[offset + 2],
-                                slide_data[offset + 3],
-                                slide_data[offset + 4],
-                                slide_data[offset + 5],
-                            ])
+                            U32::<LittleEndian>::read_from_bytes(&slide_data[offset + 2..offset + 6])
+                                .map(|v| v.get())
+                                .unwrap_or(0)
                         } else {
                             break;
                         };

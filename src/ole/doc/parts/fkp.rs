@@ -9,7 +9,7 @@
 /// - [MS-DOC] 2.4.3 PnFkp* (Page Number FKP)
 /// Size of an FKP page in bytes (always 512)
 const FKP_PAGE_SIZE: usize = 512;
-
+use crate::ole::binary::read_u32_le;
 /// A single entry in an FKP page.
 ///
 /// Each entry contains a File Character position (FC) and associated property data.
@@ -70,12 +70,7 @@ impl ChpxFkp {
             if offset + 4 > page_data.len() {
                 return None;
             }
-            let fc = u32::from_le_bytes([
-                page_data[offset],
-                page_data[offset + 1],
-                page_data[offset + 2],
-                page_data[offset + 3],
-            ]);
+            let fc = read_u32_le(&page_data, offset).unwrap_or(0);
             fcs.push(fc);
         }
 
@@ -188,12 +183,7 @@ impl PapxFkp {
             if offset + 4 > page_data.len() {
                 return None;
             }
-            let fc = u32::from_le_bytes([
-                page_data[offset],
-                page_data[offset + 1],
-                page_data[offset + 2],
-                page_data[offset + 3],
-            ]);
+            let fc = read_u32_le(&page_data, offset).unwrap_or(0);
             fcs.push(fc);
         }
 
