@@ -91,11 +91,11 @@ impl Metadata {
             return Ok(String::new());
         }
 
-        let yaml = serde_yaml::to_string(self)
+        let yaml_string = serde_saphyr::to_string(self)
             .map_err(|e| crate::common::Error::Other(format!("Failed to serialize metadata to YAML: {}", e)))?;
 
         // Add YAML front matter delimiters
-        Ok(format!("---\n{}---\n\n", yaml))
+        Ok(format!("---\n{}---\n\n", yaml_string))
     }
 }
 
