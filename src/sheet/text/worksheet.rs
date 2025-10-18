@@ -27,7 +27,7 @@ impl TextWorksheet {
     }
 
     /// Create a text worksheet from parsed data
-    pub fn from_data(data: &Vec<Vec<CellValue>>, name: String) -> Self {
+    pub fn from_data(data: &[Vec<CellValue>], name: String) -> Self {
         let dimensions = if data.is_empty() {
             None
         } else {
@@ -36,7 +36,7 @@ impl TextWorksheet {
         };
 
         TextWorksheet {
-            data: data.clone(),
+            data: data.to_vec(),
             name,
             dimensions,
         }

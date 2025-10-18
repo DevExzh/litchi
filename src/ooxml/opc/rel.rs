@@ -215,7 +215,7 @@ impl Relationships {
             .filter_map(|r_id| {
                 // Extract number from "rId123" format using fast byte searching
                 if r_id.len() > 3 && &r_id[..3] == "rId" {
-                    atoi_simd::parse::<u32>(r_id[3..].as_bytes()).ok()
+                    atoi_simd::parse::<u32>(&r_id.as_bytes()[3..]).ok()
                 } else {
                     None
                 }

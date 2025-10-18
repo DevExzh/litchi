@@ -100,12 +100,12 @@ impl RecordHeader {
         }
 
         // Read version and instance from first 2 bytes
-        let ver_inst = read_u16_le(&data, 0).unwrap_or(0);
+        let ver_inst = read_u16_le(data, 0).unwrap_or(0);
         let version = (ver_inst & 0x0F) as u8;
         let instance = (ver_inst >> 4) & 0xFFF;
 
-        let record_type = read_u16_le(&data, 2).unwrap_or(0);
-        let length = read_u32_le(&data, 4).unwrap_or(0);
+        let record_type = read_u16_le(data, 2).unwrap_or(0);
+        let length = read_u32_le(data, 4).unwrap_or(0);
 
         Ok(Self {
             version,

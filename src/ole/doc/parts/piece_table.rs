@@ -102,8 +102,8 @@ impl PieceTable {
 
         eprintln!("DEBUG: PieceTable: parsing {} bytes of CLX data", clx_data.len());
         eprint!("DEBUG: PieceTable: first 36 bytes: ");
-        for i in 0..clx_data.len().min(36) {
-            eprint!("{:02X} ", clx_data[i]);
+        for item in clx_data.iter().take(clx_data.len().min(36)) {
+            eprint!("{:02X} ", item);
         }
         eprintln!();
 
@@ -123,7 +123,7 @@ impl PieceTable {
                 return None;
             }
             // Read size as SHORT (2 bytes) - POI line 56
-            let size = read_u16_le(&clx_data, offset).unwrap_or(0) as usize;
+            let size = read_u16_le(clx_data, offset).unwrap_or(0) as usize;
             offset += 2;
             
             if offset + size > clx_data.len() {
@@ -145,7 +145,7 @@ impl PieceTable {
         }
 
         // Read lcb as INT (4 bytes) - POI line 70
-        let lcb = read_u32_le(&clx_data, offset).unwrap_or(0) as usize;
+        let lcb = read_u32_le(clx_data, offset).unwrap_or(0) as usize;
         offset += 4;
 
         if offset + lcb > clx_data.len() {
@@ -174,7 +174,7 @@ impl PieceTable {
             // Bytes 2-5: fc (File Character position)
             // Bytes 6-7: prm (Property modifier - for paragraph/character properties)
             
-            let fc_raw = read_u32_le(&pcd_data, 2).unwrap_or(0);
+            let fc_raw = read_u32_le(pcd_data, 2).unwrap_or(0);
 
             // FC encoding (from POI's PieceDescriptor.java):
             // - Bit 30 (0x40000000): if CLEAR (0), text is Unicode (UTF-16LE)

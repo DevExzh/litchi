@@ -61,6 +61,7 @@ pub fn parse_sheet_data(sheet_data: &str, cells: &mut HashMap<u32, HashMap<u32, 
 }
 
 /// Parse a single row XML to extract cells.
+#[allow(clippy::type_complexity)]
 pub fn parse_row_xml(row_content: &str) -> Result<Option<(u32, Vec<(u32, CellValue)>)>> {
     // Extract row number - optimized attribute parsing
     let row_num = if let Some(r_start) = memchr::memmem::find(row_content.as_bytes(), b"r=\"") {

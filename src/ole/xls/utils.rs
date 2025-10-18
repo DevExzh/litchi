@@ -36,7 +36,7 @@ pub fn parse_string_record(data: &[u8], encoding: &XlsEncoding) -> XlsResult<Str
     let flags = data[2];
 
     let high_byte = (flags & 0x01) != 0;
-    let offset = if matches!(encoding, XlsEncoding::Utf16Le) { 3 } else { 3 };
+    let offset = 3;
 
     if data.len() < offset + len {
         return Err(XlsError::InvalidLength {

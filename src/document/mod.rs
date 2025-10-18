@@ -56,6 +56,7 @@ use std::path::Path;
 /// This enum wraps the format-specific implementations and provides
 /// a unified API. Users typically don't interact with this enum directly,
 /// but instead use the methods on `Document`.
+#[allow(clippy::large_enum_variant)]
 enum DocumentImpl {
     /// Legacy .doc format
     Doc(ole::doc::Document, crate::common::Metadata),

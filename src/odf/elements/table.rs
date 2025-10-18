@@ -251,7 +251,7 @@ impl TableCell {
                     return Ok(CellValue::Time(val_str.to_string()));
                 }
             }
-            Some("string") | _ => {
+            _ => {
                 let text = self.text()?;
                 if text.trim().is_empty() {
                     return Ok(CellValue::Empty);

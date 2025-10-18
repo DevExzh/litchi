@@ -261,10 +261,8 @@ impl TemplateParser {
                 LargeOperator::Sum
             } else if latex.contains("\\prod") {
                 LargeOperator::Product
-            } else if latex.contains("\\int") {
-                LargeOperator::Integral
             } else {
-                LargeOperator::Integral // fallback
+                LargeOperator::Integral
             };
 
             let mut lower_limit = None;

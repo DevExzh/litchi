@@ -131,7 +131,7 @@ impl TextExtractor {
                         return Err(DocError::Corrupted("GRPPR L section truncated".to_string()));
                     }
 
-                    let size = read_u16_le(&clx_data, offset).unwrap_or(0) as usize;
+                    let size = read_u16_le(clx_data, offset).unwrap_or(0) as usize;
                     offset += 2 + size;
                 }
                 0x02 => {
@@ -140,7 +140,7 @@ impl TextExtractor {
                         return Err(DocError::Corrupted("Piece table size field truncated".to_string()));
                     }
 
-                    let piece_table_size = read_u32_le(&clx_data, offset).unwrap_or(0) as usize;
+                    let piece_table_size = read_u32_le(clx_data, offset).unwrap_or(0) as usize;
                     offset += 4;
 
                     if offset + piece_table_size > clx_data.len() {
@@ -161,13 +161,13 @@ impl TextExtractor {
                         return Err(DocError::Corrupted("Document Properties section truncated".to_string()));
                     }
 
-                    let size = read_u16_le(&clx_data, offset).unwrap_or(0) as usize;
+                    let size = read_u16_le(clx_data, offset).unwrap_or(0) as usize;
                     offset += 2 + size;
                 }
                 _ => {
                     // For unknown section types, try to skip them gracefully
                     if offset + 2 <= clx_data.len() {
-                        let size = read_u16_le(&clx_data, offset).unwrap_or(0) as usize;
+                        let size = read_u16_le(clx_data, offset).unwrap_or(0) as usize;
                         offset += 2 + size;
                     } else {
                         return Err(DocError::Corrupted(format!(
@@ -218,7 +218,7 @@ impl TextExtractor {
         let mut cps = Vec::with_capacity(num_pieces + 1);
         for i in 0..=num_pieces {
             let offset = i * 4;
-            let cp = read_u32_le(&plex_data, offset).unwrap_or(0);
+            let cp = read_u32_le(plex_data, offset).unwrap_or(0);
             cps.push(cp);
         }
 
@@ -236,9 +236,9 @@ impl TextExtractor {
             let piece_data = &plex_data[offset..offset + PIECE_DESCRIPTOR_SIZE];
 
             // Parse PieceDescriptor (matches Apache POI's PieceDescriptor constructor)
-            let _descriptor = read_u16_le(&piece_data, 0).unwrap_or(0);
-            let mut fc = read_u32_le(&piece_data, 2).unwrap_or(0);
-            let _prm = read_u16_le(&piece_data, 6).unwrap_or(0);
+            let _descriptor = read_u16_le(piece_data, 0).unwrap_or(0);
+            let mut fc = read_u32_le(piece_data, 2).unwrap_or(0);
+            let _prm = read_u16_le(piece_data, 6).unwrap_or(0);
 
             // Extract encoding information from fc (bit 30 indicates encoding)
             // From Apache POI PieceDescriptor.java lines 69-76:
@@ -324,7 +324,7 @@ impl TextExtractor {
                 };
 
                 for chunk in utf16_data.chunks_exact(2) {
-                    let code_unit = read_u16_le(&chunk, 0).unwrap_or(0);
+                    let code_unit = read_u16_le(chunk, 0).unwrap_or(0);
                     if let Some(ch) = char::from_u32(code_unit as u32) {
                         text.push(ch);
                     }

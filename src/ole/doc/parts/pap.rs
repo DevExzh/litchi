@@ -229,7 +229,7 @@ impl ParagraphProperties {
             }
 
             // Read SPRM opcode (2 bytes in Word 97+)
-            let sprm = read_u16_le(&grpprl, offset).unwrap_or(0);
+            let sprm = read_u16_le(grpprl, offset).unwrap_or(0);
             offset += 2;
 
             // Parse SPRM based on opcode using match for idiomatic Rust
@@ -251,44 +251,44 @@ impl ParagraphProperties {
                 // Left indent (sprmPDxaLeft)
                 0x840F | 0x000F => {
                     if offset + 1 < grpprl.len() {
-                        pap.indent_left = Some(read_i16_le(&grpprl, offset).unwrap_or(0) as i32);
+                        pap.indent_left = Some(read_i16_le(grpprl, offset).unwrap_or(0) as i32);
                         offset += 2;
                     }
                 }
                 // Right indent (sprmPDxaRight)
                 0x8411 | 0x0011 => {
                     if offset + 1 < grpprl.len() {
-                        pap.indent_right = Some(read_i16_le(&grpprl, offset).unwrap_or(0) as i32);
+                        pap.indent_right = Some(read_i16_le(grpprl, offset).unwrap_or(0) as i32);
                         offset += 2;
                     }
                 }
                 // First line indent (sprmPDxaLeft1)
                 0x8416 | 0x0016 => {
                     if offset + 1 < grpprl.len() {
-                        pap.indent_first_line = Some(read_i16_le(&grpprl, offset).unwrap_or(0) as i32);
+                        pap.indent_first_line = Some(read_i16_le(grpprl, offset).unwrap_or(0) as i32);
                         offset += 2;
                     }
                 }
                 // Space before (sprmPDyaBefore)
                 0xA413 | 0x0013 => {
                     if offset + 1 < grpprl.len() {
-                        pap.space_before = Some(read_u16_le(&grpprl, offset).unwrap_or(0) as i32);
+                        pap.space_before = Some(read_u16_le(grpprl, offset).unwrap_or(0) as i32);
                         offset += 2;
                     }
                 }
                 // Space after (sprmPDyaAfter)
                 0xA414 | 0x0014 => {
                     if offset + 1 < grpprl.len() {
-                        pap.space_after = Some(read_u16_le(&grpprl, offset).unwrap_or(0) as i32);
+                        pap.space_after = Some(read_u16_le(grpprl, offset).unwrap_or(0) as i32);
                         offset += 2;
                     }
                 }
                 // Line spacing (sprmPDyaLine)
                 0x6412 | 0x0012 => {
                     if offset + 3 < grpprl.len() {
-                        pap.line_spacing = Some(read_i16_le(&grpprl, offset).unwrap_or(0) as i32);
+                        pap.line_spacing = Some(read_i16_le(grpprl, offset).unwrap_or(0) as i32);
                         // Line spacing type is in the next 2 bytes
-                        let spacing_type = read_u16_le(&grpprl, offset + 2).unwrap_or(0);
+                        let spacing_type = read_u16_le(grpprl, offset + 2).unwrap_or(0);
                         pap.line_spacing_type = match spacing_type {
                             0 => LineSpacingType::Single,
                             1 => LineSpacingType::OnePointFive,
@@ -338,7 +338,7 @@ impl ParagraphProperties {
                         // Each tab is 4 bytes: position (2) + alignment (1) + leader (1)
                         for _ in 0..tab_count.min(64) {
                             if offset + 3 < grpprl.len() {
-                                let position = read_i16_le(&grpprl, offset).unwrap_or(0) as i32;
+                                let position = read_i16_le(grpprl, offset).unwrap_or(0) as i32;
                                 let alignment_val = grpprl[offset + 2];
                                 let leader_val = grpprl[offset + 3];
 

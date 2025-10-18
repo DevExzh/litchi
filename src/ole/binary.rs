@@ -11,7 +11,7 @@ pub fn read_u16_le(data: &[u8], offset: usize) -> Result<u16, OleError> {
     }
     U16::<LE>::read_from_bytes(&data[offset..offset + 2])
         .map(|v| v.get())
-        .or_else(|_| Err(OleError::InvalidData("Failed to read u16".to_string())))
+        .map_err(|_| OleError::InvalidData("Failed to read u16".to_string()))
 }
 
 /// Read a little-endian u16 from a byte slice starting at offset 0.
@@ -28,7 +28,7 @@ pub fn read_i16_le(data: &[u8], offset: usize) -> Result<i16, OleError> {
     }
     I16::<LE>::read_from_bytes(&data[offset..offset + 2])
         .map(|v| v.get())
-        .or_else(|_| Err(OleError::InvalidData("Failed to read i16".to_string())))
+        .map_err(|_| OleError::InvalidData("Failed to read i16".to_string()))
 }
 
 /// Read a little-endian u32 from a byte slice at the given offset.
@@ -39,7 +39,7 @@ pub fn read_u32_le(data: &[u8], offset: usize) -> Result<u32, OleError> {
     }
     U32::<LE>::read_from_bytes(&data[offset..offset + 4])
         .map(|v| v.get())
-        .or_else(|_| Err(OleError::InvalidData("Failed to read u32".to_string())))
+        .map_err(|_| OleError::InvalidData("Failed to read u32".to_string()))
 }
 
 /// Read a little-endian u32 from a byte slice starting at offset 0.
@@ -56,7 +56,7 @@ pub fn read_i32_le(data: &[u8], offset: usize) -> Result<i32, OleError> {
     }
     I32::<LE>::read_from_bytes(&data[offset..offset + 4])
         .map(|v| v.get())
-        .or_else(|_| Err(OleError::InvalidData("Failed to read i32".to_string())))
+        .map_err(|_| OleError::InvalidData("Failed to read i32".to_string()))
 }
 
 /// Read a little-endian f64 from a byte slice at the given offset.
@@ -67,7 +67,7 @@ pub fn read_f64_le(data: &[u8], offset: usize) -> Result<f64, OleError> {
     }
     F64::<LE>::read_from_bytes(&data[offset..offset + 8])
         .map(|v| v.get())
-        .or_else(|_| Err(OleError::InvalidData("Failed to read f64".to_string())))
+        .map_err(|_| OleError::InvalidData("Failed to read f64".to_string()))
 }
 
 /// Read a little-endian f64 from a byte slice starting at offset 0.

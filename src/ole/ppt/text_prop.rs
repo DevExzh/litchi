@@ -177,7 +177,7 @@ pub fn parse_style_text_prop_atom(data: &[u8], text_length: usize) -> (Vec<TextP
     let mut para_chars_covered = 0u32;
     while para_chars_covered < text_length as u32 && offset + 6 <= data.len() {
         // Read character count (4 bytes in POI's implementation)
-        let char_count = read_u32_le(&data, offset).unwrap_or(0);
+        let char_count = read_u32_le(data, offset).unwrap_or(0);
         offset += 4;
 
         if char_count == 0 {
@@ -185,14 +185,14 @@ pub fn parse_style_text_prop_atom(data: &[u8], text_length: usize) -> (Vec<TextP
         }
 
         // Read indent level (2 bytes)
-        let indent_level = read_i16_le(&data, offset).unwrap_or(0);
+        let indent_level = read_i16_le(data, offset).unwrap_or(0);
         offset += 2;
 
         // Read mask (4 bytes)
         if offset + 4 > data.len() {
             break;
         }
-        let mask = read_u32_le(&data, offset).unwrap_or(0);
+        let mask = read_u32_le(data, offset).unwrap_or(0);
         offset += 4;
 
         // Parse properties based on mask
@@ -210,7 +210,7 @@ pub fn parse_style_text_prop_atom(data: &[u8], text_length: usize) -> (Vec<TextP
     let mut char_chars_covered = 0u32;
     while char_chars_covered < text_length as u32 && offset + 6 <= data.len() {
         // Read character count (4 bytes)
-        let char_count = read_u32_le(&data, offset).unwrap_or(0);
+        let char_count = read_u32_le(data, offset).unwrap_or(0);
         offset += 4;
 
         if char_count == 0 {
@@ -221,7 +221,7 @@ pub fn parse_style_text_prop_atom(data: &[u8], text_length: usize) -> (Vec<TextP
         if offset + 4 > data.len() {
             break;
         }
-        let mask = read_u32_le(&data, offset).unwrap_or(0);
+        let mask = read_u32_le(data, offset).unwrap_or(0);
         offset += 4;
 
         // Parse properties based on mask

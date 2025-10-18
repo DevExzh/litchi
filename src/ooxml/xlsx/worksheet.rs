@@ -115,6 +115,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Parse a single row XML.
+    #[allow(clippy::type_complexity)]
     fn parse_row_xml(&self, row_content: &str) -> SheetResult<Option<(u32, Vec<(u32, CellValue)>)>> {
         // Extract row number
         let row_num = if let Some(r_start) = row_content.find("r=\"") {

@@ -165,13 +165,9 @@ fn detect_iwork_format_from_files(bundle_path: &Path) -> Option<FileFormat> {
     if numbers_calc.exists() && numbers_calc.is_dir() {
         // Look for Numbers calculation files
         let calc_files = std::fs::read_dir(&numbers_calc).ok()?;
-        for entry in calc_files {
-            if let Ok(entry) = entry {
-                if let Some(ext) = entry.path().extension() {
-                    if ext == "iwa" {
-                        return Some(FileFormat::Numbers);
-                    }
-                }
+        for entry in calc_files.flatten() {
+            if entry.path().extension().is_some_and(|ext| ext == "iwa") {
+                return Some(FileFormat::Numbers);
             }
         }
     }
@@ -247,30 +243,24 @@ fn detect_application_from_message_types<R: Read + std::io::Seek>(archive: &mut 
 
     // Process each IWA file in the archive
     for i in 0..archive.len() {
-        if let Ok(mut zip_file) = archive.by_index(i) {
-            if zip_file.name().ends_with(".iwa") {
-                // Read the compressed IWA data
-                let mut compressed_data = Vec::new();
-                if zip_file.read_to_end(&mut compressed_data).is_err() {
-                    continue; // Skip files we can't read
-                }
+        if let Ok(mut zip_file) = archive.by_index(i) && zip_file.name().ends_with(".iwa") {
+            // Read the compressed IWA data
+            let mut compressed_data = Vec::new();
+            if zip_file.read_to_end(&mut compressed_data).is_err() {
+                continue; // Skip files we can't read
+            }
 
-                // Try to decompress and parse the IWA file
-                match crate::iwa::snappy::SnappyStream::decompress(&mut Cursor::new(&compressed_data)) {
-                    Ok(decompressed) => {
-                        match crate::iwa::archive::Archive::parse(decompressed.data()) {
-                            Ok(iwa_archive) => {
-                                // Extract message types from all objects in this archive
-                                for object in &iwa_archive.objects {
-                                    for message in &object.messages {
-                                        all_message_types.push(message.type_);
-                                    }
-                                }
-                            }
-                            Err(_) => {} // Skip parse errors
-                        }
-                    }
-                    Err(_) => {} // Skip decompression errors
+            // Try to decompress and parse the IWA file
+            let Ok(decompressed) = crate::iwa::snappy::SnappyStream::decompress(&mut Cursor::new(&compressed_data)) else {
+                continue; // Skip files we can't read
+            };
+            let Ok(iwa_archive) = crate::iwa::archive::Archive::parse(decompressed.data()) else {
+                continue; // Skip files we can't read
+            };
+            // Extract message types from all objects in this archive
+            for object in &iwa_archive.objects {
+                for message in &object.messages {
+                    all_message_types.push(message.type_);
                 }
             }
         }

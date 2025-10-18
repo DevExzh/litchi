@@ -64,9 +64,11 @@ fn decode_table_model(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
     Ok(Box::new(TableModelWrapper(msg)) as Box<dyn DecodedMessage>)
 }
 
+type DecoderMap = phf::Map<u32, fn(&[u8]) -> Result<Box<dyn DecodedMessage>>>;
+
 /// Perfect hash map of message type IDs to decoder functions
 /// This provides O(1) lookup performance at compile time
-static DECODERS: phf::Map<u32, fn(&[u8]) -> Result<Box<dyn DecodedMessage>>> = phf_map! {
+static DECODERS: DecoderMap = phf_map! {
     1u32 => decode_archive_info,
     2u32 => decode_message_info,
     100u32 => decode_table_model,

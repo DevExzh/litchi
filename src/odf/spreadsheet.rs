@@ -558,7 +558,7 @@ impl CellBuilder {
                     CellValue::Text(text_content.to_string())
                 }
             }
-            Some("string") | _ => {
+            _ => {
                 if text_content.trim().is_empty() {
                     CellValue::Empty
                 } else {

@@ -111,7 +111,7 @@ pub fn parse_sprms(grpprl: &[u8]) -> Vec<Sprm> {
 
     while offset + 2 <= grpprl.len() {
         // Read SPRM opcode (2 bytes in Word 97+)
-        let opcode = read_u16_le(&grpprl, offset).unwrap_or(0);
+        let opcode = read_u16_le(grpprl, offset).unwrap_or(0);
 
         offset += 2;
 
@@ -137,7 +137,7 @@ pub fn parse_sprms(grpprl: &[u8]) -> Vec<Sprm> {
                     if opcode == 0xc615 || opcode == 0xd608 {
                         // Long SPRM - operand size in next 2 bytes
                         if offset + 3 <= grpprl.len() {
-                            read_u16_le(&grpprl, offset).unwrap_or(0) as usize
+                            read_u16_le(grpprl, offset).unwrap_or(0) as usize
                         } else {
                             break;
                         }

@@ -1,12 +1,13 @@
-/// FKP (Formatted Disk Page) parser for DOC files.
-///
-/// FKPs are 512-byte pages used to store character and paragraph properties.
-/// Based on Apache POI's FormattedDiskPage and CHPFormattedDiskPage.
-///
-/// References:
-/// - org.apache.poi.hwpf.model.FormattedDiskPage
-/// - org.apache.poi.hwpf.model.CHPFormattedDiskPage
-/// - [MS-DOC] 2.4.3 PnFkp* (Page Number FKP)
+//! FKP (Formatted Disk Page) parser for DOC files.
+//!
+//! FKPs are 512-byte pages used to store character and paragraph properties.
+//! Based on Apache POI's FormattedDiskPage and CHPFormattedDiskPage.
+//!
+//! References:
+//! - org.apache.poi.hwpf.model.FormattedDiskPage
+//! - org.apache.poi.hwpf.model.CHPFormattedDiskPage
+//! - [MS-DOC] 2.4.3 PnFkp* (Page Number FKP)
+
 /// Size of an FKP page in bytes (always 512)
 const FKP_PAGE_SIZE: usize = 512;
 use crate::ole::binary::read_u32_le;
@@ -70,15 +71,14 @@ impl ChpxFkp {
             if offset + 4 > page_data.len() {
                 return None;
             }
-            let fc = read_u32_le(&page_data, offset).unwrap_or(0);
+            let fc = read_u32_le(page_data, offset).unwrap_or(0);
             fcs.push(fc);
         }
 
         // Parse BX array (1 byte each, crun entries)
         // Each BX is offset*2 from start of page to grpprl
         let bx_offset = (crun + 1) * 4;
-        for i in 0..crun {
-            let fc_start = fcs[i];
+        for (i, fc_start) in fcs.iter().enumerate().take(crun) {
             let bx_index = bx_offset + i;
             
             if bx_index >= page_data.len() {
@@ -90,7 +90,7 @@ impl ChpxFkp {
             // BX = 0 means no formatting (use default)
             if bx == 0 {
                 entries.push(FkpEntry {
-                    fc: fc_start,
+                    fc: *fc_start,
                     grpprl: Vec::new(),
                 });
                 continue;
@@ -124,7 +124,7 @@ impl ChpxFkp {
             let grpprl = page_data[grpprl_start..grpprl_end].to_vec();
 
             entries.push(FkpEntry {
-                fc: fc_start,
+                fc: *fc_start,
                 grpprl,
             });
         }
@@ -183,14 +183,13 @@ impl PapxFkp {
             if offset + 4 > page_data.len() {
                 return None;
             }
-            let fc = read_u32_le(&page_data, offset).unwrap_or(0);
+            let fc = read_u32_le(page_data, offset).unwrap_or(0);
             fcs.push(fc);
         }
 
         // Parse BX array (13 bytes each for PAPX, not 1 byte like CHPX)
         let bx_offset = (cpara + 1) * 4;
-        for i in 0..cpara {
-            let fc_start = fcs[i];
+        for (i, fc_start) in fcs.iter().enumerate().take(cpara) {
             let bx_index = bx_offset + (i * 13);
             
             if bx_index + 13 > page_data.len() {
@@ -200,7 +199,7 @@ impl PapxFkp {
             // For PAPX, BX structure is more complex
             // For now, use simplified parsing
             entries.push(FkpEntry {
-                fc: fc_start,
+                fc: *fc_start,
                 grpprl: Vec::new(),
             });
         }
