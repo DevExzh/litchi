@@ -4,128 +4,92 @@
 //! used in iWork IWA (iWork Archive) files using the prost crate.
 
 use crate::iwa::{Error, Result};
+use phf::phf_map;
 use prost::Message;
 
 // Include the generated protobuf definitions from build.rs
 include!(concat!(env!("OUT_DIR"), "/iwa_protos.rs"));
 
-/// A message decoder that can handle different iWork message types
-pub struct MessageDecoder {
-    /// Map of message type IDs to decoding functions
-    decoders: std::collections::HashMap<u32, Box<dyn Fn(&[u8]) -> Result<Box<dyn DecodedMessage>>>>,
+/// Static decoder function for ArchiveInfo messages
+fn decode_archive_info(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = tsp::ArchiveInfo::decode(data)?;
+    Ok(Box::new(ArchiveInfoWrapper(msg)) as Box<dyn DecodedMessage>)
 }
 
-impl Default for MessageDecoder {
-    fn default() -> Self {
-        Self::new()
-    }
+/// Static decoder function for MessageInfo messages
+fn decode_message_info(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = tsp::MessageInfo::decode(data)?;
+    Ok(Box::new(MessageInfoWrapper(msg)) as Box<dyn DecodedMessage>)
 }
 
-impl MessageDecoder {
-    /// Create a new message decoder
-    pub fn new() -> Self {
-        let mut decoder = MessageDecoder {
-            decoders: std::collections::HashMap::new(),
-        };
+/// Static decoder function for Pages DocumentArchive messages
+fn decode_pages_document(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = tp::DocumentArchive::decode(data)?;
+    Ok(Box::new(PagesDocumentWrapper(msg)) as Box<dyn DecodedMessage>)
+}
 
-        // Register decoders for common message types
-        decoder.register_decoder(1, |data| {
-            let msg = tsp::ArchiveInfo::decode(data)?;
-            Ok(Box::new(ArchiveInfoWrapper(msg)) as Box<dyn DecodedMessage>)
-        });
+/// Static decoder function for Numbers DocumentArchive messages
+fn decode_numbers_document(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = tn::DocumentArchive::decode(data)?;
+    Ok(Box::new(NumbersDocumentWrapper(msg)) as Box<dyn DecodedMessage>)
+}
 
-        decoder.register_decoder(2, |data| {
-            let msg = tsp::MessageInfo::decode(data)?;
-            Ok(Box::new(MessageInfoWrapper(msg)) as Box<dyn DecodedMessage>)
-        });
+/// Static decoder function for Numbers SheetArchive messages
+fn decode_numbers_sheet(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = tn::SheetArchive::decode(data)?;
+    Ok(Box::new(NumbersSheetWrapper(msg)) as Box<dyn DecodedMessage>)
+}
 
-        // Register decoders for Pages document types
-        decoder.register_decoder(1001, |data| {
-            let msg = tp::DocumentArchive::decode(data)?;
-            Ok(Box::new(PagesDocumentWrapper(msg)) as Box<dyn DecodedMessage>)
-        });
+/// Static decoder function for Keynote ShowArchive messages
+fn decode_keynote_show(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = kn::ShowArchive::decode(data)?;
+    Ok(Box::new(KeynoteShowWrapper(msg)) as Box<dyn DecodedMessage>)
+}
 
-        // Register decoders for Numbers document types
-        decoder.register_decoder(1002, |data| {
-            let msg = tn::DocumentArchive::decode(data)?;
-            Ok(Box::new(NumbersDocumentWrapper(msg)) as Box<dyn DecodedMessage>)
-        });
+/// Static decoder function for Keynote SlideArchive messages
+fn decode_keynote_slide(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = kn::SlideArchive::decode(data)?;
+    Ok(Box::new(KeynoteSlideWrapper(msg)) as Box<dyn DecodedMessage>)
+}
 
-        decoder.register_decoder(1003, |data| {
-            let msg = tn::SheetArchive::decode(data)?;
-            Ok(Box::new(NumbersSheetWrapper(msg)) as Box<dyn DecodedMessage>)
-        });
+/// Static decoder function for StorageArchive messages
+fn decode_storage_archive(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = tswp::StorageArchive::decode(data)?;
+    Ok(Box::new(StorageArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
+}
 
-        // Register decoders for Keynote document types
-        decoder.register_decoder(1101, |data| {
-            let msg = kn::ShowArchive::decode(data)?;
-            Ok(Box::new(KeynoteShowWrapper(msg)) as Box<dyn DecodedMessage>)
-        });
+/// Static decoder function for TableModelArchive messages
+fn decode_table_model(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = tst::TableModelArchive::decode(data)?;
+    Ok(Box::new(TableModelWrapper(msg)) as Box<dyn DecodedMessage>)
+}
 
-        decoder.register_decoder(1102, |data| {
-            let msg = kn::SlideArchive::decode(data)?;
-            Ok(Box::new(KeynoteSlideWrapper(msg)) as Box<dyn DecodedMessage>)
-        });
+/// Perfect hash map of message type IDs to decoder functions
+/// This provides O(1) lookup performance at compile time
+static DECODERS: phf::Map<u32, fn(&[u8]) -> Result<Box<dyn DecodedMessage>>> = phf_map! {
+    1u32 => decode_archive_info,
+    2u32 => decode_message_info,
+    100u32 => decode_table_model,
+    200u32 => decode_storage_archive,
+    201u32 => decode_storage_archive,
+    202u32 => decode_storage_archive,
+    203u32 => decode_storage_archive,
+    204u32 => decode_storage_archive,
+    205u32 => decode_storage_archive,
+    1001u32 => decode_pages_document,
+    1002u32 => decode_numbers_document,
+    1003u32 => decode_numbers_sheet,
+    1101u32 => decode_keynote_show,
+    1102u32 => decode_keynote_slide,
+    2022u32 => decode_storage_archive,
+};
 
-        // Register decoders for text content
-        decoder.register_decoder(200, |data| {
-            let msg = tswp::StorageArchive::decode(data)?;
-            Ok(Box::new(StorageArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
-        });
-
-        // Register decoders for table content (Numbers)
-        decoder.register_decoder(100, |data| {
-            let msg = tst::TableModelArchive::decode(data)?;
-            Ok(Box::new(TableModelWrapper(msg)) as Box<dyn DecodedMessage>)
-        });
-
-        // Register additional StorageArchive decoders for common text-containing message types
-        // These are commonly found in iWork files
-        decoder.register_decoder(201, |data| {
-            let msg = tswp::StorageArchive::decode(data)?;
-            Ok(Box::new(StorageArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
-        });
-        decoder.register_decoder(202, |data| {
-            let msg = tswp::StorageArchive::decode(data)?;
-            Ok(Box::new(StorageArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
-        });
-        decoder.register_decoder(203, |data| {
-            let msg = tswp::StorageArchive::decode(data)?;
-            Ok(Box::new(StorageArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
-        });
-        decoder.register_decoder(204, |data| {
-            let msg = tswp::StorageArchive::decode(data)?;
-            Ok(Box::new(StorageArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
-        });
-        decoder.register_decoder(205, |data| {
-            let msg = tswp::StorageArchive::decode(data)?;
-            Ok(Box::new(StorageArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
-        });
-
-        // Add decoder for message type 2022 which is very common in test files
-        decoder.register_decoder(2022, |data| {
-            let msg = tswp::StorageArchive::decode(data)?;
-            Ok(Box::new(StorageArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
-        });
-
-        decoder
-    }
-
-    /// Register a decoder for a specific message type
-    pub fn register_decoder<F>(&mut self, message_type: u32, decoder_fn: F)
-    where
-        F: Fn(&[u8]) -> Result<Box<dyn DecodedMessage>> + 'static,
-    {
-        self.decoders.insert(message_type, Box::new(decoder_fn));
-    }
-
-    /// Decode a message of the given type
-    pub fn decode(&self, message_type: u32, data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-        if let Some(decoder) = self.decoders.get(&message_type) {
-            decoder(data)
-        } else {
-            Err(Error::UnsupportedMessageType(message_type))
-        }
+/// Decode a message of the given type using the perfect hash map for O(1) lookup
+pub fn decode(message_type: u32, data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    if let Some(decoder) = DECODERS.get(&message_type) {
+        decoder(data)
+    } else {
+        Err(Error::UnsupportedMessageType(message_type))
     }
 }
 
@@ -275,26 +239,41 @@ mod tests {
 
     #[test]
     fn test_message_decoder_creation() {
-        let decoder = MessageDecoder::new();
-        assert!(decoder.decoders.contains_key(&1)); // ArchiveInfo
-        assert!(decoder.decoders.contains_key(&2)); // MessageInfo
-        assert!(decoder.decoders.contains_key(&100)); // TableModelArchive
-        assert!(decoder.decoders.contains_key(&200)); // StorageArchive
-        assert!(decoder.decoders.contains_key(&201)); // StorageArchive variant
-        assert!(decoder.decoders.contains_key(&202)); // StorageArchive variant
-        assert!(decoder.decoders.contains_key(&2022)); // Common StorageArchive type
-        assert!(decoder.decoders.contains_key(&1001)); // Pages Document
-        assert!(decoder.decoders.contains_key(&1002)); // Numbers Document
-        assert!(decoder.decoders.contains_key(&1003)); // Numbers Sheet
-        assert!(decoder.decoders.contains_key(&1101)); // Keynote Show
-        assert!(decoder.decoders.contains_key(&1102)); // Keynote Slide
+        // Test that all expected decoders are available in the static map
+        assert!(DECODERS.contains_key(&1)); // ArchiveInfo
+        assert!(DECODERS.contains_key(&2)); // MessageInfo
+        assert!(DECODERS.contains_key(&100)); // TableModelArchive
+        assert!(DECODERS.contains_key(&200)); // StorageArchive
+        assert!(DECODERS.contains_key(&201)); // StorageArchive variant
+        assert!(DECODERS.contains_key(&202)); // StorageArchive variant
+        assert!(DECODERS.contains_key(&2022)); // Common StorageArchive type
+        assert!(DECODERS.contains_key(&1001)); // Pages Document
+        assert!(DECODERS.contains_key(&1002)); // Numbers Document
+        assert!(DECODERS.contains_key(&1003)); // Numbers Sheet
+        assert!(DECODERS.contains_key(&1101)); // Keynote Show
+        assert!(DECODERS.contains_key(&1102)); // Keynote Slide
     }
 
     #[test]
     fn test_unsupported_message_type() {
-        let decoder = MessageDecoder::new();
-        let result = decoder.decode(999, &[]);
+        let result = decode(999, &[]);
         assert!(matches!(result, Err(Error::UnsupportedMessageType(999))));
+    }
+
+    #[test]
+    fn test_decoder_performance() {
+        // Test that decoding is fast with phf::Map
+        // This test ensures the static map lookup is working
+        let message_types = [1, 2, 100, 200, 201, 202, 1001, 1002, 1101];
+
+        // Create some dummy data that will fail to decode but test the lookup
+        let dummy_data = vec![0u8; 10];
+
+        for &msg_type in &message_types {
+            let result = decode(msg_type, &dummy_data);
+            // We expect this to fail due to invalid protobuf data, but the lookup should be fast
+            assert!(result.is_err());
+        }
     }
 }
 

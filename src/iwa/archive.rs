@@ -7,7 +7,7 @@ use std::io::Read;
 
 use prost::Message;
 use crate::iwa::varint;
-use crate::iwa::protobuf::{MessageDecoder, DecodedMessage};
+use crate::iwa::protobuf::{decode, DecodedMessage};
 use crate::iwa::{Error, Result};
 
 /// Archive information header for each object in an IWA file
@@ -144,7 +144,6 @@ pub struct Archive {
 impl Archive {
     /// Parse an IWA archive from decompressed data
     pub fn parse(data: &[u8]) -> Result<Self> {
-        let decoder = MessageDecoder::new();
         let mut objects = Vec::new();
         let mut cursor = std::io::Cursor::new(data);
 
@@ -174,7 +173,7 @@ impl Archive {
                 messages.push(raw_message);
 
                 // Try to decode the message using prost
-                match decoder.decode(message_info.type_, &message_data) {
+                match decode(message_info.type_, &message_data) {
                     Ok(decoded) => decoded_messages.push(decoded),
                     Err(_) => {
                         // Message type not registered - try parsing as StorageArchive anyway

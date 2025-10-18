@@ -75,9 +75,8 @@ impl Document {
 
     /// Try to decode a raw message using the registry
     fn try_decode_message(&self, raw_message: &crate::iwa::archive::RawMessage) -> Result<Box<dyn crate::iwa::protobuf::DecodedMessage>> {
-        use crate::iwa::protobuf::MessageDecoder;
-        let decoder = MessageDecoder::new();
-        decoder.decode(raw_message.type_, &raw_message.data)
+        use crate::iwa::protobuf::decode;
+        decode(raw_message.type_, &raw_message.data)
     }
 
     /// Get all objects in the document
