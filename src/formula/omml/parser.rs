@@ -47,9 +47,6 @@ impl<'arena> OmmlParser<'arena> {
         let mut depth = 0;
         const MAX_DEPTH: usize = 1000; // Prevent stack overflow attacks
 
-        // Performance monitoring (debug builds only)
-        let mut stats = PerformanceStats::new();
-
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Start(ref e)) => {
@@ -59,25 +56,22 @@ impl<'arena> OmmlParser<'arena> {
                             format!("Maximum XML depth {} exceeded", MAX_DEPTH)
                         ));
                     }
-
-                    stats.record_element();
-                    self.handle_start_element(e, &mut stack, &mut context_pool, &mut stats)?;
+                    self.handle_start_element(e, &mut stack, &mut context_pool)?;
                 }
                 Ok(Event::End(ref e)) => {
                     let name = e.local_name();
-                    self.handle_end_element(name.as_ref(), &mut stack, &mut result, &mut context_pool, &mut stats)?;
+                    self.handle_end_element(name.as_ref(), &mut stack, &mut result, &mut context_pool)?;
                     depth = depth.saturating_sub(1);
                 }
                 Ok(Event::Text(ref e)) => {
-                    self.handle_text_element(e, &mut stack, &mut stats)?;
+                    self.handle_text_element(e, &mut stack)?;
                 }
                 Ok(Event::CData(ref e)) => {
-                    self.handle_cdata_element(e, &mut stack, &mut stats)?;
+                    self.handle_cdata_element(e, &mut stack)?;
                 }
                 Ok(Event::Empty(ref e)) => {
                     // Handle self-closing tags
-                    stats.record_element();
-                    self.handle_empty_element(e, &mut stack, &mut result, &mut context_pool, &mut stats)?;
+                    self.handle_empty_element(e, &mut stack, &mut result, &mut context_pool)?;
                 }
                 Ok(Event::Eof) => break,
                 Err(e) => {
@@ -113,9 +107,6 @@ impl<'arena> OmmlParser<'arena> {
             context_pool.put(context);
         }
 
-        #[cfg(debug_assertions)]
-        stats.print_stats();
-
         Ok(result)
     }
 
@@ -124,7 +115,6 @@ impl<'arena> OmmlParser<'arena> {
         elem: &BytesStart,
         stack: &mut ElementStack<'arena>,
         context_pool: &mut ContextPool<'arena>,
-        stats: &mut PerformanceStats,
     ) -> Result<(), OmmlError> {
         let name = elem.local_name();
         let name_str = std::str::from_utf8(name.as_ref())
@@ -150,7 +140,6 @@ impl<'arena> OmmlParser<'arena> {
 
         // Parse attributes using SIMD-accelerated parsing with caching
         let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
-        stats.record_attribute();
 
         // Store raw attributes for property element handlers
         // SAFETY: The attributes are valid for the duration of the XML parsing
@@ -160,7 +149,6 @@ impl<'arena> OmmlParser<'arena> {
 
         // Use batch attribute parsing with PHF lookups and caching for better performance
         let mut cache = AttributeCache::new(&attrs);
-        context.properties = parse_attributes_batch_with_cache(&mut cache);
 
         // Element-specific attribute parsing using handlers
         match element_type {
@@ -242,7 +230,6 @@ impl<'arena> OmmlParser<'arena> {
         stack: &mut ElementStack<'arena>,
         result: &mut Vec<MathNode<'arena>>,
         _context_pool: &mut ContextPool<'arena>,
-        _stats: &mut PerformanceStats,
     ) -> Result<(), OmmlError> {
         if stack.is_empty() {
             return Ok(());
@@ -474,7 +461,6 @@ impl<'arena> OmmlParser<'arena> {
         &self,
         event: &[u8],
         stack: &mut ElementStack<'arena>,
-        _stats: &mut PerformanceStats,
     ) -> Result<(), OmmlError> {
         if let Some(context) = stack.last_mut() {
             // For OMML, text content is typically plain and doesn't need unescaping
@@ -493,7 +479,6 @@ impl<'arena> OmmlParser<'arena> {
         &self,
         event: &[u8],
         stack: &mut ElementStack<'arena>,
-        _stats: &mut PerformanceStats,
     ) -> Result<(), OmmlError> {
         if let Some(context) = stack.last_mut() {
             // CDATA content is already unescaped by quick-xml
@@ -514,7 +499,6 @@ impl<'arena> OmmlParser<'arena> {
         stack: &mut ElementStack<'arena>,
         _result: &mut Vec<MathNode<'arena>>,
         context_pool: &mut ContextPool<'arena>,
-        stats: &mut PerformanceStats,
     ) -> Result<(), OmmlError> {
         let name = elem.local_name();
         let name_str = std::str::from_utf8(name.as_ref())
@@ -526,7 +510,6 @@ impl<'arena> OmmlParser<'arena> {
 
         // Parse attributes
         let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
-        stats.record_attribute();
 
         // Store raw attributes for property element handlers
         // SAFETY: The attributes are valid for the duration of the XML parsing
@@ -603,7 +586,6 @@ impl<'arena> OmmlParser<'arena> {
                     let text = intern_string(self.arena, "");
                     let node = MathNode::Text(std::borrow::Cow::Borrowed(text));
                     parent.children.push(node);
-                    stats.record_text_node();
                 }
             }
             ElementType::Delimiter => {
