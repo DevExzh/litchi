@@ -8,6 +8,7 @@
 
 use super::container::EscherContainer;
 use super::types::EscherRecordType;
+use super::properties::{EscherProperties, ShapeAnchor};
 
 /// Escher shape type enumeration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,6 +49,10 @@ pub struct EscherShape<'data> {
     shape_type: EscherShapeType,
     /// Shape ID
     shape_id: Option<u32>,
+    /// Shape properties (position, size, colors, etc.)
+    properties: EscherProperties,
+    /// Shape anchor (position and size)
+    anchor: Option<ShapeAnchor>,
 }
 
 impl<'data> EscherShape<'data> {
@@ -55,11 +60,15 @@ impl<'data> EscherShape<'data> {
     pub fn from_container(container: EscherContainer<'data>) -> Self {
         let shape_type = Self::detect_shape_type(&container);
         let shape_id = Self::extract_shape_id(&container);
+        let properties = EscherProperties::from_container(&container);
+        let anchor = Self::extract_anchor(&container);
         
         Self {
             container,
             shape_type,
             shape_id,
+            properties,
+            anchor,
         }
     }
     
@@ -73,6 +82,18 @@ impl<'data> EscherShape<'data> {
     #[inline]
     pub fn shape_id(&self) -> Option<u32> {
         self.shape_id
+    }
+    
+    /// Get shape properties.
+    #[inline]
+    pub fn properties(&self) -> &EscherProperties {
+        &self.properties
+    }
+    
+    /// Get shape anchor (position and size).
+    #[inline]
+    pub fn anchor(&self) -> Option<&ShapeAnchor> {
+        self.anchor.as_ref()
     }
     
     /// Check if this shape can contain text.
@@ -187,6 +208,25 @@ impl<'data> EscherShape<'data> {
                 return Some(id);
             }
         }
+        None
+    }
+    
+    /// Extract shape anchor (position and size).
+    fn extract_anchor(container: &EscherContainer<'data>) -> Option<ShapeAnchor> {
+        // Try ChildAnchor first
+        if let Some(child_anchor) = container.find_child(EscherRecordType::ChildAnchor) {
+            if let Some(anchor) = ShapeAnchor::from_child_anchor(&child_anchor) {
+                return Some(anchor);
+            }
+        }
+        
+        // Try ClientAnchor
+        if let Some(client_anchor) = container.find_child(EscherRecordType::ClientAnchor) {
+            if let Some(anchor) = ShapeAnchor::from_client_anchor(&client_anchor) {
+                return Some(anchor);
+            }
+        }
+        
         None
     }
 }

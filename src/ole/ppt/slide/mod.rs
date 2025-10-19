@@ -1,5 +1,4 @@
 /// Slide parsing and management with high-performance zero-copy design.
-
 pub mod slide_factory;
 pub mod slide;
 

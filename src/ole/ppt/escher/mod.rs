@@ -24,6 +24,7 @@ pub mod container;
 pub mod text;
 pub mod shape;
 pub mod shape_factory;
+pub mod properties;
 
 pub use types::EscherRecordType;
 pub use record::EscherRecord;
@@ -32,4 +33,5 @@ pub use container::EscherContainer;
 pub use text::extract_text_from_escher;
 pub use shape::{EscherShape, EscherShapeType};
 pub use shape_factory::EscherShapeFactory;
+pub use properties::{EscherProperties, EscherPropertyId, ShapeAnchor};
 

@@ -1,7 +1,6 @@
 /// SlideFactory - Creates slides from persist mapping with zero-copy parsing.
 ///
 /// High-performance implementation using lifetimes to avoid data copying.
-
 use crate::ole::ppt::package::{PptError, Result};
 use crate::ole::ppt::records::PptRecord;
 use crate::ole::ppt::persist::PersistMapping;

@@ -1,5 +1,4 @@
 /// High-performance Slide implementation with lazy shape loading and zero-copy design.
-
 use super::super::package::Result;
 use super::super::shapes::ShapeEnum;
 use super::super::records::PptRecord;
@@ -104,28 +103,131 @@ impl<'doc> Slide<'doc> {
         // Extract Escher shapes from PPDrawing data
         let escher_shapes = super::super::escher::EscherShapeFactory::extract_shapes_from_ppdrawing(&ppdrawing.data)?;
         
-        // Convert Escher shapes to our ShapeEnum
-        // For now, we'll create placeholder shapes based on type
-        // Full implementation would parse all shape properties
+        // Convert Escher shapes to ShapeEnum with full property extraction
         let shapes: Vec<ShapeEnum> = escher_shapes.iter()
             .filter_map(|escher_shape| {
-                // For now, just track that we found shapes
-                // Full implementation would convert to proper shape types
-                match escher_shape.shape_type() {
-                    super::super::escher::EscherShapeType::TextBox => {
-                        // Create a basic TextBox
-                        let textbox = super::super::shapes::TextBox::new(
-                            super::super::shapes::shape::ShapeProperties::default(),
-                            Vec::new(),
-                        );
-                        Some(ShapeEnum::TextBox(textbox))
-                    }
-                    _ => None, // Skip other shape types for now
-                }
+                Self::convert_escher_to_shape_enum(escher_shape)
             })
             .collect();
         
         Ok(shapes)
+    }
+    
+    /// Convert an EscherShape to ShapeEnum with full property extraction.
+    ///
+    /// # Performance
+    ///
+    /// - Direct property access (no allocations)
+    /// - Pattern matching for type dispatch
+    fn convert_escher_to_shape_enum(escher_shape: &super::super::escher::EscherShape<'_>) -> Option<ShapeEnum> {
+        use super::super::escher::EscherShapeType;
+        use super::super::shapes::*;
+        
+        let shape_id = escher_shape.shape_id().unwrap_or(0);
+        let anchor = escher_shape.anchor();
+        
+        match escher_shape.shape_type() {
+            EscherShapeType::TextBox => {
+                // Create TextBox with proper properties
+                let mut properties = shape::ShapeProperties::default();
+                properties.id = shape_id;
+                properties.shape_type = shape::ShapeType::TextBox;
+                
+                // Set coordinates if anchor exists
+                if let Some(a) = anchor {
+                    properties.x = a.left;
+                    properties.y = a.top;
+                    properties.width = a.width();
+                    properties.height = a.height();
+                }
+                
+                // Extract text from shape
+                let text = escher_shape.text().unwrap_or_default();
+                
+                let mut textbox = TextBox::new(properties, Vec::new());
+                if !text.is_empty() {
+                    textbox.set_text(text);
+                }
+                
+                Some(ShapeEnum::TextBox(textbox))
+            }
+            
+            EscherShapeType::Picture => {
+                // Create PictureShape
+                let mut picture = shape_enum::PictureShape::new(shape_id);
+                
+                if let Some(a) = anchor {
+                    picture.set_bounds(a.left, a.top, a.width(), a.height());
+                }
+                
+                // Extract blip ID from properties
+                use super::super::escher::EscherPropertyId;
+                if let Some(blip_id) = escher_shape.properties().get_int(EscherPropertyId::PictureId) {
+                    picture.set_blip_id(blip_id as u32);
+                }
+                
+                Some(ShapeEnum::Picture(picture))
+            }
+            
+            EscherShapeType::Line => {
+                // Create LineShape
+                if let Some(a) = anchor {
+                    let mut line = shape_enum::LineShape::new(
+                        shape_id,
+                        a.left,
+                        a.top,
+                        a.right,
+                        a.bottom
+                    );
+                    
+                    // Extract line properties
+                    use super::super::escher::EscherPropertyId;
+                    if let Some(width) = escher_shape.properties().get_int(EscherPropertyId::LineWidth) {
+                        line.set_width(width);
+                    }
+                    if let Some(color) = escher_shape.properties().get_color(EscherPropertyId::LineColor) {
+                        line.set_color(color);
+                    }
+                    
+                    Some(ShapeEnum::Line(line))
+                } else {
+                    None
+                }
+            }
+            
+            EscherShapeType::Group => {
+                // Create GroupShape (children would be parsed recursively)
+                let mut group = shape_enum::GroupShape::new(shape_id);
+                
+                if let Some(a) = anchor {
+                    group.set_bounds(a.left, a.top, a.width(), a.height());
+                }
+                
+                // TODO: Parse child shapes recursively
+                
+                Some(ShapeEnum::Group(group))
+            }
+            
+            EscherShapeType::Rectangle | EscherShapeType::Ellipse | EscherShapeType::AutoShape => {
+                // Create AutoShape
+                let mut properties = shape::ShapeProperties::default();
+                properties.id = shape_id;
+                properties.shape_type = shape::ShapeType::AutoShape;
+                
+                if let Some(a) = anchor {
+                    properties.x = a.left;
+                    properties.y = a.top;
+                    properties.width = a.width();
+                    properties.height = a.height();
+                }
+                
+                let autoshape = AutoShape::new(properties, Vec::new());
+                Some(ShapeEnum::AutoShape(autoshape))
+            }
+            
+            // Unknown or unsupported shape types
+            _ => None,
+        }
     }
 
     /// Extract all text from slide and its shapes.
