@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::io::{Read, Cursor};
 
 use zip::ZipArchive;
+use plist::Value;
 
 use crate::iwa::archive::{Archive, ArchiveObject};
 use crate::iwa::snappy::SnappyStream;
@@ -78,6 +79,9 @@ impl Bundle {
             has_build_version_history: true,
             has_document_identifier: true,
             detected_application: None,
+            properties: HashMap::new(),
+            build_versions: Vec::new(),
+            document_id: None,
         };
 
         Ok(Bundle {
@@ -116,6 +120,9 @@ impl Bundle {
             has_build_version_history: true,
             has_document_identifier: true,
             detected_application: None,
+            properties: HashMap::new(),
+            build_versions: Vec::new(),
+            document_id: None,
         };
 
         Ok(Bundle {
@@ -210,27 +217,97 @@ impl Bundle {
             return Ok(metadata);
         }
 
-        // Try to parse Properties.plist
+        // Parse Properties.plist
         let properties_path = metadata_dir.join("Properties.plist");
         if properties_path.exists() {
-            // For now, just check if it exists
-            // Full plist parsing would require additional dependencies
             metadata.has_properties = true;
+            if let Ok(value) = Value::from_file(&properties_path) {
+                metadata.properties = Self::parse_plist_value(&value);
+                
+                // Try to detect application from properties
+                if let Some(PropertyValue::String(app_name)) = metadata.properties.get("Application") {
+                    metadata.detected_application = Some(app_name.clone());
+                }
+            }
         }
 
-        // Try to parse BuildVersionHistory.plist
+        // Parse BuildVersionHistory.plist
         let build_version_path = metadata_dir.join("BuildVersionHistory.plist");
         if build_version_path.exists() {
             metadata.has_build_version_history = true;
+            if let Ok(value) = Value::from_file(&build_version_path) {
+                metadata.build_versions = Self::parse_build_versions(&value);
+            }
         }
 
-        // Check for DocumentIdentifier
+        // Read DocumentIdentifier
         let doc_id_path = metadata_dir.join("DocumentIdentifier");
         if doc_id_path.exists() {
             metadata.has_document_identifier = true;
+            if let Ok(id) = fs::read_to_string(&doc_id_path) {
+                metadata.document_id = Some(id.trim().to_string());
+            }
         }
 
         Ok(metadata)
+    }
+
+    /// Parse a plist Value into our PropertyValue structure
+    fn parse_plist_value(value: &Value) -> HashMap<String, PropertyValue> {
+        let mut result = HashMap::new();
+        
+        if let Value::Dictionary(dict) = value {
+            for (key, val) in dict {
+                result.insert(key.clone(), Self::convert_plist_value(val));
+            }
+        }
+        
+        result
+    }
+
+    /// Convert a plist Value to PropertyValue
+    fn convert_plist_value(value: &Value) -> PropertyValue {
+        match value {
+            Value::String(s) => PropertyValue::String(s.clone()),
+            Value::Integer(i) => PropertyValue::Integer(i.as_signed().unwrap_or(0)),
+            Value::Real(r) => PropertyValue::Real(*r),
+            Value::Boolean(b) => PropertyValue::Boolean(*b),
+            Value::Date(d) => PropertyValue::Date(format!("{:?}", d)),
+            Value::Array(arr) => {
+                PropertyValue::Array(arr.iter().map(Self::convert_plist_value).collect())
+            }
+            Value::Dictionary(dict) => {
+                let mut map = HashMap::new();
+                for (k, v) in dict {
+                    map.insert(k.clone(), Self::convert_plist_value(v));
+                }
+                PropertyValue::Dictionary(map)
+            }
+            Value::Data(_) => PropertyValue::String("<binary data>".to_string()),
+            _ => PropertyValue::String("<unknown>".to_string()),
+        }
+    }
+
+    /// Parse build versions from BuildVersionHistory.plist
+    fn parse_build_versions(value: &Value) -> Vec<String> {
+        let mut versions = Vec::new();
+        
+        if let Value::Array(arr) = value {
+            for item in arr {
+                if let Value::String(version) = item {
+                    versions.push(version.clone());
+                } else if let Value::Dictionary(dict) = item {
+                    // BuildVersionHistory might be an array of dictionaries with version info
+                    if let Some(Value::String(version)) = dict.get("Version") {
+                        versions.push(version.clone());
+                    } else if let Some(Value::String(build)) = dict.get("Build") {
+                        versions.push(build.clone());
+                    }
+                }
+            }
+        }
+        
+        versions
     }
 
     /// Get all archives in the bundle
@@ -305,6 +382,31 @@ pub struct BundleMetadata {
     pub has_document_identifier: bool,
     /// Application type detected from the bundle
     pub detected_application: Option<String>,
+    /// Parsed properties from Properties.plist
+    pub properties: HashMap<String, PropertyValue>,
+    /// Build version history
+    pub build_versions: Vec<String>,
+    /// Document identifier
+    pub document_id: Option<String>,
+}
+
+/// Represents a property value from plist
+#[derive(Debug, Clone)]
+pub enum PropertyValue {
+    /// String value
+    String(String),
+    /// Integer value
+    Integer(i64),
+    /// Real/float value
+    Real(f64),
+    /// Boolean value
+    Boolean(bool),
+    /// Date value
+    Date(String),
+    /// Array of values
+    Array(Vec<PropertyValue>),
+    /// Dictionary of values
+    Dictionary(HashMap<String, PropertyValue>),
 }
 
 impl BundleMetadata {
@@ -317,6 +419,49 @@ impl BundleMetadata {
             self.has_document_identifier,
             self.detected_application.as_deref().unwrap_or("unknown")
         )
+    }
+
+    /// Get a property value as a string
+    pub fn get_property_string(&self, key: &str) -> Option<String> {
+        match self.properties.get(key)? {
+            PropertyValue::String(s) => Some(s.clone()),
+            PropertyValue::Integer(i) => Some(i.to_string()),
+            PropertyValue::Real(r) => Some(r.to_string()),
+            PropertyValue::Boolean(b) => Some(b.to_string()),
+            PropertyValue::Date(d) => Some(d.clone()),
+            _ => None,
+        }
+    }
+
+    /// Get a property value as an integer
+    pub fn get_property_int(&self, key: &str) -> Option<i64> {
+        match self.properties.get(key)? {
+            PropertyValue::Integer(i) => Some(*i),
+            _ => None,
+        }
+    }
+
+    /// Get a property value as a boolean
+    pub fn get_property_bool(&self, key: &str) -> Option<bool> {
+        match self.properties.get(key)? {
+            PropertyValue::Boolean(b) => Some(*b),
+            _ => None,
+        }
+    }
+
+    /// Get the document identifier
+    pub fn document_identifier(&self) -> Option<&str> {
+        self.document_id.as_deref()
+    }
+
+    /// Get the build versions
+    pub fn build_version_history(&self) -> &[String] {
+        &self.build_versions
+    }
+
+    /// Get the latest build version
+    pub fn latest_build_version(&self) -> Option<&str> {
+        self.build_versions.last().map(|s| s.as_str())
     }
 }
 
@@ -415,11 +560,17 @@ mod tests {
 
     #[test]
     fn test_metadata_summary() {
+        let mut properties = HashMap::new();
+        properties.insert("Title".to_string(), PropertyValue::String("Test Doc".to_string()));
+        
         let metadata = BundleMetadata {
             has_properties: true,
             has_build_version_history: true,
             has_document_identifier: false,
             detected_application: Some("Pages".to_string()),
+            properties,
+            build_versions: vec!["7029".to_string()],
+            document_id: None,
         };
 
         let summary = metadata.summary();
@@ -427,5 +578,10 @@ mod tests {
         assert!(summary.contains("BuildVersion: true"));
         assert!(summary.contains("DocumentID: false"));
         assert!(summary.contains("App: Pages"));
+        
+        // Test property accessors
+        assert_eq!(metadata.get_property_string("Title"), Some("Test Doc".to_string()));
+        assert_eq!(metadata.latest_build_version(), Some("7029"));
+        assert_eq!(metadata.document_identifier(), None);
     }
 }

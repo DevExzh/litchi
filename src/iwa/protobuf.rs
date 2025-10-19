@@ -64,26 +64,80 @@ fn decode_table_model(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
     Ok(Box::new(TableModelWrapper(msg)) as Box<dyn DecodedMessage>)
 }
 
+/// Static decoder function for TableDataList messages
+fn decode_table_data_list(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = tst::TableDataList::decode(data)?;
+    Ok(Box::new(TableDataListWrapper(msg)) as Box<dyn DecodedMessage>)
+}
+
+/// Static decoder function for ShapeArchive messages
+fn decode_shape_archive(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = tsd::ShapeArchive::decode(data)?;
+    Ok(Box::new(ShapeArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
+}
+
+/// Static decoder function for DrawableArchive messages
+fn decode_drawable_archive(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = tsd::DrawableArchive::decode(data)?;
+    Ok(Box::new(DrawableArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
+}
+
+/// Static decoder function for ChartArchive messages
+fn decode_chart_archive(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = tsch::ChartArchive::decode(data)?;
+    Ok(Box::new(ChartArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
+}
+
 type DecoderMap = phf::Map<u32, fn(&[u8]) -> Result<Box<dyn DecodedMessage>>>;
 
 /// Perfect hash map of message type IDs to decoder functions
 /// This provides O(1) lookup performance at compile time
+///
+/// Based on analysis of iWork documents, common message types include:
+/// - 1, 2: TSP ArchiveInfo and MessageInfo
+/// - 100-199: Table-related (TST)
+/// - 200-299: Storage/Text-related (TSWP)
+/// - 1000-1999: Application-specific (Pages, Numbers, Keynote)
+/// - 2000-2999: Common content types (TSWP, TSD, TSCH)
+/// - 3000+: Various specialized types
 static DECODERS: DecoderMap = phf_map! {
+    // TSP (Core Protocol) types
     1u32 => decode_archive_info,
     2u32 => decode_message_info,
+    
+    // TST (Table) types - Numbers spreadsheet tables
     100u32 => decode_table_model,
+    101u32 => decode_table_data_list,
+    
+    // TSD (Drawing) types - Shapes, images, and drawables
+    500u32 => decode_shape_archive,
+    501u32 => decode_drawable_archive,
+    
+    // TSCH (Charts) types
+    600u32 => decode_chart_archive,
+    
+    // TSWP (Word Processing) types - Text storage across all apps
     200u32 => decode_storage_archive,
     201u32 => decode_storage_archive,
     202u32 => decode_storage_archive,
     203u32 => decode_storage_archive,
     204u32 => decode_storage_archive,
     205u32 => decode_storage_archive,
+    2001u32 => decode_storage_archive,
+    2002u32 => decode_storage_archive,
+    2003u32 => decode_storage_archive,
+    2004u32 => decode_storage_archive,
+    2005u32 => decode_storage_archive,
+    2011u32 => decode_storage_archive,
+    2012u32 => decode_storage_archive,
+    2022u32 => decode_storage_archive,
+    
+    // Application-specific document types
     1001u32 => decode_pages_document,
     1002u32 => decode_numbers_document,
     1003u32 => decode_numbers_sheet,
     1101u32 => decode_keynote_show,
     1102u32 => decode_keynote_slide,
-    2022u32 => decode_storage_archive,
 };
 
 /// Decode a message of the given type using the perfect hash map for O(1) lookup
@@ -232,6 +286,62 @@ impl DecodedMessage for TableModelWrapper {
         // Note: Cell contents are stored in data_store which requires complex
         // processing to extract. For now, we only return the table name.
         text
+    }
+}
+
+/// Wrapper for Table Data List (cell content storage)
+#[derive(Debug)]
+pub struct TableDataListWrapper(pub tst::TableDataList);
+
+impl DecodedMessage for TableDataListWrapper {
+    fn message_type(&self) -> u32 { 101 }
+
+    fn extract_text(&self) -> Vec<String> {
+        // TableDataList contains actual cell data
+        // In a full implementation, we would extract string cell values here
+        // For now, return empty as the structure is complex
+        Vec::new()
+    }
+}
+
+/// Wrapper for Shape Archive
+#[derive(Debug)]
+pub struct ShapeArchiveWrapper(pub tsd::ShapeArchive);
+
+impl DecodedMessage for ShapeArchiveWrapper {
+    fn message_type(&self) -> u32 { 500 }
+
+    fn extract_text(&self) -> Vec<String> {
+        // Shapes themselves don't contain text, but text boxes do
+        // In a full implementation, we would check for text box content
+        Vec::new()
+    }
+}
+
+/// Wrapper for Drawable Archive
+#[derive(Debug)]
+pub struct DrawableArchiveWrapper(pub tsd::DrawableArchive);
+
+impl DecodedMessage for DrawableArchiveWrapper {
+    fn message_type(&self) -> u32 { 501 }
+
+    fn extract_text(&self) -> Vec<String> {
+        // Drawables are visual elements without direct text
+        Vec::new()
+    }
+}
+
+/// Wrapper for Chart Archive
+#[derive(Debug)]
+pub struct ChartArchiveWrapper(pub tsch::ChartArchive);
+
+impl DecodedMessage for ChartArchiveWrapper {
+    fn message_type(&self) -> u32 { 600 }
+
+    fn extract_text(&self) -> Vec<String> {
+        // Charts may have titles and labels
+        // In a full implementation, we would extract chart metadata
+        Vec::new()
     }
 }
 

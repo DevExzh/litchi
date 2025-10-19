@@ -10,6 +10,8 @@ use std::collections::HashMap;
 use crate::iwa::bundle::Bundle;
 use crate::iwa::object_index::{ObjectIndex, ResolvedObject};
 use crate::iwa::registry::{detect_application, Application};
+use crate::iwa::media::{MediaManager, MediaStats};
+use crate::iwa::structured::{self, StructuredData};
 use crate::iwa::{Error, Result};
 
 /// Unified iWork document interface
@@ -21,12 +23,59 @@ pub struct Document {
     object_index: ObjectIndex,
     /// Detected application type
     application: Application,
+    /// Media manager for assets
+    media_manager: Option<MediaManager>,
 }
 
 impl Document {
     /// Open an iWork document from a bundle path
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let bundle = Bundle::open(path)?;
+        let path_ref = path.as_ref();
+        let bundle = Bundle::open(path_ref)?;
+        let object_index = ObjectIndex::from_bundle(&bundle)?;
+
+        // Detect application type from message types
+        let all_message_types: Vec<u32> = bundle.archives()
+            .values()
+            .flat_map(|archive| &archive.objects)
+            .flat_map(|obj| &obj.messages)
+            .map(|msg| msg.type_)
+            .collect();
+
+        let application = detect_application(&all_message_types)
+            .unwrap_or(Application::Common);
+
+        // Try to create media manager (may fail for single-file bundles)
+        let media_manager = MediaManager::new(path_ref).ok();
+
+        Ok(Document {
+            bundle,
+            object_index,
+            application,
+            media_manager,
+        })
+    }
+
+    /// Open an iWork document from raw bytes
+    ///
+    /// This allows parsing iWork documents directly from memory without
+    /// requiring file system access. Note that media extraction is not
+    /// available when opening from bytes.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::iwa::Document;
+    /// use std::fs;
+    ///
+    /// let data = fs::read("document.pages")?;
+    /// let doc = Document::from_bytes(&data)?;
+    /// let text = doc.text()?;
+    /// println!("Extracted text: {}", text);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        let bundle = Bundle::from_bytes(bytes)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
         // Detect application type from message types
@@ -44,6 +93,7 @@ impl Document {
             bundle,
             object_index,
             application,
+            media_manager: None, // No media access from bytes
         })
     }
 
@@ -109,6 +159,31 @@ impl Document {
         self.bundle.metadata()
     }
 
+    /// Get the media manager (if available)
+    pub fn media_manager(&self) -> Option<&MediaManager> {
+        self.media_manager.as_ref()
+    }
+
+    /// Get media statistics
+    pub fn media_stats(&self) -> Option<MediaStats> {
+        self.media_manager.as_ref().map(|m| m.stats())
+    }
+
+    /// Extract a media asset by filename
+    pub fn extract_media(&self, filename: &str) -> Result<Vec<u8>> {
+        let manager = self.media_manager.as_ref()
+            .ok_or_else(|| Error::Bundle("Media manager not available".to_string()))?;
+        manager.extract(filename)
+    }
+
+    /// Extract structured data from the document
+    ///
+    /// This returns tables, slides, sections, and other structured content
+    /// depending on the document type (Numbers, Keynote, or Pages).
+    pub fn extract_structured_data(&self) -> Result<StructuredData> {
+        structured::extract_all(&self.bundle, &self.object_index)
+    }
+
     /// Get document statistics
     pub fn stats(&self) -> DocumentStats {
         let total_objects = self.object_index.all_object_ids().len();
@@ -121,11 +196,14 @@ impl Document {
             }
         }
 
+        let media_stats = self.media_stats();
+
         DocumentStats {
             total_objects,
             archives_count,
             message_type_counts,
             application: self.application,
+            media_stats,
         }
     }
 }
@@ -141,6 +219,8 @@ pub struct DocumentStats {
     pub message_type_counts: HashMap<u32, usize>,
     /// Application type
     pub application: Application,
+    /// Media statistics (if available)
+    pub media_stats: Option<MediaStats>,
 }
 
 impl DocumentStats {
@@ -306,6 +386,7 @@ mod tests {
             archives_count: 3,
             message_type_counts: message_counts,
             application: Application::Pages,
+            media_stats: None,
         };
 
         assert_eq!(stats.total_objects, 25);
