@@ -155,6 +155,26 @@ impl<'doc> SlideData<'doc> {
     pub fn doc_data(&self) -> &'doc [u8] {
         self.doc_data
     }
+
+    /// Create a SlideData instance for testing purposes.
+    ///
+    /// # Note
+    ///
+    /// This is only available in test builds.
+    #[cfg(test)]
+    pub fn new_for_test(
+        persist_id: u32,
+        offset: usize,
+        record: PptRecord,
+        doc_data: &'doc [u8],
+    ) -> Self {
+        Self {
+            persist_id,
+            offset,
+            record,
+            doc_data,
+        }
+    }
 }
 
 #[cfg(test)]
