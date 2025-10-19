@@ -2,13 +2,45 @@
 name = "litchi"
 version = "0.0.1"
 edition = "2024"
-homepage = "https://github.com/DevExzh/litchi"
+description = "High-performance parser for Microsoft Office, OpenDocument, and Apple iWork file formats with unified API"
+authors = ["Ryker Zhu <ryker.zhu@outlook.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/DevExzh/litchi"
 documentation = "https://docs.rs/litchi"
 readme = "README.md"
-keywords = ["ole", "ooxml", "iwork", "odf", "excel", "word", "powerpoint"]
-categories = ["data-formats", "office", "document-processing"]
+keywords = ["office", "docx", "xlsx", "pptx", "parser"]
+categories = ["parser-implementations", "encoding", "text-processing"]
+exclude = [
+    # Reference materials and third-party projects
+    "3rdparty/*",
+    # Examples
+    "examples/*",
+    # Test files
+    "test.*",
+    "*.doc",
+    "*.docx", 
+    "*.xls",
+    "*.xlsx",
+    "*.xlsb",
+    "*.ppt",
+    "*.pptx",
+    "*.odt",
+    "*.ods",
+    "*.odp",
+    "*.pages",
+    "*.numbers",
+    "*.key",
+    "*.csv",
+    "*.txt",
+    # Build artifacts
+    "target/*",
+    # Media files (logo kept for crates.io display)
+    # "media/*",  # Uncomment if logo shouldn't be in package
+    # CI/CD and development files
+    ".github/*",
+    ".git/*",
+    ".gitignore",
+]
 
 [features]
 default = ["ole", "ooxml"]
