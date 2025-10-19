@@ -47,6 +47,14 @@ pub struct PptxSlideData {
     pub name: Option<String>,
 }
 
+/// Extracted data from a PPT slide (to avoid lifetime issues).
+#[derive(Debug, Clone)]
+pub struct PptSlideData {
+    pub text: String,
+    pub slide_number: usize,
+    pub shape_count: usize,
+}
+
 /// A PowerPoint presentation that can be either .ppt or .pptx format.
 ///
 /// This enum wraps the format-specific implementations and provides
@@ -54,7 +62,7 @@ pub struct PptxSlideData {
 /// but instead use the methods on `Presentation`.
 enum PresentationImpl {
     /// Legacy .ppt format
-    Ppt(Box<ole::ppt::Presentation>),
+    Ppt(ole::ppt::Presentation),
     /// Modern .pptx format
     Pptx(Box<ooxml::pptx::Presentation<'static>>),
 }
@@ -141,7 +149,7 @@ impl Presentation {
                     .map_err(Error::from)?;
                 
                 Ok(Self {
-                    inner: PresentationImpl::Ppt(Box::new(pres)),
+                    inner: PresentationImpl::Ppt(pres),
                     _package: None,
                 })
             }
@@ -211,7 +219,7 @@ impl Presentation {
                     .map_err(Error::from)?;
                 
                 Ok(Self {
-                    inner: PresentationImpl::Ppt(Box::new(pres)),
+                    inner: PresentationImpl::Ppt(pres),
                     _package: None,
                 })
             }
@@ -286,7 +294,7 @@ impl Presentation {
     pub fn slide_count(&self) -> Result<usize> {
         match &self.inner {
             PresentationImpl::Ppt(pres) => {
-                pres.slide_count().map_err(Error::from)
+                Ok(pres.slide_count())
             }
             PresentationImpl::Pptx(pres) => {
                 pres.slide_count().map_err(Error::from)
@@ -310,9 +318,20 @@ impl Presentation {
     pub fn slides(&self) -> Result<Vec<Slide>> {
         match &self.inner {
             PresentationImpl::Ppt(pres) => {
-                let slides = pres.slides()
-                    .map_err(Error::from)?;
-                Ok(slides.into_iter().map(Slide::Ppt).collect())
+                // Extract slide data to avoid lifetime issues
+                let ppt_slides = pres.slides().map_err(Error::from)?;
+                ppt_slides.iter()
+                    .map(|s| {
+                        let text = s.text().map_err(Error::from)?.to_string();
+                        let slide_number = s.slide_number();
+                        let shape_count = s.shape_count().unwrap_or(0);
+                        Ok(Slide::Ppt(PptSlideData {
+                            text,
+                            slide_number,
+                            shape_count,
+                        }))
+                    })
+                    .collect()
             }
             PresentationImpl::Pptx(pres) => {
                 let slides = pres.slides()
@@ -380,7 +399,9 @@ impl Presentation {
 
 /// A slide in a PowerPoint presentation.
 pub enum Slide {
-    Ppt(ole::ppt::Slide),
+    /// Legacy PPT slide with extracted data
+    Ppt(PptSlideData),
+    /// Modern PPTX slide with extracted data
     Pptx(PptxSlideData),
 }
 
@@ -400,8 +421,56 @@ impl Slide {
     /// ```
     pub fn text(&self) -> Result<String> {
         match self {
-            Slide::Ppt(s) => s.text().map_err(Error::from),
+            Slide::Ppt(data) => Ok(data.text.clone()),
             Slide::Pptx(data) => Ok(data.text.clone()),
+        }
+    }
+
+    /// Get the slide number (1-based).
+    ///
+    /// Only available for .ppt format. Returns None for .pptx files.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::Presentation;
+    ///
+    /// let pres = Presentation::open("presentation.ppt")?;
+    /// for slide in pres.slides()? {
+    ///     if let Some(num) = slide.number() {
+    ///         println!("Slide number: {}", num);
+    ///     }
+    /// }
+    /// # Ok::<(), litchi::common::Error>(())
+    /// ```
+    pub fn number(&self) -> Option<usize> {
+        match self {
+            Slide::Ppt(data) => Some(data.slide_number),
+            Slide::Pptx(_) => None,
+        }
+    }
+
+    /// Get the number of shapes on the slide.
+    ///
+    /// Only available for .ppt format. Returns None for .pptx files.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::Presentation;
+    ///
+    /// let pres = Presentation::open("presentation.ppt")?;
+    /// for slide in pres.slides()? {
+    ///     if let Some(count) = slide.shape_count() {
+    ///         println!("Shapes: {}", count);
+    ///     }
+    /// }
+    /// # Ok::<(), litchi::common::Error>(())
+    /// ```
+    pub fn shape_count(&self) -> Option<usize> {
+        match self {
+            Slide::Ppt(data) => Some(data.shape_count),
+            Slide::Pptx(_) => None,
         }
     }
 

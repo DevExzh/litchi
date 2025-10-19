@@ -7,7 +7,6 @@ use crate::presentation::{Presentation, Slide};
 use super::config::MarkdownOptions;
 use super::traits::ToMarkdown;
 use super::writer::MarkdownWriter;
-use crate::ole::ppt::shapes::shape::Shape;
 
 impl ToMarkdown for Presentation {
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
@@ -47,20 +46,12 @@ impl ToMarkdown for Presentation {
 /// Extract the title from a slide by looking for title placeholders.
 fn extract_slide_title(slide: &Slide) -> Result<String> {
     match slide {
-        Slide::Ppt(ppt_slide) => {
-            // For PPT slides, look for title placeholders
-            // This is a simplified implementation - in practice we'd check placeholder types
-            let placeholders = ppt_slide.placeholders();
-            for placeholder in placeholders {
-                // Check if this is a title placeholder (type 1 in PowerPoint)
-                // For now, we'll assume the first placeholder is the title
-                // TODO: Check placeholder type when the API supports it
-                let text = placeholder.text()?;
-                if !text.is_empty() {
-                    return Ok(text);
-                }
-            }
-            Ok(String::new())
+        Slide::Ppt(_) => {
+            // PPT slides don't have structured title extraction yet
+            // Just use the first line of text as title
+            let text = slide.text()?;
+            let first_line = text.lines().next().unwrap_or("");
+            Ok(first_line.to_string())
         }
         Slide::Pptx(pptx_data) => {
             // For PPTX slides, use the slide name if available
@@ -73,19 +64,12 @@ fn extract_slide_title(slide: &Slide) -> Result<String> {
 /// Write slide content with proper markdown formatting.
 fn write_slide_content(writer: &mut MarkdownWriter, slide: &Slide, _options: &MarkdownOptions) -> Result<()> {
     match slide {
-        Slide::Ppt(ppt_slide) => {
-            // For PPT slides, process shapes and extract content
-            let shapes = ppt_slide.shapes()?;
-
-            for shape in shapes {
-                // For now, just extract text content
-                // In a full implementation, we'd handle different shape types (tables, etc.)
-                let shape_text = shape.text()?;
-                if !shape_text.is_empty() {
-                    // Write the text directly as it's already formatted
-                    writer.push_str(&shape_text);
-                    writer.push_str("\n\n");
-                }
+        Slide::Ppt(_) => {
+            // Write PPT slide text content
+            let text = slide.text()?;
+            if !text.is_empty() {
+                writer.push_str(&text);
+                writer.push_str("\n\n");
             }
         }
         Slide::Pptx(_) => {

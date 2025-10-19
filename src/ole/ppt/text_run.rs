@@ -4,7 +4,7 @@
 /// provides proper text extraction with formatting from PPT files.
 use super::package::Result;
 use super::super::consts::PptRecordType;
-use super::record_parser::PptRecord;
+use super::records::PptRecord;
 use crate::ole::binary::{parse_utf16le_string, parse_windows1252_string_len};
 
 /// Text formatting properties for a text run.
@@ -287,6 +287,7 @@ mod tests {
 
         let record = PptRecord {
             record_type: PptRecordType::TextCharsAtom,
+            record_type_raw: 4000,
             version: 0,
             instance: 0,
             data_length: text_data.len() as u32,

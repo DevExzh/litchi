@@ -122,6 +122,10 @@ pub enum PptRecordType {
     SlidePersistAtom = 1011,
     /// Main master record
     MainMaster = 1016,
+    /// Slide list with text record
+    SlideListWithText = 4080,
+    /// Persist pointer holder record
+    PersistPtrHolder = 6001,
     /// Slide show slide info atom
     SSSlideInfoAtom = 1017,
     /// VBA info record
@@ -201,6 +205,8 @@ impl From<u16> for PptRecordType {
             1011 => PptRecordType::SlidePersistAtom,
             1016 => PptRecordType::MainMaster,
             1017 => PptRecordType::SSSlideInfoAtom,
+            4080 => PptRecordType::SlideListWithText,
+            6001 | 6002 => PptRecordType::PersistPtrHolder, // Both values are used
             1023 => PptRecordType::VBAInfo,
             1024 => PptRecordType::VBAInfoAtom,
             1033 => PptRecordType::ExObjList,

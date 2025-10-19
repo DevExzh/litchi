@@ -42,11 +42,18 @@
 /// ```
 pub mod escher;
 pub mod shape;
+pub mod shape_enum;
 pub mod textbox;
 pub mod placeholder;
 pub mod autoshape;
 
+// Re-export the trait and type
 pub use shape::{Shape, ShapeType};
+
+// Re-export the high-performance enum
+pub use shape_enum::ShapeEnum;
+
+// Re-export concrete shape types
 pub use textbox::TextBox;
 pub use placeholder::{Placeholder, PlaceholderType, PlaceholderSize};
 pub use autoshape::AutoShape;

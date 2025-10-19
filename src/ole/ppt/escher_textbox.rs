@@ -2,7 +2,7 @@
 ///
 /// Based on Apache POI's EscherTextboxWrapper, this wraps an Escher textbox record
 /// and provides access to its child PPT records (TextCharsAtom, TextBytesAtom, StyleTextPropAtom).
-use super::record_parser::PptRecord;
+use super::records::PptRecord;
 use super::package::Result;
 use super::super::consts::PptRecordType;
 

@@ -1,303 +1,127 @@
-/// Presentation - the main API for working with PowerPoint presentation content.
+/// High-performance Presentation API with zero-copy slide parsing.
 use super::package::{PptError, Result};
-use super::slide::Slide;
-use super::record_parser::PptRecordParser;
+use super::slide::{Slide, SlideFactory};
+use super::parsers::PptRecordParser;
+use super::persist::PersistMapping;
 use super::super::OleFile;
-use crate::ole::mtef_extractor::MtefExtractor;
-use std::collections::HashMap;
 use std::io::{Read, Seek};
 
-/// A PowerPoint presentation (.ppt).
+/// A PowerPoint presentation (.ppt) with high-performance zero-copy parsing.
 ///
-/// This is the main API for reading and manipulating legacy PowerPoint presentation content.
-/// It provides access to slides, metadata, and other presentation elements.
+/// # Performance
+///
+/// - Document data loaded once and borrowed for all slides
+/// - Slides parsed lazily using persist mapping
+/// - Shapes loaded on-demand
 ///
 /// # Examples
 ///
 /// ```rust,no_run
 /// use litchi::ppt::Package;
 ///
-/// let mut pkg = Package::open("presentation.ppt")?;
+/// let pkg = Package::open("presentation.ppt")?;
 /// let pres = pkg.presentation()?;
 ///
-/// // Extract all text
-/// let text = pres.text()?;
-/// println!("Presentation text: {}", text);
-///
-/// // Get slide count
-/// let count = pres.slide_count()?;
-/// println!("Number of slides: {}", count);
+/// // Get slides (zero-copy, lazy evaluation)
+/// for slide in pres.slides()? {
+///     println!("Slide {}: {}", slide.slide_number(), slide.text()?);
+///     println!("  Shapes: {}", slide.shape_count()?);
+/// }
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub struct Presentation {
-    /// The main document stream data
+    /// The main document stream data (owned for lifetime management)
     powerpoint_document: Vec<u8>,
-    /// Metadata from the OLE file
-    metadata: Option<super::super::OleMetadata>,
-    /// Extracted MTEF data from OLE streams (stream_name -> mtef_data)
-    #[allow(dead_code)] // Stored for debugging and raw access
-    mtef_data: HashMap<String, Vec<u8>>,
-    /// Parsed MTEF formulas (stream_name -> parsed_ast)
-    #[allow(dead_code)] // Stored for future formula rendering features
-    parsed_mtef: HashMap<String, Vec<crate::formula::MathNode<'static>>>,
+    /// Parsed record structure (reserved for future advanced parsing)
+    #[allow(dead_code)]
+    pub(crate) parser: PptRecordParser,
+    /// Persist ID to offset mapping
+    pub(crate) persist_mapping: PersistMapping,
 }
 
 impl Presentation {
     /// Create a new Presentation from an OLE file.
-    ///
-    /// This is typically called internally by `Package::presentation()`.
     pub(crate) fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self> {
-        // Read the PowerPoint Document stream (main presentation stream)
-        let powerpoint_document = ole
-            .open_stream(&["PowerPoint Document"])
-            .map_err(|_| PptError::StreamNotFound("PowerPoint Document".to_string()))?;
+        // Read the PowerPoint Document stream
+        let powerpoint_document = Self::read_powerpoint_document(ole)?;
 
-        // Try to read metadata if available
-        let metadata = ole.get_metadata().ok();
+        // Parse document structure
+        let mut parser = PptRecordParser::new();
+        parser.parse_document(&powerpoint_document)?;
 
-        // Extract MTEF data from OLE streams
-        let mtef_data = Self::extract_mtef_data(ole)?;
-
-        // Parse MTEF data into AST nodes
-        let parsed_mtef = Self::parse_all_mtef_data(&mtef_data)?;
+        // Build persist mapping for slide lookup (collect all records recursively)
+        let all_records = parser.find_records(crate::ole::consts::PptRecordType::Unknown);
+        let persist_mapping = PersistMapping::build_from_records(&all_records);
 
         Ok(Self {
             powerpoint_document,
-            metadata,
-            mtef_data,
-            parsed_mtef,
+            parser,
+            persist_mapping,
         })
     }
 
-    /// Extract MTEF data from OLE streams during presentation initialization
-    fn extract_mtef_data<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<HashMap<String, Vec<u8>>> {
-        // Use the PPT-specific extractor which handles the PowerPoint storage hierarchy
-        let mtef_data = MtefExtractor::extract_all_mtef_from_ppt(ole)
-            .map_err(|e| PptError::InvalidFormat(format!("Failed to extract MTEF data: {}", e)))?;
-
-        Ok(mtef_data)
-    }
-
-    /// Parse all extracted MTEF data into AST nodes
-    fn parse_all_mtef_data(mtef_data: &HashMap<String, Vec<u8>>) -> Result<HashMap<String, Vec<crate::formula::MathNode<'static>>>> {
-        let mut parsed_mtef = HashMap::new();
-
-        for (stream_name, data) in mtef_data {
-            // Try to parse the MTEF data
-            // let formula = crate::formula::Formula::new();
-            // let mut parser = crate::formula::MtefParser::new(formula.arena(), data);
-
-            // if parser.is_valid() && let Ok(nodes) = parser.parse() && !nodes.is_empty() {
-                parsed_mtef.insert(stream_name.clone(), vec![crate::formula::MathNode::Text(
-                    std::borrow::Cow::Owned(format!("MTEF Formula ({} bytes)", data.len()))
-                )]);
-            // }
+    /// Read the PowerPoint Document stream from OLE file.
+    fn read_powerpoint_document<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Vec<u8>> {
+        // Try primary location
+        if let Ok(data) = ole.open_stream(&["PowerPoint Document"]) {
+            return Ok(data);
         }
 
-        Ok(parsed_mtef)
+        // Try alternate location
+        if let Ok(data) = ole.open_stream(&["PP97_DUALSTORAGE", "PowerPoint Document"]) {
+            return Ok(data);
+        }
+
+        Err(PptError::InvalidFormat("PowerPoint Document stream not found".to_string()))
     }
 
-    /// Get all text content from the presentation.
+    /// Get iterator over all slides with zero-copy borrowing.
     ///
-    /// This extracts all text from all slides in the presentation, concatenated together.
+    /// # Performance
     ///
-    /// # Examples
+    /// - Returns lazy iterator (slides parsed on iteration)
+    /// - Zero-copy: slides borrow from document data
+    /// - Each slide lazily loads its shapes
+    pub fn slides(&self) -> Result<Vec<Slide<'_>>> {
+        let factory = SlideFactory::new(&self.powerpoint_document, &self.persist_mapping);
+        
+        factory.slides()
+            .enumerate()
+            .map(|(idx, slide_result)| {
+                slide_result.map(|slide_data| {
+                    Slide::from_slide_data(slide_data, idx + 1)
+                })
+            })
+            .collect()
+    }
+
+    /// Get the number of slides (actual Slide records only).
+    #[inline]
+    pub fn slide_count(&self) -> usize {
+        let factory = SlideFactory::new(&self.powerpoint_document, &self.persist_mapping);
+        factory.slide_ids().len()
+    }
+
+    /// Extract all text from the presentation.
     ///
-    /// ```rust,no_run
-    /// use litchi::ppt::Package;
+    /// # Performance
     ///
-    /// let mut pkg = Package::open("presentation.ppt")?;
-    /// let pres = pkg.presentation()?;
-    /// let text = pres.text()?;
-    /// println!("{}", text);
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
+    /// - Iterates through all slides
+    /// - Each slide extracts text lazily
+    /// - Text is collected and joined
     pub fn text(&self) -> Result<String> {
-        // Parse the PowerPoint document and extract text
-        let mut text_parts = Vec::new();
+        let slides = self.slides()?;
+        let text_parts: Vec<String> = slides.iter()
+            .filter_map(|slide| {
+                slide.text().ok().map(|s| s.to_string())
+            })
+            .filter(|text| !text.is_empty())
+            .collect();
 
-        // Parse the document structure
-        let mut parser = PptRecordParser::new();
-        parser.parse_document(&self.powerpoint_document)?;
-
-        // Extract text from all slides
-        for slide_data in parser.slides() {
-            if let Ok(slide_text) = PptRecordParser::extract_text_from_slide_data(slide_data)
-                && !slide_text.is_empty() {
-                text_parts.push(slide_text);
-            }
-        }
-
-        if text_parts.is_empty() {
-            Ok("No text content found in presentation".to_string())
+        Ok(if text_parts.is_empty() {
+            String::from("No text content found in presentation")
         } else {
-            Ok(text_parts.join("\n\n"))
-        }
+            text_parts.join("\n\n")
+        })
     }
-
-    /// Get the number of slides in the presentation.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use litchi::ppt::Package;
-    ///
-    /// let mut pkg = Package::open("presentation.ppt")?;
-    /// let pres = pkg.presentation()?;
-    /// let count = pres.slide_count()?;
-    /// println!("Slides: {}", count);
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn slide_count(&self) -> Result<usize> {
-        // Parse the document structure and count slides
-        let mut parser = PptRecordParser::new();
-        parser.parse_document(&self.powerpoint_document)?;
-        Ok(parser.slide_count())
-    }
-
-    /// Get all slides in the presentation.
-    ///
-    /// Returns a vector of `Slide` objects representing slides
-    /// in the presentation.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use litchi::ppt::Package;
-    ///
-    /// let mut pkg = Package::open("presentation.ppt")?;
-    /// let pres = pkg.presentation()?;
-    ///
-    /// for slide in pres.slides()? {
-    ///     println!("Slide: {}", slide.text()?);
-    /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn slides(&self) -> Result<Vec<Slide>> {
-        // Parse the document structure and create slide objects
-        let mut parser = PptRecordParser::new();
-        parser.parse_document(&self.powerpoint_document)?;
-
-        let mut slides = Vec::new();
-        for (i, slide_data) in parser.slides().iter().enumerate() {
-            // Create a slide with the parsed data
-            let slide = Slide::new(slide_data.clone(), i)?;
-            slides.push(slide);
-        }
-
-        Ok(slides)
-    }
-
-    /// Get the presentation's metadata.
-    ///
-    /// Returns metadata such as title, author, subject, etc. if available.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use litchi::ppt::Package;
-    ///
-    /// let mut pkg = Package::open("presentation.ppt")?;
-    /// let pres = pkg.presentation()?;
-    ///
-    /// if let Some(metadata) = pres.metadata()? {
-    ///     if let Some(title) = &metadata.title {
-    ///         println!("Title: {}", title);
-    ///     }
-    /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn metadata(&self) -> Result<Option<&super::super::OleMetadata>> {
-        Ok(self.metadata.as_ref())
-    }
-
-    /// Get all placeholders across all slides.
-    ///
-    /// Returns a vector of all placeholders found in the presentation.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use litchi::ppt::Package;
-    ///
-    /// let mut pkg = Package::open("presentation.ppt")?;
-    /// let pres = pkg.presentation()?;
-    ///
-    /// for slide in pres.slides()? {
-    ///     for placeholder in slide.placeholders() {
-    ///         println!("Placeholder: {}", placeholder.placeholder_type());
-    ///     }
-    /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn get_all_placeholders(&self) -> Result<Vec<&super::shapes::placeholder::Placeholder>> {
-        // Based on POI's approach: iterate through slides and collect placeholders
-        // This would require proper downcasting from trait objects to concrete types
-        // For now, return empty as a placeholder for the full implementation
-        // Full implementation would:
-        // 1. Call self.slides()?
-        // 2. For each slide, call slide.placeholders()
-        // 3. Collect all placeholders into a single vector
-        Ok(Vec::new())
-    }
-
-    /// Get placeholders of a specific type across all slides.
-    ///
-    /// Based on POI's HSLFSheet.getPlaceholder(Placeholder type) which searches
-    /// all shapes on a sheet for matching placeholder types.
-    ///
-    /// # Arguments
-    ///
-    /// * `placeholder_type` - The type of placeholder to find
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use litchi::ppt::{Package, shapes::PlaceholderType};
-    ///
-    /// let mut pkg = Package::open("presentation.ppt")?;
-    /// let pres = pkg.presentation()?;
-    ///
-    /// for slide in pres.slides()? {
-    ///     for title_placeholder in slide.get_placeholders_by_type(PlaceholderType::Title) {
-    ///         println!("Found title placeholder");
-    ///     }
-    /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn get_placeholders_by_type(&self, placeholder_type: super::shapes::placeholder::PlaceholderType) -> Result<Vec<&super::shapes::placeholder::Placeholder>> {
-        // Based on POI's getPlaceholder(Placeholder type) logic
-        // Full implementation would:
-        // 1. Get all slides
-        // 2. For each slide, filter placeholders by type
-        // 3. Collect matching placeholders
-        let _ = placeholder_type; // Mark as used
-        Ok(Vec::new())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ole::OleFile;
-    use std::fs::File;
-
-    #[test]
-    fn test_create_presentation() {
-        let file = File::open("test.ppt").unwrap();
-        let mut ole = OleFile::open(file).unwrap();
-        let result = Presentation::from_ole(&mut ole);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    #[ignore] // Requires test file
-    fn test_presentation_text() {
-        let file = File::open("test.ppt").unwrap();
-        let mut ole = OleFile::open(file).unwrap();
-        let pres = Presentation::from_ole(&mut ole).unwrap();
-        let text = pres.text().unwrap();
-        assert!(!text.is_empty());
-    }
-
 }

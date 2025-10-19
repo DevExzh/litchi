@@ -50,21 +50,45 @@
 /// }
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+// Core modules
 pub mod package;
 pub mod presentation;
-pub mod shapes;
+
+/// Slide module with factory and enhanced implementation
 pub mod slide;
-pub mod record_parser;
+
+// Submodules (organized by functionality)
+pub mod records;
+pub mod parsers;
+pub mod persist;
+pub mod text;
+pub mod shapes;
+
+// Drawing layer (Escher) support
+pub mod escher;
+
+// Legacy compatibility modules
 pub mod current_user;
 pub mod text_run;
 pub mod text_prop;
 pub mod escher_textbox;
 
+// Re-export main types for convenience
 pub use package::Package;
 pub use presentation::Presentation;
+pub use slide::{Slide, SlideFactory, SlideData};
+
+// Re-export record types
+pub use records::{PptRecord, DocumentInfo, SlideInfo, SlideAtomsSet};
+pub use parsers::PptRecordParser;
+
+// Re-export persist types
+pub use persist::{PersistPtrHolder, PersistMapping};
+
+// Re-export shape types
 pub use shapes::{Shape, TextBox, Placeholder, PlaceholderType, PlaceholderSize, AutoShape};
-pub use slide::Slide;
-pub use record_parser::{PptRecordParser, DocumentInfo, SlideInfo};
+
+// Re-export legacy types
 pub use current_user::CurrentUser;
 pub use text_run::{TextRun, TextRunExtractor, TextRunFormatting};
 pub use text_prop::{TextProp, TextPropCollection, TextPropType};

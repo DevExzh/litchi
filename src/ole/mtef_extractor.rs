@@ -188,6 +188,7 @@ impl<'arena> MtefExtractor<'arena> {
     /// # Returns
     ///
     /// Returns a HashMap mapping storage names to their MTEF binary data (including OLE header)
+    #[allow(dead_code)]
     pub(crate) fn extract_all_mtef_from_ppt<R: Read + Seek>(
         ole_file: &mut OleFile<R>,
     ) -> Result<std::collections::HashMap<String, Vec<u8>>, MtefExtractionError> {
