@@ -1,0 +1,63 @@
+version: 2
+updates:
+  # Cargo dependencies
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    # Only create PRs for minor and patch updates
+    open-pull-requests-limit: 10
+    # Group updates together to reduce PR noise
+    groups:
+      # Group all production dependencies together
+      production-dependencies:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      # Group all development dependencies together
+      development-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+    # Commit message configuration
+    commit-message:
+      prefix: "Bump"
+      prefix-development: "Bump"
+      include: "scope"
+    # PR configuration
+    assignees:
+      - "DevExzh"
+    labels:
+      - "dependencies"
+      - "rust"
+    # Allow only minor and patch version updates (no major breaking changes)
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    # Rebase strategy to keep PRs up to date
+    rebase-strategy: "auto"
+
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "Bump"
+      include: "scope"
+    assignees:
+      - "DevExzh"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    rebase-strategy: "auto"
