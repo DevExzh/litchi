@@ -5,14 +5,14 @@
 //! Detection follows the iWork Archive (IWA) format specification.
 
 use std::path::Path;
-use std::io::Read;
 #[cfg(feature = "iwa")]
-use std::io::Cursor;
+use std::io::{Read, Cursor};
 use crate::common::detection::FileFormat;
 
 /// Detect iWork formats from bytes.
 /// iWork files can be ZIP archives containing IWA files.
 /// Detection analyzes the ZIP structure and IWA message types.
+#[cfg(feature = "iwa")]
 pub fn detect_iwork_format(bytes: &[u8]) -> Option<FileFormat> {
     // Check if it starts with ZIP signature
     if bytes.len() < 4 || &bytes[0..4] != crate::common::detection::utils::ZIP_SIGNATURE {
@@ -41,8 +41,14 @@ pub fn detect_iwork_format(bytes: &[u8]) -> Option<FileFormat> {
     }
 }
 
+#[cfg(not(feature = "iwa"))]
+pub fn detect_iwork_format(_bytes: &[u8]) -> Option<FileFormat> {
+    None
+}
+
 /// Detect iWork formats from reader.
 /// iWork files are ZIP archives that can be detected from stream data.
+#[cfg(feature = "iwa")]
 pub fn detect_iwork_format_from_reader<R: std::io::Read + std::io::Seek>(
     reader: &mut R
 ) -> Option<FileFormat> {
@@ -73,6 +79,13 @@ pub fn detect_iwork_format_from_reader<R: std::io::Read + std::io::Seek>(
         }
     }
 
+    None
+}
+
+#[cfg(not(feature = "iwa"))]
+pub fn detect_iwork_format_from_reader<R: std::io::Read + std::io::Seek>(
+    _reader: &mut R
+) -> Option<FileFormat> {
     None
 }
 
@@ -184,6 +197,7 @@ fn detect_iwork_format_from_files(bundle_path: &Path) -> Option<FileFormat> {
 }
 
 /// Detect application type from a ZIP archive containing IWA files
+#[cfg(feature = "iwa")]
 pub fn detect_application_from_zip_archive<R: Read + std::io::Seek>(archive: &mut zip::ZipArchive<R>) -> Option<FileFormat> {
     let mut table_file_count = 0;
     let mut has_calculation_engine = false;
@@ -302,8 +316,3 @@ fn detect_application_from_message_types<R: Read + std::io::Seek>(archive: &mut 
     }
 }
 
-/// Fallback detection fallback (when iwa feature is disabled)
-#[cfg(not(feature = "iwa"))]
-fn detect_application_from_message_types<R: Read + std::io::Seek>(_archive: &mut zip::ZipArchive<R>) -> Option<FileFormat> {
-    None
-}

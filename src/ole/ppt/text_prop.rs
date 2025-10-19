@@ -2,7 +2,7 @@
 ///
 /// Based on Apache POI's TextPropCollection and TextProp classes.
 /// This module handles the complex structure of text styling in PPT files.
-use crate::ole::binary::{read_u16_le, read_i32_le, read_u32_le, read_i16_le};
+use crate::common::binary::{read_u16_le, read_i32_le, read_u32_le, read_i16_le};
 
 /// Text property definition.
 ///

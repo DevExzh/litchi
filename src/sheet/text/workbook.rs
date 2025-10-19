@@ -105,6 +105,7 @@ impl TextConfig {
 }
 
 /// Workbook implementation for text-based formats
+#[derive(Debug)]
 pub struct TextWorkbook {
     data: Vec<Vec<CellValue>>,
     config: TextConfig,

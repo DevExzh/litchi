@@ -11,6 +11,7 @@ use super::worksheet::{Worksheet, WorksheetInfo, WorksheetIterator as XlsxWorksh
 use super::parsers::{workbook_parser, styles_parser};
 
 /// Concrete implementation of a Workbook for Excel files.
+#[derive(Debug)]
 pub struct Workbook {
     /// The underlying OPC package
     package: OpcPackage,

@@ -129,3 +129,9 @@ impl From<crate::ole::file::OleError> for XlsError {
         XlsError::Cfb(err)
     }
 }
+
+impl From<crate::common::binary::BinaryError> for XlsError {
+    fn from(err: crate::common::binary::BinaryError) -> Self {
+        XlsError::InvalidData(err.to_string())
+    }
+}

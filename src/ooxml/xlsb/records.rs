@@ -6,7 +6,7 @@
 
 use std::io::Read;
 use bytes::Bytes;
-use crate::ole::binary;
+use crate::common::binary;
 use crate::ooxml::xlsb::error::{XlsbError, XlsbResult};
 
 /// XLSB record header (variable length encoding)

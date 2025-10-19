@@ -5,7 +5,7 @@
 /// and most importantly for us: embedded equations (EMBED Equation.DSMT4).
 use super::super::package::Result;
 use super::fib::FileInformationBlock;
-use crate::ole::binary::PlcfParser;
+use crate::ole::plcf::PlcfParser;
 
 /// Field types from Word specification
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

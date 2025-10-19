@@ -45,10 +45,10 @@ exclude = [
 [features]
 default = ["ole", "ooxml"]
 # Format support features
-iwa = ["dep:snap", "dep:plist", "dep:prost", "dep:prost-types", "dep:zip"]
+iwa = ["dep:snap", "dep:plist", "dep:prost", "dep:prost-types", "dep:zip", "dep:prost-build"]
 odf = ["dep:zip", "dep:quick-xml"]
 ole = ["dep:encoding_rs"]
-ooxml = ["dep:zip", "dep:quick-xml"]
+ooxml = ["dep:zip", "dep:quick-xml", "dep:encoding_rs"]
 # Additional functionality features
 formula = ["dep:rowan", "dep:bumpalo", "dep:quick-xml"]
 imgconv = ["dep:image"]
@@ -78,8 +78,9 @@ once_cell = "1"             # Lazy statics and one-time initialization for globa
 quick-xml = { version = "0.38", optional = true }  # High-performance XML parser for .docx, .xlsx, .pptx files
 zip = { version = "6", optional = true }           # ZIP archive handling for modern Office Open XML formats
 
-# OLE-specific dependencies (optional)
-encoding_rs = { version = "0.8", optional = true }  # Character encoding conversion for legacy Office formats (.doc, .xls, .ppt)
+# Character encoding conversion dependencies (optional)
+# Used by both OLE (.doc, .xls, .ppt) and OOXML (.xlsb) formats for UTF-16LE decoding
+encoding_rs = { version = "0.8", optional = true }
 
 # Image conversion dependencies (optional)
 image = { version = "0.25", features = ["default-formats", "rayon"], optional = true }  # Image format decoding/encoding for embedded media
@@ -95,4 +96,6 @@ prost = { version = "0.14", features = ["derive"], optional = true }  # Protocol
 prost-types = { version = "0.14", optional = true } # Well-known Protocol Buffer types used by iWork
 
 [build-dependencies]
-prost-build = { version = "0.14", optional = true }  # Build-time Protocol Buffer compiler for generating iWork message types
+# Build-time Protocol Buffer compiler for generating iWork message types
+# Only needed when iwa feature is enabled
+prost-build = { version = "0.14", optional = true }

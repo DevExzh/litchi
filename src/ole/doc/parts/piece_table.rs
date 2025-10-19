@@ -11,7 +11,8 @@
 /// - org.apache.poi.hwpf.model.PieceDescriptor
 /// - [MS-DOC] 2.4.1 Clx (Complex file information)
 /// - [MS-DOC] 2.9.179 Pcd (Piece Descriptor)
-use crate::ole::binary::{PlcfParser, read_u32_le, read_u16_le};
+use crate::common::binary::{read_u32_le, read_u16_le};
+use crate::ole::plcf::PlcfParser;
 
 /// A text piece - maps a range of CPs to an FC in the WordDocument stream.
 ///

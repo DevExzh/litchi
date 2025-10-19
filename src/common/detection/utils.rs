@@ -1,5 +1,6 @@
 //! Utility functions and constants for file format detection.
 
+#[cfg(any(feature = "ooxml", feature = "odf", feature = "iwa"))]
 use std::io::Read;
 
 // Magic number signatures
@@ -13,6 +14,7 @@ pub fn find_in_buffer(buffer: &[u8], pattern: &[u8]) -> bool {
 }
 
 /// Read a file from ZIP archive with minimal memory allocation.
+#[cfg(any(feature = "ooxml", feature = "odf", feature = "iwa"))]
 pub fn read_zip_file<R: Read + std::io::Seek>(
     archive: &mut zip::ZipArchive<R>,
     file_name: &str

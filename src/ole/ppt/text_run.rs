@@ -5,7 +5,7 @@
 use super::package::Result;
 use super::super::consts::PptRecordType;
 use super::records::PptRecord;
-use crate::ole::binary::{parse_utf16le_string, parse_windows1252_string_len};
+use crate::common::binary::{parse_utf16le_string, parse_windows1252_string_len};
 
 /// Text formatting properties for a text run.
 ///

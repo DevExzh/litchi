@@ -99,6 +99,7 @@ impl Metadata {
     }
 }
 
+#[cfg(feature = "ole")]
 impl From<crate::ole::OleMetadata> for Metadata {
     fn from(ole_metadata: crate::ole::OleMetadata) -> Self {
         Self {
@@ -165,6 +166,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "ole")]
     fn test_ole_metadata_conversion() {
         let ole_metadata = crate::ole::OleMetadata {
             title: Some("OLE Document".to_string()),

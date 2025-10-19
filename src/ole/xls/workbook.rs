@@ -98,13 +98,13 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 }
                 0x0042 => { // CodePage
                     if record.data.len() >= 2 {
-                        let codepage = crate::ole::binary::read_u16_le_at(&record.data, 0)?;
+                        let codepage = crate::common::binary::read_u16_le_at(&record.data, 0)?;
                         *encoding = XlsEncoding::from_codepage(codepage)?;
                     }
                 }
                 0x0022 => { // Date1904
                     if record.data.len() >= 2 {
-                        let flag = crate::ole::binary::read_u16_le_at(&record.data, 0)?;
+                        let flag = crate::common::binary::read_u16_le_at(&record.data, 0)?;
                         self.is_1904_date_system = flag == 1;
                     }
                 }
@@ -221,7 +221,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     }
 }
 
-impl<R: Read + Seek> Workbook for XlsWorkbook<R> {
+impl<R: Read + Seek + std::fmt::Debug> Workbook for XlsWorkbook<R> {
     fn active_worksheet(&self) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
         if self.worksheets.is_empty() {
             return Err(Box::new(XlsError::WorksheetNotFound("No worksheets found".to_string())));

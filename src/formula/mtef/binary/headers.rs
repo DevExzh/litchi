@@ -6,7 +6,7 @@
 //! MTEF data embedded in OLE documents starts with a 28-byte OLE header,
 //! followed by the MTEF header and equation data.
 
-use zerocopy::FromBytes;
+use zerocopy_derive::FromBytes as DeriveFromBytes;
 
 /// MTEF OLE file header (28 bytes)
 ///
@@ -16,7 +16,7 @@ use zerocopy::FromBytes;
 /// Note: This structure is kept for reference and future zerocopy-based parsing.
 /// Current implementation uses manual parsing for better error handling.
 #[allow(dead_code)]  // Kept for reference and future zerocopy parsing
-#[derive(Debug, Clone, FromBytes)]
+#[derive(Debug, Clone, DeriveFromBytes)]
 #[repr(C)]
 pub struct OleFileHeader {
     /// Total header length (should be 28)
@@ -40,7 +40,7 @@ pub struct OleFileHeader {
 /// Note: Kept for reference and documentation. Parser uses manual parsing
 /// to handle different MTEF versions (1-5) with varying header layouts.
 #[allow(dead_code)]  // Kept for reference and documentation
-#[derive(Debug, Clone, FromBytes)]
+#[derive(Debug, Clone, DeriveFromBytes)]
 #[repr(C)]
 pub struct MtefHeader {
     /// Signature bytes: "(", 0x04, "m", "t" or just version byte for headerless format

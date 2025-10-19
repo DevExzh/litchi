@@ -2,7 +2,10 @@
 ///
 /// This module provides the `MarkdownWriter` struct which handles the actual
 /// conversion of document elements to Markdown format.
+///
+/// **Note**: Some functionality requires the `ole` or `ooxml` feature to be enabled.
 use crate::common::{Error, Result, Metadata};
+#[cfg(any(feature = "ole", feature = "ooxml"))]
 use crate::document::{Paragraph, Run, Table};
 use super::config::{MarkdownOptions, TableStyle};
 use std::fmt::Write as FmtWrite;
@@ -50,6 +53,9 @@ impl MarkdownWriter {
     }
 
     /// Write a paragraph to the buffer.
+    ///
+    /// **Note**: This method requires the `ole` or `ooxml` feature to be enabled.
+    #[cfg(any(feature = "ole", feature = "ooxml"))]
     pub fn write_paragraph(&mut self, para: &Paragraph) -> Result<()> {
         let text = para.text()?;
 
@@ -76,6 +82,9 @@ impl MarkdownWriter {
     }
 
     /// Write a run with formatting.
+    ///
+    /// **Note**: This method requires the `ole` or `ooxml` feature to be enabled.
+    #[cfg(any(feature = "ole", feature = "ooxml"))]
     pub fn write_run(&mut self, run: &Run) -> Result<()> {
         // First check if this run contains a formula
         if let Some(formula_markdown) = self.extract_formula_from_run(run)? {
@@ -91,66 +100,88 @@ impl MarkdownWriter {
         let bold = run.bold()?.unwrap_or(false);
         let italic = run.italic()?.unwrap_or(false);
         let strikethrough = run.strikethrough()?.unwrap_or(false);
-        let vertical_pos = run.vertical_position()?;
 
-        // Pre-calculate buffer size needed to minimize reallocations
-        let mut needed_capacity = text.len();
-        if vertical_pos.is_some() {
-            needed_capacity += 11; // <sup></sup> or <sub></sub>
-        }
-        if strikethrough {
-            needed_capacity += 9; // ~~ or <del></del>
-        }
-        if bold && italic {
-            needed_capacity += 6; // ***
-        } else if bold || italic {
-            needed_capacity += 4; // ** or *
-        }
-
-        // Reserve capacity to avoid reallocations
-        self.buffer.reserve(needed_capacity);
-
-        // For superscript/subscript, we apply them directly and skip other formatting
-        if let Some(pos) = vertical_pos {
-            match self.options.script_style {
-                super::config::ScriptStyle::Html => {
-                    match pos {
-                        crate::ole::doc::parts::chp::VerticalPosition::Superscript => {
-                            self.buffer.push_str("<sup>");
-                            self.buffer.push_str(&text);
-                            self.buffer.push_str("</sup>");
-                        }
-                        crate::ole::doc::parts::chp::VerticalPosition::Subscript => {
-                            self.buffer.push_str("<sub>");
-                            self.buffer.push_str(&text);
-                            self.buffer.push_str("</sub>");
-                        }
-                        _ => {
-                            self.buffer.push_str(&text);
-                        }
-                    }
-                }
-                super::config::ScriptStyle::Unicode => {
-                    // For Unicode, we'd need to convert each character to superscript/subscript
-                    // This is complex, so for now fall back to HTML for unsupported characters
-                    match pos {
-                        crate::ole::doc::parts::chp::VerticalPosition::Superscript => {
-                            self.buffer.push_str("<sup>");
-                            self.buffer.push_str(&text);
-                            self.buffer.push_str("</sup>");
-                        }
-                        crate::ole::doc::parts::chp::VerticalPosition::Subscript => {
-                            self.buffer.push_str("<sub>");
-                            self.buffer.push_str(&text);
-                            self.buffer.push_str("</sub>");
-                        }
-                        _ => {
-                            self.buffer.push_str(&text);
-                        }
-                    }
-                }
+        // Handle vertical position (superscript/subscript)
+        // Note: vertical_position() is available when ole or ooxml features are enabled
+        #[cfg(any(feature = "ole", feature = "ooxml"))]
+        {
+            use crate::common::VerticalPosition;
+            let vertical_pos = run.vertical_position()?;
+            
+            // Pre-calculate buffer size needed to minimize reallocations
+            let mut needed_capacity = text.len();
+            if vertical_pos.is_some() {
+                needed_capacity += 11; // <sup></sup> or <sub></sub>
             }
-            return Ok(());
+            if strikethrough {
+                needed_capacity += 9; // ~~ or <del></del>
+            }
+            if bold && italic {
+                needed_capacity += 6; // ***
+            } else if bold || italic {
+                needed_capacity += 4; // ** or *
+            }
+
+            // Reserve capacity to avoid reallocations
+            self.buffer.reserve(needed_capacity);
+
+            // For superscript/subscript, we apply them directly and skip other formatting
+            if let Some(pos) = vertical_pos {
+                match self.options.script_style {
+                    super::config::ScriptStyle::Html => {
+                        match pos {
+                            VerticalPosition::Superscript => {
+                                self.buffer.push_str("<sup>");
+                                self.buffer.push_str(&text);
+                                self.buffer.push_str("</sup>");
+                            }
+                            VerticalPosition::Subscript => {
+                                self.buffer.push_str("<sub>");
+                                self.buffer.push_str(&text);
+                                self.buffer.push_str("</sub>");
+                            }
+                            VerticalPosition::Normal => {
+                                self.buffer.push_str(&text);
+                            }
+                        }
+                    }
+                    super::config::ScriptStyle::Unicode => {
+                        // For Unicode, we'd need to convert each character to superscript/subscript
+                        // This is complex, so for now fall back to HTML for unsupported characters
+                        match pos {
+                            VerticalPosition::Superscript => {
+                                self.buffer.push_str("<sup>");
+                                self.buffer.push_str(&text);
+                                self.buffer.push_str("</sup>");
+                            }
+                            VerticalPosition::Subscript => {
+                                self.buffer.push_str("<sub>");
+                                self.buffer.push_str(&text);
+                                self.buffer.push_str("</sub>");
+                            }
+                            VerticalPosition::Normal => {
+                                self.buffer.push_str(&text);
+                            }
+                        }
+                    }
+                }
+                return Ok(());
+            }
+        }
+
+        // Pre-calculate buffer size for non-vertical-position formatting
+        #[cfg(not(any(feature = "ole", feature = "ooxml")))]
+        {
+            let mut needed_capacity = text.len();
+            if strikethrough {
+                needed_capacity += 9; // ~~ or <del></del>
+            }
+            if bold && italic {
+                needed_capacity += 6; // ***
+            } else if bold || italic {
+                needed_capacity += 4; // ** or *
+            }
+            self.buffer.reserve(needed_capacity);
         }
 
         // Apply strikethrough and bold/italic formatting
@@ -233,6 +264,9 @@ impl MarkdownWriter {
     }
 
     /// Write a table to the buffer.
+    ///
+    /// **Note**: This method requires the `ole` or `ooxml` feature to be enabled.
+    #[cfg(any(feature = "ole", feature = "ooxml"))]
     pub fn write_table(&mut self, table: &Table) -> Result<()> {
         // Check if table has merged cells
         let has_merged_cells = self.table_has_merged_cells(table)?;
@@ -260,6 +294,7 @@ impl MarkdownWriter {
     /// - Inconsistent cell counts across rows
     /// - Empty cells in positions where content is expected
     /// - Cell spans larger than 1 (when available)
+    #[cfg(any(feature = "ole", feature = "ooxml"))]
     fn table_has_merged_cells(&self, table: &Table) -> Result<bool> {
         let rows = table.rows()?;
         if rows.is_empty() {
@@ -313,6 +348,7 @@ impl MarkdownWriter {
     }
 
     /// Write a table in Markdown format.
+    #[cfg(any(feature = "ole", feature = "ooxml"))]
     fn write_markdown_table(&mut self, table: &Table) -> Result<()> {
         let rows = table.rows()?;
         if rows.is_empty() {
@@ -353,6 +389,7 @@ impl MarkdownWriter {
     }
 
     /// Write a table in HTML format.
+    #[cfg(any(feature = "ole", feature = "ooxml"))]
     fn write_html_table(&mut self, table: &Table, styled: bool) -> Result<()> {
         let indent = " ".repeat(self.options.html_table_indent);
 
@@ -523,18 +560,29 @@ impl MarkdownWriter {
     /// Extract formula content from a run and convert to markdown.
     ///
     /// Returns the markdown representation of the formula if one is found, None otherwise.
+    #[cfg(any(feature = "ole", feature = "ooxml"))]
     fn extract_formula_from_run(&self, run: &Run) -> Result<Option<String>> {
         // Try OOXML OMML formulas first
-        if let crate::document::Run::Docx(docx_run) = run
-            && let Some(_omml_xml) = docx_run.omml_formula()? {
+        #[cfg(feature = "ooxml")]
+        if let crate::document::Run::Docx(docx_run) = run {
+            if let Some(_omml_xml) = docx_run.omml_formula()? {
                 // For now, return a placeholder. In a full implementation,
                 // this would parse the OMML XML and convert to LaTeX/markdown
                 return Ok(Some(self.format_formula_placeholder("OMML formula detected")));
             }
+        }
 
         // Try OLE MTEF formulas
-        if let crate::document::Run::Doc(ole_run) = run
-            && ole_run.has_mtef_formula() {
+        #[cfg(feature = "ole")]
+        {
+            // When only ole feature is enabled, Run can only be Doc variant
+            let ole_run = match run {
+                crate::document::Run::Doc(r) => r,
+                #[cfg(feature = "ooxml")]
+                _ => return Ok(None),
+            };
+            
+            if ole_run.has_mtef_formula() {
                 // Get the MTEF formula AST
                 if let Some(mtef_ast) = ole_run.mtef_formula_ast() {
                     // Convert MTEF AST to LaTeX
@@ -545,6 +593,7 @@ impl MarkdownWriter {
                     return Ok(Some(self.format_formula("[Formula]", true)));
                 }
             }
+        }
 
         Ok(None)
     }
@@ -593,6 +642,7 @@ impl MarkdownWriter {
     }
 
     /// Write a list item with proper formatting.
+    #[cfg(any(feature = "ole", feature = "ooxml"))]
     fn write_list_item(&mut self, _para: &Paragraph, list_info: &ListItemInfo) -> Result<()> {
         // Add indentation for nested lists
         let indent = " ".repeat(list_info.level * self.options.list_indent);

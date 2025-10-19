@@ -1,6 +1,6 @@
 //! Utility functions for XLS parsing
 
-use crate::ole::binary;
+use crate::common::binary;
 use crate::ole::xls::error::{XlsError, XlsResult};
 use crate::ole::xls::records::{XlsEncoding, FormulaValue};
 use zerocopy::{FromBytes, LE, U16};

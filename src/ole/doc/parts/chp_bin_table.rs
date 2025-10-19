@@ -12,7 +12,7 @@
 use super::fkp::ChpxFkp;
 use super::chp::CharacterProperties;
 use super::piece_table::PieceTable;
-use crate::ole::binary::read_u32_le;
+use crate::common::binary::read_u32_le;
 use crate::ole::sprm::parse_sprms;
 
 /// A character run with properties.

@@ -5,7 +5,7 @@
 use super::parser::{WmfParser, WmfRecord};
 use crate::common::error::{Error, Result};
 use crate::images::svg::*;
-use crate::ole::binary::read_i16_le;
+use crate::common::binary::read_i16_le;
 use rayon::prelude::*;
 
 /// WMF to SVG converter

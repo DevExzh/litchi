@@ -29,6 +29,15 @@ pub struct OpcPackage {
     parts: HashMap<PackURI, Box<dyn Part>>,
 }
 
+impl std::fmt::Debug for OpcPackage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OpcPackage")
+            .field("rels", &self.rels)
+            .field("parts_count", &self.parts.len())
+            .finish()
+    }
+}
+
 impl OpcPackage {
     /// Create a new empty OPC package.
     pub fn new() -> Self {

@@ -7,7 +7,7 @@
 /// - Text can be in either 8-bit (Windows-1252) or 16-bit (UTF-16LE) format
 use super::super::package::{DocError, Result};
 use super::fib::FileInformationBlock;
-use crate::ole::binary::{read_u16_le, read_u32_le};
+use crate::common::binary::{read_u16_le, read_u32_le};
 
 /// Size of a PieceDescriptor in bytes (8 bytes as per Apache POI)
 pub const PIECE_DESCRIPTOR_SIZE: usize = 8;

@@ -6,7 +6,7 @@
 /// - Text color and highlighting
 /// - Superscript/subscript
 use super::super::package::Result;
-use super::super::super::binary::{read_u16_le, read_u32_le};
+use crate::common::binary::{read_u16_le, read_u32_le};
 
 /// Character Properties structure.
 ///
@@ -87,17 +87,8 @@ pub enum HighlightColor {
     LightGray,
 }
 
-/// Vertical text position (superscript/subscript).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum VerticalPosition {
-    /// Normal position
-    #[default]
-    Normal,
-    /// Superscript
-    Superscript,
-    /// Subscript
-    Subscript,
-}
+// Re-export common VerticalPosition type
+pub use crate::common::VerticalPosition;
 
 impl CharacterProperties {
     /// Create a new CharacterProperties with default values.

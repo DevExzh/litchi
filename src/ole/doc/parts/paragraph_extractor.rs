@@ -9,7 +9,7 @@ use super::pap::ParagraphProperties;
 use super::chp::CharacterProperties;
 use super::chp_bin_table::ChpBinTable;
 use super::piece_table::PieceTable;
-use crate::ole::binary::PlcfParser;
+use crate::ole::plcf::PlcfParser;
 use crate::ole::sprm::parse_sprms;
 
 /// Type alias for extracted paragraph data: (text, properties, runs).

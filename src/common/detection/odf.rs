@@ -3,6 +3,9 @@
 use std::io::{Read, Seek};
 use crate::common::detection::FileFormat;
 
+#[cfg(feature = "odf")]
+use std::io::Cursor;
+
 /// Detect ODF format from mimetype content.
 /// Uses the standard ODF MIME type mapping.
 pub fn detect_odf_format_from_mimetype(mimetype: &[u8]) -> Option<FileFormat> {
@@ -18,6 +21,7 @@ pub fn detect_odf_format_from_mimetype(mimetype: &[u8]) -> Option<FileFormat> {
 
 /// Detect ODF format from byte content.
 /// Reads mimetype file directly from ZIP archive.
+#[cfg(feature = "odf")]
 pub fn detect_odf_format(bytes: &[u8]) -> Option<FileFormat> {
     // Check if it starts with ZIP signature
     if bytes.len() < 4 || &bytes[0..4] != crate::common::detection::utils::ZIP_SIGNATURE {
@@ -25,17 +29,21 @@ pub fn detect_odf_format(bytes: &[u8]) -> Option<FileFormat> {
     }
 
     // Create a cursor to read the ZIP file
-    let cursor = std::io::Cursor::new(bytes);
+    let cursor = Cursor::new(bytes);
     detect_odf_format_from_reader(&mut cursor.clone())
+}
+
+#[cfg(not(feature = "odf"))]
+pub fn detect_odf_format(_bytes: &[u8]) -> Option<FileFormat> {
+    None
 }
 
 /// Detect ODF format from a reader.
 /// Reads mimetype file directly from ZIP archive.
+#[cfg(feature = "odf")]
 pub fn detect_odf_format_from_reader<R: Read + Seek>(
     reader: &mut R
 ) -> Option<FileFormat> {
-    use std::io::Cursor;
-
     // Read the entire file into memory for ZIP analysis
     let mut buffer = Vec::new();
     if reader.read_to_end(&mut buffer).is_err() {
@@ -56,5 +64,12 @@ pub fn detect_odf_format_from_reader<R: Read + Seek>(
         }
     }
 
+    None
+}
+
+#[cfg(not(feature = "odf"))]
+pub fn detect_odf_format_from_reader<R: Read + Seek>(
+    _reader: &mut R
+) -> Option<FileFormat> {
     None
 }

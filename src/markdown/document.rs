@@ -2,6 +2,8 @@
 ///
 /// This module implements the `ToMarkdown` trait for Word document types,
 /// including Document, Paragraph, Run, and Table.
+///
+/// **Note**: This module is only available when the `ole` or `ooxml` feature is enabled.
 use crate::common::Result;
 use crate::document::{Document, Paragraph, Run, Table};
 use super::config::MarkdownOptions;

@@ -2,6 +2,8 @@
 ///
 /// This module implements the `ToMarkdown` trait for PowerPoint presentation types,
 /// including Presentation and Slide.
+///
+/// **Note**: This module is only available when the `ole` or `ooxml` feature is enabled.
 use crate::common::Result;
 use crate::presentation::{Presentation, Slide};
 use super::config::MarkdownOptions;

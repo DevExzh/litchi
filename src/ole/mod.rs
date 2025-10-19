@@ -11,12 +11,11 @@ mod metadata;
 #[cfg(feature = "formula")]
 mod mtef_extractor;
 
-/// Shared binary parsing utilities for OLE formats.
+/// Property List with Character Positions (PLCF) parser.
 ///
-/// This module provides common binary parsing functions used across
-/// DOC, PPT, and other OLE-based formats. Based on Apache POI's
-/// LittleEndian and similar utility classes.
-pub mod binary;
+/// PLCF is a data structure used extensively in legacy Office binary formats
+/// to map character positions to properties or data.
+pub mod plcf;
 
 /// Shared SPRM (Single Property Modifier) parsing
 ///

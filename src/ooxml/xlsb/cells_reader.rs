@@ -5,7 +5,7 @@ use crate::sheet::CellValue;
 use crate::ooxml::xlsb::error::XlsbResult;
 use crate::ooxml::xlsb::records::RecordIter;
 use crate::ooxml::xlsb::cell::XlsbCell;
-use crate::ole::binary;
+use crate::common::binary;
 
 /// Dimensions of a worksheet
 #[derive(Debug, Clone, Copy)]

@@ -112,6 +112,12 @@ impl From<io::Error> for OleError {
     }
 }
 
+impl From<crate::common::binary::BinaryError> for OleError {
+    fn from(err: crate::common::binary::BinaryError) -> Self {
+        OleError::InvalidData(err.to_string())
+    }
+}
+
 impl std::fmt::Display for OleError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

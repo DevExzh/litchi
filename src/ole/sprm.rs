@@ -4,7 +4,7 @@
 /// to modify properties. This module provides common SPRM parsing logic
 /// based on Apache POI's SPRM handling.
 /// SPRM operation types based on size code (from POI's SprmOperation).
-use crate::ole::binary::{read_u16_le, read_i16_le, read_u32_le};
+use crate::common::binary::{read_u16_le, read_i16_le, read_u32_le};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SprmOperation {
     /// Size code 0 - toggle (no operand)

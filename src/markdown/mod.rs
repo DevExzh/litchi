@@ -102,7 +102,12 @@
 mod config;
 mod traits;
 mod writer;
+
+// Document and presentation markdown implementations are only available when their respective features are enabled
+#[cfg(any(feature = "ole", feature = "ooxml"))]
 mod document;
+
+#[cfg(any(feature = "ole", feature = "ooxml"))]
 mod presentation;
 
 // Re-export public API

@@ -9,7 +9,7 @@
 // - https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-odraw/5dc1b9ed-818c-436f-8a4f-905a7ebb1ba9
 
 use crate::common::error::Result;
-use crate::ole::binary::{read_u16_le, read_u32_le};
+use crate::common::binary::{read_u16_le, read_u32_le};
 use std::io::Read;
 use zerocopy::FromBytes;
 

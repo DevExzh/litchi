@@ -1,10 +1,16 @@
 //! OOXML format detection (modern Office documents).
+//!
+//! This module is only available when the `ooxml` feature is enabled.
 
 use std::io::{Read, Seek};
 use crate::common::detection::FileFormat;
 
 /// Detect ZIP-based OOXML formats from byte content.
 /// Uses OpcPackage to properly validate and identify OOXML format.
+///
+/// # Note
+/// This function requires the `ooxml` feature to be enabled.
+#[cfg(feature = "ooxml")]
 pub fn detect_zip_format(bytes: &[u8]) -> Option<FileFormat> {
     // Check if it starts with ZIP signature
     if bytes.len() < 4 || &bytes[0..4] != crate::common::detection::utils::ZIP_SIGNATURE {
@@ -16,8 +22,19 @@ pub fn detect_zip_format(bytes: &[u8]) -> Option<FileFormat> {
     detect_zip_format_from_reader(&mut cursor.clone())
 }
 
+/// Stub implementation when `ooxml` feature is disabled.
+/// Always returns None since OOXML parsing is not available.
+#[cfg(not(feature = "ooxml"))]
+pub fn detect_zip_format(_bytes: &[u8]) -> Option<FileFormat> {
+    None
+}
+
 /// Detect ZIP-based formats from a reader.
 /// Uses OpcPackage to properly parse and identify OOXML format.
+///
+/// # Note
+/// This function requires the `ooxml` feature to be enabled.
+#[cfg(feature = "ooxml")]
 pub fn detect_zip_format_from_reader<R: Read + Seek>(
     reader: &mut R
 ) -> Option<FileFormat> {
@@ -31,8 +48,21 @@ pub fn detect_zip_format_from_reader<R: Read + Seek>(
     detect_ooxml_format_from_package(&package)
 }
 
+/// Stub implementation when `ooxml` feature is disabled.
+/// Always returns None since OOXML parsing is not available.
+#[cfg(not(feature = "ooxml"))]
+pub fn detect_zip_format_from_reader<R: Read + Seek>(
+    _reader: &mut R
+) -> Option<FileFormat> {
+    None
+}
+
 /// Detect specific OOXML format from OpcPackage.
 /// Analyzes the package structure to determine the document type.
+///
+/// # Note
+/// This function requires the `ooxml` feature to be enabled.
+#[cfg(feature = "ooxml")]
 pub fn detect_ooxml_format_from_package(package: &crate::ooxml::OpcPackage) -> Option<FileFormat> {
     // Check for Word document by looking for document part
     if package.iter_parts().any(|part| {
@@ -69,6 +99,13 @@ pub fn detect_ooxml_format_from_package(package: &crate::ooxml::OpcPackage) -> O
         }
     }
 
+    None
+}
+
+/// Stub implementation when `ooxml` feature is disabled.
+/// Always returns None since OOXML parsing is not available.
+#[cfg(not(feature = "ooxml"))]
+pub fn detect_ooxml_format_from_package(_package: &()) -> Option<FileFormat> {
     None
 }
 

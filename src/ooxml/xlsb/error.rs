@@ -138,6 +138,13 @@ impl From<quick_xml::Error> for XlsbError {
     }
 }
 
+impl From<crate::common::binary::BinaryError> for XlsbError {
+    fn from(err: crate::common::binary::BinaryError) -> Self {
+        XlsbError::Encoding(err.to_string())
+    }
+}
+
+#[cfg(feature = "ole")]
 impl From<crate::ole::OleError> for XlsbError {
     fn from(err: crate::ole::OleError) -> Self {
         match err {

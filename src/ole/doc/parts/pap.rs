@@ -7,7 +7,7 @@
 /// - Borders and shading
 /// - Tab stops
 use super::super::package::Result;
-use crate::ole::binary::{read_i16_le, read_u16_le};
+use crate::common::binary::{read_i16_le, read_u16_le};
 
 /// Paragraph Properties structure.
 ///

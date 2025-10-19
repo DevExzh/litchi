@@ -10,7 +10,7 @@
 
 /// Size of an FKP page in bytes (always 512)
 const FKP_PAGE_SIZE: usize = 512;
-use crate::ole::binary::read_u32_le;
+use crate::common::binary::read_u32_le;
 /// A single entry in an FKP page.
 ///
 /// Each entry contains a File Character position (FC) and associated property data.
