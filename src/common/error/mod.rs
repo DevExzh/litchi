@@ -47,6 +47,10 @@ pub enum Error {
     #[error("Unsupported feature: {0}")]
     Unsupported(String),
 
+    /// Feature disabled at compile time
+    #[error("Feature '{0}' is disabled. Enable it with --features {0}")]
+    FeatureDisabled(String),
+
     /// Generic error
     #[error("{0}")]
     Other(String),
@@ -56,6 +60,7 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 // Conversions from internal error types
+#[cfg(feature = "ole")]
 impl From<crate::ole::OleError> for Error {
     fn from(err: crate::ole::OleError) -> Self {
         match err {
@@ -69,6 +74,7 @@ impl From<crate::ole::OleError> for Error {
     }
 }
 
+#[cfg(feature = "ole")]
 impl From<crate::ole::doc::package::DocError> for Error {
     fn from(err: crate::ole::doc::package::DocError) -> Self {
         match err {
@@ -81,6 +87,7 @@ impl From<crate::ole::doc::package::DocError> for Error {
     }
 }
 
+#[cfg(feature = "ole")]
 impl From<crate::ole::ppt::package::PptError> for Error {
     fn from(err: crate::ole::ppt::package::PptError) -> Self {
         match err {
@@ -93,12 +100,14 @@ impl From<crate::ole::ppt::package::PptError> for Error {
     }
 }
 
+#[cfg(feature = "ooxml")]
 impl From<crate::ooxml::opc::error::OpcError> for Error {
     fn from(err: crate::ooxml::opc::error::OpcError) -> Self {
         Error::from_opc_error(err)
     }
 }
 
+#[cfg(feature = "ooxml")]
 impl From<crate::ooxml::error::OoxmlError> for Error {
     fn from(err: crate::ooxml::error::OoxmlError) -> Self {
         match err {
@@ -116,6 +125,7 @@ impl From<crate::ooxml::error::OoxmlError> for Error {
     }
 }
 
+#[cfg(feature = "ooxml")]
 impl Error {
     fn from_opc_error(err: crate::ooxml::opc::error::OpcError) -> Self {
         match err {
@@ -128,12 +138,14 @@ impl Error {
     }
 }
 
+#[cfg(any(feature = "ooxml", feature = "odf", feature = "formula"))]
 impl From<quick_xml::Error> for Error {
     fn from(err: quick_xml::Error) -> Self {
         Error::XmlError(err.to_string())
     }
 }
 
+#[cfg(any(feature = "ooxml", feature = "odf", feature = "iwa"))]
 impl From<zip::result::ZipError> for Error {
     fn from(err: zip::result::ZipError) -> Self {
         Error::ZipError(err.to_string())

@@ -34,8 +34,13 @@
 /// # Ok::<(), litchi::common::Error>(())
 /// ```
 use crate::common::{Error, Result};
+
+#[cfg(feature = "ole")]
 use crate::ole;
+
+#[cfg(feature = "ooxml")]
 use crate::ooxml;
+
 use std::fs::File;
 use std::io::{Cursor, Read, Seek};
 use std::path::Path;
@@ -62,8 +67,10 @@ pub struct PptSlideData {
 /// but instead use the methods on `Presentation`.
 enum PresentationImpl {
     /// Legacy .ppt format
+    #[cfg(feature = "ole")]
     Ppt(ole::ppt::Presentation),
     /// Modern .pptx format
+    #[cfg(feature = "ooxml")]
     Pptx(Box<ooxml::pptx::Presentation<'static>>),
 }
 
@@ -104,6 +111,7 @@ pub struct Presentation {
     /// Dropping this would invalidate those references (use-after-free).
     ///
     /// Only used for PPTX files; None for PPT files.
+    #[cfg(feature = "ooxml")]
     _package: Option<Box<ooxml::pptx::Package>>,
 }
 
@@ -142,6 +150,7 @@ impl Presentation {
         
         // Open with the appropriate parser
         match format {
+            #[cfg(feature = "ole")]
             PresentationFormat::Ppt => {
                 let mut package = ole::ppt::Package::open(path)
                     .map_err(Error::from)?;
@@ -150,9 +159,15 @@ impl Presentation {
                 
                 Ok(Self {
                     inner: PresentationImpl::Ppt(pres),
+                    #[cfg(feature = "ooxml")]
                     _package: None,
                 })
             }
+            #[cfg(not(feature = "ole"))]
+            PresentationFormat::Ppt => {
+                Err(Error::FeatureDisabled("ole".to_string()))
+            }
+            #[cfg(feature = "ooxml")]
             PresentationFormat::Pptx => {
                 let package = Box::new(ooxml::pptx::Package::open(path)
                     .map_err(Error::from)?);
@@ -171,6 +186,10 @@ impl Presentation {
                     inner: PresentationImpl::Pptx(Box::new(pres_ref)),
                     _package: Some(package),
                 })
+            }
+            #[cfg(not(feature = "ooxml"))]
+            PresentationFormat::Pptx => {
+                Err(Error::FeatureDisabled("ooxml".to_string()))
             }
         }
     }
@@ -209,6 +228,7 @@ impl Presentation {
         let format = detect_presentation_format_from_bytes(&bytes)?;
         
         match format {
+            #[cfg(feature = "ole")]
             PresentationFormat::Ppt => {
                 // For OLE2, create cursor from bytes
                 let cursor = Cursor::new(bytes);
@@ -220,9 +240,15 @@ impl Presentation {
                 
                 Ok(Self {
                     inner: PresentationImpl::Ppt(pres),
+                    #[cfg(feature = "ooxml")]
                     _package: None,
                 })
             }
+            #[cfg(not(feature = "ole"))]
+            PresentationFormat::Ppt => {
+                Err(Error::FeatureDisabled("ole".to_string()))
+            }
+            #[cfg(feature = "ooxml")]
             PresentationFormat::Pptx => {
                 // For OOXML/ZIP, Cursor<Vec<u8>> implements Read + Seek
                 let cursor = Cursor::new(bytes);
@@ -243,6 +269,10 @@ impl Presentation {
                     _package: Some(package),
                 })
             }
+            #[cfg(not(feature = "ooxml"))]
+            PresentationFormat::Pptx => {
+                Err(Error::FeatureDisabled("ooxml".to_string()))
+            }
         }
     }
 
@@ -262,9 +292,11 @@ impl Presentation {
     /// ```
     pub fn text(&self) -> Result<String> {
         match &self.inner {
+            #[cfg(feature = "ole")]
             PresentationImpl::Ppt(pres) => {
                 pres.text().map_err(Error::from)
             }
+            #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(pres) => {
                 // PPTX presentations need to extract text from all slides
                 let slides = pres.slides().map_err(Error::from)?;
@@ -293,9 +325,11 @@ impl Presentation {
     /// ```
     pub fn slide_count(&self) -> Result<usize> {
         match &self.inner {
+            #[cfg(feature = "ole")]
             PresentationImpl::Ppt(pres) => {
                 Ok(pres.slide_count())
             }
+            #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(pres) => {
                 pres.slide_count().map_err(Error::from)
             }
@@ -317,6 +351,7 @@ impl Presentation {
     /// ```
     pub fn slides(&self) -> Result<Vec<Slide>> {
         match &self.inner {
+            #[cfg(feature = "ole")]
             PresentationImpl::Ppt(pres) => {
                 // Extract slide data to avoid lifetime issues
                 let ppt_slides = pres.slides().map_err(Error::from)?;
@@ -333,6 +368,7 @@ impl Presentation {
                     })
                     .collect()
             }
+            #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(pres) => {
                 let slides = pres.slides()
                     .map_err(Error::from)?;
@@ -365,7 +401,9 @@ impl Presentation {
     /// ```
     pub fn slide_width(&self) -> Result<Option<i64>> {
         match &self.inner {
+            #[cfg(feature = "ole")]
             PresentationImpl::Ppt(_) => Ok(None),
+            #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(pres) => {
                 pres.slide_width().map_err(Error::from)
             }
@@ -389,7 +427,9 @@ impl Presentation {
     /// ```
     pub fn slide_height(&self) -> Result<Option<i64>> {
         match &self.inner {
+            #[cfg(feature = "ole")]
             PresentationImpl::Ppt(_) => Ok(None),
+            #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(pres) => {
                 pres.slide_height().map_err(Error::from)
             }
@@ -552,4 +592,3 @@ fn detect_presentation_format_from_signature(header: &[u8]) -> Result<Presentati
 
     Err(Error::NotOfficeFile)
 }
-

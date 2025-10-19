@@ -10,47 +10,57 @@ readme = "README.md"
 keywords = ["ole", "ooxml", "iwork", "odf", "excel", "word", "powerpoint"]
 categories = ["data-formats", "office", "document-processing"]
 
+[features]
+default = ["ole", "ooxml"]
+# Format support features
+iwa = ["dep:snap", "dep:plist", "dep:prost", "dep:prost-types", "dep:zip"]
+odf = ["dep:zip", "dep:quick-xml"]
+ole = ["dep:encoding_rs"]
+ooxml = ["dep:zip", "dep:quick-xml"]
+# Additional functionality features
+formula = ["dep:rowan", "dep:bumpalo", "dep:quick-xml"]
+imgconv = ["dep:image"]
+
 [dependencies]
-# XML parsing
-quick-xml = "0.38"
-# ZIP archive
-zip = "6"
-memchr = "2.7"
-atoi_simd = "0.16"
-fast-float2 = "0.2"
-thiserror = "2.0"
-itoa = "1.0"
-smallvec = "1.15"
-rayon = "1.11"
-# Image processing
-image = { version = "0.25", features = ["default-formats", "rayon"] }
-# Sparse bitset
-roaring = "0"
-bytes = { version = "1", features = ["serde"] }
-zerocopy = "0.8"
-zerocopy-derive = "0.8"
-flate2 = { version = "1", features = ["zlib-rs"], default-features = false }
-base64 = "0.22"
-# Formula parsing and conversion
-rowan = "0.16"
-bumpalo = { version = "3", features = ["collections"] }
-phf = { version = "0.13", features = ["macros"] }
-# YAML serialization for front matter
-serde = { version = "1", features = ["derive"] }
-serde-saphyr = "0"
-# Character encoding conversion for OLE strings
-encoding_rs = "0.8"
-# Date time support
-chrono = { version = "0", features = ["serde"] }
-# Snappy compression for iWork IWA files
-snap = "1"
-# Apple plist parsing library
-plist = "1"
-# Lazy static initialization
-once_cell = "1"
-# Protobuf support for iWork formats
-prost = { version = "0.14", features = ["derive"] }
-prost-types = "0.14"
+# Core dependencies (always required)
+memchr = "2.7"              # SIMD-accelerated string searching for fast byte pattern matching
+atoi_simd = "0.16"          # SIMD-optimized conversion of byte slices to integers
+fast-float2 = "0.2"         # Fast string-to-float conversion with correct rounding
+thiserror = "2.0"           # Convenient derive macros for error types
+itoa = "1.0"                # Fast integer-to-string conversion
+smallvec = "1.15"           # Stack-allocated vectors for small collections to avoid heap allocations
+rayon = "1.11"              # Data parallelism library for parallel iterators and work-stealing
+roaring = "0"               # Compressed bitmap data structure for efficient set operations
+bytes = { version = "1", features = ["serde"] }  # Efficient byte buffer operations with zero-copy slicing
+zerocopy = "0.8"            # Safe zero-cost type conversions between bytes and structured data
+zerocopy-derive = "0.8"     # Derive macros for zerocopy traits
+flate2 = { version = "1", features = ["zlib-rs"], default-features = false }  # Compression/decompression for Office file formats
+base64 = "0.22"             # Base64 encoding/decoding for embedded binary data in XML
+phf = { version = "0.13", features = ["macros"] }  # Perfect hash functions for compile-time static maps
+serde = { version = "1", features = ["derive"] }   # Serialization/deserialization framework
+serde-saphyr = "0"          # YAML serialization support
+chrono = { version = "0", features = ["serde"] }   # Date and time types for Office timestamps
+once_cell = "1"             # Lazy statics and one-time initialization for global state
+
+# OOXML-specific dependencies (optional)
+quick-xml = { version = "0.38", optional = true }  # High-performance XML parser for .docx, .xlsx, .pptx files
+zip = { version = "6", optional = true }           # ZIP archive handling for modern Office Open XML formats
+
+# OLE-specific dependencies (optional)
+encoding_rs = { version = "0.8", optional = true }  # Character encoding conversion for legacy Office formats (.doc, .xls, .ppt)
+
+# Image conversion dependencies (optional)
+image = { version = "0.25", features = ["default-formats", "rayon"], optional = true }  # Image format decoding/encoding for embedded media
+
+# Formula parsing dependencies (optional)
+rowan = { version = "0.16", optional = true }       # Lossless syntax tree library for formula parsing (AST)
+bumpalo = { version = "3", features = ["collections"], optional = true }  # Fast bump allocator for temporary formula parsing data
+
+# iWork-specific dependencies (optional)
+snap = { version = "1", optional = true }           # Snappy compression used in iWork file formats (.pages, .numbers, .key)
+plist = { version = "1", optional = true }          # Property list parser for iWork metadata and indexes
+prost = { version = "0.14", features = ["derive"], optional = true }  # Protocol Buffers implementation for iWork archive structures
+prost-types = { version = "0.14", optional = true } # Well-known Protocol Buffer types used by iWork
 
 [build-dependencies]
-prost-build = "0.14"
+prost-build = { version = "0.14", optional = true }  # Build-time Protocol Buffer compiler for generating iWork message types

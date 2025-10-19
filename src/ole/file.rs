@@ -1,12 +1,13 @@
 use super::consts::*;
 use std::io::{self, Read, Seek, SeekFrom};
 use zerocopy::{FromBytes, LE, U16, U32, U64};
+use zerocopy_derive::FromBytes as DeriveFromBytes;
 
 /// Raw OLE directory entry structure (128 bytes)
 ///
 /// This represents the on-disk format of a directory entry.
 /// Based on Microsoft OLE2 specification.
-#[derive(Debug, Clone, FromBytes)]
+#[derive(Debug, Clone, DeriveFromBytes)]
 #[repr(C)]
 struct RawDirectoryEntry {
     /// Entry name in UTF-16LE (64 bytes, null-padded)

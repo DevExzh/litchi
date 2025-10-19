@@ -5,7 +5,9 @@
 //! Detection follows the iWork Archive (IWA) format specification.
 
 use std::path::Path;
-use std::io::{Read, Cursor};
+use std::io::Read;
+#[cfg(feature = "iwa")]
+use std::io::Cursor;
 use crate::common::detection::FileFormat;
 
 /// Detect iWork formats from bytes.
@@ -97,33 +99,39 @@ pub fn detect_iwork_format_from_path<P: AsRef<Path>>(path: P) -> Option<FileForm
     // Fallback to IWA bundle parsing if direct detection fails
     // Validate bundle structure by attempting to open with Bundle::open()
     // This follows the iWork Archive format specification
-    match crate::iwa::bundle::Bundle::open(path) {
-        Ok(bundle) => {
-            // Extract message types from all archives to identify application
-            let all_message_types: Vec<u32> = bundle.archives()
-                .values()
-                .flat_map(|archive| &archive.objects)
-                .flat_map(|obj| &obj.messages)
-                .map(|msg| msg.type_)
-                .collect();
+    #[cfg(feature = "iwa")]
+    {
+        match crate::iwa::bundle::Bundle::open(path) {
+            Ok(bundle) => {
+                // Extract message types from all archives to identify application
+                let all_message_types: Vec<u32> = bundle.archives()
+                    .values()
+                    .flat_map(|archive| &archive.objects)
+                    .flat_map(|obj| &obj.messages)
+                    .map(|msg| msg.type_)
+                    .collect();
 
-            // Detect application type from IWA message types
-            match crate::iwa::registry::detect_application(&all_message_types) {
-                Some(app) => {
-                        let format = match app {
-                        crate::iwa::registry::Application::Pages => FileFormat::Pages,
-                        crate::iwa::registry::Application::Keynote => FileFormat::Keynote,
-                        crate::iwa::registry::Application::Numbers => FileFormat::Numbers,
-                        crate::iwa::registry::Application::Common => return None, // Common alone doesn't indicate a specific format
-                    };
+                // Detect application type from IWA message types
+                match crate::iwa::registry::detect_application(&all_message_types) {
+                    Some(app) => {
+                            let format = match app {
+                            crate::iwa::registry::Application::Pages => FileFormat::Pages,
+                            crate::iwa::registry::Application::Keynote => FileFormat::Keynote,
+                            crate::iwa::registry::Application::Numbers => FileFormat::Numbers,
+                            crate::iwa::registry::Application::Common => return None, // Common alone doesn't indicate a specific format
+                        };
 
-                    Some(format)
+                        Some(format)
+                    }
+                    None => None,
                 }
-                None => None,
             }
+            Err(_) => None,
         }
-        Err(_) => None,
     }
+    
+    #[cfg(not(feature = "iwa"))]
+    None
 }
 
 /// Detect iWork format by checking for identifying files in the bundle directory.
@@ -238,6 +246,7 @@ pub fn detect_application_from_zip_archive<R: Read + std::io::Seek>(archive: &mu
 }
 
 /// Fallback detection using message types when file patterns don't give a clear answer
+#[cfg(feature = "iwa")]
 fn detect_application_from_message_types<R: Read + std::io::Seek>(archive: &mut zip::ZipArchive<R>) -> Option<FileFormat> {
     let mut all_message_types = Vec::new();
 
@@ -291,4 +300,10 @@ fn detect_application_from_message_types<R: Read + std::io::Seek>(archive: &mut 
     } else {
         None
     }
+}
+
+/// Fallback detection fallback (when iwa feature is disabled)
+#[cfg(not(feature = "iwa"))]
+fn detect_application_from_message_types<R: Read + std::io::Seek>(_archive: &mut zip::ZipArchive<R>) -> Option<FileFormat> {
+    None
 }

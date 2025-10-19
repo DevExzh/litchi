@@ -109,21 +109,33 @@ pub mod common;
 ///
 /// Provides format-agnostic interface for both .doc and .docx files.
 /// Use [`Document::open()`] to get started.
+///
+/// **Note**: This requires at least one of the `ole` or `ooxml` features to be enabled.
+#[cfg(any(feature = "ole", feature = "ooxml"))]
 pub mod document;
 
 /// Image processing and conversion module
 ///
 /// Provides functionality to parse and convert Office Drawing formats
 /// (EMF, WMF, PICT) to modern image standards (PNG, JPEG, WebP).
+///
+/// **Note**: This requires the `imgconv` feature to be enabled.
+#[cfg(feature = "imgconv")]
 pub mod images;
 
 /// Unified PowerPoint presentation API
 ///
 /// Provides format-agnostic interface for both .ppt and .pptx files.
 /// Use [`Presentation::open()`] to get started.
+///
+/// **Note**: This requires at least one of the `ole` or `ooxml` features to be enabled.
+#[cfg(any(feature = "ole", feature = "ooxml"))]
 pub mod presentation;
 
 /// Unified Excel spreadsheet API (placeholder for future functionality)
+///
+/// **Note**: This requires at least one of the `ole` or `ooxml` features to be enabled.
+#[cfg(any(feature = "ole", feature = "ooxml"))]
 pub mod sheet;
 
 /// Markdown conversion module
@@ -138,6 +150,9 @@ pub mod markdown;
 /// This module provides direct access to OLE2 parsing functionality.
 /// Most users should use the high-level [`Document`] and [`Presentation`]
 /// APIs instead, which automatically handle format detection.
+///
+/// **Note**: This requires the `ole` feature to be enabled.
+#[cfg(feature = "ole")]
 pub mod ole;
 
 /// OOXML format parser (modern .docx, .pptx files)
@@ -145,11 +160,17 @@ pub mod ole;
 /// This module provides direct access to OOXML parsing functionality.
 /// Most users should use the high-level [`Document`] and [`Presentation`]
 /// APIs instead, which automatically handle format detection.
+///
+/// **Note**: This requires the `ooxml` feature to be enabled.
+#[cfg(feature = "ooxml")]
 pub mod ooxml;
 
 /// Formula module
 ///
 /// This module provides functionality to parse and convert mathematical formulas between different formats.
+///
+/// **Note**: This requires the `formula` feature to be enabled.
+#[cfg(feature = "formula")]
 pub mod formula;
 
 /// iWork Archive Format Support
@@ -157,6 +178,9 @@ pub mod formula;
 /// Provides support for parsing Apple's iWork file formats
 /// (Pages, Keynote, Numbers) which use the IWA (iWork Archive) format.
 /// Use [`iwa::Document::open()`] to get started.
+///
+/// **Note**: This requires the `iwa` feature to be enabled.
+#[cfg(feature = "iwa")]
 pub mod iwa;
 
 /// OpenDocument Format (ODF) Support
@@ -164,11 +188,18 @@ pub mod iwa;
 /// Provides unified APIs for working with OpenDocument files (.odt, .ods, .odp).
 /// The format is automatically detected and handled transparently.
 /// Use [`odf::Document`], [`odf::Spreadsheet`], or [`odf::Presentation`] to get started.
+///
+/// **Note**: This requires the `odf` feature to be enabled.
+#[cfg(feature = "odf")]
 pub mod odf;
 
 // Re-export high-level APIs
 pub use common::{Error, Result};
+
+#[cfg(any(feature = "ole", feature = "ooxml"))]
 pub use document::Document;
+
+#[cfg(any(feature = "ole", feature = "ooxml"))]
 pub use presentation::Presentation;
 
 // Re-export commonly used types

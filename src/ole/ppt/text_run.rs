@@ -52,7 +52,11 @@ pub struct TextRun {
     /// Length in characters
     pub length: usize,
     /// Parsed MTEF formula AST (if this run contains a formula)
+    #[cfg(feature = "formula")]
     mtef_formula_ast: Option<Vec<crate::formula::MathNode<'static>>>,
+    /// Parsed MTEF formula AST placeholder (when formula feature is disabled)
+    #[cfg(not(feature = "formula"))]
+    mtef_formula_ast: Option<Vec<()>>,
 }
 
 impl TextRun {
@@ -81,6 +85,7 @@ impl TextRun {
     }
 
     /// Create a text run with MTEF formula AST.
+    #[cfg(feature = "formula")]
     pub fn with_mtef_formula(
         text: String,
         start_index: usize,
@@ -96,6 +101,24 @@ impl TextRun {
             mtef_formula_ast: Some(mtef_ast),
         }
     }
+    
+    /// Create a text run with MTEF formula AST fallback (when formula feature is disabled).
+    #[cfg(not(feature = "formula"))]
+    pub fn with_mtef_formula(
+        text: String,
+        start_index: usize,
+        formatting: TextRunFormatting,
+        _mtef_ast: Vec<()>,
+    ) -> Self {
+        let length = text.chars().count();
+        Self {
+            text,
+            formatting,
+            start_index,
+            length,
+            mtef_formula_ast: None,
+        }
+    }
 
     /// Check if this text run contains an MTEF formula.
     ///
@@ -108,14 +131,26 @@ impl TextRun {
     ///
     /// Returns the parsed MTEF formula as AST nodes if this run contains a MathType equation,
     /// None otherwise.
+    #[cfg(feature = "formula")]
     pub fn mtef_formula_ast(&self) -> Option<&Vec<crate::formula::MathNode<'static>>> {
+        self.mtef_formula_ast.as_ref()
+    }
+    
+    #[cfg(not(feature = "formula"))]
+    pub fn mtef_formula_ast(&self) -> Option<&Vec<()>> {
         self.mtef_formula_ast.as_ref()
     }
 
     /// Get a mutable reference to the MTEF formula AST.
     ///
     /// This allows for modification of the formula AST if needed.
+    #[cfg(feature = "formula")]
     pub fn mtef_formula_ast_mut(&mut self) -> &mut Option<Vec<crate::formula::MathNode<'static>>> {
+        &mut self.mtef_formula_ast
+    }
+    
+    #[cfg(not(feature = "formula"))]
+    pub fn mtef_formula_ast_mut(&mut self) -> &mut Option<Vec<()>> {
         &mut self.mtef_formula_ast
     }
 }

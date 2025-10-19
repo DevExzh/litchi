@@ -8,6 +8,7 @@ mod file;
 mod metadata;
 
 /// MTEF extractor for OLE documents (internal use only)
+#[cfg(feature = "formula")]
 mod mtef_extractor;
 
 /// Shared binary parsing utilities for OLE formats.

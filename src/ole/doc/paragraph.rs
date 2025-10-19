@@ -53,6 +53,7 @@ impl Paragraph {
     }
 
     /// Create a new Paragraph with text and properties.
+    #[allow(dead_code)] // TODO: remove this once we use this function
     pub(crate) fn with_properties(
         text: String,
         properties: super::parts::pap::ParagraphProperties,
@@ -150,7 +151,11 @@ pub struct Run {
     /// Character formatting properties
     properties: CharacterProperties,
     /// Parsed MTEF formula AST (if this run contains a formula)
+    #[cfg(feature = "formula")]
     mtef_formula_ast: Option<Vec<crate::formula::MathNode<'static>>>,
+    /// Parsed MTEF formula AST placeholder (when formula feature is disabled)
+    #[cfg(not(feature = "formula"))]
+    mtef_formula_ast: Option<Vec<()>>,
 }
 
 impl Run {
@@ -164,6 +169,7 @@ impl Run {
     }
 
     /// Create a new Run with MTEF formula AST.
+    #[cfg(feature = "formula")]
     pub(crate) fn with_mtef_formula(
         text: String,
         properties: CharacterProperties,
@@ -173,6 +179,20 @@ impl Run {
             text,
             properties,
             mtef_formula_ast: Some(mtef_ast),
+        }
+    }
+    
+    /// Create a new Run with MTEF formula AST fallback (when formula feature is disabled).
+    #[cfg(not(feature = "formula"))]
+    pub(crate) fn with_mtef_formula(
+        text: String,
+        properties: CharacterProperties,
+        _mtef_ast: Vec<()>,
+    ) -> Self {
+        Self {
+            text,
+            properties,
+            mtef_formula_ast: None,
         }
     }
 
@@ -273,14 +293,26 @@ impl Run {
     ///
     /// Returns the parsed MTEF formula as AST nodes if this run contains a MathType equation,
     /// None otherwise.
+    #[cfg(feature = "formula")]
     pub fn mtef_formula_ast(&self) -> Option<&Vec<crate::formula::MathNode<'static>>> {
+        self.mtef_formula_ast.as_ref()
+    }
+    
+    #[cfg(not(feature = "formula"))]
+    pub fn mtef_formula_ast(&self) -> Option<&Vec<()>> {
         self.mtef_formula_ast.as_ref()
     }
 
     /// Get a mutable reference to the MTEF formula AST.
     ///
     /// This allows for modification of the formula AST if needed.
+    #[cfg(feature = "formula")]
     pub fn mtef_formula_ast_mut(&mut self) -> &mut Option<Vec<crate::formula::MathNode<'static>>> {
+        &mut self.mtef_formula_ast
+    }
+    
+    #[cfg(not(feature = "formula"))]
+    pub fn mtef_formula_ast_mut(&mut self) -> &mut Option<Vec<()>> {
         &mut self.mtef_formula_ast
     }
 
@@ -297,6 +329,7 @@ impl Run {
     ///     }
     /// }
     /// ```
+    #[cfg(feature = "formula")]
     pub fn formula_as_latex(&self) -> Result<Option<String>> {
         if let Some(ast) = &self.mtef_formula_ast {
             use crate::formula::LatexConverter;
@@ -308,6 +341,16 @@ impl Run {
                     Ok(Some(format!("[Formula conversion error: {}]", e)))
                 }
             }
+        } else {
+            Ok(None)
+        }
+    }
+    
+    /// Convert formula to LaTeX (fallback when formula feature is disabled).
+    #[cfg(not(feature = "formula"))]
+    pub fn formula_as_latex(&self) -> Result<Option<String>> {
+        if self.mtef_formula_ast.is_some() {
+            Ok(Some("[Formula support disabled - enable 'formula' feature]".to_string()))
         } else {
             Ok(None)
         }

@@ -550,6 +550,7 @@ impl MarkdownWriter {
     }
 
     /// Convert MTEF AST nodes to LaTeX string
+    #[cfg(feature = "formula")]
     fn convert_mtef_to_latex(&self, nodes: &[crate::formula::MathNode]) -> String {
         use crate::formula::latex::LatexConverter;
         
@@ -558,6 +559,12 @@ impl MarkdownWriter {
             Ok(latex) => latex.to_string(),
             Err(_) => "[Formula conversion error]".to_string(),
         }
+    }
+    
+    /// Convert MTEF AST nodes to LaTeX string (fallback when formula feature is disabled)
+    #[cfg(not(feature = "formula"))]
+    fn convert_mtef_to_latex(&self, _nodes: &[()]) -> String {
+        "[Formula support disabled - enable 'formula' feature]".to_string()
     }
 
     /// Format a formula with the appropriate delimiters.

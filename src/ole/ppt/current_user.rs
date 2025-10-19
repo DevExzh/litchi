@@ -5,6 +5,7 @@
 /// CurrentUserAtom implementation.
 use super::package::{PptError, Result};
 use zerocopy::FromBytes;
+use zerocopy_derive::FromBytes as DeriveFromBytes;
 
 /// Minimum size of CurrentUser stream in bytes
 const CURRENT_USER_MIN_SIZE: usize = 28;
@@ -26,7 +27,7 @@ pub struct CurrentUser {
 }
 
 /// CurrentUser header structure (first 16 bytes after size field)
-#[derive(Debug, Clone, FromBytes)]
+#[derive(Debug, Clone, DeriveFromBytes)]
 #[repr(C)]
 struct CurrentUserHeader {
     /// Header token (must be 0xF3D1C4DF)

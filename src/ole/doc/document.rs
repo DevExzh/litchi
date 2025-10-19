@@ -9,6 +9,7 @@ use super::parts::pap::ParagraphProperties;
 use super::parts::chp::CharacterProperties;
 use super::table::Table;
 use super::super::OleFile;
+#[cfg(feature = "formula")]
 use crate::ole::mtef_extractor::MtefExtractor;
 use std::collections::HashMap;
 use std::io::{Read, Seek};
@@ -51,7 +52,11 @@ pub struct Document {
     #[allow(dead_code)] // Stored for debugging and raw access
     mtef_data: std::collections::HashMap<String, Vec<u8>>,
     /// Parsed MTEF formulas (stream_name -> parsed_ast)
+    #[cfg(feature = "formula")]
     parsed_mtef: std::collections::HashMap<String, Vec<crate::formula::MathNode<'static>>>,
+    /// Parsed MTEF formulas placeholder (when formula feature is disabled)
+    #[cfg(not(feature = "formula"))]
+    parsed_mtef: std::collections::HashMap<String, Vec<()>>,
 }
 
 impl Document {
@@ -102,6 +107,7 @@ impl Document {
     ///
     /// This method extracts embedded equation objects from the ObjectPool directory.
     /// Each embedded equation is stored as a separate OLE object within ObjectPool.
+    #[cfg(feature = "formula")]
     fn extract_mtef_data<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<HashMap<String, Vec<u8>>> {
         // Extract all MTEF formulas from ObjectPool (the primary location for embedded equations)
         let mtef_data = MtefExtractor::extract_all_mtef_from_objectpool(ole)
@@ -123,8 +129,15 @@ impl Document {
 
         Ok(all_mtef)
     }
+    
+    /// Extract MTEF data fallback (when formula feature is disabled)
+    #[cfg(not(feature = "formula"))]
+    fn extract_mtef_data<R: Read + Seek>(_ole: &mut OleFile<R>) -> Result<HashMap<String, Vec<u8>>> {
+        Ok(HashMap::new())
+    }
 
     /// Parse all extracted MTEF data into AST nodes
+    #[cfg(feature = "formula")]
     fn parse_all_mtef_data(mtef_data: &HashMap<String, Vec<u8>>) -> Result<HashMap<String, Vec<crate::formula::MathNode<'static>>>> {
         let mut parsed_mtef = HashMap::new();
 
@@ -180,6 +193,12 @@ impl Document {
 
         Ok(parsed_mtef)
     }
+    
+    /// Parse all extracted MTEF data fallback (when formula feature is disabled)
+    #[cfg(not(feature = "formula"))]
+    fn parse_all_mtef_data(_mtef_data: &HashMap<String, Vec<u8>>) -> Result<HashMap<String, Vec<()>>> {
+        Ok(HashMap::new())
+    }
 
     /// Check if text indicates a potential MTEF formula
     fn is_potential_mtef_formula(text: &str) -> bool {
@@ -195,6 +214,7 @@ impl Document {
     }
 
     /// Parse MTEF data for a given text pattern
+    #[cfg(feature = "formula")]
     fn parse_mtef_for_text(&self, _text: &str) -> Option<Vec<crate::formula::MathNode<'static>>> {
         // For now, try to find any parsed MTEF data
         // In a more sophisticated implementation, we'd match specific text patterns
@@ -206,6 +226,12 @@ impl Document {
             }
         }
 
+        None
+    }
+    
+    /// Parse MTEF data for a given text pattern (fallback when formula feature is disabled)
+    #[cfg(not(feature = "formula"))]
+    fn parse_mtef_for_text(&self, _text: &str) -> Option<Vec<()>> {
         None
     }
 

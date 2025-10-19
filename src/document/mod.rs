@@ -45,8 +45,13 @@
 /// # Ok::<(), litchi::common::Error>(())
 /// ```
 use crate::common::{Error, Result};
+
+#[cfg(feature = "ole")]
 use crate::ole;
+
+#[cfg(feature = "ooxml")]
 use crate::ooxml;
+
 use std::fs::File;
 use std::io::{Cursor, Read, Seek};
 use std::path::Path;
@@ -59,8 +64,10 @@ use std::path::Path;
 #[allow(clippy::large_enum_variant)]
 enum DocumentImpl {
     /// Legacy .doc format
+    #[cfg(feature = "ole")]
     Doc(ole::doc::Document, crate::common::Metadata),
     /// Modern .docx format
+    #[cfg(feature = "ooxml")]
     Docx(Box<ooxml::docx::Document<'static>>, crate::common::Metadata),
 }
 
@@ -101,6 +108,7 @@ pub struct Document {
     /// Dropping this would invalidate those references (use-after-free).
     ///
     /// Only used for DOCX files; None for DOC files.
+    #[cfg(feature = "ooxml")]
     _package: Option<Box<ooxml::docx::Package>>,
 }
 
@@ -139,6 +147,7 @@ impl Document {
         
         // Reopen the file for the appropriate parser
         match format {
+            #[cfg(feature = "ole")]
             DocumentFormat::Doc => {
                 let mut package = ole::doc::Package::open(path)
                     .map_err(Error::from)?;
@@ -152,9 +161,15 @@ impl Document {
 
                 Ok(Self {
                     inner: DocumentImpl::Doc(doc, metadata),
+                    #[cfg(feature = "ooxml")]
                     _package: None,
                 })
             }
+            #[cfg(not(feature = "ole"))]
+            DocumentFormat::Doc => {
+                Err(Error::FeatureDisabled("ole".to_string()))
+            }
+            #[cfg(feature = "ooxml")]
             DocumentFormat::Docx => {
                 let package = Box::new(ooxml::docx::Package::open(path)
                     .map_err(Error::from)?);
@@ -177,6 +192,10 @@ impl Document {
                     inner: DocumentImpl::Docx(Box::new(doc_ref), metadata),
                     _package: Some(package),
                 })
+            }
+            #[cfg(not(feature = "ooxml"))]
+            DocumentFormat::Docx => {
+                Err(Error::FeatureDisabled("ooxml".to_string()))
             }
         }
     }
@@ -215,6 +234,7 @@ impl Document {
         let format = detect_document_format_from_bytes(&bytes)?;
         
         match format {
+            #[cfg(feature = "ole")]
             DocumentFormat::Doc => {
                 // For OLE2, create cursor from bytes
                 let cursor = Cursor::new(bytes);
@@ -231,9 +251,15 @@ impl Document {
 
                 Ok(Self {
                     inner: DocumentImpl::Doc(doc, metadata),
+                    #[cfg(feature = "ooxml")]
                     _package: None,
                 })
             }
+            #[cfg(not(feature = "ole"))]
+            DocumentFormat::Doc => {
+                Err(Error::FeatureDisabled("ole".to_string()))
+            }
+            #[cfg(feature = "ooxml")]
             DocumentFormat::Docx => {
                 // For OOXML/ZIP, Cursor<Vec<u8>> implements Read + Seek
                 let cursor = Cursor::new(bytes);
@@ -258,6 +284,10 @@ impl Document {
                     _package: Some(package),
                 })
             }
+            #[cfg(not(feature = "ooxml"))]
+            DocumentFormat::Docx => {
+                Err(Error::FeatureDisabled("ooxml".to_string()))
+            }
         }
     }
 
@@ -277,9 +307,11 @@ impl Document {
     /// ```
     pub fn text(&self) -> Result<String> {
         match &self.inner {
+            #[cfg(feature = "ole")]
             DocumentImpl::Doc(doc, _) => {
                 doc.text().map_err(Error::from)
             }
+            #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(doc, _) => {
                 doc.text().map_err(Error::from)
             }
@@ -300,9 +332,11 @@ impl Document {
     /// ```
     pub fn paragraph_count(&self) -> Result<usize> {
         match &self.inner {
+            #[cfg(feature = "ole")]
             DocumentImpl::Doc(doc, _) => {
                 doc.paragraph_count().map_err(Error::from)
             }
+            #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(doc, _) => {
                 doc.paragraph_count().map_err(Error::from)
             }
@@ -324,11 +358,13 @@ impl Document {
     /// ```
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         match &self.inner {
+            #[cfg(feature = "ole")]
             DocumentImpl::Doc(doc, _) => {
                 let paras = doc.paragraphs()
                     .map_err(Error::from)?;
                 Ok(paras.into_iter().map(Paragraph::Doc).collect())
             }
+            #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(doc, _) => {
                 let paras = doc.paragraphs()
                     .map_err(Error::from)?;
@@ -352,11 +388,13 @@ impl Document {
     /// ```
     pub fn tables(&self) -> Result<Vec<Table>> {
         match &self.inner {
+            #[cfg(feature = "ole")]
             DocumentImpl::Doc(doc, _) => {
                 let tables = doc.tables()
                     .map_err(Error::from)?;
                 Ok(tables.into_iter().map(Table::Doc).collect())
             }
+            #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(doc, _) => {
                 let tables = doc.tables()
                     .map_err(Error::from)?;
@@ -385,9 +423,11 @@ impl Document {
     /// ```
     pub fn metadata(&self) -> Result<crate::common::Metadata> {
         match &self.inner {
+            #[cfg(feature = "ole")]
             DocumentImpl::Doc(_, metadata) => {
                 Ok(metadata.clone())
             }
+            #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(_, metadata) => {
                 Ok(metadata.clone())
             }
@@ -397,7 +437,9 @@ impl Document {
 
 /// A paragraph in a Word document.
 pub enum Paragraph {
+    #[cfg(feature = "ole")]
     Doc(ole::doc::Paragraph),
+    #[cfg(feature = "ooxml")]
     Docx(ooxml::docx::Paragraph),
 }
 
@@ -405,7 +447,9 @@ impl Paragraph {
     /// Get the text content of the paragraph.
     pub fn text(&self) -> Result<String> {
         match self {
+            #[cfg(feature = "ole")]
             Paragraph::Doc(p) => p.text().map(|s| s.to_string()).map_err(Error::from),
+            #[cfg(feature = "ooxml")]
             Paragraph::Docx(p) => p.text().map(|s| s.to_string()).map_err(Error::from),
         }
     }
@@ -413,10 +457,12 @@ impl Paragraph {
     /// Get the runs in this paragraph.
     pub fn runs(&self) -> Result<Vec<Run>> {
         match self {
+            #[cfg(feature = "ole")]
             Paragraph::Doc(p) => {
                 let runs = p.runs().map_err(Error::from)?;
                 Ok(runs.into_iter().map(Run::Doc).collect())
             }
+            #[cfg(feature = "ooxml")]
             Paragraph::Docx(p) => {
                 let runs = p.runs().map_err(Error::from)?;
                 Ok(runs.into_iter().map(Run::Docx).collect())
@@ -427,7 +473,9 @@ impl Paragraph {
 
 /// A text run in a paragraph.
 pub enum Run {
+    #[cfg(feature = "ole")]
     Doc(ole::doc::Run),
+    #[cfg(feature = "ooxml")]
     Docx(ooxml::docx::Run),
 }
 
@@ -435,7 +483,9 @@ impl Run {
     /// Get the text content of the run.
     pub fn text(&self) -> Result<String> {
         match self {
+            #[cfg(feature = "ole")]
             Run::Doc(r) => r.text().map(|s| s.to_string()).map_err(Error::from),
+            #[cfg(feature = "ooxml")]
             Run::Docx(r) => r.text().map(|s| s.to_string()).map_err(Error::from),
         }
     }
@@ -443,7 +493,9 @@ impl Run {
     /// Check if the run is bold.
     pub fn bold(&self) -> Result<Option<bool>> {
         match self {
+            #[cfg(feature = "ole")]
             Run::Doc(r) => Ok(r.bold()),
+            #[cfg(feature = "ooxml")]
             Run::Docx(r) => r.bold().map_err(Error::from),
         }
     }
@@ -451,7 +503,9 @@ impl Run {
     /// Check if the run is italic.
     pub fn italic(&self) -> Result<Option<bool>> {
         match self {
+            #[cfg(feature = "ole")]
             Run::Doc(r) => Ok(r.italic()),
+            #[cfg(feature = "ooxml")]
             Run::Docx(r) => r.italic().map_err(Error::from),
         }
     }
@@ -459,7 +513,9 @@ impl Run {
     /// Check if the run is strikethrough.
     pub fn strikethrough(&self) -> Result<Option<bool>> {
         match self {
+            #[cfg(feature = "ole")]
             Run::Doc(r) => Ok(r.strikethrough()),
+            #[cfg(feature = "ooxml")]
             Run::Docx(r) => r.strikethrough().map_err(Error::from),
         }
     }
@@ -467,8 +523,10 @@ impl Run {
     /// Get the vertical position of the run (superscript/subscript).
     ///
     /// Returns the vertical positioning if specified, None if normal.
+    #[cfg(feature = "ole")]
     pub fn vertical_position(&self) -> Result<Option<crate::ole::doc::parts::chp::VerticalPosition>> {
         match self {
+            #[cfg(feature = "ole")]
             Run::Doc(r) => {
                 use crate::ole::doc::parts::chp::VerticalPosition;
                 let pos = match r.properties().vertical_position {
@@ -477,6 +535,7 @@ impl Run {
                 };
                 Ok(pos)
             }
+            #[cfg(feature = "ooxml")]
             Run::Docx(r) => {
                 use crate::ooxml::docx::paragraph::VerticalPosition as OoxmlVerticalPosition;
                 use crate::ole::doc::parts::chp::VerticalPosition as OleVerticalPosition;
@@ -492,7 +551,9 @@ impl Run {
 
 /// A table in a Word document.
 pub enum Table {
+    #[cfg(feature = "ole")]
     Doc(ole::doc::Table),
+    #[cfg(feature = "ooxml")]
     Docx(ooxml::docx::Table),
 }
 
@@ -500,7 +561,9 @@ impl Table {
     /// Get the number of rows in the table.
     pub fn row_count(&self) -> Result<usize> {
         match self {
+            #[cfg(feature = "ole")]
             Table::Doc(t) => t.row_count().map_err(Error::from),
+            #[cfg(feature = "ooxml")]
             Table::Docx(t) => t.row_count().map_err(Error::from),
         }
     }
@@ -508,10 +571,12 @@ impl Table {
     /// Get the rows in this table.
     pub fn rows(&self) -> Result<Vec<Row>> {
         match self {
+            #[cfg(feature = "ole")]
             Table::Doc(t) => {
                 let rows = t.rows().map_err(Error::from)?;
                 Ok(rows.into_iter().map(Row::Doc).collect())
             }
+            #[cfg(feature = "ooxml")]
             Table::Docx(t) => {
                 let rows = t.rows().map_err(Error::from)?;
                 Ok(rows.into_iter().map(Row::Docx).collect())
@@ -522,7 +587,9 @@ impl Table {
 
 /// A table row in a Word document.
 pub enum Row {
+    #[cfg(feature = "ole")]
     Doc(ole::doc::Row),
+    #[cfg(feature = "ooxml")]
     Docx(ooxml::docx::Row),
 }
 
@@ -530,10 +597,12 @@ impl Row {
     /// Get the cells in this row.
     pub fn cells(&self) -> Result<Vec<Cell>> {
         match self {
+            #[cfg(feature = "ole")]
             Row::Doc(r) => {
                 let cells = r.cells().map_err(Error::from)?;
                 Ok(cells.into_iter().map(Cell::Doc).collect())
             }
+            #[cfg(feature = "ooxml")]
             Row::Docx(r) => {
                 let cells = r.cells().map_err(Error::from)?;
                 Ok(cells.into_iter().map(Cell::Docx).collect())
@@ -544,7 +613,9 @@ impl Row {
 
 /// A table cell in a Word document.
 pub enum Cell {
+    #[cfg(feature = "ole")]
     Doc(ole::doc::Cell),
+    #[cfg(feature = "ooxml")]
     Docx(ooxml::docx::Cell),
 }
 
@@ -552,7 +623,9 @@ impl Cell {
     /// Get the text content of the cell.
     pub fn text(&self) -> Result<String> {
         match self {
+            #[cfg(feature = "ole")]
             Cell::Doc(c) => c.text().map(|s| s.to_string()).map_err(Error::from),
+            #[cfg(feature = "ooxml")]
             Cell::Docx(c) => c.text().map(|s| s.to_string()).map_err(Error::from),
         }
     }
