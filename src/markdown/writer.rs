@@ -146,18 +146,32 @@ impl MarkdownWriter {
                         }
                     }
                     super::config::ScriptStyle::Unicode => {
-                        // For Unicode, we'd need to convert each character to superscript/subscript
-                        // This is complex, so for now fall back to HTML for unsupported characters
+                        // Convert to Unicode superscript/subscript characters
+                        // Fall back to HTML tags for characters without Unicode equivalents
                         match pos {
                             VerticalPosition::Superscript => {
-                                self.buffer.push_str("<sup>");
-                                self.buffer.push_str(&text);
-                                self.buffer.push_str("</sup>");
+                                if super::unicode::can_convert_to_superscript(&text) {
+                                    // All characters can be converted to superscript
+                                    let converted = super::unicode::convert_to_superscript(&text);
+                                    self.buffer.push_str(&converted);
+                                } else {
+                                    // Fall back to HTML for partial support
+                                    self.buffer.push_str("<sup>");
+                                    self.buffer.push_str(&text);
+                                    self.buffer.push_str("</sup>");
+                                }
                             }
                             VerticalPosition::Subscript => {
-                                self.buffer.push_str("<sub>");
-                                self.buffer.push_str(&text);
-                                self.buffer.push_str("</sub>");
+                                if super::unicode::can_convert_to_subscript(&text) {
+                                    // All characters can be converted to subscript
+                                    let converted = super::unicode::convert_to_subscript(&text);
+                                    self.buffer.push_str(&converted);
+                                } else {
+                                    // Fall back to HTML for partial support
+                                    self.buffer.push_str("<sub>");
+                                    self.buffer.push_str(&text);
+                                    self.buffer.push_str("</sub>");
+                                }
                             }
                             VerticalPosition::Normal => {
                                 self.buffer.push_str(&text);

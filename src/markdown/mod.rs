@@ -102,6 +102,7 @@
 mod config;
 mod traits;
 mod writer;
+pub mod unicode;
 
 // Document and presentation markdown implementations are only available when their respective features are enabled
 #[cfg(any(feature = "ole", feature = "ooxml"))]
