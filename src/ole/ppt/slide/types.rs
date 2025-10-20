@@ -2,7 +2,7 @@
 use super::super::package::Result;
 use super::super::shapes::ShapeEnum;
 use super::super::records::PptRecord;
-use super::slide_factory::SlideData;
+use super::factory::SlideData;
 use once_cell::unsync::OnceCell;
 
 /// A slide in a PowerPoint presentation with lazy-loaded shapes.

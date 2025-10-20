@@ -1,6 +1,6 @@
-/// PPT record types and parsing.
-///
-/// This module provides structures and functions for parsing PowerPoint binary records.
+//! PPT record types and parsing.
+//!
+//! This module provides structures and functions for parsing PowerPoint binary records.
 
 pub mod record;
 pub mod document_info;

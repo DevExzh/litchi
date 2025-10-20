@@ -578,13 +578,12 @@ impl MarkdownWriter {
     fn extract_formula_from_run(&self, run: &Run) -> Result<Option<String>> {
         // Try OOXML OMML formulas first
         #[cfg(feature = "ooxml")]
-        if let crate::document::Run::Docx(docx_run) = run {
-            if let Some(_omml_xml) = docx_run.omml_formula()? {
+        if let crate::document::Run::Docx(docx_run) = run
+            && let Some(_omml_xml) = docx_run.omml_formula()? {
                 // For now, return a placeholder. In a full implementation,
                 // this would parse the OMML XML and convert to LaTeX/markdown
                 return Ok(Some(self.format_formula_placeholder("OMML formula detected")));
             }
-        }
 
         // Try OLE MTEF formulas
         #[cfg(feature = "ole")]

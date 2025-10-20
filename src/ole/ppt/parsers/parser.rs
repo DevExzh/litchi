@@ -1,6 +1,6 @@
-/// PPT record parser - orchestrates document parsing and text extraction.
-///
-/// Based on Apache POI's HSLFSlideShow and QuickButCruddyTextExtractor.
+//! PPT record parser - orchestrates document parsing and text extraction.
+//!
+//! Based on Apache POI's HSLFSlideShow and QuickButCruddyTextExtractor.
 
 use crate::ole::consts::PptRecordType;
 use crate::ole::ppt::package::{PptError, Result};
@@ -102,16 +102,36 @@ impl PptRecordParser {
     pub fn find_records(&self, _record_type: PptRecordType) -> Vec<PptRecord> {
         // Collect all records recursively
         let mut all_records = Vec::new();
-        self.collect_records_recursive(&self.records, &mut all_records);
+        Self::collect_records_recursive(&self.records, &mut all_records);
         all_records
     }
     
-    /// Recursively collect all records including children.
-    fn collect_records_recursive(&self, records: &[PptRecord], collector: &mut Vec<PptRecord>) {
+    /// Get all record references recursively (zero-copy version).
+    pub fn find_records_ref(&self) -> Vec<&PptRecord> {
+        let mut all_records = Vec::new();
+        Self::collect_records_recursive_ref(&self.records, &mut all_records);
+        all_records
+    }
+    
+    /// Recursively collect all records including children (cloning version).
+    /// 
+    /// Note: This clones records. Consider using `collect_records_recursive_ref` 
+    /// for zero-copy collection when ownership is not needed.
+    fn collect_records_recursive(records: &[PptRecord], collector: &mut Vec<PptRecord>) {
         for record in records {
             collector.push(record.clone());
             if !record.children.is_empty() {
-                self.collect_records_recursive(&record.children, collector);
+                Self::collect_records_recursive(&record.children, collector);
+            }
+        }
+    }
+    
+    /// Recursively collect all record references including children (zero-copy).
+    fn collect_records_recursive_ref<'a>(records: &'a [PptRecord], collector: &mut Vec<&'a PptRecord>) {
+        for record in records {
+            collector.push(record);
+            if !record.children.is_empty() {
+                Self::collect_records_recursive_ref(&record.children, collector);
             }
         }
     }

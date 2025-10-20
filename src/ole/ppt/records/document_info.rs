@@ -1,6 +1,6 @@
-/// Document information extracted from PPT Document records.
-///
-/// Based on POI's Document and DocumentAtom record parsing.
+//! Document information extracted from PPT Document records.
+//!
+//! Based on POI's Document and DocumentAtom record parsing.
 
 /// Information extracted from a Document record.
 #[derive(Debug, Clone, Default)]

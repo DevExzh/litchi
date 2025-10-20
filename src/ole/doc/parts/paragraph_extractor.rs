@@ -13,7 +13,7 @@ use crate::ole::plcf::PlcfParser;
 use crate::ole::sprm::parse_sprms;
 
 /// Type alias for extracted paragraph data: (text, properties, runs).
-type ExtractedParagraph = (String, ParagraphProperties, Vec<(String, CharacterProperties)>);
+pub(crate) type ExtractedParagraph = (String, ParagraphProperties, Vec<(String, CharacterProperties)>);
 
 /// Paragraph extractor using binary structures.
 ///

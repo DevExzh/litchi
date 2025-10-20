@@ -3,10 +3,8 @@ use super::package::{DocError, Result};
 use super::paragraph::{Paragraph, Run};
 use super::parts::fib::FileInformationBlock;
 use super::parts::text::TextExtractor;
-use super::parts::paragraph_extractor::ParagraphExtractor;
+use super::parts::paragraph_extractor::{ParagraphExtractor, ExtractedParagraph};
 use super::parts::fields::FieldsTable;
-use super::parts::pap::ParagraphProperties;
-use super::parts::chp::CharacterProperties;
 use super::table::Table;
 use super::super::OleFile;
 #[cfg(feature = "formula")]
@@ -363,7 +361,7 @@ impl Document {
     /// paragraph data into high-level Paragraph objects with formula matching.
     fn convert_to_paragraphs(
         &self,
-        extracted_paras: Vec<(String, ParagraphProperties, Vec<(String, CharacterProperties)>)>,
+        extracted_paras: Vec<ExtractedParagraph>,
         output: &mut Vec<Paragraph>,
     ) {
         for (para_text, para_props, runs) in extracted_paras {

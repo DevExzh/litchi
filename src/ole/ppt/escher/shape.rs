@@ -1,10 +1,10 @@
-/// Escher shape parsing and representation.
-///
-/// # Performance
-///
-/// - Zero-copy shape data access
-/// - Lazy property parsing
-/// - Enum-based shape type dispatch (no trait objects)
+//! Escher shape parsing and representation.
+//!
+//! # Performance
+//!
+//! - Zero-copy shape data access
+//! - Lazy property parsing
+//! - Enum-based shape type dispatch (no trait objects)
 
 use super::container::EscherContainer;
 use super::types::EscherRecordType;
@@ -161,11 +161,10 @@ impl<'data> EscherShape<'data> {
         
         // Check if it's a group by looking for SpgrContainer
         for child_result in container.children() {
-            if let Ok(child) = child_result {
-                if child.record_type == EscherRecordType::SpgrContainer {
+            if let Ok(child) = child_result
+                && child.record_type == EscherRecordType::SpgrContainer {
                     return EscherShapeType::Group;
                 }
-            }
         }
         
         // Default
@@ -175,20 +174,18 @@ impl<'data> EscherShape<'data> {
     /// Check if container has picture/blip data.
     fn has_picture_data(container: &EscherContainer<'data>) -> bool {
         // Look for blip references or embedded blip data
-        for child_result in container.children() {
-            if let Ok(child) = child_result {
-                match child.record_type {
-                    EscherRecordType::BlipJpeg
-                    | EscherRecordType::BlipPng
-                    | EscherRecordType::BlipDib
-                    | EscherRecordType::BlipTiff
-                    | EscherRecordType::BlipEmf
-                    | EscherRecordType::BlipWmf
-                    | EscherRecordType::BlipPict => {
-                        return true;
-                    }
-                    _ => {}
+        for child in container.children().flatten() {
+            match child.record_type {
+                EscherRecordType::BlipJpeg
+                | EscherRecordType::BlipPng
+                | EscherRecordType::BlipDib
+                | EscherRecordType::BlipTiff
+                | EscherRecordType::BlipEmf
+                | EscherRecordType::BlipWmf
+                | EscherRecordType::BlipPict => {
+                    return true;
                 }
+                _ => {}
             }
         }
         false
@@ -214,18 +211,16 @@ impl<'data> EscherShape<'data> {
     /// Extract shape anchor (position and size).
     fn extract_anchor(container: &EscherContainer<'data>) -> Option<ShapeAnchor> {
         // Try ChildAnchor first
-        if let Some(child_anchor) = container.find_child(EscherRecordType::ChildAnchor) {
-            if let Some(anchor) = ShapeAnchor::from_child_anchor(&child_anchor) {
+        if let Some(child_anchor) = container.find_child(EscherRecordType::ChildAnchor)
+            && let Some(anchor) = ShapeAnchor::from_child_anchor(&child_anchor) {
                 return Some(anchor);
             }
-        }
         
         // Try ClientAnchor
-        if let Some(client_anchor) = container.find_child(EscherRecordType::ClientAnchor) {
-            if let Some(anchor) = ShapeAnchor::from_client_anchor(&client_anchor) {
+        if let Some(client_anchor) = container.find_child(EscherRecordType::ClientAnchor)
+            && let Some(anchor) = ShapeAnchor::from_client_anchor(&client_anchor) {
                 return Some(anchor);
             }
-        }
         
         None
     }

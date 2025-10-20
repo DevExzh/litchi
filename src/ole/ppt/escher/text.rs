@@ -1,10 +1,10 @@
-/// Text extraction from Escher records.
-///
-/// # Architecture
-///
-/// - Extracts text from ClientTextbox records
-/// - Parses embedded PPT text records (TextCharsAtom, TextBytesAtom)
-/// - Zero-copy where possible
+//! Text extraction from Escher records.
+//!
+//! # Architecture
+//!
+//! - Extracts text from ClientTextbox records
+//! - Parses embedded PPT text records (TextCharsAtom, TextBytesAtom)
+//! - Zero-copy where possible
 
 use super::record::EscherRecord;
 use super::container::EscherContainer;
@@ -41,32 +41,30 @@ pub fn extract_text_from_escher(escher_data: &[u8]) -> Result<String> {
 
 /// Recursively extract text from a container and its children.
 fn extract_text_from_container(container: &EscherContainer, text_parts: &mut Vec<String>) {
-    for child_result in container.children() {
-        if let Ok(child) = child_result {
-            match child.record_type {
-                // ClientTextbox contains embedded PPT text records
-                EscherRecordType::ClientTextbox => {
-                    if let Some(text) = extract_text_from_textbox(&child) {
-                        if !text.trim().is_empty() {
-                            text_parts.push(text);
-                        }
+    for child in container.children().flatten() {
+        match child.record_type {
+            // ClientTextbox contains embedded PPT text records
+            EscherRecordType::ClientTextbox => {
+                if let Some(text) = extract_text_from_textbox(&child)
+                    && !text.trim().is_empty() {
+                        text_parts.push(text);
                     }
-                }
-                // SpContainer may contain shapes with text
-                EscherRecordType::SpContainer => {
-                    let sp_container = EscherContainer::new(child);
-                    extract_text_from_container(&sp_container, text_parts);
-                }
-                // Other container types - recurse
-                _ if child.is_container() => {
-                    let child_container = EscherContainer::new(child);
-                    extract_text_from_container(&child_container, text_parts);
-                }
-                _ => {}
+            }    
+            // SpContainer may contain shapes with text
+            EscherRecordType::SpContainer => {
+                let sp_container = EscherContainer::new(child);
+                extract_text_from_container(&sp_container, text_parts);
             }
+            // Other container types - recurse
+            _ if child.is_container() => {
+                let child_container = EscherContainer::new(child);
+                extract_text_from_container(&child_container, text_parts);
+            }
+            _ => {}
         }
     }
 }
+
 
 /// Extract text from a ClientTextbox record.
 ///

@@ -1,6 +1,6 @@
-/// SlideAtomsSet - groups text records associated with a single slide.
-///
-/// Based on POI's SlideListWithText.SlideAtomsSet inner class.
+//! SlideAtomsSet - groups text records associated with a single slide.
+//!
+//! Based on POI's SlideListWithText.SlideAtomsSet inner class.
 
 use super::record::PptRecord;
 use crate::ole::ppt::package::Result;
@@ -24,11 +24,10 @@ impl<'a> SlideAtomsSet<'a> {
         let mut text_parts = Vec::new();
 
         for record in &self.slide_records {
-            if let Ok(text) = record.extract_text() {
-                if !text.is_empty() {
+            if let Ok(text) = record.extract_text()
+                && !text.is_empty() {
                     text_parts.push(text);
                 }
-            }
         }
 
         Ok(text_parts.join("\n"))

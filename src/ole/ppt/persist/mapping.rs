@@ -1,6 +1,6 @@
-/// Persist ID to byte offset mapping manager.
-///
-/// Idiomatic Rust implementation using iterator chaining and functional patterns.
+//! Persist ID to byte offset mapping manager.
+//!
+//! Idiomatic Rust implementation using iterator chaining and functional patterns.
 
 use crate::ole::ppt::records::PptRecord;
 use crate::ole::consts::PptRecordType;

@@ -1,7 +1,7 @@
-/// Core PPT record structure and parsing.
-///
-/// This module implements the fundamental PPT record parsing based on
-/// Apache POI's HSLF Record.java implementation.
+//! Core PPT record structure and parsing.
+//!
+//! This module implements the fundamental PPT record parsing based on
+//! Apache POI's HSLF Record.java implementation.
 
 use crate::ole::consts::PptRecordType;
 use crate::ole::ppt::package::{PptError, Result};
@@ -167,8 +167,8 @@ impl PptRecord {
             return Some(ppdrawing.data.clone());
         }
 
-        if self.record_type == PptRecordType::Slide {
-            if !self.data.is_empty() && self.data.len() > 8 {
+        if self.record_type == PptRecordType::Slide
+            && !self.data.is_empty() && self.data.len() > 8 {
                 let first_record_type = U16::<LittleEndian>::read_from_bytes(&self.data[0..2])
                     .map(|v| v.get())
                     .unwrap_or(0);
@@ -176,7 +176,6 @@ impl PptRecord {
                     return Some(self.data.clone());
                 }
             }
-        }
 
         None
     }
@@ -297,11 +296,10 @@ impl PptRecord {
 
         // Recursively extract text from children
         for child in &self.children {
-            if let Ok(child_text) = child.extract_text() {
-                if !child_text.is_empty() {
+            if let Ok(child_text) = child.extract_text()
+                && !child_text.is_empty() {
                     text_parts.push(child_text);
                 }
-            }
         }
 
         Ok(text_parts.join("\n"))

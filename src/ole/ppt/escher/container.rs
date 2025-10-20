@@ -1,10 +1,10 @@
-/// Container record handling with iterator-based traversal.
-///
-/// # Performance
-///
-/// - Lazy evaluation: Children parsed on-demand
-/// - Iterator-based: Functional composition
-/// - Zero-copy: Borrows from parent data
+//! Container record handling with iterator-based traversal.
+//!
+//! # Performance
+//!
+//! - Lazy evaluation: Children parsed on-demand
+//! - Iterator-based: Functional composition
+//! - Zero-copy: Borrows from parent data
 
 use super::record::EscherRecord;
 use crate::ole::ppt::package::Result;
@@ -150,18 +150,16 @@ impl<'data> EscherContainer<'data> {
     }
     
     fn find_recursive_impl(&self, record_type: super::types::EscherRecordType, results: &mut Vec<EscherRecord<'data>>) {
-        for child_result in self.children() {
-            if let Ok(child) = child_result {
-                // Add if matches
-                if child.record_type == record_type {
-                    results.push(child.clone());
-                }
-                
-                // Recurse if container
-                if child.is_container() {
-                    let container = EscherContainer::new(child);
-                    container.find_recursive_impl(record_type, results);
-                }
+        for child in self.children().flatten() {
+            // Add if matches
+            if child.record_type == record_type {
+                results.push(child.clone());
+            }
+            
+            // Recurse if container
+            if child.is_container() {
+                let container = EscherContainer::new(child);
+                container.find_recursive_impl(record_type, results);
             }
         }
     }

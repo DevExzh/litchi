@@ -1,6 +1,6 @@
-/// PersistPtrHolder parsing - maps persist IDs to byte offsets.
-///
-/// Idiomatic Rust implementation with zero-copy parsing and high performance.
+//! PersistPtrHolder parsing - maps persist IDs to byte offsets.
+//!
+//! Idiomatic Rust implementation with zero-copy parsing and high performance.
 
 use crate::ole::ppt::package::{PptError, Result};
 use crate::ole::ppt::records::PptRecord;

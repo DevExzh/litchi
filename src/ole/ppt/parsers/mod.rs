@@ -1,4 +1,4 @@
-/// PPT document parsers.
+//! PPT document parsers.
 
 pub mod parser;
 

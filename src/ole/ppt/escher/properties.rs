@@ -1,7 +1,7 @@
-/// Escher shape property parsing (Opt record).
-///
-/// Properties control shape appearance: position, size, colors, rotation, etc.
-/// Based on MS-ODRAW specification section 2.3.
+//! Escher shape property parsing (Opt record).
+//!
+//! Properties control shape appearance: position, size, colors, rotation, etc.
+//! Based on MS-ODRAW specification section 2.3.
 
 use super::record::EscherRecord;
 use super::types::EscherRecordType;

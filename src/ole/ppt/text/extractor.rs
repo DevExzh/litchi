@@ -1,7 +1,7 @@
-/// Text extraction utilities for PPT records.
-///
-/// This module provides functions to extract text from various PPT record types,
-/// including TextCharsAtom (UTF-16LE), TextBytesAtom (ISO-8859-1), and CString.
+//! Text extraction utilities for PPT records.
+//!
+//! This module provides functions to extract text from various PPT record types,
+//! including TextCharsAtom (UTF-16LE), TextBytesAtom (ISO-8859-1), and CString.
 
 use crate::ole::ppt::package::Result;
 use zerocopy::{byteorder::{U16, LittleEndian}, FromBytes};

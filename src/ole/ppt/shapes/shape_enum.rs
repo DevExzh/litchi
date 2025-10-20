@@ -1,6 +1,6 @@
-/// High-performance Shape enum for representing all shape types.
-///
-/// Idiomatic Rust implementation using enum variants instead of trait objects.
+//! High-performance Shape enum for representing all shape types.
+//!
+//! Idiomatic Rust implementation using enum variants instead of trait objects.
 
 use super::{TextBox, Placeholder, AutoShape};
 use super::shape::{ShapeType, Shape};
@@ -62,11 +62,10 @@ impl ShapeEnum {
                 let mut text_parts = Vec::new();
                 for row in 0..table.rows() {
                     for col in 0..table.columns() {
-                        if let Some(cell_text) = table.cell(row, col) {
-                            if !cell_text.is_empty() {
+                        if let Some(cell_text) = table.cell(row, col)
+                            && !cell_text.is_empty() {
                                 text_parts.push(cell_text.to_string());
                             }
-                        }
                     }
                 }
                 Ok(text_parts.join(" "))
@@ -75,11 +74,10 @@ impl ShapeEnum {
                 // Recursively extract text from all child shapes
                 let mut text_parts = Vec::new();
                 for child in group.children() {
-                    if let Ok(child_text) = child.text() {
-                        if !child_text.is_empty() {
+                    if let Ok(child_text) = child.text()
+                        && !child_text.is_empty() {
                             text_parts.push(child_text);
                         }
-                    }
                 }
                 Ok(text_parts.join("\n"))
             }

@@ -21,33 +21,33 @@
 //!
 //! // Access worksheets
 //! for worksheet in workbook.worksheets() {
-///     let worksheet = worksheet?;
-///     println!("Sheet: {}", worksheet.name());
-///
-///     // Access cells
-///     let cell = worksheet.cell(1, 1)?;
-///     println!("A1 value: {:?}", cell.value());
-///
-///     // Access by coordinate
-///     let cell_a1 = worksheet.cell_by_coordinate("A1")?;
-///     println!("A1 coordinate access: {:?}", cell_a1.value());
-///
-///     // Iterate over all cells
-///     for cell_result in worksheet.cells() {
-///         let cell = cell_result?;
-///         println!("Cell {}: {:?}", cell.coordinate(), cell.value());
-///     }
-/// }
-///
-/// // Access specific worksheet by name
-/// let sheet1 = workbook.worksheet_by_name("Sheet1")?;
-/// println!("Found worksheet: {}", sheet1.name());
-///
-/// // Get active worksheet
-/// let active = workbook.active_worksheet()?;
-/// println!("Active sheet: {}", active.name());
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
+//!     let worksheet = worksheet?;
+//!     println!("Sheet: {}", worksheet.name());
+//!
+//!     // Access cells
+//!     let cell = worksheet.cell(1, 1)?;
+//!     println!("A1 value: {:?}", cell.value());
+//!
+//!     // Access by coordinate
+//!     let cell_a1 = worksheet.cell_by_coordinate("A1")?;
+//!     println!("A1 coordinate access: {:?}", cell_a1.value());
+//!
+//!     // Iterate over all cells
+//!     for cell_result in worksheet.cells() {
+//!         let cell = cell_result?;
+//!         println!("Cell {}: {:?}", cell.coordinate(), cell.value());
+//!     }
+//! }
+//!
+//! // Access specific worksheet by name
+//! let sheet1 = workbook.worksheet_by_name("Sheet1")?;
+//! println!("Found worksheet: {}", sheet1.name());
+//!
+//! // Get active worksheet
+//! let active = workbook.active_worksheet()?;
+//! println!("Active sheet: {}", active.name());
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
 
 // Submodule declarations
 pub mod types;

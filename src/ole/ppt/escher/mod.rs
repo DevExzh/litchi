@@ -1,21 +1,21 @@
-/// Escher (Office Drawing) record parsing module.
-///
-/// Escher is Microsoft's drawing layer format used across Office applications.
-/// It contains shapes, text boxes, images, and other graphical elements.
-///
-/// # Architecture
-///
-/// - Zero-copy parsing with lifetime-based borrowing
-/// - Iterator-based container traversal
-/// - Lazy shape evaluation
-/// - Minimal allocations
-///
-/// # Performance
-///
-/// - Direct byte slice access (no intermediate buffers)
-/// - Pre-allocated capacity estimation
-/// - Functional iterator chains
-/// - Efficient bit manipulation
+//! Escher (Office Drawing) record parsing module.
+//!
+//! Escher is Microsoft's drawing layer format used across Office applications.
+//! It contains shapes, text boxes, images, and other graphical elements.
+//!
+//! # Architecture
+//!
+//! - Zero-copy parsing with lifetime-based borrowing
+//! - Iterator-based container traversal
+//! - Lazy shape evaluation
+//! - Minimal allocations
+//!
+//! # Performance
+//!
+//! - Direct byte slice access (no intermediate buffers)
+//! - Pre-allocated capacity estimation
+//! - Functional iterator chains
+//! - Efficient bit manipulation
 
 pub mod types;
 pub mod record;

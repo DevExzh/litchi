@@ -1,4 +1,4 @@
-/// Text extraction utilities for PPT records.
+//! Text extraction utilities for PPT records.
 
 pub mod extractor;
 

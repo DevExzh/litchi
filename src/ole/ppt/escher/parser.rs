@@ -1,10 +1,10 @@
-/// High-performance Escher record parser.
-///
-/// # Architecture
-///
-/// - Zero-copy: Borrows from document data
-/// - Lazy: Parses on-demand via iterators
-/// - Efficient: Single-pass with minimal allocations
+//! High-performance Escher record parser.
+//!
+//! # Architecture
+//!
+//! - Zero-copy: Borrows from document data
+//! - Lazy: Parses on-demand via iterators
+//! - Efficient: Single-pass with minimal allocations
 
 use super::record::EscherRecord;
 use super::container::{EscherContainer, EscherChildIterator};

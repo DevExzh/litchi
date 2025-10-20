@@ -1,6 +1,6 @@
-/// Slide information extracted from PPT Slide records.
-///
-/// Based on POI's Slide and SlideAtom record parsing.
+//! Slide information extracted from PPT Slide records.
+//!
+//! Based on POI's Slide and SlideAtom record parsing.
 
 /// Information extracted from a Slide record.
 #[derive(Debug, Clone, Default)]

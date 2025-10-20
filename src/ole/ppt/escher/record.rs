@@ -1,17 +1,17 @@
-/// Escher record structure with zero-copy parsing.
-///
-/// # Format
-///
-/// Escher records have an 8-byte header:
-/// - Bytes 0-1: Version and Instance (packed)
-/// - Bytes 2-3: Record Type
-/// - Bytes 4-7: Record Length (32-bit)
-///
-/// # Performance
-///
-/// - Zero-copy: Borrows from original data
-/// - No intermediate allocations
-/// - Direct byte access via slices
+//! Escher record structure with zero-copy parsing.
+//!
+//! # Format
+//!
+//! Escher records have an 8-byte header:
+//! - Bytes 0-1: Version and Instance (packed)
+//! - Bytes 2-3: Record Type
+//! - Bytes 4-7: Record Length (32-bit)
+//!
+//! # Performance
+//!
+//! - Zero-copy: Borrows from original data
+//! - No intermediate allocations
+//! - Direct byte access via slices
 
 use super::types::EscherRecordType;
 use crate::ole::ppt::package::{PptError, Result};
