@@ -155,8 +155,8 @@ impl MediaManager {
 
             if path.is_dir() {
                 Self::scan_directory_recursive(&path, bundle_root, assets)?;
-            } else if path.is_file() {
-                if let Ok(metadata) = fs::metadata(&path) {
+            } else if path.is_file()
+                && let Ok(metadata) = fs::metadata(&path) {
                     let relative_path = path
                         .strip_prefix(bundle_root)
                         .unwrap_or(&path)
@@ -166,7 +166,6 @@ impl MediaManager {
                     let filename = asset.filename.clone();
                     assets.insert(filename, asset);
                 }
-            }
         }
 
         Ok(())

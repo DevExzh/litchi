@@ -1,0 +1,13 @@
+//! Text Extraction Utilities for iWork Documents
+//!
+//! This module provides shared text extraction functionality used across
+//! Pages, Numbers, and Keynote documents.
+
+pub mod extractor;
+pub mod storage;
+pub mod style;
+
+pub use extractor::TextExtractor;
+pub use storage::{TextStorage, TextFragment, TextRun};
+pub use style::{TextStyle, ParagraphStyle};
+

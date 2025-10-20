@@ -127,6 +127,7 @@
 //! - `pyiwa` - Python iWork format reader
 //! - `iWorkFileFormat` - Reverse-engineered format documentation
 
+// Core parsing modules
 pub mod snappy;
 pub mod varint;
 pub mod archive;
@@ -137,8 +138,16 @@ pub mod protobuf;
 pub mod media;
 pub mod structured;
 
+/// Shared text extraction utilities
+pub mod text;
+
 /// High-level iWork document types
 pub mod document;
+
+/// Application-specific modules
+pub mod pages;
+pub mod numbers;
+pub mod keynote;
 
 /// Re-export commonly used types
 pub use archive::{ArchiveInfo, MessageInfo};
@@ -147,6 +156,7 @@ pub use document::Document;
 pub use snappy::SnappyStream;
 pub use media::{MediaManager, MediaAsset, MediaType, MediaStats};
 pub use structured::{Table, Slide, Section, StructuredData, CellValue};
+pub use text::{TextExtractor, TextStorage, TextFragment, TextStyle, ParagraphStyle};
 
 /// Error types for iWork parsing
 #[derive(Debug, thiserror::Error)]
