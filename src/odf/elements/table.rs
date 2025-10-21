@@ -5,7 +5,7 @@
 
 use super::element::{Element, ElementBase};
 use crate::common::{Error, Result};
-use crate::odf::spreadsheet::CellValue;
+use crate::odf::ods::CellValue;
 
 /// A table element
 #[derive(Debug, Clone)]

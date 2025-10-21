@@ -1,18 +1,55 @@
+//! OpenDocument Format (ODF) support.
+//!
+//! This module provides comprehensive support for parsing and working with OpenDocument
+//! files, including text documents (.odt), spreadsheets (.ods), and presentations (.odp).
+//!
+//! # Features
+//!
+//! - Parse ODF files from paths or byte buffers
+//! - Extract text, structured content, and metadata
+//! - Support for styles and formatting
+//! - Export capabilities (e.g., CSV for spreadsheets)
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use litchi::odf::{Document, Spreadsheet, Presentation};
+//!
+//! # fn main() -> litchi::Result<()> {
+//! // Open a text document
+//! let mut doc = Document::open("document.odt")?;
+//! let text = doc.text()?;
+//!
+//! // Open a spreadsheet
+//! let mut sheet = Spreadsheet::open("data.ods")?;
+//! let csv = sheet.to_csv()?;
+//!
+//! // Open a presentation
+//! let mut pres = Presentation::open("slides.odp")?;
+//! let slide_count = pres.slide_count()?;
+//!
+//! # Ok(())
+//! # }
+//! ```
+
 /// Core ODF parsing functionality
 mod core;
 /// ODF XML element classes
 mod elements;
 /// ODF presentation (.odp) support
-mod presentation;
+mod odp;
 /// ODF spreadsheet (.ods) support
-mod spreadsheet;
+mod ods;
 /// ODF text document (.odt) support
-mod text;
+mod odt;
 
-pub use presentation::Presentation;
-pub use spreadsheet::Spreadsheet;
-/// Re-export the main APIs
-pub use text::Document;
+// Re-export main types for convenience
+pub use odp::Presentation;
+pub use ods::{Cell, CellValue, Row, Sheet, Spreadsheet};
+pub use odt::Document;
+
+// Re-export shapes for presentations
+pub use odp::{Shape, Slide};
 
 /// ODF format types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,7 +128,24 @@ pub const ODF_MIME_TYPES: &[(&str, OdfFormat)] = &[
     ),
 ];
 
-/// Detect ODF format from MIME type
+/// Detect ODF format from MIME type.
+///
+/// # Arguments
+///
+/// * `mime_type` - MIME type string to detect
+///
+/// # Returns
+///
+/// The corresponding `OdfFormat` if recognized, None otherwise.
+///
+/// # Examples
+///
+/// ```
+/// use litchi::odf::{detect_format_from_mime, OdfFormat};
+///
+/// let format = detect_format_from_mime("application/vnd.oasis.opendocument.text");
+/// assert_eq!(format, Some(OdfFormat::Text));
+/// ```
 pub fn detect_format_from_mime(mime_type: &str) -> Option<OdfFormat> {
     ODF_MIME_TYPES
         .iter()
