@@ -35,9 +35,9 @@
 //! ```
 
 // Submodule declarations
-mod types;
 mod prs;
 mod slide;
+mod types;
 
 // Re-exports
 pub use prs::Presentation;

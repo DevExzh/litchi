@@ -3,7 +3,7 @@
 /// Placeholders are special shapes that define the layout and structure
 /// of PowerPoint slides. They represent positions where content like titles,
 /// text, charts, or media should be placed.
-use super::shape::{Shape, ShapeProperties, ShapeContainer};
+use super::shape::{Shape, ShapeContainer, ShapeProperties};
 
 /// Placeholder size options (quarter, half, full).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -162,21 +162,24 @@ impl Placeholder {
     }
 
     /// Create a placeholder from an Escher record with proper parsing.
-    pub fn from_escher_record(record: &super::escher::EscherRecord) -> super::super::package::Result<Self> {
+    pub fn from_escher_record(
+        record: &super::escher::EscherRecord,
+    ) -> super::super::package::Result<Self> {
         // Extract basic shape properties
         let properties = record.extract_shape_properties()?;
 
         // Extract placeholder information from OEPlaceholderAtom or similar records
         let placeholder_info = Self::extract_placeholder_info_from_record(record)?;
 
-        let (placeholder_type, size, index) = if let Some((poi_id, size_val, index_val)) = placeholder_info {
-            match Self::map_poi_placeholder_id_to_type(poi_id) {
-                Ok(placeholder_type) => (placeholder_type, Some(size_val), Some(index_val)),
-                Err(_) => (PlaceholderType::Body, None, None), // Fallback
-            }
-        } else {
-            (PlaceholderType::Body, None, None)
-        };
+        let (placeholder_type, size, index) =
+            if let Some((poi_id, size_val, index_val)) = placeholder_info {
+                match Self::map_poi_placeholder_id_to_type(poi_id) {
+                    Ok(placeholder_type) => (placeholder_type, Some(size_val), Some(index_val)),
+                    Err(_) => (PlaceholderType::Body, None, None), // Fallback
+                }
+            } else {
+                (PlaceholderType::Body, None, None)
+            };
 
         // Extract additional placeholder properties from Escher data
         let container = ShapeContainer::new(properties, record.data.clone());
@@ -199,10 +202,15 @@ impl Placeholder {
         // The raw data may contain an OEPlaceholderAtom record
         let (placeholder_type, size, index) = if !container.raw_data.is_empty() {
             // Parse as Escher record to find OEPlaceholderAtom
-            if let Ok((escher_record, _)) = super::escher::EscherRecord::parse(&container.raw_data, 0) {
-                if let Ok(Some((poi_id, size_val, index_val))) = escher_record.extract_placeholder_info() {
+            if let Ok((escher_record, _)) =
+                super::escher::EscherRecord::parse(&container.raw_data, 0)
+            {
+                if let Ok(Some((poi_id, size_val, index_val))) =
+                    escher_record.extract_placeholder_info()
+                {
                     // Map POI placeholder ID to our type
-                    let ph_type = Self::map_poi_placeholder_id_to_type(poi_id).unwrap_or(PlaceholderType::Body);
+                    let ph_type = Self::map_poi_placeholder_id_to_type(poi_id)
+                        .unwrap_or(PlaceholderType::Body);
                     (ph_type, Some(size_val), Some(index_val))
                 } else {
                     (PlaceholderType::Body, None, None)
@@ -225,42 +233,47 @@ impl Placeholder {
 
     /// Extract placeholder information from an Escher record.
     /// This follows POI's logic for parsing OEPlaceholderAtom records.
-    fn extract_placeholder_info_from_record(record: &super::escher::EscherRecord) -> super::super::package::Result<Option<(u16, u8, u16)>> {
+    fn extract_placeholder_info_from_record(
+        record: &super::escher::EscherRecord,
+    ) -> super::super::package::Result<Option<(u16, u8, u16)>> {
         // Use the EscherRecord's extract_placeholder_info method
         record.extract_placeholder_info()
     }
 
     /// Map POI placeholder IDs to our placeholder types.
     /// This follows the mapping used in POI's Placeholder enum.
-    fn map_poi_placeholder_id_to_type(poi_id: u16) -> super::super::package::Result<PlaceholderType> {
+    fn map_poi_placeholder_id_to_type(
+        poi_id: u16,
+    ) -> super::super::package::Result<PlaceholderType> {
         // Based on POI's Placeholder enum mapping
         let placeholder_type = match poi_id {
             0 => PlaceholderType::None,
-            13 => PlaceholderType::Title,        // TITLE
-            14 => PlaceholderType::Body,         // BODY
-            15 => PlaceholderType::CenterTitle,  // CENTERED_TITLE
-            16 => PlaceholderType::SubTitle,     // SUBTITLE
-            7 => PlaceholderType::DateAndTime,   // DATETIME
-            8 => PlaceholderType::SlideNumber,   // SLIDE_NUMBER
-            9 => PlaceholderType::Footer,        // FOOTER
-            10 => PlaceholderType::Header,       // HEADER
-            19 => PlaceholderType::Content,      // CONTENT
-            20 => PlaceholderType::Chart,        // CHART
-            21 => PlaceholderType::Table,        // TABLE
-            22 => PlaceholderType::ClipArt,      // CLIP_ART
-            23 => PlaceholderType::Diagram,      // DGM
-            24 => PlaceholderType::MediaClip,    // MEDIA
-            11 => PlaceholderType::SlideImage,   // SLIDE_IMAGE
-            26 => PlaceholderType::Picture,      // PICTURE
-            25 => PlaceholderType::VerticalObject, // VERTICAL_OBJECT
+            13 => PlaceholderType::Title,             // TITLE
+            14 => PlaceholderType::Body,              // BODY
+            15 => PlaceholderType::CenterTitle,       // CENTERED_TITLE
+            16 => PlaceholderType::SubTitle,          // SUBTITLE
+            7 => PlaceholderType::DateAndTime,        // DATETIME
+            8 => PlaceholderType::SlideNumber,        // SLIDE_NUMBER
+            9 => PlaceholderType::Footer,             // FOOTER
+            10 => PlaceholderType::Header,            // HEADER
+            19 => PlaceholderType::Content,           // CONTENT
+            20 => PlaceholderType::Chart,             // CHART
+            21 => PlaceholderType::Table,             // TABLE
+            22 => PlaceholderType::ClipArt,           // CLIP_ART
+            23 => PlaceholderType::Diagram,           // DGM
+            24 => PlaceholderType::MediaClip,         // MEDIA
+            11 => PlaceholderType::SlideImage,        // SLIDE_IMAGE
+            26 => PlaceholderType::Picture,           // PICTURE
+            25 => PlaceholderType::VerticalObject,    // VERTICAL_OBJECT
             17 => PlaceholderType::VerticalTextTitle, // VERTICAL_TEXT_TITLE
             18 => PlaceholderType::VerticalTextBody,  // VERTICAL_TEXT_BODY
             _ => {
                 // For unknown types, return None (POI doesn't have this)
-                return Err(super::super::package::PptError::Corrupted(
-                    format!("Unknown placeholder type ID: {}", poi_id)
-                ));
-            }
+                return Err(super::super::package::PptError::Corrupted(format!(
+                    "Unknown placeholder type ID: {}",
+                    poi_id
+                )));
+            },
         };
 
         Ok(placeholder_type)
@@ -377,11 +390,10 @@ impl Shape for Placeholder {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::shape::ShapeType;
+    use super::*;
 
     #[test]
     #[allow(clippy::field_reassign_with_default)]

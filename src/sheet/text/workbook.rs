@@ -4,8 +4,8 @@ use std::fs::File;
 use std::io::{BufReader, Read, Seek};
 use std::path::Path;
 
-use crate::sheet::{WorkbookTrait, Worksheet, WorksheetIterator, CellValue, Result as SheetResult};
 use super::iterators::TextWorksheetIterator;
+use crate::sheet::{CellValue, Result as SheetResult, WorkbookTrait, Worksheet, WorksheetIterator};
 
 /// Configuration for parsing text-based spreadsheet files
 #[derive(Debug, Clone)]
@@ -29,13 +29,13 @@ pub struct TextConfig {
 impl Default for TextConfig {
     fn default() -> Self {
         Self {
-            delimiter: b',',      // CSV default
-            quote: b'"',          // Standard CSV quoting
-            comment: Some(b'#'),  // Common comment character
-            trim_whitespace: false, // Preserve whitespace by default
-            has_headers: true,    // Assume first row is headers
+            delimiter: b',',              // CSV default
+            quote: b'"',                  // Standard CSV quoting
+            comment: Some(b'#'),          // Common comment character
+            trim_whitespace: false,       // Preserve whitespace by default
+            has_headers: true,            // Assume first row is headers
             max_line_length: 1024 * 1024, // 1MB max line length
-            buffer_size: 8192,    // 8KB buffer
+            buffer_size: 8192,            // 8KB buffer
         }
     }
 }

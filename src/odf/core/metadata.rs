@@ -3,10 +3,10 @@
 //! This module provides comprehensive parsing of ODF metadata from meta.xml,
 //! including document properties, statistics, and user information.
 
-use crate::common::{Error, Result, Metadata};
-use std::collections::HashMap;
-use quick_xml::events::Event;
+use crate::common::{Error, Metadata, Result};
 use chrono::{DateTime, Utc};
+use quick_xml::events::Event;
+use std::collections::HashMap;
 
 /// Comprehensive ODF metadata
 #[derive(Debug, Clone, Default)]
@@ -57,8 +57,8 @@ pub struct DocumentStatistics {
 impl OdfMetadata {
     /// Parse metadata from meta.xml content
     pub fn from_xml(xml_content: &str) -> Result<Self> {
-        use quick_xml::events::Event;
         use quick_xml::Reader;
+        use quick_xml::events::Event;
 
         let mut reader = Reader::from_str(xml_content);
         let mut buf = Vec::new();
@@ -69,62 +69,74 @@ impl OdfMetadata {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Start(ref e)) => {
                     let name = e.name();
-                    let name_str = String::from_utf8(name.as_ref().to_vec())
-                        .unwrap_or_default();
+                    let name_str = String::from_utf8(name.as_ref().to_vec()).unwrap_or_default();
 
                     current_element.push(name_str.clone());
 
                     match name.as_ref() {
                         b"dc:title" => {
                             metadata.title = Self::extract_text_content(&mut reader, &mut buf)?;
-                        }
+                        },
                         b"dc:description" => {
-                            metadata.description = Self::extract_text_content(&mut reader, &mut buf)?;
-                        }
+                            metadata.description =
+                                Self::extract_text_content(&mut reader, &mut buf)?;
+                        },
                         b"dc:subject" => {
                             metadata.subject = Self::extract_text_content(&mut reader, &mut buf)?;
-                        }
+                        },
                         b"meta:keyword" => {
-                            if let Some(keyword) = Self::extract_text_content(&mut reader, &mut buf)? {
+                            if let Some(keyword) =
+                                Self::extract_text_content(&mut reader, &mut buf)?
+                            {
                                 metadata.keywords.push(keyword);
                             }
-                        }
+                        },
                         b"dc:creator" => {
                             metadata.creator = Self::extract_text_content(&mut reader, &mut buf)?;
-                        }
+                        },
                         b"dc:language" => {
                             metadata.language = Self::extract_text_content(&mut reader, &mut buf)?;
-                        }
+                        },
                         b"meta:creation-date" => {
-                            metadata.creation_date = Self::extract_text_content(&mut reader, &mut buf)?;
-                        }
+                            metadata.creation_date =
+                                Self::extract_text_content(&mut reader, &mut buf)?;
+                        },
                         b"dc:date" => {
-                            metadata.modification_date = Self::extract_text_content(&mut reader, &mut buf)?;
-                        }
+                            metadata.modification_date =
+                                Self::extract_text_content(&mut reader, &mut buf)?;
+                        },
                         b"meta:generator" => {
                             metadata.generator = Self::extract_text_content(&mut reader, &mut buf)?;
-                        }
+                        },
                         b"meta:document-statistic" => {
                             metadata.statistics = Self::parse_document_statistics(e)?;
-                        }
+                        },
                         b"meta:user-defined" => {
                             let mut temp_buf = Vec::new();
-                            if let Some((key, value)) = Self::parse_user_defined_property(e, &mut reader, &mut temp_buf)? {
+                            if let Some((key, value)) =
+                                Self::parse_user_defined_property(e, &mut reader, &mut temp_buf)?
+                            {
                                 metadata.custom_properties.insert(key, value);
                             }
-                        }
-                        _ => {}
+                        },
+                        _ => {},
                     }
-                }
+                },
                 Ok(Event::End(ref e)) => {
                     if let Some(last) = current_element.last()
-                        && last.as_bytes() == e.name().as_ref() {
-                            current_element.pop();
-                        }
-                }
+                        && last.as_bytes() == e.name().as_ref()
+                    {
+                        current_element.pop();
+                    }
+                },
                 Ok(Event::Eof) => break,
-                Err(e) => return Err(Error::InvalidFormat(format!("XML parsing error in metadata: {}", e))),
-                _ => {}
+                Err(e) => {
+                    return Err(Error::InvalidFormat(format!(
+                        "XML parsing error in metadata: {}",
+                        e
+                    )));
+                },
+                _ => {},
             }
             buf.clear();
         }
@@ -133,7 +145,10 @@ impl OdfMetadata {
     }
 
     /// Extract text content from current element
-    fn extract_text_content(reader: &mut quick_xml::Reader<&[u8]>, buf: &mut Vec<u8>) -> Result<Option<String>> {
+    fn extract_text_content(
+        reader: &mut quick_xml::Reader<&[u8]>,
+        buf: &mut Vec<u8>,
+    ) -> Result<Option<String>> {
         let mut content = String::new();
         let mut depth = 0;
 
@@ -141,21 +156,20 @@ impl OdfMetadata {
             match reader.read_event_into(buf) {
                 Ok(Event::Start(_)) => {
                     depth += 1;
-                }
+                },
                 Ok(Event::Text(ref t)) => {
                     if depth == 0 {
-                        content.push_str(&String::from_utf8(t.to_vec())
-                            .unwrap_or_default());
+                        content.push_str(&String::from_utf8(t.to_vec()).unwrap_or_default());
                     }
-                }
+                },
                 Ok(Event::End(_)) => {
                     if depth == 0 {
                         break;
                     }
                     depth -= 1;
-                }
+                },
                 Ok(Event::Eof) => break,
-                _ => {}
+                _ => {},
             }
         }
 
@@ -172,9 +186,12 @@ impl OdfMetadata {
         let mut stats = DocumentStatistics::default();
 
         for attr_result in e.attributes() {
-            let attr = attr_result.map_err(|_| Error::InvalidFormat("Invalid attribute in document statistics".to_string()))?;
-            let value_str = String::from_utf8(attr.value.to_vec())
-                .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in document statistics".to_string()))?;
+            let attr = attr_result.map_err(|_| {
+                Error::InvalidFormat("Invalid attribute in document statistics".to_string())
+            })?;
+            let value_str = String::from_utf8(attr.value.to_vec()).map_err(|_| {
+                Error::InvalidFormat("Invalid UTF-8 in document statistics".to_string())
+            })?;
 
             if let Ok(value) = value_str.parse::<u32>() {
                 match attr.key.as_ref() {
@@ -185,7 +202,7 @@ impl OdfMetadata {
                     b"meta:table-count" => stats.table_count = Some(value),
                     b"meta:image-count" => stats.image_count = Some(value),
                     b"meta:object-count" => stats.object_count = Some(value),
-                    _ => {}
+                    _ => {},
                 }
             }
         }
@@ -197,16 +214,19 @@ impl OdfMetadata {
     fn parse_user_defined_property(
         e: &quick_xml::events::BytesStart,
         reader: &mut quick_xml::Reader<&[u8]>,
-        buf: &mut Vec<u8>
+        buf: &mut Vec<u8>,
     ) -> Result<Option<(String, String)>> {
         let mut name = None;
 
         // Get property name from attributes
         for attr_result in e.attributes() {
-            let attr = attr_result.map_err(|_| Error::InvalidFormat("Invalid attribute in user-defined property".to_string()))?;
+            let attr = attr_result.map_err(|_| {
+                Error::InvalidFormat("Invalid attribute in user-defined property".to_string())
+            })?;
             if attr.key.as_ref() == b"meta:name" {
-                name = Some(String::from_utf8(attr.value.to_vec())
-                    .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in property name".to_string()))?);
+                name = Some(String::from_utf8(attr.value.to_vec()).map_err(|_| {
+                    Error::InvalidFormat("Invalid UTF-8 in property name".to_string())
+                })?);
                 break;
             }
         }
@@ -237,7 +257,9 @@ impl OdfMetadata {
                 Some(dt.into())
             } else {
                 // Try simpler date format
-                DateTime::parse_from_str(&s, "%Y-%m-%d").ok().map(|dt| dt.into())
+                DateTime::parse_from_str(&s, "%Y-%m-%d")
+                    .ok()
+                    .map(|dt| dt.into())
             }
         })
     }

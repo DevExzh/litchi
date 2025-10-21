@@ -4,7 +4,7 @@
 // split into logical components for better maintainability.
 
 pub mod converter;
-pub mod node;
-pub mod matrix;
-pub mod utils;
 pub mod error;
+pub mod matrix;
+pub mod node;
+pub mod utils;

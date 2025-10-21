@@ -55,11 +55,7 @@ impl PackURI {
         }
 
         if let Some(pos) = self.uri.rfind('/') {
-            if pos == 0 {
-                "/"
-            } else {
-                &self.uri[..pos]
-            }
+            if pos == 0 { "/" } else { &self.uri[..pos] }
         } else {
             "/"
         }
@@ -120,9 +116,11 @@ impl PackURI {
 
         // Parse the numeric suffix if found
         if let Some(start) = digit_start
-            && start > 0 && start < name_part.len() {
-                return name_part[start..].parse::<u32>().ok();
-            }
+            && start > 0
+            && start < name_part.len()
+        {
+            return name_part[start..].parse::<u32>().ok();
+        }
 
         None
     }
@@ -132,11 +130,7 @@ impl PackURI {
     /// This is the form used as the Zip file membername for the package item.
     /// Returns an empty string for the package pseudo-partname "/".
     pub fn membername(&self) -> &str {
-        if self.uri == "/" {
-            ""
-        } else {
-            &self.uri[1..]
-        }
+        if self.uri == "/" { "" } else { &self.uri[1..] }
     }
 
     /// Get the relative reference from a base URI to this PackURI.
@@ -222,16 +216,16 @@ impl PackURI {
                         // Keep leading slash
                         parts.push("");
                     }
-                }
+                },
                 ".." => {
                     // Go up one directory
                     if parts.len() > 1 {
                         parts.pop();
                     }
-                }
+                },
                 _ => {
                     parts.push(part);
-                }
+                },
             }
         }
 

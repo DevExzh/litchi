@@ -1,8 +1,8 @@
 //! Cell representation for XLS files
 
-use crate::sheet::{Cell, CellValue};
-use crate::ole::xls::records::{CellRecord, BoolErrValue, FormulaValue};
+use crate::ole::xls::records::{BoolErrValue, CellRecord, FormulaValue};
 use crate::ole::xls::utils;
+use crate::sheet::{Cell, CellValue};
 
 /// XLS cell implementation
 #[derive(Debug, Clone)]
@@ -39,37 +39,63 @@ impl XlsCell {
         let (row, col, value, formula) = match record {
             CellRecord::Blank { row, col, .. } => {
                 (*row as u32, *col as u32, CellValue::Empty, None)
-            }
-            CellRecord::Number { row, col, value, .. } => {
-                (*row as u32, *col as u32, CellValue::Float(*value), None)
-            }
-            CellRecord::Label { row, col, value, .. } => {
-                (*row as u32, *col as u32, CellValue::String(value.clone()), None)
-            }
-            CellRecord::BoolErr { row, col, value, .. } => {
+            },
+            CellRecord::Number {
+                row, col, value, ..
+            } => (*row as u32, *col as u32, CellValue::Float(*value), None),
+            CellRecord::Label {
+                row, col, value, ..
+            } => (
+                *row as u32,
+                *col as u32,
+                CellValue::String(value.clone()),
+                None,
+            ),
+            CellRecord::BoolErr {
+                row, col, value, ..
+            } => {
                 let cell_value = match value {
                     BoolErrValue::Bool(b) => CellValue::Bool(*b),
                     BoolErrValue::Error(e) => CellValue::Error(format!("Error {}", e)),
                 };
                 (*row as u32, *col as u32, cell_value, None)
-            }
-            CellRecord::Rk { row, col, value, .. } => {
-                (*row as u32, *col as u32, CellValue::Float(*value), None)
-            }
-            CellRecord::LabelSst { row, col, sst_index, .. } => {
+            },
+            CellRecord::Rk {
+                row, col, value, ..
+            } => (*row as u32, *col as u32, CellValue::Float(*value), None),
+            CellRecord::LabelSst {
+                row,
+                col,
+                sst_index,
+                ..
+            } => {
                 let cell_value = if let Some(sst) = sst {
-                    println!("DEBUG: SST index {} requested, SST has {} entries", sst_index, sst.len());
+                    println!(
+                        "DEBUG: SST index {} requested, SST has {} entries",
+                        sst_index,
+                        sst.len()
+                    );
                     if let Some(s) = sst.get(*sst_index as usize) {
                         CellValue::String(s.clone())
                     } else {
-                        CellValue::Error(format!("Invalid SST index: {} (max: {})", sst_index, sst.len()))
+                        CellValue::Error(format!(
+                            "Invalid SST index: {} (max: {})",
+                            sst_index,
+                            sst.len()
+                        ))
                     }
                 } else {
                     CellValue::Error("SST not available".to_string())
                 };
                 (*row as u32, *col as u32, cell_value, None)
-            }
-            CellRecord::Formula { row, col, value, formula, xf_index: _ } => {
+            },
+            CellRecord::Formula {
+                row,
+                col,
+                value,
+                formula,
+                xf_index: _,
+            } => {
                 let cell_value = match value {
                     FormulaValue::Number(n) => CellValue::Float(*n),
                     FormulaValue::String(s) => CellValue::String(s.clone()),
@@ -83,7 +109,7 @@ impl XlsCell {
                 let formula_str = format!("Formula({} bytes)", formula.len());
 
                 (*row as u32, *col as u32, cell_value, Some(formula_str))
-            }
+            },
         };
 
         Some(XlsCell {

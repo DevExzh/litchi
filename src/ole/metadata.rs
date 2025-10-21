@@ -1,9 +1,9 @@
 use super::consts::*;
 use super::file::{OleError, OleFile};
+use chrono::{DateTime, Duration, Utc};
 use std::collections::HashMap;
 use std::io::{Read, Seek};
-use chrono::{DateTime, Duration, Utc};
-use zerocopy::{FromBytes, LE, U16, U32, I16, I32};
+use zerocopy::{FromBytes, I16, I32, LE, U16, U32};
 
 /// Metadata extracted from OLE property streams
 ///
@@ -62,13 +62,15 @@ impl<R: Read + Seek> OleFile<R> {
 
         // Try to parse SummaryInformation stream
         if let Ok(data) = self.open_stream(&["\u{0005}SummaryInformation"])
-            && let Ok(props) = parse_property_stream(&data) {
+            && let Ok(props) = parse_property_stream(&data)
+        {
             extract_summary_info(&mut metadata, &props);
         }
 
         // Try to parse DocumentSummaryInformation stream
         if let Ok(data) = self.open_stream(&["\u{0005}DocumentSummaryInformation"])
-            && let Ok(props) = parse_property_stream(&data) {
+            && let Ok(props) = parse_property_stream(&data)
+        {
             extract_document_summary_info(&mut metadata, &props);
         }
 
@@ -76,25 +78,26 @@ impl<R: Read + Seek> OleFile<R> {
     }
 }
 
-
 /// Convert a FILETIME property value to Rust Date
-/// 
-/// The FILETIME structure is a 64-bit value that represents the number of 100-nanosecond intervals 
+///
+/// The FILETIME structure is a 64-bit value that represents the number of 100-nanosecond intervals
 /// that have elapsed since January 1, 1601, Coordinated Universal Time (UTC).
 #[inline]
 fn filetime_to_date(filetime: u64) -> Option<DateTime<Utc>> {
     // Number of 100-nanosecond intervals between 1601-01-01 and 1970-01-01
     const EPOCH_DIFF: i64 = 116_444_736_000_000_000;
     let doc_epoch = i64::try_from(filetime).ok()?;
-    Some(DateTime::from_timestamp_nanos((doc_epoch - EPOCH_DIFF) * 100))
+    Some(DateTime::from_timestamp_nanos(
+        (doc_epoch - EPOCH_DIFF) * 100,
+    ))
 }
 
 /// Convert a FILETIME property value to Rust duration
-/// 
+///
 /// It is like [filetime_to_date], but the result is a duration instead of a date.
 #[inline]
 fn filetime_to_duration(filetime: u64) -> Option<Duration> {
-    let nanos= filetime * 100;
+    let nanos = filetime * 100;
     Some(Duration::nanoseconds(i64::try_from(nanos).ok()?))
 }
 
@@ -183,7 +186,7 @@ fn parse_property_value(
                 .map(|v| v.get())
                 .unwrap_or(0);
             Ok(PropertyValue::I2(value))
-        }
+        },
         VT_I4 | VT_INT | VT_ERROR => {
             // 32-bit signed integer
             if offset + 4 > data.len() {
@@ -193,7 +196,7 @@ fn parse_property_value(
                 .map(|v| v.get())
                 .unwrap_or(0);
             Ok(PropertyValue::I4(value))
-        }
+        },
         VT_UI2 => {
             // 16-bit unsigned integer
             if offset + 2 > data.len() {
@@ -203,7 +206,7 @@ fn parse_property_value(
                 .map(|v| v.get())
                 .unwrap_or(0);
             Ok(PropertyValue::UI2(value))
-        }
+        },
         VT_UI4 | VT_UINT => {
             // 32-bit unsigned integer
             if offset + 4 > data.len() {
@@ -213,7 +216,7 @@ fn parse_property_value(
                 .map(|v| v.get())
                 .unwrap_or(0);
             Ok(PropertyValue::UI4(value))
-        }
+        },
         VT_LPSTR | VT_BSTR => {
             // Code page string
             if offset + 4 > data.len() {
@@ -231,7 +234,7 @@ fn parse_property_value(
             // Store raw bytes - will be decoded later with proper codepage
             let raw_bytes = str_bytes.to_vec();
             Ok(PropertyValue::Lpstr(raw_bytes))
-        }
+        },
         VT_LPWSTR => {
             // Unicode string (UTF-16LE)
             if offset + 4 > data.len() {
@@ -261,7 +264,7 @@ fn parse_property_value(
 
             let s = String::from_utf16_lossy(&utf16_chars);
             Ok(PropertyValue::Lpwstr(s))
-        }
+        },
         VT_FILETIME => {
             // 64-bit file time
             if offset + 8 > data.len() {
@@ -275,7 +278,7 @@ fn parse_property_value(
                 .unwrap_or(0);
             let filetime = low | (high << 32);
             Ok(PropertyValue::Filetime(filetime))
-        }
+        },
         VT_BOOL => {
             // Boolean (16-bit)
             if offset + 2 > data.len() {
@@ -285,7 +288,7 @@ fn parse_property_value(
                 .map(|v| v.get())
                 .unwrap_or(0);
             Ok(PropertyValue::Bool(value != 0))
-        }
+        },
         VT_BLOB => {
             // Binary data
             if offset + 4 > data.len() {
@@ -301,17 +304,17 @@ fn parse_property_value(
 
             let blob = data[offset + 4..offset + 4 + blob_len].to_vec();
             Ok(PropertyValue::Blob(blob))
-        }
+        },
         VT_EMPTY | VT_NULL => Ok(PropertyValue::Empty),
         _ => {
             // Unsupported type
             Ok(PropertyValue::Empty)
-        }
+        },
     }
 }
 
 /// Extract SummaryInformation properties into metadata
-/// 
+///
 /// See [this document](https://learn.microsoft.com/en-us/openspecs/windows_protocols/MS-OLEPS/f7933d28-2cc4-4b36-bc23-8861cbcd37c4)
 /// for your information.
 fn extract_summary_info(metadata: &mut OleMetadata, props: &HashMap<u32, PropertyValue>) {
@@ -412,7 +415,7 @@ fn extract_summary_info(metadata: &mut OleMetadata, props: &HashMap<u32, Propert
 }
 
 /// Extract DocumentSummaryInformation properties into metadata
-/// 
+///
 /// See [this document](https://learn.microsoft.com/en-us/windows/win32/stg/the-documentsummaryinformation-and-userdefined-property-sets)
 /// for your information.
 fn extract_document_summary_info(metadata: &mut OleMetadata, props: &HashMap<u32, PropertyValue>) {
@@ -441,25 +444,29 @@ fn extract_document_summary_info(metadata: &mut OleMetadata, props: &HashMap<u32
 }
 
 /// Decode ANSI string bytes to UTF-8 using the specified codepage
-/// 
+///
 /// Return `None` if the encoding is not supported.
-/// 
+///
 /// The full code page list is [here](https://learn.microsoft.com/en-us/windows/win32/intl/code-page-identifiers).
 fn decode_ansi_string(bytes: &[u8], codepage: Option<u32>) -> Option<String> {
     // Remove null terminators
-    let bytes = bytes.iter().take_while(|&&b| b != 0).cloned().collect::<Vec<_>>();
+    let bytes = bytes
+        .iter()
+        .take_while(|&&b| b != 0)
+        .cloned()
+        .collect::<Vec<_>>();
 
     // Try to detect the encoding from codepage
     let encoding = match codepage {
         Some(cp) => {
             // Try to find the encoding by codepage number
             match cp {
-                437 => encoding_rs::IBM866, // IBM866
-                874 => encoding_rs::WINDOWS_874, // Thai
-                932 => encoding_rs::SHIFT_JIS, // Japanese
-                936 => encoding_rs::GBK, // GB2312/GBK (Chinese)
-                949 => encoding_rs::EUC_KR, // Korean
-                950 => encoding_rs::BIG5, // Big5 (Traditional Chinese)
+                437 => encoding_rs::IBM866,        // IBM866
+                874 => encoding_rs::WINDOWS_874,   // Thai
+                932 => encoding_rs::SHIFT_JIS,     // Japanese
+                936 => encoding_rs::GBK,           // GB2312/GBK (Chinese)
+                949 => encoding_rs::EUC_KR,        // Korean
+                950 => encoding_rs::BIG5,          // Big5 (Traditional Chinese)
                 1250 => encoding_rs::WINDOWS_1250, // Windows-1250 (Central European)
                 1251 => encoding_rs::WINDOWS_1251, // Windows-1251 (Cyrillic)
                 1252 => encoding_rs::WINDOWS_1252, // Windows-1252 (Western European)
@@ -469,22 +476,26 @@ fn decode_ansi_string(bytes: &[u8], codepage: Option<u32>) -> Option<String> {
                 1256 => encoding_rs::WINDOWS_1256, // Windows-1256 (Arabic)
                 1257 => encoding_rs::WINDOWS_1257, // Windows-1257 (Baltic)
                 1258 => encoding_rs::WINDOWS_1258, // Windows-1258 (Vietnamese)
-                10000 => encoding_rs::MACINTOSH, // Macintosh Roman
-                20932 => encoding_rs::EUC_JP, // Japanese
-                28592 => encoding_rs::ISO_8859_2, // Latin 2 (Latin 2)
-                28593 => encoding_rs::ISO_8859_3, // Latin 3 (Latin 3)
-                28594 => encoding_rs::ISO_8859_4, // Latin 4 (Latin 4)
-                28595 => encoding_rs::ISO_8859_5, // Cyrillic (Cyrillic)
-                28596 => encoding_rs::ISO_8859_6, // Arabic (Arabic)
-                28597 => encoding_rs::ISO_8859_7, // Greek (Greek)
-                28598 => encoding_rs::ISO_8859_8, // Hebrew (Hebrew)
+                10000 => encoding_rs::MACINTOSH,   // Macintosh Roman
+                20932 => encoding_rs::EUC_JP,      // Japanese
+                28592 => encoding_rs::ISO_8859_2,  // Latin 2 (Latin 2)
+                28593 => encoding_rs::ISO_8859_3,  // Latin 3 (Latin 3)
+                28594 => encoding_rs::ISO_8859_4,  // Latin 4 (Latin 4)
+                28595 => encoding_rs::ISO_8859_5,  // Cyrillic (Cyrillic)
+                28596 => encoding_rs::ISO_8859_6,  // Arabic (Arabic)
+                28597 => encoding_rs::ISO_8859_7,  // Greek (Greek)
+                28598 => encoding_rs::ISO_8859_8,  // Hebrew (Hebrew)
                 28605 => encoding_rs::ISO_8859_15, // Latin 9 (Latin 9)
-                54936 => encoding_rs::GB18030, // GB18030 (Chinese)
+                54936 => encoding_rs::GB18030,     // GB18030 (Chinese)
                 65001 => encoding_rs::UTF_8,
-                _ => { return None; },
+                _ => {
+                    return None;
+                },
             }
-        }
-        None => { return None; },
+        },
+        None => {
+            return None;
+        },
     };
 
     // Decode the bytes using the determined encoding
@@ -500,14 +511,14 @@ fn extract_string(value: &PropertyValue, codepage: Option<u32>) -> Option<String
             } else {
                 decode_ansi_string(bytes, codepage)
             }
-        }
+        },
         PropertyValue::Lpwstr(s) => {
             if s.is_empty() {
                 None
             } else {
                 Some(s.clone())
             }
-        }
+        },
         _ => None,
     }
 }

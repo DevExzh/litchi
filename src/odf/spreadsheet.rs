@@ -3,8 +3,8 @@
 //! This module provides a unified API for working with OpenDocument spreadsheets,
 //! equivalent to Microsoft Excel spreadsheets.
 
-use crate::common::{Error, Result, Metadata};
-use crate::odf::core::{Content, Meta, Package, Styles, Manifest};
+use crate::common::{Error, Metadata, Result};
+use crate::odf::core::{Content, Manifest, Meta, Package, Styles};
 use std::io::Cursor;
 use std::path::Path;
 
@@ -72,7 +72,8 @@ impl Spreadsheet {
         let mime_type = package.mimetype();
         if !mime_type.contains("opendocument.spreadsheet") {
             return Err(Error::InvalidFormat(format!(
-                "Not an ODS file: MIME type is {}", mime_type
+                "Not an ODS file: MIME type is {}",
+                mime_type
             )));
         }
 
@@ -118,8 +119,8 @@ impl Spreadsheet {
         let content_bytes = self._package.get_file("content.xml")?;
         let content = Content::from_bytes(&content_bytes)?;
 
-        use quick_xml::events::Event;
         use quick_xml::Reader;
+        use quick_xml::events::Event;
 
         let mut reader = Reader::from_str(content.xml_content());
         let mut buf = Vec::new();
@@ -134,48 +135,46 @@ impl Spreadsheet {
 
         loop {
             match reader.read_event_into(&mut buf) {
-                Ok(Event::Start(ref e)) => {
-                    match e.name().as_ref() {
-                        b"table:table" => {
-                            let name = Self::extract_table_name(e)?;
-                            current_sheet = Some(SheetBuilder::new(name));
+                Ok(Event::Start(ref e)) => match e.name().as_ref() {
+                    b"table:table" => {
+                        let name = Self::extract_table_name(e)?;
+                        current_sheet = Some(SheetBuilder::new(name));
+                    },
+                    b"table:table-row" => {
+                        if current_sheet.is_some() {
+                            current_row = Some(RowBuilder::new());
                         }
-                        b"table:table-row" => {
-                            if current_sheet.is_some() {
-                                current_row = Some(RowBuilder::new());
-                            }
+                    },
+                    b"table:table-cell" => {
+                        if current_row.is_some() {
+                            let cell_builder = Self::parse_cell_attributes(e)?;
+                            current_cell = Some(cell_builder);
+                            text_content.clear();
                         }
-                        b"table:table-cell" => {
-                            if current_row.is_some() {
-                                let cell_builder = Self::parse_cell_attributes(e)?;
-                                current_cell = Some(cell_builder);
+                    },
+                    b"text:p" | b"text:span" => {
+                        if current_cell.is_some() {
+                            in_text_element = true;
+                            if e.name().as_ref() == b"text:p" {
                                 text_content.clear();
                             }
                         }
-                        b"text:p" | b"text:span" => {
-                            if current_cell.is_some() {
-                                in_text_element = true;
-                                if e.name().as_ref() == b"text:p" {
-                                    text_content.clear();
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
+                    },
+                    _ => {},
+                },
                 Ok(Event::Text(ref t)) => {
                     if in_text_element && current_cell.is_some() {
                         let text = String::from_utf8(t.to_vec()).unwrap_or_default();
                         text_content.push_str(&text);
                     }
-                }
+                },
                 Ok(Event::End(ref e)) => {
                     match e.name().as_ref() {
                         b"text:p" | b"text:span" => {
                             if in_text_element {
                                 in_text_element = false;
                             }
-                        }
+                        },
                         b"table:table-cell" => {
                             if let Some(cell_builder) = current_cell.take() {
                                 let repeated = cell_builder.repeated;
@@ -187,7 +186,7 @@ impl Spreadsheet {
                                     }
                                 }
                             }
-                        }
+                        },
                         b"table:table-row" => {
                             if let Some(row_builder) = current_row.take() {
                                 let row = row_builder.build();
@@ -195,19 +194,24 @@ impl Spreadsheet {
                                     sheet_builder.add_row(row);
                                 }
                             }
-                        }
+                        },
                         b"table:table" => {
                             if let Some(sheet_builder) = current_sheet.take() {
                                 let sheet = sheet_builder.build();
                                 sheets.push(sheet);
                             }
-                        }
-                        _ => {}
+                        },
+                        _ => {},
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
-                Err(e) => return Err(crate::common::Error::InvalidFormat(format!("XML parsing error: {}", e))),
-                _ => {}
+                Err(e) => {
+                    return Err(crate::common::Error::InvalidFormat(format!(
+                        "XML parsing error: {}",
+                        e
+                    )));
+                },
+                _ => {},
             }
             buf.clear();
         }
@@ -218,10 +222,13 @@ impl Spreadsheet {
     /// Extract table name from table:table element
     fn extract_table_name(e: &quick_xml::events::BytesStart) -> Result<String> {
         for attr_result in e.attributes() {
-            let attr = attr_result.map_err(|_| crate::common::Error::InvalidFormat("Invalid attribute".to_string()))?;
+            let attr = attr_result.map_err(|_| {
+                crate::common::Error::InvalidFormat("Invalid attribute".to_string())
+            })?;
             if attr.key.as_ref() == b"table:name" {
-                return String::from_utf8(attr.value.to_vec())
-                    .map_err(|_| crate::common::Error::InvalidFormat("Invalid UTF-8 in table name".to_string()));
+                return String::from_utf8(attr.value.to_vec()).map_err(|_| {
+                    crate::common::Error::InvalidFormat("Invalid UTF-8 in table name".to_string())
+                });
             }
         }
         Ok("Sheet1".to_string()) // Default name
@@ -236,32 +243,41 @@ impl Spreadsheet {
         let mut repeated = 1;
 
         for attr_result in e.attributes() {
-            let attr = attr_result.map_err(|_| crate::common::Error::InvalidFormat("Invalid attribute".to_string()))?;
+            let attr = attr_result.map_err(|_| {
+                crate::common::Error::InvalidFormat("Invalid attribute".to_string())
+            })?;
             match attr.key.as_ref() {
                 b"office:value-type" => {
-                    value_type = Some(String::from_utf8(attr.value.to_vec())
-                        .map_err(|_| crate::common::Error::InvalidFormat("Invalid UTF-8".to_string()))?);
-                }
+                    value_type = Some(String::from_utf8(attr.value.to_vec()).map_err(|_| {
+                        crate::common::Error::InvalidFormat("Invalid UTF-8".to_string())
+                    })?);
+                },
                 b"office:value" => {
-                    value_str = Some(String::from_utf8(attr.value.to_vec())
-                        .map_err(|_| crate::common::Error::InvalidFormat("Invalid UTF-8".to_string()))?);
-                }
+                    value_str = Some(String::from_utf8(attr.value.to_vec()).map_err(|_| {
+                        crate::common::Error::InvalidFormat("Invalid UTF-8".to_string())
+                    })?);
+                },
                 b"office:currency" => {
-                    currency = Some(String::from_utf8(attr.value.to_vec())
-                        .map_err(|_| crate::common::Error::InvalidFormat("Invalid UTF-8".to_string()))?);
-                }
+                    currency = Some(String::from_utf8(attr.value.to_vec()).map_err(|_| {
+                        crate::common::Error::InvalidFormat("Invalid UTF-8".to_string())
+                    })?);
+                },
                 b"table:formula" => {
-                    formula = Some(String::from_utf8(attr.value.to_vec())
-                        .map_err(|_| crate::common::Error::InvalidFormat("Invalid UTF-8".to_string()))?);
-                }
+                    formula = Some(String::from_utf8(attr.value.to_vec()).map_err(|_| {
+                        crate::common::Error::InvalidFormat("Invalid UTF-8".to_string())
+                    })?);
+                },
                 b"table:number-columns-repeated" => {
                     if let Ok(rep) = String::from_utf8(attr.value.to_vec())
-                        .map_err(|_| crate::common::Error::InvalidFormat("Invalid UTF-8".to_string()))?
-                        .parse::<usize>() {
+                        .map_err(|_| {
+                            crate::common::Error::InvalidFormat("Invalid UTF-8".to_string())
+                        })?
+                        .parse::<usize>()
+                    {
                         repeated = rep;
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
 
@@ -326,7 +342,10 @@ impl Spreadsheet {
 
                     // Escape CSV special characters and wrap in quotes if needed
                     let cell_text = &cell.text;
-                    if cell_text.contains(',') || cell_text.contains('"') || cell_text.contains('\n') {
+                    if cell_text.contains(',')
+                        || cell_text.contains('"')
+                        || cell_text.contains('\n')
+                    {
                         let escaped = cell_text.replace('"', "\"\"");
                         csv_output.push('"');
                         csv_output.push_str(&escaped);
@@ -376,7 +395,9 @@ impl Sheet {
 
     /// Get the number of columns in the sheet
     pub fn column_count(&self) -> Result<usize> {
-        let max_cols = self.rows.iter()
+        let max_cols = self
+            .rows
+            .iter()
             .map(|row| row.cells.len())
             .max()
             .unwrap_or(0);
@@ -451,9 +472,7 @@ struct RowBuilder {
 
 impl RowBuilder {
     fn new() -> Self {
-        Self {
-            cells: Vec::new(),
-        }
+        Self { cells: Vec::new() }
     }
 
     fn add_cell(&mut self, mut cell: Cell) {
@@ -509,11 +528,12 @@ impl CellBuilder {
                 } else {
                     CellValue::Text(text_content.to_string())
                 }
-            }
+            },
             Some("currency") => {
                 if let Some(ref val_str) = self.value_str {
                     if let Ok(num) = val_str.parse::<f64>() {
-                        let currency_code = self.currency.clone().unwrap_or_else(|| "USD".to_string());
+                        let currency_code =
+                            self.currency.clone().unwrap_or_else(|| "USD".to_string());
                         CellValue::Currency(num, currency_code)
                     } else {
                         CellValue::Text(text_content.to_string())
@@ -521,7 +541,7 @@ impl CellBuilder {
                 } else {
                     CellValue::Text(text_content.to_string())
                 }
-            }
+            },
             Some("percentage") => {
                 if let Some(ref val_str) = self.value_str {
                     if let Ok(num) = val_str.parse::<f64>() {
@@ -532,7 +552,7 @@ impl CellBuilder {
                 } else {
                     CellValue::Text(text_content.to_string())
                 }
-            }
+            },
             Some("boolean") => {
                 if let Some(ref val_str) = self.value_str {
                     match val_str.as_str() {
@@ -543,28 +563,28 @@ impl CellBuilder {
                 } else {
                     CellValue::Text(text_content.to_string())
                 }
-            }
+            },
             Some("date") => {
                 if let Some(ref val_str) = self.value_str {
                     CellValue::Date(val_str.clone())
                 } else {
                     CellValue::Text(text_content.to_string())
                 }
-            }
+            },
             Some("time") => {
                 if let Some(ref val_str) = self.value_str {
                     CellValue::Time(val_str.clone())
                 } else {
                     CellValue::Text(text_content.to_string())
                 }
-            }
+            },
             _ => {
                 if text_content.trim().is_empty() {
                     CellValue::Empty
                 } else {
                     CellValue::Text(text_content.to_string())
                 }
-            }
+            },
         }
     }
 }

@@ -204,11 +204,7 @@ impl EmfHeader {
     pub fn aspect_ratio(&self) -> f64 {
         let w = self.width() as f64;
         let h = self.height() as f64;
-        if h == 0.0 {
-            1.0
-        } else {
-            w / h
-        }
+        if h == 0.0 { 1.0 } else { w / h }
     }
 }
 
@@ -300,7 +296,7 @@ impl EmfParser {
                     }
                     records.push(record);
                     offset += consumed;
-                }
+                },
                 Err(_) => break,
             }
         }
@@ -341,4 +337,3 @@ mod tests {
         assert_eq!(0x464D4520u32.to_le_bytes(), [0x20, 0x45, 0x4D, 0x46]);
     }
 }
-

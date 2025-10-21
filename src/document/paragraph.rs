@@ -1,7 +1,7 @@
 //! Paragraph implementation for Word documents.
 
-use crate::common::{Error, Result};
 use super::Run;
+use crate::common::{Error, Result};
 
 #[cfg(feature = "ole")]
 use crate::ole;
@@ -39,19 +39,18 @@ impl Paragraph {
             Paragraph::Doc(p) => {
                 let runs = p.runs().map_err(Error::from)?;
                 Ok(runs.into_iter().map(Run::Doc).collect())
-            }
+            },
             #[cfg(feature = "ooxml")]
             Paragraph::Docx(p) => {
                 let runs = p.runs().map_err(Error::from)?;
                 Ok(runs.into_iter().map(Run::Docx).collect())
-            }
+            },
             #[cfg(feature = "iwa")]
             Paragraph::Pages(text) => {
                 // Pages paragraphs are simple strings without run-level formatting
                 // Return a single run with the entire text
                 Ok(vec![Run::Pages(text.clone())])
-            }
+            },
         }
     }
 }
-

@@ -48,7 +48,7 @@ static SUPERSCRIPT_MAP: phf::Map<char, char> = phf_map! {
     '7' => '⁷',
     '8' => '⁸',
     '9' => '⁹',
-    
+
     // Latin lowercase letters
     'a' => 'ᵃ',
     'b' => 'ᵇ',
@@ -75,7 +75,7 @@ static SUPERSCRIPT_MAP: phf::Map<char, char> = phf_map! {
     'x' => 'ˣ',
     'y' => 'ʸ',
     'z' => 'ᶻ',
-    
+
     // Latin uppercase letters (limited support in Unicode)
     'A' => 'ᴬ',
     'B' => 'ᴮ',
@@ -96,14 +96,14 @@ static SUPERSCRIPT_MAP: phf::Map<char, char> = phf_map! {
     'U' => 'ᵁ',
     'V' => 'ᵛ',
     'W' => 'ᵂ',
-    
+
     // Greek letters
     'β' => 'ᵝ',
     'γ' => 'ᵞ',
     'δ' => 'ᵟ',
     'φ' => 'ᵠ',
     'χ' => 'ᵡ',
-    
+
     // Symbols
     '+' => '⁺',
     '-' => '⁻',
@@ -128,7 +128,7 @@ static SUBSCRIPT_MAP: phf::Map<char, char> = phf_map! {
     '7' => '₇',
     '8' => '₈',
     '9' => '₉',
-    
+
     // Latin lowercase letters (limited support)
     'a' => 'ₐ',
     'e' => 'ₑ',
@@ -147,14 +147,14 @@ static SUBSCRIPT_MAP: phf::Map<char, char> = phf_map! {
     'u' => 'ᵤ',
     'v' => 'ᵥ',
     'x' => 'ₓ',
-    
+
     // Greek letters
     'β' => 'ᵦ',
     'γ' => 'ᵧ',
     'ρ' => 'ᵨ',
     'φ' => 'ᵩ',
     'χ' => 'ᵪ',
-    
+
     // Symbols
     '+' => '₊',
     '-' => '₋',
@@ -239,11 +239,11 @@ pub fn to_subscript(c: char) -> Option<char> {
 pub fn convert_to_superscript(text: &str) -> String {
     // Pre-allocate with same capacity as input (superscript chars are same byte size or larger)
     let mut result = String::with_capacity(text.len() * 2);
-    
+
     for c in text.chars() {
         result.push(to_superscript(c).unwrap_or(c));
     }
-    
+
     result
 }
 
@@ -274,11 +274,11 @@ pub fn convert_to_superscript(text: &str) -> String {
 pub fn convert_to_subscript(text: &str) -> String {
     // Pre-allocate with same capacity as input (subscript chars are same byte size or larger)
     let mut result = String::with_capacity(text.len() * 2);
-    
+
     for c in text.chars() {
         result.push(to_subscript(c).unwrap_or(c));
     }
-    
+
     result
 }
 
@@ -383,9 +383,8 @@ mod tests {
         assert!(can_convert_to_superscript("123"));
         assert!(can_convert_to_superscript("n+1"));
         assert!(!can_convert_to_superscript("query"));
-        
+
         assert!(can_convert_to_subscript("123"));
         assert!(!can_convert_to_subscript("abc"));
     }
 }
-

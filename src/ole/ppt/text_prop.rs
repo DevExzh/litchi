@@ -2,7 +2,7 @@
 ///
 /// Based on Apache POI's TextPropCollection and TextProp classes.
 /// This module handles the complex structure of text styling in PPT files.
-use crate::common::binary::{read_u16_le, read_i32_le, read_u32_le, read_i16_le};
+use crate::common::binary::{read_i16_le, read_i32_le, read_u16_le, read_u32_le};
 
 /// Text property definition.
 ///
@@ -89,8 +89,8 @@ pub fn parse_paragraph_properties(data: &[u8], offset: &mut usize, mask: u32) ->
         ("linespacing", 2, 0x1000),
         ("spacebefore", 2, 0x2000),
         ("spaceafter", 2, 0x4000),
-        ("text.offset", 2, 0x0100),    // left margin
-        ("bullet.offset", 2, 0x0400),   // indent
+        ("text.offset", 2, 0x0100),   // left margin
+        ("bullet.offset", 2, 0x0400), // indent
         ("defaultTabSize", 2, 0x8000),
         ("textDirection", 2, 0x200000),
     ];
@@ -126,7 +126,7 @@ pub fn parse_character_properties(data: &[u8], offset: &mut usize, mask: u32) ->
 
     // Character property definitions (from POI's TextPropCollection)
     let prop_defs = [
-        ("char.flags", 2, 0x0001),        // bold, italic, underline, etc.
+        ("char.flags", 2, 0x0001), // bold, italic, underline, etc.
         ("font.index", 2, 0x10000),
         ("asian.font.index", 2, 0x200000),
         ("ansi.font.index", 2, 0x400000),
@@ -163,7 +163,10 @@ pub fn parse_character_properties(data: &[u8], offset: &mut usize, mask: u32) ->
 ///
 /// Based on Apache POI's StyleTextPropAtom parsing logic.
 /// Returns (paragraph_styles, character_styles).
-pub fn parse_style_text_prop_atom(data: &[u8], text_length: usize) -> (Vec<TextPropCollection>, Vec<TextPropCollection>) {
+pub fn parse_style_text_prop_atom(
+    data: &[u8],
+    text_length: usize,
+) -> (Vec<TextPropCollection>, Vec<TextPropCollection>) {
     let mut paragraph_styles = Vec::new();
     let mut character_styles = Vec::new();
 
@@ -284,4 +287,3 @@ mod tests {
         assert!(!underline);
     }
 }
-

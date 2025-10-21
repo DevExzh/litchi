@@ -1,4 +1,4 @@
-use crate::formula::ast::{MathNode, Fence, LargeOperator, AccentType, MatrixFence};
+use crate::formula::ast::{AccentType, Fence, LargeOperator, MathNode, MatrixFence};
 
 /// Element types in OMML
 ///
@@ -359,8 +359,16 @@ impl<'arena> ElementContext<'arena> {
             + self.post_scripts.len()
             + self.spacing_nodes.len()
             + self.matrix_cells.len()
-            + self.eq_array_rows.iter().map(|row| row.len()).sum::<usize>()
-            + self.matrix_rows.iter().map(|row| row.iter().map(|cell| cell.len()).sum::<usize>()).sum::<usize>()
+            + self
+                .eq_array_rows
+                .iter()
+                .map(|row| row.len())
+                .sum::<usize>()
+            + self
+                .matrix_rows
+                .iter()
+                .map(|row| row.iter().map(|cell| cell.len()).sum::<usize>())
+                .sum::<usize>()
     }
 
     /// Reserve capacity for expected number of children
@@ -423,4 +431,3 @@ impl<'arena> ElementContext<'arena> {
         )
     }
 }
-

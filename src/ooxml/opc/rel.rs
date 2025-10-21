@@ -231,7 +231,7 @@ impl Relationships {
             match num.cmp(&next_num) {
                 std::cmp::Ordering::Equal => next_num += 1,
                 std::cmp::Ordering::Greater => break,
-                std::cmp::Ordering::Less => {}
+                std::cmp::Ordering::Less => {},
             }
         }
 

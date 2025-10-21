@@ -1,9 +1,9 @@
-mod operators;
-mod templates;
-mod matrix;
-mod symbols;
-mod utils;
 mod conv;
+mod matrix;
+mod operators;
+mod symbols;
+mod templates;
+mod utils;
 
 pub use conv::converter::LatexConverter;
 pub use conv::error::LatexError;

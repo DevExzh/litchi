@@ -7,10 +7,10 @@
 //! (characters, templates, lines, etc.) and building a linked list of objects
 //! that can be converted to AST nodes.
 
-use crate::formula::mtef::constants::*;
 use super::objects::*;
 use crate::formula::mtef::MtefError;
-use zerocopy::{FromBytes, LE, I16, U16};
+use crate::formula::mtef::constants::*;
+use zerocopy::{FromBytes, I16, LE, U16};
 
 /// Binary MTEF parser
 ///
@@ -73,21 +73,29 @@ impl<'arena> MtefBinaryParser<'arena> {
     /// Create a new MTEF binary parser
     pub fn new(arena: &'arena bumpalo::Bump, data: &'arena [u8]) -> Result<Self, MtefError> {
         if data.len() < 28 {
-            return Err(MtefError::InvalidFormat("Data too short for OLE header".to_string()));
+            return Err(MtefError::InvalidFormat(
+                "Data too short for OLE header".to_string(),
+            ));
         }
 
         // Parse OLE header manually for better compatibility
         // Read fields in little-endian order
         let cb_hdr = u16::from_le_bytes([data[0], data[1]]);
         let version = u32::from_le_bytes([data[2], data[3], data[4], data[5]]);
-        
+
         if cb_hdr != 28 {
-            return Err(MtefError::InvalidFormat(format!("Invalid OLE header length: {}", cb_hdr)));
+            return Err(MtefError::InvalidFormat(format!(
+                "Invalid OLE header length: {}",
+                cb_hdr
+            )));
         }
 
         // Accept both 0x00020000 and 0x00000200 as valid versions (observed in real files)
         if version != 0x00020000 && version != 0x00000200 {
-            return Err(MtefError::InvalidFormat(format!("Invalid OLE version: 0x{:08X}", version)));
+            return Err(MtefError::InvalidFormat(format!(
+                "Invalid OLE version: 0x{:08X}",
+                version
+            )));
         }
 
         // Note: The clipboard format can vary (0xC2D3, 0xC1B0, 0xC1E1, 0xC1AE, etc.)
@@ -117,11 +125,11 @@ impl<'arena> MtefBinaryParser<'arena> {
 
         // Check if we have the full MTEF signature "(\x04mt" (0x28 0x04 0x6D 0x74)
         // or if this is a headerless/embedded format that starts directly with the version
-        let has_signature = self.pos + 4 <= self.data.len() &&
-                           self.data[self.pos] == 0x28 &&
-                           self.data[self.pos + 1] == 0x04 &&
-                           self.data[self.pos + 2] == 0x6D &&
-                           self.data[self.pos + 3] == 0x74;
+        let has_signature = self.pos + 4 <= self.data.len()
+            && self.data[self.pos] == 0x28
+            && self.data[self.pos + 1] == 0x04
+            && self.data[self.pos + 2] == 0x6D
+            && self.data[self.pos + 3] == 0x74;
 
         if has_signature {
             // Full format with signature
@@ -141,19 +149,19 @@ impl<'arena> MtefBinaryParser<'arena> {
                 self.product = 0;
                 self.version = 0;
                 self.version_sub = 0;
-            }
+            },
             1 | 101 => {
                 self.platform = if self.mtef_version == 101 { 1 } else { 0 };
                 self.product = 0;
                 self.version = 1;
                 self.version_sub = 0;
-            }
+            },
             2..=4 => {
                 self.platform = self.read_u8()?;
                 self.product = self.read_u8()?;
                 self.version = self.read_u8()?;
                 self.version_sub = self.read_u8()?;
-            }
+            },
             5 => {
                 self.platform = self.read_u8()?;
                 self.product = self.read_u8()?;
@@ -170,10 +178,13 @@ impl<'arena> MtefBinaryParser<'arena> {
                 self.pos += 1; // Skip null terminator
 
                 self.inline = self.read_u8()?;
-            }
+            },
             _ => {
-                return Err(MtefError::InvalidFormat(format!("Unsupported MTEF version: {}", self.mtef_version)));
-            }
+                return Err(MtefError::InvalidFormat(format!(
+                    "Unsupported MTEF version: {}",
+                    self.mtef_version
+                )));
+            },
         }
 
         Ok(())
@@ -190,7 +201,10 @@ impl<'arena> MtefBinaryParser<'arena> {
         }
     }
 
-    fn parse_object_list(&mut self, num_objs: usize) -> Result<Option<Box<MtefObjectList>>, MtefError> {
+    fn parse_object_list(
+        &mut self,
+        num_objs: usize,
+    ) -> Result<Option<Box<MtefObjectList>>, MtefError> {
         let mut head: Option<Box<MtefObjectList>> = None;
         let mut curr: Option<*mut MtefObjectList> = None;
         let mut tally = 0;
@@ -296,52 +310,54 @@ impl<'arena> MtefBinaryParser<'arena> {
                     Err(MtefError::UnexpectedEof) => break,
                     Err(e) => return Err(e),
                 },
-                MtefRecordType::Size | MtefRecordType::Full | MtefRecordType::Sub |
-                MtefRecordType::Sub2 | MtefRecordType::Sym | MtefRecordType::SubSym => {
-                    match self.parse_size() {
-                        Ok(obj) => Some(Box::new(obj)),
-                        Err(MtefError::UnexpectedEof) => break,
-                        Err(e) => return Err(e),
-                    }
-                }
+                MtefRecordType::Size
+                | MtefRecordType::Full
+                | MtefRecordType::Sub
+                | MtefRecordType::Sub2
+                | MtefRecordType::Sym
+                | MtefRecordType::SubSym => match self.parse_size() {
+                    Ok(obj) => Some(Box::new(obj)),
+                    Err(MtefError::UnexpectedEof) => break,
+                    Err(e) => return Err(e),
+                },
                 MtefRecordType::ColorDef => {
                     // Skip color definition - just skip the tag
                     if self.pos < self.data.len() {
                         self.pos += 1;
                     }
                     None
-                }
+                },
                 MtefRecordType::FontDef => {
                     if self.skip_font_def().is_err() {
                         break; // EOF hit
                     }
                     None
-                }
+                },
                 MtefRecordType::EqnPrefs => {
                     if self.skip_eqn_prefs().is_err() {
                         break; // EOF hit
                     }
                     None
-                }
+                },
                 MtefRecordType::EncodingDef => {
                     if self.skip_encoding_def().is_err() {
                         break; // EOF hit
                     }
                     None
-                }
+                },
                 MtefRecordType::Future => {
                     if self.skip_future_record().is_err() {
                         break; // EOF hit
                     }
                     None
-                }
+                },
                 _ => {
                     // Unknown record type - skip it
                     if self.skip_unknown_record().is_err() {
                         break; // EOF hit
                     }
                     None
-                }
+                },
             };
 
             // Only create a node if we have an object
@@ -362,7 +378,7 @@ impl<'arena> MtefBinaryParser<'arena> {
                     None => {
                         head = Some(new_node);
                         curr = head.as_mut().map(|n| n.as_mut() as *mut _);
-                    }
+                    },
                 }
 
                 tally += 1;
@@ -394,7 +410,8 @@ impl<'arena> MtefBinaryParser<'arena> {
 
         if self.mtef_version < 5 {
             character = self.read_u8()? as u16;
-            if self.platform == 1 { // PLATFORM_WIN
+            if self.platform == 1 {
+                // PLATFORM_WIN
                 character |= (self.read_u8()? as u16) << 8;
             }
         } else {
@@ -645,7 +662,7 @@ impl<'arena> MtefBinaryParser<'arena> {
                 None => {
                     head = Some(new_tabstop);
                     curr = head.as_mut().map(|n| n.as_mut() as *mut _);
-                }
+                },
             }
         }
 

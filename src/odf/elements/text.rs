@@ -29,7 +29,9 @@ impl Paragraph {
     /// Create paragraph from element
     pub fn from_element(element: Element) -> Result<Self> {
         if element.tag_name() != "text:p" {
-            return Err(Error::InvalidFormat("Element is not a paragraph".to_string()));
+            return Err(Error::InvalidFormat(
+                "Element is not a paragraph".to_string(),
+            ));
         }
         Ok(Self { element })
     }
@@ -50,7 +52,9 @@ impl Paragraph {
         for child in self.element.children() {
             if child.tag_name() == "text:span" {
                 // This is a simplified conversion - in practice you'd need proper downcasting
-                if let Ok(span) = Span::from_element(unsafe { &*(child as *const _ as *const Element) }.clone()) {
+                if let Ok(span) =
+                    Span::from_element(unsafe { &*(child as *const _ as *const Element) }.clone())
+                {
                     spans.push(span);
                 }
             }
@@ -174,12 +178,15 @@ impl Heading {
 
     /// Get the outline level
     pub fn level(&self) -> Option<u8> {
-        self.element.get_int_attribute("text:outline-level").map(|n| n as u8)
+        self.element
+            .get_int_attribute("text:outline-level")
+            .map(|n| n as u8)
     }
 
     /// Set the outline level
     pub fn set_level(&mut self, level: u8) {
-        self.element.set_attribute("text:outline-level", &level.to_string());
+        self.element
+            .set_attribute("text:outline-level", &level.to_string());
     }
 
     /// Get the style name
@@ -237,9 +244,12 @@ impl List {
         let mut items = Vec::new();
         for child in self.element.children() {
             if child.tag_name() == "text:list-item"
-                && let Ok(item) = ListItem::from_element(unsafe { &*(child as *const _ as *const Element) }.clone()) {
-                    items.push(item);
-                }
+                && let Ok(item) = ListItem::from_element(
+                    unsafe { &*(child as *const _ as *const Element) }.clone(),
+                )
+            {
+                items.push(item);
+            }
         }
         Ok(items)
     }
@@ -289,7 +299,9 @@ impl ListItem {
     /// Create list item from element
     pub fn from_element(element: Element) -> Result<Self> {
         if element.tag_name() != "text:list-item" {
-            return Err(Error::InvalidFormat("Element is not a list item".to_string()));
+            return Err(Error::InvalidFormat(
+                "Element is not a list item".to_string(),
+            ));
         }
         Ok(Self { element })
     }
@@ -309,9 +321,12 @@ impl ListItem {
         let mut paragraphs = Vec::new();
         for child in self.element.children() {
             if child.tag_name() == "text:p"
-                && let Ok(para) = Paragraph::from_element(unsafe { &*(child as *const _ as *const Element) }.clone()) {
-                    paragraphs.push(para);
-                }
+                && let Ok(para) = Paragraph::from_element(
+                    unsafe { &*(child as *const _ as *const Element) }.clone(),
+                )
+            {
+                paragraphs.push(para);
+            }
         }
         Ok(paragraphs)
     }
@@ -351,10 +366,14 @@ impl PageBreak {
     /// Create page break from element
     pub fn from_element(element: Element) -> Result<Self> {
         if element.tag_name() != "text:p" {
-            return Err(Error::InvalidFormat("Element is not a page break".to_string()));
+            return Err(Error::InvalidFormat(
+                "Element is not a page break".to_string(),
+            ));
         }
         if element.get_attribute("text:style-name") != Some("PageBreak") {
-            return Err(Error::InvalidFormat("Element is not a page break".to_string()));
+            return Err(Error::InvalidFormat(
+                "Element is not a page break".to_string(),
+            ));
         }
         Ok(Self { element })
     }
@@ -380,14 +399,15 @@ impl TextElements {
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(quick_xml::events::Event::Start(ref e)) => {
-                    let tag_name = String::from_utf8(e.name().as_ref().to_vec())
-                        .unwrap_or_default();
+                    let tag_name =
+                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
 
                     if tag_name == "text:p" || tag_name == "text:h" {
                         if let Some(para) = current_para.take()
-                            && let Ok(p) = Paragraph::from_element(para) {
-                                paragraphs.push(p);
-                            }
+                            && let Ok(p) = Paragraph::from_element(para)
+                        {
+                            paragraphs.push(p);
+                        }
 
                         let mut element = Element::new(&tag_name);
 
@@ -396,44 +416,49 @@ impl TextElements {
                             if let Ok(attr) = attr_result
                                 && let (Ok(key), Ok(value)) = (
                                     String::from_utf8(attr.key.as_ref().to_vec()),
-                                    String::from_utf8(attr.value.to_vec())
-                                ) {
-                                    element.set_attribute(&key, &value);
-                                }
+                                    String::from_utf8(attr.value.to_vec()),
+                                )
+                            {
+                                element.set_attribute(&key, &value);
+                            }
                         }
 
                         current_para = Some(element);
                     }
-                }
+                },
                 Ok(quick_xml::events::Event::Text(ref t)) => {
                     if let Some(ref mut para) = current_para
-                        && let Ok(text) = String::from_utf8(t.to_vec()) {
-                            let current_text = para.text().to_string();
-                            para.set_text(&format!("{}{}", current_text, text));
-                        }
-                }
+                        && let Ok(text) = String::from_utf8(t.to_vec())
+                    {
+                        let current_text = para.text().to_string();
+                        para.set_text(&format!("{}{}", current_text, text));
+                    }
+                },
                 Ok(quick_xml::events::Event::End(ref e)) => {
-                    let tag_name = String::from_utf8(e.name().as_ref().to_vec())
-                        .unwrap_or_default();
+                    let tag_name =
+                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
 
-                    if (tag_name == "text:p" || tag_name == "text:h") && current_para.is_some()
+                    if (tag_name == "text:p" || tag_name == "text:h")
+                        && current_para.is_some()
                         && let Some(para) = current_para.take()
-                            && let Ok(p) = Paragraph::from_element(para) {
-                                paragraphs.push(p);
-                            }
-                }
+                        && let Ok(p) = Paragraph::from_element(para)
+                    {
+                        paragraphs.push(p);
+                    }
+                },
                 Ok(quick_xml::events::Event::Eof) => break,
                 Err(_) => break,
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
 
         // Handle any remaining paragraph
         if let Some(para) = current_para
-            && let Ok(p) = Paragraph::from_element(para) {
-                paragraphs.push(p);
-            }
+            && let Ok(p) = Paragraph::from_element(para)
+        {
+            paragraphs.push(p);
+        }
 
         Ok(paragraphs)
     }
@@ -447,9 +472,10 @@ impl TextElements {
         for para in paragraphs {
             let element = para.element;
             if element.tag_name() == "text:h"
-                && let Ok(heading) = Heading::from_element(element) {
-                    headings.push(heading);
-                }
+                && let Ok(heading) = Heading::from_element(element)
+            {
+                headings.push(heading);
+            }
         }
 
         Ok(headings)
@@ -466,8 +492,8 @@ impl TextElements {
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(quick_xml::events::Event::Start(ref e)) => {
-                    let tag_name = String::from_utf8(e.name().as_ref().to_vec())
-                        .unwrap_or_default();
+                    let tag_name =
+                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
 
                     match tag_name.as_str() {
                         "text:p" | "text:h" => {
@@ -479,7 +505,7 @@ impl TextElements {
                                 paragraph_text.clear();
                             }
                             in_paragraph = true;
-                        }
+                        },
                         "text:list" => {
                             // Handle lists - add a newline before list if needed
                             if in_paragraph && !paragraph_text.is_empty() {
@@ -490,14 +516,14 @@ impl TextElements {
                                 paragraph_text.clear();
                             }
                             in_paragraph = false;
-                        }
+                        },
                         "text:list-item" => {
                             // Add bullet point
                             if !paragraph_text.is_empty() {
                                 paragraph_text.push('\n');
                             }
                             paragraph_text.push_str("• ");
-                        }
+                        },
                         "text:line-break" | "text:tab" => {
                             // Handle line breaks and tabs
                             if in_paragraph {
@@ -507,19 +533,18 @@ impl TextElements {
                                     paragraph_text.push('\t');
                                 }
                             }
-                        }
-                        _ => {} // Ignore other elements
+                        },
+                        _ => {}, // Ignore other elements
                     }
-                }
+                },
                 Ok(quick_xml::events::Event::Text(ref t)) => {
-                    if in_paragraph
-                        && let Ok(text_content) = String::from_utf8(t.to_vec()) {
-                            paragraph_text.push_str(&text_content);
-                        }
-                }
+                    if in_paragraph && let Ok(text_content) = String::from_utf8(t.to_vec()) {
+                        paragraph_text.push_str(&text_content);
+                    }
+                },
                 Ok(quick_xml::events::Event::End(ref e)) => {
-                    let tag_name = String::from_utf8(e.name().as_ref().to_vec())
-                        .unwrap_or_default();
+                    let tag_name =
+                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
 
                     match tag_name.as_str() {
                         "text:p" | "text:h" => {
@@ -531,13 +556,13 @@ impl TextElements {
                                 paragraph_text.clear();
                             }
                             in_paragraph = false;
-                        }
+                        },
                         "text:list" => {
                             in_paragraph = false;
-                        }
-                        _ => {}
+                        },
+                        _ => {},
                     }
-                }
+                },
                 Ok(quick_xml::events::Event::Eof) => {
                     // Handle any remaining paragraph text
                     if in_paragraph && !paragraph_text.is_empty() {
@@ -547,9 +572,9 @@ impl TextElements {
                         text.push_str(&paragraph_text);
                     }
                     break;
-                }
+                },
                 Err(_) => break,
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }

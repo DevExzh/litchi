@@ -103,7 +103,9 @@ pub struct MtefChar {
 }
 
 impl MtefObject for MtefChar {
-    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 /// Embellishment object (MT_EMBELL)
@@ -128,7 +130,9 @@ pub struct MtefEmbell {
 }
 
 impl MtefObject for MtefEmbell {
-    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 /// Template object (MT_TMPL)
@@ -158,7 +162,9 @@ pub struct MtefTemplate {
 }
 
 impl MtefObject for MtefTemplate {
-    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 /// Line object (MT_LINE)
@@ -187,7 +193,9 @@ pub struct MtefLine {
 }
 
 impl MtefObject for MtefLine {
-    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 /// Ruler object (MT_RULER)
@@ -205,7 +213,9 @@ pub struct MtefRuler {
 }
 
 impl MtefObject for MtefRuler {
-    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 /// Tabstop object (MT_TABSTOP)
@@ -225,7 +235,9 @@ pub struct MtefTabstop {
 }
 
 impl MtefObject for MtefTabstop {
-    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 /// Pile object (MT_PILE)
@@ -256,7 +268,9 @@ pub struct MtefPile {
 }
 
 impl MtefObject for MtefPile {
-    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 /// Matrix object (MT_MATRIX)
@@ -298,7 +312,9 @@ pub struct MtefMatrix {
 }
 
 impl MtefObject for MtefMatrix {
-    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 /// Font object (MT_FONT)
@@ -319,7 +335,9 @@ pub struct MtefFont {
 }
 
 impl MtefObject for MtefFont {
-    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 /// Size object (MT_SIZE)
@@ -340,5 +358,7 @@ pub struct MtefSize {
 }
 
 impl MtefObject for MtefSize {
-    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }

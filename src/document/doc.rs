@@ -1,8 +1,10 @@
 //! Word document implementation.
 
-use crate::common::{Error, Result};
-use super::types::{DocumentImpl, DocumentFormat, detect_document_format, detect_document_format_from_bytes};
+use super::types::{
+    DocumentFormat, DocumentImpl, detect_document_format, detect_document_format_from_bytes,
+};
 use super::{Paragraph, Table};
+use crate::common::{Error, Result};
 
 #[cfg(feature = "ole")]
 use crate::ole;
@@ -83,25 +85,25 @@ impl Document {
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
-        
+
         // Try to detect the format by reading the file header
         let mut file = File::open(path)?;
         let initial_format = detect_document_format(&mut file)?;
-        
+
         // Refine ZIP-based format detection (distinguish DOCX from Pages)
         let format = super::types::refine_document_format(&mut file, initial_format)?;
-        
+
         // Reopen the file for the appropriate parser
         match format {
             #[cfg(feature = "ole")]
             DocumentFormat::Doc => {
-                let mut package = ole::doc::Package::open(path)
-                    .map_err(Error::from)?;
-                let doc = package.document()
-                    .map_err(Error::from)?;
+                let mut package = ole::doc::Package::open(path).map_err(Error::from)?;
+                let doc = package.document().map_err(Error::from)?;
 
                 // Extract metadata from the OLE file
-                let metadata = package.ole_file().get_metadata()
+                let metadata = package
+                    .ole_file()
+                    .get_metadata()
                     .map(|m| m.into())
                     .unwrap_or_default();
 
@@ -110,24 +112,22 @@ impl Document {
                     #[cfg(feature = "ooxml")]
                     _package: None,
                 })
-            }
+            },
             #[cfg(not(feature = "ole"))]
-            DocumentFormat::Doc => {
-                Err(Error::FeatureDisabled("ole".to_string()))
-            }
+            DocumentFormat::Doc => Err(Error::FeatureDisabled("ole".to_string())),
             #[cfg(feature = "ooxml")]
             DocumentFormat::Docx => {
-                let package = Box::new(ooxml::docx::Package::open(path)
-                    .map_err(Error::from)?);
+                let package = Box::new(ooxml::docx::Package::open(path).map_err(Error::from)?);
 
                 // SAFETY: We're using unsafe here to extend the lifetime of the document
                 // reference. This is safe because we're storing the package in the same
                 // struct, ensuring it lives as long as the document reference.
                 let doc_ref = unsafe {
                     let pkg_ptr = &*package as *const ooxml::docx::Package;
-                    let doc = (*pkg_ptr).document()
-                        .map_err(Error::from)?;
-                    std::mem::transmute::<ooxml::docx::Document<'_>, ooxml::docx::Document<'static>>(doc)
+                    let doc = (*pkg_ptr).document().map_err(Error::from)?;
+                    std::mem::transmute::<ooxml::docx::Document<'_>, ooxml::docx::Document<'static>>(
+                        doc,
+                    )
                 };
 
                 // Extract metadata from OOXML core properties
@@ -138,26 +138,23 @@ impl Document {
                     inner: DocumentImpl::Docx(Box::new(doc_ref), metadata),
                     _package: Some(package),
                 })
-            }
+            },
             #[cfg(not(feature = "ooxml"))]
-            DocumentFormat::Docx => {
-                Err(Error::FeatureDisabled("ooxml".to_string()))
-            }
+            DocumentFormat::Docx => Err(Error::FeatureDisabled("ooxml".to_string())),
             #[cfg(feature = "iwa")]
             DocumentFormat::Pages => {
-                let doc = crate::iwa::pages::PagesDocument::open(path)
-                    .map_err(|e| Error::ParseError(format!("Failed to open Pages document: {}", e)))?;
-                
+                let doc = crate::iwa::pages::PagesDocument::open(path).map_err(|e| {
+                    Error::ParseError(format!("Failed to open Pages document: {}", e))
+                })?;
+
                 Ok(Self {
                     inner: DocumentImpl::Pages(doc),
                     #[cfg(feature = "ooxml")]
                     _package: None,
                 })
-            }
+            },
             #[cfg(not(feature = "iwa"))]
-            DocumentFormat::Pages => {
-                Err(Error::FeatureDisabled("iwa".to_string()))
-            }
+            DocumentFormat::Pages => Err(Error::FeatureDisabled("iwa".to_string())),
         }
     }
 
@@ -193,7 +190,7 @@ impl Document {
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         // Detect format from byte signature
         let initial_format = detect_document_format_from_bytes(&bytes)?;
-        
+
         // Refine ZIP-based format detection for bytes
         let format = if initial_format == DocumentFormat::Docx {
             // Check if it's a Pages document
@@ -207,20 +204,20 @@ impl Document {
         } else {
             initial_format
         };
-        
+
         match format {
             #[cfg(feature = "ole")]
             DocumentFormat::Doc => {
                 // For OLE2, create cursor from bytes
                 let cursor = Cursor::new(bytes);
 
-                let mut package = ole::doc::Package::from_reader(cursor)
-                    .map_err(Error::from)?;
-                let doc = package.document()
-                    .map_err(Error::from)?;
+                let mut package = ole::doc::Package::from_reader(cursor).map_err(Error::from)?;
+                let doc = package.document().map_err(Error::from)?;
 
                 // Extract metadata from the OLE file
-                let metadata = package.ole_file().get_metadata()
+                let metadata = package
+                    .ole_file()
+                    .get_metadata()
                     .map(|m| m.into())
                     .unwrap_or_default();
 
@@ -229,25 +226,24 @@ impl Document {
                     #[cfg(feature = "ooxml")]
                     _package: None,
                 })
-            }
+            },
             #[cfg(not(feature = "ole"))]
-            DocumentFormat::Doc => {
-                Err(Error::FeatureDisabled("ole".to_string()))
-            }
+            DocumentFormat::Doc => Err(Error::FeatureDisabled("ole".to_string())),
             #[cfg(feature = "ooxml")]
             DocumentFormat::Docx => {
                 // For OOXML/ZIP, Cursor<Vec<u8>> implements Read + Seek
                 let cursor = Cursor::new(bytes);
 
-                let package = Box::new(ooxml::docx::Package::from_reader(cursor)
-                    .map_err(Error::from)?);
+                let package =
+                    Box::new(ooxml::docx::Package::from_reader(cursor).map_err(Error::from)?);
 
                 // SAFETY: Same lifetime extension as in `open()`
                 let doc_ref = unsafe {
                     let pkg_ptr = &*package as *const ooxml::docx::Package;
-                    let doc = (*pkg_ptr).document()
-                        .map_err(Error::from)?;
-                    std::mem::transmute::<ooxml::docx::Document<'_>, ooxml::docx::Document<'static>>(doc)
+                    let doc = (*pkg_ptr).document().map_err(Error::from)?;
+                    std::mem::transmute::<ooxml::docx::Document<'_>, ooxml::docx::Document<'static>>(
+                        doc,
+                    )
                 };
 
                 // Extract metadata from OOXML core properties
@@ -258,26 +254,23 @@ impl Document {
                     inner: DocumentImpl::Docx(Box::new(doc_ref), metadata),
                     _package: Some(package),
                 })
-            }
+            },
             #[cfg(not(feature = "ooxml"))]
-            DocumentFormat::Docx => {
-                Err(Error::FeatureDisabled("ooxml".to_string()))
-            }
+            DocumentFormat::Docx => Err(Error::FeatureDisabled("ooxml".to_string())),
             #[cfg(feature = "iwa")]
             DocumentFormat::Pages => {
-                let doc = crate::iwa::pages::PagesDocument::from_bytes(&bytes)
-                    .map_err(|e| Error::ParseError(format!("Failed to open Pages document from bytes: {}", e)))?;
-                
+                let doc = crate::iwa::pages::PagesDocument::from_bytes(&bytes).map_err(|e| {
+                    Error::ParseError(format!("Failed to open Pages document from bytes: {}", e))
+                })?;
+
                 Ok(Self {
                     inner: DocumentImpl::Pages(doc),
                     #[cfg(feature = "ooxml")]
                     _package: None,
                 })
-            }
+            },
             #[cfg(not(feature = "iwa"))]
-            DocumentFormat::Pages => {
-                Err(Error::FeatureDisabled("iwa".to_string()))
-            }
+            DocumentFormat::Pages => Err(Error::FeatureDisabled("iwa".to_string())),
         }
     }
 
@@ -298,17 +291,13 @@ impl Document {
     pub fn text(&self) -> Result<String> {
         match &self.inner {
             #[cfg(feature = "ole")]
-            DocumentImpl::Doc(doc, _) => {
-                doc.text().map_err(Error::from)
-            }
+            DocumentImpl::Doc(doc, _) => doc.text().map_err(Error::from),
             #[cfg(feature = "ooxml")]
-            DocumentImpl::Docx(doc, _) => {
-                doc.text().map_err(Error::from)
-            }
+            DocumentImpl::Docx(doc, _) => doc.text().map_err(Error::from),
             #[cfg(feature = "iwa")]
-            DocumentImpl::Pages(doc) => {
-                doc.text().map_err(|e| Error::ParseError(format!("Failed to extract text from Pages: {}", e)))
-            }
+            DocumentImpl::Pages(doc) => doc.text().map_err(|e| {
+                Error::ParseError(format!("Failed to extract text from Pages: {}", e))
+            }),
         }
     }
 
@@ -327,20 +316,17 @@ impl Document {
     pub fn paragraph_count(&self) -> Result<usize> {
         match &self.inner {
             #[cfg(feature = "ole")]
-            DocumentImpl::Doc(doc, _) => {
-                doc.paragraph_count().map_err(Error::from)
-            }
+            DocumentImpl::Doc(doc, _) => doc.paragraph_count().map_err(Error::from),
             #[cfg(feature = "ooxml")]
-            DocumentImpl::Docx(doc, _) => {
-                doc.paragraph_count().map_err(Error::from)
-            }
+            DocumentImpl::Docx(doc, _) => doc.paragraph_count().map_err(Error::from),
             #[cfg(feature = "iwa")]
             DocumentImpl::Pages(doc) => {
                 // Pages documents are organized by sections
-                let sections = doc.sections()
+                let sections = doc
+                    .sections()
                     .map_err(|e| Error::ParseError(format!("Failed to get sections: {}", e)))?;
                 Ok(sections.iter().map(|s| s.paragraphs.len()).sum())
-            }
+            },
         }
     }
 
@@ -361,28 +347,31 @@ impl Document {
         match &self.inner {
             #[cfg(feature = "ole")]
             DocumentImpl::Doc(doc, _) => {
-                let paras = doc.paragraphs()
-                    .map_err(Error::from)?;
+                let paras = doc.paragraphs().map_err(Error::from)?;
                 Ok(paras.into_iter().map(Paragraph::Doc).collect())
-            }
+            },
             #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(doc, _) => {
-                let paras = doc.paragraphs()
-                    .map_err(Error::from)?;
+                let paras = doc.paragraphs().map_err(Error::from)?;
                 Ok(paras.into_iter().map(Paragraph::Docx).collect())
-            }
+            },
             #[cfg(feature = "iwa")]
             DocumentImpl::Pages(doc) => {
                 // Pages documents have sections, each with paragraphs
-                let sections = doc.sections()
+                let sections = doc
+                    .sections()
                     .map_err(|e| Error::ParseError(format!("Failed to get sections: {}", e)))?;
-                let paragraphs: Vec<_> = sections.iter()
+                let paragraphs: Vec<_> = sections
+                    .iter()
                     .flat_map(|section| {
-                        section.paragraphs.iter().map(|text| Paragraph::Pages(text.clone()))
+                        section
+                            .paragraphs
+                            .iter()
+                            .map(|text| Paragraph::Pages(text.clone()))
                     })
                     .collect();
                 Ok(paragraphs)
-            }
+            },
         }
     }
 
@@ -403,22 +392,20 @@ impl Document {
         match &self.inner {
             #[cfg(feature = "ole")]
             DocumentImpl::Doc(doc, _) => {
-                let tables = doc.tables()
-                    .map_err(Error::from)?;
+                let tables = doc.tables().map_err(Error::from)?;
                 Ok(tables.into_iter().map(Table::Doc).collect())
-            }
+            },
             #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(doc, _) => {
-                let tables = doc.tables()
-                    .map_err(Error::from)?;
+                let tables = doc.tables().map_err(Error::from)?;
                 Ok(tables.into_iter().map(Table::Docx).collect())
-            }
+            },
             #[cfg(feature = "iwa")]
             DocumentImpl::Pages(_doc) => {
                 // Pages tables are not currently supported in the paragraph/table extraction API
                 // Tables in Pages are embedded as structured data which requires different extraction
                 Ok(Vec::new())
-            }
+            },
         }
     }
 
@@ -443,37 +430,32 @@ impl Document {
     pub fn metadata(&self) -> Result<crate::common::Metadata> {
         match &self.inner {
             #[cfg(feature = "ole")]
-            DocumentImpl::Doc(_, metadata) => {
-                Ok(metadata.clone())
-            }
+            DocumentImpl::Doc(_, metadata) => Ok(metadata.clone()),
             #[cfg(feature = "ooxml")]
-            DocumentImpl::Docx(_, metadata) => {
-                Ok(metadata.clone())
-            }
+            DocumentImpl::Docx(_, metadata) => Ok(metadata.clone()),
             #[cfg(feature = "iwa")]
             DocumentImpl::Pages(doc) => {
                 // Extract metadata from Pages bundle metadata
                 let bundle_metadata = doc.bundle().metadata();
                 let mut metadata = crate::common::Metadata::default();
-                
+
                 // Extract title from properties
                 if let Some(title) = bundle_metadata.get_property_string("Title") {
                     metadata.title = Some(title);
                 }
-                
+
                 // Extract author from properties
                 if let Some(author) = bundle_metadata.get_property_string("Author") {
                     metadata.author = Some(author);
                 }
-                
+
                 // Extract document identifier
                 if let Some(doc_id) = bundle_metadata.document_identifier() {
                     metadata.description = Some(format!("Document ID: {}", doc_id));
                 }
-                
+
                 Ok(metadata)
-            }
+            },
         }
     }
 }
-

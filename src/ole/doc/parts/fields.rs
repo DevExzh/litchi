@@ -46,9 +46,9 @@ pub enum FieldBoundary {
 /// A field descriptor structure (FLD - 2 bytes in MTEF format)
 #[derive(Debug, Clone)]
 pub struct FieldDescriptor {
-    pub boundary_type: u8,  // FIELD_BEGIN_MARK, FIELD_SEPARATOR_MARK, or FIELD_END_MARK
-    pub field_type: u8,     // Field type (e.g., 58 for EMBED)
-    pub flags: u8,          // Various field flags
+    pub boundary_type: u8, // FIELD_BEGIN_MARK, FIELD_SEPARATOR_MARK, or FIELD_END_MARK
+    pub field_type: u8,    // Field type (e.g., 58 for EMBED)
+    pub flags: u8,         // Various field flags
 }
 
 impl FieldDescriptor {
@@ -64,8 +64,8 @@ impl FieldDescriptor {
         let byte0 = bytes[0];
         let byte1 = bytes[1];
 
-        let boundary_type = byte0 & 0x1F;  // Lower 5 bits
-        let flags = (byte0 >> 5) & 0x07;   // Upper 3 bits
+        let boundary_type = byte0 & 0x1F; // Lower 5 bits
+        let flags = (byte0 >> 5) & 0x07; // Upper 3 bits
         let field_type = byte1;
 
         Some(Self {
@@ -77,17 +77,17 @@ impl FieldDescriptor {
 
     /// Check if this is a field begin marker
     pub fn is_begin(&self) -> bool {
-        self.boundary_type == 0x13  // FIELD_BEGIN_MARK
+        self.boundary_type == 0x13 // FIELD_BEGIN_MARK
     }
 
     /// Check if this is a field separator marker
     pub fn is_separator(&self) -> bool {
-        self.boundary_type == 0x14  // FIELD_SEPARATOR_MARK
+        self.boundary_type == 0x14 // FIELD_SEPARATOR_MARK
     }
 
     /// Check if this is a field end marker
     pub fn is_end(&self) -> bool {
-        self.boundary_type == 0x15  // FIELD_END_MARK
+        self.boundary_type == 0x15 // FIELD_END_MARK
     }
 }
 
@@ -187,42 +187,44 @@ impl FieldsTable {
         while i < plcf.count() {
             if let Some((cp, cp_end)) = plcf.range(i)
                 && let Some(fld_data) = plcf.property(i)
-                    && let Some(descriptor) = FieldDescriptor::from_bytes(fld_data)
-                        && descriptor.is_begin() {
-                            // Found field begin - look for separator and end
-                            let start_cp = cp;
-                            let field_type = FieldType::from(descriptor.field_type);
-                            let mut separator_cp = None;
-                            let mut end_cp = cp_end;
-                            let mut has_separator = false;
+                && let Some(descriptor) = FieldDescriptor::from_bytes(fld_data)
+                && descriptor.is_begin()
+            {
+                // Found field begin - look for separator and end
+                let start_cp = cp;
+                let field_type = FieldType::from(descriptor.field_type);
+                let mut separator_cp = None;
+                let mut end_cp = cp_end;
+                let mut has_separator = false;
 
-                            // Scan forward for separator and end markers
-                            let mut j = i + 1;
-                            while j < plcf.count() {
-                                if let Some((sep_cp, _)) = plcf.range(j)
-                                    && let Some(next_fld) = plcf.property(j)
-                                        && let Some(next_desc) = FieldDescriptor::from_bytes(next_fld) {
-                                            if next_desc.is_separator() {
-                                                separator_cp = Some(sep_cp);
-                                                has_separator = true;
-                                            } else if next_desc.is_end() {
-                                                end_cp = sep_cp;
-                                                i = j; // Move past this field
-                                                break;
-                                            }
-                                        }
-                                j += 1;
-                            }
-
-                            // Create field
-                            fields.push(Field {
-                                start_cp,
-                                separator_cp,
-                                end_cp,
-                                field_type,
-                                has_separator,
-                            });
+                // Scan forward for separator and end markers
+                let mut j = i + 1;
+                while j < plcf.count() {
+                    if let Some((sep_cp, _)) = plcf.range(j)
+                        && let Some(next_fld) = plcf.property(j)
+                        && let Some(next_desc) = FieldDescriptor::from_bytes(next_fld)
+                    {
+                        if next_desc.is_separator() {
+                            separator_cp = Some(sep_cp);
+                            has_separator = true;
+                        } else if next_desc.is_end() {
+                            end_cp = sep_cp;
+                            i = j; // Move past this field
+                            break;
                         }
+                    }
+                    j += 1;
+                }
+
+                // Create field
+                fields.push(Field {
+                    start_cp,
+                    separator_cp,
+                    end_cp,
+                    field_type,
+                    has_separator,
+                });
+            }
             i += 1;
         }
 
@@ -277,11 +279,10 @@ mod tests {
     fn test_field_type_conversion() {
         assert_eq!(FieldType::from(58), FieldType::EmbeddedObject);
         assert_eq!(FieldType::from(88), FieldType::Hyperlink);
-        
+
         match FieldType::from(99) {
             FieldType::Other(99) => {},
             _ => panic!("Expected Other(99)"),
         }
     }
 }
-

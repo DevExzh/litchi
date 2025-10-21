@@ -2,8 +2,8 @@
 //!
 //! Idiomatic Rust implementation using enum variants instead of trait objects.
 
-use super::{TextBox, Placeholder, AutoShape};
-use super::shape::{ShapeType, Shape};
+use super::shape::{Shape, ShapeType};
+use super::{AutoShape, Placeholder, TextBox};
 use crate::ole::ppt::package::Result;
 
 /// Represents any shape on a slide using an enum for zero-cost abstraction.
@@ -63,24 +63,26 @@ impl ShapeEnum {
                 for row in 0..table.rows() {
                     for col in 0..table.columns() {
                         if let Some(cell_text) = table.cell(row, col)
-                            && !cell_text.is_empty() {
-                                text_parts.push(cell_text.to_string());
-                            }
+                            && !cell_text.is_empty()
+                        {
+                            text_parts.push(cell_text.to_string());
+                        }
                     }
                 }
                 Ok(text_parts.join(" "))
-            }
+            },
             ShapeEnum::Group(group) => {
                 // Recursively extract text from all child shapes
                 let mut text_parts = Vec::new();
                 for child in group.children() {
                     if let Ok(child_text) = child.text()
-                        && !child_text.is_empty() {
-                            text_parts.push(child_text);
-                        }
+                        && !child_text.is_empty()
+                    {
+                        text_parts.push(child_text);
+                    }
                 }
                 Ok(text_parts.join("\n"))
-            }
+            },
             ShapeEnum::Picture(_) | ShapeEnum::Line(_) => Ok(String::new()),
         }
     }
@@ -147,7 +149,7 @@ impl PictureShape {
             height: 0,
         }
     }
-    
+
     /// Set picture coordinates and size.
     pub fn set_bounds(&mut self, left: i32, top: i32, width: i32, height: i32) {
         self.left = left;
@@ -155,22 +157,22 @@ impl PictureShape {
         self.width = width;
         self.height = height;
     }
-    
+
     /// Set blip ID.
     pub fn set_blip_id(&mut self, blip_id: u32) {
         self.blip_id = Some(blip_id);
     }
-    
+
     /// Set picture name.
     pub fn set_name(&mut self, name: String) {
         self.name = Some(name);
     }
-    
+
     /// Get shape ID.
     pub fn id(&self) -> u32 {
         self.id
     }
-    
+
     /// Get blip ID.
     pub fn blip_id(&self) -> Option<u32> {
         self.blip_id
@@ -196,27 +198,35 @@ impl TableShape {
     /// Create a new table shape.
     pub fn new(id: u32, rows: usize, columns: usize) -> Self {
         let cells = vec![vec![String::new(); columns]; rows];
-        Self { id, rows, columns, cells }
+        Self {
+            id,
+            rows,
+            columns,
+            cells,
+        }
     }
-    
+
     /// Get shape ID.
     pub fn id(&self) -> u32 {
         self.id
     }
-    
+
     /// Get number of rows.
     pub fn rows(&self) -> usize {
         self.rows
     }
-    
+
     /// Get number of columns.
     pub fn columns(&self) -> usize {
         self.columns
     }
-    
+
     /// Get cell text.
     pub fn cell(&self, row: usize, col: usize) -> Option<&str> {
-        self.cells.get(row).and_then(|r| r.get(col)).map(|s| s.as_str())
+        self.cells
+            .get(row)
+            .and_then(|r| r.get(col))
+            .map(|s| s.as_str())
     }
 }
 
@@ -251,17 +261,17 @@ impl GroupShape {
             height: 0,
         }
     }
-    
+
     /// Add a child shape.
     pub fn add_child(&mut self, shape: ShapeEnum) {
         self.children.push(shape);
     }
-    
+
     /// Get child shapes.
     pub fn children(&self) -> &[ShapeEnum] {
         &self.children
     }
-    
+
     /// Set group bounds.
     pub fn set_bounds(&mut self, left: i32, top: i32, width: i32, height: i32) {
         self.left = left;
@@ -269,7 +279,7 @@ impl GroupShape {
         self.width = width;
         self.height = height;
     }
-    
+
     /// Get shape ID.
     pub fn id(&self) -> u32 {
         self.id
@@ -310,22 +320,22 @@ impl LineShape {
             color: None,
         }
     }
-    
+
     /// Set line width.
     pub fn set_width(&mut self, width: i32) {
         self.width = width;
     }
-    
+
     /// Set line color.
     pub fn set_color(&mut self, color: u32) {
         self.color = Some(color);
     }
-    
+
     /// Get shape ID.
     pub fn id(&self) -> u32 {
         self.id
     }
-    
+
     /// Get line length.
     pub fn length(&self) -> f64 {
         let dx = (self.x2 - self.x1) as f64;
@@ -333,4 +343,3 @@ impl LineShape {
         (dx * dx + dy * dy).sqrt()
     }
 }
-

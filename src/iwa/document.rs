@@ -12,13 +12,13 @@
 //! - `crate::iwa::numbers::NumbersDocument` for Numbers-specific features
 //! - `crate::iwa::keynote::KeynoteDocument` for Keynote-specific features
 
-use std::path::Path;
 use std::collections::HashMap;
+use std::path::Path;
 
 use crate::iwa::bundle::Bundle;
-use crate::iwa::object_index::{ObjectIndex, ResolvedObject};
-use crate::iwa::registry::{detect_application, Application};
 use crate::iwa::media::{MediaManager, MediaStats};
+use crate::iwa::object_index::{ObjectIndex, ResolvedObject};
+use crate::iwa::registry::{Application, detect_application};
 use crate::iwa::structured::{self, StructuredData};
 use crate::iwa::text::TextExtractor;
 use crate::iwa::{Error, Result};
@@ -44,15 +44,15 @@ impl Document {
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
         // Detect application type from message types
-        let all_message_types: Vec<u32> = bundle.archives()
+        let all_message_types: Vec<u32> = bundle
+            .archives()
             .values()
             .flat_map(|archive| &archive.objects)
             .flat_map(|obj| &obj.messages)
             .map(|msg| msg.type_)
             .collect();
 
-        let application = detect_application(&all_message_types)
-            .unwrap_or(Application::Common);
+        let application = detect_application(&all_message_types).unwrap_or(Application::Common);
 
         // Try to create media manager (may fail for single-file bundles)
         let media_manager = MediaManager::new(path_ref).ok();
@@ -88,15 +88,15 @@ impl Document {
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
         // Detect application type from message types
-        let all_message_types: Vec<u32> = bundle.archives()
+        let all_message_types: Vec<u32> = bundle
+            .archives()
             .values()
             .flat_map(|archive| &archive.objects)
             .flat_map(|obj| &obj.messages)
             .map(|msg| msg.type_)
             .collect();
 
-        let application = detect_application(&all_message_types)
-            .unwrap_or(Application::Common);
+        let application = detect_application(&all_message_types).unwrap_or(Application::Common);
 
         Ok(Document {
             bundle,
@@ -118,10 +118,14 @@ impl Document {
 
     /// Get all objects in the document
     pub fn objects(&self) -> Vec<ResolvedObject> {
-        self.object_index.all_object_ids()
+        self.object_index
+            .all_object_ids()
             .iter()
             .filter_map(|&id| {
-                self.object_index.resolve_object(&self.bundle, id).ok().flatten()
+                self.object_index
+                    .resolve_object(&self.bundle, id)
+                    .ok()
+                    .flatten()
             })
             .collect()
     }
@@ -158,7 +162,9 @@ impl Document {
 
     /// Extract a media asset by filename
     pub fn extract_media(&self, filename: &str) -> Result<Vec<u8>> {
-        let manager = self.media_manager.as_ref()
+        let manager = self
+            .media_manager
+            .as_ref()
             .ok_or_else(|| Error::Bundle("Media manager not available".to_string()))?;
         manager.extract(filename)
     }
@@ -213,7 +219,8 @@ pub struct DocumentStats {
 impl DocumentStats {
     /// Get the most common message type
     pub fn most_common_message_type(&self) -> Option<(u32, usize)> {
-        self.message_type_counts.iter()
+        self.message_type_counts
+            .iter()
             .max_by_key(|&(_, count)| count)
             .map(|(&type_, &count)| (type_, count))
     }
@@ -223,13 +230,18 @@ impl DocumentStats {
         let mut types: Vec<_> = self.message_type_counts.iter().collect();
         types.sort_by_key(|&(_, count)| std::cmp::Reverse(*count));
 
-        let top_types: Vec<String> = types.into_iter()
+        let top_types: Vec<String> = types
+            .into_iter()
             .take(5)
             .map(|(type_, count)| format!("{}: {}", type_, count))
             .collect();
 
         if top_types.len() < self.message_type_counts.len() {
-            format!("{} (and {} more)", top_types.join(", "), self.message_type_counts.len() - top_types.len())
+            format!(
+                "{} (and {} more)",
+                top_types.join(", "),
+                self.message_type_counts.len() - top_types.len()
+            )
         } else {
             top_types.join(", ")
         }
@@ -238,7 +250,7 @@ impl DocumentStats {
 
 // Note: Application-specific document types have been moved to dedicated modules:
 // - crate::iwa::pages::PagesDocument
-// - crate::iwa::numbers::NumbersDocument  
+// - crate::iwa::numbers::NumbersDocument
 // - crate::iwa::keynote::KeynoteDocument
 //
 // The unified Document type above works with all formats and provides
@@ -298,7 +310,11 @@ mod tests {
         }
 
         let doc_result = Document::open(doc_path);
-        assert!(doc_result.is_ok(), "Failed to open document: {:?}", doc_result.err());
+        assert!(
+            doc_result.is_ok(),
+            "Failed to open document: {:?}",
+            doc_result.err()
+        );
 
         let doc = doc_result.unwrap();
 
@@ -325,7 +341,7 @@ mod tests {
         let doc = Document::open(doc_path).unwrap();
         let text_result = doc.text();
         assert!(text_result.is_ok());
-        
+
         // Text extraction should succeed even if result is empty
         let _text = text_result.unwrap();
     }

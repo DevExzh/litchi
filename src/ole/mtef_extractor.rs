@@ -9,7 +9,7 @@
 // - 5 bytes: MTEF header (version, platform, product, version major, version minor)
 // - N bytes: MTEF byte stream (formula data)
 
-use crate::formula::{MtefParser, MathNode};
+use crate::formula::{MathNode, MtefParser};
 use crate::ole::file::OleFile;
 use std::io::{Read, Seek};
 
@@ -64,13 +64,13 @@ impl<'arena> MtefExtractor<'arena> {
         // Parse cbObject field (u32 little-endian at offset 8)
         // This tells us the size of MTEF data after the 28-byte header
         let cb_object = u32::from_le_bytes([data[8], data[9], data[10], data[11]]) as usize;
-        
+
         // Calculate total size: OLE header (28) + MTEF data (cbObject)
         let total_size = 28 + cb_object;
-        
+
         // Ensure we don't read past the actual data
         let actual_size = total_size.min(data.len());
-        
+
         // Return only the valid portion (OLE header + exact MTEF data)
         Ok(Some(data[..actual_size].to_vec()))
     }
@@ -210,7 +210,7 @@ impl<'arena> MtefExtractor<'arena> {
 
             // Look for storages that might contain equations
             // Common patterns: "MBD[hex]", "Equation Native", or names starting with "_"
-            let is_equation_storage = entry.name.starts_with("MBD") 
+            let is_equation_storage = entry.name.starts_with("MBD")
                 || entry.name == "Equation Native"
                 || entry.name.starts_with('_');
 
@@ -219,20 +219,18 @@ impl<'arena> MtefExtractor<'arena> {
             }
 
             // Try to extract "Equation Native" stream from this storage
-            if let Ok(Some(mtef_data)) = Self::extract_mtef_from_stream(
-                ole_file,
-                &[&entry.name, "Equation Native"],
-            ) {
+            if let Ok(Some(mtef_data)) =
+                Self::extract_mtef_from_stream(ole_file, &[&entry.name, "Equation Native"])
+            {
                 mtef_map.insert(entry.name.clone(), mtef_data);
                 continue;
             }
 
             // Try alternative stream names
             for stream_name in &["CONTENTS", "\x01Ole", "\x01Ole10Native"] {
-                if let Ok(Some(mtef_data)) = Self::extract_mtef_from_stream(
-                    ole_file,
-                    &[&entry.name, stream_name],
-                ) {
+                if let Ok(Some(mtef_data)) =
+                    Self::extract_mtef_from_stream(ole_file, &[&entry.name, stream_name])
+                {
                     mtef_map.insert(entry.name.clone(), mtef_data);
                     break;
                 }
@@ -252,19 +250,21 @@ impl<'arena> MtefExtractor<'arena> {
     ///
     /// Returns a vector of MathNode AST nodes representing the parsed formula
     #[allow(dead_code)] // Public API for future use
-    pub fn parse_mtef_to_ast(&self, mtef_data: Vec<u8>) -> Result<Vec<MathNode<'arena>>, MtefExtractionError> {
+    pub fn parse_mtef_to_ast(
+        &self,
+        mtef_data: Vec<u8>,
+    ) -> Result<Vec<MathNode<'arena>>, MtefExtractionError> {
         // We need to create a reference with the arena lifetime
         // This is a bit of a hack, but we know the data will live long enough
-        let data_ref: &[u8] = unsafe {
-            std::slice::from_raw_parts(mtef_data.as_ptr(), mtef_data.len())
-        };
+        let data_ref: &[u8] =
+            unsafe { std::slice::from_raw_parts(mtef_data.as_ptr(), mtef_data.len()) };
         // Extend the lifetime (this is safe because we control the Vec lifetime)
-        let data_with_lifetime: &'arena [u8] = unsafe {
-            std::mem::transmute(data_ref)
-        };
+        let data_with_lifetime: &'arena [u8] = unsafe { std::mem::transmute(data_ref) };
 
         let mut parser = MtefParser::new(self.arena, data_with_lifetime);
-        parser.parse().map_err(|e| MtefExtractionError::ParseError(e.to_string()))
+        parser
+            .parse()
+            .map_err(|e| MtefExtractionError::ParseError(e.to_string()))
     }
 
     /// Extract and parse MTEF data from an OLE file
@@ -293,12 +293,11 @@ impl<'arena> MtefExtractor<'arena> {
                 return Ok(Some(self.parse_mtef_to_ast(mtef_data)?));
             }
         }
-        
+
         // No valid MTEF data found in any of the stream names
         Ok(None)
     }
 }
-
 
 /// Errors that can occur during MTEF extraction
 #[derive(Debug)]
@@ -347,9 +346,7 @@ mod tests {
             0xD3, 0xC2, // format = 0xC2D3
             0x20, 0x00, 0x00, 0x00, // size = 32
             0x00, 0x00, 0x00, 0x00, // reserved
-            0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
 
         assert!(MtefExtractor::validate_ole_header(&valid_data));

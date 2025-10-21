@@ -1,7 +1,7 @@
 /// Paragraph and Run structures for Word documents.
 use crate::ooxml::error::{OoxmlError, Result};
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 use smallvec::SmallVec;
 use std::borrow::Cow;
 
@@ -60,20 +60,20 @@ impl Paragraph {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = true;
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_text_element => {
                     // Use unsafe conversion for better performance (safe since we validate XML)
                     let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
                     result.push_str(text);
-                }
+                },
                 Ok(Event::End(e)) => {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = false;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
         }
 
@@ -129,7 +129,7 @@ impl Paragraph {
                         }
                         current_run_xml.push(b'>');
                     }
-                }
+                },
                 Ok(Event::End(e)) => {
                     if in_run {
                         current_run_xml.extend_from_slice(b"</");
@@ -142,10 +142,10 @@ impl Paragraph {
                             in_run = false;
                         }
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_run => {
                     current_run_xml.extend_from_slice(e.as_ref());
-                }
+                },
                 Ok(Event::Empty(e)) if in_run => {
                     current_run_xml.push(b'<');
                     current_run_xml.extend_from_slice(e.name().as_ref());
@@ -157,10 +157,10 @@ impl Paragraph {
                         current_run_xml.push(b'"');
                     }
                     current_run_xml.extend_from_slice(b"/>");
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -249,20 +249,20 @@ impl Run {
                     } else if name.as_ref() == b"br" {
                         result.push('\n');
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_text_element => {
                     // Use unsafe conversion for better performance (safe since we validate XML)
                     let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
                     result.push_str(text);
-                }
+                },
                 Ok(Event::End(e)) => {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = false;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -311,15 +311,15 @@ impl Run {
                     } else if in_r_pr && name.as_ref() == b"u" {
                         return Ok(Some(true));
                     }
-                }
+                },
                 Ok(Event::End(e)) => {
                     if e.local_name().as_ref() == b"rPr" {
                         in_r_pr = false;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -356,22 +356,24 @@ impl Run {
                             if attr.key.as_ref() == b"val" {
                                 let value = attr.value.as_ref();
                                 match value {
-                                    b"superscript" => return Ok(Some(VerticalPosition::Superscript)),
+                                    b"superscript" => {
+                                        return Ok(Some(VerticalPosition::Superscript));
+                                    },
                                     b"subscript" => return Ok(Some(VerticalPosition::Subscript)),
-                                    _ => {}
+                                    _ => {},
                                 }
                             }
                         }
                     }
-                }
+                },
                 Ok(Event::End(e)) => {
                     if e.local_name().as_ref() == b"rPr" {
                         in_r_pr = false;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -403,15 +405,15 @@ impl Run {
                             }
                         }
                     }
-                }
+                },
                 Ok(Event::End(e)) => {
                     if e.local_name().as_ref() == b"rPr" {
                         break;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -440,20 +442,21 @@ impl Run {
                         for attr in e.attributes().flatten() {
                             if attr.key.as_ref() == b"val"
                                 && let Ok(value) = std::str::from_utf8(&attr.value)
-                                    && let Ok(size) = value.parse::<u32>() {
-                                        return Ok(Some(size));
-                                    }
+                                && let Ok(size) = value.parse::<u32>()
+                            {
+                                return Ok(Some(size));
+                            }
                         }
                     }
-                }
+                },
                 Ok(Event::End(e)) => {
                     if e.local_name().as_ref() == b"rPr" {
                         break;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -485,7 +488,8 @@ impl Run {
                             omml_content.push(' ');
                             omml_content.push_str(std::str::from_utf8(attr.key.as_ref()).unwrap());
                             omml_content.push_str("=\"");
-                            omml_content.push_str(&attr.unescape_value().unwrap_or(Cow::Borrowed("")));
+                            omml_content
+                                .push_str(&attr.unescape_value().unwrap_or(Cow::Borrowed("")));
                             omml_content.push('"');
                         }
                         omml_content.push('>');
@@ -497,7 +501,8 @@ impl Run {
                             omml_content.push(' ');
                             omml_content.push_str(std::str::from_utf8(attr.key.as_ref()).unwrap());
                             omml_content.push_str("=\"");
-                            omml_content.push_str(&attr.unescape_value().unwrap_or(Cow::Borrowed("")));
+                            omml_content
+                                .push_str(&attr.unescape_value().unwrap_or(Cow::Borrowed("")));
                             omml_content.push('"');
                         }
                         if name.as_ref() == b"oMath" {
@@ -506,21 +511,21 @@ impl Run {
                         }
                         omml_content.push('>');
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_omath => {
                     // Extract text content - OMML doesn't typically use entities that need unescaping
                     let text = std::str::from_utf8(e.as_ref())
                         .map_err(|_| OoxmlError::Xml("Invalid UTF-8 in OMML text".to_string()))?;
                     omml_content.push_str(text);
-                }
+                },
                 Ok(Event::End(e)) if in_omath => {
                     omml_content.push_str("</");
                     omml_content.push_str(std::str::from_utf8(e.name().as_ref()).unwrap());
                     omml_content.push('>');
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -560,15 +565,15 @@ impl Run {
                         // Element present without val attribute means true
                         return Ok(Some(true));
                     }
-                }
+                },
                 Ok(Event::End(e)) => {
                     if e.local_name().as_ref() == b"rPr" {
                         in_r_pr = false;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }

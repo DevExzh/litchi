@@ -2,22 +2,30 @@
 //
 // This module contains specialized matrix conversion functionality.
 
-use crate::formula::ast::{MatrixFence, MatrixProperties, Alignment};
-use super::error::LatexError;
 use super::converter::LatexConverter;
-use crate::formula::latex::matrix::matrix_fence_to_env;
+use super::error::LatexError;
 use super::utils::estimate_matrix_capacity;
+use crate::formula::ast::{Alignment, MatrixFence, MatrixProperties};
+use crate::formula::latex::matrix::matrix_fence_to_env;
 use std::fmt::Write;
 
 /// Convert matrix with optimized performance (no temporary converters)
-pub fn convert_matrix_optimized_internal(converter: &mut LatexConverter, rows: &[Vec<Vec<crate::formula::ast::MathNode>>], fence_type: MatrixFence, properties: Option<&MatrixProperties>) -> Result<(), LatexError> {
-
+pub fn convert_matrix_optimized_internal(
+    converter: &mut LatexConverter,
+    rows: &[Vec<Vec<crate::formula::ast::MathNode>>],
+    fence_type: MatrixFence,
+    properties: Option<&MatrixProperties>,
+) -> Result<(), LatexError> {
     if rows.is_empty() {
         return Ok(());
     }
 
     let use_array_env = properties.as_ref().and_then(|p| p.base_alignment).is_some();
-    let env = if use_array_env { "array" } else { matrix_fence_to_env(fence_type) };
+    let env = if use_array_env {
+        "array"
+    } else {
+        matrix_fence_to_env(fence_type)
+    };
 
     let mut estimated_capacity = estimate_matrix_capacity(rows);
     if use_array_env {
@@ -50,7 +58,7 @@ pub fn convert_matrix_optimized_internal(converter: &mut LatexConverter, rows: &
                     MatrixFence::Brace => converter.buffer.push_str("\\left\\{"),
                     MatrixFence::Pipe => converter.buffer.push_str("\\left|"),
                     MatrixFence::DoublePipe => converter.buffer.push_str("\\left\\|"),
-                    MatrixFence::None => {}
+                    MatrixFence::None => {},
                 }
             } else {
                 let num_cols = rows.first().map(|r| r.len()).unwrap_or(1);
@@ -89,7 +97,7 @@ pub fn convert_matrix_optimized_internal(converter: &mut LatexConverter, rows: &
             MatrixFence::Brace => converter.buffer.push_str("\\right\\}"),
             MatrixFence::Pipe => converter.buffer.push_str("\\right|"),
             MatrixFence::DoublePipe => converter.buffer.push_str("\\right\\|"),
-            MatrixFence::None => {}
+            MatrixFence::None => {},
         }
     }
 

@@ -1,8 +1,10 @@
 // Group character element handler
 
 use crate::formula::ast::*;
+use crate::formula::omml::attributes::{
+    get_attribute_value, parse_position_type, parse_vertical_alignment,
+};
 use crate::formula::omml::elements::ElementContext;
-use crate::formula::omml::attributes::{get_attribute_value, parse_position_type, parse_vertical_alignment};
 use crate::formula::omml::properties::parse_group_char_properties;
 use quick_xml::events::BytesStart;
 use std::borrow::Cow;
@@ -53,17 +55,23 @@ impl GroupCharHandler {
             context.children.clone()
         };
 
-        let character = context.properties.chr
+        let character = context
+            .properties
+            .chr
             .as_ref()
             .map(|s| Cow::Borrowed(arena.alloc_str(s)));
 
         // Use dedicated position parsing function
-        let position = context.properties.accent_position
+        let position = context
+            .properties
+            .accent_position
             .as_ref()
             .and_then(|s| parse_position_type(Some(s)));
 
         // Use dedicated vertical alignment parsing function
-        let vertical_alignment = context.properties.vertical_alignment
+        let vertical_alignment = context
+            .properties
+            .vertical_alignment
             .as_ref()
             .and_then(|s| parse_vertical_alignment(Some(s)));
 

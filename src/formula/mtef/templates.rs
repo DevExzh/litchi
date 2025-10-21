@@ -6,7 +6,7 @@
 //!
 //! Based on rtf2latex2e Profile_TEMPLATES_5 template system.
 
-use crate::formula::ast::{MathNode, Operator, Fence, LargeOperator};
+use crate::formula::ast::{Fence, LargeOperator, MathNode, Operator};
 use smallvec::SmallVec;
 
 /// Template argument list type - a small vector of node vectors
@@ -34,98 +34,530 @@ pub struct TemplateDef {
 
 /// MTEF v5 Template definitions based on rtf2latex2e Profile_TEMPLATES_5
 const MTEF_TEMPLATES: &[TemplateDef] = &[
-    TemplateDef { selector: 0, variation: 1, description: "fence: angle-left only", template: "\\left\\langle #1[M]\\right.  " },
-    TemplateDef { selector: 0, variation: 2, description: "fence: angle-right only", template: "\\left. #1[M]\\right\\rangle  " },
-    TemplateDef { selector: 0, variation: 3, description: "fence: angle-both", template: "\\left\\langle #1[M]\\right\\rangle  " },
-    TemplateDef { selector: 1, variation: 1, description: "fence: paren-left only", template: "\\left( #1[M]\\right.  " },
-    TemplateDef { selector: 1, variation: 2, description: "fence: paren-right only", template: "\\left. #1[M]\\right)  " },
-    TemplateDef { selector: 1, variation: 3, description: "fence: paren-both", template: "\\left( #1[M]\\right)  " },
-    TemplateDef { selector: 2, variation: 1, description: "fence: brace-left only", template: "\\left\\{ #1[M]\\right.  " },
-    TemplateDef { selector: 2, variation: 2, description: "fence: brace-right only", template: "\\left. #1[M]\\right\\}  " },
-    TemplateDef { selector: 2, variation: 3, description: "fence: brace-both", template: "\\left\\{ #1[M]\\right\\}  " },
-    TemplateDef { selector: 3, variation: 1, description: "fence: brack-left only", template: "\\lef]t[ #1[M]\\right.  " },
-    TemplateDef { selector: 3, variation: 2, description: "fence: brack-right only", template: "\\left. #1[M]\\right]  " },
-    TemplateDef { selector: 3, variation: 3, description: "fence: brack-both", template: "\\left[ #1[M]\\right]  " },
-    TemplateDef { selector: 4, variation: 1, description: "fence: bar-left only", template: "\\left| #1[M]\\right.  " },
-    TemplateDef { selector: 4, variation: 2, description: "fence: bar-right only", template: "\\left. #1[M]\\right|  " },
-    TemplateDef { selector: 4, variation: 3, description: "fence: bar-both", template: "\\left| #1[M]\\right|  " },
-    TemplateDef { selector: 5, variation: 1, description: "fence: dbar-left only", template: "\\left\\| #1[M]\\right.  " },
-    TemplateDef { selector: 5, variation: 2, description: "fence: dbar-right only", template: "\\left. #1[M]\\right\\|  " },
-    TemplateDef { selector: 5, variation: 3, description: "fence: dbar-both", template: "\\left\\| #1[M]\\right\\|  " },
-    TemplateDef { selector: 6, variation: 1, description: "fence: floor", template: "\\left\\lfloor #1[M]\\right.  " },
-    TemplateDef { selector: 6, variation: 2, description: "fence: floor", template: "\\left. #1[M]\\right\\rfloor  " },
-    TemplateDef { selector: 6, variation: 3, description: "fence: floor", template: "\\left\\lfloor #1[M]\\right\\rfloor  " },
-    TemplateDef { selector: 7, variation: 1, description: "fence: ceiling", template: "\\left\\lceil #1[M]\\right.  " },
-    TemplateDef { selector: 7, variation: 2, description: "fence: ceiling", template: "\\left. #1[M]\\right\\rceil  " },
-    TemplateDef { selector: 7, variation: 3, description: "fence: ceiling", template: "\\left\\lceil #1[M]\\right\\rceil  " },
-    TemplateDef { selector: 8, variation: 0, description: "fence: LBLB", template: "\\left[ #1[M]\\right[  " },
-    TemplateDef { selector: 9, variation: 0, description: "fence: LPLP", template: "\\left( #1[M]\\right(  " },
-    TemplateDef { selector: 9, variation: 1, description: "fence: RPLP", template: "\\left) #1[M]\\right(  " },
-    TemplateDef { selector: 9, variation: 2, description: "fence: LBLP", template: "\\left[ #1[M]\\right(  " },
-    TemplateDef { selector: 9, variation: 3, description: "fence: RBLP", template: "\\left] #1[M]\\right(  " },
-    TemplateDef { selector: 9, variation: 16, description: "fence: LPRP", template: "\\left( #1[M]\\right)  " },
-    TemplateDef { selector: 9, variation: 17, description: "fence: RPRP", template: "\\left) #1[M]\\right)  " },
-    TemplateDef { selector: 9, variation: 18, description: "fence: LBRP", template: "\\left[ #1[M]\\right)  " },
-    TemplateDef { selector: 9, variation: 19, description: "fence: RBRP", template: "\\left] #1[M]\\right)  " },
-    TemplateDef { selector: 9, variation: 32, description: "fence: LPLB", template: "\\left( #1[M]\\right[  " },
-    TemplateDef { selector: 9, variation: 33, description: "fence: RPLB", template: "\\left) #1[M]\\right[  " },
-    TemplateDef { selector: 9, variation: 34, description: "fence: LBLB", template: "\\left[ #1[M]\\right[  " },
-    TemplateDef { selector: 9, variation: 35, description: "fence: RBLB", template: "\\left] #1[M]\\right[  " },
-    TemplateDef { selector: 9, variation: 48, description: "fence: LPRB", template: "\\left( #1[M]\\right]  " },
-    TemplateDef { selector: 9, variation: 49, description: "fence: RPRB", template: "\\left) #1[M]\\right]  " },
-    TemplateDef { selector: 9, variation: 50, description: "fence: LBRB", template: "\\left[ #1[M]\\right]  " },
-    TemplateDef { selector: 9, variation: 51, description: "fence: RBRB", template: "\\left] #1[M]\\right]  " },
-    TemplateDef { selector: 10, variation: 0, description: "root: sqroot", template: "\\sqrt{#1[M]}  " },
-    TemplateDef { selector: 10, variation: 1, description: "root: nthroot", template: "\\sqrt[#2[M]]{#1[M]}  " },
-    TemplateDef { selector: 11, variation: 0, description: "fract: tmfract", template: "\\frac{#1[M]}{#2[M]}  " },
-    TemplateDef { selector: 11, variation: 1, description: "fract: smfract", template: "\\frac{#1[M]}{#2[M]}  " },
-    TemplateDef { selector: 11, variation: 2, description: "fract: slfract", template: "{#1[M]}/{#2[M]}  " },
-    TemplateDef { selector: 11, variation: 3, description: "fract: slfract", template: "{#1[M]}/{#2[M]}  " },
-    TemplateDef { selector: 11, variation: 4, description: "fract: slfract", template: "{#1[M]}/{#2[M]}  " },
-    TemplateDef { selector: 11, variation: 5, description: "fract: smfract", template: "\\frac{#1[M]}{#2[M]}  " },
-    TemplateDef { selector: 11, variation: 6, description: "fract: slfract", template: "{#1[M]}/{#2[M]}  " },
-    TemplateDef { selector: 11, variation: 7, description: "fract: slfract", template: "{#1[M]}/{#2[M]}  " },
-    TemplateDef { selector: 12, variation: 0, description: "ubar: subar", template: "\\underline{#1[M]}  " },
-    TemplateDef { selector: 12, variation: 1, description: "ubar: dubar", template: "\\underline{\\underline{#1[M]}}  " },
-    TemplateDef { selector: 13, variation: 0, description: "obar: sobar", template: "\\overline{#1[M]}  " },
-    TemplateDef { selector: 13, variation: 1, description: "obar: dobar", template: "\\overline{\\overline{#1[M]}}  " },
-    TemplateDef { selector: 14, variation: 0, description: "larrow: box on top", template: "\\stackrel{#1[M]}{\\longleftarrow}  " },
-    TemplateDef { selector: 14, variation: 1, description: "larrow: box below ", template: "\\stackunder{#1[M]}{\\longleftarrow}  " },
-    TemplateDef { selector: 14, variation: 0, description: "rarrow: box on top", template: "\\stackrel{#1[M]}{\\longrightarrow}  " },
-    TemplateDef { selector: 14, variation: 1, description: "rarrow: box below ", template: "\\stackunder{#1[M]}{\\longrightarrow}  " },
-    TemplateDef { selector: 14, variation: 0, description: "barrow: box on top", template: "\\stackrel{#1[M]}{\\longleftrightarrow}  " },
-    TemplateDef { selector: 14, variation: 1, description: "barrow: box below ", template: "\\stackunder{#1[M]}{\\longleftrightarrow}  " },
-    TemplateDef { selector: 15, variation: 0, description: "integrals: single - no limits", template: "\\int #1[M]  " },
-    TemplateDef { selector: 15, variation: 1, description: "integrals: single - both", template: "\\int\\nolimits#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  " },
-    TemplateDef { selector: 15, variation: 2, description: "integrals: double - both", template: "\\iint\\nolimits#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  " },
-    TemplateDef { selector: 15, variation: 3, description: "integrals: triple - both", template: "\\iiint\\nolimits#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  " },
-    TemplateDef { selector: 15, variation: 4, description: "integrals: contour - no limits", template: "\\oint #1[M]  " },
-    TemplateDef { selector: 15, variation: 8, description: "integrals: contour - no limits", template: "\\oint #1[M]  " },
-    TemplateDef { selector: 15, variation: 12, description: "integrals: contour - no limits", template: "\\oint #1[M]  " },
-    TemplateDef { selector: 16, variation: 0, description: "sum: limits top/bottom - both", template: "\\sum\\limits#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  " },
-    TemplateDef { selector: 17, variation: 0, description: "product: limits top/bottom - both", template: "\\prod\\limits#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  " },
-    TemplateDef { selector: 18, variation: 0, description: "coproduct: limits top/bottom - both", template: "\\dcoprod\\limits#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  " },
-    TemplateDef { selector: 19, variation: 0, description: "union: limits top/bottom - both", template: "\\dbigcup\\limits#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  " },
-    TemplateDef { selector: 20, variation: 0, description: "intersection: limits top/bottom - both", template: "\\dbigcap\\limits#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  " },
-    TemplateDef { selector: 21, variation: 0, description: "integrals: single - both", template: "\\int#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  " },
-    TemplateDef { selector: 22, variation: 0, description: "sum: single - both", template: "\\sum#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  " },
-    TemplateDef { selector: 23, variation: 0, description: "limit: both", template: "#1 #2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]  " },
-    TemplateDef { selector: 24, variation: 0, description: "horizontal brace: lower", template: "\\stackunder{#2[M]}{\\underbrace{#1[M]}}  " },
-    TemplateDef { selector: 24, variation: 1, description: "horizontal brace: upper", template: "\\stackrel{#2[M]}{\\overbrace{#1[M]}}  " },
-    TemplateDef { selector: 25, variation: 0, description: "horizontal brace: lower", template: "\\stackunder{#2[M]}{\\underbrace{#1[M]}}  " },
-    TemplateDef { selector: 25, variation: 1, description: "horizontal brace: upper", template: "\\stackrel{#2[M]}{\\overbrace{#1[M]}}  " },
-    TemplateDef { selector: 25, variation: 0, description: "hbracket", template: " " },
-    TemplateDef { selector: 27, variation: 0, description: "script: sub", template: "#1[L][STARTSUB][ENDSUB]  " },
-    TemplateDef { selector: 27, variation: 1, description: "script: sub", template: "#1[L][STARTSUB][ENDSUB]  " },
-    TemplateDef { selector: 28, variation: 0, description: "script: super", template: "#2[L][STARTSUP][ENDSUP]  " },
-    TemplateDef { selector: 28, variation: 1, description: "script: super", template: "#2[L][STARTSUP][ENDSUP]  " },
-    TemplateDef { selector: 29, variation: 0, description: "script: subsup", template: "#1[L][STARTSUB][ENDSUB]#2[L][STARTSUP][ENDSUP]  " },
+    TemplateDef {
+        selector: 0,
+        variation: 1,
+        description: "fence: angle-left only",
+        template: "\\left\\langle #1[M]\\right.  ",
+    },
+    TemplateDef {
+        selector: 0,
+        variation: 2,
+        description: "fence: angle-right only",
+        template: "\\left. #1[M]\\right\\rangle  ",
+    },
+    TemplateDef {
+        selector: 0,
+        variation: 3,
+        description: "fence: angle-both",
+        template: "\\left\\langle #1[M]\\right\\rangle  ",
+    },
+    TemplateDef {
+        selector: 1,
+        variation: 1,
+        description: "fence: paren-left only",
+        template: "\\left( #1[M]\\right.  ",
+    },
+    TemplateDef {
+        selector: 1,
+        variation: 2,
+        description: "fence: paren-right only",
+        template: "\\left. #1[M]\\right)  ",
+    },
+    TemplateDef {
+        selector: 1,
+        variation: 3,
+        description: "fence: paren-both",
+        template: "\\left( #1[M]\\right)  ",
+    },
+    TemplateDef {
+        selector: 2,
+        variation: 1,
+        description: "fence: brace-left only",
+        template: "\\left\\{ #1[M]\\right.  ",
+    },
+    TemplateDef {
+        selector: 2,
+        variation: 2,
+        description: "fence: brace-right only",
+        template: "\\left. #1[M]\\right\\}  ",
+    },
+    TemplateDef {
+        selector: 2,
+        variation: 3,
+        description: "fence: brace-both",
+        template: "\\left\\{ #1[M]\\right\\}  ",
+    },
+    TemplateDef {
+        selector: 3,
+        variation: 1,
+        description: "fence: brack-left only",
+        template: "\\lef]t[ #1[M]\\right.  ",
+    },
+    TemplateDef {
+        selector: 3,
+        variation: 2,
+        description: "fence: brack-right only",
+        template: "\\left. #1[M]\\right]  ",
+    },
+    TemplateDef {
+        selector: 3,
+        variation: 3,
+        description: "fence: brack-both",
+        template: "\\left[ #1[M]\\right]  ",
+    },
+    TemplateDef {
+        selector: 4,
+        variation: 1,
+        description: "fence: bar-left only",
+        template: "\\left| #1[M]\\right.  ",
+    },
+    TemplateDef {
+        selector: 4,
+        variation: 2,
+        description: "fence: bar-right only",
+        template: "\\left. #1[M]\\right|  ",
+    },
+    TemplateDef {
+        selector: 4,
+        variation: 3,
+        description: "fence: bar-both",
+        template: "\\left| #1[M]\\right|  ",
+    },
+    TemplateDef {
+        selector: 5,
+        variation: 1,
+        description: "fence: dbar-left only",
+        template: "\\left\\| #1[M]\\right.  ",
+    },
+    TemplateDef {
+        selector: 5,
+        variation: 2,
+        description: "fence: dbar-right only",
+        template: "\\left. #1[M]\\right\\|  ",
+    },
+    TemplateDef {
+        selector: 5,
+        variation: 3,
+        description: "fence: dbar-both",
+        template: "\\left\\| #1[M]\\right\\|  ",
+    },
+    TemplateDef {
+        selector: 6,
+        variation: 1,
+        description: "fence: floor",
+        template: "\\left\\lfloor #1[M]\\right.  ",
+    },
+    TemplateDef {
+        selector: 6,
+        variation: 2,
+        description: "fence: floor",
+        template: "\\left. #1[M]\\right\\rfloor  ",
+    },
+    TemplateDef {
+        selector: 6,
+        variation: 3,
+        description: "fence: floor",
+        template: "\\left\\lfloor #1[M]\\right\\rfloor  ",
+    },
+    TemplateDef {
+        selector: 7,
+        variation: 1,
+        description: "fence: ceiling",
+        template: "\\left\\lceil #1[M]\\right.  ",
+    },
+    TemplateDef {
+        selector: 7,
+        variation: 2,
+        description: "fence: ceiling",
+        template: "\\left. #1[M]\\right\\rceil  ",
+    },
+    TemplateDef {
+        selector: 7,
+        variation: 3,
+        description: "fence: ceiling",
+        template: "\\left\\lceil #1[M]\\right\\rceil  ",
+    },
+    TemplateDef {
+        selector: 8,
+        variation: 0,
+        description: "fence: LBLB",
+        template: "\\left[ #1[M]\\right[  ",
+    },
+    TemplateDef {
+        selector: 9,
+        variation: 0,
+        description: "fence: LPLP",
+        template: "\\left( #1[M]\\right(  ",
+    },
+    TemplateDef {
+        selector: 9,
+        variation: 1,
+        description: "fence: RPLP",
+        template: "\\left) #1[M]\\right(  ",
+    },
+    TemplateDef {
+        selector: 9,
+        variation: 2,
+        description: "fence: LBLP",
+        template: "\\left[ #1[M]\\right(  ",
+    },
+    TemplateDef {
+        selector: 9,
+        variation: 3,
+        description: "fence: RBLP",
+        template: "\\left] #1[M]\\right(  ",
+    },
+    TemplateDef {
+        selector: 9,
+        variation: 16,
+        description: "fence: LPRP",
+        template: "\\left( #1[M]\\right)  ",
+    },
+    TemplateDef {
+        selector: 9,
+        variation: 17,
+        description: "fence: RPRP",
+        template: "\\left) #1[M]\\right)  ",
+    },
+    TemplateDef {
+        selector: 9,
+        variation: 18,
+        description: "fence: LBRP",
+        template: "\\left[ #1[M]\\right)  ",
+    },
+    TemplateDef {
+        selector: 9,
+        variation: 19,
+        description: "fence: RBRP",
+        template: "\\left] #1[M]\\right)  ",
+    },
+    TemplateDef {
+        selector: 9,
+        variation: 32,
+        description: "fence: LPLB",
+        template: "\\left( #1[M]\\right[  ",
+    },
+    TemplateDef {
+        selector: 9,
+        variation: 33,
+        description: "fence: RPLB",
+        template: "\\left) #1[M]\\right[  ",
+    },
+    TemplateDef {
+        selector: 9,
+        variation: 34,
+        description: "fence: LBLB",
+        template: "\\left[ #1[M]\\right[  ",
+    },
+    TemplateDef {
+        selector: 9,
+        variation: 35,
+        description: "fence: RBLB",
+        template: "\\left] #1[M]\\right[  ",
+    },
+    TemplateDef {
+        selector: 9,
+        variation: 48,
+        description: "fence: LPRB",
+        template: "\\left( #1[M]\\right]  ",
+    },
+    TemplateDef {
+        selector: 9,
+        variation: 49,
+        description: "fence: RPRB",
+        template: "\\left) #1[M]\\right]  ",
+    },
+    TemplateDef {
+        selector: 9,
+        variation: 50,
+        description: "fence: LBRB",
+        template: "\\left[ #1[M]\\right]  ",
+    },
+    TemplateDef {
+        selector: 9,
+        variation: 51,
+        description: "fence: RBRB",
+        template: "\\left] #1[M]\\right]  ",
+    },
+    TemplateDef {
+        selector: 10,
+        variation: 0,
+        description: "root: sqroot",
+        template: "\\sqrt{#1[M]}  ",
+    },
+    TemplateDef {
+        selector: 10,
+        variation: 1,
+        description: "root: nthroot",
+        template: "\\sqrt[#2[M]]{#1[M]}  ",
+    },
+    TemplateDef {
+        selector: 11,
+        variation: 0,
+        description: "fract: tmfract",
+        template: "\\frac{#1[M]}{#2[M]}  ",
+    },
+    TemplateDef {
+        selector: 11,
+        variation: 1,
+        description: "fract: smfract",
+        template: "\\frac{#1[M]}{#2[M]}  ",
+    },
+    TemplateDef {
+        selector: 11,
+        variation: 2,
+        description: "fract: slfract",
+        template: "{#1[M]}/{#2[M]}  ",
+    },
+    TemplateDef {
+        selector: 11,
+        variation: 3,
+        description: "fract: slfract",
+        template: "{#1[M]}/{#2[M]}  ",
+    },
+    TemplateDef {
+        selector: 11,
+        variation: 4,
+        description: "fract: slfract",
+        template: "{#1[M]}/{#2[M]}  ",
+    },
+    TemplateDef {
+        selector: 11,
+        variation: 5,
+        description: "fract: smfract",
+        template: "\\frac{#1[M]}{#2[M]}  ",
+    },
+    TemplateDef {
+        selector: 11,
+        variation: 6,
+        description: "fract: slfract",
+        template: "{#1[M]}/{#2[M]}  ",
+    },
+    TemplateDef {
+        selector: 11,
+        variation: 7,
+        description: "fract: slfract",
+        template: "{#1[M]}/{#2[M]}  ",
+    },
+    TemplateDef {
+        selector: 12,
+        variation: 0,
+        description: "ubar: subar",
+        template: "\\underline{#1[M]}  ",
+    },
+    TemplateDef {
+        selector: 12,
+        variation: 1,
+        description: "ubar: dubar",
+        template: "\\underline{\\underline{#1[M]}}  ",
+    },
+    TemplateDef {
+        selector: 13,
+        variation: 0,
+        description: "obar: sobar",
+        template: "\\overline{#1[M]}  ",
+    },
+    TemplateDef {
+        selector: 13,
+        variation: 1,
+        description: "obar: dobar",
+        template: "\\overline{\\overline{#1[M]}}  ",
+    },
+    TemplateDef {
+        selector: 14,
+        variation: 0,
+        description: "larrow: box on top",
+        template: "\\stackrel{#1[M]}{\\longleftarrow}  ",
+    },
+    TemplateDef {
+        selector: 14,
+        variation: 1,
+        description: "larrow: box below ",
+        template: "\\stackunder{#1[M]}{\\longleftarrow}  ",
+    },
+    TemplateDef {
+        selector: 14,
+        variation: 0,
+        description: "rarrow: box on top",
+        template: "\\stackrel{#1[M]}{\\longrightarrow}  ",
+    },
+    TemplateDef {
+        selector: 14,
+        variation: 1,
+        description: "rarrow: box below ",
+        template: "\\stackunder{#1[M]}{\\longrightarrow}  ",
+    },
+    TemplateDef {
+        selector: 14,
+        variation: 0,
+        description: "barrow: box on top",
+        template: "\\stackrel{#1[M]}{\\longleftrightarrow}  ",
+    },
+    TemplateDef {
+        selector: 14,
+        variation: 1,
+        description: "barrow: box below ",
+        template: "\\stackunder{#1[M]}{\\longleftrightarrow}  ",
+    },
+    TemplateDef {
+        selector: 15,
+        variation: 0,
+        description: "integrals: single - no limits",
+        template: "\\int #1[M]  ",
+    },
+    TemplateDef {
+        selector: 15,
+        variation: 1,
+        description: "integrals: single - both",
+        template: "\\int\\nolimits#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  ",
+    },
+    TemplateDef {
+        selector: 15,
+        variation: 2,
+        description: "integrals: double - both",
+        template: "\\iint\\nolimits#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  ",
+    },
+    TemplateDef {
+        selector: 15,
+        variation: 3,
+        description: "integrals: triple - both",
+        template: "\\iiint\\nolimits#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  ",
+    },
+    TemplateDef {
+        selector: 15,
+        variation: 4,
+        description: "integrals: contour - no limits",
+        template: "\\oint #1[M]  ",
+    },
+    TemplateDef {
+        selector: 15,
+        variation: 8,
+        description: "integrals: contour - no limits",
+        template: "\\oint #1[M]  ",
+    },
+    TemplateDef {
+        selector: 15,
+        variation: 12,
+        description: "integrals: contour - no limits",
+        template: "\\oint #1[M]  ",
+    },
+    TemplateDef {
+        selector: 16,
+        variation: 0,
+        description: "sum: limits top/bottom - both",
+        template: "\\sum\\limits#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  ",
+    },
+    TemplateDef {
+        selector: 17,
+        variation: 0,
+        description: "product: limits top/bottom - both",
+        template: "\\prod\\limits#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  ",
+    },
+    TemplateDef {
+        selector: 18,
+        variation: 0,
+        description: "coproduct: limits top/bottom - both",
+        template: "\\dcoprod\\limits#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  ",
+    },
+    TemplateDef {
+        selector: 19,
+        variation: 0,
+        description: "union: limits top/bottom - both",
+        template: "\\dbigcup\\limits#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  ",
+    },
+    TemplateDef {
+        selector: 20,
+        variation: 0,
+        description: "intersection: limits top/bottom - both",
+        template: "\\dbigcap\\limits#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  ",
+    },
+    TemplateDef {
+        selector: 21,
+        variation: 0,
+        description: "integrals: single - both",
+        template: "\\int#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  ",
+    },
+    TemplateDef {
+        selector: 22,
+        variation: 0,
+        description: "sum: single - both",
+        template: "\\sum#2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]#1[M]  ",
+    },
+    TemplateDef {
+        selector: 23,
+        variation: 0,
+        description: "limit: both",
+        template: "#1 #2[L][STARTSUB][ENDSUB]#3[L][STARTSUP][ENDSUP]  ",
+    },
+    TemplateDef {
+        selector: 24,
+        variation: 0,
+        description: "horizontal brace: lower",
+        template: "\\stackunder{#2[M]}{\\underbrace{#1[M]}}  ",
+    },
+    TemplateDef {
+        selector: 24,
+        variation: 1,
+        description: "horizontal brace: upper",
+        template: "\\stackrel{#2[M]}{\\overbrace{#1[M]}}  ",
+    },
+    TemplateDef {
+        selector: 25,
+        variation: 0,
+        description: "horizontal brace: lower",
+        template: "\\stackunder{#2[M]}{\\underbrace{#1[M]}}  ",
+    },
+    TemplateDef {
+        selector: 25,
+        variation: 1,
+        description: "horizontal brace: upper",
+        template: "\\stackrel{#2[M]}{\\overbrace{#1[M]}}  ",
+    },
+    TemplateDef {
+        selector: 25,
+        variation: 0,
+        description: "hbracket",
+        template: " ",
+    },
+    TemplateDef {
+        selector: 27,
+        variation: 0,
+        description: "script: sub",
+        template: "#1[L][STARTSUB][ENDSUB]  ",
+    },
+    TemplateDef {
+        selector: 27,
+        variation: 1,
+        description: "script: sub",
+        template: "#1[L][STARTSUB][ENDSUB]  ",
+    },
+    TemplateDef {
+        selector: 28,
+        variation: 0,
+        description: "script: super",
+        template: "#2[L][STARTSUP][ENDSUP]  ",
+    },
+    TemplateDef {
+        selector: 28,
+        variation: 1,
+        description: "script: super",
+        template: "#2[L][STARTSUP][ENDSUP]  ",
+    },
+    TemplateDef {
+        selector: 29,
+        variation: 0,
+        description: "script: subsup",
+        template: "#1[L][STARTSUB][ENDSUB]#2[L][STARTSUP][ENDSUP]  ",
+    },
 ];
 
 impl TemplateParser {
     /// Find template by selector and variation
     pub fn find_template(selector: u8, variation: u16) -> Option<&'static TemplateDef> {
-        MTEF_TEMPLATES.iter().find(|t| t.selector == selector && t.variation == variation)
+        MTEF_TEMPLATES
+            .iter()
+            .find(|t| t.selector == selector && t.variation == variation)
     }
 
     /// Parse template arguments and apply formatting
@@ -166,7 +598,7 @@ impl TemplateParser {
                                     } else {
                                         arg_text.push_str(&sym.name);
                                     }
-                                }
+                                },
                                 _ => arg_text.push('?'), // Placeholder for complex nodes
                             }
                         }
@@ -195,7 +627,7 @@ impl TemplateParser {
                         result.push('[');
                         result.push_str(&marker);
                         result.push(']');
-                    }
+                    },
                 }
             } else {
                 result.push(ch);
@@ -216,25 +648,25 @@ impl TemplateParser {
         // Fraction: \frac{numerator}{denominator}
         if latex.starts_with("\\frac{")
             && latex.contains("}{")
-                && latex[latex.find("}{").unwrap() + 2..].find('}').is_some() {
+            && latex[latex.find("}{").unwrap() + 2..].find('}').is_some()
+        {
+            // Try to find the actual nodes from args
+            let mut numerator = Vec::new();
+            let mut denominator = Vec::new();
 
-                    // Try to find the actual nodes from args
-                    let mut numerator = Vec::new();
-                    let mut denominator = Vec::new();
+            // Simple heuristic: first arg is numerator, second is denominator
+            if args.len() >= 2 {
+                numerator = args[0].iter().cloned().collect();
+                denominator = args[1].iter().cloned().collect();
+            }
 
-                    // Simple heuristic: first arg is numerator, second is denominator
-                    if args.len() >= 2 {
-                        numerator = args[0].iter().cloned().collect();
-                        denominator = args[1].iter().cloned().collect();
-                    }
-
-                    return MathNode::Frac {
-                        numerator,
-                        denominator,
-                        line_thickness: None,
-                        frac_type: None,
-                    };
-                }
+            return MathNode::Frac {
+                numerator,
+                denominator,
+                line_thickness: None,
+                frac_type: None,
+            };
+        }
 
         // Root: \sqrt[index]{base} or \sqrt{base}
         if latex.starts_with("\\sqrt") {
@@ -258,18 +690,14 @@ impl TemplateParser {
                         };
                     }
                 }
-            } else if latex.starts_with("\\sqrt{")
-                && latex[6..].find('}').is_some() {
-                    let mut base = Vec::new();
-                    if !args.is_empty() {
-                        base = args[0].iter().cloned().collect();
-                    }
-
-                    return MathNode::Root {
-                        base,
-                        index: None,
-                    };
+            } else if latex.starts_with("\\sqrt{") && latex[6..].find('}').is_some() {
+                let mut base = Vec::new();
+                if !args.is_empty() {
+                    base = args[0].iter().cloned().collect();
                 }
+
+                return MathNode::Root { base, index: None };
+            }
         }
 
         // Large operators with limits
@@ -289,15 +717,17 @@ impl TemplateParser {
             // Extract limits from _{...}^{...} patterns
             if let Some(sub_start) = latex.find("_{")
                 && latex[sub_start + 2..].find('}').is_some()
-                    && args.len() >= 2 {
-                        lower_limit = Some(args[1].iter().cloned().collect());
-                    }
+                && args.len() >= 2
+            {
+                lower_limit = Some(args[1].iter().cloned().collect());
+            }
 
             if let Some(sup_start) = latex.find("^{")
                 && latex[sup_start + 2..].find('}').is_some()
-                    && args.len() >= 3 {
-                        upper_limit = Some(args[2].iter().cloned().collect());
-                    }
+                && args.len() >= 3
+            {
+                upper_limit = Some(args[2].iter().cloned().collect());
+            }
 
             if !args.is_empty() {
                 integrand = Some(args[0].iter().cloned().collect());
@@ -347,10 +777,7 @@ impl TemplateParser {
                 subscript = args[1].iter().cloned().collect();
             }
 
-            return MathNode::Sub {
-                base,
-                subscript,
-            };
+            return MathNode::Sub { base, subscript };
         } else if latex.contains("^{") {
             // Superscript only
             let mut base = Vec::new();
@@ -363,60 +790,60 @@ impl TemplateParser {
                 exponent = args[1].iter().cloned().collect();
             }
 
-            return MathNode::Power {
-                base,
-                exponent,
-            };
+            return MathNode::Power { base, exponent };
         }
 
         // Fences: \left...\right...
         if latex.contains("\\left") && latex.contains("\\right") {
             // Extract content between \left and \right
             if let Some(left_pos) = latex.find("\\left")
-                && let Some(right_pos) = latex.find("\\right") {
-                    let content_start = latex[left_pos..].find('{').map(|p| left_pos + p + 1).unwrap_or(left_pos + 6);
-                    let content_end = right_pos;
+                && let Some(right_pos) = latex.find("\\right")
+            {
+                let content_start = latex[left_pos..]
+                    .find('{')
+                    .map(|p| left_pos + p + 1)
+                    .unwrap_or(left_pos + 6);
+                let content_end = right_pos;
 
-                    if content_start < content_end {
+                if content_start < content_end {
+                    // Determine fence type
+                    let open_fence = if latex.contains("\\left(") {
+                        Fence::Paren
+                    } else if latex.contains("\\left[") {
+                        Fence::Bracket
+                    } else if latex.contains("\\left{") {
+                        Fence::Brace
+                    } else if latex.contains("\\left|") {
+                        Fence::Pipe
+                    } else {
+                        Fence::Paren // default
+                    };
 
-                        // Determine fence type
-                        let open_fence = if latex.contains("\\left(") {
-                            Fence::Paren
-                        } else if latex.contains("\\left[") {
-                            Fence::Bracket
-                        } else if latex.contains("\\left{") {
-                            Fence::Brace
-                        } else if latex.contains("\\left|") {
-                            Fence::Pipe
-                        } else {
-                            Fence::Paren // default
-                        };
+                    let close_fence = if latex.contains("\\right)") {
+                        Fence::Paren
+                    } else if latex.contains("\\right]") {
+                        Fence::Bracket
+                    } else if latex.contains("\\right}") {
+                        Fence::Brace
+                    } else if latex.contains("\\right|") {
+                        Fence::Pipe
+                    } else {
+                        Fence::Paren // default
+                    };
 
-                        let close_fence = if latex.contains("\\right)") {
-                            Fence::Paren
-                        } else if latex.contains("\\right]") {
-                            Fence::Bracket
-                        } else if latex.contains("\\right}") {
-                            Fence::Brace
-                        } else if latex.contains("\\right|") {
-                            Fence::Pipe
-                        } else {
-                            Fence::Paren // default
-                        };
-
-                        let mut content = Vec::new();
-                        if !args.is_empty() {
-                            content = args[0].iter().cloned().collect();
-                        }
-
-                        return MathNode::Fenced {
-                            open: open_fence,
-                            content,
-                            close: close_fence,
-                            separator: None,
-                        };
+                    let mut content = Vec::new();
+                    if !args.is_empty() {
+                        content = args[0].iter().cloned().collect();
                     }
+
+                    return MathNode::Fenced {
+                        open: open_fence,
+                        content,
+                        close: close_fence,
+                        separator: None,
+                    };
                 }
+            }
         }
 
         // Default: return as text
@@ -438,7 +865,7 @@ impl TemplateParser {
     /// Parse a slash template (inline fraction)
     ///
     /// Public API for potential external use or future MTEF features
-    #[allow(dead_code)]  // Part of public template parsing API
+    #[allow(dead_code)] // Part of public template parsing API
     pub fn parse_slash<'a>(
         numerator: Vec<MathNode<'a>>,
         denominator: Vec<MathNode<'a>>,
@@ -455,10 +882,7 @@ impl TemplateParser {
         base: Vec<MathNode<'a>>,
         index: Option<Vec<MathNode<'a>>>,
     ) -> MathNode<'a> {
-        MathNode::Root {
-            base,
-            index,
-        }
+        MathNode::Root { base, index }
     }
 
     /// Parse a subscript template
@@ -466,10 +890,7 @@ impl TemplateParser {
         base: Vec<MathNode<'a>>,
         subscript: Vec<MathNode<'a>>,
     ) -> MathNode<'a> {
-        MathNode::Sub {
-            base,
-            subscript,
-        }
+        MathNode::Sub { base, subscript }
     }
 
     /// Parse a superscript template
@@ -499,11 +920,8 @@ impl TemplateParser {
     /// Parse an underscript template
     ///
     /// Public API for potential external use or future MTEF features
-    #[allow(dead_code)]  // Part of public template parsing API
-    pub fn parse_below<'a>(
-        base: Vec<MathNode<'a>>,
-        script: Vec<MathNode<'a>>,
-    ) -> MathNode<'a> {
+    #[allow(dead_code)] // Part of public template parsing API
+    pub fn parse_below<'a>(base: Vec<MathNode<'a>>, script: Vec<MathNode<'a>>) -> MathNode<'a> {
         MathNode::Under {
             base,
             under: script,
@@ -514,11 +932,8 @@ impl TemplateParser {
     /// Parse an overscript template
     ///
     /// Public API for potential external use or future MTEF features
-    #[allow(dead_code)]  // Part of public template parsing API
-    pub fn parse_above<'a>(
-        base: Vec<MathNode<'a>>,
-        script: Vec<MathNode<'a>>,
-    ) -> MathNode<'a> {
+    #[allow(dead_code)] // Part of public template parsing API
+    pub fn parse_above<'a>(base: Vec<MathNode<'a>>, script: Vec<MathNode<'a>>) -> MathNode<'a> {
         MathNode::Over {
             base,
             over: script,
@@ -529,7 +944,7 @@ impl TemplateParser {
     /// Parse an underscript-overscript template
     ///
     /// Public API for potential external use or future MTEF features
-    #[allow(dead_code)]  // Part of public template parsing API
+    #[allow(dead_code)] // Part of public template parsing API
     pub fn parse_below_above<'a>(
         base: Vec<MathNode<'a>>,
         below: Vec<MathNode<'a>>,
@@ -552,19 +967,28 @@ impl TemplateParser {
     ) -> MathNode<'a> {
         MathNode::LargeOp {
             operator,
-            lower_limit: if lower_limit.is_empty() { None } else { Some(lower_limit) },
-            upper_limit: if upper_limit.is_empty() { None } else { Some(upper_limit) },
-            integrand: if integrand.is_empty() { None } else { Some(integrand) },
+            lower_limit: if lower_limit.is_empty() {
+                None
+            } else {
+                Some(lower_limit)
+            },
+            upper_limit: if upper_limit.is_empty() {
+                None
+            } else {
+                Some(upper_limit)
+            },
+            integrand: if integrand.is_empty() {
+                None
+            } else {
+                Some(integrand)
+            },
             hide_lower: false,
             hide_upper: false,
         }
     }
 
     /// Parse a fence template
-    pub fn parse_fence<'a>(
-        fence: Fence,
-        content: Vec<MathNode<'a>>,
-    ) -> MathNode<'a> {
+    pub fn parse_fence<'a>(fence: Fence, content: Vec<MathNode<'a>>) -> MathNode<'a> {
         MathNode::Fenced {
             open: fence,
             content,
@@ -579,18 +1003,18 @@ impl TemplateParser {
     /// Some selectors may map to the same operator type (e.g., multiple integral variants).
     ///
     /// Public API for template system, may be used by custom template handlers
-    #[allow(dead_code)]  // Part of public template mapping API
+    #[allow(dead_code)] // Part of public template mapping API
     pub fn large_op_from_selector(selector: u8) -> Option<LargeOperator> {
         match selector {
-            15 => Some(LargeOperator::Integral),   // TMPL_INTOP: integrals (single, double, triple, contour)
-            16 => Some(LargeOperator::Sum),        // TMPL_SUM: summation
-            17 => Some(LargeOperator::Product),    // TMPL_PROD: product
-            18 => Some(LargeOperator::Coproduct),  // TMPL_COPROD: coproduct
-            19 => Some(LargeOperator::Union),      // TMPL_UNION: union
+            15 => Some(LargeOperator::Integral), // TMPL_INTOP: integrals (single, double, triple, contour)
+            16 => Some(LargeOperator::Sum),      // TMPL_SUM: summation
+            17 => Some(LargeOperator::Product),  // TMPL_PROD: product
+            18 => Some(LargeOperator::Coproduct), // TMPL_COPROD: coproduct
+            19 => Some(LargeOperator::Union),    // TMPL_UNION: union
             20 => Some(LargeOperator::Intersection), // TMPL_INTER: intersection
-            21 => Some(LargeOperator::Integral),   // TMPL_IINTOP: single integral with limits
-            22 => Some(LargeOperator::Sum),        // TMPL_IIINTOP: single sum with limits
-            23 => Some(LargeOperator::Integral),   // TMPL_OINTOP: contour integral / limit template
+            21 => Some(LargeOperator::Integral), // TMPL_IINTOP: single integral with limits
+            22 => Some(LargeOperator::Sum),      // TMPL_IIINTOP: single sum with limits
+            23 => Some(LargeOperator::Integral), // TMPL_OINTOP: contour integral / limit template
             _ => None,
         }
     }
@@ -600,7 +1024,7 @@ impl TemplateParser {
     /// Maps MTEF template selectors to corresponding fence types.
     ///
     /// Public API for template system, may be used by custom template handlers
-    #[allow(dead_code)]  // Part of public template mapping API
+    #[allow(dead_code)] // Part of public template mapping API
     pub fn fence_from_selector(selector: u8) -> Option<Fence> {
         match selector {
             1 => Some(Fence::Paren),      // TMPL_PAREN: parentheses
@@ -612,4 +1036,3 @@ impl TemplateParser {
         }
     }
 }
-

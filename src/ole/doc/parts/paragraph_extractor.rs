@@ -4,16 +4,20 @@
 /// extracts paragraphs using PLCF (Property List with Character Positions)
 /// structures for paragraph boundaries (PAP) and character runs (CHP).
 use super::super::package::Result;
-use super::fib::FileInformationBlock;
-use super::pap::ParagraphProperties;
 use super::chp::CharacterProperties;
 use super::chp_bin_table::ChpBinTable;
+use super::fib::FileInformationBlock;
+use super::pap::ParagraphProperties;
 use super::piece_table::PieceTable;
 use crate::ole::plcf::PlcfParser;
 use crate::ole::sprm::parse_sprms;
 
 /// Type alias for extracted paragraph data: (text, properties, runs).
-pub(crate) type ExtractedParagraph = (String, ParagraphProperties, Vec<(String, CharacterProperties)>);
+pub(crate) type ExtractedParagraph = (
+    String,
+    ParagraphProperties,
+    Vec<(String, CharacterProperties)>,
+);
 
 /// Paragraph extractor using binary structures.
 ///
@@ -51,15 +55,19 @@ impl ParagraphExtractor {
         eprintln!("DEBUG: FIB table pointers with non-zero length:");
         for i in 0..50 {
             if let Some((offset, length)) = fib.get_table_pointer(i)
-                && length > 0 {
-                    eprintln!("DEBUG:   Index {}: offset={}, length={}", i, offset, length);
-                }
+                && length > 0
+            {
+                eprintln!("DEBUG:   Index {}: offset={}, length={}", i, offset, length);
+            }
         }
-        
+
         // Get PAP bin table location from FIB
         // Index 13 in FibRgFcLcb97 is fcPlcfBtePapx/lcbPlcfBtePapx (PLCFBTEPAPX)
         let pap_plcf = if let Some((offset, length)) = fib.get_table_pointer(13) {
-            eprintln!("DEBUG: PAP table pointer: offset={}, length={}", offset, length);
+            eprintln!(
+                "DEBUG: PAP table pointer: offset={}, length={}",
+                offset, length
+            );
             if length > 0 && (offset as usize) < table_stream.len() {
                 let pap_data = &table_stream[offset as usize..];
                 let pap_len = length.min((table_stream.len() - offset as usize) as u32) as usize;
@@ -97,7 +105,11 @@ impl ParagraphExtractor {
                 eprintln!("DEBUG: CLX data length={}", clx_len);
                 let result = PieceTable::parse(&clx_data[..clx_len]);
                 if let Some(ref pt) = result {
-                    eprintln!("DEBUG: PieceTable has {} pieces, total_cps={}", pt.pieces().len(), pt.total_cps());
+                    eprintln!(
+                        "DEBUG: PieceTable has {} pieces, total_cps={}",
+                        pt.pieces().len(),
+                        pt.total_cps()
+                    );
                 } else {
                     eprintln!("DEBUG: Failed to parse PieceTable");
                 }
@@ -114,8 +126,13 @@ impl ParagraphExtractor {
         // Get CHP bin table location from FIB and parse it properly with FKP
         // Index 12 in FibRgFcLcb97 is fcPlcfBteChpx/lcbPlcfBteChpx (PLCFBTECHPX)
         // Requires piece table for FC-to-CP conversion
-        let chp_bin_table = if let (Some((offset, length)), Some(pt)) = (fib.get_table_pointer(12), &piece_table) {
-            eprintln!("DEBUG: CHP table pointer: offset={}, length={}", offset, length);
+        let chp_bin_table = if let (Some((offset, length)), Some(pt)) =
+            (fib.get_table_pointer(12), &piece_table)
+        {
+            eprintln!(
+                "DEBUG: CHP table pointer: offset={}, length={}",
+                offset, length
+            );
             if length > 0 && (offset as usize) < table_stream.len() {
                 let chp_data = &table_stream[offset as usize..];
                 let chp_len = length.min((table_stream.len() - offset as usize) as u32) as usize;
@@ -244,7 +261,7 @@ impl ParagraphExtractor {
             for line in self.text.lines() {
                 let line_len = line.chars().count() as u32 + 1; // +1 for newline
                 let line_end = char_pos + line_len;
-                
+
                 // Extract character runs for this line
                 let runs = if !line.is_empty() {
                     self.extract_runs(char_pos, line_end).unwrap_or_else(|_| {
@@ -253,13 +270,9 @@ impl ParagraphExtractor {
                 } else {
                     vec![(String::new(), CharacterProperties::default())]
                 };
-                
-                paragraphs.push((
-                    line.to_string(),
-                    ParagraphProperties::default(),
-                    runs,
-                ));
-                
+
+                paragraphs.push((line.to_string(), ParagraphProperties::default(), runs));
+
                 char_pos = line_end;
             }
         }
@@ -273,11 +286,11 @@ impl ParagraphExtractor {
         let max_cp = self.text_ranges.len() as u32;
         let cp_start_clamped = cp_start.min(max_cp);
         let cp_end_clamped = cp_end.min(max_cp);
-        
+
         if cp_start_clamped >= cp_end_clamped {
             return String::new();
         }
-        
+
         let start_idx = cp_start_clamped as usize;
         let end_idx = cp_end_clamped as usize;
 
@@ -312,19 +325,23 @@ impl ParagraphExtractor {
             unsafe {
                 DEBUG_COUNT += 1;
                 if DEBUG_COUNT <= 3 {
-                    eprintln!("DEBUG: extract_runs called, para_start={}, para_end={}, total_runs={}", 
-                              para_start, para_end, chp_bin_table.runs().len());
+                    eprintln!(
+                        "DEBUG: extract_runs called, para_start={}, para_end={}, total_runs={}",
+                        para_start,
+                        para_end,
+                        chp_bin_table.runs().len()
+                    );
                 }
             }
-            
+
             // Get runs that overlap with this paragraph
             let overlapping_runs = chp_bin_table.runs_in_range(para_start, para_end);
-            
+
             let debug_count = unsafe { DEBUG_COUNT };
             if debug_count <= 3 {
                 eprintln!("DEBUG:   Found {} overlapping runs", overlapping_runs.len());
             }
-            
+
             for run in overlapping_runs {
                 // Calculate actual run boundaries within paragraph
                 let actual_start = run.start_cp.max(para_start);
@@ -332,11 +349,16 @@ impl ParagraphExtractor {
 
                 // Extract run text
                 let run_text = self.extract_text_range(actual_start, actual_end);
-                
+
                 if debug_count <= 3 && runs.len() < 5 {
-                    eprintln!("DEBUG:     Run: cp={}..{}, is_ole2={}, pic_offset={:?}, text_len={}", 
-                             actual_start, actual_end, run.properties.is_ole2, 
-                             run.properties.pic_offset, run_text.len());
+                    eprintln!(
+                        "DEBUG:     Run: cp={}..{}, is_ole2={}, pic_offset={:?}, text_len={}",
+                        actual_start,
+                        actual_end,
+                        run.properties.is_ole2,
+                        run.properties.pic_offset,
+                        run_text.len()
+                    );
                 }
 
                 runs.push((run_text, run.properties.clone()));
@@ -385,33 +407,31 @@ impl ParagraphExtractor {
                             _ => super::pap::Justification::Left,
                         };
                     }
-                }
+                },
                 0x840F | 0x000F => {
                     // Left indent
                     props.indent_left = sprm.operand_i16().map(|v| v as i32);
-                }
+                },
                 0x8411 | 0x0011 => {
                     // Right indent
                     props.indent_right = sprm.operand_i16().map(|v| v as i32);
-                }
+                },
                 0x2416 => {
                     // sprmPFInTable - paragraph is in a table
                     props.in_table = sprm.operand_byte().unwrap_or(0) != 0;
-                }
+                },
                 0x2417 => {
                     // sprmPFTtp - table row end marker (table trailer paragraph)
                     props.is_table_row_end = sprm.operand_byte().unwrap_or(0) != 0;
-                }
+                },
                 0x6649 => {
                     // sprmPItap - table nesting level (4-byte operand)
                     props.table_level = sprm.operand_dword().unwrap_or(0) as i32;
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
 
         Ok(props)
     }
-
 }
-

@@ -4,12 +4,12 @@
 
 use std::path::Path;
 
+use super::section::{PagesSection, PagesSectionType};
 use crate::iwa::Result;
 use crate::iwa::bundle::Bundle;
 use crate::iwa::object_index::ObjectIndex;
 use crate::iwa::registry::Application;
 use crate::iwa::text::TextExtractor;
-use super::section::{PagesSection, PagesSectionType};
 
 /// High-level interface for Pages documents
 pub struct PagesDocument {
@@ -33,10 +33,10 @@ impl PagesDocument {
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let bundle = Bundle::open(path)?;
-        
+
         // Verify this is a Pages document
         Self::verify_application(&bundle)?;
-        
+
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
         Ok(Self {
@@ -59,10 +59,10 @@ impl PagesDocument {
     /// ```
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let bundle = Bundle::from_bytes(bytes)?;
-        
+
         // Verify this is a Pages document
         Self::verify_application(&bundle)?;
-        
+
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
         Ok(Self {
@@ -77,7 +77,9 @@ impl PagesDocument {
         // Message type 10000 is TP.DocumentArchive
         let has_pages_types = bundle.archives().values().any(|archive| {
             archive.objects.iter().any(|obj| {
-                obj.messages.iter().any(|msg| msg.type_ == 10000 || (10000..11000).contains(&msg.type_))
+                obj.messages
+                    .iter()
+                    .any(|msg| msg.type_ == 10000 || (10000..11000).contains(&msg.type_))
             })
         });
 
@@ -136,11 +138,11 @@ impl PagesDocument {
             // If no explicit sections found, create a single body section
             // with all text content
             let mut section = PagesSection::new(0, PagesSectionType::Body);
-            
+
             // Extract text from all TSWP storage objects
             let mut extractor = TextExtractor::new();
             extractor.extract_from_bundle(&self.bundle)?;
-            
+
             for storage in extractor.storages() {
                 if !storage.is_empty() {
                     section.text_storages.push(storage.clone());
@@ -155,7 +157,7 @@ impl PagesDocument {
             // Parse explicit sections
             for (index, (_archive_name, _object)) in section_objects.iter().enumerate() {
                 let section = PagesSection::new(index, PagesSectionType::Body);
-                
+
                 // In a full implementation, we would:
                 // 1. Parse the section protobuf message
                 // 2. Resolve references to text storage objects
@@ -219,7 +221,11 @@ mod tests {
         }
 
         let doc_result = PagesDocument::open(doc_path);
-        assert!(doc_result.is_ok(), "Failed to open Pages document: {:?}", doc_result.err());
+        assert!(
+            doc_result.is_ok(),
+            "Failed to open Pages document: {:?}",
+            doc_result.err()
+        );
 
         let doc = doc_result.unwrap();
         assert!(doc.object_index.all_object_ids().len() > 0);
@@ -235,7 +241,7 @@ mod tests {
         let doc = PagesDocument::open(doc_path).unwrap();
         let text_result = doc.text();
         assert!(text_result.is_ok());
-        
+
         // Text might be empty for some documents, but extraction should succeed
         let _text = text_result.unwrap();
     }
@@ -253,7 +259,9 @@ mod tests {
 
         let sections = sections_result.unwrap();
         // Document should have at least one section (even if implicit)
-        assert!(!sections.is_empty(), "Document should have at least one section");
+        assert!(
+            !sections.is_empty(),
+            "Document should have at least one section"
+        );
     }
 }
-

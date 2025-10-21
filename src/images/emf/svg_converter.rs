@@ -80,19 +80,11 @@ impl EmfSvgConverter {
     /// This processes all EMF records in parallel where possible and generates
     /// an SVG document with vector graphics and embedded raster images.
     pub fn convert_to_svg(&self) -> Result<String> {
-        let mut builder = SvgBuilder::new(
-            self.parser.width() as f64,
-            self.parser.height() as f64,
-        );
+        let mut builder = SvgBuilder::new(self.parser.width() as f64, self.parser.height() as f64);
 
         // Set viewBox based on bounds
         let (x1, y1, x2, y2) = self.parser.header.bounds;
-        builder = builder.with_viewbox(
-            x1 as f64,
-            y1 as f64,
-            (x2 - x1) as f64,
-            (y2 - y1) as f64,
-        );
+        builder = builder.with_viewbox(x1 as f64, y1 as f64, (x2 - x1) as f64, (y2 - y1) as f64);
 
         // Process records in parallel to extract elements
         // Group records by type for efficient parallel processing
@@ -356,7 +348,9 @@ impl EmfSvgConverter {
 
         // Try to extract and convert DIB data
         // This is simplified - full implementation would parse DIB structure
-        if let Ok(png_data) = self.extract_and_convert_dib(&record.data[std::mem::size_of::<EmfStretchDibits>()..]) {
+        if let Ok(png_data) =
+            self.extract_and_convert_dib(&record.data[std::mem::size_of::<EmfStretchDibits>()..])
+        {
             return Ok(Some(SvgElement::Image(SvgImage::from_png_data(
                 stretch.x_dest as f64,
                 stretch.y_dest as f64,
@@ -426,4 +420,3 @@ mod tests {
         // Placeholder for future tests
     }
 }
-

@@ -2,10 +2,9 @@
 //!
 //! Based on Apache POI's PersistPtrHolder and related infrastructure.
 
-pub mod ptr_holder;
 pub mod mapping;
+pub mod ptr_holder;
 
 // Re-export main types
-pub use ptr_holder::PersistPtrHolder;
 pub use mapping::PersistMapping;
-
+pub use ptr_holder::PersistPtrHolder;

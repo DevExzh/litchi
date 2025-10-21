@@ -1,9 +1,9 @@
+use super::super::OleFile;
 /// High-performance Presentation API with zero-copy slide parsing.
 use super::package::{PptError, Result};
-use super::slide::{Slide, SlideFactory};
 use super::parsers::PptRecordParser;
 use super::persist::PersistMapping;
-use super::super::OleFile;
+use super::slide::{Slide, SlideFactory};
 use std::io::{Read, Seek};
 
 /// A PowerPoint presentation (.ppt) with high-performance zero-copy parsing.
@@ -72,7 +72,9 @@ impl Presentation {
             return Ok(data);
         }
 
-        Err(PptError::InvalidFormat("PowerPoint Document stream not found".to_string()))
+        Err(PptError::InvalidFormat(
+            "PowerPoint Document stream not found".to_string(),
+        ))
     }
 
     /// Get iterator over all slides with zero-copy borrowing.
@@ -84,13 +86,12 @@ impl Presentation {
     /// - Each slide lazily loads its shapes
     pub fn slides(&self) -> Result<Vec<Slide<'_>>> {
         let factory = SlideFactory::new(&self.powerpoint_document, &self.persist_mapping);
-        
-        factory.slides()
+
+        factory
+            .slides()
             .enumerate()
             .map(|(idx, slide_result)| {
-                slide_result.map(|slide_data| {
-                    Slide::from_slide_data(slide_data, idx + 1)
-                })
+                slide_result.map(|slide_data| Slide::from_slide_data(slide_data, idx + 1))
             })
             .collect()
     }
@@ -111,10 +112,9 @@ impl Presentation {
     /// - Text is collected and joined
     pub fn text(&self) -> Result<String> {
         let slides = self.slides()?;
-        let text_parts: Vec<String> = slides.iter()
-            .filter_map(|slide| {
-                slide.text().ok().map(|s| s.to_string())
-            })
+        let text_parts: Vec<String> = slides
+            .iter()
+            .filter_map(|slide| slide.text().ok().map(|s| s.to_string()))
             .filter(|text| !text.is_empty())
             .collect();
 

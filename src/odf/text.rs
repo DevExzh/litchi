@@ -3,11 +3,11 @@
 //! This module provides a unified API for working with OpenDocument text documents,
 //! equivalent to Microsoft Word documents.
 
-use crate::common::{Error, Result, Metadata};
-use crate::odf::core::{Content, Meta, Package, Styles, Manifest};
-use crate::odf::elements::text::{TextElements, Paragraph as ElementParagraph};
+use crate::common::{Error, Metadata, Result};
+use crate::odf::core::{Content, Manifest, Meta, Package, Styles};
+use crate::odf::elements::style::{StyleElements, StyleRegistry};
 use crate::odf::elements::table::Table as ElementTable;
-use crate::odf::elements::style::{StyleRegistry, StyleElements};
+use crate::odf::elements::text::{Paragraph as ElementParagraph, TextElements};
 use std::io::Cursor;
 use std::path::Path;
 
@@ -41,7 +41,8 @@ impl Document {
         let mime_type = package.mimetype();
         if !mime_type.contains("opendocument.text") {
             return Err(Error::InvalidFormat(format!(
-                "Not an ODT file: MIME type is {}", mime_type
+                "Not an ODT file: MIME type is {}",
+                mime_type
             )));
         }
 
@@ -70,9 +71,10 @@ impl Document {
 
         // Parse styles from styles.xml if available
         if let Some(ref styles_part) = styles
-            && let Ok(registry) = StyleElements::parse_styles(styles_part.xml_content()) {
-                style_registry = registry;
-            }
+            && let Ok(registry) = StyleElements::parse_styles(styles_part.xml_content())
+        {
+            style_registry = registry;
+        }
 
         // Also parse styles from content.xml (automatic styles)
         if let Ok(content_registry) = StyleElements::parse_styles(content.xml_content()) {
@@ -123,8 +125,10 @@ impl Document {
     }
 
     /// Get resolved style properties for a given style name
-    pub fn get_style_properties(&self, style_name: &str) -> crate::odf::elements::style::StyleProperties {
+    pub fn get_style_properties(
+        &self,
+        style_name: &str,
+    ) -> crate::odf::elements::style::StyleProperties {
         self.style_registry.get_resolved_properties(style_name)
     }
 }
-

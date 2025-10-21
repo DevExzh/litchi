@@ -336,4 +336,3 @@ mod tests {
         assert_eq!(options.strikethrough_style, StrikethroughStyle::Markdown);
     }
 }
-

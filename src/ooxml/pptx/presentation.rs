@@ -1,7 +1,7 @@
 /// Main presentation object - the high-level API for working with presentations.
 use crate::ooxml::error::Result;
-use crate::ooxml::opc::packuri::PackURI;
 use crate::ooxml::opc::OpcPackage;
+use crate::ooxml::opc::packuri::PackURI;
 use crate::ooxml::pptx::parts::{PresentationPart, SlideMasterPart, SlidePart};
 use crate::ooxml::pptx::slide::{Slide, SlideMaster};
 
@@ -134,7 +134,7 @@ impl<'a> Presentation<'a> {
         for rid in slide_rids {
             // Get the target reference from the relationship
             let target_ref = pres_part.target_ref(&rid)?;
-            
+
             // Resolve the target partname and get the part from the package
             let base_uri = pres_part.partname().base_uri();
             let target_partname = PackURI::from_rel_ref(base_uri, target_ref)
@@ -174,7 +174,7 @@ impl<'a> Presentation<'a> {
         for rid in master_rids {
             // Get the target reference from the relationship
             let target_ref = pres_part.target_ref(&rid)?;
-            
+
             // Resolve the target partname and get the part from the package
             let base_uri = pres_part.partname().base_uri();
             let target_partname = PackURI::from_rel_ref(base_uri, target_ref)
@@ -207,4 +207,3 @@ impl<'a> Presentation<'a> {
 mod tests {
     // Tests will be added as implementation progresses
 }
-

@@ -1,13 +1,13 @@
-/// Type definitions for mathematical formula nodes
-mod types;
-/// Math node definitions
-mod node;
 /// Builder for constructing formula nodes efficiently
 mod builder;
+/// Math node definitions
+mod node;
+/// Type definitions for mathematical formula nodes
+mod types;
 
-pub use types::*;
-pub use node::MathNode;
 pub use builder::FormulaBuilder;
+pub use node::MathNode;
+pub use types::*;
 
 use bumpalo::Bump;
 
@@ -87,4 +87,3 @@ mod tests {
         assert!(formula.display_style());
     }
 }
-

@@ -1,10 +1,10 @@
+use super::super::consts::PptRecordType;
+use super::package::Result;
 /// EscherTextboxWrapper implementation.
 ///
 /// Based on Apache POI's EscherTextboxWrapper, this wraps an Escher textbox record
 /// and provides access to its child PPT records (TextCharsAtom, TextBytesAtom, StyleTextPropAtom).
 use super::records::PptRecord;
-use super::package::Result;
-use super::super::consts::PptRecordType;
 
 /// Wrapper around Escher textbox data.
 ///
@@ -35,7 +35,7 @@ impl EscherTextboxWrapper {
         // that should be handled by the fallback in parse_text_record
         if text.is_empty() && !child_records.is_empty() {
             return Err(super::package::PptError::InvalidFormat(
-                "No text records found in Escher textbox data".to_string()
+                "No text records found in Escher textbox data".to_string(),
             ));
         }
 
@@ -61,14 +61,14 @@ impl EscherTextboxWrapper {
                     if consumed == 0 {
                         break; // Prevent infinite loop
                     }
-                }
+                },
                 Err(_) => {
                     // Skip invalid records
                     offset += 1;
                     if offset + 8 > data.len() {
                         break;
                     }
-                }
+                },
             }
         }
 
@@ -85,11 +85,12 @@ impl EscherTextboxWrapper {
             match record.record_type {
                 PptRecordType::TextCharsAtom | PptRecordType::TextBytesAtom => {
                     if let Ok(text) = record.extract_text()
-                        && !text.is_empty() {
-                            text_parts.push(text);
-                        }
-                }
-                _ => {}
+                        && !text.is_empty()
+                    {
+                        text_parts.push(text);
+                    }
+                },
+                _ => {},
             }
         }
 
@@ -127,12 +128,12 @@ mod tests {
     fn test_escher_textbox_wrapper_creation() {
         // Create a simple textbox with a TextCharsAtom
         let mut data = Vec::new();
-        
+
         // TextCharsAtom header
         data.extend_from_slice(&[0xA0, 0x0F]); // Record type 0x0FA0 (4000)
         data.extend_from_slice(&[0x0A, 0x00, 0x00, 0x00]); // Length: 10 bytes
         data.extend_from_slice(&[0x00, 0x00]); // Version/instance
-        
+
         // Text data (UTF-16LE): "Hello"
         data.extend_from_slice(&[
             0x48, 0x00, // 'H'
@@ -147,4 +148,3 @@ mod tests {
         assert!(!wrapper.child_records().is_empty());
     }
 }
-

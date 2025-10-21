@@ -4,7 +4,7 @@
 /// to modify properties. This module provides common SPRM parsing logic
 /// based on Apache POI's SPRM handling.
 /// SPRM operation types based on size code (from POI's SprmOperation).
-use crate::common::binary::{read_u16_le, read_i16_le, read_u32_le};
+use crate::common::binary::{read_i16_le, read_u16_le, read_u32_le};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SprmOperation {
     /// Size code 0 - toggle (no operand)
@@ -127,9 +127,9 @@ fn parse_sprms_two_byte(grpprl: &[u8]) -> Vec<Sprm> {
         //   case 6: variable length
         //   case 7: return 5;  // 2 byte opcode + 3 byte operand
         let operand_size = match size_code {
-            0 | 1 => 1, // 1 byte operand
+            0 | 1 => 1,     // 1 byte operand
             2 | 4 | 5 => 2, // 2 byte operand
-            3 => 4, // 4 byte operand
+            3 => 4,         // 4 byte operand
             6 => {
                 // Variable length - read size from first byte (or 2 bytes for long SPRMs)
                 if offset + 1 < grpprl.len() {
@@ -148,7 +148,7 @@ fn parse_sprms_two_byte(grpprl: &[u8]) -> Vec<Sprm> {
                 } else {
                     break;
                 }
-            }
+            },
             7 => 3, // 3 byte operand
             _ => unreachable!(),
         };
@@ -201,7 +201,7 @@ pub fn get_int_from_sprm(sprm: &Sprm) -> Option<i32> {
         SprmOperation::Byte | SprmOperation::Toggle => sprm.operand_byte().map(|b| b as i32),
         SprmOperation::Word | SprmOperation::Word2 | SprmOperation::Word3 => {
             sprm.operand_i16().map(|w| w as i32)
-        }
+        },
         SprmOperation::DWord => sprm.operand_dword().map(|d| d as i32),
         _ => None,
     }
@@ -277,4 +277,3 @@ mod tests {
         assert!(!get_bool_from_sprm(&sprm_false));
     }
 }
-

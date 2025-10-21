@@ -17,21 +17,20 @@
 //! - Functional iterator chains
 //! - Efficient bit manipulation
 
-pub mod types;
-pub mod record;
-pub mod parser;
 pub mod container;
-pub mod text;
+pub mod parser;
+pub mod properties;
+pub mod record;
 pub mod shape;
 pub mod shape_factory;
-pub mod properties;
+pub mod text;
+pub mod types;
 
-pub use types::EscherRecordType;
-pub use record::EscherRecord;
-pub use parser::EscherParser;
 pub use container::EscherContainer;
-pub use text::extract_text_from_escher;
+pub use parser::EscherParser;
+pub use properties::{EscherProperties, EscherPropertyId, ShapeAnchor};
+pub use record::EscherRecord;
 pub use shape::{EscherShape, EscherShapeType};
 pub use shape_factory::EscherShapeFactory;
-pub use properties::{EscherProperties, EscherPropertyId, ShapeAnchor};
-
+pub use text::extract_text_from_escher;
+pub use types::EscherRecordType;

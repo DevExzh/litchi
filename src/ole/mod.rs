@@ -42,6 +42,6 @@ pub mod ppt;
 pub mod xls;
 
 // Re-export public types for convenient access
-pub use file::{is_ole_file, DirectoryEntry, OleError, OleFile};
+pub use file::{DirectoryEntry, OleError, OleFile, is_ole_file};
 pub use metadata::{OleMetadata, PropertyValue};
 pub use xls::{XlsError, XlsWorkbook};

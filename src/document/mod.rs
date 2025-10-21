@@ -46,14 +46,14 @@
 //! ```
 
 // Submodule declarations
-mod types;
 mod doc;
 mod paragraph;
 mod run;
 mod table;
+mod types;
 
 // Re-exports
 pub use doc::Document;
 pub use paragraph::Paragraph;
 pub use run::Run;
-pub use table::{Table, Row, Cell};
+pub use table::{Cell, Row, Table};

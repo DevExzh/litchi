@@ -15,5 +15,5 @@ pub mod style;
 pub use detection::{FileFormat, detect_file_format, detect_file_format_from_bytes};
 pub use error::{Error, Result};
 pub use metadata::Metadata;
-pub use shapes::{ShapeType, PlaceholderType};
-pub use style::{RGBColor, Length, VerticalPosition};
+pub use shapes::{PlaceholderType, ShapeType};
+pub use style::{Length, RGBColor, VerticalPosition};

@@ -2,8 +2,8 @@
 //!
 //! This module is only available when the `ole` feature is enabled.
 
-use std::io::{Read, Seek};
 use crate::common::detection::FileFormat;
+use std::io::{Read, Seek};
 
 /// Detect OLE2-based formats from byte signature.
 /// Uses proper OLE file parsing to identify the format.
@@ -35,9 +35,7 @@ pub fn detect_ole2_format(_bytes: &[u8]) -> Option<FileFormat> {
 /// # Note
 /// This function requires the `ole` feature to be enabled.
 #[cfg(feature = "ole")]
-pub fn detect_ole2_format_from_reader<R: Read + Seek>(
-    reader: &mut R
-) -> Option<FileFormat> {
+pub fn detect_ole2_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileFormat> {
     // Try to open as OLE file - this will validate the format and parse structure
     let ole_file = match crate::ole::OleFile::open(reader) {
         Ok(ole) => ole,
@@ -70,8 +68,6 @@ pub fn detect_ole2_format_from_reader<R: Read + Seek>(
 /// Stub implementation when `ole` feature is disabled.
 /// Always returns None since OLE2 parsing is not available.
 #[cfg(not(feature = "ole"))]
-pub fn detect_ole2_format_from_reader<R: Read + Seek>(
-    _reader: &mut R
-) -> Option<FileFormat> {
+pub fn detect_ole2_format_from_reader<R: Read + Seek>(_reader: &mut R) -> Option<FileFormat> {
     None
 }

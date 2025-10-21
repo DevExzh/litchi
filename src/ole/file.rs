@@ -287,9 +287,10 @@ impl<R: Read + Seek> OleFile<R> {
 
                 // Get next DIFAT sector
                 let next_offset = entries_per_sector * 4;
-                difat_sector = U32::<LE>::read_from_bytes(&sector_data[next_offset..next_offset + 4])
-                    .map(|v| v.get())
-                    .unwrap_or(0);
+                difat_sector =
+                    U32::<LE>::read_from_bytes(&sector_data[next_offset..next_offset + 4])
+                        .map(|v| v.get())
+                        .unwrap_or(0);
 
                 if difat_sector == ENDOFCHAIN || difat_sector == FREESECT {
                     break;
@@ -723,12 +724,16 @@ impl<R: Read + Seek> OleFile<R> {
         }
 
         // Search left subtree
-        if entry.sid_left != NOSTREAM && let Ok(found) = self.find_child_by_name(entry.sid_left, name) {
+        if entry.sid_left != NOSTREAM
+            && let Ok(found) = self.find_child_by_name(entry.sid_left, name)
+        {
             return Ok(found);
         }
 
         // Search right subtree
-        if entry.sid_right != NOSTREAM && let Ok(found) = self.find_child_by_name(entry.sid_right, name) {
+        if entry.sid_right != NOSTREAM
+            && let Ok(found) = self.find_child_by_name(entry.sid_right, name)
+        {
             return Ok(found);
         }
 

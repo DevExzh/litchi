@@ -206,12 +206,13 @@ impl TableProperties {
                         };
                         offset += 1;
                     }
-                }
+                },
                 // Table definition (sprmTDefTable)
                 0xD608 => {
                     // This is complex - contains cell count and boundaries
                     if offset + 1 < grpprl.len() {
-                        let size = u16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]) as usize;
+                        let size =
+                            u16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]) as usize;
                         offset += 2;
 
                         if offset + size <= grpprl.len() {
@@ -220,35 +221,36 @@ impl TableProperties {
                             offset += size;
                         }
                     }
-                }
+                },
                 // Row height (sprmTDyaRowHeight)
                 0x9407 => {
                     if offset + 1 < grpprl.len() {
-                        tap.row_height = Some(i16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]));
+                        tap.row_height =
+                            Some(i16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]));
                         offset += 2;
                     }
-                }
+                },
                 // Header row (sprmTTableHeader)
                 0x3403 => {
                     if offset < grpprl.len() {
                         tap.is_header_row = grpprl[offset] != 0;
                         offset += 1;
                     }
-                }
+                },
                 // Can't split row (sprmTFCantSplit)
                 0x3404 => {
                     if offset < grpprl.len() {
                         tap.allow_row_break = grpprl[offset] == 0;
                         offset += 1;
                     }
-                }
+                },
                 // Table indent (sprmTDxaLeft)
                 0x9601 => {
                     if offset + 1 < grpprl.len() {
                         tap.indent_left = i16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]);
                         offset += 2;
                     }
-                }
+                },
                 // Cell properties (various sprmTCxxx)
                 0xD605..=0xD620 => {
                     // Cell-specific SPRMs
@@ -257,12 +259,12 @@ impl TableProperties {
                         // Parse cell properties if needed
                         offset += size;
                     }
-                }
+                },
                 // Unknown SPRM - skip
                 _ => {
                     let size = Self::get_sprm_size(sprm);
                     offset += size;
-                }
+                },
             }
         }
 
@@ -350,14 +352,14 @@ mod tests {
     #[test]
     fn test_table_definition() {
         let mut tap = TableProperties::new();
-        
+
         // Create simple table definition: 2 cells
         // Format: count(1) + boundaries(3 * 2 bytes)
         let data = vec![
-            2,         // 2 cells
-            0, 0,      // Start at 0
-            100, 0,    // First boundary at 100 twips
-            200, 0,    // End at 200 twips
+            2, // 2 cells
+            0, 0, // Start at 0
+            100, 0, // First boundary at 100 twips
+            200, 0, // End at 200 twips
         ];
 
         tap.parse_table_definition(&data).unwrap();
@@ -367,4 +369,3 @@ mod tests {
         assert_eq!(tap.get_cell_width(1), Some(100));
     }
 }
-

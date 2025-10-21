@@ -52,8 +52,8 @@ impl Content {
     /// Extract paragraphs from the document body
     #[allow(dead_code)]
     pub fn extract_paragraphs(&self) -> Result<Vec<crate::odf::elements::text::Paragraph>> {
-        use quick_xml::events::Event;
         use quick_xml::Reader;
+        use quick_xml::events::Event;
 
         let mut reader = Reader::from_str(self.xml.content());
         let mut buf = Vec::new();
@@ -80,14 +80,13 @@ impl Content {
                         is_current_heading = name_bytes == b"text:h";
                         current_para_text.clear();
                     }
-                }
+                },
                 Ok(Event::Text(ref t)) => {
                     if in_paragraph {
-                        let text_content = String::from_utf8(t.to_vec())
-                            .unwrap_or_default();
+                        let text_content = String::from_utf8(t.to_vec()).unwrap_or_default();
                         current_para_text.push_str(&text_content);
                     }
-                }
+                },
                 Ok(Event::End(ref e)) => {
                     // Copy the name bytes to avoid lifetime issues
                     let name_bytes = e.name().as_ref().to_vec();
@@ -98,8 +97,8 @@ impl Content {
 
                     // Check if we're ending a paragraph element
                     if in_paragraph {
-                        let is_ending_para = (is_current_heading && name_bytes == b"text:h") ||
-                                           (!is_current_heading && name_bytes == b"text:p");
+                        let is_ending_para = (is_current_heading && name_bytes == b"text:h")
+                            || (!is_current_heading && name_bytes == b"text:p");
 
                         if is_ending_para {
                             in_paragraph = false;
@@ -115,9 +114,9 @@ impl Content {
                             }
                         }
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -125,7 +124,6 @@ impl Content {
         Ok(paragraphs)
     }
 }
-
 
 /// Parsed styles.xml part
 #[derive(Debug)]
@@ -174,5 +172,3 @@ impl Meta {
         }
     }
 }
-
-

@@ -60,9 +60,12 @@ impl Table {
         let mut rows = Vec::new();
         for child in self.element.children() {
             if child.tag_name() == "table:table-row"
-                && let Ok(row) = TableRow::from_element(unsafe { &*(child as *const _ as *const Element) }.clone()) {
-                    rows.push(row);
-                }
+                && let Ok(row) = TableRow::from_element(
+                    unsafe { &*(child as *const _ as *const Element) }.clone(),
+                )
+            {
+                rows.push(row);
+            }
         }
         Ok(rows)
     }
@@ -86,7 +89,8 @@ impl Table {
     /// Get the number of columns (based on the widest row)
     pub fn column_count(&self) -> Result<usize> {
         let rows = self.rows()?;
-        let max_cols = rows.iter()
+        let max_cols = rows
+            .iter()
             .map(|row| row.cells().map(|cells| cells.len()).unwrap_or(0))
             .max()
             .unwrap_or(0);
@@ -123,7 +127,9 @@ impl TableRow {
     /// Create table row from element
     pub fn from_element(element: Element) -> Result<Self> {
         if element.tag_name() != "table:table-row" {
-            return Err(Error::InvalidFormat("Element is not a table row".to_string()));
+            return Err(Error::InvalidFormat(
+                "Element is not a table row".to_string(),
+            ));
         }
         Ok(Self { element })
     }
@@ -133,9 +139,12 @@ impl TableRow {
         let mut cells = Vec::new();
         for child in self.element.children() {
             if child.tag_name() == "table:table-cell"
-                && let Ok(cell) = TableCell::from_element(unsafe { &*(child as *const _ as *const Element) }.clone()) {
-                    cells.push(cell);
-                }
+                && let Ok(cell) = TableCell::from_element(
+                    unsafe { &*(child as *const _ as *const Element) }.clone(),
+                )
+            {
+                cells.push(cell);
+            }
         }
         Ok(cells)
     }
@@ -191,7 +200,9 @@ impl TableCell {
     /// Create table cell from element
     pub fn from_element(element: Element) -> Result<Self> {
         if element.tag_name() != "table:table-cell" {
-            return Err(Error::InvalidFormat("Element is not a table cell".to_string()));
+            return Err(Error::InvalidFormat(
+                "Element is not a table cell".to_string(),
+            ));
         }
         Ok(Self { element })
     }
@@ -214,43 +225,48 @@ impl TableCell {
         match value_type {
             Some("float") | Some("double") | Some("decimal") => {
                 if let Some(val_str) = self.element.get_attribute("office:value")
-                    && let Ok(num) = val_str.parse::<f64>() {
-                        return Ok(CellValue::Number(num));
-                    }
-            }
+                    && let Ok(num) = val_str.parse::<f64>()
+                {
+                    return Ok(CellValue::Number(num));
+                }
+            },
             Some("currency") => {
                 if let Some(val_str) = self.element.get_attribute("office:value")
-                    && let Ok(num) = val_str.parse::<f64>() {
-                        let currency = self.element.get_attribute("office:currency")
-                            .unwrap_or("USD");
-                        return Ok(CellValue::Currency(num, currency.to_string()));
-                    }
-            }
+                    && let Ok(num) = val_str.parse::<f64>()
+                {
+                    let currency = self
+                        .element
+                        .get_attribute("office:currency")
+                        .unwrap_or("USD");
+                    return Ok(CellValue::Currency(num, currency.to_string()));
+                }
+            },
             Some("percentage") => {
                 if let Some(val_str) = self.element.get_attribute("office:value")
-                    && let Ok(num) = val_str.parse::<f64>() {
-                        return Ok(CellValue::Percentage(num));
-                    }
-            }
+                    && let Ok(num) = val_str.parse::<f64>()
+                {
+                    return Ok(CellValue::Percentage(num));
+                }
+            },
             Some("boolean") => {
                 if let Some(val_str) = self.element.get_attribute("office:value") {
                     match val_str {
                         "true" => return Ok(CellValue::Boolean(true)),
                         "false" => return Ok(CellValue::Boolean(false)),
-                        _ => {}
+                        _ => {},
                     }
                 }
-            }
+            },
             Some("date") => {
                 if let Some(val_str) = self.element.get_attribute("office:value") {
                     return Ok(CellValue::Date(val_str.to_string()));
                 }
-            }
+            },
             Some("time") => {
                 if let Some(val_str) = self.element.get_attribute("office:value") {
                     return Ok(CellValue::Time(val_str.to_string()));
                 }
-            }
+            },
             _ => {
                 let text = self.text()?;
                 if text.trim().is_empty() {
@@ -258,7 +274,7 @@ impl TableCell {
                 } else {
                     return Ok(CellValue::Text(text));
                 }
-            }
+            },
         }
 
         // Fallback to text parsing
@@ -292,26 +308,30 @@ impl TableCell {
 
     /// Get the number of columns this cell spans
     pub fn colspan(&self) -> usize {
-        self.element.get_int_attribute("table:number-columns-spanned")
+        self.element
+            .get_int_attribute("table:number-columns-spanned")
             .map(|n| n as usize)
             .unwrap_or(1)
     }
 
     /// Set the number of columns this cell spans
     pub fn set_colspan(&mut self, span: usize) {
-        self.element.set_attribute("table:number-columns-spanned", &span.to_string());
+        self.element
+            .set_attribute("table:number-columns-spanned", &span.to_string());
     }
 
     /// Get the number of rows this cell spans
     pub fn rowspan(&self) -> usize {
-        self.element.get_int_attribute("table:number-rows-spanned")
+        self.element
+            .get_int_attribute("table:number-rows-spanned")
             .map(|n| n as usize)
             .unwrap_or(1)
     }
 
     /// Set the number of rows this cell spans
     pub fn set_rowspan(&mut self, span: usize) {
-        self.element.set_attribute("table:number-rows-spanned", &span.to_string());
+        self.element
+            .set_attribute("table:number-rows-spanned", &span.to_string());
     }
 
     /// Check if the cell is empty
@@ -349,7 +369,9 @@ impl TableColumn {
     /// Create table column from element
     pub fn from_element(element: Element) -> Result<Self> {
         if element.tag_name() != "table:table-column" {
-            return Err(Error::InvalidFormat("Element is not a table column".to_string()));
+            return Err(Error::InvalidFormat(
+                "Element is not a table column".to_string(),
+            ));
         }
         Ok(Self { element })
     }
@@ -371,19 +393,22 @@ impl TableColumn {
 
     /// Set the default cell style name
     pub fn set_default_cell_style_name(&mut self, name: &str) {
-        self.element.set_attribute("table:default-cell-style-name", name);
+        self.element
+            .set_attribute("table:default-cell-style-name", name);
     }
 
     /// Get the number of columns this column definition represents
     pub fn repeated(&self) -> usize {
-        self.element.get_int_attribute("table:number-columns-repeated")
+        self.element
+            .get_int_attribute("table:number-columns-repeated")
             .map(|n| n as usize)
             .unwrap_or(1)
     }
 
     /// Set the number of columns this column definition represents
     pub fn set_repeated(&mut self, count: usize) {
-        self.element.set_attribute("table:number-columns-repeated", &count.to_string());
+        self.element
+            .set_attribute("table:number-columns-repeated", &count.to_string());
     }
 }
 
@@ -412,8 +437,8 @@ impl TableElements {
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(quick_xml::events::Event::Start(ref e)) => {
-                    let tag_name = String::from_utf8(e.name().as_ref().to_vec())
-                        .unwrap_or_default();
+                    let tag_name =
+                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
 
                     if tag_name == "table:table" {
                         let mut element = Element::new(&tag_name);
@@ -423,10 +448,11 @@ impl TableElements {
                             if let Ok(attr) = attr_result
                                 && let (Ok(key), Ok(value)) = (
                                     String::from_utf8(attr.key.as_ref().to_vec()),
-                                    String::from_utf8(attr.value.to_vec())
-                                ) {
-                                    element.set_attribute(&key, &value);
-                                }
+                                    String::from_utf8(attr.value.to_vec()),
+                                )
+                            {
+                                element.set_attribute(&key, &value);
+                            }
                         }
 
                         stack.push(element);
@@ -439,41 +465,44 @@ impl TableElements {
                             if let Ok(attr) = attr_result
                                 && let (Ok(key), Ok(value)) = (
                                     String::from_utf8(attr.key.as_ref().to_vec()),
-                                    String::from_utf8(attr.value.to_vec())
-                                ) {
-                                    element.set_attribute(&key, &value);
-                                }
+                                    String::from_utf8(attr.value.to_vec()),
+                                )
+                            {
+                                element.set_attribute(&key, &value);
+                            }
                         }
 
                         stack.push(element);
                     }
-                }
+                },
                 Ok(quick_xml::events::Event::Text(ref t)) => {
                     if let Some(current) = stack.last_mut()
-                        && let Ok(text) = String::from_utf8(t.to_vec()) {
-                            let current_text = current.text().to_string();
-                            current.set_text(&format!("{}{}", current_text, text));
-                        }
-                }
+                        && let Ok(text) = String::from_utf8(t.to_vec())
+                    {
+                        let current_text = current.text().to_string();
+                        current.set_text(&format!("{}{}", current_text, text));
+                    }
+                },
                 Ok(quick_xml::events::Event::End(ref e)) => {
-                    let tag_name = String::from_utf8(e.name().as_ref().to_vec())
-                        .unwrap_or_default();
+                    let tag_name =
+                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
 
                     if tag_name == "table:table" {
                         if let Some(table_element) = stack.pop()
-                            && let Ok(table) = Table::from_element(table_element) {
-                                tables.push(table);
-                            }
+                            && let Ok(table) = Table::from_element(table_element)
+                        {
+                            tables.push(table);
+                        }
                     } else if !stack.is_empty() {
                         let element = stack.pop().unwrap();
                         if let Some(parent) = stack.last_mut() {
                             parent.add_child(Box::new(element));
                         }
                     }
-                }
+                },
                 Ok(quick_xml::events::Event::Eof) => break,
                 Err(_) => break,
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -483,7 +512,10 @@ impl TableElements {
 
     /// Parse table from XML content with proper handling of repeated cells
     #[allow(dead_code)]
-    pub fn parse_table_with_expansion(xml_content: &str, table_name: Option<&str>) -> Result<Option<Table>> {
+    pub fn parse_table_with_expansion(
+        xml_content: &str,
+        table_name: Option<&str>,
+    ) -> Result<Option<Table>> {
         let tables = Self::parse_tables(xml_content)?;
 
         for table in tables {
@@ -504,7 +536,9 @@ impl TableElements {
                     }
 
                     for cell in row.cells()? {
-                        let repeated = cell.element.get_int_attribute("table:number-columns-repeated")
+                        let repeated = cell
+                            .element
+                            .get_int_attribute("table:number-columns-repeated")
                             .map(|n| n as usize)
                             .unwrap_or(1);
 

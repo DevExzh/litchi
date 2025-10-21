@@ -15,7 +15,10 @@
 
 use super::types::EscherRecordType;
 use crate::ole::ppt::package::{PptError, Result};
-use zerocopy::{byteorder::{U16, U32, LittleEndian}, FromBytes};
+use zerocopy::{
+    FromBytes,
+    byteorder::{LittleEndian, U16, U32},
+};
 
 /// An Escher record with zero-copy data access.
 #[derive(Debug, Clone)]
@@ -50,32 +53,32 @@ impl<'data> EscherRecord<'data> {
         // Verify we have enough data for header
         if offset + 8 > data.len() {
             return Err(PptError::Corrupted(
-                "Not enough data for Escher record header".to_string()
+                "Not enough data for Escher record header".to_string(),
             ));
         }
-        
+
         // Read header (8 bytes) - little-endian format
         // Bytes 0-1: Version (4 bits) | Instance (12 bits)
         let ver_inst = U16::<LittleEndian>::read_from_bytes(&data[offset..offset + 2])
             .map(|v| v.get())
             .unwrap_or(0);
-        
+
         // Bytes 2-3: Record Type
         let record_type_raw = U16::<LittleEndian>::read_from_bytes(&data[offset + 2..offset + 4])
             .map(|v| v.get())
             .unwrap_or(0);
-        
+
         // Bytes 4-7: Record Length
         let length = U32::<LittleEndian>::read_from_bytes(&data[offset + 4..offset + 8])
             .map(|v| v.get())
             .unwrap_or(0);
-        
+
         // Extract version (lower 4 bits) and instance (upper 12 bits)
         let version = (ver_inst & 0x000F) as u8;
         let instance = (ver_inst >> 4) & 0x0FFF;
-        
+
         let record_type = EscherRecordType::from(record_type_raw);
-        
+
         // Verify record data is within bounds
         let data_end = offset + 8 + length as usize;
         if data_end > data.len() {
@@ -83,7 +86,7 @@ impl<'data> EscherRecord<'data> {
             if record_type.is_container() && offset + 8 <= data.len() {
                 let available_length = (data.len() - offset - 8) as u32;
                 let record_data = &data[offset + 8..];
-                
+
                 return Ok((
                     Self {
                         record_type,
@@ -96,16 +99,18 @@ impl<'data> EscherRecord<'data> {
                     8 + record_data.len(),
                 ));
             }
-            
-            return Err(PptError::Corrupted(
-                format!("Escher record data extends beyond bounds: offset={}, length={}, data_len={}", 
-                       offset, length, data.len())
-            ));
+
+            return Err(PptError::Corrupted(format!(
+                "Escher record data extends beyond bounds: offset={}, length={}, data_len={}",
+                offset,
+                length,
+                data.len()
+            )));
         }
-        
+
         // Zero-copy: Borrow slice from original data
         let record_data = &data[offset + 8..data_end];
-        
+
         Ok((
             Self {
                 record_type,
@@ -118,7 +123,7 @@ impl<'data> EscherRecord<'data> {
             8 + length as usize,
         ))
     }
-    
+
     /// Check if this is a container record (can have children).
     ///
     /// Container records have version 0xF (15).
@@ -126,19 +131,19 @@ impl<'data> EscherRecord<'data> {
     pub fn is_container(&self) -> bool {
         self.version == 0x0F || self.record_type.is_container()
     }
-    
+
     /// Check if this record can contain text.
     #[inline]
     pub fn can_contain_text(&self) -> bool {
         self.record_type.can_contain_text()
     }
-    
+
     /// Get the offset of this record's data within the parent data slice.
     #[inline]
     pub fn data_offset(&self, parent_data: &[u8]) -> Option<usize> {
         let parent_ptr = parent_data.as_ptr() as usize;
         let data_ptr = self.data.as_ptr() as usize;
-        
+
         if data_ptr >= parent_ptr && data_ptr < parent_ptr + parent_data.len() {
             Some(data_ptr - parent_ptr)
         } else {
@@ -150,7 +155,7 @@ impl<'data> EscherRecord<'data> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_parse_container_record() {
         // Create a test SpContainer record (0xF004)
@@ -161,9 +166,9 @@ mod tests {
             0x01, 0x02, 0x03, 0x04, // data
             0x05, 0x06, 0x07, 0x08,
         ];
-        
+
         let (record, consumed) = EscherRecord::parse(&data, 0).unwrap();
-        
+
         assert_eq!(record.version, 0x0F);
         assert_eq!(record.instance, 0);
         assert_eq!(record.record_type, EscherRecordType::SpContainer);
@@ -172,7 +177,7 @@ mod tests {
         assert_eq!(consumed, 16);
         assert!(record.is_container());
     }
-    
+
     #[test]
     fn test_parse_atom_record() {
         // Create a test Sp atom record (0xF00A)
@@ -182,9 +187,9 @@ mod tests {
             0x04, 0x00, 0x00, 0x00, // length = 4
             0xAA, 0xBB, 0xCC, 0xDD, // data
         ];
-        
+
         let (record, consumed) = EscherRecord::parse(&data, 0).unwrap();
-        
+
         assert_eq!(record.version, 0x02);
         assert_eq!(record.instance, 0);
         assert_eq!(record.record_type, EscherRecordType::Sp);
@@ -194,4 +199,3 @@ mod tests {
         assert!(!record.is_container());
     }
 }
-

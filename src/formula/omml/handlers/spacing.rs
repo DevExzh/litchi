@@ -1,8 +1,8 @@
 // Spacing element handler
 
 use crate::formula::ast::*;
-use crate::formula::omml::elements::ElementContext;
 use crate::formula::omml::attributes::{get_attribute_value, parse_space_type};
+use crate::formula::omml::elements::ElementContext;
 use crate::formula::omml::properties::parse_spacing_properties;
 use quick_xml::events::BytesStart;
 
@@ -35,8 +35,7 @@ impl SpacingHandler {
         // Create a spacing node if spacing is specified
         if let Some(spacing) = &context.properties.spacing {
             // Use the dedicated space type parsing function
-            let space_type = parse_space_type(Some(spacing))
-                .unwrap_or(SpaceType::Thin);
+            let space_type = parse_space_type(Some(spacing)).unwrap_or(SpaceType::Thin);
 
             let node = MathNode::Space(space_type);
 

@@ -1,6 +1,6 @@
 // Operator and symbol conversion to LaTeX
 
-use crate::formula::ast::{Operator, Fence, LargeOperator, AccentType, SpaceType, StyleType};
+use crate::formula::ast::{AccentType, Fence, LargeOperator, Operator, SpaceType, StyleType};
 
 /// Convert operator to LaTeX string
 pub fn operator_to_latex(op: Operator) -> &'static str {
@@ -190,12 +190,35 @@ pub fn style_to_latex(style: StyleType) -> &'static str {
 pub fn is_standard_function(name: &str) -> bool {
     matches!(
         name,
-        "sin" | "cos" | "tan" | "cot" | "sec" | "csc" |
-        "sinh" | "cosh" | "tanh" | "coth" |
-        "arcsin" | "arccos" | "arctan" |
-        "log" | "ln" | "lg" | "exp" |
-        "max" | "min" | "sup" | "inf" |
-        "lim" | "limsup" | "liminf" |
-        "det" | "dim" | "deg" | "gcd" | "hom" | "ker"
+        "sin"
+            | "cos"
+            | "tan"
+            | "cot"
+            | "sec"
+            | "csc"
+            | "sinh"
+            | "cosh"
+            | "tanh"
+            | "coth"
+            | "arcsin"
+            | "arccos"
+            | "arctan"
+            | "log"
+            | "ln"
+            | "lg"
+            | "exp"
+            | "max"
+            | "min"
+            | "sup"
+            | "inf"
+            | "lim"
+            | "limsup"
+            | "liminf"
+            | "det"
+            | "dim"
+            | "deg"
+            | "gcd"
+            | "hom"
+            | "ker"
     )
 }

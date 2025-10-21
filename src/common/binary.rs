@@ -3,7 +3,7 @@
 //! This module provides common functions for reading binary data in little-endian format
 //! and parsing strings (UTF-16LE, Windows-1252) used in Office file formats.
 
-use zerocopy::{FromBytes, LE, U16, U32, I16, I32, F64};
+use zerocopy::{F64, FromBytes, I16, I32, LE, U16, U32};
 
 /// Binary parsing error type
 #[derive(Debug, Clone)]
@@ -17,9 +17,16 @@ pub enum BinaryError {
 impl std::fmt::Display for BinaryError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BinaryError::InsufficientData { expected, available } => {
-                write!(f, "Insufficient data: expected {}, got {}", expected, available)
-            }
+            BinaryError::InsufficientData {
+                expected,
+                available,
+            } => {
+                write!(
+                    f,
+                    "Insufficient data: expected {}, got {}",
+                    expected, available
+                )
+            },
             BinaryError::ParseError(msg) => write!(f, "Parse error: {}", msg),
         }
     }
@@ -314,7 +321,6 @@ fn windows_1252_to_char(byte: u8) -> char {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -354,6 +360,4 @@ mod tests {
         assert!(result.starts_with("Hello"));
         assert!(result.contains('"'));
     }
-
 }
-

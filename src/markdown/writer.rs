@@ -1,13 +1,13 @@
+use super::config::{MarkdownOptions, TableStyle};
 /// Low-level writer for Markdown generation.
 ///
 /// This module provides the `MarkdownWriter` struct which handles the actual
 /// conversion of document elements to Markdown format.
 ///
 /// **Note**: Some functionality requires the `ole` or `ooxml` feature to be enabled.
-use crate::common::{Error, Result, Metadata};
+use crate::common::{Error, Metadata, Result};
 #[cfg(any(feature = "ole", feature = "ooxml"))]
 use crate::document::{Paragraph, Run, Table};
-use super::config::{MarkdownOptions, TableStyle};
 use std::fmt::Write as FmtWrite;
 
 /// Information about a detected list item.
@@ -107,7 +107,7 @@ impl MarkdownWriter {
         {
             use crate::common::VerticalPosition;
             let vertical_pos = run.vertical_position()?;
-            
+
             // Pre-calculate buffer size needed to minimize reallocations
             let mut needed_capacity = text.len();
             if vertical_pos.is_some() {
@@ -128,23 +128,21 @@ impl MarkdownWriter {
             // For superscript/subscript, we apply them directly and skip other formatting
             if let Some(pos) = vertical_pos {
                 match self.options.script_style {
-                    super::config::ScriptStyle::Html => {
-                        match pos {
-                            VerticalPosition::Superscript => {
-                                self.buffer.push_str("<sup>");
-                                self.buffer.push_str(&text);
-                                self.buffer.push_str("</sup>");
-                            }
-                            VerticalPosition::Subscript => {
-                                self.buffer.push_str("<sub>");
-                                self.buffer.push_str(&text);
-                                self.buffer.push_str("</sub>");
-                            }
-                            VerticalPosition::Normal => {
-                                self.buffer.push_str(&text);
-                            }
-                        }
-                    }
+                    super::config::ScriptStyle::Html => match pos {
+                        VerticalPosition::Superscript => {
+                            self.buffer.push_str("<sup>");
+                            self.buffer.push_str(&text);
+                            self.buffer.push_str("</sup>");
+                        },
+                        VerticalPosition::Subscript => {
+                            self.buffer.push_str("<sub>");
+                            self.buffer.push_str(&text);
+                            self.buffer.push_str("</sub>");
+                        },
+                        VerticalPosition::Normal => {
+                            self.buffer.push_str(&text);
+                        },
+                    },
                     super::config::ScriptStyle::Unicode => {
                         // Convert to Unicode superscript/subscript characters
                         // Fall back to HTML tags for characters without Unicode equivalents
@@ -160,7 +158,7 @@ impl MarkdownWriter {
                                     self.buffer.push_str(&text);
                                     self.buffer.push_str("</sup>");
                                 }
-                            }
+                            },
                             VerticalPosition::Subscript => {
                                 if super::unicode::can_convert_to_subscript(&text) {
                                     // All characters can be converted to subscript
@@ -172,12 +170,12 @@ impl MarkdownWriter {
                                     self.buffer.push_str(&text);
                                     self.buffer.push_str("</sub>");
                                 }
-                            }
+                            },
                             VerticalPosition::Normal => {
                                 self.buffer.push_str(&text);
-                            }
+                            },
                         }
-                    }
+                    },
                 }
                 return Ok(());
             }
@@ -201,30 +199,28 @@ impl MarkdownWriter {
         // Apply strikethrough and bold/italic formatting
         if strikethrough {
             match self.options.strikethrough_style {
-                super::config::StrikethroughStyle::Markdown => {
-                    match (bold, italic) {
-                        (true, true) => {
-                            self.buffer.push_str("~~***");
-                            self.buffer.push_str(&text);
-                            self.buffer.push_str("***~~");
-                        }
-                        (true, false) => {
-                            self.buffer.push_str("~~**");
-                            self.buffer.push_str(&text);
-                            self.buffer.push_str("**~~");
-                        }
-                        (false, true) => {
-                            self.buffer.push_str("~~*");
-                            self.buffer.push_str(&text);
-                            self.buffer.push_str("*~~");
-                        }
-                        (false, false) => {
-                            self.buffer.push_str("~~");
-                            self.buffer.push_str(&text);
-                            self.buffer.push_str("~~");
-                        }
-                    }
-                }
+                super::config::StrikethroughStyle::Markdown => match (bold, italic) {
+                    (true, true) => {
+                        self.buffer.push_str("~~***");
+                        self.buffer.push_str(&text);
+                        self.buffer.push_str("***~~");
+                    },
+                    (true, false) => {
+                        self.buffer.push_str("~~**");
+                        self.buffer.push_str(&text);
+                        self.buffer.push_str("**~~");
+                    },
+                    (false, true) => {
+                        self.buffer.push_str("~~*");
+                        self.buffer.push_str(&text);
+                        self.buffer.push_str("*~~");
+                    },
+                    (false, false) => {
+                        self.buffer.push_str("~~");
+                        self.buffer.push_str(&text);
+                        self.buffer.push_str("~~");
+                    },
+                },
                 super::config::StrikethroughStyle::Html => {
                     self.buffer.push_str("<del>");
                     match (bold, italic) {
@@ -232,23 +228,23 @@ impl MarkdownWriter {
                             self.buffer.push_str("***");
                             self.buffer.push_str(&text);
                             self.buffer.push_str("***");
-                        }
+                        },
                         (true, false) => {
                             self.buffer.push_str("**");
                             self.buffer.push_str(&text);
                             self.buffer.push_str("**");
-                        }
+                        },
                         (false, true) => {
                             self.buffer.push('*');
                             self.buffer.push_str(&text);
                             self.buffer.push('*');
-                        }
+                        },
                         (false, false) => {
                             self.buffer.push_str(&text);
-                        }
+                        },
                     }
                     self.buffer.push_str("</del>");
-                }
+                },
             }
         } else {
             // Apply bold/italic only
@@ -257,20 +253,20 @@ impl MarkdownWriter {
                     self.buffer.push_str("***");
                     self.buffer.push_str(&text);
                     self.buffer.push_str("***");
-                }
+                },
                 (true, false) => {
                     self.buffer.push_str("**");
                     self.buffer.push_str(&text);
                     self.buffer.push_str("**");
-                }
+                },
                 (false, true) => {
                     self.buffer.push('*');
                     self.buffer.push_str(&text);
                     self.buffer.push('*');
-                }
+                },
                 (false, false) => {
                     self.buffer.push_str(&text);
-                }
+                },
             }
         }
 
@@ -288,13 +284,13 @@ impl MarkdownWriter {
         match self.options.table_style {
             TableStyle::Markdown if !has_merged_cells => {
                 self.write_markdown_table(table)?;
-            }
+            },
             TableStyle::MinimalHtml | TableStyle::Markdown => {
                 self.write_html_table(table, false)?;
-            }
+            },
             TableStyle::StyledHtml => {
                 self.write_html_table(table, true)?;
-            }
+            },
         }
 
         // Add spacing after table
@@ -316,7 +312,8 @@ impl MarkdownWriter {
         }
 
         // Check for inconsistent cell counts
-        let cell_counts: Vec<usize> = rows.iter()
+        let cell_counts: Vec<usize> = rows
+            .iter()
             .map(|row| row.cells().map(|cells| cells.len()).unwrap_or(0))
             .collect();
 
@@ -428,10 +425,13 @@ impl MarkdownWriter {
                     .replace('<', "&lt;")
                     .replace('>', "&gt;")
                     .replace('\n', "<br>");
-                
-                writeln!(self.buffer, "{}{}<{}>{}</{}>", 
-                    indent, indent, tag, escaped, tag)
-                    .map_err(|e| Error::Other(e.to_string()))?;
+
+                writeln!(
+                    self.buffer,
+                    "{}{}<{}>{}</{}>",
+                    indent, indent, tag, escaped, tag
+                )
+                .map_err(|e| Error::Other(e.to_string()))?;
             }
 
             writeln!(self.buffer, "{}</tr>", indent).map_err(|e| Error::Other(e.to_string()))?;
@@ -459,7 +459,9 @@ impl MarkdownWriter {
     /// Write a formatted string to the buffer.
     pub fn write_fmt(&mut self, args: std::fmt::Arguments) -> Result<()> {
         use std::fmt::Write as FmtWrite;
-        self.buffer.write_fmt(args).map_err(|e| Error::Other(e.to_string()))
+        self.buffer
+            .write_fmt(args)
+            .map_err(|e| Error::Other(e.to_string()))
     }
 
     /// Reserve additional capacity in the buffer.
@@ -476,7 +478,8 @@ impl MarkdownWriter {
             return Ok(());
         }
 
-        let yaml_front_matter = metadata.to_yaml_front_matter()
+        let yaml_front_matter = metadata
+            .to_yaml_front_matter()
             .map_err(|e| Error::Other(format!("Failed to generate YAML front matter: {}", e)))?;
 
         if !yaml_front_matter.is_empty() {
@@ -523,29 +526,34 @@ impl MarkdownWriter {
     fn extract_ordered_list_marker<'a>(&self, text: &'a str) -> Option<(&'a str, &'a str)> {
         // Match patterns like: "1. ", "2) ", "(1) ", etc.
         if let Some(pos) = text.find('.')
-            && pos > 0 && text[..pos].chars().all(|c| c.is_ascii_digit()) {
-                let marker_end = pos + 1;
-                if text.len() > marker_end && text.as_bytes()[marker_end] == b' ' {
-                    return Some((&text[..marker_end], &text[marker_end + 1..]));
-                }
+            && pos > 0
+            && text[..pos].chars().all(|c| c.is_ascii_digit())
+        {
+            let marker_end = pos + 1;
+            if text.len() > marker_end && text.as_bytes()[marker_end] == b' ' {
+                return Some((&text[..marker_end], &text[marker_end + 1..]));
             }
+        }
 
         if let Some(pos) = text.find(')')
-            && pos > 0 && text[..pos].chars().all(|c| c.is_ascii_digit()) {
-                let marker_end = pos + 1;
-                if text.len() > marker_end && text.as_bytes()[marker_end] == b' ' {
-                    return Some((&text[..marker_end], &text[marker_end + 1..]));
-                }
+            && pos > 0
+            && text[..pos].chars().all(|c| c.is_ascii_digit())
+        {
+            let marker_end = pos + 1;
+            if text.len() > marker_end && text.as_bytes()[marker_end] == b' ' {
+                return Some((&text[..marker_end], &text[marker_end + 1..]));
             }
+        }
 
         // Check for parenthesized numbers: (1) (2) (3)
         if text.starts_with('(')
-            && let Some(end_pos) = text.find(") ") {
-                let inner = &text[1..end_pos];
-                if inner.chars().all(|c| c.is_ascii_digit()) {
-                    return Some((&text[..end_pos + 1], &text[end_pos + 2..]));
-                }
+            && let Some(end_pos) = text.find(") ")
+        {
+            let inner = &text[1..end_pos];
+            if inner.chars().all(|c| c.is_ascii_digit()) {
+                return Some((&text[..end_pos + 1], &text[end_pos + 2..]));
             }
+        }
 
         None
     }
@@ -556,9 +564,10 @@ impl MarkdownWriter {
 
         for &marker in &markers {
             if let Some(remaining) = text.strip_prefix(marker)
-                && (remaining.starts_with(' ') || remaining.starts_with('\t')) {
-                    return Some((marker, remaining.trim_start()));
-                }
+                && (remaining.starts_with(' ') || remaining.starts_with('\t'))
+            {
+                return Some((marker, remaining.trim_start()));
+            }
         }
 
         None
@@ -579,11 +588,14 @@ impl MarkdownWriter {
         // Try OOXML OMML formulas first
         #[cfg(feature = "ooxml")]
         if let crate::document::Run::Docx(docx_run) = run
-            && let Some(_omml_xml) = docx_run.omml_formula()? {
-                // For now, return a placeholder. In a full implementation,
-                // this would parse the OMML XML and convert to LaTeX/markdown
-                return Ok(Some(self.format_formula_placeholder("OMML formula detected")));
-            }
+            && let Some(_omml_xml) = docx_run.omml_formula()?
+        {
+            // For now, return a placeholder. In a full implementation,
+            // this would parse the OMML XML and convert to LaTeX/markdown
+            return Ok(Some(
+                self.format_formula_placeholder("OMML formula detected"),
+            ));
+        }
 
         // Try OLE MTEF formulas
         #[cfg(feature = "ole")]
@@ -594,7 +606,7 @@ impl MarkdownWriter {
                 #[cfg(feature = "ooxml")]
                 _ => return Ok(None),
             };
-            
+
             if ole_run.has_mtef_formula() {
                 // Get the MTEF formula AST
                 if let Some(mtef_ast) = ole_run.mtef_formula_ast() {
@@ -615,14 +627,14 @@ impl MarkdownWriter {
     #[cfg(feature = "formula")]
     fn convert_mtef_to_latex(&self, nodes: &[crate::formula::MathNode]) -> String {
         use crate::formula::latex::LatexConverter;
-        
+
         let mut converter = LatexConverter::new();
         match converter.convert_nodes(nodes) {
             Ok(latex) => latex.to_string(),
             Err(_) => "[Formula conversion error]".to_string(),
         }
     }
-    
+
     /// Convert MTEF AST nodes to LaTeX string (fallback when formula feature is disabled)
     #[cfg(not(feature = "formula"))]
     fn convert_mtef_to_latex(&self, _nodes: &[()]) -> String {
@@ -673,14 +685,14 @@ impl MarkdownWriter {
                     // Convert "1)" or "(1)" to "1." for markdown
                     if list_info.marker.starts_with('(') && list_info.marker.ends_with(')') {
                         // Extract number from (1) -> 1.
-                        let inner = &list_info.marker[1..list_info.marker.len()-1];
+                        let inner = &list_info.marker[1..list_info.marker.len() - 1];
                         format!("{}.", inner)
                     } else {
                         // Convert "1)" to "1."
                         list_info.marker.replace(')', ".")
                     }
                 }
-            }
+            },
             ListType::Unordered => "-".to_string(),
         };
 
@@ -701,4 +713,3 @@ impl MarkdownWriter {
         Ok(())
     }
 }
-

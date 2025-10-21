@@ -114,7 +114,7 @@ impl ReferenceGraph {
         if !outgoing.contains(&target_id) {
             outgoing.push(target_id);
         }
-        
+
         // Add to incoming refs with deduplication
         let incoming = self.incoming_refs.entry(target_id).or_default();
         if !incoming.contains(&source_id) {
@@ -225,13 +225,13 @@ impl ReferenceGraph {
     /// ```
     pub fn has_cycle_from(&self, start_id: u64) -> bool {
         use std::collections::HashSet;
-        
+
         let mut visited = HashSet::new();
         let mut rec_stack = HashSet::new();
-        
+
         self.has_cycle_dfs(start_id, &mut visited, &mut rec_stack)
     }
-    
+
     /// Helper for cycle detection using DFS
     ///
     /// Implements the classical DFS-based cycle detection algorithm for
@@ -246,7 +246,7 @@ impl ReferenceGraph {
         // Mark current node as visited and add to recursion stack
         visited.insert(node);
         rec_stack.insert(node);
-        
+
         // Check all outgoing edges
         if let Some(neighbors) = self.get_outgoing_refs(node) {
             for &neighbor in neighbors {
@@ -261,7 +261,7 @@ impl ReferenceGraph {
                 }
             }
         }
-        
+
         // Remove from recursion stack before returning
         rec_stack.remove(&node);
         false
@@ -300,19 +300,19 @@ impl ReferenceGraph {
     /// ```
     pub fn get_reachable(&self, start_id: u64) -> Vec<u64> {
         use std::collections::{HashSet, VecDeque};
-        
+
         let mut visited = HashSet::new();
         let mut queue = VecDeque::new();
         let mut result = Vec::new();
-        
+
         // Start with the initial object
         queue.push_back(start_id);
         visited.insert(start_id);
-        
+
         // BFS traversal
         while let Some(node) = queue.pop_front() {
             result.push(node);
-            
+
             // Add all unvisited neighbors to the queue
             if let Some(neighbors) = self.get_outgoing_refs(node) {
                 for &neighbor in neighbors {
@@ -322,7 +322,7 @@ impl ReferenceGraph {
                 }
             }
         }
-        
+
         result
     }
 
@@ -364,9 +364,19 @@ impl ReferenceGraph {
     pub fn stats(&self) -> (usize, usize, usize, usize) {
         let total_objects = self.len();
         let total_edges: usize = self.outgoing_refs.values().map(|v| v.len()).sum();
-        let max_out_degree = self.outgoing_refs.values().map(|v| v.len()).max().unwrap_or(0);
-        let max_in_degree = self.incoming_refs.values().map(|v| v.len()).max().unwrap_or(0);
-        
+        let max_out_degree = self
+            .outgoing_refs
+            .values()
+            .map(|v| v.len())
+            .max()
+            .unwrap_or(0);
+        let max_in_degree = self
+            .incoming_refs
+            .values()
+            .map(|v| v.len())
+            .max()
+            .unwrap_or(0);
+
         (total_objects, total_edges, max_out_degree, max_in_degree)
     }
 }
@@ -470,16 +480,16 @@ mod tests {
         assert_eq!(objects, 4);
         assert_eq!(edges, 4);
         assert_eq!(max_out, 3); // Node 1 has 3 outgoing edges
-        assert_eq!(max_in, 2);  // Node 3 has 2 incoming edges
+        assert_eq!(max_in, 2); // Node 3 has 2 incoming edges
     }
 
     #[test]
     fn test_reference_graph_empty() {
         let graph = ReferenceGraph::new();
-        
+
         assert!(graph.is_empty());
         assert_eq!(graph.len(), 0);
-        
+
         let (objects, edges, max_out, max_in) = graph.stats();
         assert_eq!(objects, 0);
         assert_eq!(edges, 0);
@@ -490,11 +500,11 @@ mod tests {
     #[test]
     fn test_all_objects() {
         let mut graph = ReferenceGraph::new();
-        
+
         graph.add_reference(1, 2);
         graph.add_reference(3, 4);
         graph.add_reference(5, 6);
-        
+
         let all = graph.all_objects();
         assert_eq!(all.len(), 6);
         for i in 1..=6 {
@@ -502,4 +512,3 @@ mod tests {
         }
     }
 }
-

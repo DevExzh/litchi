@@ -17,7 +17,10 @@ impl EqArrPrHandler {
             // Store the parsed properties in the parent context
             parent.properties = context.properties.clone();
             // Pass children up
-            crate::formula::omml::utils::extend_vec_efficient(&mut parent.children, context.children.clone());
+            crate::formula::omml::utils::extend_vec_efficient(
+                &mut parent.children,
+                context.children.clone(),
+            );
         }
     }
 }

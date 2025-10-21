@@ -76,25 +76,25 @@ impl BaseHandler {
             match parent.element_type {
                 ElementType::Superscript | ElementType::Subscript | ElementType::SubSup => {
                     parent.base = Some(context.children.clone());
-                }
+                },
                 ElementType::Radical => {
                     parent.base = Some(context.children.clone());
-                }
+                },
                 ElementType::Accent | ElementType::Bar | ElementType::GroupChar => {
                     parent.base = Some(context.children.clone());
-                }
+                },
                 ElementType::Nary => {
                     // For n-ary operators, the e element is the integrand
                     parent.integrand = Some(context.children.clone());
-                }
+                },
                 ElementType::EqArr => {
                     // For equation arrays, each e element is a row
                     parent.eq_array_rows.push(context.children.clone());
-                }
+                },
                 _ => {
                     // Pass children up for other contexts
                     extend_vec_efficient(&mut parent.children, context.children.clone());
-                }
+                },
             }
         }
     }
@@ -154,7 +154,10 @@ impl IntegrandHandler {
                 parent.integrand = Some(context.children.clone());
             } else {
                 // Pass children up if not in a nary context
-                crate::formula::omml::utils::extend_vec_efficient(&mut parent.children, context.children.clone());
+                crate::formula::omml::utils::extend_vec_efficient(
+                    &mut parent.children,
+                    context.children.clone(),
+                );
             }
         }
     }
@@ -174,7 +177,10 @@ impl LimUppHandler {
                 parent.upper_limit = Some(context.children.clone());
             } else {
                 // If not in nary context, treat as overset
-                crate::formula::omml::utils::extend_vec_efficient(&mut parent.children, context.children.clone());
+                crate::formula::omml::utils::extend_vec_efficient(
+                    &mut parent.children,
+                    context.children.clone(),
+                );
             }
         }
     }
@@ -194,7 +200,10 @@ impl LimLowHandler {
                 parent.lower_limit = Some(context.children.clone());
             } else {
                 // If not in nary context, treat as underset
-                crate::formula::omml::utils::extend_vec_efficient(&mut parent.children, context.children.clone());
+                crate::formula::omml::utils::extend_vec_efficient(
+                    &mut parent.children,
+                    context.children.clone(),
+                );
             }
         }
     }

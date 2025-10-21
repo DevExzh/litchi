@@ -3,7 +3,7 @@
 // Parses Macintosh PICT format records and extracts relevant information
 
 use crate::common::error::{Error, Result};
-use zerocopy::{FromBytes, BE, I16, U16};
+use zerocopy::{BE, FromBytes, I16, U16};
 
 /// PICT file version
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,9 +47,11 @@ impl PictHeader {
         // PICT data starts with:
         // - 10 bytes of size/frame info for version 1
         // - picSize (2 bytes) + picFrame (8 bytes) for both versions
-        
+
         if offset + 10 > data.len() {
-            return Err(Error::ParseError("Insufficient data for PICT header".into()));
+            return Err(Error::ParseError(
+                "Insufficient data for PICT header".into(),
+            ));
         }
 
         // Parse picture size (used in version 1, may be 0 in version 2)
@@ -82,7 +84,7 @@ impl PictHeader {
             let op2 = U16::<BE>::read_from_bytes(&data[offset + 2..offset + 4])
                 .map_err(|_| Error::ParseError("Failed to read op2".into()))?
                 .get();
-            
+
             if op1 == 0x0011 && op2 == 0x02FF {
                 PictVersion::V2
             } else {
@@ -206,7 +208,7 @@ impl PictParser {
     /// Create a new PICT parser from raw data
     pub fn new(data: &[u8]) -> Result<Self> {
         let header = PictHeader::parse(data)?;
-        
+
         let data_start = if header.has_512_header { 512 } else { 0 };
         let mut offset = data_start + 10; // Skip size and frame
 
@@ -239,7 +241,7 @@ impl PictParser {
 
             // Determine data size based on opcode
             let data_size = Self::get_opcode_data_size(opcode, data, offset)?;
-            
+
             if offset + data_size > data.len() {
                 break;
             }
@@ -269,7 +271,6 @@ impl PictParser {
             0x0004 => Ok(1), // TxFace
             0x0005 => Ok(2), // TxMode
             0x0011 => Ok(2), // Version
-            
             // Variable size opcodes - read size from data
             0x0001 | // Clip
             0x00A1 | // Long comment
@@ -283,7 +284,6 @@ impl PictParser {
                     .get() as usize;
                 Ok(size + 2) // Include size field itself
             }
-            
             // Default: try to read size field
             _ => {
                 if offset + 2 > data.len() {
@@ -317,11 +317,7 @@ impl PictParser {
     pub fn aspect_ratio(&self) -> f64 {
         let w = self.width() as f64;
         let h = self.height() as f64;
-        if h == 0.0 {
-            1.0
-        } else {
-            w / h
-        }
+        if h == 0.0 { 1.0 } else { w / h }
     }
 }
 
@@ -335,4 +331,3 @@ mod tests {
         assert_eq!(PictOpcode::from_u16(0x0011), Some(PictOpcode::Version));
     }
 }
-

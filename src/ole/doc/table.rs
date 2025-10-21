@@ -1,7 +1,7 @@
 /// Table, Row, and Cell structures for legacy Word documents.
 use super::package::Result;
 use super::paragraph::Paragraph;
-use super::parts::tap::{TableProperties, CellProperties, TableJustification};
+use super::parts::tap::{CellProperties, TableJustification, TableProperties};
 
 /// A table in a Word document.
 ///
@@ -31,7 +31,10 @@ impl Table {
     /// Create a new Table.
     #[allow(dead_code)]
     pub(crate) fn new(rows: Vec<Row>) -> Self {
-        Self { rows, properties: None }
+        Self {
+            rows,
+            properties: None,
+        }
     }
 
     /// Create a new Table with properties.
@@ -146,7 +149,9 @@ impl Row {
 
     /// Check if this is a header row.
     pub fn is_header(&self) -> bool {
-        self.row_properties.as_ref().is_some_and(|p| p.is_header_row)
+        self.row_properties
+            .as_ref()
+            .is_some_and(|p| p.is_header_row)
     }
 }
 
@@ -251,4 +256,3 @@ mod tests {
         assert_eq!(table.column_count().unwrap(), 2);
     }
 }
-

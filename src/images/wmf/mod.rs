@@ -10,12 +10,12 @@
 // - [MS-WMF]: Windows Metafile Format Specification
 // - https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-wmf/
 
-pub mod parser;
 pub mod converter;
+pub mod parser;
 pub mod svg_converter;
 
-pub use parser::WmfParser;
 pub use converter::{WmfConverter, WmfToRasterOptions};
+pub use parser::WmfParser;
 pub use svg_converter::WmfSvgConverter;
 
 use crate::common::error::Result;
@@ -54,7 +54,7 @@ pub fn convert_wmf(
         height,
         background_color: image::Rgba([255, 255, 255, 255]),
     };
-    
+
     let converter = WmfConverter::new(parser, options);
     converter.convert_to_format(format)
 }
@@ -116,4 +116,3 @@ pub fn convert_wmf_to_svg(wmf_data: &[u8]) -> Result<String> {
 pub fn convert_wmf_to_svg_bytes(wmf_data: &[u8]) -> Result<Vec<u8>> {
     Ok(convert_wmf_to_svg(wmf_data)?.into_bytes())
 }
-

@@ -262,10 +262,10 @@ impl FileInformationBlock {
     ///
     /// Returns Some((start_cp, end_cp)) if comments exist, None otherwise.
     pub fn get_comment_range(&self) -> Option<(u32, u32)> {
-        let base = self.get_character_count(0) 
-                  + self.get_character_count(1) 
-                  + self.get_character_count(2)
-                  + self.get_character_count(3); // Skip macros
+        let base = self.get_character_count(0)
+            + self.get_character_count(1)
+            + self.get_character_count(2)
+            + self.get_character_count(3); // Skip macros
         let ccp_atn = self.get_character_count(4);
         if ccp_atn > 0 {
             Some((base, base + ccp_atn))
@@ -278,11 +278,11 @@ impl FileInformationBlock {
     ///
     /// Returns Some((start_cp, end_cp)) if endnotes exist, None otherwise.
     pub fn get_endnote_range(&self) -> Option<(u32, u32)> {
-        let base = self.get_character_count(0) 
-                  + self.get_character_count(1) 
-                  + self.get_character_count(2)
-                  + self.get_character_count(3)
-                  + self.get_character_count(4);
+        let base = self.get_character_count(0)
+            + self.get_character_count(1)
+            + self.get_character_count(2)
+            + self.get_character_count(3)
+            + self.get_character_count(4);
         let ccp_edn = self.get_character_count(5);
         if ccp_edn > 0 {
             Some((base, base + ccp_edn))
@@ -295,12 +295,12 @@ impl FileInformationBlock {
     ///
     /// Returns Some((start_cp, end_cp)) if text boxes exist, None otherwise.
     pub fn get_textbox_range(&self) -> Option<(u32, u32)> {
-        let base = self.get_character_count(0) 
-                  + self.get_character_count(1) 
-                  + self.get_character_count(2)
-                  + self.get_character_count(3)
-                  + self.get_character_count(4)
-                  + self.get_character_count(5);
+        let base = self.get_character_count(0)
+            + self.get_character_count(1)
+            + self.get_character_count(2)
+            + self.get_character_count(3)
+            + self.get_character_count(4)
+            + self.get_character_count(5);
         let ccp_txbx = self.get_character_count(6);
         if ccp_txbx > 0 {
             Some((base, base + ccp_txbx))
@@ -313,13 +313,13 @@ impl FileInformationBlock {
     ///
     /// Returns Some((start_cp, end_cp)) if header text boxes exist, None otherwise.
     pub fn get_header_textbox_range(&self) -> Option<(u32, u32)> {
-        let base = self.get_character_count(0) 
-                  + self.get_character_count(1) 
-                  + self.get_character_count(2)
-                  + self.get_character_count(3)
-                  + self.get_character_count(4)
-                  + self.get_character_count(5)
-                  + self.get_character_count(6);
+        let base = self.get_character_count(0)
+            + self.get_character_count(1)
+            + self.get_character_count(2)
+            + self.get_character_count(3)
+            + self.get_character_count(4)
+            + self.get_character_count(5)
+            + self.get_character_count(6);
         let ccp_hdr_txbx = self.get_character_count(7);
         if ccp_hdr_txbx > 0 {
             Some((base, base + ccp_hdr_txbx))
@@ -333,36 +333,36 @@ impl FileInformationBlock {
     /// Returns a vector of (name, start_cp, end_cp) tuples for all non-empty subdocuments.
     pub fn get_all_subdoc_ranges(&self) -> Vec<(&'static str, u32, u32)> {
         let mut ranges = Vec::new();
-        
+
         let (start, end) = self.get_main_doc_range();
         if end > start {
             ranges.push(("Main Document", start, end));
         }
-        
+
         if let Some((start, end)) = self.get_footnote_range() {
             ranges.push(("Footnotes", start, end));
         }
-        
+
         if let Some((start, end)) = self.get_header_range() {
             ranges.push(("Headers/Footers", start, end));
         }
-        
+
         if let Some((start, end)) = self.get_comment_range() {
             ranges.push(("Comments", start, end));
         }
-        
+
         if let Some((start, end)) = self.get_endnote_range() {
             ranges.push(("Endnotes", start, end));
         }
-        
+
         if let Some((start, end)) = self.get_textbox_range() {
             ranges.push(("Text Boxes", start, end));
         }
-        
+
         if let Some((start, end)) = self.get_header_textbox_range() {
             ranges.push(("Header Text Boxes", start, end));
         }
-        
+
         ranges
     }
 }
@@ -420,4 +420,3 @@ mod tests {
         assert!(fib.which_table_stream());
     }
 }
-

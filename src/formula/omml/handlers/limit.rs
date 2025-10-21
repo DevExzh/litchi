@@ -13,7 +13,10 @@ impl LimitHandler {
     ) {
         if let Some(parent) = parent_context {
             // Limits are handled by the specific handlers above
-            crate::formula::omml::utils::extend_vec_efficient(&mut parent.children, context.children.clone());
+            crate::formula::omml::utils::extend_vec_efficient(
+                &mut parent.children,
+                context.children.clone(),
+            );
         }
     }
 }

@@ -4,10 +4,10 @@
 //! is stored as a directory containing multiple files including Index.zip.
 //! Detection follows the iWork Archive (IWA) format specification.
 
-use std::path::Path;
-#[cfg(feature = "iwa")]
-use std::io::{Read, Cursor};
 use crate::common::detection::FileFormat;
+#[cfg(feature = "iwa")]
+use std::io::{Cursor, Read};
+use std::path::Path;
 
 /// Detect iWork formats from bytes.
 /// iWork files can be ZIP archives containing IWA files.
@@ -25,7 +25,9 @@ pub fn detect_iwork_format(bytes: &[u8]) -> Option<FileFormat> {
         Ok(mut archive) => {
             // Check if archive contains IWA files
             let has_iwa_files = (0..archive.len()).any(|i| {
-                archive.by_index(i).ok()
+                archive
+                    .by_index(i)
+                    .ok()
                     .map(|file| file.name().ends_with(".iwa"))
                     .unwrap_or(false)
             });
@@ -36,7 +38,7 @@ pub fn detect_iwork_format(bytes: &[u8]) -> Option<FileFormat> {
 
             // Try to extract message types and detect application
             detect_application_from_zip_archive(&mut archive)
-        }
+        },
         Err(_) => None,
     }
 }
@@ -50,7 +52,7 @@ pub fn detect_iwork_format(_bytes: &[u8]) -> Option<FileFormat> {
 /// iWork files are ZIP archives that can be detected from stream data.
 #[cfg(feature = "iwa")]
 pub fn detect_iwork_format_from_reader<R: std::io::Read + std::io::Seek>(
-    reader: &mut R
+    reader: &mut R,
 ) -> Option<FileFormat> {
     // Read the first 4 bytes to check for ZIP signature
     let mut header = [0u8; 4];
@@ -67,7 +69,9 @@ pub fn detect_iwork_format_from_reader<R: std::io::Read + std::io::Seek>(
         if let Ok(mut archive) = zip::ZipArchive::new(reader) {
             // Check if archive contains IWA files
             let has_iwa_files = (0..archive.len()).any(|i| {
-                archive.by_index(i).ok()
+                archive
+                    .by_index(i)
+                    .ok()
                     .map(|file| file.name().ends_with(".iwa"))
                     .unwrap_or(false)
             });
@@ -84,7 +88,7 @@ pub fn detect_iwork_format_from_reader<R: std::io::Read + std::io::Seek>(
 
 #[cfg(not(feature = "iwa"))]
 pub fn detect_iwork_format_from_reader<R: std::io::Read + std::io::Seek>(
-    _reader: &mut R
+    _reader: &mut R,
 ) -> Option<FileFormat> {
     None
 }
@@ -117,7 +121,8 @@ pub fn detect_iwork_format_from_path<P: AsRef<Path>>(path: P) -> Option<FileForm
         match crate::iwa::bundle::Bundle::open(path) {
             Ok(bundle) => {
                 // Extract message types from all archives to identify application
-                let all_message_types: Vec<u32> = bundle.archives()
+                let all_message_types: Vec<u32> = bundle
+                    .archives()
                     .values()
                     .flat_map(|archive| &archive.objects)
                     .flat_map(|obj| &obj.messages)
@@ -127,7 +132,7 @@ pub fn detect_iwork_format_from_path<P: AsRef<Path>>(path: P) -> Option<FileForm
                 // Detect application type from IWA message types
                 match crate::iwa::registry::detect_application(&all_message_types) {
                     Some(app) => {
-                            let format = match app {
+                        let format = match app {
                             crate::iwa::registry::Application::Pages => FileFormat::Pages,
                             crate::iwa::registry::Application::Keynote => FileFormat::Keynote,
                             crate::iwa::registry::Application::Numbers => FileFormat::Numbers,
@@ -135,14 +140,14 @@ pub fn detect_iwork_format_from_path<P: AsRef<Path>>(path: P) -> Option<FileForm
                         };
 
                         Some(format)
-                    }
+                    },
                     None => None,
                 }
-            }
+            },
             Err(_) => None,
         }
     }
-    
+
     #[cfg(not(feature = "iwa"))]
     None
 }
@@ -198,7 +203,9 @@ fn detect_iwork_format_from_files(bundle_path: &Path) -> Option<FileFormat> {
 
 /// Detect application type from a ZIP archive containing IWA files
 #[cfg(feature = "iwa")]
-pub fn detect_application_from_zip_archive<R: Read + std::io::Seek>(archive: &mut zip::ZipArchive<R>) -> Option<FileFormat> {
+pub fn detect_application_from_zip_archive<R: Read + std::io::Seek>(
+    archive: &mut zip::ZipArchive<R>,
+) -> Option<FileFormat> {
     let mut table_file_count = 0;
     let mut has_calculation_engine = false;
     let mut slide_file_count = 0;
@@ -221,7 +228,9 @@ pub fn detect_application_from_zip_archive<R: Read + std::io::Seek>(archive: &mu
             }
 
             // Count presentation files (slides and templates)
-            if (name.starts_with("Index/Slide") || name.starts_with("Index/TemplateSlide")) && name.ends_with(".iwa") {
+            if (name.starts_with("Index/Slide") || name.starts_with("Index/TemplateSlide"))
+                && name.ends_with(".iwa")
+            {
                 slide_file_count += 1;
             }
         }
@@ -261,12 +270,16 @@ pub fn detect_application_from_zip_archive<R: Read + std::io::Seek>(archive: &mu
 
 /// Fallback detection using message types when file patterns don't give a clear answer
 #[cfg(feature = "iwa")]
-fn detect_application_from_message_types<R: Read + std::io::Seek>(archive: &mut zip::ZipArchive<R>) -> Option<FileFormat> {
+fn detect_application_from_message_types<R: Read + std::io::Seek>(
+    archive: &mut zip::ZipArchive<R>,
+) -> Option<FileFormat> {
     let mut all_message_types = Vec::new();
 
     // Process each IWA file in the archive
     for i in 0..archive.len() {
-        if let Ok(mut zip_file) = archive.by_index(i) && zip_file.name().ends_with(".iwa") {
+        if let Ok(mut zip_file) = archive.by_index(i)
+            && zip_file.name().ends_with(".iwa")
+        {
             // Read the compressed IWA data
             let mut compressed_data = Vec::new();
             if zip_file.read_to_end(&mut compressed_data).is_err() {
@@ -274,7 +287,9 @@ fn detect_application_from_message_types<R: Read + std::io::Seek>(archive: &mut 
             }
 
             // Try to decompress and parse the IWA file
-            let Ok(decompressed) = crate::iwa::snappy::SnappyStream::decompress(&mut Cursor::new(&compressed_data)) else {
+            let Ok(decompressed) =
+                crate::iwa::snappy::SnappyStream::decompress(&mut Cursor::new(&compressed_data))
+            else {
                 continue; // Skip files we can't read
             };
             let Ok(iwa_archive) = crate::iwa::archive::Archive::parse(decompressed.data()) else {
@@ -297,10 +312,10 @@ fn detect_application_from_message_types<R: Read + std::io::Seek>(archive: &mut 
 
     for &type_id in &all_message_types {
         match type_id {
-            10000..=19999 => pages_score += 1,     // Pages tends to have higher type IDs
-            200..=999 => keynote_score += 1,        // Keynote has mid-range IDs
-            1..=199 => numbers_score += 1,          // Numbers has lower IDs
-            _ => {}
+            10000..=19999 => pages_score += 1, // Pages tends to have higher type IDs
+            200..=999 => keynote_score += 1,   // Keynote has mid-range IDs
+            1..=199 => numbers_score += 1,     // Numbers has lower IDs
+            _ => {},
         }
     }
 
@@ -315,4 +330,3 @@ fn detect_application_from_message_types<R: Read + std::io::Seek>(archive: &mut 
         None
     }
 }
-

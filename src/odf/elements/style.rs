@@ -190,28 +190,56 @@ impl Style {
     /// Parse text properties from element
     fn parse_text_properties(element: &Element) -> TextProperties {
         TextProperties {
-            font_name: element.get_attribute("style:font-name").map(|s| s.to_string()),
+            font_name: element
+                .get_attribute("style:font-name")
+                .map(|s| s.to_string()),
             font_size: element.get_attribute("fo:font-size").map(|s| s.to_string()),
-            font_weight: element.get_attribute("fo:font-weight").map(|s| s.to_string()),
-            font_style: element.get_attribute("fo:font-style").map(|s| s.to_string()),
+            font_weight: element
+                .get_attribute("fo:font-weight")
+                .map(|s| s.to_string()),
+            font_style: element
+                .get_attribute("fo:font-style")
+                .map(|s| s.to_string()),
             color: element.get_attribute("fo:color").map(|s| s.to_string()),
-            background_color: element.get_attribute("fo:background-color").map(|s| s.to_string()),
-            underline: element.get_attribute("style:text-underline-style").map(|s| s.to_string()),
-            strikethrough: element.get_attribute("style:text-line-through-style").map(|s| s.to_string()),
-            text_shadow: element.get_attribute("fo:text-shadow").map(|s| s.to_string()),
+            background_color: element
+                .get_attribute("fo:background-color")
+                .map(|s| s.to_string()),
+            underline: element
+                .get_attribute("style:text-underline-style")
+                .map(|s| s.to_string()),
+            strikethrough: element
+                .get_attribute("style:text-line-through-style")
+                .map(|s| s.to_string()),
+            text_shadow: element
+                .get_attribute("fo:text-shadow")
+                .map(|s| s.to_string()),
         }
     }
 
     /// Parse paragraph properties from element
     fn parse_paragraph_properties(element: &Element) -> ParagraphProperties {
         ParagraphProperties {
-            margin_left: element.get_attribute("fo:margin-left").map(|s| s.to_string()),
-            margin_right: element.get_attribute("fo:margin-right").map(|s| s.to_string()),
-            margin_top: element.get_attribute("fo:margin-top").map(|s| s.to_string()),
-            margin_bottom: element.get_attribute("fo:margin-bottom").map(|s| s.to_string()),
-            text_align: element.get_attribute("fo:text-align").map(|s| s.to_string()),
-            line_height: element.get_attribute("fo:line-height").map(|s| s.to_string()),
-            background_color: element.get_attribute("fo:background-color").map(|s| s.to_string()),
+            margin_left: element
+                .get_attribute("fo:margin-left")
+                .map(|s| s.to_string()),
+            margin_right: element
+                .get_attribute("fo:margin-right")
+                .map(|s| s.to_string()),
+            margin_top: element
+                .get_attribute("fo:margin-top")
+                .map(|s| s.to_string()),
+            margin_bottom: element
+                .get_attribute("fo:margin-bottom")
+                .map(|s| s.to_string()),
+            text_align: element
+                .get_attribute("fo:text-align")
+                .map(|s| s.to_string()),
+            line_height: element
+                .get_attribute("fo:line-height")
+                .map(|s| s.to_string()),
+            background_color: element
+                .get_attribute("fo:background-color")
+                .map(|s| s.to_string()),
             border: element.get_attribute("fo:border").map(|s| s.to_string()),
         }
     }
@@ -220,7 +248,9 @@ impl Style {
     fn parse_table_properties(element: &Element) -> TableProperties {
         TableProperties {
             width: element.get_attribute("style:width").map(|s| s.to_string()),
-            background_color: element.get_attribute("fo:background-color").map(|s| s.to_string()),
+            background_color: element
+                .get_attribute("fo:background-color")
+                .map(|s| s.to_string()),
             border: element.get_attribute("fo:border").map(|s| s.to_string()),
             align: element.get_attribute("table:align").map(|s| s.to_string()),
         }
@@ -229,7 +259,9 @@ impl Style {
     /// Parse graphic properties from element
     fn parse_graphic_properties(element: &Element) -> GraphicProperties {
         GraphicProperties {
-            background_color: element.get_attribute("draw:fill-color").map(|s| s.to_string()),
+            background_color: element
+                .get_attribute("draw:fill-color")
+                .map(|s| s.to_string()),
             border: element.get_attribute("draw:stroke").map(|s| s.to_string()),
             shadow: element.get_attribute("draw:shadow").map(|s| s.to_string()),
         }
@@ -242,7 +274,8 @@ impl Style {
 
     /// Get the style family
     pub fn family(&self) -> Option<StyleFamily> {
-        self.element.get_attribute("style:family")
+        self.element
+            .get_attribute("style:family")
             .and_then(StyleFamily::from_str)
     }
 
@@ -383,8 +416,8 @@ impl StyleRegistry {
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(quick_xml::events::Event::Start(ref e)) => {
-                    let tag_name = String::from_utf8(e.name().as_ref().to_vec())
-                        .unwrap_or_default();
+                    let tag_name =
+                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
 
                     if tag_name == "style:style" {
                         let mut element = Element::new("style:style");
@@ -394,10 +427,11 @@ impl StyleRegistry {
                             if let Ok(attr) = attr_result
                                 && let (Ok(key), Ok(value)) = (
                                     String::from_utf8(attr.key.as_ref().to_vec()),
-                                    String::from_utf8(attr.value.to_vec())
-                                ) {
-                                    element.set_attribute(&key, &value);
-                                }
+                                    String::from_utf8(attr.value.to_vec()),
+                                )
+                            {
+                                element.set_attribute(&key, &value);
+                            }
                         }
 
                         // Create style from element
@@ -405,10 +439,10 @@ impl StyleRegistry {
                             registry.add_style(style);
                         }
                     }
-                }
+                },
                 Ok(quick_xml::events::Event::Eof) => break,
                 Err(_) => break,
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }

@@ -111,4 +111,3 @@ pub trait WorkbookTrait: Debug {
     /// Get the index of the active worksheet.
     fn active_sheet_index(&self) -> usize;
 }
-

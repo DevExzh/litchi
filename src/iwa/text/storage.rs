@@ -52,10 +52,10 @@ impl TextStorage {
             .filter_map(|run| {
                 let end = (run.offset + run.length).min(self.text.len());
                 if run.offset < self.text.len() && run.offset < end {
-                Some(TextFragment {
-                    text: self.text[run.offset..end].to_string(),
-                    style: run.style,
-                })
+                    Some(TextFragment {
+                        text: self.text[run.offset..end].to_string(),
+                        style: run.style,
+                    })
                 } else {
                     None
                 }
@@ -103,10 +103,7 @@ pub struct TextFragment {
 impl TextFragment {
     /// Create a new text fragment
     pub fn new(text: String) -> Self {
-        Self {
-            text,
-            style: None,
-        }
+        Self { text, style: None }
     }
 
     /// Create a fragment with style
@@ -123,7 +120,7 @@ pub fn parse_storage_archive(text_lines: &[String]) -> Result<TextStorage> {
     // StorageArchive in iWork protobuf contains text as repeated string field
     // Join all text lines with newlines to preserve structure
     let text = text_lines.join("\n");
-    
+
     Ok(TextStorage::from_text(text))
 }
 
@@ -177,11 +174,10 @@ mod tests {
             "Second line".to_string(),
             "Third line".to_string(),
         ];
-        
+
         let storage = parse_storage_archive(&lines).unwrap();
         assert!(storage.plain_text().contains("First line"));
         assert!(storage.plain_text().contains("Second line"));
         assert!(storage.plain_text().contains("Third line"));
     }
 }
-

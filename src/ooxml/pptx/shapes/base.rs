@@ -1,8 +1,8 @@
 /// Base shape types for PowerPoint presentations.
 use crate::ooxml::error::Result;
 use crate::ooxml::pptx::shapes::textframe::TextFrame;
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 
 /// Shape type enumeration.
 ///
@@ -97,18 +97,17 @@ impl BaseShape {
                     if e.local_name().as_ref() == b"cNvPr" {
                         for attr in e.attributes().flatten() {
                             if attr.key.as_ref() == b"name" {
-                                let name = std::str::from_utf8(&attr.value)
-                                    .unwrap_or("")
-                                    .to_string();
+                                let name =
+                                    std::str::from_utf8(&attr.value).unwrap_or("").to_string();
                                 self.name = Some(name.clone());
                                 return Ok(name);
                             }
                         }
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(_) => break,
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -152,10 +151,10 @@ impl BaseShape {
                     if e.local_name().as_ref() == b"ph" {
                         return true;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(_) => break,
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -198,7 +197,7 @@ impl BaseShape {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e)) => {
                     let tag_name = e.local_name();
-                    
+
                     if tag_name.as_ref() == b"off" {
                         for attr in e.attributes().flatten() {
                             match attr.key.as_ref() {
@@ -207,14 +206,14 @@ impl BaseShape {
                                         .ok()
                                         .and_then(|s| s.parse().ok())
                                         .unwrap_or(0);
-                                }
+                                },
                                 b"y" => {
                                     y = std::str::from_utf8(&attr.value)
                                         .ok()
                                         .and_then(|s| s.parse().ok())
                                         .unwrap_or(0);
-                                }
-                                _ => {}
+                                },
+                                _ => {},
                             }
                         }
                     } else if tag_name.as_ref() == b"ext" {
@@ -225,21 +224,21 @@ impl BaseShape {
                                         .ok()
                                         .and_then(|s| s.parse().ok())
                                         .unwrap_or(0);
-                                }
+                                },
                                 b"cy" => {
                                     cy = std::str::from_utf8(&attr.value)
                                         .ok()
                                         .and_then(|s| s.parse().ok())
                                         .unwrap_or(0);
-                                }
-                                _ => {}
+                                },
+                                _ => {},
                             }
                         }
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(_) => break,
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -293,4 +292,3 @@ impl Shape {
         tf.text()
     }
 }
-

@@ -1,3 +1,4 @@
+use super::chp::CharacterProperties;
 /// CHPBinTable (Character Property Bin Table) parser.
 ///
 /// Based on Apache POI's CHPBinTable class.
@@ -10,7 +11,6 @@
 /// - org.apache.poi.hwpf.model.CHPFormattedDiskPage
 /// - [MS-DOC] 2.8.5 PlcfBteChpx
 use super::fkp::ChpxFkp;
-use super::chp::CharacterProperties;
 use super::piece_table::PieceTable;
 use crate::common::binary::read_u32_le;
 use crate::ole::sprm::parse_sprms;
@@ -60,7 +60,7 @@ impl ChpBinTable {
         //
         // Each PnBteChpx contains:
         // - pn (PN): Page number (offset / 512) of CHPXFKP page
-        
+
         if plcf_bte_chpx_data.len() < 8 {
             return None;
         }
@@ -71,9 +71,13 @@ impl ChpBinTable {
         // Size = (n+1)*4 + n*4 = 8n + 4
         // So n = (size - 4) / 8
         let n = (plcf_bte_chpx_data.len() - 4) / 8;
-        
-        eprintln!("DEBUG: ChpBinTable parsing {} BTE entries from {} bytes", n, plcf_bte_chpx_data.len());
-        
+
+        eprintln!(
+            "DEBUG: ChpBinTable parsing {} BTE entries from {} bytes",
+            n,
+            plcf_bte_chpx_data.len()
+        );
+
         // Debug: show first few FC values and PN values
         if n >= 5 {
             eprintln!("DEBUG: First 5 FC values:");
@@ -106,17 +110,23 @@ impl ChpBinTable {
             }
 
             let pn_raw = read_u32_le(plcf_bte_chpx_data, pn_offset).unwrap_or(0);
-            
+
             if i < 5 {
-                eprintln!("DEBUG: BTE {}: Reading from offset {} (n={}, pn_offset={}+{}*4), raw_bytes=[{:02X} {:02X} {:02X} {:02X}], pn_raw=0x{:08X}",
-                         i, pn_offset, n, (n+1)*4, i,
-                         plcf_bte_chpx_data[pn_offset],
-                         plcf_bte_chpx_data[pn_offset+1],
-                         plcf_bte_chpx_data[pn_offset+2],
-                         plcf_bte_chpx_data[pn_offset+3],
-                         pn_raw);
+                eprintln!(
+                    "DEBUG: BTE {}: Reading from offset {} (n={}, pn_offset={}+{}*4), raw_bytes=[{:02X} {:02X} {:02X} {:02X}], pn_raw=0x{:08X}",
+                    i,
+                    pn_offset,
+                    n,
+                    (n + 1) * 4,
+                    i,
+                    plcf_bte_chpx_data[pn_offset],
+                    plcf_bte_chpx_data[pn_offset + 1],
+                    plcf_bte_chpx_data[pn_offset + 2],
+                    plcf_bte_chpx_data[pn_offset + 3],
+                    pn_raw
+                );
             }
-            
+
             // PnFkpChpx structure (from [MS-DOC]):
             // - Bits 0-21 (22 bits): pn (Page Number)
             // - Bits 22-31 (10 bits): unused (MUST be ignored)
@@ -128,24 +138,37 @@ impl ChpBinTable {
             // FKP pages are stored in the WordDocument stream, not table stream!
             if pn == 0 || pn == 0x3FFFFF {
                 // Invalid PN
-                eprintln!("DEBUG: Skipping BTE {} with invalid PN 0x{:08X} (masked: 0x{:08X})", i, pn_raw, pn);
+                eprintln!(
+                    "DEBUG: Skipping BTE {} with invalid PN 0x{:08X} (masked: 0x{:08X})",
+                    i, pn_raw, pn
+                );
                 continue;
             }
-            
+
             let page_offset = (pn as usize) * 512;
-            
+
             // Debug specific PNs we know should be valid
             if pn == 133 || pn == 159 || pn == 204 || pn == 217 {
-                eprintln!("DEBUG: BTE {}: Found valid PN={} (0x{:02X}), page_offset={}", i, pn, pn, page_offset);
+                eprintln!(
+                    "DEBUG: BTE {}: Found valid PN={} (0x{:02X}), page_offset={}",
+                    i, pn, pn, page_offset
+                );
             }
-            
+
             if i < 5 {
-                eprintln!("DEBUG: BTE {}: PN=0x{:08X}, page_offset={}", i, pn, page_offset);
+                eprintln!(
+                    "DEBUG: BTE {}: PN=0x{:08X}, page_offset={}",
+                    i, pn, page_offset
+                );
             }
 
             if page_offset + 512 > word_document.len() {
-                eprintln!("DEBUG: Skipping BTE {}: page_offset {} exceeds WordDocument size {}", 
-                         i, page_offset, word_document.len());
+                eprintln!(
+                    "DEBUG: Skipping BTE {}: page_offset {} exceeds WordDocument size {}",
+                    i,
+                    page_offset,
+                    word_document.len()
+                );
                 continue;
             }
 
@@ -155,7 +178,7 @@ impl ChpBinTable {
             // Parse CHPX FKP
             if let Some(fkp) = ChpxFkp::parse(fkp_page, word_document) {
                 eprintln!("DEBUG: FKP {} has {} entries", i, fkp.count());
-                
+
                 // Process each entry in the FKP
                 for j in 0..fkp.count() {
                     if let Some(entry) = fkp.entry(j) {
@@ -173,11 +196,19 @@ impl ChpBinTable {
 
                         // Parse CHPX (grpprl) to get character properties
                         let properties = Self::parse_chpx(&entry.grpprl);
-                        
+
                         if all_runs.len() < 5 && !entry.grpprl.is_empty() {
-                            eprint!("DEBUG:       Entry {}: fc={}..{} -> cp={}..{}, grpprl_len={}, is_ole2={}, pic_offset={:?}, grpprl_bytes=", 
-                                     j, entry.fc, end_fc, start_cp, end_cp, entry.grpprl.len(), 
-                                     properties.is_ole2, properties.pic_offset);
+                            eprint!(
+                                "DEBUG:       Entry {}: fc={}..{} -> cp={}..{}, grpprl_len={}, is_ole2={}, pic_offset={:?}, grpprl_bytes=",
+                                j,
+                                entry.fc,
+                                end_fc,
+                                start_cp,
+                                end_cp,
+                                entry.grpprl.len(),
+                                properties.is_ole2,
+                                properties.pic_offset
+                            );
                             for b in entry.grpprl.iter().take(20) {
                                 eprint!("{:02X} ", b);
                             }
@@ -216,34 +247,44 @@ impl ChpBinTable {
                 0x0835 | 0x0085 => {
                     // Bold
                     props.is_bold = Some(sprm.operand_byte().unwrap_or(0) != 0);
-                }
+                },
                 0x0836 | 0x0086 => {
                     // Italic
                     props.is_italic = Some(sprm.operand_byte().unwrap_or(0) != 0);
-                }
+                },
                 0x4A43 | 0x0043 => {
                     // Font size
                     props.font_size = sprm.operand_word();
-                }
+                },
                 0x080A => {
                     // OLE2 object flag (SPRM_FOLE2)
                     let operand = sprm.operand_byte().unwrap_or(0);
                     props.is_ole2 = operand != 0;
-                    eprintln!("DEBUG: Found SPRM_FOLE2 in FKP, operand=0x{:02X}, operand_len={}, is_ole2={}", 
-                             operand, sprm.operand.len(), props.is_ole2);
-                }
+                    eprintln!(
+                        "DEBUG: Found SPRM_FOLE2 in FKP, operand=0x{:02X}, operand_len={}, is_ole2={}",
+                        operand,
+                        sprm.operand.len(),
+                        props.is_ole2
+                    );
+                },
                 0x6A03 => {
                     // Picture location (sprmCPicLocation)
                     // This is the FILE character position (fc) of the picture/object data
                     props.pic_offset = sprm.operand_dword();
-                    eprintln!("DEBUG: Found sprmCPicLocation (0x6A03) in FKP, pic_offset={:?}", props.pic_offset);
-                }
+                    eprintln!(
+                        "DEBUG: Found sprmCPicLocation (0x6A03) in FKP, pic_offset={:?}",
+                        props.pic_offset
+                    );
+                },
                 0x680E => {
                     // Object location/pic offset (SPRM_OBJLOCATION)
                     props.pic_offset = sprm.operand_dword();
-                    eprintln!("DEBUG: Found SPRM_OBJLOCATION (0x680E) in FKP, pic_offset={:?}", props.pic_offset);
-                }
-                _ => {}
+                    eprintln!(
+                        "DEBUG: Found SPRM_OBJLOCATION (0x680E) in FKP, pic_offset={:?}",
+                        props.pic_offset
+                    );
+                },
+                _ => {},
             }
         }
 

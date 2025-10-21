@@ -7,7 +7,7 @@
 //
 // - `blip`: Core BLIP (Binary Large Image or Picture) record parsing
 // - `emf`: Enhanced Metafile (EMF) format support
-// - `wmf`: Windows Metafile (WMF) format support  
+// - `wmf`: Windows Metafile (WMF) format support
 // - `pict`: Macintosh PICT format support
 //
 // # Example: Converting a BLIP record
@@ -34,12 +34,12 @@
 /// ```
 pub mod blip;
 pub mod emf;
-pub mod wmf;
 pub mod pict;
 pub mod svg;
+pub mod wmf;
 
-pub use blip::{Blip, BlipType, BitmapBlip, MetafileBlip};
 use crate::common::error::Result;
+pub use blip::{BitmapBlip, Blip, BlipType, MetafileBlip};
 use image::ImageFormat;
 
 /// Convert a BLIP record to a raster image format
@@ -72,12 +72,13 @@ pub fn convert_blip_to_format(
                     "Unknown metafile BLIP type".into(),
                 )),
             }
-        }
+        },
         Blip::Bitmap(bitmap) => {
             // For bitmap formats that are already in a modern format, we may just need
             // to re-encode or pass through
-            let img = image::load_from_memory(&bitmap.picture_data)
-                .map_err(|e| crate::common::error::Error::ParseError(format!("Failed to load bitmap: {}", e)))?;
+            let img = image::load_from_memory(&bitmap.picture_data).map_err(|e| {
+                crate::common::error::Error::ParseError(format!("Failed to load bitmap: {}", e))
+            })?;
 
             // Resize if requested
             let img = match (width, height) {
@@ -88,7 +89,7 @@ pub fn convert_blip_to_format(
                         h,
                         image::imageops::FilterType::Lanczos3,
                     ))
-                }
+                },
                 (Some(w), None) => {
                     let aspect = img.height() as f64 / img.width() as f64;
                     let h = (w as f64 * aspect) as u32;
@@ -98,7 +99,7 @@ pub fn convert_blip_to_format(
                         h,
                         image::imageops::FilterType::Lanczos3,
                     ))
-                }
+                },
                 (None, Some(h)) => {
                     let aspect = img.width() as f64 / img.height() as f64;
                     let w = (h as f64 * aspect) as u32;
@@ -108,17 +109,18 @@ pub fn convert_blip_to_format(
                         h,
                         image::imageops::FilterType::Lanczos3,
                     ))
-                }
+                },
                 _ => img,
             };
 
             // Encode to target format
             let mut buffer = std::io::Cursor::new(Vec::new());
-            img.write_to(&mut buffer, format)
-                .map_err(|e| crate::common::error::Error::ParseError(format!("Failed to encode image: {}", e)))?;
+            img.write_to(&mut buffer, format).map_err(|e| {
+                crate::common::error::Error::ParseError(format!("Failed to encode image: {}", e))
+            })?;
 
             Ok(buffer.into_inner())
-        }
+        },
     }
 }
 

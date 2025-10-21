@@ -7,19 +7,17 @@
 //! analysis, reading only the minimal amount of data required for identification.
 
 // Submodule declarations
-pub mod types;
 pub mod functions;
+pub mod iwork;
+pub mod odf;
 pub mod ole2;
 pub mod ooxml;
-pub mod odf;
-pub mod iwork;
+pub mod types;
 pub mod utils;
 
 // Re-exports
-pub use types::FileFormat;
 pub use functions::{
-    detect_file_format,
-    detect_file_format_from_bytes,
-    detect_format_from_reader,
+    detect_file_format, detect_file_format_from_bytes, detect_format_from_reader,
     detect_iwork_format_from_path,
 };
+pub use types::FileFormat;

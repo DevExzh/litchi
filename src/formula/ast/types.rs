@@ -221,18 +221,18 @@ pub enum PredefinedSymbol {
 /// Fence types for fenced expressions
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Fence {
-    Paren,          // ( )
-    Bracket,        // [ ]
-    Brace,          // { }
-    Angle,          // ⟨ ⟩
-    Pipe,           // | |
-    DoublePipe,     // ‖ ‖
-    Floor,          // ⌊ ⌋
-    Ceiling,        // ⌈ ⌉
-    AngleBracket,   // 〈 〉
-    SquareBracket,  // ⟦ ⟧
-    CurlyBrace,     // ⦃ ⦄
-    None,           // No fence
+    Paren,         // ( )
+    Bracket,       // [ ]
+    Brace,         // { }
+    Angle,         // ⟨ ⟩
+    Pipe,          // | |
+    DoublePipe,    // ‖ ‖
+    Floor,         // ⌊ ⌋
+    Ceiling,       // ⌈ ⌉
+    AngleBracket,  // 〈 〉
+    SquareBracket, // ⟦ ⟧
+    CurlyBrace,    // ⦃ ⦄
+    None,          // No fence
 }
 
 /// Fence character specification for customizable fences
@@ -245,64 +245,64 @@ pub struct FenceSpec {
 /// Large operators (sum, product, integral, etc.)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LargeOperator {
-    Sum,            // ∑
-    Product,        // ∏
-    Coproduct,      // ∐
-    Integral,       // ∫
-    DoubleIntegral, // ∬
-    TripleIntegral, // ∭
-    ContourIntegral,// ∮
-    SurfaceIntegral,// ∯
-    VolumeIntegral, // ∰
-    Union,          // ⋃
-    Intersection,   // ⋂
-    BigUnion,       // ⋃
-    BigIntersection,// ⋂
-    Limit,          // lim
-    Max,            // max
-    Min,            // min
-    Supremum,       // sup
-    Infimum,        // inf
-    ArgMax,         // argmax
-    ArgMin,         // argmin
+    Sum,             // ∑
+    Product,         // ∏
+    Coproduct,       // ∐
+    Integral,        // ∫
+    DoubleIntegral,  // ∬
+    TripleIntegral,  // ∭
+    ContourIntegral, // ∮
+    SurfaceIntegral, // ∯
+    VolumeIntegral,  // ∰
+    Union,           // ⋃
+    Intersection,    // ⋂
+    BigUnion,        // ⋃
+    BigIntersection, // ⋂
+    Limit,           // lim
+    Max,             // max
+    Min,             // min
+    Supremum,        // sup
+    Infimum,         // inf
+    ArgMax,          // argmax
+    ArgMin,          // argmin
 }
 
 /// Matrix fence types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MatrixFence {
-    None,           // No fence
-    Paren,          // ( )
-    Bracket,        // [ ]
-    Brace,          // { }
-    Pipe,           // | |
-    DoublePipe,     // ‖ ‖
+    None,       // No fence
+    Paren,      // ( )
+    Bracket,    // [ ]
+    Brace,      // { }
+    Pipe,       // | |
+    DoublePipe, // ‖ ‖
 }
 
 /// Accent types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AccentType {
-    Hat,            // ^
-    Check,          // ˇ
-    Tilde,          // ~
-    Acute,          // ´
-    Grave,          // `
-    Dot,            // ˙
-    DoubleDot,      // ¨
-    TripleDot,      // ⃛
-    Bar,            // ¯
-    Breve,          // ˘
-    Vec,            // →
+    Hat,       // ^
+    Check,     // ˇ
+    Tilde,     // ~
+    Acute,     // ´
+    Grave,     // `
+    Dot,       // ˙
+    DoubleDot, // ¨
+    TripleDot, // ⃛
+    Bar,       // ¯
+    Breve,     // ˘
+    Vec,       // →
 }
 
 /// Space types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpaceType {
-    Thin,           // Thin space
-    Medium,         // Medium space
-    Thick,          // Thick space
-    Quad,           // Quad space
-    QQuad,          // Double quad space
-    Negative,       // Negative space
+    Thin,     // Thin space
+    Medium,   // Medium space
+    Thick,    // Thick space
+    Quad,     // Quad space
+    QQuad,    // Double quad space
+    Negative, // Negative space
 }
 
 /// Style types
@@ -361,9 +361,9 @@ pub enum Position {
 /// Fraction types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FractionType {
-    Bar,        // Normal fraction bar
-    NoBar,      // Linear fraction (no bar)
-    Skewed,     // Skewed fraction bar
+    Bar,    // Normal fraction bar
+    NoBar,  // Linear fraction (no bar)
+    Skewed, // Skewed fraction bar
 }
 
 /// Math variant types (equivalent to style types but OMML-specific)
@@ -427,8 +427,8 @@ pub struct BorderBoxStyle {
     pub hide_right: bool,
     pub strike_horizontal: bool,
     pub strike_vertical: bool,
-    pub strike_bltr: bool,  // bottom-left to top-right
-    pub strike_tlbr: bool,  // top-left to bottom-right
+    pub strike_bltr: bool, // bottom-left to top-right
+    pub strike_tlbr: bool, // top-left to bottom-right
 }
 
 /// Equation array properties
@@ -456,4 +456,3 @@ pub enum LimitType {
     Lower,
     Upper,
 }
-

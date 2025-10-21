@@ -4,8 +4,8 @@
 //! OLE2 and OOXML parsing, presenting a consistent API to users.
 
 // Submodule declarations
-pub mod types;
 pub mod conversions;
+pub mod types;
 
 // Re-exports
 pub use types::{Error, Result};

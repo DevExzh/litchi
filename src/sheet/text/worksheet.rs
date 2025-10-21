@@ -1,10 +1,10 @@
 //! Worksheet implementation for text-based formats
 
-use std::io::{Read, Seek};
-use crate::sheet::{Worksheet, Cell, CellIterator, RowIterator, CellValue, Result as SheetResult};
 use super::cell::TextCell;
 use super::iterators::{TextCellIterator, TextRowIterator};
 use super::parser::TextParser;
+use crate::sheet::{Cell, CellIterator, CellValue, Result as SheetResult, RowIterator, Worksheet};
+use std::io::{Read, Seek};
 
 /// Worksheet implementation for text-based formats
 pub struct TextWorksheet {
@@ -15,7 +15,11 @@ pub struct TextWorksheet {
 
 impl TextWorksheet {
     /// Create a new text worksheet by loading all data into memory
-    pub fn new<R: Read + Seek>(reader: &mut R, config: super::workbook::TextConfig, name: String) -> SheetResult<Self> {
+    pub fn new<R: Read + Seek>(
+        reader: &mut R,
+        config: super::workbook::TextConfig,
+        name: String,
+    ) -> SheetResult<Self> {
         let mut parser = TextParser::new(reader, config);
         let mut data = Vec::new();
 
@@ -41,7 +45,6 @@ impl TextWorksheet {
             dimensions,
         }
     }
-
 }
 
 impl Worksheet for TextWorksheet {
@@ -85,7 +88,10 @@ impl Worksheet for TextWorksheet {
     fn cell_by_coordinate(&self, coordinate: &str) -> SheetResult<Box<dyn Cell + '_>> {
         // Parse coordinate like "A1", "B2", etc.
         let (col_str, row_str) = coordinate.split_at(
-            coordinate.chars().position(|c| c.is_ascii_digit()).unwrap_or(coordinate.len())
+            coordinate
+                .chars()
+                .position(|c| c.is_ascii_digit())
+                .unwrap_or(coordinate.len()),
         );
 
         if col_str.is_empty() || row_str.is_empty() {
@@ -101,7 +107,8 @@ impl Worksheet for TextWorksheet {
             col_num = col_num * 26 + (c.to_ascii_uppercase() as u32 - 'A' as u32 + 1);
         }
 
-        let row_num = row_str.parse::<u32>()
+        let row_num = row_str
+            .parse::<u32>()
             .map_err(|_| format!("Invalid row number in coordinate: {}", coordinate))?;
 
         self.cell(row_num, col_num)

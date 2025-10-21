@@ -45,8 +45,8 @@ impl Paragraph {
     #[allow(unused)]
     pub(crate) fn with_runs(runs: Vec<Run>) -> Self {
         let text = runs.iter().map(|r| r.text.as_str()).collect::<String>();
-        Self { 
-            text, 
+        Self {
+            text,
             runs,
             properties: super::parts::pap::ParagraphProperties::default(),
         }
@@ -181,7 +181,7 @@ impl Run {
             mtef_formula_ast: Some(mtef_ast),
         }
     }
-    
+
     /// Create a new Run with MTEF formula AST fallback (when formula feature is disabled).
     #[cfg(not(feature = "formula"))]
     pub(crate) fn with_mtef_formula(
@@ -297,7 +297,7 @@ impl Run {
     pub fn mtef_formula_ast(&self) -> Option<&Vec<crate::formula::MathNode<'static>>> {
         self.mtef_formula_ast.as_ref()
     }
-    
+
     #[cfg(not(feature = "formula"))]
     pub fn mtef_formula_ast(&self) -> Option<&Vec<()>> {
         self.mtef_formula_ast.as_ref()
@@ -310,7 +310,7 @@ impl Run {
     pub fn mtef_formula_ast_mut(&mut self) -> &mut Option<Vec<crate::formula::MathNode<'static>>> {
         &mut self.mtef_formula_ast
     }
-    
+
     #[cfg(not(feature = "formula"))]
     pub fn mtef_formula_ast_mut(&mut self) -> &mut Option<Vec<()>> {
         &mut self.mtef_formula_ast
@@ -339,18 +339,20 @@ impl Run {
                 Err(e) => {
                     // Return error message as placeholder
                     Ok(Some(format!("[Formula conversion error: {}]", e)))
-                }
+                },
             }
         } else {
             Ok(None)
         }
     }
-    
+
     /// Convert formula to LaTeX (fallback when formula feature is disabled).
     #[cfg(not(feature = "formula"))]
     pub fn formula_as_latex(&self) -> Result<Option<String>> {
         if self.mtef_formula_ast.is_some() {
-            Ok(Some("[Formula support disabled - enable 'formula' feature]".to_string()))
+            Ok(Some(
+                "[Formula support disabled - enable 'formula' feature]".to_string(),
+            ))
         } else {
             Ok(None)
         }
@@ -394,4 +396,3 @@ mod tests {
         assert_eq!(run.font_size(), Some(24));
     }
 }
-

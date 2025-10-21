@@ -1,6 +1,8 @@
 use super::elements::ElementType;
+use crate::formula::ast::{
+    AccentType, Alignment, FunctionName, LargeOperator, Operator, PredefinedSymbol, StyleType,
+};
 use phf::{phf_map, phf_set};
-use crate::formula::ast::{Operator, AccentType, LargeOperator, PredefinedSymbol, FunctionName, Alignment, StyleType};
 
 /// Fast element name to type lookup using PHF
 pub static ELEMENT_TYPES: phf::Map<&'static str, ElementType> = phf_map! {
@@ -426,7 +428,10 @@ pub static STYLE_VALUES: phf::Map<&'static str, StyleType> = phf_map! {
 /// Fast lookup functions using PHF maps
 /// Get element type from name with fallback to Unknown
 pub fn get_element_type(name: &str) -> ElementType {
-    ELEMENT_TYPES.get(name).copied().unwrap_or(ElementType::Unknown)
+    ELEMENT_TYPES
+        .get(name)
+        .copied()
+        .unwrap_or(ElementType::Unknown)
 }
 
 /// Get operator from character

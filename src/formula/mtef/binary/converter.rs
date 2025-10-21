@@ -11,21 +11,32 @@
 
 use super::charset::*;
 use super::objects::*;
-use crate::formula::mtef::templates::{TemplateParser, TemplateArgs};
-use crate::formula::ast::{MathNode, Fence, MatrixFence, LargeOperator, LineStyle};
-use crate::formula::mtef::constants::*;
+use crate::formula::ast::{Fence, LargeOperator, LineStyle, MathNode, MatrixFence};
 use crate::formula::mtef::MtefError;
+use crate::formula::mtef::constants::*;
+use crate::formula::mtef::templates::{TemplateArgs, TemplateParser};
 use std::borrow::Cow;
 
 /// Type alias for subscript/superscript parsing result (base, subscript, superscript)
-type SubSupResult<'a> = Result<(Vec<MathNode<'a>>, Vec<MathNode<'a>>, Vec<MathNode<'a>>), MtefError>;
+type SubSupResult<'a> =
+    Result<(Vec<MathNode<'a>>, Vec<MathNode<'a>>, Vec<MathNode<'a>>), MtefError>;
 
 /// Type alias for large operator parsing result (lower_limit, upper_limit, integrand)
-type LargeOpResult<'a> = Result<(Option<Vec<MathNode<'a>>>, Option<Vec<MathNode<'a>>>, Vec<MathNode<'a>>), MtefError>;
+type LargeOpResult<'a> = Result<
+    (
+        Option<Vec<MathNode<'a>>>,
+        Option<Vec<MathNode<'a>>>,
+        Vec<MathNode<'a>>,
+    ),
+    MtefError,
+>;
 
 /// Implementation of AST conversion methods for MtefBinaryParser
 impl<'arena> super::parser::MtefBinaryParser<'arena> {
-    pub fn convert_objects_to_ast(&self, obj_list: &MtefObjectList) -> Result<Vec<MathNode<'arena>>, MtefError> {
+    pub fn convert_objects_to_ast(
+        &self,
+        obj_list: &MtefObjectList,
+    ) -> Result<Vec<MathNode<'arena>>, MtefError> {
         let mut nodes = Vec::new();
         let mut current = Some(obj_list);
 
@@ -35,7 +46,8 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                     if let Some(char_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefChar>() {
                         // Special handling based on rtf2latex2e Eqn_TranslateObjects logic
                         match char_obj.typeface {
-                            130 => { // Function typeface - auto-recognize functions
+                            130 => {
+                                // Function typeface - auto-recognize functions
                                 let (node, skip_count) = self.convert_function_to_node(current)?;
                                 nodes.push(node);
                                 // Skip the consumed characters
@@ -43,7 +55,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                                     current = current.and_then(|c| c.next.as_deref());
                                 }
                                 continue;
-                            }
+                            },
                             129 if self.mode != crate::formula::mtef::constants::EQN_MODE_TEXT => {
                                 // Text in math mode
                                 let (node, skip_count) = self.convert_text_run_to_node(current)?;
@@ -53,47 +65,52 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                                     current = current.and_then(|c| c.next.as_deref());
                                 }
                                 continue;
-                            }
+                            },
                             _ => {
                                 // Regular character
                                 nodes.push(self.convert_char_to_node(char_obj)?);
-                            }
+                            },
                         }
                     }
-                }
+                },
                 MtefRecordType::Tmpl => {
                     if let Some(tmpl_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefTemplate>() {
                         nodes.push(self.convert_template_to_node(tmpl_obj)?);
                     }
-                }
+                },
                 MtefRecordType::Line => {
                     if let Some(line_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefLine>()
-                        && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)? {
-                            nodes.extend(line_nodes);
-                        }
-                }
+                        && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)?
+                    {
+                        nodes.extend(line_nodes);
+                    }
+                },
                 MtefRecordType::Pile => {
                     if let Some(pile_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefPile>() {
                         nodes.push(self.convert_pile_to_node(pile_obj)?);
                     }
-                }
+                },
                 MtefRecordType::Matrix => {
                     if let Some(matrix_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefMatrix>() {
                         nodes.push(self.convert_matrix_to_node(matrix_obj)?);
                     }
-                }
+                },
                 MtefRecordType::Font => {
                     // Font objects affect character rendering but don't generate output
                     // In a full implementation, this would update the current font context
-                }
-                MtefRecordType::Size | MtefRecordType::Full | MtefRecordType::Sub |
-                MtefRecordType::Sub2 | MtefRecordType::Sym | MtefRecordType::SubSym => {
+                },
+                MtefRecordType::Size
+                | MtefRecordType::Full
+                | MtefRecordType::Sub
+                | MtefRecordType::Sub2
+                | MtefRecordType::Sym
+                | MtefRecordType::SubSym => {
                     // Size objects affect character size but don't generate output
                     // In a full implementation, this would update the current size context
-                }
+                },
                 _ => {
                     // Skip other record types for now
-                }
+                },
             }
             current = obj.next.as_deref();
         }
@@ -103,13 +120,19 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
 
     fn convert_char_to_node(&self, char_obj: &MtefChar) -> Result<MathNode<'arena>, MtefError> {
         let text = self.convert_char_to_text(char_obj).map_err(|e| {
-            MtefError::ParseError(format!("Failed to convert character (typeface={}, char={}): {}", char_obj.typeface, char_obj.character, e))
+            MtefError::ParseError(format!(
+                "Failed to convert character (typeface={}, char={}): {}",
+                char_obj.typeface, char_obj.character, e
+            ))
         })?;
         Ok(MathNode::Text(text))
     }
 
     /// Convert a function sequence to a MathNode (handles typeface 130 functions)
-    fn convert_function_to_node(&self, start_obj: Option<&MtefObjectList>) -> Result<(MathNode<'arena>, usize), MtefError> {
+    fn convert_function_to_node(
+        &self,
+        start_obj: Option<&MtefObjectList>,
+    ) -> Result<(MathNode<'arena>, usize), MtefError> {
         use crate::formula::mtef::binary::charset::lookup_function;
 
         let mut function_name = String::new();
@@ -120,13 +143,15 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         while let Some(obj) = current {
             if let MtefRecordType::Char = obj.tag
                 && let Some(char_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefChar>()
-                    && char_obj.typeface == 130 && (char_obj.character as u8).is_ascii_alphabetic()
-                        && let Some(ch) = char::from_u32(char_obj.character as u32) {
-                            function_name.push(ch);
-                            skip_count += 1;
-                            current = obj.next.as_deref();
-                            continue;
-                        }
+                && char_obj.typeface == 130
+                && (char_obj.character as u8).is_ascii_alphabetic()
+                && let Some(ch) = char::from_u32(char_obj.character as u32)
+            {
+                function_name.push(ch);
+                skip_count += 1;
+                current = obj.next.as_deref();
+                continue;
+            }
             break;
         }
 
@@ -146,7 +171,10 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
     }
 
     /// Convert a text run to a MathNode (handles typeface 129 text in math)
-    fn convert_text_run_to_node(&self, start_obj: Option<&MtefObjectList>) -> Result<(MathNode<'arena>, usize), MtefError> {
+    fn convert_text_run_to_node(
+        &self,
+        start_obj: Option<&MtefObjectList>,
+    ) -> Result<(MathNode<'arena>, usize), MtefError> {
         let mut text_run = String::new();
         let mut current = start_obj;
         let mut skip_count = 0;
@@ -157,21 +185,26 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                 MtefRecordType::Char => {
                     if let Some(char_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefChar>()
                         && char_obj.typeface == 129
-                            && let Some(ch) = char::from_u32(char_obj.character as u32) {
-                                text_run.push(ch);
-                                skip_count += 1;
-                                current = obj.next.as_deref();
-                                continue;
-                            }
+                        && let Some(ch) = char::from_u32(char_obj.character as u32)
+                    {
+                        text_run.push(ch);
+                        skip_count += 1;
+                        current = obj.next.as_deref();
+                        continue;
+                    }
                     break;
-                }
-                MtefRecordType::Size | MtefRecordType::Full | MtefRecordType::Sub |
-                MtefRecordType::Sub2 | MtefRecordType::Sym | MtefRecordType::SubSym => {
+                },
+                MtefRecordType::Size
+                | MtefRecordType::Full
+                | MtefRecordType::Sub
+                | MtefRecordType::Sub2
+                | MtefRecordType::Sym
+                | MtefRecordType::SubSym => {
                     // Skip size objects
                     skip_count += 1;
                     current = obj.next.as_deref();
                     continue;
-                }
+                },
                 _ => break,
             }
         }
@@ -202,13 +235,17 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                     let old_mode = current_mode;
                     current_mode = EQN_MODE_TEXT;
                     Some(old_mode)
-                }
+                },
                 MA_FORCE_MATH => {
                     let old_mode = current_mode;
                     // For forced math mode, use inline if equation is inline, otherwise display
-                    current_mode = if self.inline != 0 { EQN_MODE_INLINE } else { EQN_MODE_DISPLAY };
+                    current_mode = if self.inline != 0 {
+                        EQN_MODE_INLINE
+                    } else {
+                        EQN_MODE_DISPLAY
+                    };
                     Some(old_mode)
-                }
+                },
                 MA_TEXT | MA_MATH => {
                     // For special case: mode depends on variation (like spaces)
                     if typeface == 152 && _math_attr == MA_TEXT {
@@ -217,12 +254,16 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                         Some(old_mode)
                     } else if typeface == 152 && _math_attr == MA_MATH {
                         let old_mode = current_mode;
-                        current_mode = if self.inline != 0 { EQN_MODE_INLINE } else { EQN_MODE_DISPLAY };
+                        current_mode = if self.inline != 0 {
+                            EQN_MODE_INLINE
+                        } else {
+                            EQN_MODE_DISPLAY
+                        };
                         Some(old_mode)
                     } else {
                         None
                     }
-                }
+                },
                 _ => None,
             };
 
@@ -261,12 +302,20 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         Ok(Cow::Owned(base_text))
     }
 
-    fn apply_embellishments(&self, base_text: &mut String, embellishments: &MtefEmbell, mode: i32) -> Result<(), MtefError> {
+    fn apply_embellishments(
+        &self,
+        base_text: &mut String,
+        embellishments: &MtefEmbell,
+        mode: i32,
+    ) -> Result<(), MtefError> {
         // Apply embellishments to the base character, following rtf2latex2e Eqn_GetTexChar logic
         let mut current = Some(embellishments);
 
         while let Some(embell) = current {
-            if embell.embell > 0 && usize::from(embell.embell) < crate::formula::mtef::binary::charset::EMBELLISHMENT_TEMPLATES.len() {
+            if embell.embell > 0
+                && usize::from(embell.embell)
+                    < crate::formula::mtef::binary::charset::EMBELLISHMENT_TEMPLATES.len()
+            {
                 let template = get_embellishment_template(embell.embell);
                 if !template.is_empty() {
                     // Split template on comma to get math and text versions
@@ -292,18 +341,24 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         Ok(())
     }
 
-    fn convert_codepoint(&self, character: u16, typeface: usize) -> Result<Cow<'arena, str>, MtefError> {
+    fn convert_codepoint(
+        &self,
+        character: u16,
+        typeface: usize,
+    ) -> Result<Cow<'arena, str>, MtefError> {
         // Handle special characters and formatting based on rtf2latex2e logic
         if (32..=127).contains(&character) {
             let ch = character as u8 as char;
 
             // Special handling for ampersand
-            if character == 38 { // '&'
+            if character == 38 {
+                // '&'
                 return Ok(Cow::Borrowed("\\&"));
             }
 
             // Special handling for certain typefaces (like bold)
-            if typeface == 135 { // Bold typeface - matches rtf2latex2e logic
+            if typeface == 135 {
+                // Bold typeface - matches rtf2latex2e logic
                 return Ok(Cow::Owned(format!("\\mathbf{{{}}}", ch)));
             }
 
@@ -320,58 +375,63 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         }
     }
 
-    fn convert_template_to_node(&self, tmpl_obj: &MtefTemplate) -> Result<MathNode<'arena>, MtefError> {
+    fn convert_template_to_node(
+        &self,
+        tmpl_obj: &MtefTemplate,
+    ) -> Result<MathNode<'arena>, MtefError> {
         // Handle templates based on selector type
         // Some templates have specific AST representations, others use generic template parsing
         match tmpl_obj.selector {
             0..=9 => {
                 // Fences (parentheses, brackets, braces, etc.)
                 self.convert_fence_template(tmpl_obj)
-            }
+            },
             10 => {
                 // Root
                 self.convert_legacy_template(tmpl_obj)
-            }
+            },
             11 => {
                 // Fraction
                 self.convert_legacy_template(tmpl_obj)
-            }
+            },
             12..=13 => {
                 // Underline/overline
                 self.convert_decoration_template(tmpl_obj)
-            }
+            },
             14 => {
                 // Arrows
                 self.convert_arrow_template(tmpl_obj)
-            }
+            },
             15 | 21 => {
                 // Integrals
                 self.convert_legacy_template(tmpl_obj)
-            }
+            },
             16..=20 => {
                 // Large operators (sum, product, etc.)
                 self.convert_large_op_template(tmpl_obj)
-            }
+            },
             22 => {
                 // Sum (alternate form)
                 self.convert_large_op_template(tmpl_obj)
-            }
+            },
             23 => {
                 // Limit
                 self.convert_limit_template(tmpl_obj)
-            }
+            },
             24..=25 => {
                 // Horizontal braces
                 self.convert_brace_template(tmpl_obj)
-            }
+            },
             27..=29 => {
                 // Scripts (subscript, superscript, sub+sup)
                 self.convert_legacy_template(tmpl_obj)
-            }
+            },
             _ => {
                 // Try template table lookup for unknown templates
                 let variation = tmpl_obj.variation;
-                if let Some(template_def) = TemplateParser::find_template(tmpl_obj.selector, variation) {
+                if let Some(template_def) =
+                    TemplateParser::find_template(tmpl_obj.selector, variation)
+                {
                     // Parse subobjects into arguments
                     let args = if let Some(obj_list) = &tmpl_obj.subobject_list {
                         self.parse_template_arguments(obj_list)?
@@ -380,19 +440,29 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                     };
 
                     // Apply the template
-                    Ok(TemplateParser::parse_template_arguments(template_def.template, &args))
+                    Ok(TemplateParser::parse_template_arguments(
+                        template_def.template,
+                        &args,
+                    ))
                 } else {
                     // Fallback for completely unknown templates
-                    Ok(MathNode::Text(Cow::Owned(format!("\\unknown_template_{}_{{{}}}", tmpl_obj.selector, tmpl_obj.variation))))
+                    Ok(MathNode::Text(Cow::Owned(format!(
+                        "\\unknown_template_{}_{{{}}}",
+                        tmpl_obj.selector, tmpl_obj.variation
+                    ))))
                 }
-            }
+            },
         }
     }
 
-    fn convert_legacy_template(&self, tmpl_obj: &MtefTemplate) -> Result<MathNode<'arena>, MtefError> {
+    fn convert_legacy_template(
+        &self,
+        tmpl_obj: &MtefTemplate,
+    ) -> Result<MathNode<'arena>, MtefError> {
         // Template handling based on MTEF selector values from rtf2latex2e
         match tmpl_obj.selector {
-            14 => { // Fraction (ffract)
+            14 => {
+                // Fraction (ffract)
                 // Fraction template - should have numerator and denominator subobjects
                 if let Some(obj_list) = &tmpl_obj.subobject_list {
                     let (numerator, denominator) = self.parse_fraction_subobjects(obj_list)?;
@@ -400,46 +470,57 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                 } else {
                     Ok(MathNode::Text(Cow::Borrowed("\\frac{}{}")))
                 }
-            }
-            13 => { // Root (sqroot/nthroot)
+            },
+            13 => {
+                // Root (sqroot/nthroot)
                 // Root template - may have index and base
                 if let Some(obj_list) = &tmpl_obj.subobject_list {
                     let (base, index) = self.parse_root_subobjects(obj_list)?;
-                    Ok(TemplateParser::parse_root(base, if index.is_empty() { None } else { Some(index) }))
+                    Ok(TemplateParser::parse_root(
+                        base,
+                        if index.is_empty() { None } else { Some(index) },
+                    ))
                 } else {
                     Ok(MathNode::Text(Cow::Borrowed("\\sqrt{}")))
                 }
-            }
-            15 => { // Scripts (super, sub, subsup based on variation)
+            },
+            15 => {
+                // Scripts (super, sub, subsup based on variation)
                 match tmpl_obj.variation {
-                    0 => { // Superscript
+                    0 => {
+                        // Superscript
                         if let Some(obj_list) = &tmpl_obj.subobject_list {
-                            let (base, superscript) = self.parse_superscript_subobjects(obj_list)?;
+                            let (base, superscript) =
+                                self.parse_superscript_subobjects(obj_list)?;
                             Ok(TemplateParser::parse_superscript(base, superscript))
                         } else {
                             Ok(MathNode::Text(Cow::Borrowed("^{}")))
                         }
-                    }
-                    1 => { // Subscript
+                    },
+                    1 => {
+                        // Subscript
                         if let Some(obj_list) = &tmpl_obj.subobject_list {
                             let (base, subscript) = self.parse_subscript_subobjects(obj_list)?;
                             Ok(TemplateParser::parse_subscript(base, subscript))
                         } else {
                             Ok(MathNode::Text(Cow::Borrowed("_{}")))
                         }
-                    }
-                    2 => { // Sub+Sup
+                    },
+                    2 => {
+                        // Sub+Sup
                         if let Some(obj_list) = &tmpl_obj.subobject_list {
-                            let (base, subscript, superscript) = self.parse_subsup_subobjects(obj_list)?;
+                            let (base, subscript, superscript) =
+                                self.parse_subsup_subobjects(obj_list)?;
                             Ok(TemplateParser::parse_subsup(base, subscript, superscript))
                         } else {
                             Ok(MathNode::Text(Cow::Borrowed("_{}^{}")))
                         }
-                    }
-                    _ => Ok(MathNode::Text(Cow::Borrowed("_{}^{}"))) // fallback
+                    },
+                    _ => Ok(MathNode::Text(Cow::Borrowed("_{}^{}"))), // fallback
                 }
-            }
-            21 => { // Integrals
+            },
+            21 => {
+                // Integrals
                 // For now, just create a simple integral node
                 // This should be expanded to handle limits properly
                 if let Some(obj_list) = &tmpl_obj.subobject_list {
@@ -455,15 +536,21 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                 } else {
                     Ok(MathNode::Text(Cow::Borrowed("\\int ")))
                 }
-            }
+            },
             _ => {
                 // Unknown template - return as placeholder
-                Ok(MathNode::Text(Cow::Owned(format!("\\unknown_template_{}_{{{}}}", tmpl_obj.selector, tmpl_obj.variation))))
-            }
+                Ok(MathNode::Text(Cow::Owned(format!(
+                    "\\unknown_template_{}_{{{}}}",
+                    tmpl_obj.selector, tmpl_obj.variation
+                ))))
+            },
         }
     }
 
-    fn parse_template_arguments(&self, obj_list: &MtefObjectList) -> Result<TemplateArgs<'arena>, MtefError> {
+    fn parse_template_arguments(
+        &self,
+        obj_list: &MtefObjectList,
+    ) -> Result<TemplateArgs<'arena>, MtefError> {
         // Parse template arguments from subobjects
         // This follows the rtf2latex2e pattern where arguments are separated by LINE objects
         let mut args = TemplateArgs::new();
@@ -474,10 +561,11 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
             match obj.tag {
                 MtefRecordType::Line => {
                     if let Some(line_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefLine>()
-                        && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)? {
-                            current_arg.extend(line_nodes);
-                        }
-                }
+                        && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)?
+                    {
+                        current_arg.extend(line_nodes);
+                    }
+                },
                 MtefRecordType::Pile => {
                     // Piles can separate arguments
                     if !current_arg.is_empty() {
@@ -488,12 +576,12 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                         let pile_node = self.convert_pile_to_node(pile_obj)?;
                         current_arg.push(pile_node);
                     }
-                }
+                },
                 _ => {
                     // Other objects go into current argument
                     let nodes = self.convert_single_object_to_ast(obj)?;
                     current_arg.extend(nodes);
-                }
+                },
             }
             current = obj.next.as_deref();
         }
@@ -506,7 +594,10 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         Ok(args)
     }
 
-    fn parse_fraction_subobjects(&self, obj_list: &MtefObjectList) -> Result<(Vec<MathNode<'arena>>, Vec<MathNode<'arena>>), MtefError> {
+    fn parse_fraction_subobjects(
+        &self,
+        obj_list: &MtefObjectList,
+    ) -> Result<(Vec<MathNode<'arena>>, Vec<MathNode<'arena>>), MtefError> {
         // Parse LINE objects as numerator and denominator
         let mut numerator = Vec::new();
         let mut denominator = Vec::new();
@@ -515,20 +606,24 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         while let Some(obj) = current {
             if obj.tag == MtefRecordType::Line
                 && let Some(line_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefLine>()
-                    && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)? {
-                        if numerator.is_empty() {
-                            numerator = line_nodes;
-                        } else {
-                            denominator = line_nodes;
-                        }
-                    }
+                && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)?
+            {
+                if numerator.is_empty() {
+                    numerator = line_nodes;
+                } else {
+                    denominator = line_nodes;
+                }
+            }
             current = obj.next.as_deref();
         }
 
         Ok((numerator, denominator))
     }
 
-    fn parse_root_subobjects(&self, obj_list: &MtefObjectList) -> Result<(Vec<MathNode<'arena>>, Vec<MathNode<'arena>>), MtefError> {
+    fn parse_root_subobjects(
+        &self,
+        obj_list: &MtefObjectList,
+    ) -> Result<(Vec<MathNode<'arena>>, Vec<MathNode<'arena>>), MtefError> {
         // Parse LINE objects as index and base
         let mut index = Vec::new();
         let mut base = Vec::new();
@@ -537,20 +632,24 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         while let Some(obj) = current {
             if obj.tag == MtefRecordType::Line
                 && let Some(line_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefLine>()
-                    && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)? {
-                        if index.is_empty() {
-                            index = line_nodes;
-                        } else {
-                            base = line_nodes;
-                        }
-                    }
+                && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)?
+            {
+                if index.is_empty() {
+                    index = line_nodes;
+                } else {
+                    base = line_nodes;
+                }
+            }
             current = obj.next.as_deref();
         }
 
         Ok((base, index))
     }
 
-    fn parse_subscript_subobjects(&self, obj_list: &MtefObjectList) -> Result<(Vec<MathNode<'arena>>, Vec<MathNode<'arena>>), MtefError> {
+    fn parse_subscript_subobjects(
+        &self,
+        obj_list: &MtefObjectList,
+    ) -> Result<(Vec<MathNode<'arena>>, Vec<MathNode<'arena>>), MtefError> {
         // Parse LINE objects as base and subscript
         let mut base = Vec::new();
         let mut subscript = Vec::new();
@@ -559,20 +658,24 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         while let Some(obj) = current {
             if obj.tag == MtefRecordType::Line
                 && let Some(line_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefLine>()
-                    && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)? {
-                        if base.is_empty() {
-                            base = line_nodes;
-                        } else {
-                            subscript = line_nodes;
-                        }
-                    }
+                && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)?
+            {
+                if base.is_empty() {
+                    base = line_nodes;
+                } else {
+                    subscript = line_nodes;
+                }
+            }
             current = obj.next.as_deref();
         }
 
         Ok((base, subscript))
     }
 
-    fn parse_superscript_subobjects(&self, obj_list: &MtefObjectList) -> Result<(Vec<MathNode<'arena>>, Vec<MathNode<'arena>>), MtefError> {
+    fn parse_superscript_subobjects(
+        &self,
+        obj_list: &MtefObjectList,
+    ) -> Result<(Vec<MathNode<'arena>>, Vec<MathNode<'arena>>), MtefError> {
         // Parse LINE objects as base and superscript
         let mut base = Vec::new();
         let mut superscript = Vec::new();
@@ -581,13 +684,14 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         while let Some(obj) = current {
             if obj.tag == MtefRecordType::Line
                 && let Some(line_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefLine>()
-                    && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)? {
-                        if base.is_empty() {
-                            base = line_nodes;
-                        } else {
-                            superscript = line_nodes;
-                        }
-                    }
+                && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)?
+            {
+                if base.is_empty() {
+                    base = line_nodes;
+                } else {
+                    superscript = line_nodes;
+                }
+            }
             current = obj.next.as_deref();
         }
 
@@ -604,22 +708,26 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         while let Some(obj) = current {
             if obj.tag == MtefRecordType::Line
                 && let Some(line_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefLine>()
-                    && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)? {
-                        if base.is_empty() {
-                            base = line_nodes;
-                        } else if subscript.is_empty() {
-                            subscript = line_nodes;
-                        } else {
-                            superscript = line_nodes;
-                        }
-                    }
+                && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)?
+            {
+                if base.is_empty() {
+                    base = line_nodes;
+                } else if subscript.is_empty() {
+                    subscript = line_nodes;
+                } else {
+                    superscript = line_nodes;
+                }
+            }
             current = obj.next.as_deref();
         }
 
         Ok((base, subscript, superscript))
     }
 
-    fn parse_single_subobject(&self, obj_list: &MtefObjectList) -> Result<Vec<MathNode<'arena>>, MtefError> {
+    fn parse_single_subobject(
+        &self,
+        obj_list: &MtefObjectList,
+    ) -> Result<Vec<MathNode<'arena>>, MtefError> {
         // Parse a single subobject (typically for templates with one content area)
         let mut current = Some(obj_list);
         let mut result = Vec::new();
@@ -628,15 +736,16 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
             match obj.tag {
                 MtefRecordType::Line => {
                     if let Some(line_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefLine>()
-                        && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)? {
-                            result.extend(line_nodes);
-                        }
-                }
+                        && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)?
+                    {
+                        result.extend(line_nodes);
+                    }
+                },
                 _ => {
                     // Convert other object types directly
                     let nodes = self.convert_single_object_to_ast(obj)?;
                     result.extend(nodes);
-                }
+                },
             }
             current = obj.next.as_deref();
         }
@@ -644,7 +753,10 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         Ok(result)
     }
 
-    fn convert_single_object_to_ast(&self, obj: &MtefObjectList) -> Result<Vec<MathNode<'arena>>, MtefError> {
+    fn convert_single_object_to_ast(
+        &self,
+        obj: &MtefObjectList,
+    ) -> Result<Vec<MathNode<'arena>>, MtefError> {
         // Convert a single object to AST nodes
         let mut nodes = Vec::new();
 
@@ -653,38 +765,45 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                 if let Some(char_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefChar>() {
                     nodes.push(self.convert_char_to_node(char_obj)?);
                 }
-            }
+            },
             MtefRecordType::Tmpl => {
                 if let Some(tmpl_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefTemplate>() {
                     nodes.push(self.convert_template_to_node(tmpl_obj)?);
                 }
-            }
+            },
             MtefRecordType::Pile => {
                 if let Some(pile_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefPile>() {
                     nodes.push(self.convert_pile_to_node(pile_obj)?);
                 }
-            }
+            },
             MtefRecordType::Matrix => {
                 if let Some(matrix_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefMatrix>() {
                     nodes.push(self.convert_matrix_to_node(matrix_obj)?);
                 }
-            }
+            },
             MtefRecordType::Font => {
                 // Font objects affect character rendering but don't generate output
-            }
-            MtefRecordType::Size | MtefRecordType::Full | MtefRecordType::Sub |
-            MtefRecordType::Sub2 | MtefRecordType::Sym | MtefRecordType::SubSym => {
+            },
+            MtefRecordType::Size
+            | MtefRecordType::Full
+            | MtefRecordType::Sub
+            | MtefRecordType::Sub2
+            | MtefRecordType::Sym
+            | MtefRecordType::SubSym => {
                 // Size objects affect character size but don't generate output
-            }
+            },
             _ => {
                 // Skip other record types for now
-            }
+            },
         }
 
         Ok(nodes)
     }
 
-    fn convert_line_to_nodes(&self, line_obj: &MtefLine) -> Result<Option<Vec<MathNode<'arena>>>, MtefError> {
+    fn convert_line_to_nodes(
+        &self,
+        line_obj: &MtefLine,
+    ) -> Result<Option<Vec<MathNode<'arena>>>, MtefError> {
         if let Some(obj_list) = &line_obj.object_list {
             Ok(Some(self.convert_objects_to_ast(obj_list)?))
         } else {
@@ -701,21 +820,24 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
 
             while let Some(obj) = current {
                 if obj.tag == MtefRecordType::Line
-                    && let Some(line_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefLine>() {
-                        if let Some(line_nodes) = self.convert_line_to_nodes(line_obj)? {
-                            // Each line becomes a row in the pile
-                            rows.push(vec![line_nodes]);
-                        } else {
-                            // Empty line - add empty row
-                            rows.push(vec![Vec::new()]);
-                        }
+                    && let Some(line_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefLine>()
+                {
+                    if let Some(line_nodes) = self.convert_line_to_nodes(line_obj)? {
+                        // Each line becomes a row in the pile
+                        rows.push(vec![line_nodes]);
+                    } else {
+                        // Empty line - add empty row
+                        rows.push(vec![Vec::new()]);
                     }
+                }
                 current = obj.next.as_deref();
             }
 
             if rows.len() == 1 {
                 // Single row - just return the content
-                Ok(MathNode::Row(rows.into_iter().flatten().flatten().collect()))
+                Ok(MathNode::Row(
+                    rows.into_iter().flatten().flatten().collect(),
+                ))
             } else if rows.len() == 2 {
                 // Two rows - could be a fraction or other binary operation
                 // For now, represent as a simple vertical stack
@@ -739,7 +861,10 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         }
     }
 
-    fn convert_matrix_to_node(&self, matrix_obj: &MtefMatrix) -> Result<MathNode<'arena>, MtefError> {
+    fn convert_matrix_to_node(
+        &self,
+        matrix_obj: &MtefMatrix,
+    ) -> Result<MathNode<'arena>, MtefError> {
         // Convert matrix to proper matrix AST node
         // MTEF matrices store elements in row-major order
         if let Some(element_list) = &matrix_obj.element_list {
@@ -761,16 +886,17 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
             while let Some(obj) = current {
                 if obj.tag == MtefRecordType::Line
                     && let Some(line_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefLine>()
-                        && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)? {
-                            // Calculate row and column from cell index
-                            let row_idx = cell_index / (matrix_obj.cols as usize);
-                            let col_idx = cell_index % (matrix_obj.cols as usize);
+                    && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)?
+                {
+                    // Calculate row and column from cell index
+                    let row_idx = cell_index / (matrix_obj.cols as usize);
+                    let col_idx = cell_index % (matrix_obj.cols as usize);
 
-                            if row_idx < rows.len() && col_idx < rows[row_idx].len() {
-                                rows[row_idx][col_idx] = line_nodes;
-                            }
-                            cell_index += 1;
-                        }
+                    if row_idx < rows.len() && col_idx < rows[row_idx].len() {
+                        rows[row_idx][col_idx] = line_nodes;
+                    }
+                    cell_index += 1;
+                }
                 current = obj.next.as_deref();
 
                 // Safety check to prevent infinite loops
@@ -803,7 +929,10 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         }
     }
 
-    fn convert_fence_template(&self, tmpl_obj: &MtefTemplate) -> Result<MathNode<'arena>, MtefError> {
+    fn convert_fence_template(
+        &self,
+        tmpl_obj: &MtefTemplate,
+    ) -> Result<MathNode<'arena>, MtefError> {
         // Convert fence templates (parentheses, brackets, braces, etc.) to Fence AST nodes
         let fence_type = match tmpl_obj.selector {
             0 => match tmpl_obj.variation {
@@ -848,7 +977,10 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         Ok(TemplateParser::parse_fence(fence_type, content))
     }
 
-    fn convert_decoration_template(&self, tmpl_obj: &MtefTemplate) -> Result<MathNode<'arena>, MtefError> {
+    fn convert_decoration_template(
+        &self,
+        tmpl_obj: &MtefTemplate,
+    ) -> Result<MathNode<'arena>, MtefError> {
         // Convert underline/overline templates
         let content = if let Some(obj_list) = &tmpl_obj.subobject_list {
             self.parse_single_subobject(obj_list)?
@@ -875,7 +1007,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                     strike_through: None,
                     double_strike_through: None,
                 })
-            }
+            },
             13 => {
                 // Overline
                 let overline_style = if tmpl_obj.variation == 1 {
@@ -894,12 +1026,15 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                     strike_through: None,
                     double_strike_through: None,
                 })
-            }
+            },
             _ => Ok(MathNode::Text(Cow::Borrowed("\\decoration"))),
         }
     }
 
-    fn convert_arrow_template(&self, tmpl_obj: &MtefTemplate) -> Result<MathNode<'arena>, MtefError> {
+    fn convert_arrow_template(
+        &self,
+        tmpl_obj: &MtefTemplate,
+    ) -> Result<MathNode<'arena>, MtefError> {
         // Convert arrow templates to appropriate AST nodes
         // For now, fall back to template parsing
         let variation = tmpl_obj.variation;
@@ -909,13 +1044,19 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
             } else {
                 smallvec::SmallVec::new()
             };
-            Ok(TemplateParser::parse_template_arguments(template_def.template, &args))
+            Ok(TemplateParser::parse_template_arguments(
+                template_def.template,
+                &args,
+            ))
         } else {
             Ok(MathNode::Text(Cow::Borrowed("\\arrow")))
         }
     }
 
-    fn convert_large_op_template(&self, tmpl_obj: &MtefTemplate) -> Result<MathNode<'arena>, MtefError> {
+    fn convert_large_op_template(
+        &self,
+        tmpl_obj: &MtefTemplate,
+    ) -> Result<MathNode<'arena>, MtefError> {
         // Convert large operator templates (sum, product, etc.)
         let operator = match tmpl_obj.selector {
             16 | 22 => LargeOperator::Sum,
@@ -927,16 +1068,25 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         };
 
         // Parse limits from subobjects
-        let (lower_limit, upper_limit, integrand) = if let Some(obj_list) = &tmpl_obj.subobject_list {
+        let (lower_limit, upper_limit, integrand) = if let Some(obj_list) = &tmpl_obj.subobject_list
+        {
             self.parse_large_op_subobjects(obj_list)?
         } else {
             (None, None, Vec::new())
         };
 
-        Ok(TemplateParser::parse_large_op(operator, lower_limit.unwrap_or_default(), upper_limit.unwrap_or_default(), integrand))
+        Ok(TemplateParser::parse_large_op(
+            operator,
+            lower_limit.unwrap_or_default(),
+            upper_limit.unwrap_or_default(),
+            integrand,
+        ))
     }
 
-    fn convert_limit_template(&self, tmpl_obj: &MtefTemplate) -> Result<MathNode<'arena>, MtefError> {
+    fn convert_limit_template(
+        &self,
+        tmpl_obj: &MtefTemplate,
+    ) -> Result<MathNode<'arena>, MtefError> {
         // Convert limit templates
         // Parse the limit expression and the approaching value
         let (function, approaching) = if let Some(obj_list) = &tmpl_obj.subobject_list {
@@ -958,7 +1108,10 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         })
     }
 
-    fn convert_brace_template(&self, tmpl_obj: &MtefTemplate) -> Result<MathNode<'arena>, MtefError> {
+    fn convert_brace_template(
+        &self,
+        tmpl_obj: &MtefTemplate,
+    ) -> Result<MathNode<'arena>, MtefError> {
         // Convert horizontal brace templates
         let _is_upper = tmpl_obj.variation == 1;
 
@@ -976,7 +1129,10 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
             } else {
                 smallvec::SmallVec::new()
             };
-            Ok(TemplateParser::parse_template_arguments(template_def.template, &args))
+            Ok(TemplateParser::parse_template_arguments(
+                template_def.template,
+                &args,
+            ))
         } else {
             Ok(MathNode::Text(Cow::Borrowed("\\brace")))
         }
@@ -994,22 +1150,26 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         while let Some(obj) = current {
             if obj.tag == MtefRecordType::Line
                 && let Some(line_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefLine>()
-                    && let Some(nodes) = self.convert_line_to_nodes(line_obj)? {
-                        if integrand.is_empty() {
-                            integrand = nodes;
-                        } else if lower_limit.is_none() {
-                            lower_limit = Some(nodes);
-                        } else if upper_limit.is_none() {
-                            upper_limit = Some(nodes);
-                        }
-                    }
+                && let Some(nodes) = self.convert_line_to_nodes(line_obj)?
+            {
+                if integrand.is_empty() {
+                    integrand = nodes;
+                } else if lower_limit.is_none() {
+                    lower_limit = Some(nodes);
+                } else if upper_limit.is_none() {
+                    upper_limit = Some(nodes);
+                }
+            }
             current = obj.next.as_deref();
         }
 
         Ok((lower_limit, upper_limit, integrand))
     }
 
-    fn parse_limit_subobjects(&self, obj_list: &MtefObjectList) -> Result<(Vec<MathNode<'arena>>, Vec<MathNode<'arena>>), MtefError> {
+    fn parse_limit_subobjects(
+        &self,
+        obj_list: &MtefObjectList,
+    ) -> Result<(Vec<MathNode<'arena>>, Vec<MathNode<'arena>>), MtefError> {
         // Parse subobjects for limits: function and approaching value
         let mut function = Vec::new();
         let mut approaching = Vec::new();
@@ -1018,20 +1178,24 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         while let Some(obj) = current {
             if obj.tag == MtefRecordType::Line
                 && let Some(line_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefLine>()
-                    && let Some(nodes) = self.convert_line_to_nodes(line_obj)? {
-                        if function.is_empty() {
-                            function = nodes;
-                        } else {
-                            approaching = nodes;
-                        }
-                    }
+                && let Some(nodes) = self.convert_line_to_nodes(line_obj)?
+            {
+                if function.is_empty() {
+                    function = nodes;
+                } else {
+                    approaching = nodes;
+                }
+            }
             current = obj.next.as_deref();
         }
 
         Ok((function, approaching))
     }
 
-    fn parse_brace_subobjects(&self, obj_list: &MtefObjectList) -> Result<(Vec<MathNode<'arena>>, Vec<MathNode<'arena>>), MtefError> {
+    fn parse_brace_subobjects(
+        &self,
+        obj_list: &MtefObjectList,
+    ) -> Result<(Vec<MathNode<'arena>>, Vec<MathNode<'arena>>), MtefError> {
         // Parse subobjects for braces: content and brace symbol
         let mut content = Vec::new();
         let mut brace_text = Vec::new();
@@ -1040,13 +1204,14 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         while let Some(obj) = current {
             if obj.tag == MtefRecordType::Line
                 && let Some(line_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefLine>()
-                    && let Some(nodes) = self.convert_line_to_nodes(line_obj)? {
-                        if content.is_empty() {
-                            content = nodes;
-                        } else {
-                            brace_text = nodes;
-                        }
-                    }
+                && let Some(nodes) = self.convert_line_to_nodes(line_obj)?
+            {
+                if content.is_empty() {
+                    content = nodes;
+                } else {
+                    brace_text = nodes;
+                }
+            }
             current = obj.next.as_deref();
         }
 

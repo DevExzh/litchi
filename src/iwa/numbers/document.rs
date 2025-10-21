@@ -4,13 +4,13 @@
 
 use std::path::Path;
 
+use super::sheet::NumbersSheet;
+use super::table::NumbersTable;
 use crate::iwa::Result;
 use crate::iwa::bundle::Bundle;
 use crate::iwa::object_index::ObjectIndex;
 use crate::iwa::registry::Application;
 use crate::iwa::text::TextExtractor;
-use super::sheet::NumbersSheet;
-use super::table::NumbersTable;
 
 /// High-level interface for Numbers documents
 pub struct NumbersDocument {
@@ -98,7 +98,7 @@ impl NumbersDocument {
     /// for sheet in sheets {
     ///     println!("Sheet: {}", sheet.name);
     ///     for table in &sheet.tables {
-    ///         println!("  Table: {} ({}x{})", 
+    ///         println!("  Table: {} ({}x{})",
     ///             table.name, table.row_count, table.column_count);
     ///     }
     /// }
@@ -113,7 +113,7 @@ impl NumbersDocument {
         if sheet_objects.is_empty() {
             // Try alternate sheet message type (TN.SheetArchive from JSON)
             let alt_sheet_objects = self.bundle.find_objects_by_type(2);
-            
+
             for (index, (_archive_name, object)) in alt_sheet_objects.iter().enumerate() {
                 let sheet = self.parse_sheet(index, object)?;
                 if !sheet.is_empty() || !sheet.name.is_empty() {
@@ -145,10 +145,15 @@ impl NumbersDocument {
     }
 
     /// Parse a single sheet from an object
-    fn parse_sheet(&self, index: usize, object: &crate::iwa::archive::ArchiveObject) -> Result<NumbersSheet> {
+    fn parse_sheet(
+        &self,
+        index: usize,
+        object: &crate::iwa::archive::ArchiveObject,
+    ) -> Result<NumbersSheet> {
         // Extract sheet name from decoded messages
         let text_parts = object.extract_text();
-        let sheet_name = text_parts.first()
+        let sheet_name = text_parts
+            .first()
             .cloned()
             .unwrap_or_else(|| format!("Sheet {}", index + 1));
 
@@ -185,10 +190,11 @@ impl NumbersDocument {
     /// Parse a single table from an object
     fn parse_table(&self, object: &crate::iwa::archive::ArchiveObject) -> Result<NumbersTable> {
         use prost::Message;
-        
+
         // Extract table name from decoded messages
         let text_parts = object.extract_text();
-        let table_name = text_parts.first()
+        let table_name = text_parts
+            .first()
             .cloned()
             .unwrap_or_else(|| "Table".to_string());
 
@@ -201,20 +207,22 @@ impl NumbersDocument {
         // - number_of_columns: uint32
         // - data_store: reference to TableDataList
         // - table_id: UUID
-        
+
         if let Some(raw_message) = object.messages.first() {
             // Try to decode as TableModelArchive
-            if let Ok(table_model) = crate::iwa::protobuf::tst::TableModelArchive::decode(&*raw_message.data) {
+            if let Ok(table_model) =
+                crate::iwa::protobuf::tst::TableModelArchive::decode(&*raw_message.data)
+            {
                 // Set table dimensions from protobuf fields
                 // These are required uint32 fields in the proto, so they're always present
                 table.row_count = table_model.number_of_rows as usize;
                 table.column_count = table_model.number_of_columns as usize;
-                
+
                 // Extract table name if available
                 if !table_model.table_name.is_empty() {
                     table.name = table_model.table_name.clone();
                 }
-                
+
                 // TODO: Parse cell data from data_store reference
                 // The data_store field contains a reference to a TableDataList object
                 // which stores the actual cell values. We would need to:
@@ -293,7 +301,11 @@ mod tests {
         }
 
         let doc_result = NumbersDocument::open(doc_path);
-        assert!(doc_result.is_ok(), "Failed to open Numbers document: {:?}", doc_result.err());
+        assert!(
+            doc_result.is_ok(),
+            "Failed to open Numbers document: {:?}",
+            doc_result.err()
+        );
 
         let doc = doc_result.unwrap();
         assert!(doc.object_index.all_object_ids().len() > 0);
@@ -324,7 +336,9 @@ mod tests {
 
         let sheets = sheets_result.unwrap();
         // Document should have at least one sheet (even if implicit)
-        assert!(!sheets.is_empty(), "Document should have at least one sheet");
+        assert!(
+            !sheets.is_empty(),
+            "Document should have at least one sheet"
+        );
     }
 }
-

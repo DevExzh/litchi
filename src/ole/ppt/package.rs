@@ -1,6 +1,6 @@
+use super::super::{OleError, OleFile};
 /// Package implementation for legacy PowerPoint presentations (.ppt).
 use super::presentation::Presentation;
-use super::super::{OleError, OleFile};
 use std::fs::File;
 use std::io::{self, Read, Seek};
 use std::path::Path;

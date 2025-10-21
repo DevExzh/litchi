@@ -2,10 +2,10 @@
 //
 // Converts Macintosh PICT files to modern raster formats (PNG, JPEG, WebP).
 
-use super::parser::PictParser;
-use crate::common::error::{Error, Result};
 use super::data::{get_bitmap_pixel, stretch_coordinates, unpack_bits};
+use super::parser::PictParser;
 use super::types::{PictBitmap, PictRect};
+use crate::common::error::{Error, Result};
 use image::{DynamicImage, ImageBuffer, ImageFormat, Rgba, RgbaImage};
 use std::io::Cursor;
 
@@ -79,12 +79,12 @@ impl PictConverter {
                 let aspect = src_height as f64 / src_width as f64;
                 let h = (w as f64 * aspect) as u32;
                 (w, h)
-            }
+            },
             (None, Some(h)) => {
                 let aspect = src_width as f64 / src_height as f64;
                 let w = (h as f64 * aspect) as u32;
                 (w, h)
-            }
+            },
             (None, None) => {
                 let max_dim = 4096;
                 if src_width > max_dim || src_height > max_dim {
@@ -96,7 +96,7 @@ impl PictConverter {
                 } else {
                     (src_width, src_height)
                 }
-            }
+            },
         }
     }
 
@@ -114,14 +114,14 @@ impl PictConverter {
                     if let Some(img) = self.parse_direct_bits(&record.data) {
                         return Some(img);
                     }
-                }
+                },
                 0x8200 => {
                     // CompressedQuickTime - contains JPEG or other compressed data
                     if let Some(img) = self.parse_compressed_quicktime(&record.data) {
                         return Some(img);
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
         None
@@ -137,9 +137,8 @@ impl PictConverter {
         }
 
         // Parse the bitmap header (big-endian format)
-        let mut bitmap: PictBitmap = unsafe {
-            std::ptr::read_unaligned(data.as_ptr() as *const PictBitmap)
-        };
+        let mut bitmap: PictBitmap =
+            unsafe { std::ptr::read_unaligned(data.as_ptr() as *const PictBitmap) };
 
         // Convert from big-endian to native endianness
         bitmap_to_native(&mut bitmap);
@@ -197,11 +196,11 @@ impl PictConverter {
                 Ok(unpacked_row) => {
                     // Render the unpacked row to the image
                     self.render_bitmap_row(&unpacked_row, &bitmap, y as i32, &mut img);
-                }
+                },
                 Err(_) => {
                     // If decompression fails, skip this row
                     continue;
-                }
+                },
             }
         }
 
@@ -267,7 +266,7 @@ impl PictConverter {
     fn parse_compressed_quicktime(&self, data: &[u8]) -> Option<DynamicImage> {
         // QuickTime compressed data may contain JPEG or other formats
         // Try to detect and decode
-        
+
         // Look for JPEG markers
         if data.len() > 2 {
             for i in 0..data.len() - 2 {
@@ -364,4 +363,3 @@ impl PictConverter {
         self.convert_to_format(ImageFormat::WebP)
     }
 }
-

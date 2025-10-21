@@ -1,3 +1,4 @@
+pub mod autoshape;
 /// Shape and placeholder parsing for PowerPoint presentations.
 ///
 /// This module provides functionality to parse shapes and placeholders
@@ -41,11 +42,10 @@
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub mod escher;
+pub mod placeholder;
 pub mod shape;
 pub mod shape_enum;
 pub mod textbox;
-pub mod placeholder;
-pub mod autoshape;
 
 // Re-export the trait and type
 pub use shape::{Shape, ShapeType};
@@ -54,6 +54,6 @@ pub use shape::{Shape, ShapeType};
 pub use shape_enum::ShapeEnum;
 
 // Re-export concrete shape types
-pub use textbox::TextBox;
-pub use placeholder::{Placeholder, PlaceholderType, PlaceholderSize};
 pub use autoshape::AutoShape;
+pub use placeholder::{Placeholder, PlaceholderSize, PlaceholderType};
+pub use textbox::TextBox;

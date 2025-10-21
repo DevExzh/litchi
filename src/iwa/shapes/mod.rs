@@ -10,4 +10,3 @@
 pub mod text_extractor;
 
 pub use text_extractor::ShapeTextExtractor;
-

@@ -16,7 +16,7 @@ type Result<T> = std::result::Result<T, Error>;
 pub(super) enum WorkbookImpl {
     #[cfg(feature = "iwa")]
     Numbers(crate::iwa::numbers::NumbersDocument),
-    
+
     // For other formats, we just indicate they're not yet fully unified
     #[cfg(any(feature = "ole", feature = "ooxml"))]
     #[allow(dead_code)]
@@ -37,7 +37,9 @@ pub(super) enum WorkbookFormat {
 }
 
 /// Detect workbook format from file signature.
-pub(super) fn detect_workbook_format_from_signature<R: Read + Seek>(reader: &mut R) -> Result<WorkbookFormat> {
+pub(super) fn detect_workbook_format_from_signature<R: Read + Seek>(
+    reader: &mut R,
+) -> Result<WorkbookFormat> {
     let mut header = [0u8; 8];
     reader.seek(SeekFrom::Start(0))?;
     reader.read_exact(&mut header)?;
@@ -57,24 +59,26 @@ pub(super) fn detect_workbook_format_from_signature<R: Read + Seek>(reader: &mut
     Err(Error::NotOfficeFile)
 }
 
-
 /// Refine ZIP-based workbook format detection (XLSX vs XLSB vs Numbers)
-pub(super) fn refine_workbook_format<R: Read + Seek>(reader: &mut R, initial_format: WorkbookFormat) -> Result<WorkbookFormat> {
+pub(super) fn refine_workbook_format<R: Read + Seek>(
+    reader: &mut R,
+    initial_format: WorkbookFormat,
+) -> Result<WorkbookFormat> {
     use std::io::SeekFrom;
-    
+
     // Only refine if it's a ZIP-based format
     if initial_format != WorkbookFormat::Xlsx {
         return Ok(initial_format);
     }
 
     reader.seek(SeekFrom::Start(0))?;
-    
+
     // Open ZIP archive once
     let mut archive = match zip::ZipArchive::new(reader) {
         Ok(archive) => archive,
         Err(_) => return Ok(initial_format),
     };
-    
+
     // Check for iWork Numbers format (Index/*.iwa files)
     #[cfg(feature = "iwa")]
     {
@@ -82,7 +86,7 @@ pub(super) fn refine_workbook_format<R: Read + Seek>(reader: &mut R, initial_for
         if archive.by_name("Index.zip").is_ok() {
             return Ok(WorkbookFormat::Numbers);
         }
-        
+
         // Check for Index/ directory with .iwa files (newer iWork format)
         for i in 0..archive.len() {
             if let Ok(file) = archive.by_index(i) {
@@ -105,4 +109,3 @@ pub(super) fn refine_workbook_format<R: Read + Seek>(reader: &mut R, initial_for
 
     Ok(WorkbookFormat::Xlsx)
 }
-

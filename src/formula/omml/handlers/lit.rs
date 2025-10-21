@@ -15,9 +15,9 @@ impl LitHandler {
             // Set literal property based on element content
             let text_content = context.text.as_str().trim();
             if !text_content.is_empty() {
-                parent.properties.run_literal = Some(text_content == "1" || text_content.to_lowercase() == "true");
+                parent.properties.run_literal =
+                    Some(text_content == "1" || text_content.to_lowercase() == "true");
             }
         }
     }
 }
-

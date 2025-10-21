@@ -58,4 +58,3 @@ pub use document::Document;
 pub use package::Package;
 pub use paragraph::{Paragraph, Run};
 pub use table::{Cell, Row, Table};
-

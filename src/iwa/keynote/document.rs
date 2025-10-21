@@ -4,13 +4,13 @@
 
 use std::path::Path;
 
+use super::show::KeynoteShow;
+use super::slide::KeynoteSlide;
 use crate::iwa::Result;
 use crate::iwa::bundle::Bundle;
 use crate::iwa::object_index::ObjectIndex;
 use crate::iwa::registry::Application;
 use crate::iwa::text::TextExtractor;
-use super::slide::KeynoteSlide;
-use super::show::KeynoteShow;
 
 /// High-level interface for Keynote documents
 pub struct KeynoteDocument {
@@ -116,8 +116,12 @@ impl KeynoteDocument {
             // Try alternate slide message types (5 and 6 from JSON)
             let alt_slide_objects_5 = self.bundle.find_objects_by_type(5);
             let alt_slide_objects_6 = self.bundle.find_objects_by_type(6);
-            
-            for (index, (_archive_name, object)) in alt_slide_objects_5.iter().chain(alt_slide_objects_6.iter()).enumerate() {
+
+            for (index, (_archive_name, object)) in alt_slide_objects_5
+                .iter()
+                .chain(alt_slide_objects_6.iter())
+                .enumerate()
+            {
                 let slide = self.parse_slide(index, object)?;
                 if !slide.is_empty() {
                     slides.push(slide);
@@ -136,7 +140,7 @@ impl KeynoteDocument {
         if slides.is_empty() {
             let mut extractor = TextExtractor::new();
             extractor.extract_from_bundle(&self.bundle)?;
-            
+
             if extractor.storage_count() > 0 {
                 let mut slide = KeynoteSlide::new(0);
                 for storage in extractor.storages() {
@@ -155,18 +159,22 @@ impl KeynoteDocument {
     }
 
     /// Parse a single slide from an object
-    fn parse_slide(&self, index: usize, object: &crate::iwa::archive::ArchiveObject) -> Result<KeynoteSlide> {
+    fn parse_slide(
+        &self,
+        index: usize,
+        object: &crate::iwa::archive::ArchiveObject,
+    ) -> Result<KeynoteSlide> {
         use prost::Message;
-        
+
         let mut slide = KeynoteSlide::new(index);
 
         // Extract text content from the slide object
         let text_parts = object.extract_text();
-        
+
         if !text_parts.is_empty() {
             // First text part is typically the title or slide name
             slide.title = text_parts.first().cloned();
-            
+
             // Remaining parts are content
             slide.text_content = text_parts.into_iter().skip(1).collect();
         }
@@ -179,27 +187,30 @@ impl KeynoteDocument {
         // - builds: references to KN.BuildArchive (animations)
         // - transition: reference to KN.TransitionArchive
         // - master_slide: reference to master slide
-        
+
         if let Some(raw_message) = object.messages.first() {
             // Try to decode as SlideArchive
-            if let Ok(slide_archive) = crate::iwa::protobuf::kn::SlideArchive::decode(&*raw_message.data) {
+            if let Ok(slide_archive) =
+                crate::iwa::protobuf::kn::SlideArchive::decode(&*raw_message.data)
+            {
                 // Extract slide name if available
-                if let Some(ref name) = slide_archive.name 
-                    && !name.is_empty() {
-                        slide.title = Some(name.clone());
-                    }
-                
+                if let Some(ref name) = slide_archive.name
+                    && !name.is_empty()
+                {
+                    slide.title = Some(name.clone());
+                }
+
                 // TODO: Extract build animations
                 // The builds field contains references to KN.BuildArchive objects
                 // which define the animation effects for objects on the slide
-                
+
                 // TODO: Extract transition
                 // The transition field contains a reference to a transition effect
-                
+
                 // TODO: Resolve drawable references to get text boxes and other content
                 // The drawables field contains references to TSD.DrawableArchive objects
                 // which can include text boxes, shapes, images, etc.
-                
+
                 // TODO: Extract speaker notes
                 // The note field contains a reference to KN.NoteArchive
                 // which has the speaker notes text
@@ -209,9 +220,10 @@ impl KeynoteDocument {
         // Extract text from text storages
         let extractor = TextExtractor::new();
         if let Ok(storage) = extractor.extract_from_object(object)
-            && !storage.is_empty() {
-                slide.text_storages.push(storage);
-            }
+            && !storage.is_empty()
+        {
+            slide.text_storages.push(storage);
+        }
 
         Ok(slide)
     }
@@ -297,7 +309,11 @@ mod tests {
         }
 
         let doc_result = KeynoteDocument::open(doc_path);
-        assert!(doc_result.is_ok(), "Failed to open Keynote document: {:?}", doc_result.err());
+        assert!(
+            doc_result.is_ok(),
+            "Failed to open Keynote document: {:?}",
+            doc_result.err()
+        );
 
         let doc = doc_result.unwrap();
         assert!(doc.object_index.all_object_ids().len() > 0);
@@ -328,7 +344,10 @@ mod tests {
 
         let slides = slides_result.unwrap();
         // Presentation should have at least one slide
-        assert!(!slides.is_empty(), "Presentation should have at least one slide");
+        assert!(
+            !slides.is_empty(),
+            "Presentation should have at least one slide"
+        );
     }
 
     #[test]
@@ -346,4 +365,3 @@ mod tests {
         assert!(!show.is_empty(), "Show should have slides");
     }
 }
-

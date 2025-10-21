@@ -2,10 +2,10 @@
 //!
 //! Provides utilities for extracting text from iWork document objects.
 
-use crate::iwa::bundle::Bundle;
-use crate::iwa::archive::ArchiveObject;
-use crate::iwa::Result;
 use super::storage::{TextStorage, parse_storage_archive};
+use crate::iwa::Result;
+use crate::iwa::archive::ArchiveObject;
+use crate::iwa::bundle::Bundle;
 
 /// Text extractor for iWork documents
 pub struct TextExtractor {
@@ -25,18 +25,17 @@ impl TextExtractor {
     pub fn extract_from_bundle(&mut self, bundle: &Bundle) -> Result<()> {
         // Find all TSWP storage objects (message types 200-205, 2001-2022)
         let storage_types = [
-            200, 201, 202, 203, 204, 205,
-            2001, 2002, 2003, 2004, 2005,
-            2011, 2012, 2022,
+            200, 201, 202, 203, 204, 205, 2001, 2002, 2003, 2004, 2005, 2011, 2012, 2022,
         ];
 
         for type_id in storage_types {
             let objects = bundle.find_objects_by_type(type_id);
             for (_archive_name, object) in objects {
                 if let Ok(storage) = self.extract_from_object(object)
-                    && !storage.is_empty() {
-                        self.storages.push(storage);
-                    }
+                    && !storage.is_empty()
+                {
+                    self.storages.push(storage);
+                }
             }
         }
 
@@ -47,7 +46,7 @@ impl TextExtractor {
     pub fn extract_from_object(&self, object: &ArchiveObject) -> Result<TextStorage> {
         // Extract text from decoded messages
         let text_lines = object.extract_text();
-        
+
         if text_lines.is_empty() {
             return Ok(TextStorage::new());
         }
@@ -107,11 +106,12 @@ mod tests {
     #[test]
     fn test_text_extractor_clear() {
         let mut extractor = TextExtractor::new();
-        extractor.storages.push(TextStorage::from_text("Test".to_string()));
+        extractor
+            .storages
+            .push(TextStorage::from_text("Test".to_string()));
         assert_eq!(extractor.storage_count(), 1);
-        
+
         extractor.clear();
         assert_eq!(extractor.storage_count(), 0);
     }
 }
-

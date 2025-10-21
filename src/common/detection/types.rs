@@ -30,4 +30,3 @@ pub enum FileFormat {
     /// OpenDocument Presentation (.odp)
     Odp,
 }
-

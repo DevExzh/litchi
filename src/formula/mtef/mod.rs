@@ -18,7 +18,11 @@ impl<'arena> MtefParser<'arena> {
         let binary_parser = match binary::MtefBinaryParser::new(arena, data) {
             Ok(parser) => Some(parser),
             Err(e) => {
-                eprintln!("DEBUG: MTEF parser validation failed ({} bytes): {}", data.len(), e);
+                eprintln!(
+                    "DEBUG: MTEF parser validation failed ({} bytes): {}",
+                    data.len(),
+                    e
+                );
                 if data.len() >= 28 {
                     eprintln!("DEBUG:   OLE header bytes: {:02X?}", &data[0..28]);
                     if data.len() >= 40 {
@@ -26,7 +30,7 @@ impl<'arena> MtefParser<'arena> {
                     }
                 }
                 None
-            }
+            },
         };
         Self {
             arena,
@@ -59,13 +63,15 @@ impl<'arena> MtefParser<'arena> {
 
     /// Get MTEF version information if available
     pub fn version_info(&self) -> Option<(u8, u8, u8, u8, u8)> {
-        self.binary_parser.as_ref().map(|p| (
-            p.mtef_version,
-            p.platform,
-            p.product,
-            p.version,
-            p.version_sub,
-        ))
+        self.binary_parser.as_ref().map(|p| {
+            (
+                p.mtef_version,
+                p.platform,
+                p.product,
+                p.version,
+                p.version_sub,
+            )
+        })
     }
 }
 
@@ -285,10 +291,14 @@ mod tests {
         let result = TemplateParser::parse_fraction(args[0].to_vec(), args[1].to_vec());
 
         match result {
-            crate::formula::ast::MathNode::Frac { numerator, denominator, .. } => {
+            crate::formula::ast::MathNode::Frac {
+                numerator,
+                denominator,
+                ..
+            } => {
                 assert_eq!(numerator.len(), 1);
                 assert_eq!(denominator.len(), 1);
-            }
+            },
             _ => panic!("Expected fraction node"),
         }
     }

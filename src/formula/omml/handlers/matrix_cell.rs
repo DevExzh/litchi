@@ -16,7 +16,10 @@ impl MatrixCellHandler {
         if let Some(parent) = parent_context {
             // Matrix cells are processed by the matrix row handler
             // Here we just pass children up to the matrix row
-            crate::formula::omml::utils::extend_vec_efficient(&mut parent.children, context.children.clone());
+            crate::formula::omml::utils::extend_vec_efficient(
+                &mut parent.children,
+                context.children.clone(),
+            );
         }
     }
 }

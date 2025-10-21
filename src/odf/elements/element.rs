@@ -4,7 +4,7 @@
 //! inherit from, providing common functionality for XML manipulation.
 
 use crate::common::{Error, Result};
-use crate::odf::elements::namespace::{QualifiedName, NamespaceContext};
+use crate::odf::elements::namespace::{NamespaceContext, QualifiedName};
 use quick_xml::events::Event;
 use std::collections::HashMap;
 
@@ -67,7 +67,8 @@ pub trait ElementBase {
 
     /// Set attribute value
     fn set_attribute(&mut self, name: &str, value: &str) {
-        self.attributes_mut().insert(name.to_string(), value.to_string());
+        self.attributes_mut()
+            .insert(name.to_string(), value.to_string());
     }
 
     /// Remove attribute
@@ -82,12 +83,11 @@ pub trait ElementBase {
 
     /// Get boolean attribute value
     fn get_bool_attribute(&self, name: &str) -> Option<bool> {
-        self.get_attribute(name)
-            .and_then(|s| match s {
-                "true" | "1" => Some(true),
-                "false" | "0" => Some(false),
-                _ => None,
-            })
+        self.get_attribute(name).and_then(|s| match s {
+            "true" | "1" => Some(true),
+            "false" | "0" => Some(false),
+            _ => None,
+        })
     }
 
     /// Get numeric attribute value
@@ -215,7 +215,8 @@ impl Element {
 
     /// Check if element name matches (namespace-aware)
     pub fn name_matches(&self, name: &str) -> bool {
-        self.qualified_name.matches_str(name, Some(&self.namespace_context))
+        self.qualified_name
+            .matches_str(name, Some(&self.namespace_context))
     }
 
     /// Get attribute with namespace-aware lookup
@@ -246,18 +247,22 @@ impl Element {
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Start(ref e)) => {
-                    let tag_name = String::from_utf8(e.name().as_ref().to_vec())
-                        .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in tag name".to_string()))?;
+                    let tag_name = String::from_utf8(e.name().as_ref().to_vec()).map_err(|_| {
+                        Error::InvalidFormat("Invalid UTF-8 in tag name".to_string())
+                    })?;
 
                     let mut namespace_context = NamespaceContext::new();
 
                     // First pass: collect namespace declarations
                     for attr_result in e.attributes() {
-                        let attr = attr_result.map_err(|_| Error::InvalidFormat("Invalid attribute".to_string()))?;
-                        let key = String::from_utf8(attr.key.as_ref().to_vec())
-                            .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in attribute key".to_string()))?;
-                        let value = String::from_utf8(attr.value.to_vec())
-                            .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in attribute value".to_string()))?;
+                        let attr = attr_result
+                            .map_err(|_| Error::InvalidFormat("Invalid attribute".to_string()))?;
+                        let key = String::from_utf8(attr.key.as_ref().to_vec()).map_err(|_| {
+                            Error::InvalidFormat("Invalid UTF-8 in attribute key".to_string())
+                        })?;
+                        let value = String::from_utf8(attr.value.to_vec()).map_err(|_| {
+                            Error::InvalidFormat("Invalid UTF-8 in attribute value".to_string())
+                        })?;
 
                         // Check for namespace declarations
                         if key == "xmlns" || key.starts_with("xmlns:") {
@@ -269,11 +274,14 @@ impl Element {
 
                     // Second pass: set regular attributes
                     for attr_result in e.attributes() {
-                        let attr = attr_result.map_err(|_| Error::InvalidFormat("Invalid attribute".to_string()))?;
-                        let key = String::from_utf8(attr.key.as_ref().to_vec())
-                            .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in attribute key".to_string()))?;
-                        let value = String::from_utf8(attr.value.to_vec())
-                            .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in attribute value".to_string()))?;
+                        let attr = attr_result
+                            .map_err(|_| Error::InvalidFormat("Invalid attribute".to_string()))?;
+                        let key = String::from_utf8(attr.key.as_ref().to_vec()).map_err(|_| {
+                            Error::InvalidFormat("Invalid UTF-8 in attribute key".to_string())
+                        })?;
+                        let value = String::from_utf8(attr.value.to_vec()).map_err(|_| {
+                            Error::InvalidFormat("Invalid UTF-8 in attribute value".to_string())
+                        })?;
 
                         // Skip namespace declarations - they're already handled
                         if !(key == "xmlns" || key.starts_with("xmlns:")) {
@@ -282,17 +290,20 @@ impl Element {
                     }
 
                     stack.push(element);
-                }
+                },
                 Ok(Event::Text(ref t)) => {
                     if let Some(current) = stack.last_mut() {
-                        let text = String::from_utf8(t.to_vec())
-                            .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in text content".to_string()))?;
+                        let text = String::from_utf8(t.to_vec()).map_err(|_| {
+                            Error::InvalidFormat("Invalid UTF-8 in text content".to_string())
+                        })?;
                         current.text_content.push_str(&text);
                     }
-                }
+                },
                 Ok(Event::End(ref e)) => {
                     let _tag_name = String::from_utf8(e.name().as_ref().to_vec()) // Tag name for debugging - kept for future use
-                        .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in tag name".to_string()))?;
+                        .map_err(|_| {
+                            Error::InvalidFormat("Invalid UTF-8 in tag name".to_string())
+                        })?;
 
                     if let Some(element) = stack.pop() {
                         if let Some(parent) = stack.last_mut() {
@@ -302,10 +313,10 @@ impl Element {
                             return Ok(element);
                         }
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(Error::InvalidFormat(format!("XML parsing error: {}", e))),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }

@@ -221,7 +221,14 @@ impl WmfRecord {
         let param_size = size_bytes - 6;
         let params = data[offset + 6..offset + 6 + param_size].to_vec();
 
-        Ok((Self { size, function, params }, size_bytes))
+        Ok((
+            Self {
+                size,
+                function,
+                params,
+            },
+            size_bytes,
+        ))
     }
 
     /// Check if this is an EOF record
@@ -277,7 +284,7 @@ impl WmfParser {
                     if is_eof {
                         break;
                     }
-                }
+                },
                 Err(_) => break,
             }
         }
@@ -319,11 +326,7 @@ impl WmfParser {
     pub fn aspect_ratio(&self) -> f64 {
         let w = self.width() as f64;
         let h = self.height() as f64;
-        if h == 0.0 {
-            1.0
-        } else {
-            w / h
-        }
+        if h == 0.0 { 1.0 } else { w / h }
     }
 }
 
@@ -336,4 +339,3 @@ mod tests {
         assert_eq!(WmfPlaceableHeader::PLACEABLE_KEY, 0x9AC6CDD7);
     }
 }
-

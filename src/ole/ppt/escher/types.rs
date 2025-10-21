@@ -6,7 +6,7 @@
 pub enum EscherRecordType {
     /// Unknown or unsupported record type
     Unknown = 0x0000,
-    
+
     // Container records (0xF000 - 0xF00F)
     /// Drawing Group Container
     DggContainer = 0xF000,
@@ -20,7 +20,7 @@ pub enum EscherRecordType {
     SpContainer = 0xF004,
     /// Solver Container
     SolverContainer = 0xF005,
-    
+
     // Atom records
     /// File Drawing Group atom
     Dgg = 0xF006,
@@ -42,7 +42,7 @@ pub enum EscherRecordType {
     ClientTextbox = 0xF00D,
     /// Child Anchor
     ChildAnchor = 0xF00F,
-    
+
     // Blip records
     /// JPEG Blip
     BlipJpeg = 0xF01D,
@@ -58,21 +58,21 @@ pub enum EscherRecordType {
     BlipWmf = 0xF01B,
     /// PICT Blip
     BlipPict = 0xF01C,
-    
+
     // Text records
     /// Secondary Opt (Shape Options)
     SecondaryOpt = 0xF121,
     /// Tertiary Opt
     TertiaryOpt = 0xF122,
-    
+
     // Split menu colors
     /// Split Menu Colors
     SplitMenuColors = 0xF11E,
-    
+
     // Color MRU
     /// Color MRU
     ColorMRU = 0xF11A,
-    
+
     // Connector rule
     /// Connector Rule
     ConnectorRule = 0xF012,
@@ -102,14 +102,11 @@ impl EscherRecordType {
                 | Self::SolverContainer
         )
     }
-    
+
     /// Check if this record type can contain text.
     #[inline]
     pub const fn can_contain_text(self) -> bool {
-        matches!(
-            self,
-            Self::ClientTextbox | Self::SpContainer
-        )
+        matches!(self, Self::ClientTextbox | Self::SpContainer)
     }
 }
 
@@ -158,4 +155,3 @@ impl From<EscherRecordType> for u16 {
         record_type as u16
     }
 }
-

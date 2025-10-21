@@ -2,9 +2,9 @@
 //!
 //! Idiomatic Rust implementation with zero-copy parsing and high performance.
 
+use crate::ole::consts::PptRecordType;
 use crate::ole::ppt::package::{PptError, Result};
 use crate::ole::ppt::records::PptRecord;
-use crate::ole::consts::PptRecordType;
 use std::collections::HashMap;
 
 /// Holder for persist pointer mappings from persist IDs to byte offsets.
@@ -32,9 +32,10 @@ impl PersistPtrHolder {
     /// - Zero-copy: reads directly from slice without intermediate allocations
     pub fn parse(record: &PptRecord) -> Result<Self> {
         if record.record_type != PptRecordType::PersistPtrHolder {
-            return Err(PptError::InvalidFormat(
-                format!("Expected PersistPtrHolder, got {:?}", record.record_type)
-            ));
+            return Err(PptError::InvalidFormat(format!(
+                "Expected PersistPtrHolder, got {:?}",
+                record.record_type
+            )));
         }
 
         Self::parse_data(&record.data)
@@ -113,8 +114,8 @@ mod tests {
         // offsets: 1000, 2000
         let mut data = Vec::new();
         data.extend_from_slice(&0x00200000u32.to_le_bytes()); // info: base=0, count=2
-        data.extend_from_slice(&1000u32.to_le_bytes());        // offset for persist_id=0
-        data.extend_from_slice(&2000u32.to_le_bytes());        // offset for persist_id=1
+        data.extend_from_slice(&1000u32.to_le_bytes()); // offset for persist_id=0
+        data.extend_from_slice(&2000u32.to_le_bytes()); // offset for persist_id=1
 
         let record = PptRecord {
             record_type: PptRecordType::PersistPtrHolder,
@@ -127,7 +128,7 @@ mod tests {
         };
 
         let holder = PersistPtrHolder::parse(&record).unwrap();
-        
+
         assert_eq!(holder.slide_count(), 2);
         assert_eq!(holder.get_slide_location(0), Some(1000));
         assert_eq!(holder.get_slide_location(1), Some(2000));
@@ -139,12 +140,12 @@ mod tests {
         // Group 1: base_id=0, count=2
         // Group 2: base_id=10, count=1
         let mut data = Vec::new();
-        
+
         // Group 1
         data.extend_from_slice(&0x00200000u32.to_le_bytes()); // base=0, count=2
         data.extend_from_slice(&1000u32.to_le_bytes());
         data.extend_from_slice(&2000u32.to_le_bytes());
-        
+
         // Group 2
         data.extend_from_slice(&0x0010000Au32.to_le_bytes()); // base=10, count=1
         data.extend_from_slice(&3000u32.to_le_bytes());
@@ -160,11 +161,10 @@ mod tests {
         };
 
         let holder = PersistPtrHolder::parse(&record).unwrap();
-        
+
         assert_eq!(holder.slide_count(), 3);
         assert_eq!(holder.get_slide_location(0), Some(1000));
         assert_eq!(holder.get_slide_location(1), Some(2000));
         assert_eq!(holder.get_slide_location(10), Some(3000));
     }
 }
-

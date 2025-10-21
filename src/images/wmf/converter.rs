@@ -54,12 +54,12 @@ impl WmfConverter {
                 let aspect = src_height as f64 / src_width as f64;
                 let h = (w as f64 * aspect) as u32;
                 (w, h)
-            }
+            },
             (None, Some(h)) => {
                 let aspect = src_width as f64 / src_height as f64;
                 let w = (h as f64 * aspect) as u32;
                 (w, h)
-            }
+            },
             (None, None) => {
                 // Use source dimensions, but cap at reasonable size
                 let max_dim = 4096;
@@ -72,7 +72,7 @@ impl WmfConverter {
                 } else {
                     (src_width, src_height)
                 }
-            }
+            },
         }
     }
 
@@ -90,8 +90,8 @@ impl WmfConverter {
                     if let Some(img) = self.parse_dib_from_record(&record.params) {
                         return Some(img);
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
         None
@@ -212,4 +212,3 @@ impl WmfConverter {
         self.convert_to_format(ImageFormat::WebP)
     }
 }
-

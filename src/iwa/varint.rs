@@ -112,10 +112,14 @@ mod tests {
             let encoded = encode_varint(value);
             assert_eq!(encoded, expected, "Encoding failed for value {}", value);
 
-            let (decoded, consumed) = decode_varint_from_bytes(&encoded)
-                .expect("Decoding failed");
+            let (decoded, consumed) = decode_varint_from_bytes(&encoded).expect("Decoding failed");
             assert_eq!(decoded, value, "Decoding failed for value {}", value);
-            assert_eq!(consumed, encoded.len(), "Wrong consumed bytes for value {}", value);
+            assert_eq!(
+                consumed,
+                encoded.len(),
+                "Wrong consumed bytes for value {}",
+                value
+            );
         }
     }
 
@@ -138,7 +142,8 @@ mod tests {
 
             // Decode using zigzag decoding
             let unsigned = decode_varint_from_bytes(&encoded)
-                .expect("Decoding failed").0;
+                .expect("Decoding failed")
+                .0;
             let decoded = (unsigned >> 1) as i64 ^ -((unsigned & 1) as i64);
             assert_eq!(decoded, value, "Decoding failed for value {}", value);
         }

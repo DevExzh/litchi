@@ -49,7 +49,7 @@ impl KeynoteShow {
     /// Get all text content from all slides
     pub fn all_text(&self) -> Vec<String> {
         let mut all_text = Vec::new();
-        
+
         if let Some(ref title) = self.title {
             all_text.push(title.clone());
         }
@@ -88,14 +88,14 @@ mod tests {
     #[test]
     fn test_show_add_slide() {
         let mut show = KeynoteShow::new();
-        
+
         let mut slide = KeynoteSlide::new(0);
         slide.title = Some("Slide 1".to_string());
         show.add_slide(slide);
 
         assert_eq!(show.slide_count(), 1);
         assert!(!show.is_empty());
-        
+
         let retrieved = show.get_slide(0);
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().title, Some("Slide 1".to_string()));
@@ -124,4 +124,3 @@ mod tests {
         assert!(all_text.contains(&"Content 2".to_string()));
     }
 }
-

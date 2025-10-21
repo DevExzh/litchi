@@ -1,8 +1,10 @@
 // Equation array element handler
 
 use crate::formula::ast::*;
+use crate::formula::omml::attributes::{
+    get_attribute_value, get_attribute_value_float, get_attribute_value_int,
+};
 use crate::formula::omml::elements::ElementContext;
-use crate::formula::omml::attributes::{get_attribute_value, get_attribute_value_int, get_attribute_value_float};
 use crate::formula::omml::properties::parse_eq_arr_properties;
 use quick_xml::events::BytesStart;
 
@@ -53,34 +55,42 @@ impl EqArrHandler {
         let rows = std::mem::take(&mut context.eq_array_rows);
 
         // Create equation array properties from context
-        let properties = if context.properties.eq_arr_base_alignment.is_some()
-            || context.properties.eq_arr_max_distance.is_some()
-            || context.properties.eq_arr_object_distance.is_some()
-            || context.properties.eq_arr_row_spacing.is_some()
-            || context.properties.eq_arr_row_spacing_rule.is_some() {
-            Some(EqArrayProperties {
-                base_alignment: context.properties.eq_arr_base_alignment
-                    .as_ref()
-                    .and_then(|s| match s.as_str() {
-                        "top" => Some(Alignment::Top),
-                        "center" | "cen" => Some(Alignment::Center),
-                        "bottom" | "bot" => Some(Alignment::Bottom),
-                        _ => None,
-                    }),
-                max_distance: context.properties.eq_arr_max_distance
-                    .as_ref()
-                    .and_then(|s| s.parse().ok()),
-                object_distance: context.properties.eq_arr_object_distance
-                    .as_ref()
-                    .and_then(|s| s.parse().ok()),
-                row_spacing: context.properties.eq_arr_row_spacing
-                    .as_ref()
-                    .and_then(|s| s.parse().ok()),
-                row_spacing_rule: context.properties.eq_arr_row_spacing_rule.clone(),
-            })
-        } else {
-            None
-        };
+        let properties =
+            if context.properties.eq_arr_base_alignment.is_some()
+                || context.properties.eq_arr_max_distance.is_some()
+                || context.properties.eq_arr_object_distance.is_some()
+                || context.properties.eq_arr_row_spacing.is_some()
+                || context.properties.eq_arr_row_spacing_rule.is_some()
+            {
+                Some(EqArrayProperties {
+                    base_alignment: context.properties.eq_arr_base_alignment.as_ref().and_then(
+                        |s| match s.as_str() {
+                            "top" => Some(Alignment::Top),
+                            "center" | "cen" => Some(Alignment::Center),
+                            "bottom" | "bot" => Some(Alignment::Bottom),
+                            _ => None,
+                        },
+                    ),
+                    max_distance: context
+                        .properties
+                        .eq_arr_max_distance
+                        .as_ref()
+                        .and_then(|s| s.parse().ok()),
+                    object_distance: context
+                        .properties
+                        .eq_arr_object_distance
+                        .as_ref()
+                        .and_then(|s| s.parse().ok()),
+                    row_spacing: context
+                        .properties
+                        .eq_arr_row_spacing
+                        .as_ref()
+                        .and_then(|s| s.parse().ok()),
+                    row_spacing_rule: context.properties.eq_arr_row_spacing_rule.clone(),
+                })
+            } else {
+                None
+            };
 
         // Create equation array node
         let node = MathNode::EqArray { rows, properties };

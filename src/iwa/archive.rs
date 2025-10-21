@@ -5,10 +5,10 @@
 
 use std::io::Read;
 
-use prost::Message;
+use crate::iwa::protobuf::{DecodedMessage, decode};
 use crate::iwa::varint;
-use crate::iwa::protobuf::{decode, DecodedMessage};
 use crate::iwa::{Error, Result};
+use prost::Message;
 
 /// Archive information header for each object in an IWA file
 #[derive(Debug, Clone, PartialEq)]
@@ -28,20 +28,22 @@ impl ArchiveInfo {
         // Parse Protocol Buffer fields
         while let Ok((field_number, wire_type)) = Self::read_field_header(reader) {
             match (field_number, wire_type) {
-                (1, 0) => { // identifier (varint)
+                (1, 0) => {
+                    // identifier (varint)
                     identifier = Some(varint::decode_varint(reader)?);
-                }
-                (2, 2) => { // message_infos (length-delimited, repeated)
+                },
+                (2, 2) => {
+                    // message_infos (length-delimited, repeated)
                     let length = varint::decode_varint(reader)?;
                     let mut data = vec![0u8; length as usize];
                     reader.read_exact(&mut data)?;
                     let mut cursor = std::io::Cursor::new(data);
                     message_infos.push(MessageInfo::parse(&mut cursor)?);
-                }
+                },
                 _ => {
                     // Skip unknown fields
                     Self::skip_field(reader, wire_type)?;
-                }
+                },
             }
         }
 
@@ -60,23 +62,32 @@ impl ArchiveInfo {
 
     fn skip_field<R: Read>(reader: &mut R, wire_type: u32) -> Result<()> {
         match wire_type {
-            0 => { // varint
+            0 => {
+                // varint
                 varint::decode_varint(reader)?;
-            }
-            1 => { // 64-bit
+            },
+            1 => {
+                // 64-bit
                 let mut buf = [0u8; 8];
                 reader.read_exact(&mut buf)?;
-            }
-            2 => { // length-delimited
+            },
+            2 => {
+                // length-delimited
                 let length = varint::decode_varint(reader)?;
                 let mut buf = vec![0u8; length as usize];
                 reader.read_exact(&mut buf)?;
-            }
-            5 => { // 32-bit
+            },
+            5 => {
+                // 32-bit
                 let mut buf = [0u8; 4];
                 reader.read_exact(&mut buf)?;
-            }
-            _ => return Err(Error::InvalidFormat(format!("Unknown wire type: {}", wire_type))),
+            },
+            _ => {
+                return Err(Error::InvalidFormat(format!(
+                    "Unknown wire type: {}",
+                    wire_type
+                )));
+            },
         }
         Ok(())
     }
@@ -102,19 +113,22 @@ impl MessageInfo {
 
         while let Ok((field_number, wire_type)) = Self::read_field_header(reader) {
             match (field_number, wire_type) {
-                (1, 0) => { // type (varint)
+                (1, 0) => {
+                    // type (varint)
                     type_ = varint::decode_varint(reader)? as u32;
-                }
-                (2, 0) => { // version (varint, packed repeated)
+                },
+                (2, 0) => {
+                    // version (varint, packed repeated)
                     versions.push(varint::decode_varint(reader)? as u32);
-                }
-                (3, 0) => { // length (varint)
+                },
+                (3, 0) => {
+                    // length (varint)
                     length = varint::decode_varint(reader)? as u32;
-                }
+                },
                 _ => {
                     // Skip unknown fields
                     Self::skip_field(reader, wire_type)?;
-                }
+                },
             }
         }
 
@@ -178,11 +192,15 @@ impl Archive {
                     Err(_) => {
                         // Message type not registered - try parsing as StorageArchive anyway
                         // since many message types might contain text
-                        if let Ok(storage_msg) = crate::iwa::protobuf::tswp::StorageArchive::decode(&*message_data) {
+                        if let Ok(storage_msg) =
+                            crate::iwa::protobuf::tswp::StorageArchive::decode(&*message_data)
+                        {
                             let wrapper = crate::iwa::protobuf::StorageArchiveWrapper(storage_msg);
-                            decoded_messages.push(Box::new(wrapper) as Box<dyn crate::iwa::protobuf::DecodedMessage>);
+                            decoded_messages
+                                .push(Box::new(wrapper)
+                                    as Box<dyn crate::iwa::protobuf::DecodedMessage>);
                         }
-                    }
+                    },
                 }
             }
 

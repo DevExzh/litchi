@@ -124,14 +124,14 @@ impl CharacterProperties {
                         chp.is_bold = Some(grpprl[offset] != 0);
                         offset += 1;
                     }
-                }
+                },
                 // Italic (sprmCFItalic)
                 0x0836 | 0x0086 => {
                     if offset < grpprl.len() {
                         chp.is_italic = Some(grpprl[offset] != 0);
                         offset += 1;
                     }
-                }
+                },
                 // Underline (sprmCKul)
                 0x2A3E | 0x003E => {
                     if offset < grpprl.len() {
@@ -148,49 +148,49 @@ impl CharacterProperties {
                         };
                         offset += 1;
                     }
-                }
+                },
                 // Strikethrough (sprmCFStrike)
                 0x0837 | 0x0087 => {
                     if offset < grpprl.len() {
                         chp.is_strikethrough = Some(grpprl[offset] != 0);
                         offset += 1;
                     }
-                }
+                },
                 // Font size in half-points (sprmCHps)
                 0x4A43 | 0x0043 => {
                     if offset + 1 < grpprl.len() {
                         chp.font_size = Some(read_u16_le(grpprl, offset).unwrap_or(0));
                         offset += 2;
                     }
-                }
+                },
                 // Font (sprmCRgFtc0) - ASCII font
                 0x4A4F | 0x004F => {
                     if offset + 1 < grpprl.len() {
                         chp.font_index = Some(read_u16_le(grpprl, offset).unwrap_or(0));
                         offset += 2;
                     }
-                }
+                },
                 // Small caps (sprmCFSmallCaps)
                 0x0838 | 0x0088 => {
                     if offset < grpprl.len() {
                         chp.is_small_caps = Some(grpprl[offset] != 0);
                         offset += 1;
                     }
-                }
+                },
                 // All caps (sprmCFCaps)
                 0x0839 | 0x0089 => {
                     if offset < grpprl.len() {
                         chp.is_all_caps = Some(grpprl[offset] != 0);
                         offset += 1;
                     }
-                }
+                },
                 // Hidden (sprmCFVanish)
                 0x083A | 0x008A => {
                     if offset < grpprl.len() {
                         chp.is_hidden = Some(grpprl[offset] != 0);
                         offset += 1;
                     }
-                }
+                },
                 // Color (sprmCIco)
                 0x2A42 | 0x0042 => {
                     if offset < grpprl.len() {
@@ -209,7 +209,7 @@ impl CharacterProperties {
                         };
                         offset += 1;
                     }
-                }
+                },
                 // Highlight color (sprmCHighlight)
                 0x2A0C | 0x000C => {
                     if offset < grpprl.len() {
@@ -235,7 +235,7 @@ impl CharacterProperties {
                         };
                         offset += 1;
                     }
-                }
+                },
                 // Superscript/subscript (sprmCIss)
                 0x2A3F | 0x003F => {
                     if offset < grpprl.len() {
@@ -246,38 +246,47 @@ impl CharacterProperties {
                         };
                         offset += 1;
                     }
-                }
+                },
                 // OLE2 object flag (sprmCFOle2 = 0x080A)
                 0x080A => {
                     if offset < grpprl.len() {
                         let operand = grpprl[offset];
                         chp.is_ole2 = operand != 0;
-                        eprintln!("DEBUG: Found sprmCFOle2, operand=0x{:02X}, is_ole2={}", operand, chp.is_ole2);
+                        eprintln!(
+                            "DEBUG: Found sprmCFOle2, operand=0x{:02X}, is_ole2={}",
+                            operand, chp.is_ole2
+                        );
                         offset += 1;
                     }
-                }
+                },
                 // Object flag (sprmCFObj = 0x0856)
                 0x0856 => {
                     if offset < grpprl.len() {
                         let operand = grpprl[offset];
                         chp.is_ole2 = operand != 0;
-                        eprintln!("DEBUG: Found sprmCFObj, operand=0x{:02X}, is_ole2={}", operand, chp.is_ole2);
+                        eprintln!(
+                            "DEBUG: Found sprmCFObj, operand=0x{:02X}, is_ole2={}",
+                            operand, chp.is_ole2
+                        );
                         offset += 1;
                     }
-                }
+                },
                 // Special character flag (sprmCFSpec = 0x0855)
                 // Special characters include embedded objects
                 0x0855 => {
                     if offset < grpprl.len() {
                         let operand = grpprl[offset];
                         if operand != 0 {
-                            eprintln!("DEBUG: Found sprmCFSpec (special char), operand=0x{:02X}", operand);
+                            eprintln!(
+                                "DEBUG: Found sprmCFSpec (special char), operand=0x{:02X}",
+                                operand
+                            );
                             // Special characters can be objects - mark as potential OLE2
                             // Will be confirmed by picture data
                         }
                         offset += 1;
                     }
-                }
+                },
                 // Data/field flag (sprmCFData = 0x0806)
                 0x0806 => {
                     if offset < grpprl.len() {
@@ -285,36 +294,48 @@ impl CharacterProperties {
                         eprintln!("DEBUG: Found sprmCFData, operand=0x{:02X}", operand);
                         offset += 1;
                     }
-                }
+                },
                 // Picture location (sprmCPicLocation = 0x6A03)
                 // This is the FILE character position (fc) of the picture/object data
                 0x6A03 => {
-                    eprintln!("DEBUG CHP: MATCHED sprmCPicLocation (0x6A03)! offset={}, grpprl.len()={}", offset, grpprl.len());
+                    eprintln!(
+                        "DEBUG CHP: MATCHED sprmCPicLocation (0x6A03)! offset={}, grpprl.len()={}",
+                        offset,
+                        grpprl.len()
+                    );
                     if offset + 3 < grpprl.len() {
                         let fc = read_u32_le(grpprl, offset).unwrap_or(0);
                         chp.pic_offset = Some(fc);
                         eprintln!("DEBUG CHP: Set pic_offset to fc=0x{:X} ({})", fc, fc);
                         offset += 4;
                     } else {
-                        eprintln!("DEBUG CHP: Not enough bytes for pic_offset! offset={}, needed={}, have={}", offset, offset+4, grpprl.len());
+                        eprintln!(
+                            "DEBUG CHP: Not enough bytes for pic_offset! offset={}, needed={}, have={}",
+                            offset,
+                            offset + 4,
+                            grpprl.len()
+                        );
                     }
-                }
+                },
                 // Object location/pic offset (SPRM_OBJLOCATION = 0x680E)
                 0x680E => {
                     if offset + 3 < grpprl.len() {
                         let fc = read_u32_le(grpprl, offset).unwrap_or(0);
                         chp.pic_offset = Some(fc);
-                        eprintln!("DEBUG: Found SPRM_OBJLOCATION (0x680E), fc/pic_offset={:?}", chp.pic_offset);
+                        eprintln!(
+                            "DEBUG: Found SPRM_OBJLOCATION (0x680E), fc/pic_offset={:?}",
+                            chp.pic_offset
+                        );
                         offset += 4;
                     }
-                }
+                },
                 // Unknown SPRM - skip based on size
                 _ => {
                     // SPRMs have different sizes based on their type
                     // This is a simplified approach - real implementation would need full SPRM table
                     let size = Self::get_sprm_size(sprm);
                     offset += size;
-                }
+                },
             }
         }
 
@@ -328,15 +349,15 @@ impl CharacterProperties {
         // Extract type from SPRM (bits 0-2 in newer versions)
         let sprm_type = sprm & 0x07;
         match sprm_type {
-            0 | 1 => 1,  // 1-byte operand
-            2 | 4 | 5 => 2,  // 2-byte operand
-            3 => 4,      // 4-byte operand
+            0 | 1 => 1,     // 1-byte operand
+            2 | 4 | 5 => 2, // 2-byte operand
+            3 => 4,         // 4-byte operand
             6 => {
                 // Variable length - would need to read length from data
                 // Default to 1 for safety
                 1
-            }
-            7 => 3,      // 3-byte operand
+            },
+            7 => 3, // 3-byte operand
             _ => 1,
         }
     }
@@ -382,4 +403,3 @@ mod tests {
         assert_ne!(normal, super_pos);
     }
 }
-

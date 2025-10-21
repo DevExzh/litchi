@@ -29,15 +29,14 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+pub mod cell;
 pub mod document;
 pub mod sheet;
 pub mod table;
-pub mod cell;
 pub mod table_extractor;
 
+pub use cell::{CellType, CellValue};
 pub use document::NumbersDocument;
 pub use sheet::NumbersSheet;
 pub use table::NumbersTable;
-pub use cell::{CellValue, CellType};
 pub use table_extractor::TableDataExtractor;
-

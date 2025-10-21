@@ -1,6 +1,6 @@
+use super::super::{OleError, OleFile};
 /// Package implementation for legacy Word documents (.doc).
 use super::document::Document;
-use super::super::{OleError, OleFile};
 use std::fs::File;
 use std::io::{self, Read, Seek};
 use std::path::Path;
@@ -174,4 +174,3 @@ mod tests {
         std::fs::remove_file("test_invalid.tmp").ok();
     }
 }
-

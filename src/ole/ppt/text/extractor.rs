@@ -4,7 +4,10 @@
 //! including TextCharsAtom (UTF-16LE), TextBytesAtom (ISO-8859-1), and CString.
 
 use crate::ole::ppt::package::Result;
-use zerocopy::{byteorder::{U16, LittleEndian}, FromBytes};
+use zerocopy::{
+    FromBytes,
+    byteorder::{LittleEndian, U16},
+};
 
 /// Actions for processing UTF-16LE text characters.
 #[derive(Debug, Clone, Copy)]
@@ -30,7 +33,7 @@ impl TextCharAction {
                 } else {
                     TextCharAction::Skip
                 }
-            }
+            },
             // Unicode range (0x80 and above) - try to decode as Unicode
             0x80.. => {
                 if let Some(ch) = char::from_u32(code_unit as u32) {
@@ -38,7 +41,7 @@ impl TextCharAction {
                 } else {
                     TextCharAction::Skip
                 }
-            }
+            },
         }
     }
 }
@@ -55,7 +58,10 @@ pub fn parse_text_chars_atom(data: &[u8]) -> Result<String> {
     let text = from_utf16le_lossy(data);
 
     // POI strips the trailing return character and null terminator if present
-    let text = text.trim_end_matches('\r').trim_end_matches('\u{0}').to_string();
+    let text = text
+        .trim_end_matches('\r')
+        .trim_end_matches('\u{0}')
+        .to_string();
 
     Ok(text)
 }
@@ -105,7 +111,10 @@ pub fn parse_text_bytes_atom(data: &[u8]) -> Result<String> {
     let text = data.iter().map(|&b| b as char).collect::<String>();
 
     // POI strips the trailing return character and null terminator if present
-    let text = text.trim_end_matches('\r').trim_end_matches('\u{0}').to_string();
+    let text = text
+        .trim_end_matches('\r')
+        .trim_end_matches('\u{0}')
+        .to_string();
 
     Ok(text)
 }
@@ -125,7 +134,10 @@ pub fn parse_cstring(data: &[u8]) -> Result<String> {
     }
 
     // Filter out non-printable/binary data - if more than 20% of characters are non-printable, skip it
-    let printable_count = text.chars().filter(|c| c.is_alphanumeric() || c.is_whitespace() || c.is_ascii_punctuation()).count();
+    let printable_count = text
+        .chars()
+        .filter(|c| c.is_alphanumeric() || c.is_whitespace() || c.is_ascii_punctuation())
+        .count();
     let total_count = text.chars().count();
     if total_count > 0 && (printable_count as f32 / total_count as f32) < 0.8 {
         return Ok(String::new());
@@ -176,4 +188,3 @@ mod tests {
         assert_eq!(text, "Normal Text");
     }
 }
-

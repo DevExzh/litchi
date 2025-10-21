@@ -2,7 +2,7 @@
 ///
 /// Auto shapes are predefined shapes like rectangles, ovals, arrows, etc.
 /// that can be used as building blocks for more complex graphics in PowerPoint.
-use super::shape::{Shape, ShapeProperties, ShapeContainer};
+use super::shape::{Shape, ShapeContainer, ShapeProperties};
 
 /// Types of auto shapes available in PowerPoint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -156,16 +156,16 @@ impl AutoShape {
         // Scan for shape type in raw data
         // The shape type ID would typically be at a known offset in Escher Sp record
         // For a complete implementation, we'd parse the Escher structure properly
-        
+
         // If raw_data is too small, return default
         if raw_data.len() < 4 {
             return AutoShapeType::Rectangle;
         }
-        
+
         // Try to extract shape type ID from first few bytes
         // In Escher Sp record, bytes 0-1 contain shape flags, bytes 2-3 contain shape type
         let shape_type_id = u16::from_le_bytes([raw_data[0], raw_data[1]]);
-        
+
         AutoShapeType::from(shape_type_id)
     }
 
@@ -181,12 +181,12 @@ impl AutoShape {
     fn extract_adjustments(raw_data: &[u8]) -> Vec<i32> {
         // In Escher format, adjustments are stored in shape options (Opt record)
         // Each adjustment is a 32-bit signed integer
-        
+
         // For basic shapes, no adjustments needed
         if raw_data.len() < 8 {
             return Vec::new();
         }
-        
+
         // Full implementation would parse Escher Opt record for adjustment properties
         // For now, return empty vector - adjustments are optional
         Vec::new()
@@ -272,11 +272,10 @@ impl Shape for AutoShape {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::shape::ShapeType;
+    use super::*;
 
     #[test]
     #[allow(clippy::field_reassign_with_default)]

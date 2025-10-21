@@ -1,11 +1,11 @@
 //! Workbook implementation for XLSB files
 
-use std::io::{Read, Seek, BufReader, Cursor};
-use crate::sheet::{Worksheet as SheetTrait, WorksheetIterator};
-use crate::ooxml::xlsb::error::XlsbResult;
-use crate::ooxml::xlsb::worksheet::XlsbWorksheet;
-use crate::ooxml::xlsb::records::{XlsbRecordIter, record_types};
 use crate::ooxml::opc::OpcPackage;
+use crate::ooxml::xlsb::error::XlsbResult;
+use crate::ooxml::xlsb::records::{XlsbRecordIter, record_types};
+use crate::ooxml::xlsb::worksheet::XlsbWorksheet;
+use crate::sheet::{Worksheet as SheetTrait, WorksheetIterator};
+use std::io::{BufReader, Cursor, Read, Seek};
 
 /// XLSB workbook implementation
 #[allow(dead_code)]
@@ -72,7 +72,11 @@ impl XlsbWorkbook {
     /// Get a worksheet by index (lazy loading)
     fn get_worksheet(&self, index: usize) -> XlsbResult<XlsbWorksheet> {
         if index >= self.worksheet_names.len() {
-            return Err(crate::ooxml::error::OoxmlError::InvalidFormat(format!("Worksheet index {} out of bounds", index)).into());
+            return Err(crate::ooxml::error::OoxmlError::InvalidFormat(format!(
+                "Worksheet index {} out of bounds",
+                index
+            ))
+            .into());
         }
 
         let name = &self.worksheet_names[index];
@@ -87,7 +91,10 @@ impl XlsbWorkbook {
     }
 
     /// Read shared strings from SST
-    fn read_shared_strings(iter: &mut XlsbRecordIter<impl Read>, strings: &mut Vec<String>) -> XlsbResult<()> {
+    fn read_shared_strings(
+        iter: &mut XlsbRecordIter<impl Read>,
+        strings: &mut Vec<String>,
+    ) -> XlsbResult<()> {
         for record in iter.by_ref() {
             let record = record?;
             // println!("DEBUG SST: Record type 0x{:04X}, data len {}", record.header.record_type, record.data.len());
@@ -95,24 +102,26 @@ impl XlsbWorkbook {
                 record_types::BEGIN_SST => {
                     // println!("DEBUG SST: Found BEGIN_SST");
                     // SST header, continue reading
-                }
+                },
                 record_types::SST_ITEM => {
                     // println!("DEBUG SST: Found SST_ITEM");
-                    if let Ok(sst_item) = crate::ooxml::xlsb::records::SstItemRecord::parse(&record.data) {
+                    if let Ok(sst_item) =
+                        crate::ooxml::xlsb::records::SstItemRecord::parse(&record.data)
+                    {
                         // println!("DEBUG SST: Parsed string: '{}'", sst_item.string);
                         strings.push(sst_item.string);
-                    }/* else {
-                        println!("DEBUG SST: Failed to parse SST_ITEM");
+                    } /* else {
+                    println!("DEBUG SST: Failed to parse SST_ITEM");
                     }*/
-                }
+                },
                 record_types::END_SST => {
                     // println!("DEBUG SST: Found END_SST, breaking");
                     break;
-                }
+                },
                 _ => {
                     // Skip other records
                     // println!("DEBUG SST: Skipping record type 0x{:04X}", record.header.record_type);
-                }
+                },
             }
         }
         // println!("DEBUG SST: Total strings parsed: {}", strings.len());
@@ -123,7 +132,7 @@ impl XlsbWorkbook {
     fn read_workbook(
         iter: &mut XlsbRecordIter<impl Read>,
         worksheet_names: &mut Vec<String>,
-        is_1904: &mut bool
+        is_1904: &mut bool,
     ) -> XlsbResult<()> {
         for record in iter.by_ref() {
             let record = record?;
@@ -131,29 +140,31 @@ impl XlsbWorkbook {
             match record.header.record_type {
                 record_types::WORKBOOK_PROP => {
                     // println!("DEBUG: Found WORKBOOK_PROP");
-                    if let Ok(prop) = crate::ooxml::xlsb::records::WorkbookPropRecord::parse(&record.data) {
+                    if let Ok(prop) =
+                        crate::ooxml::xlsb::records::WorkbookPropRecord::parse(&record.data)
+                    {
                         *is_1904 = prop.is_date1904;
                     }
-                }
+                },
                 record_types::BUNDLE_SH => {
                     // println!("DEBUG: Found BUNDLE_SH");
                     match crate::ooxml::xlsb::records::BundleSheetRecord::parse(&record.data) {
                         Ok(bundle_sh) => {
                             // println!("DEBUG: Parsed sheet name: {}", bundle_sh.name);
                             worksheet_names.push(bundle_sh.name);
-                        }
+                        },
                         Err(_e) => {
                             // println!("DEBUG: Failed to parse BundleSheetRecord: {:?}", e);
-                        }
+                        },
                     }
-                }
+                },
                 record_types::END_BUNDLE_SHS => {
                     // println!("DEBUG: Found END_BUNDLE_SHS, breaking");
                     break;
-                }
+                },
                 _ => {
                     // Skip other records
-                }
+                },
             }
         }
         Ok(())
@@ -163,11 +174,13 @@ impl XlsbWorkbook {
     fn read_worksheet(
         cursor: Cursor<&[u8]>,
         name: String,
-        shared_strings: &[String]
+        shared_strings: &[String],
     ) -> XlsbResult<XlsbWorksheet> {
         let mut worksheet = XlsbWorksheet::new(name);
-        let iter = crate::ooxml::xlsb::records::RecordIter::<std::io::Cursor<&[u8]>>::from_cursor(cursor);
-        let mut cells_reader = crate::ooxml::xlsb::cells_reader::XlsbCellsReader::new(iter, shared_strings.to_vec())?;
+        let iter =
+            crate::ooxml::xlsb::records::RecordIter::<std::io::Cursor<&[u8]>>::from_cursor(cursor);
+        let mut cells_reader =
+            crate::ooxml::xlsb::cells_reader::XlsbCellsReader::new(iter, shared_strings.to_vec())?;
 
         while let Some(cell) = cells_reader.next_cell()? {
             worksheet.add_cell(cell);
@@ -194,12 +207,18 @@ impl crate::sheet::WorkbookTrait for XlsbWorkbook {
         self.worksheet_names.clone()
     }
 
-    fn worksheet_by_index(&self, index: usize) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
+    fn worksheet_by_index(
+        &self,
+        index: usize,
+    ) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
         let worksheet = self.get_worksheet(index)?;
         Ok(Box::new(worksheet))
     }
 
-    fn worksheet_by_name(&self, name: &str) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
+    fn worksheet_by_name(
+        &self,
+        name: &str,
+    ) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
         for (i, ws_name) in self.worksheet_names.iter().enumerate() {
             if ws_name == name {
                 return self.worksheet_by_index(i);
@@ -226,13 +245,13 @@ impl<'a> WorksheetIterator<'a> for XlsbWorksheetIterator<'a> {
         if self.index < self.workbook.worksheet_names.len() {
             match self.workbook.get_worksheet(self.index) {
                 Ok(worksheet) => {
-            self.index += 1;
-            Some(Ok(Box::new(worksheet)))
-                }
+                    self.index += 1;
+                    Some(Ok(Box::new(worksheet)))
+                },
                 Err(e) => {
                     self.index += 1; // Continue to next worksheet even on error
                     Some(Err(Box::new(e)))
-                }
+                },
             }
         } else {
             None

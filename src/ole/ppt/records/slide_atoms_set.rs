@@ -25,9 +25,10 @@ impl<'a> SlideAtomsSet<'a> {
 
         for record in &self.slide_records {
             if let Ok(text) = record.extract_text()
-                && !text.is_empty() {
-                    text_parts.push(text);
-                }
+                && !text.is_empty()
+            {
+                text_parts.push(text);
+            }
         }
 
         Ok(text_parts.join("\n"))
@@ -38,4 +39,3 @@ impl<'a> SlideAtomsSet<'a> {
         self.slide_persist_atom.get_slide_id()
     }
 }
-

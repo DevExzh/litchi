@@ -1,7 +1,7 @@
 //! Streaming parser for text-based spreadsheet formats
 
-use std::io::{Read, Seek, SeekFrom};
 use crate::sheet::{CellValue, Result as SheetResult};
+use std::io::{Read, Seek, SeekFrom};
 
 /// Streaming parser for delimited text formats
 pub struct TextParser<'a, R: Read + Seek> {
@@ -77,7 +77,7 @@ impl<'a, R: Read + Seek> TextParser<'a, R> {
                         self.finish_field(&mut current_field, &mut fields);
                         return Ok(Some(Ok(fields)));
                     }
-                }
+                },
                 b'\r' => {
                     // Handle CRLF - just skip CR, let LF handle the line end
                     if !in_quotes {
@@ -85,11 +85,13 @@ impl<'a, R: Read + Seek> TextParser<'a, R> {
                     } else {
                         current_field.push(byte);
                     }
-                }
+                },
                 quote if quote == self.config.quote => {
                     if in_quotes {
                         // This might be a closing quote or escaped quote
-                        if self.buffer_pos < self.buffer_len && self.buffer[self.buffer_pos] == self.config.quote {
+                        if self.buffer_pos < self.buffer_len
+                            && self.buffer[self.buffer_pos] == self.config.quote
+                        {
                             // Escaped quote (doubled quote) - include one quote and skip the next
                             current_field.push(self.config.quote);
                             self.buffer_pos += 1;
@@ -102,12 +104,12 @@ impl<'a, R: Read + Seek> TextParser<'a, R> {
                         in_quotes = true;
                         field_start = false; // Don't treat this as field start
                     }
-                }
+                },
                 delim if delim == self.config.delimiter && !in_quotes => {
                     // Field separator
                     self.finish_field(&mut current_field, &mut fields);
                     field_start = true;
-                }
+                },
                 b'\\' if in_quotes => {
                     // Handle escape sequences inside quotes
                     if self.buffer_pos < self.buffer_len {
@@ -123,15 +125,19 @@ impl<'a, R: Read + Seek> TextParser<'a, R> {
                                 // Unknown escape, include both characters
                                 current_field.push(byte);
                                 current_field.push(next_byte);
-                            }
+                            },
                         }
                     } else {
                         current_field.push(byte);
                     }
-                }
+                },
                 _ => {
                     // Regular character
-                    if field_start && self.config.comment == Some(byte) && fields.is_empty() && !in_quotes {
+                    if field_start
+                        && self.config.comment == Some(byte)
+                        && fields.is_empty()
+                        && !in_quotes
+                    {
                         // Comment line, skip to end of line
                         while self.buffer_pos < self.buffer_len {
                             let b = self.buffer[self.buffer_pos];
@@ -146,7 +152,7 @@ impl<'a, R: Read + Seek> TextParser<'a, R> {
 
                     current_field.push(byte);
                     field_start = false;
-                }
+                },
             }
         }
     }
@@ -158,8 +164,15 @@ impl<'a, R: Read + Seek> TextParser<'a, R> {
         // Trim whitespace if configured
         if self.config.trim_whitespace {
             // Trim from both ends
-            let start = field_bytes.iter().position(|&b| !b.is_ascii_whitespace()).unwrap_or(field_bytes.len());
-            let end = field_bytes.iter().rposition(|&b| !b.is_ascii_whitespace()).map(|i| i + 1).unwrap_or(0);
+            let start = field_bytes
+                .iter()
+                .position(|&b| !b.is_ascii_whitespace())
+                .unwrap_or(field_bytes.len());
+            let end = field_bytes
+                .iter()
+                .rposition(|&b| !b.is_ascii_whitespace())
+                .map(|i| i + 1)
+                .unwrap_or(0);
             if start < end {
                 field_bytes = field_bytes[start..end].to_vec();
             } else {
@@ -174,7 +187,7 @@ impl<'a, R: Read + Seek> TextParser<'a, R> {
                 // Handle invalid UTF-8 by replacing invalid sequences
                 let valid_bytes = e.into_bytes();
                 String::from_utf8_lossy(&valid_bytes).to_string()
-            }
+            },
         };
 
         let cell_value = if field_str.is_empty() {
@@ -199,8 +212,8 @@ impl<'a, R: Read + Seek> TextParser<'a, R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
     use crate::sheet::CellValue;
+    use std::io::Cursor;
 
     #[test]
     fn test_simple_csv_parsing() {
@@ -244,7 +257,10 @@ mod tests {
         let row = parser.parse_row().unwrap().unwrap().unwrap();
         assert_eq!(row.len(), 3);
         assert_eq!(row[0], CellValue::String("Hello, World".to_string()));
-        assert_eq!(row[1], CellValue::String("Value with \"quotes\"".to_string()));
+        assert_eq!(
+            row[1],
+            CellValue::String("Value with \"quotes\"".to_string())
+        );
         assert_eq!(row[2], CellValue::String("Normal".to_string()));
     }
 

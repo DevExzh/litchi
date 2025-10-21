@@ -62,48 +62,55 @@ impl fmt::Display for XlsError {
         match self {
             XlsError::Io(e) => write!(f, "I/O error: {}", e),
             XlsError::Cfb(e) => write!(f, "CFB error: {}", e),
-            XlsError::InvalidRecord { record_type, message } => {
+            XlsError::InvalidRecord {
+                record_type,
+                message,
+            } => {
                 write!(f, "Invalid record 0x{:04X}: {}", record_type, message)
-            }
+            },
             XlsError::UnsupportedBiffVersion(version) => {
                 write!(f, "Unsupported BIFF version: {}", version)
-            }
+            },
             XlsError::PasswordProtected => {
                 write!(f, "Workbook is password protected")
-            }
+            },
             XlsError::InvalidLength { expected, found } => {
                 write!(f, "Invalid length: expected {}, found {}", expected, found)
-            }
+            },
             XlsError::UnexpectedEndOfStream(context) => {
                 write!(f, "Unexpected end of stream: {}", context)
-            }
+            },
             XlsError::InvalidFormula(msg) => {
                 write!(f, "Invalid formula: {}", msg)
-            }
+            },
             XlsError::InvalidCellReference(ref_str) => {
                 write!(f, "Invalid cell reference: {}", ref_str)
-            }
+            },
             XlsError::WorksheetNotFound(name) => {
                 write!(f, "Worksheet '{}' not found", name)
-            }
+            },
             XlsError::InvalidFormat(code) => {
                 write!(f, "Invalid format code: {}", code)
-            }
+            },
             XlsError::Encoding(msg) => {
                 write!(f, "Encoding error: {}", msg)
-            }
+            },
             XlsError::UnsupportedFeature(feature) => {
                 write!(f, "Unsupported feature: {}", feature)
-            }
+            },
             XlsError::InvalidData(msg) => {
                 write!(f, "Invalid data: {}", msg)
-            }
+            },
             XlsError::UnexpectedRecordType { expected, found } => {
-                write!(f, "Unexpected record type: expected 0x{:04X}, found 0x{:04X}", expected, found)
-            }
+                write!(
+                    f,
+                    "Unexpected record type: expected 0x{:04X}, found 0x{:04X}",
+                    expected, found
+                )
+            },
             XlsError::Eof(context) => {
                 write!(f, "End of file: {}", context)
-            }
+            },
         }
     }
 }

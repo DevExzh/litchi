@@ -57,12 +57,12 @@ impl EmfConverter {
                 let aspect = src_height as f64 / src_width as f64;
                 let h = (w as f64 * aspect) as u32;
                 (w, h)
-            }
+            },
             (None, Some(h)) => {
                 let aspect = src_width as f64 / src_height as f64;
                 let w = (h as f64 * aspect) as u32;
                 (w, h)
-            }
+            },
             (None, None) => {
                 // Use source dimensions, but cap at reasonable size
                 let max_dim = 4096;
@@ -75,7 +75,7 @@ impl EmfConverter {
                 } else {
                     (src_width, src_height)
                 }
-            }
+            },
         }
     }
 
@@ -94,14 +94,14 @@ impl EmfConverter {
                     if let Some(img) = self.parse_dib_from_record(&record.data) {
                         return Some(img);
                     }
-                }
+                },
                 0x00000040 | 0x00000041 => {
                     // EMR_BITBLT or EMR_STRETCHBLT
                     if let Some(img) = self.parse_bitmap_from_bitblt(&record.data) {
                         return Some(img);
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
         None
@@ -203,14 +203,12 @@ impl EmfConverter {
         if let Some(embedded) = self.extract_embedded_bitmap() {
             // Resize if necessary
             if embedded.width() != target_width || embedded.height() != target_height {
-                return Ok(DynamicImage::ImageRgba8(
-                    image::imageops::resize(
-                        &embedded,
-                        target_width,
-                        target_height,
-                        image::imageops::FilterType::Lanczos3,
-                    ),
-                ));
+                return Ok(DynamicImage::ImageRgba8(image::imageops::resize(
+                    &embedded,
+                    target_width,
+                    target_height,
+                    image::imageops::FilterType::Lanczos3,
+                )));
             }
             return Ok(embedded);
         }
@@ -263,4 +261,3 @@ mod tests {
         // Placeholder for future tests
     }
 }
-

@@ -15,10 +15,10 @@ impl StyHandler {
             // Set display style based on element content
             let text_content = context.text.as_str().trim();
             if !text_content.is_empty() {
-                parent.properties.display_style = Some(matches!(text_content, "d" | "display" | "1" | "true"));
+                parent.properties.display_style =
+                    Some(matches!(text_content, "d" | "display" | "1" | "true"));
                 parent.properties.run_math_style = Some(text_content.to_string());
             }
         }
     }
 }
-

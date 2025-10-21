@@ -15,10 +15,10 @@
 //! referenced from the shape. The shape itself contains geometry and styling,
 //! while the actual text is stored separately.
 
+use crate::iwa::Result;
 use crate::iwa::bundle::Bundle;
 use crate::iwa::object_index::{ObjectIndex, ResolvedObject};
 use crate::iwa::protobuf::tsd;
-use crate::iwa::Result;
 use prost::Message;
 
 /// Extractor for text content from shapes
@@ -45,8 +45,9 @@ impl<'a> ShapeTextExtractor<'a> {
 
         for entry in shape_entries {
             if let Some(resolved) = self.object_index.resolve_object(self.bundle, entry.id)?
-                && let Some(text) = self.extract_text_from_shape(&resolved)? {
-                    all_text.push(text);
+                && let Some(text) = self.extract_text_from_shape(&resolved)?
+            {
+                all_text.push(text);
             }
         }
 
@@ -54,8 +55,9 @@ impl<'a> ShapeTextExtractor<'a> {
         let image_entries = self.object_index.find_objects_by_type(3005);
         for entry in image_entries {
             if let Some(resolved) = self.object_index.resolve_object(self.bundle, entry.id)?
-                && let Some(text) = self.extract_text_from_shape(&resolved)? {
-                    all_text.push(text);
+                && let Some(text) = self.extract_text_from_shape(&resolved)?
+            {
+                all_text.push(text);
             }
         }
 
@@ -74,8 +76,9 @@ impl<'a> ShapeTextExtractor<'a> {
     fn extract_text_from_shape(&self, object: &ResolvedObject) -> Result<Option<String>> {
         for msg in &object.messages {
             if (msg.type_ == 3004 || msg.type_ == 3005)
-                && let Ok(shape) = tsd::ShapeArchive::decode(&*msg.data) {
-                    return self.parse_shape_text(&shape);
+                && let Ok(shape) = tsd::ShapeArchive::decode(&*msg.data)
+            {
+                return self.parse_shape_text(&shape);
             }
         }
 
@@ -87,10 +90,14 @@ impl<'a> ShapeTextExtractor<'a> {
         let mut texts = Vec::new();
 
         for msg in &object.messages {
-            if msg.type_ == 3008 && let Ok(group) = tsd::GroupArchive::decode(&*msg.data) {
+            if msg.type_ == 3008
+                && let Ok(group) = tsd::GroupArchive::decode(&*msg.data)
+            {
                 // Extract text from each child in the group
                 for child_ref in &group.children {
-                    if let Some(child_text) = self.extract_text_from_referenced_object(child_ref.identifier)? {
+                    if let Some(child_text) =
+                        self.extract_text_from_referenced_object(child_ref.identifier)?
+                    {
                         texts.push(child_text);
                     }
                 }
@@ -108,9 +115,11 @@ impl<'a> ShapeTextExtractor<'a> {
     fn parse_shape_text(&self, shape: &tsd::ShapeArchive) -> Result<Option<String>> {
         // super_ is a required field, not Optional
         let drawable = &shape.super_;
-        
+
         // Text boxes often have an accessibility description or hyperlink
-        if let Some(ref desc) = drawable.accessibility_description && !desc.is_empty() {
+        if let Some(ref desc) = drawable.accessibility_description
+            && !desc.is_empty()
+        {
             return Ok(Some(desc.clone()));
         }
 
@@ -129,11 +138,12 @@ impl<'a> ShapeTextExtractor<'a> {
             // Check if it's a shape
             for msg in &resolved.messages {
                 if (msg.type_ == 3004 || msg.type_ == 3005)
-                    && let Ok(shape) = tsd::ShapeArchive::decode(&*msg.data) {
-                        return self.parse_shape_text(&shape);
+                    && let Ok(shape) = tsd::ShapeArchive::decode(&*msg.data)
+                {
+                    return self.parse_shape_text(&shape);
                 }
             }
-            
+
             // Check if it's a direct text storage
             return self.extract_text_from_storage_object(&resolved);
         }
@@ -156,10 +166,12 @@ impl<'a> ShapeTextExtractor<'a> {
     fn extract_text_from_storage_object(&self, object: &ResolvedObject) -> Result<Option<String>> {
         for msg in &object.messages {
             // TSWP storage types range from 2001-2022
-            if msg.type_ >= 2001 && msg.type_ <= 2022
+            if msg.type_ >= 2001
+                && msg.type_ <= 2022
                 && let Ok(storage) = crate::iwa::protobuf::tswp::StorageArchive::decode(&*msg.data)
-                && !storage.text.is_empty() {
-                    return Ok(Some(storage.text.join("\n")));
+                && !storage.text.is_empty()
+            {
+                return Ok(Some(storage.text.join("\n")));
             }
         }
 
@@ -194,4 +206,3 @@ mod tests {
         assert!(true);
     }
 }
-

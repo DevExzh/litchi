@@ -31,10 +31,9 @@
 //! ```
 
 pub mod document;
-pub mod slide;
 pub mod show;
+pub mod slide;
 
 pub use document::KeynoteDocument;
-pub use slide::{KeynoteSlide, SlideTransition, BuildAnimation};
 pub use show::KeynoteShow;
-
+pub use slide::{BuildAnimation, KeynoteSlide, SlideTransition};

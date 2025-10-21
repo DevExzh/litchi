@@ -2,7 +2,7 @@
 ///
 /// Text boxes are shapes that contain text content and are commonly used
 /// for titles, bullet points, and other text elements in PowerPoint slides.
-use super::shape::{Shape, ShapeProperties, ShapeContainer};
+use super::shape::{Shape, ShapeContainer, ShapeProperties};
 
 /// Type alias for text formatting tuple to reduce complexity.
 type TextFormattingResult = (Option<u16>, Option<u32>, bool, bool, bool);
@@ -41,7 +41,9 @@ impl TextBox {
     }
 
     /// Create a text box from an Escher record with proper parsing.
-    pub fn from_escher_record(record: &super::escher::EscherRecord) -> super::super::package::Result<Self> {
+    pub fn from_escher_record(
+        record: &super::escher::EscherRecord,
+    ) -> super::super::package::Result<Self> {
         // Extract basic shape properties
         let properties = record.extract_shape_properties()?;
 
@@ -49,7 +51,8 @@ impl TextBox {
         let text = record.extract_text().unwrap_or_default();
 
         // Extract text formatting from text properties if available
-        let (font_size, font_color, bold, italic, underline) = Self::extract_text_formatting(record)?;
+        let (font_size, font_color, bold, italic, underline) =
+            Self::extract_text_formatting(record)?;
 
         // Extract additional properties from Escher records
         let mut container = ShapeContainer::new(properties, record.data.clone());
@@ -86,7 +89,9 @@ impl TextBox {
 
     /// Extract text formatting information from Escher records.
     /// This follows POI's text formatting parsing logic.
-    fn extract_text_formatting(record: &super::escher::EscherRecord) -> super::super::package::Result<TextFormattingResult> {
+    fn extract_text_formatting(
+        record: &super::escher::EscherRecord,
+    ) -> super::super::package::Result<TextFormattingResult> {
         let mut font_size = None;
         let mut font_color = None;
         let mut bold = false;
@@ -108,15 +113,23 @@ impl TextBox {
             // Check for character flags (0x100000)
             if let Some(flags_prop) = record.find_property(0x100000u32) {
                 let flags = (flags_prop.data & 0xFFFF) as u16;
-                bold = (flags & 0x0001) != 0;      // Bold flag
-                italic = (flags & 0x0002) != 0;    // Italic flag
+                bold = (flags & 0x0001) != 0; // Bold flag
+                italic = (flags & 0x0002) != 0; // Italic flag
                 underline = (flags & 0x0004) != 0; // Underline flag
             }
         }
 
         // Look for text properties record (StyleTextPropAtom) - simplified parsing
-        if let Some(text_props) = record.find_child(super::escher::EscherRecordType::TextProperties) {
-            Self::parse_style_text_prop_atom(text_props, &mut font_size, &mut font_color, &mut bold, &mut italic, &mut underline)?;
+        if let Some(text_props) = record.find_child(super::escher::EscherRecordType::TextProperties)
+        {
+            Self::parse_style_text_prop_atom(
+                text_props,
+                &mut font_size,
+                &mut font_color,
+                &mut bold,
+                &mut italic,
+                &mut underline,
+            )?;
         }
 
         // Look for font information in child records
@@ -142,10 +155,11 @@ impl TextBox {
 
         // Use the proper text_prop module to parse StyleTextPropAtom
         // This follows POI's TextPropCollection parsing logic
-        let (_paragraph_styles, character_styles) = super::super::text_prop::parse_style_text_prop_atom(
-            &record.data,
-            100, // Default text length - will be adjusted by actual text length
-        );
+        let (_paragraph_styles, character_styles) =
+            super::super::text_prop::parse_style_text_prop_atom(
+                &record.data,
+                100, // Default text length - will be adjusted by actual text length
+            );
 
         // Extract formatting from the first character style collection
         if let Some(char_style) = character_styles.first() {
@@ -196,7 +210,12 @@ impl TextBox {
 
                     // Extract font color if available
                     if font_color.is_none() && child.data.len() >= 8 {
-                        let color_val = u32::from_le_bytes([child.data[4], child.data[5], child.data[6], child.data[7]]);
+                        let color_val = u32::from_le_bytes([
+                            child.data[4],
+                            child.data[5],
+                            child.data[6],
+                            child.data[7],
+                        ]);
                         if color_val != 0 {
                             *font_color = Some(color_val);
                         }
@@ -210,7 +229,10 @@ impl TextBox {
 
     /// Extract additional text properties from Escher records.
     /// This parses Escher-specific text formatting properties.
-    fn extract_escher_text_properties(_record: &super::escher::EscherRecord, _container: &mut ShapeContainer) -> super::super::package::Result<()> {
+    fn extract_escher_text_properties(
+        _record: &super::escher::EscherRecord,
+        _container: &mut ShapeContainer,
+    ) -> super::super::package::Result<()> {
         // In a full implementation, this would parse Escher text properties
         // such as font size, color, alignment, etc. from the Escher record data
         // POI does this through EscherOptRecord and related property parsing
@@ -317,7 +339,6 @@ impl Shape for TextBox {
     }
 }
 
-
 /// Text formatting properties for text boxes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct TextFormatting {
@@ -335,8 +356,8 @@ pub struct TextFormatting {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::shape::ShapeType;
+    use super::*;
 
     #[test]
     #[allow(clippy::field_reassign_with_default)]

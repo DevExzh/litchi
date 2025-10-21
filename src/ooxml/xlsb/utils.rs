@@ -58,7 +58,8 @@ pub fn parse_cell_reference(ref_str: &str) -> XlsbResult<(u32, u32)> {
 
     let col = column_name_to_index(&col_str)
         .ok_or_else(|| XlsbError::InvalidCellReference(ref_str.to_string()))?;
-    let row: u32 = row_str.parse()
+    let row: u32 = row_str
+        .parse()
         .map_err(|_| XlsbError::InvalidCellReference(ref_str.to_string()))?;
 
     Ok((row - 1, col)) // Make 0-based
@@ -67,7 +68,7 @@ pub fn parse_cell_reference(ref_str: &str) -> XlsbResult<(u32, u32)> {
 /// Convert serial date to datetime
 #[allow(dead_code)]
 pub fn excel_date_to_datetime(serial: f64, is_1904: bool) -> Option<chrono::NaiveDateTime> {
-    use chrono::{NaiveDate, Duration};
+    use chrono::{Duration, NaiveDate};
 
     let base_date = if is_1904 {
         NaiveDate::from_ymd_opt(1904, 1, 1)?

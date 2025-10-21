@@ -1,9 +1,9 @@
 /// Package implementation for PowerPoint presentations.
 use crate::ooxml::error::{OoxmlError, Result};
-use crate::ooxml::opc::constants::content_type as ct;
 use crate::ooxml::opc::OpcPackage;
-use crate::ooxml::pptx::presentation::Presentation;
+use crate::ooxml::opc::constants::content_type as ct;
 use crate::ooxml::pptx::parts::PresentationPart;
+use crate::ooxml::pptx::presentation::Presentation;
 use std::io::{Read, Seek};
 use std::path::Path;
 
@@ -22,7 +22,7 @@ use std::path::Path;
 ///
 /// // Get the main presentation
 /// let pres = pkg.presentation()?;
-/// 
+///
 /// // Access slides
 /// println!("Presentation has {} slides", pres.slide_count()?);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -124,7 +124,7 @@ impl Package {
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
-    /// 
+    ///
     /// // Access slides
     /// for slide in pres.slides()? {
     ///     println!("Slide text: {}", slide.text()?);
@@ -164,4 +164,3 @@ mod tests {
         assert!(result.is_ok());
     }
 }
-

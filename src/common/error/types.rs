@@ -58,4 +58,3 @@ pub enum Error {
 
 /// Result type for Litchi operations.
 pub type Result<T> = std::result::Result<T, Error>;
-

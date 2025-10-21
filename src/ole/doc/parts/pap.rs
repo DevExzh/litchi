@@ -253,42 +253,43 @@ impl ParagraphProperties {
                         };
                         offset += 1;
                     }
-                }
+                },
                 // Left indent (sprmPDxaLeft)
                 0x840F | 0x000F => {
                     if offset + 1 < grpprl.len() {
                         pap.indent_left = Some(read_i16_le(grpprl, offset).unwrap_or(0) as i32);
                         offset += 2;
                     }
-                }
+                },
                 // Right indent (sprmPDxaRight)
                 0x8411 | 0x0011 => {
                     if offset + 1 < grpprl.len() {
                         pap.indent_right = Some(read_i16_le(grpprl, offset).unwrap_or(0) as i32);
                         offset += 2;
                     }
-                }
+                },
                 // First line indent (sprmPDxaLeft1)
                 0x8416 | 0x0016 => {
                     if offset + 1 < grpprl.len() {
-                        pap.indent_first_line = Some(read_i16_le(grpprl, offset).unwrap_or(0) as i32);
+                        pap.indent_first_line =
+                            Some(read_i16_le(grpprl, offset).unwrap_or(0) as i32);
                         offset += 2;
                     }
-                }
+                },
                 // Space before (sprmPDyaBefore)
                 0xA413 | 0x0013 => {
                     if offset + 1 < grpprl.len() {
                         pap.space_before = Some(read_u16_le(grpprl, offset).unwrap_or(0) as i32);
                         offset += 2;
                     }
-                }
+                },
                 // Space after (sprmPDyaAfter)
                 0xA414 | 0x0014 => {
                     if offset + 1 < grpprl.len() {
                         pap.space_after = Some(read_u16_le(grpprl, offset).unwrap_or(0) as i32);
                         offset += 2;
                     }
-                }
+                },
                 // Line spacing (sprmPDyaLine)
                 0x6412 | 0x0012 => {
                     if offset + 3 < grpprl.len() {
@@ -306,35 +307,35 @@ impl ParagraphProperties {
                         };
                         offset += 4;
                     }
-                }
+                },
                 // Keep on page (sprmPFKeep)
                 0x2405 | 0x0005 => {
                     if offset < grpprl.len() {
                         pap.keep_on_page = grpprl[offset] != 0;
                         offset += 1;
                     }
-                }
+                },
                 // Keep with next (sprmPFKeepFollow)
                 0x2406 | 0x0006 => {
                     if offset < grpprl.len() {
                         pap.keep_with_next = grpprl[offset] != 0;
                         offset += 1;
                     }
-                }
+                },
                 // Page break before (sprmPFPageBreakBefore)
                 0x2407 | 0x0007 => {
                     if offset < grpprl.len() {
                         pap.page_break_before = grpprl[offset] != 0;
                         offset += 1;
                     }
-                }
+                },
                 // Widow control (sprmPFWidowControl)
                 0x240E | 0x000E => {
                     if offset < grpprl.len() {
                         pap.widow_control = grpprl[offset] != 0;
                         offset += 1;
                     }
-                }
+                },
                 // Tab stops (sprmPChgTabsPapx)
                 0xC615 | 0x0015 => {
                     // Tab stops are complex - simplified parsing
@@ -377,12 +378,12 @@ impl ParagraphProperties {
                             }
                         }
                     }
-                }
+                },
                 // Unknown SPRM - skip based on size
                 _ => {
                     let size = Self::get_sprm_size(sprm);
                     offset += size;
-                }
+                },
             }
         }
 
@@ -394,11 +395,11 @@ impl ParagraphProperties {
         // Extract type from SPRM (bits 0-2)
         let sprm_type = sprm & 0x07;
         match sprm_type {
-            0 | 1 => 1,  // 1-byte operand
-            2 | 4 | 5 => 2,  // 2-byte operand
-            3 => 4,      // 4-byte operand
-            6 => 1,      // Variable - default to 1
-            7 => 3,      // 3-byte operand
+            0 | 1 => 1,     // 1-byte operand
+            2 | 4 | 5 => 2, // 2-byte operand
+            3 => 4,         // 4-byte operand
+            6 => 1,         // Variable - default to 1
+            7 => 3,         // 3-byte operand
             _ => 1,
         }
     }
@@ -431,7 +432,9 @@ impl ParagraphProperties {
 
     /// Get first line indent in inches.
     pub fn get_indent_first_line_inches(&self) -> f32 {
-        self.indent_first_line.map(|v| v as f32 / 1440.0).unwrap_or(0.0)
+        self.indent_first_line
+            .map(|v| v as f32 / 1440.0)
+            .unwrap_or(0.0)
     }
 }
 
@@ -469,4 +472,3 @@ mod tests {
         assert_eq!(pap.get_indent_left_inches(), 1.0);
     }
 }
-

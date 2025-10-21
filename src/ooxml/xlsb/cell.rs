@@ -1,7 +1,7 @@
 //! Cell representation for XLSB files
 
-use crate::sheet::{Cell, CellValue};
 use crate::ooxml::xlsb::records::CellRecord;
+use crate::sheet::{Cell, CellValue};
 
 /// XLSB cell implementation
 #[derive(Debug, Clone)]
@@ -22,7 +22,9 @@ impl XlsbCell {
         let value = match &record.value {
             crate::ooxml::xlsb::records::CellValue::Blank => CellValue::Empty,
             crate::ooxml::xlsb::records::CellValue::Bool(b) => CellValue::Bool(*b),
-            crate::ooxml::xlsb::records::CellValue::Error(e) => CellValue::Error(format!("Error {}", e)),
+            crate::ooxml::xlsb::records::CellValue::Error(e) => {
+                CellValue::Error(format!("Error {}", e))
+            },
             crate::ooxml::xlsb::records::CellValue::Real(f) => CellValue::Float(*f),
             crate::ooxml::xlsb::records::CellValue::String(s) => CellValue::String(s.clone()),
             crate::ooxml::xlsb::records::CellValue::Isst(idx) => {
@@ -35,7 +37,7 @@ impl XlsbCell {
                 } else {
                     CellValue::Error("SST not available".to_string())
                 }
-            }
+            },
         };
 
         Some(XlsbCell {

@@ -8,11 +8,11 @@
 
 use std::collections::HashMap;
 use std::fs;
+use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
-use std::io::{Read, Cursor};
 
-use zip::ZipArchive;
 use plist::Value;
+use zip::ZipArchive;
 
 use crate::iwa::archive::{Archive, ArchiveObject};
 use crate::iwa::snappy::SnappyStream;
@@ -152,8 +152,7 @@ impl Bundle {
     /// Parse Index.zip and extract all IWA files
     fn parse_index_zip(bundle_path: &Path) -> Result<HashMap<String, Archive>> {
         let index_zip_path = bundle_path.join("Index.zip");
-        let file = fs::File::open(&index_zip_path)
-            .map_err(Error::Io)?;
+        let file = fs::File::open(&index_zip_path).map_err(Error::Io)?;
 
         let mut zip_archive = ZipArchive::new(file)
             .map_err(|e| Error::Bundle(format!("Failed to open Index.zip: {}", e)))?;
@@ -163,8 +162,7 @@ impl Bundle {
 
     /// Parse a single-file bundle (zip archive) and extract all IWA files
     fn parse_zip_bundle(bundle_path: &Path) -> Result<HashMap<String, Archive>> {
-        let file = fs::File::open(bundle_path)
-            .map_err(Error::Io)?;
+        let file = fs::File::open(bundle_path).map_err(Error::Io)?;
 
         let mut zip_archive = ZipArchive::new(file)
             .map_err(|e| Error::Bundle(format!("Failed to open bundle file: {}", e)))?;
@@ -182,16 +180,20 @@ impl Bundle {
     }
 
     /// Parse IWA files from a zip archive
-    fn parse_iwa_files_from_zip<R: Read + std::io::Seek>(zip_archive: &mut ZipArchive<R>) -> Result<HashMap<String, Archive>> {
+    fn parse_iwa_files_from_zip<R: Read + std::io::Seek>(
+        zip_archive: &mut ZipArchive<R>,
+    ) -> Result<HashMap<String, Archive>> {
         let mut archives = HashMap::new();
 
         for i in 0..zip_archive.len() {
-            let mut zip_file = zip_archive.by_index(i)
+            let mut zip_file = zip_archive
+                .by_index(i)
                 .map_err(|e| Error::Bundle(format!("Failed to read zip entry: {}", e)))?;
 
             if zip_file.name().ends_with(".iwa") {
                 let mut compressed_data = Vec::new();
-                zip_file.read_to_end(&mut compressed_data)
+                zip_file
+                    .read_to_end(&mut compressed_data)
                     .map_err(Error::Io)?;
 
                 // Decompress IWA file
@@ -223,9 +225,11 @@ impl Bundle {
             metadata.has_properties = true;
             if let Ok(value) = Value::from_file(&properties_path) {
                 metadata.properties = Self::parse_plist_value(&value);
-                
+
                 // Try to detect application from properties
-                if let Some(PropertyValue::String(app_name)) = metadata.properties.get("Application") {
+                if let Some(PropertyValue::String(app_name)) =
+                    metadata.properties.get("Application")
+                {
                     metadata.detected_application = Some(app_name.clone());
                 }
             }
@@ -255,13 +259,13 @@ impl Bundle {
     /// Parse a plist Value into our PropertyValue structure
     fn parse_plist_value(value: &Value) -> HashMap<String, PropertyValue> {
         let mut result = HashMap::new();
-        
+
         if let Value::Dictionary(dict) = value {
             for (key, val) in dict {
                 result.insert(key.clone(), Self::convert_plist_value(val));
             }
         }
-        
+
         result
     }
 
@@ -275,14 +279,14 @@ impl Bundle {
             Value::Date(d) => PropertyValue::Date(format!("{:?}", d)),
             Value::Array(arr) => {
                 PropertyValue::Array(arr.iter().map(Self::convert_plist_value).collect())
-            }
+            },
             Value::Dictionary(dict) => {
                 let mut map = HashMap::new();
                 for (k, v) in dict {
                     map.insert(k.clone(), Self::convert_plist_value(v));
                 }
                 PropertyValue::Dictionary(map)
-            }
+            },
             Value::Data(_) => PropertyValue::String("<binary data>".to_string()),
             _ => PropertyValue::String("<unknown>".to_string()),
         }
@@ -291,7 +295,7 @@ impl Bundle {
     /// Parse build versions from BuildVersionHistory.plist
     fn parse_build_versions(value: &Value) -> Vec<String> {
         let mut versions = Vec::new();
-        
+
         if let Value::Array(arr) = value {
             for item in arr {
                 if let Value::String(version) = item {
@@ -306,7 +310,7 @@ impl Bundle {
                 }
             }
         }
-        
+
         versions
     }
 
@@ -475,7 +479,7 @@ pub fn detect_application_type<P: AsRef<Path>>(bundle_path: P) -> Result<String>
             Some("pages") => return Ok("Pages".to_string()),
             Some("key") => return Ok("Keynote".to_string()),
             Some("numbers") => return Ok("Numbers".to_string()),
-            _ => {}
+            _ => {},
         }
     }
 
@@ -505,7 +509,11 @@ mod tests {
         let bundle_path = std::path::Path::new("test.pages");
         if bundle_path.exists() {
             let result = Bundle::open(bundle_path);
-            assert!(result.is_ok(), "Failed to open test.pages: {:?}", result.err());
+            assert!(
+                result.is_ok(),
+                "Failed to open test.pages: {:?}",
+                result.err()
+            );
         }
     }
 
@@ -520,18 +528,27 @@ mod tests {
         let bundle = Bundle::open(bundle_path).expect("Failed to open test.pages");
 
         // Verify bundle has expected structure
-        assert!(!bundle.archives().is_empty(), "Bundle should contain archives");
+        assert!(
+            !bundle.archives().is_empty(),
+            "Bundle should contain archives"
+        );
 
         // Check for common iWork files
-        assert!(bundle.get_archive("Index/Document.iwa").is_some(),
-                "Bundle should contain Document.iwa");
-        assert!(bundle.get_archive("Index/Metadata.iwa").is_some(),
-                "Bundle should contain Metadata.iwa");
+        assert!(
+            bundle.get_archive("Index/Document.iwa").is_some(),
+            "Bundle should contain Document.iwa"
+        );
+        assert!(
+            bundle.get_archive("Index/Metadata.iwa").is_some(),
+            "Bundle should contain Metadata.iwa"
+        );
 
         // Verify metadata exists
         let metadata = bundle.metadata();
-        assert!(metadata.has_properties || metadata.has_build_version_history,
-                "Bundle should have some metadata");
+        assert!(
+            metadata.has_properties || metadata.has_build_version_history,
+            "Bundle should have some metadata"
+        );
 
         // Test text extraction (will be empty for now as protobuf decoding isn't implemented)
         let text_result = bundle.extract_text();
@@ -549,20 +566,30 @@ mod tests {
         let bundle = Bundle::open(bundle_path).expect("Failed to open test.numbers");
 
         // Verify bundle has expected structure
-        assert!(!bundle.archives().is_empty(), "Bundle should contain archives");
+        assert!(
+            !bundle.archives().is_empty(),
+            "Bundle should contain archives"
+        );
 
         // Check for common Numbers files
-        assert!(bundle.get_archive("Index/Document.iwa").is_some(),
-                "Bundle should contain Document.iwa");
-        assert!(bundle.get_archive("Index/CalculationEngine.iwa").is_some(),
-                "Numbers bundle should contain CalculationEngine.iwa");
+        assert!(
+            bundle.get_archive("Index/Document.iwa").is_some(),
+            "Bundle should contain Document.iwa"
+        );
+        assert!(
+            bundle.get_archive("Index/CalculationEngine.iwa").is_some(),
+            "Numbers bundle should contain CalculationEngine.iwa"
+        );
     }
 
     #[test]
     fn test_metadata_summary() {
         let mut properties = HashMap::new();
-        properties.insert("Title".to_string(), PropertyValue::String("Test Doc".to_string()));
-        
+        properties.insert(
+            "Title".to_string(),
+            PropertyValue::String("Test Doc".to_string()),
+        );
+
         let metadata = BundleMetadata {
             has_properties: true,
             has_build_version_history: true,
@@ -578,9 +605,12 @@ mod tests {
         assert!(summary.contains("BuildVersion: true"));
         assert!(summary.contains("DocumentID: false"));
         assert!(summary.contains("App: Pages"));
-        
+
         // Test property accessors
-        assert_eq!(metadata.get_property_string("Title"), Some("Test Doc".to_string()));
+        assert_eq!(
+            metadata.get_property_string("Title"),
+            Some("Test Doc".to_string())
+        );
         assert_eq!(metadata.latest_build_version(), Some("7029"));
         assert_eq!(metadata.document_identifier(), None);
     }

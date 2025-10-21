@@ -34,12 +34,12 @@ impl Table {
             Table::Doc(t) => {
                 let rows = t.rows().map_err(Error::from)?;
                 Ok(rows.into_iter().map(Row::Doc).collect())
-            }
+            },
             #[cfg(feature = "ooxml")]
             Table::Docx(t) => {
                 let rows = t.rows().map_err(Error::from)?;
                 Ok(rows.into_iter().map(Row::Docx).collect())
-            }
+            },
         }
     }
 }
@@ -60,12 +60,12 @@ impl Row {
             Row::Doc(r) => {
                 let cells = r.cells().map_err(Error::from)?;
                 Ok(cells.into_iter().map(Cell::Doc).collect())
-            }
+            },
             #[cfg(feature = "ooxml")]
             Row::Docx(r) => {
                 let cells = r.cells().map_err(Error::from)?;
                 Ok(cells.into_iter().map(Cell::Docx).collect())
-            }
+            },
         }
     }
 }
@@ -89,4 +89,3 @@ impl Cell {
         }
     }
 }
-

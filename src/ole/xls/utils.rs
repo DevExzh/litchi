@@ -2,7 +2,7 @@
 
 use crate::common::binary;
 use crate::ole::xls::error::{XlsError, XlsResult};
-use crate::ole::xls::records::{XlsEncoding, FormulaValue};
+use crate::ole::xls::records::{FormulaValue, XlsEncoding};
 use zerocopy::{FromBytes, LE, U16};
 
 /// Parse a short string (used in sheet names, etc.)
@@ -50,12 +50,17 @@ pub fn parse_string_record(data: &[u8], encoding: &XlsEncoding) -> XlsResult<Str
     // For BIFF8, handle UTF-16
     if matches!(encoding, XlsEncoding::Utf16Le) && high_byte {
         if !len.is_multiple_of(2) {
-            return Err(XlsError::Encoding("Invalid UTF-16 string length".to_string()));
+            return Err(XlsError::Encoding(
+                "Invalid UTF-16 string length".to_string(),
+            ));
         }
-        let utf16_data: Vec<u16> = string_data.chunks_exact(2)
-            .map(|chunk| U16::<LE>::read_from_bytes(chunk)
-                .map(|v| v.get())
-                .unwrap_or(0))
+        let utf16_data: Vec<u16> = string_data
+            .chunks_exact(2)
+            .map(|chunk| {
+                U16::<LE>::read_from_bytes(chunk)
+                    .map(|v| v.get())
+                    .unwrap_or(0)
+            })
             .collect();
         Ok(String::from_utf16(&utf16_data)
             .map_err(|e| XlsError::Encoding(format!("UTF-16 decoding error: {}", e)))?)
@@ -119,12 +124,17 @@ pub fn parse_unicode_string(data: &[u8], encoding: &XlsEncoding) -> XlsResult<(S
     let string = if matches!(encoding, XlsEncoding::Utf16Le) && high_byte {
         // UTF-16 LE
         if !cch.is_multiple_of(2) {
-            return Err(XlsError::Encoding("Invalid UTF-16 string length".to_string()));
+            return Err(XlsError::Encoding(
+                "Invalid UTF-16 string length".to_string(),
+            ));
         }
-        let utf16_data: Vec<u16> = string_data.chunks_exact(2)
-            .map(|chunk| U16::<LE>::read_from_bytes(chunk)
-                .map(|v| v.get())
-                .unwrap_or(0))
+        let utf16_data: Vec<u16> = string_data
+            .chunks_exact(2)
+            .map(|chunk| {
+                U16::<LE>::read_from_bytes(chunk)
+                    .map(|v| v.get())
+                    .unwrap_or(0)
+            })
             .collect();
         String::from_utf16(&utf16_data)
             .map_err(|e| XlsError::Encoding(format!("UTF-16 decoding error: {}", e)))?
@@ -186,23 +196,23 @@ pub fn parse_formula_value(data: &[u8]) -> XlsResult<FormulaValue> {
         0x00 => {
             // String (will be in next record)
             Ok(FormulaValue::Empty)
-        }
+        },
         0x01 => {
             // Boolean
             Ok(FormulaValue::Bool(data[2] != 0))
-        }
+        },
         0x02 => {
             // Error
             Ok(FormulaValue::Error(data[2]))
-        }
+        },
         0x03 => {
             // Empty string
             Ok(FormulaValue::String(String::new()))
-        }
+        },
         _ => {
             // Number
             Ok(FormulaValue::Number(binary::read_f64_le_at(data, 0)?))
-        }
+        },
     }
 }
 
@@ -269,7 +279,7 @@ pub fn parse_cell_reference(ref_str: &str) -> Option<(u32, u32)> {
 /// Convert serial date to datetime
 #[allow(dead_code)]
 pub fn excel_date_to_datetime(serial: f64, is_1904: bool) -> Option<chrono::NaiveDateTime> {
-    use chrono::{NaiveDate, Duration};
+    use chrono::{Duration, NaiveDate};
 
     let base_date = if is_1904 {
         NaiveDate::from_ymd_opt(1904, 1, 1)?

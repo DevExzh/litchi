@@ -4,11 +4,13 @@
 //! for Excel (.xlsx) files using the Office Open XML format.
 
 use crate::ooxml::opc::{OpcPackage, PackURI};
-use crate::sheet::{WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator, Result as SheetResult};
 use crate::ooxml::xlsx::{SharedStrings, Styles};
+use crate::sheet::{
+    Result as SheetResult, WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator,
+};
 
+use super::parsers::{styles_parser, workbook_parser};
 use super::worksheet::{Worksheet, WorksheetInfo, WorksheetIterator as XlsxWorksheetIterator};
-use super::parsers::{workbook_parser, styles_parser};
 
 /// Concrete implementation of a Workbook for Excel files.
 #[derive(Debug)]

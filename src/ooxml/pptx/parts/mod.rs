@@ -6,5 +6,4 @@ pub mod presentation;
 pub mod slide;
 
 pub use presentation::PresentationPart;
-pub use slide::{SlidePart, SlideLayoutPart, SlideMasterPart};
-
+pub use slide::{SlideLayoutPart, SlideMasterPart, SlidePart};

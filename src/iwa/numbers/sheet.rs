@@ -81,12 +81,12 @@ mod tests {
     #[test]
     fn test_sheet_add_table() {
         let mut sheet = NumbersSheet::new("Sheet1".to_string(), 0);
-        
+
         let mut table = NumbersTable::new("Table1".to_string());
         table.set_cell(0, 0, CellValue::Number(1.0));
-        
+
         sheet.add_table(table);
-        
+
         assert_eq!(sheet.table_count(), 1);
         assert!(!sheet.is_empty());
     }
@@ -94,13 +94,13 @@ mod tests {
     #[test]
     fn test_sheet_get_table() {
         let mut sheet = NumbersSheet::new("Sheet1".to_string(), 0);
-        
+
         let table1 = NumbersTable::new("Table1".to_string());
         let table2 = NumbersTable::new("Table2".to_string());
-        
+
         sheet.add_table(table1);
         sheet.add_table(table2);
-        
+
         assert!(sheet.get_table("Table1").is_some());
         assert!(sheet.get_table("Table2").is_some());
         assert!(sheet.get_table("Table3").is_none());
@@ -109,11 +109,11 @@ mod tests {
     #[test]
     fn test_sheet_table_names() {
         let mut sheet = NumbersSheet::new("Sheet1".to_string(), 0);
-        
+
         sheet.add_table(NumbersTable::new("Table1".to_string()));
         sheet.add_table(NumbersTable::new("Table2".to_string()));
         sheet.add_table(NumbersTable::new("Table3".to_string()));
-        
+
         let names = sheet.table_names();
         assert_eq!(names.len(), 3);
         assert!(names.contains(&"Table1".to_string()));
@@ -121,4 +121,3 @@ mod tests {
         assert!(names.contains(&"Table3".to_string()));
     }
 }
-

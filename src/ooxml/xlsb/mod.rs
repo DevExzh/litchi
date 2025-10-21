@@ -25,7 +25,7 @@ mod cells_reader;
 /// Shared parsing utilities
 mod utils;
 
+pub use cell::XlsbCell;
 pub use error::{XlsbError, XlsbResult};
 pub use workbook::XlsbWorkbook;
 pub use worksheet::XlsbWorksheet;
-pub use cell::XlsbCell;

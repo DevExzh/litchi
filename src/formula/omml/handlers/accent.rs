@@ -1,8 +1,10 @@
 // Accent element handler
 
 use crate::formula::ast::*;
+use crate::formula::omml::attributes::{
+    get_attribute_value, parse_accent_type, parse_position_type,
+};
 use crate::formula::omml::elements::ElementContext;
-use crate::formula::omml::attributes::{get_attribute_value, parse_accent_type, parse_position_type};
 use crate::formula::omml::properties::parse_accent_properties;
 use quick_xml::events::BytesStart;
 
@@ -34,15 +36,23 @@ impl AccentHandler {
     ) {
         // Try to get accent type from properties if not set by attribute
         let accent_type = context.accent_type.or_else(|| {
-            context.properties.chr.as_deref()
+            context
+                .properties
+                .chr
+                .as_deref()
                 .and_then(|s| parse_accent_type(Some(s)))
         });
 
         if let Some(accent_type) = accent_type {
-            let base = context.base.clone().unwrap_or_else(|| context.children.clone());
+            let base = context
+                .base
+                .clone()
+                .unwrap_or_else(|| context.children.clone());
 
             // Parse position using the dedicated position parsing function
-            let position = context.properties.accent_position
+            let position = context
+                .properties
+                .accent_position
                 .as_ref()
                 .and_then(|s| parse_position_type(Some(s)));
 

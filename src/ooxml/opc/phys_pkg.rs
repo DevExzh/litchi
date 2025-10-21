@@ -104,9 +104,7 @@ impl<R: Read + Seek> PhysPkgReader<R> {
     /// # Arguments
     /// * `source_uri` - The PackURI of the source (part or package)
     pub fn rels_xml_for(&mut self, source_uri: &PackURI) -> Result<Option<Vec<u8>>> {
-        let rels_uri = source_uri
-            .rels_uri()
-            .map_err(OpcError::InvalidPackUri)?;
+        let rels_uri = source_uri.rels_uri().map_err(OpcError::InvalidPackUri)?;
 
         match self.blob_for(&rels_uri) {
             Ok(blob) => Ok(Some(blob)),

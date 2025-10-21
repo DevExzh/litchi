@@ -11,7 +11,7 @@
 /// - org.apache.poi.hwpf.model.PieceDescriptor
 /// - [MS-DOC] 2.4.1 Clx (Complex file information)
 /// - [MS-DOC] 2.9.179 Pcd (Piece Descriptor)
-use crate::common::binary::{read_u32_le, read_u16_le};
+use crate::common::binary::{read_u16_le, read_u32_le};
 use crate::ole::plcf::PlcfParser;
 
 /// A text piece - maps a range of CPs to an FC in the WordDocument stream.
@@ -66,11 +66,7 @@ impl TextPiece {
         };
 
         let cp = self.cp_start + char_offset;
-        if cp > self.cp_end {
-            None
-        } else {
-            Some(cp)
-        }
+        if cp > self.cp_end { None } else { Some(cp) }
     }
 }
 
@@ -101,7 +97,10 @@ impl PieceTable {
             return None;
         }
 
-        eprintln!("DEBUG: PieceTable: parsing {} bytes of CLX data", clx_data.len());
+        eprintln!(
+            "DEBUG: PieceTable: parsing {} bytes of CLX data",
+            clx_data.len()
+        );
         eprint!("DEBUG: PieceTable: first 36 bytes: ");
         for item in clx_data.iter().take(clx_data.len().min(36)) {
             eprint!("{:02X} ", item);
@@ -116,7 +115,7 @@ impl PieceTable {
         //
         // POI line 54: while (tableStream[offset] == GRPPRL_TYPE)
         // where GRPPRL_TYPE = 1, TEXT_PIECE_TABLE_TYPE = 2
-        
+
         // Skip RgPrc entries (type 0x01 only!)
         while offset < clx_data.len() && clx_data[offset] == 0x01 {
             offset += 1;
@@ -126,7 +125,7 @@ impl PieceTable {
             // Read size as SHORT (2 bytes) - POI line 56
             let size = read_u16_le(clx_data, offset).unwrap_or(0) as usize;
             offset += 2;
-            
+
             if offset + size > clx_data.len() {
                 return None;
             }
@@ -137,10 +136,10 @@ impl PieceTable {
         if offset >= clx_data.len() || clx_data[offset] != 0x02 {
             return None;
         }
-        
+
         // Skip the 0x02 marker - POI line 70: ++offset
         offset += 1;
-        
+
         if offset + 4 > clx_data.len() {
             return None;
         }
@@ -174,7 +173,7 @@ impl PieceTable {
             // Bytes 0-1: flags (bit 6 = fNoParaLast, others reserved)
             // Bytes 2-5: fc (File Character position)
             // Bytes 6-7: prm (Property modifier - for paragraph/character properties)
-            
+
             let fc_raw = read_u32_le(pcd_data, 2).unwrap_or(0);
 
             // FC encoding (from POI's PieceDescriptor.java):
@@ -183,7 +182,7 @@ impl PieceTable {
             // This is the actual file offset in the WordDocument stream
             let is_unicode = (fc_raw & 0x40000000) == 0;
             let mut fc = fc_raw & 0x3FFFFFFF; // Clear bit 30
-            
+
             // For non-Unicode text, divide fc by 2 (POI line 74-75)
             if !is_unicode {
                 fc /= 2;
@@ -203,8 +202,10 @@ impl PieceTable {
         // Debug: print first few pieces
         eprintln!("DEBUG: PieceTable parsed {} pieces:", pieces.len());
         for (i, piece) in pieces.iter().take(5).enumerate() {
-            eprintln!("DEBUG:   Piece {}: cp={}..{}, fc={}, unicode={}", 
-                     i, piece.cp_start, piece.cp_end, piece.fc, piece.is_unicode);
+            eprintln!(
+                "DEBUG:   Piece {}: cp={}..{}, fc={}, unicode={}",
+                i, piece.cp_start, piece.cp_end, piece.fc, piece.is_unicode
+            );
         }
 
         Some(Self { pieces })
@@ -219,7 +220,9 @@ impl PieceTable {
     /// Find the text piece containing a given CP.
     pub fn piece_for_cp(&self, cp: u32) -> Option<&TextPiece> {
         // Binary search for efficiency
-        self.pieces.iter().find(|piece| cp >= piece.cp_start && cp < piece.cp_end)
+        self.pieces
+            .iter()
+            .find(|piece| cp >= piece.cp_start && cp < piece.cp_end)
     }
 
     /// Convert a CP to an FC.
@@ -290,4 +293,3 @@ mod tests {
         assert_eq!(piece.fc_to_cp(700), None);
     }
 }
-

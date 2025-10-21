@@ -50,7 +50,7 @@ impl KeynoteSlide {
         if let Some(ref notes) = self.notes {
             all.push(notes.clone());
         }
-        
+
         // Include text from storages
         for storage in &self.text_storages {
             let text = storage.plain_text();
@@ -58,7 +58,7 @@ impl KeynoteSlide {
                 all.push(text.to_string());
             }
         }
-        
+
         all
     }
 
@@ -179,7 +179,7 @@ mod tests {
         slide.title = Some("Introduction".to_string());
         slide.text_content.push("Point 1".to_string());
         slide.text_content.push("Point 2".to_string());
-        
+
         assert!(!slide.is_empty());
         let text = slide.plain_text();
         assert!(text.contains("Introduction"));
@@ -192,7 +192,9 @@ mod tests {
         slide.title = Some("Title".to_string());
         slide.text_content.push("Content".to_string());
         slide.notes = Some("Notes".to_string());
-        slide.text_storages.push(TextStorage::from_text("Storage".to_string()));
+        slide
+            .text_storages
+            .push(TextStorage::from_text("Storage".to_string()));
 
         let all_text = slide.all_text();
         assert_eq!(all_text.len(), 4);
@@ -216,4 +218,3 @@ mod tests {
         assert_eq!(TransitionType::Push.name(), "Push");
     }
 }
-

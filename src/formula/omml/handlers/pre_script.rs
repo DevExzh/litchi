@@ -13,7 +13,10 @@ impl PreScriptHandler {
     ) {
         if let Some(parent) = parent_context {
             // Pre-scripts are handled by the superscript/subscript elements
-            crate::formula::omml::utils::extend_vec_efficient(&mut parent.pre_scripts, context.children.clone());
+            crate::formula::omml::utils::extend_vec_efficient(
+                &mut parent.pre_scripts,
+                context.children.clone(),
+            );
         }
     }
 }

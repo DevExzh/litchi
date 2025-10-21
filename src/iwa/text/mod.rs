@@ -8,6 +8,5 @@ pub mod storage;
 pub mod style;
 
 pub use extractor::TextExtractor;
-pub use storage::{TextStorage, TextFragment, TextRun};
-pub use style::{TextStyle, ParagraphStyle};
-
+pub use storage::{TextFragment, TextRun, TextStorage};
+pub use style::{ParagraphStyle, TextStyle};

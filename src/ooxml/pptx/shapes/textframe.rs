@@ -1,7 +1,7 @@
 /// Text frame for accessing text content in shapes.
 use crate::ooxml::error::{OoxmlError, Result};
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 
 /// A text frame containing text content.
 ///
@@ -55,7 +55,7 @@ impl TextFrame {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = true;
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_text_element => {
                     // Extract text content
                     let t = std::str::from_utf8(e.as_ref())
@@ -64,15 +64,15 @@ impl TextFrame {
                         text.push('\n');
                     }
                     text.push_str(t);
-                }
+                },
                 Ok(Event::End(e)) => {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = false;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -115,7 +115,7 @@ impl TextFrame {
                         }
                         current_para_xml.push(b'>');
                     }
-                }
+                },
                 Ok(Event::End(e)) => {
                     if in_para {
                         current_para_xml.extend_from_slice(b"</");
@@ -128,10 +128,10 @@ impl TextFrame {
                             in_para = false;
                         }
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_para => {
                     current_para_xml.extend_from_slice(e.as_ref());
-                }
+                },
                 Ok(Event::Empty(e)) if in_para => {
                     current_para_xml.push(b'<');
                     current_para_xml.extend_from_slice(e.name().as_ref());
@@ -143,10 +143,10 @@ impl TextFrame {
                         current_para_xml.push(b'"');
                     }
                     current_para_xml.extend_from_slice(b"/>");
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -204,20 +204,20 @@ impl Paragraph {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = true;
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_text_element => {
                     let t = std::str::from_utf8(e.as_ref())
                         .map_err(|e| OoxmlError::Xml(e.to_string()))?;
                     text.push_str(t);
-                }
+                },
                 Ok(Event::End(e)) => {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = false;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -225,4 +225,3 @@ impl Paragraph {
         Ok(text)
     }
 }
-

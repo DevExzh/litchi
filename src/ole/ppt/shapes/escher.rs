@@ -1,3 +1,4 @@
+use super::super::package::{PptError, Result};
 /// Escher record parsing for PowerPoint shapes.
 ///
 /// This module provides functionality to parse Escher binary records
@@ -6,9 +7,11 @@
 /// Escher is Microsoft's binary format for storing graphics and shape data
 /// in Office documents, including PowerPoint presentations.
 use super::shape::{ShapeProperties, ShapeType};
-use super::super::package::{PptError, Result};
 use std::collections::HashMap;
-use zerocopy::{byteorder::{U16, U32, I32, LittleEndian}, FromBytes};
+use zerocopy::{
+    FromBytes,
+    byteorder::{I32, LittleEndian, U16, U32},
+};
 
 /// Escher property types for Office Drawing properties
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -340,7 +343,7 @@ impl CharacterAction {
     /// Process a UTF-16LE code unit and determine the appropriate action.
     /// This replaces the previous if-else chain with a more idiomatic match expression.
     fn process_text_character(code_unit: u16) -> Self {
-            match code_unit {
+        match code_unit {
             // Null terminator - stop processing
             0 => CharacterAction::Stop,
             // Vertical tab (often used as paragraph separator) - stop processing
@@ -352,7 +355,7 @@ impl CharacterAction {
                 } else {
                     CharacterAction::Skip
                 }
-            }
+            },
             // Unicode range (0x80 and above) - try to decode as Unicode
             0x80.. => {
                 if let Some(ch) = char::from_u32(code_unit as u32) {
@@ -360,7 +363,7 @@ impl CharacterAction {
                 } else {
                     CharacterAction::Skip
                 }
-            }
+            },
         }
     }
 }
@@ -379,7 +382,9 @@ impl EscherRecord {
     /// Tuple of (parsed_record, bytes_consumed)
     pub fn parse(data: &[u8], offset: usize) -> Result<(Self, usize)> {
         if offset + 8 > data.len() {
-            return Err(PptError::Corrupted("Not enough data for Escher record header".to_string()));
+            return Err(PptError::Corrupted(
+                "Not enough data for Escher record header".to_string(),
+            ));
         }
 
         // Read record header (8 bytes) - little-endian format using zerocopy for safe parsing
@@ -395,14 +400,16 @@ impl EscherRecord {
         let version_instance = U16::<LittleEndian>::read_from_bytes(&data[offset + 6..offset + 8])
             .map(|v| v.get())
             .unwrap_or(0);
-        let version = (version_instance >> 4) & 0x0FFF;  // High 12 bits for version
-        let instance = version_instance & 0x0FFF;        // Low 12 bits for instance
+        let version = (version_instance >> 4) & 0x0FFF; // High 12 bits for version
+        let instance = version_instance & 0x0FFF; // Low 12 bits for instance
 
         let record_type_enum = EscherRecordType::from(record_type);
         let total_size = 8 + data_length as usize;
 
         if offset + total_size > data.len() {
-            return Err(PptError::Corrupted("Record extends beyond data bounds".to_string()));
+            return Err(PptError::Corrupted(
+                "Record extends beyond data bounds".to_string(),
+            ));
         }
 
         // Use slice reference where possible to avoid allocation
@@ -422,7 +429,8 @@ impl EscherRecord {
             // Estimate number of children based on data size (rough heuristic)
             let estimated_children = (data_length as usize / 32).min(100); // Assume ~32 bytes per child
             record.children = Vec::with_capacity(estimated_children);
-            record.children = Self::parse_container_children(&data[offset + 8..offset + total_size])?;
+            record.children =
+                Self::parse_container_children(&data[offset + 8..offset + total_size])?;
         }
 
         // Parse properties if this is an Options record
@@ -434,7 +442,9 @@ impl EscherRecord {
                     .unwrap_or(0);
                 let property_data = &record.data[2..];
 
-                if let Ok(mut properties) = EscherProperty::parse_properties(property_data, num_properties) {
+                if let Ok(mut properties) =
+                    EscherProperty::parse_properties(property_data, num_properties)
+                {
                     // Pre-allocate with exact size to avoid reallocations
                     record.properties = Vec::with_capacity(properties.len());
                     record.properties.append(&mut properties);
@@ -465,17 +475,24 @@ impl EscherRecord {
 
     /// Find a child record of a specific type.
     pub fn find_child(&self, record_type: EscherRecordType) -> Option<&EscherRecord> {
-        self.children.iter().find(|child| child.record_type == record_type)
+        self.children
+            .iter()
+            .find(|child| child.record_type == record_type)
     }
 
     /// Find all child records of a specific type.
     pub fn find_children(&self, record_type: EscherRecordType) -> Vec<&EscherRecord> {
-        self.children.iter().filter(|child| child.record_type == record_type).collect()
+        self.children
+            .iter()
+            .filter(|child| child.record_type == record_type)
+            .collect()
     }
 
     /// Find a property by property number.
     pub fn find_property(&self, property_number: u32) -> Option<&EscherProperty> {
-        self.properties.iter().find(|prop| prop.property_number() as u32 == property_number)
+        self.properties
+            .iter()
+            .find(|prop| prop.property_number() as u32 == property_number)
     }
 
     /// Get all properties of this record.
@@ -521,7 +538,7 @@ impl EscherRecord {
                 0x0000 => values.rotation = Some(property.data),
                 0x0001 => values.lock_aspect_ratio = Some(property.data != 0),
 
-                _ => {} // Ignore unknown properties for now
+                _ => {}, // Ignore unknown properties for now
             }
         }
 
@@ -583,8 +600,12 @@ impl EscherRecord {
 
     /// Parse shape properties record (type, ID, flags).
     /// Based on POI's EscherSpRecord parsing.
-    fn parse_shape_properties_record(shape_props: &EscherRecord, props: &mut ShapeProperties) -> Result<()> {
-        if shape_props.data.len() >= 4 { // Shape properties should have at least 4 bytes
+    fn parse_shape_properties_record(
+        shape_props: &EscherRecord,
+        props: &mut ShapeProperties,
+    ) -> Result<()> {
+        if shape_props.data.len() >= 4 {
+            // Shape properties should have at least 4 bytes
             // First 2 bytes: shape type
             let shape_type_id = U16::<LittleEndian>::read_from_bytes(&shape_props.data[0..2])
                 .map(|v| v.get())
@@ -611,7 +632,10 @@ impl EscherRecord {
     }
 
     /// Extract additional properties from various Escher records.
-    fn extract_additional_properties(record: &EscherRecord, props: &mut ShapeProperties) -> Result<()> {
+    fn extract_additional_properties(
+        record: &EscherRecord,
+        props: &mut ShapeProperties,
+    ) -> Result<()> {
         // Check if this record has properties (Options record)
         if !record.properties.is_empty() {
             let prop_values = record.extract_property_values();
@@ -689,7 +713,10 @@ impl EscherRecord {
     }
 
     /// Parse shadow properties (color, offset, blur).
-    fn parse_shadow_properties(_shadow_props: &EscherRecord, _props: &mut ShapeProperties) -> Result<()> {
+    fn parse_shadow_properties(
+        _shadow_props: &EscherRecord,
+        _props: &mut ShapeProperties,
+    ) -> Result<()> {
         // Shadow properties record contains shadow-related data
         // POI would parse this for shadow effects
         // For now, this is a placeholder implementation
@@ -712,14 +739,15 @@ impl EscherRecord {
             // POI's OEPlaceholderAtom structure (8 bytes):
             // Offset 0-3: position/placementId (4 bytes, little-endian) - i32
             // Offset 4: placeholderId (1 byte)
-            // Offset 5: size (1 byte)  
+            // Offset 5: size (1 byte)
             // Offset 6-7: unused (2 bytes)
 
             if placeholder_data.data.len() >= 8 {
                 // Position/placement ID (4 bytes)
-                let placement_id = U32::<LittleEndian>::read_from_bytes(&placeholder_data.data[0..4])
-                    .map(|v| v.get() as u16)
-                    .unwrap_or(0); // Convert to u16 for compatibility
+                let placement_id =
+                    U32::<LittleEndian>::read_from_bytes(&placeholder_data.data[0..4])
+                        .map(|v| v.get() as u16)
+                        .unwrap_or(0); // Convert to u16 for compatibility
 
                 // Placeholder ID (1 byte at offset 4)
                 let placeholder_id = placeholder_data.data[4] as u16;
@@ -756,7 +784,6 @@ impl EscherRecord {
         }
     }
 
-
     /// Parse text record data according to MS-ODRAW text record format.
     /// Based on POI's EscherTextboxWrapper and related text parsing.
     ///
@@ -777,12 +804,12 @@ impl EscherRecord {
             Err(_) => {
                 // Fallback: try simple UTF-16LE decoding for backward compatibility
                 if text_data.len() >= 2 {
-                    let start_offset = if text_data.len() >= 2 &&
-                        text_data[0] == 0xFF && text_data[1] == 0xFE {
-                        2 // Skip BOM
-                    } else {
-                        0
-                    };
+                    let start_offset =
+                        if text_data.len() >= 2 && text_data[0] == 0xFF && text_data[1] == 0xFE {
+                            2 // Skip BOM
+                        } else {
+                            0
+                        };
 
                     let mut text = String::new();
                     let mut i = start_offset;
@@ -798,7 +825,7 @@ impl EscherRecord {
                             CharacterAction::Stop => {
                                 // Stop processing, but trim any trailing nulls
                                 break;
-                            }
+                            },
                             CharacterAction::Skip => continue,
                         }
                     }
@@ -807,7 +834,7 @@ impl EscherRecord {
                 } else {
                     Ok(String::new())
                 }
-            }
+            },
         }
     }
 
@@ -879,7 +906,11 @@ impl EscherParser {
     }
 
     /// Find a record by type and instance.
-    pub fn find_record(&self, record_type: EscherRecordType, instance: u16) -> Option<&EscherRecord> {
+    pub fn find_record(
+        &self,
+        record_type: EscherRecordType,
+        instance: u16,
+    ) -> Option<&EscherRecord> {
         let key = (record_type.as_u16() as u32) << 16 | (instance as u32);
         self.records.get(&key)
     }
@@ -900,9 +931,10 @@ impl EscherParser {
 
         for record in self.records.values() {
             if matches!(record.record_type, EscherRecordType::ShapeProperties)
-                && let Ok(shape_props) = record.extract_shape_properties() {
-                    shapes.push(shape_props);
-                }
+                && let Ok(shape_props) = record.extract_shape_properties()
+            {
+                shapes.push(shape_props);
+            }
         }
 
         Ok(shapes)
@@ -941,7 +973,10 @@ mod tests {
     #[test]
     fn test_escher_record_type_conversion() {
         assert_eq!(EscherRecordType::from(0xF000), EscherRecordType::Container);
-        assert_eq!(EscherRecordType::from(0xF004), EscherRecordType::ShapeProperties);
+        assert_eq!(
+            EscherRecordType::from(0xF004),
+            EscherRecordType::ShapeProperties
+        );
         assert_eq!(EscherRecordType::from(0xF010), EscherRecordType::Transform);
         assert_eq!(EscherRecordType::from(0xF011), EscherRecordType::Text);
         assert_eq!(EscherRecordType::from(999), EscherRecordType::Container);

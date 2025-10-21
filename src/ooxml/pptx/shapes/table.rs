@@ -1,7 +1,7 @@
 /// Table shape implementation for PowerPoint presentations.
 use crate::ooxml::error::{OoxmlError, Result};
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 
 /// A table in a PowerPoint presentation.
 ///
@@ -67,7 +67,7 @@ impl Table {
                         }
                         table_xml.push(b'>');
                     }
-                }
+                },
                 Ok(Event::End(e)) => {
                     if in_table {
                         table_xml.extend_from_slice(b"</");
@@ -79,10 +79,10 @@ impl Table {
                             return Ok(Table::new(table_xml));
                         }
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_table => {
                     table_xml.extend_from_slice(e.as_ref());
-                }
+                },
                 Ok(Event::Empty(e)) if in_table => {
                     table_xml.push(b'<');
                     table_xml.extend_from_slice(e.name().as_ref());
@@ -94,15 +94,17 @@ impl Table {
                         table_xml.push(b'"');
                     }
                     table_xml.extend_from_slice(b"/>");
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
 
-        Err(OoxmlError::PartNotFound("Table not found in graphic frame".to_string()))
+        Err(OoxmlError::PartNotFound(
+            "Table not found in graphic frame".to_string(),
+        ))
     }
 
     /// Get the number of rows in the table.
@@ -120,10 +122,10 @@ impl Table {
                     if e.local_name().as_ref() == b"tr" {
                         count += 1;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -175,7 +177,7 @@ impl Table {
                         }
                         current_row_xml.push(b'>');
                     }
-                }
+                },
                 Ok(Event::End(e)) => {
                     if in_row {
                         current_row_xml.extend_from_slice(b"</");
@@ -188,10 +190,10 @@ impl Table {
                             in_row = false;
                         }
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_row => {
                     current_row_xml.extend_from_slice(e.as_ref());
-                }
+                },
                 Ok(Event::Empty(e)) if in_row => {
                     current_row_xml.push(b'<');
                     current_row_xml.extend_from_slice(e.name().as_ref());
@@ -203,10 +205,10 @@ impl Table {
                         current_row_xml.push(b'"');
                     }
                     current_row_xml.extend_from_slice(b"/>");
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -256,10 +258,10 @@ impl TableRow {
                     if e.local_name().as_ref() == b"tc" {
                         count += 1;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -299,7 +301,7 @@ impl TableRow {
                         }
                         current_cell_xml.push(b'>');
                     }
-                }
+                },
                 Ok(Event::End(e)) => {
                     if in_cell {
                         current_cell_xml.extend_from_slice(b"</");
@@ -312,10 +314,10 @@ impl TableRow {
                             in_cell = false;
                         }
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_cell => {
                     current_cell_xml.extend_from_slice(e.as_ref());
-                }
+                },
                 Ok(Event::Empty(e)) if in_cell => {
                     current_cell_xml.push(b'<');
                     current_cell_xml.extend_from_slice(e.name().as_ref());
@@ -327,10 +329,10 @@ impl TableRow {
                         current_cell_xml.push(b'"');
                     }
                     current_cell_xml.extend_from_slice(b"/>");
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -367,7 +369,7 @@ impl TableCell {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = true;
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_text_element => {
                     let t = std::str::from_utf8(e.as_ref())
                         .map_err(|e| OoxmlError::Xml(e.to_string()))?;
@@ -375,15 +377,15 @@ impl TableCell {
                         text.push(' ');
                     }
                     text.push_str(t);
-                }
+                },
                 Ok(Event::End(e)) => {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = false;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -391,4 +393,3 @@ impl TableCell {
         Ok(text.trim().to_string())
     }
 }
-

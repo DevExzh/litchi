@@ -11,5 +11,4 @@
 
 pub mod metadata_extractor;
 
-pub use metadata_extractor::{ChartMetadataExtractor, ChartMetadata};
-
+pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};

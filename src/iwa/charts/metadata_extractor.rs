@@ -25,10 +25,10 @@
 //! }
 //! ```
 
+use crate::iwa::Result;
 use crate::iwa::bundle::Bundle;
 use crate::iwa::object_index::{ObjectIndex, ResolvedObject};
 use crate::iwa::protobuf::tsch;
-use crate::iwa::Result;
 use prost::Message;
 
 /// Metadata extracted from a chart
@@ -112,8 +112,9 @@ impl<'a> ChartMetadataExtractor<'a> {
 
             for entry in chart_entries {
                 if let Some(resolved) = self.object_index.resolve_object(self.bundle, entry.id)?
-                    && let Some(metadata) = self.extract_chart_metadata(&resolved)? {
-                        charts.push(metadata);
+                    && let Some(metadata) = self.extract_chart_metadata(&resolved)?
+                {
+                    charts.push(metadata);
                 }
             }
         }
@@ -125,8 +126,9 @@ impl<'a> ChartMetadataExtractor<'a> {
     fn extract_chart_metadata(&self, object: &ResolvedObject) -> Result<Option<ChartMetadata>> {
         for msg in &object.messages {
             if (msg.type_ == 5000 || msg.type_ == 5004 || msg.type_ == 5021)
-                && let Ok(chart) = tsch::ChartArchive::decode(&*msg.data) {
-                    return Ok(Some(self.parse_chart(&chart)?));
+                && let Ok(chart) = tsch::ChartArchive::decode(&*msg.data)
+            {
+                return Ok(Some(self.parse_chart(&chart)?));
             }
         }
 
@@ -165,7 +167,7 @@ impl<'a> ChartMetadataExtractor<'a> {
     /// Convert chart type enum to string
     fn chart_type_to_string(&self, chart_type: i32) -> String {
         use crate::iwa::protobuf::tsch::ChartType;
-        
+
         match ChartType::try_from(chart_type) {
             Ok(ChartType::UndefinedChartType) => "Undefined".to_string(),
             Ok(ChartType::ColumnChartType2D) => "Column".to_string(),
@@ -200,16 +202,18 @@ impl<'a> ChartMetadataExtractor<'a> {
         // Check paragraph styles for title text
         for para_ref in &chart.paragraph_styles {
             if let Some(text) = self.extract_text_from_style_ref(para_ref.identifier)?
-                && !text.is_empty() {
-                    return Ok(Some(text));
+                && !text.is_empty()
+            {
+                return Ok(Some(text));
             }
         }
 
         // Check chart style for title references
         if let Some(ref chart_style_ref) = chart.chart_style
             && let Some(text) = self.extract_text_from_style_ref(chart_style_ref.identifier)?
-            && !text.is_empty() {
-                return Ok(Some(text));
+            && !text.is_empty()
+        {
+            return Ok(Some(text));
         }
 
         Ok(None)
@@ -238,10 +242,13 @@ impl<'a> ChartMetadataExtractor<'a> {
         if let Some(resolved) = self.object_index.resolve_object(self.bundle, storage_id)? {
             for msg in &resolved.messages {
                 // TSWP storage types
-                if msg.type_ >= 2001 && msg.type_ <= 2022
-                    && let Ok(storage) = crate::iwa::protobuf::tswp::StorageArchive::decode(&*msg.data)
-                    && !storage.text.is_empty() {
-                        return Ok(Some(storage.text.join(" ")));
+                if msg.type_ >= 2001
+                    && msg.type_ <= 2022
+                    && let Ok(storage) =
+                        crate::iwa::protobuf::tswp::StorageArchive::decode(&*msg.data)
+                    && !storage.text.is_empty()
+                {
+                    return Ok(Some(storage.text.join(" ")));
                 }
             }
         }
@@ -261,15 +268,13 @@ impl<'a> ChartMetadataExtractor<'a> {
     /// Get all chart titles in the document
     pub fn get_all_chart_titles(&self) -> Result<Vec<String>> {
         let charts = self.extract_all_charts()?;
-        Ok(charts.into_iter()
-            .filter_map(|c| c.title)
-            .collect())
+        Ok(charts.into_iter().filter_map(|c| c.title).collect())
     }
 
     /// Get total number of charts in the document
     pub fn chart_count(&self) -> Result<usize> {
         let mut count = 0;
-        
+
         for chart_type in [5000u32, 5004, 5021] {
             count += self.object_index.find_objects_by_type(chart_type).len();
         }
@@ -296,7 +301,7 @@ mod tests {
         metadata.title = Some("Sales Chart".to_string());
         metadata.row_names = vec!["Q1".to_string(), "Q2".to_string()];
         metadata.column_names = vec!["Revenue".to_string()];
-        
+
         assert!(metadata.has_content());
         let all_text = metadata.all_text();
         assert_eq!(all_text.len(), 4);
@@ -313,8 +318,7 @@ mod tests {
             chart_type: "Bar".to_string(),
             contains_default_data: false,
         };
-        
+
         assert_eq!(metadata.chart_type, "Bar");
     }
 }
-

@@ -4,10 +4,10 @@
 //! the older XLS BIFF format. Records are stored in a ZIP container
 //! and use a binary record format with variable-length encoding.
 
-use std::io::Read;
-use bytes::Bytes;
 use crate::common::binary;
 use crate::ooxml::xlsb::error::{XlsbError, XlsbResult};
+use bytes::Bytes;
+use std::io::Read;
 
 /// XLSB record header (variable length encoding)
 #[derive(Debug, Clone)]
@@ -103,7 +103,6 @@ impl<R: Read> Iterator for XlsbRecordIter<R> {
         }
     }
 }
-
 
 /// XLSB record types (matching pyxlsb2 constants)
 #[allow(dead_code)]
@@ -277,9 +276,7 @@ impl SstItemRecord {
         let mut str_len = 0;
         let string = wide_str(&data[1..], &mut str_len)?;
 
-        Ok(SstItemRecord {
-            string,
-        })
+        Ok(SstItemRecord { string })
     }
 }
 
@@ -335,7 +332,6 @@ pub struct CellRecord {
 
 impl CellRecord {
     pub fn parse(record_type: u16, data: &[u8]) -> XlsbResult<Self> {
-
         if data.len() < 6 {
             return Err(XlsbError::InvalidLength {
                 expected: 6,
@@ -356,7 +352,7 @@ impl CellRecord {
                     });
                 }
                 CellValue::Bool(data[6] != 0)
-            }
+            },
             record_types::CELL_ERROR => {
                 if data.len() < 7 {
                     return Err(XlsbError::InvalidLength {
@@ -365,7 +361,7 @@ impl CellRecord {
                     });
                 }
                 CellValue::Error(data[6])
-            }
+            },
             record_types::CELL_REAL => {
                 if data.len() < 14 {
                     return Err(XlsbError::InvalidLength {
@@ -374,12 +370,12 @@ impl CellRecord {
                     });
                 }
                 CellValue::Real(binary::read_f64_le_at(data, 6)?)
-            }
+            },
             record_types::CELL_ST => {
                 let mut str_len = 0;
                 let string = wide_str(&data[6..], &mut str_len)?;
                 CellValue::String(string.to_owned())
-            }
+            },
             record_types::CELL_ISST => {
                 if data.len() < 10 {
                     return Err(XlsbError::InvalidLength {
@@ -388,7 +384,7 @@ impl CellRecord {
                     });
                 }
                 CellValue::Isst(binary::read_u32_le_at(data, 6)?)
-            }
+            },
             record_types::CELL_RK => {
                 if data.len() < 10 {
                     return Err(XlsbError::InvalidLength {
@@ -399,7 +395,7 @@ impl CellRecord {
                 let rk_value = binary::read_u32_le_at(data, 6)?;
                 let real_value = rk_to_f64(rk_value);
                 CellValue::Real(real_value)
-            }
+            },
             _ => return Err(XlsbError::InvalidRecordType(record_type)),
         };
 

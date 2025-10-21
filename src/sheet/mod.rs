@@ -41,15 +41,15 @@
 //! - **Trait-based API**: `Workbook`, `Worksheet`, `Cell` traits for advanced use
 
 // Submodule declarations
-pub mod types;
-pub mod traits;
 pub mod functions;
 pub mod text;
-mod workbook_types;
+pub mod traits;
+pub mod types;
 mod workbook;
+mod workbook_types;
 
 // Re-exports
-pub use types::{Result, CellValue};
-pub use traits::{Cell, CellIterator, RowIterator, Worksheet, WorksheetIterator, WorkbookTrait};
-pub use workbook::Workbook;
 pub use functions::*;
+pub use traits::{Cell, CellIterator, RowIterator, WorkbookTrait, Worksheet, WorksheetIterator};
+pub use types::{CellValue, Result};
+pub use workbook::Workbook;

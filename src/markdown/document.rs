@@ -1,3 +1,6 @@
+use super::config::MarkdownOptions;
+use super::traits::ToMarkdown;
+use super::writer::MarkdownWriter;
 /// ToMarkdown implementations for Document types.
 ///
 /// This module implements the `ToMarkdown` trait for Word document types,
@@ -6,9 +9,6 @@
 /// **Note**: This module is only available when the `ole` or `ooxml` feature is enabled.
 use crate::common::Result;
 use crate::document::{Document, Paragraph, Run, Table};
-use super::config::MarkdownOptions;
-use super::traits::ToMarkdown;
-use super::writer::MarkdownWriter;
 
 impl ToMarkdown for Document {
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
@@ -65,4 +65,3 @@ impl ToMarkdown for Table {
         Ok(writer.finish().trim_end().to_string())
     }
 }
-

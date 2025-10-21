@@ -2,8 +2,8 @@ use crate::ooxml::opc::error::{OpcError, Result};
 use crate::ooxml::opc::packuri::PackURI;
 use crate::ooxml::opc::rel::Relationships;
 use memchr::memmem;
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 /// Open Packaging Convention (OPC) objects related to package parts.
 ///
 /// This module provides the Part trait and XmlPart implementation for representing
@@ -226,12 +226,12 @@ impl XmlPart {
                     if e.local_name().as_ref() == element_name_bytes {
                         in_target_element = true;
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_target_element => {
                     // Efficiently decode text without unnecessary allocation
                     let text = std::str::from_utf8(e.as_ref())?;
                     text_content.push_str(text);
-                }
+                },
                 Ok(Event::End(ref e)) => {
                     if e.local_name().as_ref() == element_name_bytes {
                         in_target_element = false;
@@ -242,10 +242,10 @@ impl XmlPart {
                             return Ok(Some(text_content));
                         }
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OpcError::XmlError(format!("XML parse error: {}", e))),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -279,10 +279,10 @@ impl XmlPart {
                         }
                         results.push(attrs);
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OpcError::XmlError(format!("XML parse error: {}", e))),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }

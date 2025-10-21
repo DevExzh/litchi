@@ -44,10 +44,7 @@ impl<'arena> FormulaBuilder<'arena> {
 
     /// Create a square root node
     pub fn sqrt(&self, base: Vec<MathNode<'arena>>) -> MathNode<'arena> {
-        MathNode::Root {
-            base,
-            index: None,
-        }
+        MathNode::Root { base, index: None }
     }
 
     /// Create an nth root node
@@ -68,10 +65,7 @@ impl<'arena> FormulaBuilder<'arena> {
         base: Vec<MathNode<'arena>>,
         exponent: Vec<MathNode<'arena>>,
     ) -> MathNode<'arena> {
-        MathNode::Power {
-            base,
-            exponent,
-        }
+        MathNode::Power { base, exponent }
     }
 
     /// Create a subscript node
@@ -80,10 +74,7 @@ impl<'arena> FormulaBuilder<'arena> {
         base: Vec<MathNode<'arena>>,
         subscript: Vec<MathNode<'arena>>,
     ) -> MathNode<'arena> {
-        MathNode::Sub {
-            base,
-            subscript,
-        }
+        MathNode::Sub { base, subscript }
     }
 }
 
@@ -96,7 +87,7 @@ mod tests {
     fn test_builder() {
         let formula = Formula::new();
         let builder = FormulaBuilder::new(formula.arena());
-        
+
         let node = builder.text("x");
         match node {
             MathNode::Text(ref text) => assert_eq!(text, "x"),
@@ -104,4 +95,3 @@ mod tests {
         }
     }
 }
-

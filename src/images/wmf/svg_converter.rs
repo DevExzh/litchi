@@ -3,9 +3,9 @@
 // Converts Windows Metafile vector graphics to SVG while extracting embedded raster images
 
 use super::parser::{WmfParser, WmfRecord};
+use crate::common::binary::read_i16_le;
 use crate::common::error::{Error, Result};
 use crate::images::svg::*;
-use crate::common::binary::read_i16_le;
 use rayon::prelude::*;
 
 /// WMF to SVG converter
@@ -252,8 +252,14 @@ impl WmfSvgConverter {
 
         // Create rounded rectangle using path with arcs
         let commands = vec![
-            PathCommand::MoveTo { x: left + rx, y: top },
-            PathCommand::LineTo { x: right - rx, y: top },
+            PathCommand::MoveTo {
+                x: left + rx,
+                y: top,
+            },
+            PathCommand::LineTo {
+                x: right - rx,
+                y: top,
+            },
             PathCommand::Arc {
                 rx,
                 ry,
@@ -263,7 +269,10 @@ impl WmfSvgConverter {
                 x: right,
                 y: top + ry,
             },
-            PathCommand::LineTo { x: right, y: bottom - ry },
+            PathCommand::LineTo {
+                x: right,
+                y: bottom - ry,
+            },
             PathCommand::Arc {
                 rx,
                 ry,
@@ -273,7 +282,10 @@ impl WmfSvgConverter {
                 x: right - rx,
                 y: bottom,
             },
-            PathCommand::LineTo { x: left + rx, y: bottom },
+            PathCommand::LineTo {
+                x: left + rx,
+                y: bottom,
+            },
             PathCommand::Arc {
                 rx,
                 ry,
@@ -283,7 +295,10 @@ impl WmfSvgConverter {
                 x: left,
                 y: bottom - ry,
             },
-            PathCommand::LineTo { x: left, y: top + ry },
+            PathCommand::LineTo {
+                x: left,
+                y: top + ry,
+            },
             PathCommand::Arc {
                 rx,
                 ry,
@@ -386,11 +401,7 @@ impl WmfSvgConverter {
             let height = read_i16_le(&record.params, 10).unwrap_or(0) as f64;
 
             return Ok(Some(SvgElement::Image(SvgImage::from_png_data(
-                dest_x,
-                dest_y,
-                width,
-                height,
-                &png_data,
+                dest_x, dest_y, width, height, &png_data,
             ))));
         }
 
@@ -435,4 +446,3 @@ mod tests {
         // Placeholder for future tests
     }
 }
-

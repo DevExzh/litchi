@@ -44,10 +44,10 @@ pub const XF_LSPACE: u8 = 0x04;
 pub const XF_LMOVE: u8 = 0x08;
 
 /// Math attribute constants for character set handling
-pub const MA_TEXT: i32 = 0;        // Text mode
-pub const MA_MATH: i32 = 1;        // Math mode
-pub const MA_FORCE_TEXT: i32 = 2;  // Force text mode
-pub const MA_FORCE_MATH: i32 = 3;  // Force math mode
+pub const MA_TEXT: i32 = 0; // Text mode
+pub const MA_MATH: i32 = 1; // Math mode
+pub const MA_FORCE_TEXT: i32 = 2; // Force text mode
+pub const MA_FORCE_MATH: i32 = 3; // Force math mode
 
 /// Number of typeface slots in MTEF
 pub const NUM_TYPEFACE_SLOTS: usize = 32;
@@ -56,4 +56,3 @@ pub const NUM_TYPEFACE_SLOTS: usize = 32;
 pub const EQN_MODE_TEXT: i32 = 0;
 pub const EQN_MODE_INLINE: i32 = 1;
 pub const EQN_MODE_DISPLAY: i32 = 2;
-

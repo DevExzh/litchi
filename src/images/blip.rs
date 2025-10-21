@@ -8,8 +8,8 @@
 // - [MS-ODRAW] 2.2.23: OfficeArtBlip records
 // - https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-odraw/5dc1b9ed-818c-436f-8a4f-905a7ebb1ba9
 
-use crate::common::error::Result;
 use crate::common::binary::{read_u16_le, read_u32_le};
+use crate::common::error::Result;
 use std::io::Read;
 use zerocopy::FromBytes;
 
@@ -220,8 +220,10 @@ impl MetafileBlip {
             ));
         }
 
-        let metadata = RawMetafileMetadata::read_from_bytes(&data[offset..offset + 34])
-            .map_err(|_| crate::common::error::Error::ParseError("Invalid metafile metadata format".into()))?;
+        let metadata =
+            RawMetafileMetadata::read_from_bytes(&data[offset..offset + 34]).map_err(|_| {
+                crate::common::error::Error::ParseError("Invalid metafile metadata format".into())
+            })?;
         offset += 34;
 
         // Extract picture data
@@ -280,9 +282,9 @@ impl MetafileBlip {
         let mut decoder = flate2::read::DeflateDecoder::new(&self.picture_data[..]);
         let mut decompressed = Vec::with_capacity(self.uncompressed_size as usize);
 
-        decoder
-            .read_to_end(&mut decompressed)
-            .map_err(|e| crate::common::error::Error::ParseError(format!("Decompression failed: {}", e)))?;
+        decoder.read_to_end(&mut decompressed).map_err(|e| {
+            crate::common::error::Error::ParseError(format!("Decompression failed: {}", e))
+        })?;
 
         Ok(decompressed)
     }
@@ -389,21 +391,20 @@ impl Blip {
         }
 
         let header = RecordHeader::parse(data)?;
-        let blip_type = BlipType::from_record_id(header.record_type)
-            .ok_or_else(|| {
-                crate::common::error::Error::ParseError(format!(
-                    "Unknown BLIP record type: 0x{:04X}",
-                    header.record_type
-                ))
-            })?;
+        let blip_type = BlipType::from_record_id(header.record_type).ok_or_else(|| {
+            crate::common::error::Error::ParseError(format!(
+                "Unknown BLIP record type: 0x{:04X}",
+                header.record_type
+            ))
+        })?;
 
         match blip_type {
             BlipType::Emf | BlipType::Wmf | BlipType::Pict => {
                 Ok(Self::Metafile(MetafileBlip::parse(data)?))
-            }
+            },
             BlipType::Jpeg | BlipType::Png | BlipType::Dib | BlipType::Tiff => {
                 Ok(Self::Bitmap(BitmapBlip::parse(data)?))
-            }
+            },
         }
     }
 
@@ -456,4 +457,3 @@ mod tests {
         assert_eq!(BlipType::Png.extension(), "png");
     }
 }
-

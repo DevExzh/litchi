@@ -5,7 +5,7 @@
 
 /// Vertical text position (superscript/subscript).
 ///
-/// Used to represent vertical alignment of text in both OLE (.doc) 
+/// Used to represent vertical alignment of text in both OLE (.doc)
 /// and OOXML (.docx) formats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VerticalPosition {
@@ -37,4 +37,3 @@ impl VerticalPosition {
         matches!(self, VerticalPosition::Subscript)
     }
 }
-

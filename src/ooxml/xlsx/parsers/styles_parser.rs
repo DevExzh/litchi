@@ -5,8 +5,8 @@
 
 use std::collections::HashMap;
 
+use crate::ooxml::xlsx::styles::{Border, CellStyle, Fill, Font, NumberFormat, Styles};
 use crate::sheet::Result;
-use crate::ooxml::xlsx::styles::{Styles, NumberFormat, Font, Fill, Border, CellStyle};
 
 /// Parse styles.xml content to extract style information.
 pub fn parse_styles_xml(content: &str) -> Result<Styles> {
@@ -14,51 +14,61 @@ pub fn parse_styles_xml(content: &str) -> Result<Styles> {
 
     // Parse number formats
     if let Some(num_fmts_start) = content.find("<numFmts")
-        && let Some(num_fmts_end) = content[num_fmts_start..].find("</numFmts>") {
-            let num_fmts_content = &content[num_fmts_start..num_fmts_start + num_fmts_end];
-            parse_number_formats(num_fmts_content, &mut styles.number_formats)?;
-        }
+        && let Some(num_fmts_end) = content[num_fmts_start..].find("</numFmts>")
+    {
+        let num_fmts_content = &content[num_fmts_start..num_fmts_start + num_fmts_end];
+        parse_number_formats(num_fmts_content, &mut styles.number_formats)?;
+    }
 
     // Parse fonts
     if let Some(fonts_start) = content.find("<fonts")
-        && let Some(fonts_end) = content[fonts_start..].find("</fonts>") {
-            let fonts_content = &content[fonts_start..fonts_start + fonts_end];
-            styles.fonts = parse_fonts(fonts_content)?;
-        }
+        && let Some(fonts_end) = content[fonts_start..].find("</fonts>")
+    {
+        let fonts_content = &content[fonts_start..fonts_start + fonts_end];
+        styles.fonts = parse_fonts(fonts_content)?;
+    }
 
     // Parse fills
     if let Some(fills_start) = content.find("<fills")
-        && let Some(fills_end) = content[fills_start..].find("</fills>") {
-            let fills_content = &content[fills_start..fills_start + fills_end];
-            styles.fills = parse_fills(fills_content)?;
-        }
+        && let Some(fills_end) = content[fills_start..].find("</fills>")
+    {
+        let fills_content = &content[fills_start..fills_start + fills_end];
+        styles.fills = parse_fills(fills_content)?;
+    }
 
     // Parse borders
     if let Some(borders_start) = content.find("<borders")
-        && let Some(borders_end) = content[borders_start..].find("</borders>") {
-            let borders_content = &content[borders_start..borders_start + borders_end];
-            styles.borders = parse_borders(borders_content)?;
-        }
+        && let Some(borders_end) = content[borders_start..].find("</borders>")
+    {
+        let borders_content = &content[borders_start..borders_start + borders_end];
+        styles.borders = parse_borders(borders_content)?;
+    }
 
     // Parse cell style formats
     if let Some(cell_style_xfs_start) = content.find("<cellStyleXfs")
-        && let Some(cell_style_xfs_end) = content[cell_style_xfs_start..].find("</cellStyleXfs>") {
-            let cell_style_xfs_content = &content[cell_style_xfs_start..cell_style_xfs_start + cell_style_xfs_end];
-            styles.cell_styles = parse_cell_styles(cell_style_xfs_content)?;
-        }
+        && let Some(cell_style_xfs_end) = content[cell_style_xfs_start..].find("</cellStyleXfs>")
+    {
+        let cell_style_xfs_content =
+            &content[cell_style_xfs_start..cell_style_xfs_start + cell_style_xfs_end];
+        styles.cell_styles = parse_cell_styles(cell_style_xfs_content)?;
+    }
 
     // Parse cell XFs
     if let Some(cell_xfs_start) = content.find("<cellXfs")
-        && let Some(cell_xfs_end) = content[cell_xfs_start..].find("</cellXfs>") {
-            let cell_xfs_content = &content[cell_xfs_start..cell_xfs_start + cell_xfs_end];
-            styles.cell_xfs = parse_cell_xfs(cell_xfs_content)?;
-        }
+        && let Some(cell_xfs_end) = content[cell_xfs_start..].find("</cellXfs>")
+    {
+        let cell_xfs_content = &content[cell_xfs_start..cell_xfs_start + cell_xfs_end];
+        styles.cell_xfs = parse_cell_xfs(cell_xfs_content)?;
+    }
 
     Ok(styles)
 }
 
 /// Parse number formats section.
-fn parse_number_formats(content: &str, number_formats: &mut HashMap<u32, NumberFormat>) -> Result<()> {
+fn parse_number_formats(
+    content: &str,
+    number_formats: &mut HashMap<u32, NumberFormat>,
+) -> Result<()> {
     let mut pos = 0;
     while let Some(num_fmt_start) = content[pos..].find("<numFmt ") {
         let num_fmt_start_pos = pos + num_fmt_start;
@@ -91,7 +101,9 @@ fn parse_number_format(num_fmt_xml: &str) -> Result<Option<NumberFormat>> {
 
     let code = if let Some(code_start) = num_fmt_xml.find("formatCode=\"") {
         let code_content = &num_fmt_xml[code_start + 12..];
-        code_content.find('"').map(|quote_pos| code_content[..quote_pos].to_string())
+        code_content
+            .find('"')
+            .map(|quote_pos| code_content[..quote_pos].to_string())
     } else {
         None
     };
@@ -137,9 +149,10 @@ fn parse_font(font_xml: &str) -> Font {
     if let Some(sz_start) = font_xml.find("<sz val=\"") {
         let sz_content = &font_xml[sz_start + 9..];
         if let Some(quote_pos) = sz_content.find('"')
-            && let Ok(size) = sz_content[..quote_pos].parse::<f64>() {
-                font.size = Some(size);
-            }
+            && let Ok(size) = sz_content[..quote_pos].parse::<f64>()
+        {
+            font.size = Some(size);
+        }
     }
 
     // Parse bold
@@ -330,14 +343,19 @@ fn parse_cell_style(xf_xml: &str) -> Result<Option<CellStyle>> {
 }
 
 /// Helper function to parse border style.
-fn parse_border_style(border_xml: &str, side: &str) -> Option<crate::ooxml::xlsx::styles::BorderStyle> {
+fn parse_border_style(
+    border_xml: &str,
+    side: &str,
+) -> Option<crate::ooxml::xlsx::styles::BorderStyle> {
     let side_tag = format!("<{}>", side);
     if let Some(side_start) = border_xml.find(&side_tag) {
         let side_content = &border_xml[side_start..];
 
         let style = if let Some(style_start) = side_content.find("style=\"") {
             let style_content = &side_content[style_start + 7..];
-            style_content.find('"').map(|quote_pos| style_content[..quote_pos].to_string())
+            style_content
+                .find('"')
+                .map(|quote_pos| style_content[..quote_pos].to_string())
         } else {
             None
         };

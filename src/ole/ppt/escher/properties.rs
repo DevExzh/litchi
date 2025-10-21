@@ -3,9 +3,9 @@
 //! Properties control shape appearance: position, size, colors, rotation, etc.
 //! Based on MS-ODRAW specification section 2.3.
 
+use super::container::EscherContainer;
 use super::record::EscherRecord;
 use super::types::EscherRecordType;
-use super::container::EscherContainer;
 use std::collections::HashMap;
 
 /// Escher shape property IDs (from MS-ODRAW).
@@ -15,7 +15,7 @@ pub enum EscherPropertyId {
     // Transform properties
     /// Rotation angle (16.16 fixed point degrees)
     Rotation = 0x0004,
-    
+
     // Geometry properties
     /// Left coordinate
     Left = 0x0082,
@@ -25,7 +25,7 @@ pub enum EscherPropertyId {
     Right = 0x0084,
     /// Bottom coordinate
     Bottom = 0x0085,
-    
+
     // Fill properties
     /// Fill color
     FillColor = 0x0181,
@@ -33,7 +33,7 @@ pub enum EscherPropertyId {
     FillType = 0x0182,
     /// Fill opacity
     FillOpacity = 0x0183,
-    
+
     // Line properties
     /// Line color
     LineColor = 0x01C0,
@@ -41,7 +41,7 @@ pub enum EscherPropertyId {
     LineWidth = 0x01CB,
     /// Line style
     LineStyle = 0x01C9,
-    
+
     // Text properties
     /// Text ID (reference to text)
     TextId = 0x0080,
@@ -53,19 +53,19 @@ pub enum EscherPropertyId {
     TextRightMargin = 0x0067,
     /// Text bottom margin
     TextBottomMargin = 0x0068,
-    
+
     // Picture properties
     /// Blip (picture) reference
     PictureId = 0x0104,
     /// Picture file name
     PictureName = 0x0105,
-    
+
     // Protection properties
     /// Lock rotation
     LockRotation = 0x0077,
     /// Lock aspect ratio
     LockAspectRatio = 0x0078,
-    
+
     /// Unknown property
     Unknown = 0xFFFF,
 }
@@ -130,7 +130,7 @@ impl EscherProperties {
             properties: HashMap::new(),
         }
     }
-    
+
     /// Parse properties from Escher Opt record.
     ///
     /// # Performance
@@ -140,18 +140,18 @@ impl EscherProperties {
     /// - Efficient bit manipulation
     pub fn from_opt_record(opt: &EscherRecord) -> Self {
         let mut properties = HashMap::with_capacity(opt.instance as usize);
-        
+
         if opt.data.len() < 6 {
             return Self { properties };
         }
-        
+
         // Each property is 6 bytes: 2 bytes ID + 4 bytes value
         let mut offset = 0;
         while offset + 6 <= opt.data.len() {
             let prop_id_raw = u16::from_le_bytes([opt.data[offset], opt.data[offset + 1]]);
             let prop_id = EscherPropertyId::from(prop_id_raw & 0x3FFF); // Lower 14 bits
             let is_complex = (prop_id_raw & 0x8000) != 0; // Bit 15
-            
+
             let value_bytes = [
                 opt.data[offset + 2],
                 opt.data[offset + 3],
@@ -159,7 +159,7 @@ impl EscherProperties {
                 opt.data[offset + 5],
             ];
             let value = i32::from_le_bytes(value_bytes);
-            
+
             let prop_value = if is_complex {
                 // Complex property - value is length, data follows
                 EscherPropertyValue::Binary(Vec::new()) // TODO: Parse complex data
@@ -167,14 +167,14 @@ impl EscherProperties {
                 // Simple property - value is the data
                 EscherPropertyValue::Integer(value)
             };
-            
+
             properties.insert(prop_id, prop_value);
             offset += 6;
         }
-        
+
         Self { properties }
     }
-    
+
     /// Parse properties from a container by finding Opt record.
     pub fn from_container(container: &EscherContainer) -> Self {
         if let Some(opt) = container.find_child(EscherRecordType::Opt) {
@@ -183,7 +183,7 @@ impl EscherProperties {
             Self::new()
         }
     }
-    
+
     /// Get integer property value.
     #[inline]
     pub fn get_int(&self, id: EscherPropertyId) -> Option<i32> {
@@ -192,13 +192,13 @@ impl EscherProperties {
             _ => None,
         }
     }
-    
+
     /// Get color property value (RGB).
     #[inline]
     pub fn get_color(&self, id: EscherPropertyId) -> Option<u32> {
         self.get_int(id).map(|v| v as u32)
     }
-    
+
     /// Get boolean property value.
     #[inline]
     pub fn get_bool(&self, id: EscherPropertyId) -> Option<bool> {
@@ -208,7 +208,7 @@ impl EscherProperties {
             _ => None,
         }
     }
-    
+
     /// Get binary property value.
     #[inline]
     pub fn get_binary(&self, id: EscherPropertyId) -> Option<&[u8]> {
@@ -217,7 +217,7 @@ impl EscherProperties {
             _ => None,
         }
     }
-    
+
     /// Check if property exists.
     #[inline]
     pub fn has(&self, id: EscherPropertyId) -> bool {
@@ -253,43 +253,60 @@ impl ShapeAnchor {
     /// Create anchor from coordinates.
     #[inline]
     pub const fn new(left: i32, top: i32, right: i32, bottom: i32) -> Self {
-        Self { left, top, right, bottom }
+        Self {
+            left,
+            top,
+            right,
+            bottom,
+        }
     }
-    
+
     /// Get width.
     #[inline]
     pub const fn width(&self) -> i32 {
         self.right - self.left
     }
-    
+
     /// Get height.
     #[inline]
     pub const fn height(&self) -> i32 {
         self.bottom - self.top
     }
-    
+
     /// Parse from ChildAnchor record.
     pub fn from_child_anchor(anchor: &EscherRecord) -> Option<Self> {
         if anchor.data.len() < 16 {
             return None;
         }
-        
+
         let left = i32::from_le_bytes([
-            anchor.data[0], anchor.data[1], anchor.data[2], anchor.data[3]
+            anchor.data[0],
+            anchor.data[1],
+            anchor.data[2],
+            anchor.data[3],
         ]);
         let top = i32::from_le_bytes([
-            anchor.data[4], anchor.data[5], anchor.data[6], anchor.data[7]
+            anchor.data[4],
+            anchor.data[5],
+            anchor.data[6],
+            anchor.data[7],
         ]);
         let right = i32::from_le_bytes([
-            anchor.data[8], anchor.data[9], anchor.data[10], anchor.data[11]
+            anchor.data[8],
+            anchor.data[9],
+            anchor.data[10],
+            anchor.data[11],
         ]);
         let bottom = i32::from_le_bytes([
-            anchor.data[12], anchor.data[13], anchor.data[14], anchor.data[15]
+            anchor.data[12],
+            anchor.data[13],
+            anchor.data[14],
+            anchor.data[15],
         ]);
-        
+
         Some(Self::new(left, top, right, bottom))
     }
-    
+
     /// Parse from ClientAnchor record.
     pub fn from_client_anchor(anchor: &EscherRecord) -> Option<Self> {
         // ClientAnchor has same format as ChildAnchor
@@ -300,7 +317,7 @@ impl ShapeAnchor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_anchor_dimensions() {
         let anchor = ShapeAnchor::new(100, 200, 500, 600);
@@ -308,4 +325,3 @@ mod tests {
         assert_eq!(anchor.height(), 400);
     }
 }
-

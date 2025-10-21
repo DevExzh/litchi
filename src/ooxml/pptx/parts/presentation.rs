@@ -3,8 +3,8 @@
 /// Corresponds to `/ppt/presentation.xml` in the package.
 use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::opc::part::Part;
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 
 /// The main presentation part.
 ///
@@ -67,10 +67,10 @@ impl<'a> PresentationPart<'a> {
                     if e.local_name().as_ref() == b"sldId" {
                         count += 1;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -103,17 +103,16 @@ impl<'a> PresentationPart<'a> {
                             if attr.key.as_ref() == b"cx" {
                                 let value = std::str::from_utf8(&attr.value)
                                     .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                                return value
-                                    .parse::<i64>()
-                                    .map(Some)
-                                    .map_err(|e| OoxmlError::Xml(format!("Invalid slide width: {}", e)));
+                                return value.parse::<i64>().map(Some).map_err(|e| {
+                                    OoxmlError::Xml(format!("Invalid slide width: {}", e))
+                                });
                             }
                         }
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -146,17 +145,16 @@ impl<'a> PresentationPart<'a> {
                             if attr.key.as_ref() == b"cy" {
                                 let value = std::str::from_utf8(&attr.value)
                                     .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                                return value
-                                    .parse::<i64>()
-                                    .map(Some)
-                                    .map_err(|e| OoxmlError::Xml(format!("Invalid slide height: {}", e)));
+                                return value.parse::<i64>().map(Some).map_err(|e| {
+                                    OoxmlError::Xml(format!("Invalid slide height: {}", e))
+                                });
                             }
                         }
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -192,9 +190,11 @@ impl<'a> PresentationPart<'a> {
                             // Look for r:id attribute (can be r:id or just id with relationships namespace)
                             let key = attr.key.as_ref();
                             // Check if this is the relationship ID attribute
-                            if key == b"r:id" || 
-                               (key.starts_with(b"r:") && attr.key.local_name().as_ref() == b"id") ||
-                               attr.key.local_name().as_ref() == b"id" {
+                            if key == b"r:id"
+                                || (key.starts_with(b"r:")
+                                    && attr.key.local_name().as_ref() == b"id")
+                                || attr.key.local_name().as_ref() == b"id"
+                            {
                                 let rid = std::str::from_utf8(&attr.value)
                                     .map_err(|e| OoxmlError::Xml(e.to_string()))?;
                                 // Only push if it looks like a relationship ID (starts with "rId")
@@ -205,10 +205,10 @@ impl<'a> PresentationPart<'a> {
                             }
                         }
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -238,9 +238,11 @@ impl<'a> PresentationPart<'a> {
                             // Look for r:id attribute (can be r:id or just id with relationships namespace)
                             let key = attr.key.as_ref();
                             // Check if this is the relationship ID attribute
-                            if key == b"r:id" || 
-                               (key.starts_with(b"r:") && attr.key.local_name().as_ref() == b"id") ||
-                               attr.key.local_name().as_ref() == b"id" {
+                            if key == b"r:id"
+                                || (key.starts_with(b"r:")
+                                    && attr.key.local_name().as_ref() == b"id")
+                                || attr.key.local_name().as_ref() == b"id"
+                            {
                                 let rid = std::str::from_utf8(&attr.value)
                                     .map_err(|e| OoxmlError::Xml(e.to_string()))?;
                                 // Only push if it looks like a relationship ID (starts with "rId")
@@ -251,10 +253,10 @@ impl<'a> PresentationPart<'a> {
                             }
                         }
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -268,4 +270,3 @@ impl<'a> PresentationPart<'a> {
         self.part
     }
 }
-

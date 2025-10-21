@@ -75,7 +75,7 @@ impl Run {
     #[cfg(any(feature = "ole", feature = "ooxml", feature = "iwa"))]
     pub fn vertical_position(&self) -> Result<Option<crate::common::VerticalPosition>> {
         use crate::common::VerticalPosition;
-        
+
         match self {
             #[cfg(feature = "ole")]
             Run::Doc(r) => {
@@ -84,19 +84,20 @@ impl Run {
                     pos => Some(pos),
                 };
                 Ok(pos)
-            }
+            },
             #[cfg(feature = "ooxml")]
             Run::Docx(r) => {
                 use crate::ooxml::docx::paragraph::VerticalPosition as OoxmlVerticalPosition;
                 match r.vertical_position().map_err(Error::from)? {
-                    Some(OoxmlVerticalPosition::Superscript) => Ok(Some(VerticalPosition::Superscript)),
+                    Some(OoxmlVerticalPosition::Superscript) => {
+                        Ok(Some(VerticalPosition::Superscript))
+                    },
                     Some(OoxmlVerticalPosition::Subscript) => Ok(Some(VerticalPosition::Subscript)),
                     Some(OoxmlVerticalPosition::Normal) | None => Ok(None),
                 }
-            }
+            },
             #[cfg(feature = "iwa")]
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
         }
     }
 }
-

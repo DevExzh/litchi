@@ -128,16 +128,16 @@
 //! - `iWorkFileFormat` - Reverse-engineered format documentation
 
 // Core parsing modules
-pub mod snappy;
-pub mod varint;
 pub mod archive;
 pub mod bundle;
-pub mod registry;
-pub mod object_index;
-pub mod ref_graph;
-pub mod protobuf;
 pub mod media;
+pub mod object_index;
+pub mod protobuf;
+pub mod ref_graph;
+pub mod registry;
+pub mod snappy;
 pub mod structured;
+pub mod varint;
 
 /// Shared text extraction utilities
 pub mod text;
@@ -145,24 +145,24 @@ pub mod text;
 /// High-level iWork document types
 pub mod document;
 
+pub mod keynote;
+pub mod numbers;
 /// Application-specific modules
 pub mod pages;
-pub mod numbers;
-pub mod keynote;
 
+pub mod charts;
 /// Cross-application content extractors
 pub mod shapes;
-pub mod charts;
 
 /// Re-export commonly used types
 pub use archive::{ArchiveInfo, MessageInfo};
 pub use bundle::{Bundle, BundleMetadata, PropertyValue};
 pub use document::Document;
-pub use snappy::SnappyStream;
-pub use media::{MediaManager, MediaAsset, MediaType, MediaStats};
-pub use structured::{Table, Slide, Section, StructuredData, CellValue};
-pub use text::{TextExtractor, TextStorage, TextFragment, TextStyle, ParagraphStyle};
+pub use media::{MediaAsset, MediaManager, MediaStats, MediaType};
 pub use ref_graph::ReferenceGraph;
+pub use snappy::SnappyStream;
+pub use structured::{CellValue, Section, Slide, StructuredData, Table};
+pub use text::{ParagraphStyle, TextExtractor, TextFragment, TextStorage, TextStyle};
 
 /// Error types for iWork parsing
 #[derive(Debug, thiserror::Error)]

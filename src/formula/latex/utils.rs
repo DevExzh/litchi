@@ -25,10 +25,10 @@ pub fn is_valid_number_fast(s: &str) -> bool {
                     return false; // Multiple dots
                 }
                 has_dot = true;
-            }
+            },
             b'-' if bytes.len() == 1 => return false, // Just a minus sign
-            b'-' => {} // Allow negative numbers at start
-            _ => return false, // Invalid character
+            b'-' => {},                               // Allow negative numbers at start
+            _ => return false,                        // Invalid character
         }
     }
 
@@ -69,7 +69,7 @@ pub fn escape_latex_special_chars(text: &str, buffer: &mut String) -> bool {
             ' ' | '#' | '$' | '%' | '&' | '_' | '{' | '}' | '~' | '^' | '\\' => {
                 buffer.push('\\');
                 buffer.push(ch);
-            }
+            },
             _ => buffer.push(ch),
         }
     }

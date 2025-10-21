@@ -62,7 +62,8 @@ impl Cell {
             col_num = col_num * 26 + (ch.to_ascii_uppercase() as u32 - 'A' as u32 + 1);
         }
 
-        let row_num = row_str.parse::<u32>()
+        let row_num = row_str
+            .parse::<u32>()
             .map_err(|_| format!("Invalid row number in reference: {}", reference))?;
 
         Ok((col_num, row_num))

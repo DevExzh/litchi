@@ -1,9 +1,9 @@
+use super::super::consts::PptRecordType;
 /// TextRun parsing for PowerPoint presentations.
 ///
 /// Based on Apache POI's HSLF TextRun and related classes, this module
 /// provides proper text extraction with formatting from PPT files.
 use super::package::Result;
-use super::super::consts::PptRecordType;
 use super::records::PptRecord;
 use crate::common::binary::{parse_utf16le_string, parse_windows1252_string_len};
 
@@ -73,7 +73,11 @@ impl TextRun {
     }
 
     /// Create a text run with formatting.
-    pub fn with_formatting(text: String, start_index: usize, formatting: TextRunFormatting) -> Self {
+    pub fn with_formatting(
+        text: String,
+        start_index: usize,
+        formatting: TextRunFormatting,
+    ) -> Self {
         let length = text.chars().count();
         Self {
             text,
@@ -101,7 +105,7 @@ impl TextRun {
             mtef_formula_ast: Some(mtef_ast),
         }
     }
-    
+
     /// Create a text run with MTEF formula AST fallback (when formula feature is disabled).
     #[cfg(not(feature = "formula"))]
     pub fn with_mtef_formula(
@@ -135,7 +139,7 @@ impl TextRun {
     pub fn mtef_formula_ast(&self) -> Option<&Vec<crate::formula::MathNode<'static>>> {
         self.mtef_formula_ast.as_ref()
     }
-    
+
     #[cfg(not(feature = "formula"))]
     pub fn mtef_formula_ast(&self) -> Option<&Vec<()>> {
         self.mtef_formula_ast.as_ref()
@@ -148,7 +152,7 @@ impl TextRun {
     pub fn mtef_formula_ast_mut(&mut self) -> &mut Option<Vec<crate::formula::MathNode<'static>>> {
         &mut self.mtef_formula_ast
     }
-    
+
     #[cfg(not(feature = "formula"))]
     pub fn mtef_formula_ast_mut(&mut self) -> &mut Option<Vec<()>> {
         &mut self.mtef_formula_ast
@@ -199,7 +203,7 @@ impl TextRunExtractor {
                     self.text.push_str(&text);
                     self.runs.push(TextRun::new(text, start_index));
                 }
-            }
+            },
             PptRecordType::TextBytesAtom => {
                 // Windows-1252 text
                 let text = parse_windows1252_string_len(&record.data, 0, record.data.len());
@@ -208,17 +212,17 @@ impl TextRunExtractor {
                     self.text.push_str(&text);
                     self.runs.push(TextRun::new(text, start_index));
                 }
-            }
+            },
             PptRecordType::StyleTextPropAtom => {
                 // Text formatting properties
                 self.apply_style_properties(record)?;
-            }
+            },
             _ => {
                 // Recursively process child records
                 for child in &record.children {
                     self.process_record(child)?;
                 }
-            }
+            },
         }
 
         Ok(())
@@ -233,10 +237,8 @@ impl TextRunExtractor {
         }
 
         // Parse the StyleTextPropAtom using POI's logic
-        let (_paragraph_styles, character_styles) = super::text_prop::parse_style_text_prop_atom(
-            &record.data,
-            self.text.chars().count(),
-        );
+        let (_paragraph_styles, character_styles) =
+            super::text_prop::parse_style_text_prop_atom(&record.data, self.text.chars().count());
 
         // Apply character styles to runs
         for (style_idx, char_style) in character_styles.iter().enumerate() {
@@ -335,4 +337,3 @@ mod tests {
         assert_eq!(extractor.run_count(), 1);
     }
 }
-

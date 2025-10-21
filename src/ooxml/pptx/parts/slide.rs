@@ -4,8 +4,8 @@
 use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::opc::part::Part;
 use crate::ooxml::pptx::shapes::base::{BaseShape, ShapeType};
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 
 /// A slide part.
 ///
@@ -48,10 +48,10 @@ impl<'a> SlidePart<'a> {
                             }
                         }
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -77,7 +77,7 @@ impl<'a> SlidePart<'a> {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = true;
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_text_element => {
                     // Extract text content
                     let t = std::str::from_utf8(e.as_ref())
@@ -86,15 +86,15 @@ impl<'a> SlidePart<'a> {
                         text.push('\n');
                     }
                     text.push_str(t);
-                }
+                },
                 Ok(Event::End(e)) => {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = false;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -125,14 +125,14 @@ impl<'a> SlidePart<'a> {
                 Ok(Event::Start(ref e)) => {
                     let local_name = e.local_name();
                     let tag_name_bytes = local_name.as_ref();
-                    
+
                     // Extract individual shape elements
                     let shape_type = match tag_name_bytes {
-                        b"sp" => Some(ShapeType::Shape),         // Text shape
-                        b"pic" => Some(ShapeType::Picture),      // Picture
+                        b"sp" => Some(ShapeType::Shape),                  // Text shape
+                        b"pic" => Some(ShapeType::Picture),               // Picture
                         b"graphicFrame" => Some(ShapeType::GraphicFrame), // Table/Chart
-                        b"grpSp" => Some(ShapeType::GroupShape), // Group
-                        b"cxnSp" => Some(ShapeType::Connector),  // Connector
+                        b"grpSp" => Some(ShapeType::GroupShape),          // Group
+                        b"cxnSp" => Some(ShapeType::Connector),           // Connector
                         _ => None,
                     };
 
@@ -140,14 +140,16 @@ impl<'a> SlidePart<'a> {
                         // Create a new buffer for extracting shape XML
                         let mut shape_buf = Vec::new();
                         // Extract the complete shape XML
-                        if let Ok(shape_xml) = Self::extract_shape_xml(&mut reader, tag_name_bytes, &mut shape_buf) {
+                        if let Ok(shape_xml) =
+                            Self::extract_shape_xml(&mut reader, tag_name_bytes, &mut shape_buf)
+                        {
                             shapes.push(BaseShape::new(shape_xml, st));
                         }
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(_) => break,
-                _ => {}
+                _ => {},
             }
         }
 
@@ -155,7 +157,11 @@ impl<'a> SlidePart<'a> {
     }
 
     /// Helper to extract complete shape XML.
-    fn extract_shape_xml(reader: &mut Reader<&[u8]>, tag_name: &[u8], buf: &mut Vec<u8>) -> Result<Vec<u8>> {
+    fn extract_shape_xml(
+        reader: &mut Reader<&[u8]>,
+        tag_name: &[u8],
+        buf: &mut Vec<u8>,
+    ) -> Result<Vec<u8>> {
         let mut shape_xml = Vec::new();
         let mut depth = 1;
 
@@ -179,20 +185,20 @@ impl<'a> SlidePart<'a> {
                         shape_xml.push(b'"');
                     }
                     shape_xml.push(b'>');
-                }
+                },
                 Ok(Event::End(e)) => {
                     shape_xml.extend_from_slice(b"</");
                     shape_xml.extend_from_slice(e.name().as_ref());
                     shape_xml.push(b'>');
-                    
+
                     depth -= 1;
                     if depth == 0 {
                         return Ok(shape_xml);
                     }
-                }
+                },
                 Ok(Event::Text(e)) => {
                     shape_xml.extend_from_slice(e.as_ref());
-                }
+                },
                 Ok(Event::Empty(e)) => {
                     shape_xml.push(b'<');
                     shape_xml.extend_from_slice(e.name().as_ref());
@@ -204,10 +210,10 @@ impl<'a> SlidePart<'a> {
                         shape_xml.push(b'"');
                     }
                     shape_xml.extend_from_slice(b"/>");
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
         }
 
@@ -254,10 +260,10 @@ impl<'a> SlideLayoutPart<'a> {
                             }
                         }
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -311,10 +317,10 @@ impl<'a> SlideMasterPart<'a> {
                             }
                         }
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -338,9 +344,11 @@ impl<'a> SlideMasterPart<'a> {
                             // Look for r:id attribute (can be r:id or just id with relationships namespace)
                             let key = attr.key.as_ref();
                             // Check if this is the relationship ID attribute
-                            if key == b"r:id" || 
-                               (key.starts_with(b"r:") && attr.key.local_name().as_ref() == b"id") ||
-                               attr.key.local_name().as_ref() == b"id" {
+                            if key == b"r:id"
+                                || (key.starts_with(b"r:")
+                                    && attr.key.local_name().as_ref() == b"id")
+                                || attr.key.local_name().as_ref() == b"id"
+                            {
                                 let rid = std::str::from_utf8(&attr.value)
                                     .map_err(|e| OoxmlError::Xml(e.to_string()))?;
                                 // Only push if it looks like a relationship ID (starts with "rId")
@@ -351,10 +359,10 @@ impl<'a> SlideMasterPart<'a> {
                             }
                         }
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }

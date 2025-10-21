@@ -1,8 +1,8 @@
 //! Worksheet implementation for XLSB files
 
-use std::collections::BTreeMap;
-use crate::sheet::{Worksheet, Cell as SheetCell, CellValue, CellIterator, RowIterator};
 use crate::ooxml::xlsb::cell::XlsbCell;
+use crate::sheet::{Cell as SheetCell, CellIterator, CellValue, RowIterator, Worksheet};
+use std::collections::BTreeMap;
 
 /// XLSB worksheet implementation
 #[derive(Debug, Clone)]
@@ -59,18 +59,25 @@ impl Worksheet for XlsbWorksheet {
         }
     }
 
-    fn cell(&self, row: u32, column: u32) -> Result<Box<dyn SheetCell + '_>, Box<dyn std::error::Error>> {
+    fn cell(
+        &self,
+        row: u32,
+        column: u32,
+    ) -> Result<Box<dyn SheetCell + '_>, Box<dyn std::error::Error>> {
         match self.cells.get(&(row, column)) {
             Some(cell) => Ok(Box::new(cell.clone())),
             None => {
                 // Return empty cell for missing positions
                 let empty_cell = XlsbCell::new(row, column, CellValue::Empty);
                 Ok(Box::new(empty_cell))
-            }
+            },
         }
     }
 
-    fn cell_by_coordinate(&self, coordinate: &str) -> Result<Box<dyn SheetCell + '_>, Box<dyn std::error::Error>> {
+    fn cell_by_coordinate(
+        &self,
+        coordinate: &str,
+    ) -> Result<Box<dyn SheetCell + '_>, Box<dyn std::error::Error>> {
         let (row, col) = crate::ooxml::xlsb::utils::parse_cell_reference(coordinate)?;
         self.cell(row, col)
     }

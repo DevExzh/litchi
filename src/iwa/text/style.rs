@@ -127,4 +127,3 @@ mod tests {
         assert_eq!(TextAlignment::from_i32(999), TextAlignment::Left); // default
     }
 }
-

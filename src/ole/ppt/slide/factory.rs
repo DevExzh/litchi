@@ -1,10 +1,10 @@
+use crate::ole::consts::PptRecordType;
 /// SlideFactory - Creates slides from persist mapping with zero-copy parsing.
 ///
 /// High-performance implementation using lifetimes to avoid data copying.
 use crate::ole::ppt::package::{PptError, Result};
-use crate::ole::ppt::records::PptRecord;
 use crate::ole::ppt::persist::PersistMapping;
-use crate::ole::consts::PptRecordType;
+use crate::ole::ppt::records::PptRecord;
 
 /// Factory for creating slides from document data using persist mapping.
 ///
@@ -34,7 +34,8 @@ impl<'doc> SlideFactory<'doc> {
     pub fn slide_ids(&self) -> Vec<u32> {
         // Filter to only actual Slide records (not Notes, Masters, etc.)
         let all_ids = self.persist_mapping.get_persist_ids();
-        all_ids.into_iter()
+        all_ids
+            .into_iter()
             .filter(|&persist_id| {
                 if let Some(offset) = self.persist_mapping.get_offset(persist_id) {
                     let offset = offset as usize;
@@ -42,7 +43,7 @@ impl<'doc> SlideFactory<'doc> {
                         // Check record type at this offset (bytes 2-3)
                         let record_type = u16::from_le_bytes([
                             self.doc_data[offset + 2],
-                            self.doc_data[offset + 3]
+                            self.doc_data[offset + 3],
                         ]);
                         // 1006 = Slide record type
                         record_type == 1006
@@ -64,11 +65,9 @@ impl<'doc> SlideFactory<'doc> {
     /// - No intermediate buffers
     /// - Direct record parsing at offset
     pub fn parse_slide(&self, persist_id: u32) -> Result<SlideData<'doc>> {
-        let offset = self.persist_mapping
-            .get_offset(persist_id)
-            .ok_or_else(|| PptError::InvalidFormat(
-                format!("No offset found for persist_id {}", persist_id)
-            ))?;
+        let offset = self.persist_mapping.get_offset(persist_id).ok_or_else(|| {
+            PptError::InvalidFormat(format!("No offset found for persist_id {}", persist_id))
+        })?;
 
         self.parse_slide_at_offset(offset, persist_id)
     }
@@ -76,20 +75,22 @@ impl<'doc> SlideFactory<'doc> {
     /// Parse slide record at specific byte offset.
     fn parse_slide_at_offset(&self, offset: u32, persist_id: u32) -> Result<SlideData<'doc>> {
         let offset = offset as usize;
-        
+
         if offset + 8 > self.doc_data.len() {
-            return Err(PptError::Corrupted(
-                format!("Offset {} exceeds document length", offset)
-            ));
+            return Err(PptError::Corrupted(format!(
+                "Offset {} exceeds document length",
+                offset
+            )));
         }
 
         // Parse the Slide record at this offset
         let (record, _consumed) = PptRecord::parse(self.doc_data, offset)?;
 
         if record.record_type != PptRecordType::Slide {
-            return Err(PptError::InvalidFormat(
-                format!("Expected Slide record, got {:?}", record.record_type)
-            ));
+            return Err(PptError::InvalidFormat(format!(
+                "Expected Slide record, got {:?}",
+                record.record_type
+            )));
         }
 
         Ok(SlideData {
@@ -185,9 +186,8 @@ mod tests {
     fn test_slide_factory_creation() {
         let doc_data = vec![0u8; 1024];
         let mapping = PersistMapping::new();
-        
+
         let factory = SlideFactory::new(&doc_data, &mapping);
         assert_eq!(factory.slide_ids().len(), 0);
     }
 }
-

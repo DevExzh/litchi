@@ -67,7 +67,10 @@ fn test_quoted_fields() {
 
     assert_eq!(row.len(), 3);
     assert_eq!(row[0], CellValue::String("Hello, World".to_string()));
-    assert_eq!(row[1], CellValue::String("Value with \"quotes\"".to_string()));
+    assert_eq!(
+        row[1],
+        CellValue::String("Value with \"quotes\"".to_string())
+    );
     assert_eq!(row[2], CellValue::String("Normal".to_string()));
 }
 
@@ -129,17 +132,17 @@ fn test_iterators() {
                 assert_eq!(row[0], CellValue::String("a".to_string()));
                 assert_eq!(row[1], CellValue::String("b".to_string()));
                 assert_eq!(row[2], CellValue::String("c".to_string()));
-            }
+            },
             2 => {
                 assert_eq!(row[0], CellValue::Int(1));
                 assert_eq!(row[1], CellValue::Int(2));
                 assert_eq!(row[2], CellValue::Int(3));
-            }
+            },
             3 => {
                 assert_eq!(row[0], CellValue::Int(4));
                 assert_eq!(row[1], CellValue::Int(5));
                 assert_eq!(row[2], CellValue::Int(6));
-            }
+            },
             _ => panic!("Too many rows"),
         }
     }

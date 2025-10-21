@@ -1,8 +1,8 @@
 // Bar element handler
 
 use crate::formula::ast::*;
-use crate::formula::omml::elements::ElementContext;
 use crate::formula::omml::attributes::parse_position_type;
+use crate::formula::omml::elements::ElementContext;
 
 /// Handler for bar elements
 pub struct BarHandler;
@@ -20,7 +20,9 @@ impl BarHandler {
         };
 
         // Use dedicated position parsing function
-        let position = context.properties.alignment
+        let position = context
+            .properties
+            .alignment
             .as_ref()
             .and_then(|s| parse_position_type(Some(s)));
 

@@ -80,13 +80,13 @@ impl ChpxFkp {
         let bx_offset = (crun + 1) * 4;
         for (i, fc_start) in fcs.iter().enumerate().take(crun) {
             let bx_index = bx_offset + i;
-            
+
             if bx_index >= page_data.len() {
                 return None;
             }
-            
+
             let bx = page_data[bx_index] as usize;
-            
+
             // BX = 0 means no formatting (use default)
             if bx == 0 {
                 entries.push(FkpEntry {
@@ -106,13 +106,16 @@ impl ChpxFkp {
             if grpprl_offset >= page_data.len() {
                 return None;
             }
-            
+
             let cb = page_data[grpprl_offset] as usize;
-            
+
             if entries.len() < 2 && cb > 0 {
-                eprintln!("DEBUG:           FKP entry {}: bx={}, grpprl_offset={}, cb={}", i, bx, grpprl_offset, cb);
+                eprintln!(
+                    "DEBUG:           FKP entry {}: bx={}, grpprl_offset={}, cb={}",
+                    i, bx, grpprl_offset, cb
+                );
             }
-            
+
             // grpprl data starts at grpprl_offset + 1
             let grpprl_start = grpprl_offset + 1;
             let grpprl_end = grpprl_start + cb;
@@ -191,11 +194,11 @@ impl PapxFkp {
         let bx_offset = (cpara + 1) * 4;
         for (i, fc_start) in fcs.iter().enumerate().take(cpara) {
             let bx_index = bx_offset + (i * 13);
-            
+
             if bx_index + 13 > page_data.len() {
                 return None;
             }
-            
+
             // For PAPX, BX structure is more complex
             // For now, use simplified parsing
             entries.push(FkpEntry {
@@ -248,4 +251,3 @@ mod tests {
         assert!(ChpxFkp::parse(&page, &[]).is_none());
     }
 }
-

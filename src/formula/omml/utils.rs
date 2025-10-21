@@ -1,5 +1,5 @@
-use crate::formula::omml::elements::{ElementContext, ElementType};
 use crate::formula::ast::MathNode;
+use crate::formula::omml::elements::{ElementContext, ElementType};
 use std::borrow::Cow as StdCow;
 
 /// High-performance string interning using bumpalo arena
@@ -21,15 +21,15 @@ pub fn extract_text_content(nodes: &[MathNode]) -> String {
             MathNode::Text(text) => result.push_str(text.as_ref()),
             MathNode::Fenced { content, .. } => {
                 result.push_str(&extract_text_content(content));
-            }
+            },
             MathNode::Function { name, argument } => {
                 result.push_str(name.as_ref());
                 result.push('(');
                 result.push_str(&extract_text_content(argument));
                 result.push(')');
-            }
+            },
             // Add more cases as needed
-            _ => {} // Skip non-text nodes
+            _ => {}, // Skip non-text nodes
         }
     }
     result
@@ -101,9 +101,10 @@ pub fn find_attribute_fast<'a>(
 ) -> Option<&'a quick_xml::events::attributes::Attribute<'a>> {
     for attr in attrs {
         if let Ok(attr_key) = std::str::from_utf8(attr.key.as_ref())
-            && (attr_key == key || attr_key == format!("m:{}", key)) {
-                return Some(attr);
-            }
+            && (attr_key == key || attr_key == format!("m:{}", key))
+        {
+            return Some(attr);
+        }
     }
     None
 }
@@ -311,7 +312,10 @@ pub fn handle_parse_error<T>(result: Result<T, impl std::fmt::Display>) -> Resul
 #[allow(dead_code)] // Utility function for validation
 pub fn is_valid_omml_element_name(name: &str) -> bool {
     // Basic validation - element names should be alphanumeric with possible namespace prefix
-    !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == ':' || c == '_' || c == '-')
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == ':' || c == '_' || c == '-')
 }
 
 /// Validates OMML attribute values for basic sanity checks
@@ -359,9 +363,10 @@ pub fn extract_attribute_value_simd<'a>(
 ) -> Option<&'a [u8]> {
     for attr in attrs {
         if let Ok(attr_key) = std::str::from_utf8(attr.key.as_ref())
-            && (attr_key == key || attr_key == format!("m:{}", key)) {
-                return Some(&attr.value);
-            }
+            && (attr_key == key || attr_key == format!("m:{}", key))
+        {
+            return Some(&attr.value);
+        }
     }
     None
 }
@@ -388,12 +393,14 @@ pub fn validate_omml_structure(nodes: &[super::MathNode]) -> Result<(), super::O
     // Empty OMML documents are not allowed
     if nodes.is_empty() {
         return Err(super::OmmlError::InvalidStructure(
-            "Empty OMML document".to_string()
+            "Empty OMML document".to_string(),
         ));
     }
 
     // Check for required root math element
-    let has_math_root = nodes.iter().any(|node| matches!(node, super::MathNode::Row(_)));
+    let has_math_root = nodes
+        .iter()
+        .any(|node| matches!(node, super::MathNode::Row(_)));
     if !has_math_root && !nodes.is_empty() {
         // Allow documents that don't start with explicit math element
         // as long as they contain valid mathematical content
@@ -407,83 +414,88 @@ pub fn validate_omml_structure(nodes: &[super::MathNode]) -> Result<(), super::O
 pub fn validate_math_nodes(nodes: &[super::MathNode]) -> Result<(), super::OmmlError> {
     for node in nodes {
         match node {
-            super::MathNode::Frac { numerator, denominator, .. } => {
+            super::MathNode::Frac {
+                numerator,
+                denominator,
+                ..
+            } => {
                 if numerator.is_empty() {
                     return Err(super::OmmlError::MissingRequiredElement(
-                        "Fraction numerator is empty".to_string()
+                        "Fraction numerator is empty".to_string(),
                     ));
                 }
                 if denominator.is_empty() {
                     return Err(super::OmmlError::MissingRequiredElement(
-                        "Fraction denominator is empty".to_string()
+                        "Fraction denominator is empty".to_string(),
                     ));
                 }
-            }
+            },
             super::MathNode::Root { base, .. } => {
                 if base.is_empty() {
                     return Err(super::OmmlError::MissingRequiredElement(
-                        "Root base is empty".to_string()
+                        "Root base is empty".to_string(),
                     ));
                 }
-            }
+            },
             super::MathNode::Power { base, exponent } => {
                 if base.is_empty() {
                     return Err(super::OmmlError::MissingRequiredElement(
-                        "Power base is empty".to_string()
+                        "Power base is empty".to_string(),
                     ));
                 }
                 if exponent.is_empty() {
                     return Err(super::OmmlError::MissingRequiredElement(
-                        "Power exponent is empty".to_string()
+                        "Power exponent is empty".to_string(),
                     ));
                 }
-            }
+            },
             super::MathNode::Sub { base, subscript } => {
                 if base.is_empty() {
                     return Err(super::OmmlError::MissingRequiredElement(
-                        "Subscript base is empty".to_string()
+                        "Subscript base is empty".to_string(),
                     ));
                 }
                 if subscript.is_empty() {
                     return Err(super::OmmlError::MissingRequiredElement(
-                        "Subscript is empty".to_string()
+                        "Subscript is empty".to_string(),
                     ));
                 }
-            }
+            },
             super::MathNode::Function { name, argument } => {
                 if name.is_empty() {
                     return Err(super::OmmlError::MissingRequiredElement(
-                        "Function name is empty".to_string()
+                        "Function name is empty".to_string(),
                     ));
                 }
                 if argument.is_empty() {
                     return Err(super::OmmlError::MissingRequiredElement(
-                        "Function argument is empty".to_string()
+                        "Function argument is empty".to_string(),
                     ));
                 }
-            }
+            },
             super::MathNode::Fenced { content, .. } => {
                 if content.is_empty() {
                     return Err(super::OmmlError::ValidationError(
-                        "Fenced content is empty".to_string()
+                        "Fenced content is empty".to_string(),
                     ));
                 }
-            }
+            },
             super::MathNode::Matrix { rows, .. } => {
                 if rows.is_empty() {
                     return Err(super::OmmlError::ValidationError(
-                        "Matrix has no rows".to_string()
+                        "Matrix has no rows".to_string(),
                     ));
                 }
                 for (i, row) in rows.iter().enumerate() {
                     if row.is_empty() {
-                        return Err(super::OmmlError::ValidationError(
-                            format!("Matrix row {} is empty", i)
-                        ));
+                        return Err(super::OmmlError::ValidationError(format!(
+                            "Matrix row {} is empty",
+                            i
+                        )));
                     }
                 }
-            }
-            _ => {} // Other nodes don't have specific validation requirements
+            },
+            _ => {}, // Other nodes don't have specific validation requirements
         }
     }
     Ok(())
@@ -501,24 +513,24 @@ pub fn validate_element_nesting(
             // Math element should be root or not have a parent
             if parent_type.is_some() {
                 return Err(super::OmmlError::InvalidStructure(
-                    "Math element should be root".to_string()
+                    "Math element should be root".to_string(),
                 ));
             }
-        }
+        },
         ElementType::Numerator | ElementType::Denominator => {
             if !matches!(parent_type, Some(ElementType::Fraction)) {
                 return Err(super::OmmlError::InvalidStructure(
-                    "Numerator/denominator must be inside fraction".to_string()
+                    "Numerator/denominator must be inside fraction".to_string(),
                 ));
             }
-        }
+        },
         ElementType::Degree => {
             if !matches!(parent_type, Some(ElementType::Radical)) {
                 return Err(super::OmmlError::InvalidStructure(
-                    "Degree must be inside radical".to_string()
+                    "Degree must be inside radical".to_string(),
                 ));
             }
-        }
+        },
         ElementType::Base => {
             match parent_type {
                 Some(
@@ -528,34 +540,40 @@ pub fn validate_element_nesting(
                     | ElementType::Radical
                     | ElementType::Accent
                     | ElementType::Bar
-                    | ElementType::GroupChar
-                ) => {}
+                    | ElementType::GroupChar,
+                ) => {},
                 _ => {
                     // Allow base elements in other contexts too - they might be generic containers
-                }
+                },
             }
-        }
-        ElementType::SuperscriptElement => {
-            match parent_type {
-                Some(ElementType::Superscript | ElementType::SubSup | ElementType::Nary | ElementType::Integrand) => {}
-                _ => {
-                    return Err(super::OmmlError::InvalidStructure(
-                        "Superscript element in invalid context".to_string()
-                    ));
-                }
-            }
-        }
-        ElementType::SubscriptElement => {
-            match parent_type {
-                Some(ElementType::Subscript | ElementType::SubSup | ElementType::Nary | ElementType::Integrand) => {}
-                _ => {
-                    return Err(super::OmmlError::InvalidStructure(
-                        "Subscript element in invalid context".to_string()
-                    ));
-                }
-            }
-        }
-        _ => {} // Other elements have more flexible nesting rules
+        },
+        ElementType::SuperscriptElement => match parent_type {
+            Some(
+                ElementType::Superscript
+                | ElementType::SubSup
+                | ElementType::Nary
+                | ElementType::Integrand,
+            ) => {},
+            _ => {
+                return Err(super::OmmlError::InvalidStructure(
+                    "Superscript element in invalid context".to_string(),
+                ));
+            },
+        },
+        ElementType::SubscriptElement => match parent_type {
+            Some(
+                ElementType::Subscript
+                | ElementType::SubSup
+                | ElementType::Nary
+                | ElementType::Integrand,
+            ) => {},
+            _ => {
+                return Err(super::OmmlError::InvalidStructure(
+                    "Subscript element in invalid context".to_string(),
+                ));
+            },
+        },
+        _ => {}, // Other elements have more flexible nesting rules
     }
     Ok(())
 }

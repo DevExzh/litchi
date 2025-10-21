@@ -30,16 +30,16 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-pub mod workbook;
-pub mod worksheet;
 pub mod cell;
+pub mod parsers;
 pub mod shared_strings;
 pub mod styles;
-pub mod parsers;
+pub mod workbook;
+pub mod worksheet;
 
 // Re-export main types for convenience
-pub use workbook::Workbook;
-pub use worksheet::Worksheet;
 pub use cell::Cell;
 pub use shared_strings::SharedStrings;
 pub use styles::Styles;
+pub use workbook::Workbook;
+pub use worksheet::Worksheet;

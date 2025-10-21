@@ -39,7 +39,9 @@ impl Manifest {
             file.read_to_string(&mut content)?;
             content
         } else {
-            return Err(Error::InvalidFormat("No manifest.xml found in ODF package".to_string()));
+            return Err(Error::InvalidFormat(
+                "No manifest.xml found in ODF package".to_string(),
+            ));
         };
 
         Self::parse(&manifest_content)
@@ -47,8 +49,8 @@ impl Manifest {
 
     /// Parse manifest XML content
     pub fn parse(xml_content: &str) -> Result<Self> {
-        use quick_xml::events::Event;
         use quick_xml::Reader;
+        use quick_xml::events::Event;
 
         let mut reader = Reader::from_str(xml_content);
         let mut buf = Vec::new();
@@ -59,25 +61,28 @@ impl Manifest {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Start(ref e)) => {
                     if e.name().as_ref() == b"manifest:file-entry"
-                        && let Some(entry) = Self::parse_file_entry(e)? {
-                            entries.insert(entry.full_path.clone(), entry);
-                        }
-                }
+                        && let Some(entry) = Self::parse_file_entry(e)?
+                    {
+                        entries.insert(entry.full_path.clone(), entry);
+                    }
+                },
                 Ok(Event::Empty(ref e)) => {
                     if e.name().as_ref() == b"manifest:file-entry"
-                        && let Some(entry) = Self::parse_file_entry(e)? {
-                            entries.insert(entry.full_path.clone(), entry);
-                        }
-                }
+                        && let Some(entry) = Self::parse_file_entry(e)?
+                    {
+                        entries.insert(entry.full_path.clone(), entry);
+                    }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(Error::InvalidFormat(format!("XML parsing error: {}", e))),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
 
         // Extract mimetype from root document entry
-        let mimetype = entries.get("/")
+        let mimetype = entries
+            .get("/")
             .map(|entry| entry.media_type.clone())
             .unwrap_or_else(|| "application/vnd.oasis.opendocument.text".to_string());
 
@@ -91,7 +96,8 @@ impl Manifest {
         let mut size = None;
 
         for attr_result in e.attributes() {
-            let attr = attr_result.map_err(|_| Error::InvalidFormat("Invalid attribute in manifest".to_string()))?;
+            let attr = attr_result
+                .map_err(|_| Error::InvalidFormat("Invalid attribute in manifest".to_string()))?;
             let value = String::from_utf8(attr.value.to_vec())
                 .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in manifest".to_string()))?;
 
@@ -102,8 +108,8 @@ impl Manifest {
                     if let Ok(s) = value.parse::<u64>() {
                         size = Some(s);
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
 
@@ -125,7 +131,9 @@ impl Manifest {
     /// Get media type for a path
     #[allow(dead_code)]
     pub fn get_media_type(&self, path: &str) -> Option<&str> {
-        self.entries.get(path).map(|entry| entry.media_type.as_str())
+        self.entries
+            .get(path)
+            .map(|entry| entry.media_type.as_str())
     }
 
     /// Check if a path exists in manifest

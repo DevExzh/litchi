@@ -4,6 +4,5 @@ pub mod factory;
 pub mod types;
 
 // Re-export main types
-pub use factory::{SlideFactory, SlideData};
+pub use factory::{SlideData, SlideFactory};
 pub use types::Slide;
-

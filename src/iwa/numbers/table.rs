@@ -2,8 +2,8 @@
 //!
 //! Tables in Numbers contain cells organized in rows and columns.
 
-use std::collections::HashMap;
 use super::cell::CellValue;
+use std::collections::HashMap;
 
 /// Represents a table in a Numbers spreadsheet
 #[derive(Debug, Clone)]
@@ -50,22 +50,14 @@ impl NumbersTable {
     /// Get all cell values in a specific row
     pub fn get_row(&self, row: usize) -> Vec<CellValue> {
         (0..self.column_count)
-            .map(|col| {
-                self.get_cell(row, col)
-                    .cloned()
-                    .unwrap_or(CellValue::Empty)
-            })
+            .map(|col| self.get_cell(row, col).cloned().unwrap_or(CellValue::Empty))
             .collect()
     }
 
     /// Get all cell values in a specific column
     pub fn get_column(&self, col: usize) -> Vec<CellValue> {
         (0..self.row_count)
-            .map(|row| {
-                self.get_cell(row, col)
-                    .cloned()
-                    .unwrap_or(CellValue::Empty)
-            })
+            .map(|row| self.get_cell(row, col).cloned().unwrap_or(CellValue::Empty))
             .collect()
     }
 
@@ -177,10 +169,9 @@ mod tests {
     fn test_table_dimensions() {
         let mut table = NumbersTable::new("Test".to_string());
         table.set_cell(5, 10, CellValue::Number(1.0));
-        
+
         let (rows, cols) = table.dimensions();
         assert_eq!(rows, 6); // 0-5 inclusive
         assert_eq!(cols, 11); // 0-10 inclusive
     }
 }
-

@@ -20,7 +20,9 @@ impl FunctionHandler {
             context.children.clone()
         };
 
-        let name = context.function_name.take()
+        let name = context
+            .function_name
+            .take()
             .unwrap_or_else(|| "f".to_string());
         let name = arena.alloc_str(&name);
 
@@ -53,8 +55,9 @@ impl FunctionNameHandler {
         }
 
         if !name.is_empty()
-            && let Some(parent) = parent_context {
-                parent.function_name = Some(name);
-            }
+            && let Some(parent) = parent_context
+        {
+            parent.function_name = Some(name);
+        }
     }
 }

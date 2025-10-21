@@ -3,8 +3,8 @@
 //! PLCF is a data structure used extensively in legacy Office binary formats
 //! to map character positions to properties or data.
 
-use bytes::Bytes;
 use crate::common::binary;
+use bytes::Bytes;
 
 /// Property List with Character Positions (PLCF) parser.
 ///
@@ -21,7 +21,7 @@ use crate::common::binary;
 ///
 /// ```
 /// use litchi::ole::plcf::PlcfParser;
-/// 
+///
 /// // Create a simple PLCF with 2 elements, element_size = 2
 /// // CPs: 0, 10, 20
 /// // Props: [1, 2], [3, 4]
@@ -127,9 +127,9 @@ impl PlcfParser {
     /// Get property data at index.
     #[inline]
     pub fn property(&self, index: usize) -> Option<&[u8]> {
-        self.properties_offsets.get(index).map(|(offset, len)| {
-            &self.properties_data[*offset..*offset + *len]
-        })
+        self.properties_offsets
+            .get(index)
+            .map(|(offset, len)| &self.properties_data[*offset..*offset + *len])
     }
 
     /// Get character range for element at index.
@@ -169,4 +169,3 @@ mod tests {
         assert_eq!(plcf.range(1), Some((10, 20)));
     }
 }
-

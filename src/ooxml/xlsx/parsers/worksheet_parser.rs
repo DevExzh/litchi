@@ -23,18 +23,23 @@ pub fn parse_worksheet_xml(content: &str) -> Result<HashMap<u32, HashMap<u32, Ce
 
     // Find the sheetData section using optimized search
     if let Some(sheet_data_start) = memchr::memmem::find(content.as_bytes(), b"<sheetData>")
-        && let Some(sheet_data_end) = memchr::memmem::find(&content.as_bytes()[sheet_data_start..], b"</sheetData>") {
-            let sheet_data_content = &content[sheet_data_start..sheet_data_start + sheet_data_end];
+        && let Some(sheet_data_end) =
+            memchr::memmem::find(&content.as_bytes()[sheet_data_start..], b"</sheetData>")
+    {
+        let sheet_data_content = &content[sheet_data_start..sheet_data_start + sheet_data_end];
 
-            // Parse individual rows and cells
-            parse_sheet_data(sheet_data_content, &mut cells)?;
-        }
+        // Parse individual rows and cells
+        parse_sheet_data(sheet_data_content, &mut cells)?;
+    }
 
     Ok(cells)
 }
 
 /// Parse sheetData content to extract cells.
-pub fn parse_sheet_data(sheet_data: &str, cells: &mut HashMap<u32, HashMap<u32, CellValue>>) -> Result<()> {
+pub fn parse_sheet_data(
+    sheet_data: &str,
+    cells: &mut HashMap<u32, HashMap<u32, CellValue>>,
+) -> Result<()> {
     let bytes = sheet_data.as_bytes();
     let mut pos = 0;
 
@@ -45,7 +50,9 @@ pub fn parse_sheet_data(sheet_data: &str, cells: &mut HashMap<u32, HashMap<u32, 
 
             if let Some((row_num, row_cells)) = parse_row_xml(row_content)? {
                 // Performance: Use entry API to avoid double hash lookups
-                let row_map = cells.entry(row_num).or_insert_with(|| HashMap::with_capacity(INITIAL_COL_CAPACITY));
+                let row_map = cells
+                    .entry(row_num)
+                    .or_insert_with(|| HashMap::with_capacity(INITIAL_COL_CAPACITY));
                 for (col_num, value) in row_cells {
                     row_map.insert(col_num, value);
                 }
@@ -133,7 +140,8 @@ pub fn parse_cell_xml(cell_content: &str) -> Result<Option<(u32, CellValue)>> {
     // Extract value - optimized tag search
     let value = if let Some(v_start) = memchr::memmem::find(cell_content.as_bytes(), b"<v>") {
         let v_start_pos = v_start + 3;
-        memchr::memmem::find(&cell_content.as_bytes()[v_start_pos..], b"</v>").map(|v_end| &cell_content[v_start_pos..v_start_pos + v_end])
+        memchr::memmem::find(&cell_content.as_bytes()[v_start_pos..], b"</v>")
+            .map(|v_end| &cell_content[v_start_pos..v_start_pos + v_end])
     } else {
         None
     };
@@ -143,14 +151,12 @@ pub fn parse_cell_xml(cell_content: &str) -> Result<Option<(u32, CellValue)>> {
         (Some("s"), Some(v)) => {
             // Shared string reference - this will be resolved later
             CellValue::String(format!("SHARED_STRING_{}", v))
-        }
-        (Some("b"), Some(v)) => {
-            match v {
-                "1" => CellValue::Bool(true),
-                "0" => CellValue::Bool(false),
-                _ => CellValue::Error("Invalid boolean value".to_string()),
-            }
-        }
+        },
+        (Some("b"), Some(v)) => match v {
+            "1" => CellValue::Bool(true),
+            "0" => CellValue::Bool(false),
+            _ => CellValue::Error("Invalid boolean value".to_string()),
+        },
         (_, Some(v)) => {
             // Try to parse as number - use fast parsing
             if let Ok(int_val) = atoi_simd::parse(v.as_bytes()) {
@@ -160,7 +166,7 @@ pub fn parse_cell_xml(cell_content: &str) -> Result<Option<(u32, CellValue)>> {
             } else {
                 CellValue::String(v.to_string())
             }
-        }
+        },
         _ => CellValue::Empty,
     };
 

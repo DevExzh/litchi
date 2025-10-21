@@ -13,7 +13,10 @@ impl PostScriptHandler {
     ) {
         if let Some(parent) = parent_context {
             // Post-scripts are handled by the superscript/subscript elements
-            crate::formula::omml::utils::extend_vec_efficient(&mut parent.post_scripts, context.children.clone());
+            crate::formula::omml::utils::extend_vec_efficient(
+                &mut parent.post_scripts,
+                context.children.clone(),
+            );
         }
     }
 }

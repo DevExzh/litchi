@@ -3,8 +3,8 @@
 // This module handles conversion of matrix nodes to LaTeX format with
 // performance optimizations and proper fence handling.
 
-use crate::formula::ast::{MathNode, MatrixFence};
 use super::LatexError;
+use crate::formula::ast::{MathNode, MatrixFence};
 
 /// Convert matrix fence type to LaTeX environment name
 #[inline]
@@ -52,8 +52,7 @@ pub fn convert_matrix(
     buffer.reserve(estimated_capacity);
 
     // Begin environment
-    write!(buffer, "\\begin{{{}}}", env)
-        .map_err(|e| LatexError::FormatError(e.to_string()))?;
+    write!(buffer, "\\begin{{{}}}", env).map_err(|e| LatexError::FormatError(e.to_string()))?;
 
     // Convert each row
     for (i, row) in rows.iter().enumerate() {
@@ -75,8 +74,7 @@ pub fn convert_matrix(
     }
 
     // End environment
-    write!(buffer, "\\end{{{}}}", env)
-        .map_err(|e| LatexError::FormatError(e.to_string()))?;
+    write!(buffer, "\\end{{{}}}", env).map_err(|e| LatexError::FormatError(e.to_string()))?;
 
     Ok(())
 }
@@ -97,10 +95,7 @@ pub fn estimate_matrix_capacity(rows: &[Vec<Vec<MathNode>>]) -> usize {
     let col_separators = num_rows * (num_cols.saturating_sub(1)) * 3; // " & "
 
     // Rough estimate for content (average 5 chars per node)
-    let content_estimate = rows.iter()
-        .flatten()
-        .flatten()
-        .count() * 5;
+    let content_estimate = rows.iter().flatten().flatten().count() * 5;
 
     env_overhead + row_separators + col_separators + content_estimate
 }
@@ -181,11 +176,10 @@ pub fn convert_matrix_with_alignment(
             MatrixFence::Brace => buffer.push_str("\\left\\{"),
             MatrixFence::Pipe => buffer.push_str("\\left|"),
             MatrixFence::DoublePipe => buffer.push_str("\\left\\|"),
-            MatrixFence::None => {} // No fence
+            MatrixFence::None => {}, // No fence
         }
     } else {
-        write!(buffer, "\\begin{{{}}}", env)
-            .map_err(|e| LatexError::FormatError(e.to_string()))?;
+        write!(buffer, "\\begin{{{}}}", env).map_err(|e| LatexError::FormatError(e.to_string()))?;
     }
 
     // Convert each row
@@ -215,13 +209,12 @@ pub fn convert_matrix_with_alignment(
             MatrixFence::Brace => buffer.push_str("\\right\\}"),
             MatrixFence::Pipe => buffer.push_str("\\right|"),
             MatrixFence::DoublePipe => buffer.push_str("\\right\\|"),
-            MatrixFence::None => {} // No fence
+            MatrixFence::None => {}, // No fence
         }
     }
 
     // End environment
-    write!(buffer, "\\end{{{}}}", env)
-        .map_err(|e| LatexError::FormatError(e.to_string()))?;
+    write!(buffer, "\\end{{{}}}", env).map_err(|e| LatexError::FormatError(e.to_string()))?;
 
     Ok(())
 }
@@ -300,7 +293,14 @@ mod tests {
         ];
         let alignments = vec!['l', 'c', 'r'];
 
-        convert_matrix_with_alignment(&mut buffer, &rows, MatrixFence::Bracket, Some(&alignments), &dummy_converter).unwrap();
+        convert_matrix_with_alignment(
+            &mut buffer,
+            &rows,
+            MatrixFence::Bracket,
+            Some(&alignments),
+            &dummy_converter,
+        )
+        .unwrap();
 
         // Should use array environment with alignment specification
         assert!(buffer.contains("\\begin{array}{lcr}"));
@@ -314,15 +314,20 @@ mod tests {
     #[test]
     fn test_convert_matrix_with_alignment_default() {
         let mut buffer = String::new();
-        let rows = vec![
-            vec![
-                vec![MathNode::Number("1".into())],
-                vec![MathNode::Number("2".into())],
-            ],
-        ];
+        let rows = vec![vec![
+            vec![MathNode::Number("1".into())],
+            vec![MathNode::Number("2".into())],
+        ]];
 
         // No alignments specified, should use standard matrix environment
-        convert_matrix_with_alignment(&mut buffer, &rows, MatrixFence::Paren, None, &dummy_converter).unwrap();
+        convert_matrix_with_alignment(
+            &mut buffer,
+            &rows,
+            MatrixFence::Paren,
+            None,
+            &dummy_converter,
+        )
+        .unwrap();
 
         assert!(buffer.contains("\\begin{pmatrix}"));
         assert!(buffer.contains("\\end{pmatrix}"));

@@ -2,8 +2,8 @@ use crate::ooxml::docx::document::Document;
 use crate::ooxml::docx::parts::DocumentPart;
 /// Package implementation for Word documents.
 use crate::ooxml::error::{OoxmlError, Result};
-use crate::ooxml::opc::constants::content_type as ct;
 use crate::ooxml::opc::OpcPackage;
+use crate::ooxml::opc::constants::content_type as ct;
 use std::io::{Read, Seek};
 use std::path::Path;
 

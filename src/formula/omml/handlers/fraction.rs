@@ -25,16 +25,18 @@ impl FractionHandler {
         parent_context: Option<&mut ElementContext<'arena>>,
         _arena: &'arena bumpalo::Bump,
     ) {
-        let numerator = context.numerator.take()
-            .unwrap_or_default();
-        let denominator = context.denominator.take()
-            .unwrap_or_default();
+        let numerator = context.numerator.take().unwrap_or_default();
+        let denominator = context.denominator.take().unwrap_or_default();
 
-        let line_thickness = context.properties.fraction_line_thickness
+        let line_thickness = context
+            .properties
+            .fraction_line_thickness
             .as_ref()
             .and_then(|s| s.parse().ok());
 
-        let frac_type = context.properties.fraction_type
+        let frac_type = context
+            .properties
+            .fraction_type
             .as_ref()
             .and_then(|s| match s.as_str() {
                 "bar" => Some(FractionType::Bar),

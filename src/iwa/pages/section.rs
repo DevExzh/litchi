@@ -41,7 +41,7 @@ impl PagesSection {
             all.push(heading.clone());
         }
         all.extend(self.paragraphs.clone());
-        
+
         // Also include text from storages
         for storage in &self.text_storages {
             let text = storage.plain_text();
@@ -49,7 +49,7 @@ impl PagesSection {
                 all.push(text.to_string());
             }
         }
-        
+
         all
     }
 
@@ -60,9 +60,7 @@ impl PagesSection {
 
     /// Check if section is empty
     pub fn is_empty(&self) -> bool {
-        self.heading.is_none()
-            && self.paragraphs.is_empty()
-            && self.text_storages.is_empty()
+        self.heading.is_none() && self.paragraphs.is_empty() && self.text_storages.is_empty()
     }
 }
 
@@ -104,7 +102,7 @@ mod tests {
 
         section.heading = Some("Introduction".to_string());
         section.paragraphs.push("First paragraph".to_string());
-        
+
         assert!(!section.is_empty());
         let text = section.plain_text();
         assert!(text.contains("Introduction"));
@@ -125,7 +123,9 @@ mod tests {
         section.heading = Some("Title".to_string());
         section.paragraphs.push("Para 1".to_string());
         section.paragraphs.push("Para 2".to_string());
-        section.text_storages.push(TextStorage::from_text("Storage text".to_string()));
+        section
+            .text_storages
+            .push(TextStorage::from_text("Storage text".to_string()));
 
         let all_text = section.all_text();
         assert_eq!(all_text.len(), 4);
@@ -135,4 +135,3 @@ mod tests {
         assert_eq!(all_text[3], "Storage text");
     }
 }
-

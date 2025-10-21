@@ -5,8 +5,8 @@
 //! - No CRC-32C checksums
 //! - Custom chunk header format (4 bytes: type + 24-bit length)
 
-use std::io::{self, Read, Cursor};
 use snap::raw::Decoder;
+use std::io::{self, Cursor, Read};
 
 use crate::iwa::Error;
 
@@ -32,11 +32,11 @@ impl SnappyStream {
             // Read 4-byte header
             let mut header = [0u8; 4];
             match reader.read_exact(&mut header) {
-                Ok(_) => {}
+                Ok(_) => {},
                 Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => {
                     // End of stream
                     break;
-                }
+                },
                 Err(e) => return Err(Error::Io(e)),
             }
 
@@ -57,8 +57,7 @@ impl SnappyStream {
 
             // Read compressed chunk
             let mut compressed = vec![0u8; length as usize];
-            reader.read_exact(&mut compressed)
-                .map_err(Error::Io)?;
+            reader.read_exact(&mut compressed).map_err(Error::Io)?;
 
             let mut chunk_decompressed = Vec::new();
             let mut buffer_size = 1024; // Start with 1KB
@@ -70,15 +69,15 @@ impl SnappyStream {
                         // Success - truncate to actual size and break
                         chunk_decompressed.truncate(decompressed_size);
                         break;
-                    }
+                    },
                     Err(_) if buffer_size < 10 * 1024 * 1024 => {
                         // Buffer too small, try with larger buffer (up to 10MB)
                         buffer_size *= 2;
                         continue;
-                    }
+                    },
                     Err(e) => {
                         return Err(Error::Snappy(format!("Decompression failed: {}", e)));
-                    }
+                    },
                 }
             }
 
@@ -118,8 +117,8 @@ impl AsRef<[u8]> for SnappyStream {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
     use std::fs::File;
+    use std::io::Cursor;
     use zip::ZipArchive;
 
     #[test]
@@ -164,19 +163,27 @@ mod tests {
 
                 if zip_file.name().ends_with(".iwa") {
                     let mut compressed_data = Vec::new();
-                    zip_file.read_to_end(&mut compressed_data)
+                    zip_file
+                        .read_to_end(&mut compressed_data)
                         .expect("Failed to read IWA file");
 
                     let mut cursor = Cursor::new(&compressed_data);
                     let result = SnappyStream::decompress(&mut cursor);
 
-                    assert!(result.is_ok(),
+                    assert!(
+                        result.is_ok(),
                         "Failed to decompress {} from {}: {:?}",
-                        zip_file.name(), test_file, result.err());
+                        zip_file.name(),
+                        test_file,
+                        result.err()
+                    );
 
                     let decompressed = result.unwrap();
-                    assert!(!decompressed.data().is_empty(),
-                        "Decompressed data should not be empty for {}", zip_file.name());
+                    assert!(
+                        !decompressed.data().is_empty(),
+                        "Decompressed data should not be empty for {}",
+                        zip_file.name()
+                    );
 
                     // Verify it's valid protobuf data (starts with a varint length)
                     let data = decompressed.data();

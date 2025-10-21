@@ -2,9 +2,9 @@
 //!
 //! Idiomatic Rust implementation using iterator chaining and functional patterns.
 
-use crate::ole::ppt::records::PptRecord;
-use crate::ole::consts::PptRecordType;
 use super::ptr_holder::PersistPtrHolder;
+use crate::ole::consts::PptRecordType;
+use crate::ole::ppt::records::PptRecord;
 use std::collections::HashMap;
 
 /// Consolidated mapping from persist IDs to byte offsets.
@@ -32,7 +32,8 @@ impl PersistMapping {
     /// - Later records override earlier ones (most recent wins)
     pub fn build_from_records(records: &[PptRecord]) -> Self {
         // Count PersistPtrHolder records for capacity estimation
-        let ptr_holder_count = records.iter()
+        let ptr_holder_count = records
+            .iter()
             .filter(|r| r.record_type == PptRecordType::PersistPtrHolder)
             .count();
 
@@ -40,7 +41,8 @@ impl PersistMapping {
         let mut mappings = HashMap::with_capacity(ptr_holder_count * 10);
 
         // Process all PersistPtrHolder records in order
-        records.iter()
+        records
+            .iter()
             .filter(|r| r.record_type == PptRecordType::PersistPtrHolder)
             .filter_map(|r| PersistPtrHolder::parse(r).ok())
             .for_each(|holder| {
@@ -119,7 +121,7 @@ mod tests {
         // Second holder updates persist_id=0
         let mut data2 = Vec::new();
         data2.extend_from_slice(&0x00100000u32.to_le_bytes()); // base=0, count=1
-        data2.extend_from_slice(&1500u32.to_le_bytes());        // updated offset
+        data2.extend_from_slice(&1500u32.to_le_bytes()); // updated offset
 
         let record2 = PptRecord {
             record_type: PptRecordType::PersistPtrHolder,
@@ -140,4 +142,3 @@ mod tests {
         assert_eq!(mapping.get_offset(1), Some(2000));
     }
 }
-

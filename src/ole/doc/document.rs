@@ -1,12 +1,12 @@
+use super::super::OleFile;
 /// Document - the main API for working with Word document content.
 use super::package::{DocError, Result};
 use super::paragraph::{Paragraph, Run};
 use super::parts::fib::FileInformationBlock;
-use super::parts::text::TextExtractor;
-use super::parts::paragraph_extractor::{ParagraphExtractor, ExtractedParagraph};
 use super::parts::fields::FieldsTable;
+use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
+use super::parts::text::TextExtractor;
 use super::table::Table;
-use super::super::OleFile;
 #[cfg(feature = "formula")]
 use crate::ole::mtef_extractor::MtefExtractor;
 use std::collections::HashMap;
@@ -71,7 +71,11 @@ impl Document {
         let fib = FileInformationBlock::parse(&word_document)?;
 
         // Determine which table stream to use (0Table or 1Table)
-        let table_stream_name = if fib.which_table_stream() { "1Table" } else { "0Table" };
+        let table_stream_name = if fib.which_table_stream() {
+            "1Table"
+        } else {
+            "0Table"
+        };
 
         // Read the table stream
         let table_stream = ole
@@ -113,11 +117,7 @@ impl Document {
 
         // Also try direct stream names for compatibility with older formats
         let mut all_mtef = mtef_data;
-        let direct_stream_names = [
-            "Equation Native",
-            "MSWordEquation",
-            "Equation.3",
-        ];
+        let direct_stream_names = ["Equation Native", "MSWordEquation", "Equation.3"];
 
         for stream_name in &direct_stream_names {
             if let Ok(Some(data)) = MtefExtractor::extract_mtef_from_stream(ole, &[stream_name]) {
@@ -127,74 +127,95 @@ impl Document {
 
         Ok(all_mtef)
     }
-    
+
     /// Extract MTEF data fallback (when formula feature is disabled)
     #[cfg(not(feature = "formula"))]
-    fn extract_mtef_data<R: Read + Seek>(_ole: &mut OleFile<R>) -> Result<HashMap<String, Vec<u8>>> {
+    fn extract_mtef_data<R: Read + Seek>(
+        _ole: &mut OleFile<R>,
+    ) -> Result<HashMap<String, Vec<u8>>> {
         Ok(HashMap::new())
     }
 
     /// Parse all extracted MTEF data into AST nodes
     #[cfg(feature = "formula")]
-    fn parse_all_mtef_data(mtef_data: &HashMap<String, Vec<u8>>) -> Result<HashMap<String, Vec<crate::formula::MathNode<'static>>>> {
+    fn parse_all_mtef_data(
+        mtef_data: &HashMap<String, Vec<u8>>,
+    ) -> Result<HashMap<String, Vec<crate::formula::MathNode<'static>>>> {
         let mut parsed_mtef = HashMap::new();
 
         for (stream_name, data) in mtef_data {
             // Create a formula arena for parsing
             let formula = crate::formula::Formula::new();
-            
+
             // Clone data to extend its lifetime for the parser
             // We'll need to leak the arena to make the parsed nodes 'static
             // This is necessary because we're storing them in the Document
             let arena_box = Box::new(formula);
             let arena_ptr = Box::leak(arena_box);
-            
+
             // Create a buffer that will live as long as we need
             let data_box = data.clone().into_boxed_slice();
             let data_ptr: &'static [u8] = Box::leak(data_box);
-            
+
             // Parse the MTEF data
             let mut parser = crate::formula::MtefParser::new(arena_ptr.arena(), data_ptr);
-            
-            eprintln!("DEBUG: Parsing MTEF stream '{}', {} bytes, is_valid={}", stream_name, data.len(), parser.is_valid());
+
+            eprintln!(
+                "DEBUG: Parsing MTEF stream '{}', {} bytes, is_valid={}",
+                stream_name,
+                data.len(),
+                parser.is_valid()
+            );
 
             if parser.is_valid() {
                 match parser.parse() {
                     Ok(nodes) if !nodes.is_empty() => {
                         // Successfully parsed - store the AST nodes
                         parsed_mtef.insert(stream_name.clone(), nodes);
-                    }
+                    },
                     Ok(_) => {
                         // Empty result - skip
-                    }
+                    },
                     Err(e) => {
                         // Parse error - store placeholder text
                         // We need to create a new arena for the placeholder
                         let placeholder_formula = crate::formula::Formula::new();
                         let placeholder_arena = Box::leak(Box::new(placeholder_formula));
-                        let error_text = placeholder_arena.arena().alloc_str(&format!("[Formula parsing error: {}]", e));
-                        parsed_mtef.insert(stream_name.clone(), vec![crate::formula::MathNode::Text(
-                            std::borrow::Cow::Borrowed(error_text)
-                        )]);
-                    }
+                        let error_text = placeholder_arena
+                            .arena()
+                            .alloc_str(&format!("[Formula parsing error: {}]", e));
+                        parsed_mtef.insert(
+                            stream_name.clone(),
+                            vec![crate::formula::MathNode::Text(std::borrow::Cow::Borrowed(
+                                error_text,
+                            ))],
+                        );
+                    },
                 }
             } else {
                 // Invalid MTEF format - store placeholder
                 let placeholder_formula = crate::formula::Formula::new();
                 let placeholder_arena = Box::leak(Box::new(placeholder_formula));
-                let error_text = placeholder_arena.arena().alloc_str(&format!("[Invalid MTEF format ({} bytes)]", data.len()));
-                parsed_mtef.insert(stream_name.clone(), vec![crate::formula::MathNode::Text(
-                    std::borrow::Cow::Borrowed(error_text)
-                )]);
+                let error_text = placeholder_arena
+                    .arena()
+                    .alloc_str(&format!("[Invalid MTEF format ({} bytes)]", data.len()));
+                parsed_mtef.insert(
+                    stream_name.clone(),
+                    vec![crate::formula::MathNode::Text(std::borrow::Cow::Borrowed(
+                        error_text,
+                    ))],
+                );
             }
         }
 
         Ok(parsed_mtef)
     }
-    
+
     /// Parse all extracted MTEF data fallback (when formula feature is disabled)
     #[cfg(not(feature = "formula"))]
-    fn parse_all_mtef_data(_mtef_data: &HashMap<String, Vec<u8>>) -> Result<HashMap<String, Vec<()>>> {
+    fn parse_all_mtef_data(
+        _mtef_data: &HashMap<String, Vec<u8>>,
+    ) -> Result<HashMap<String, Vec<()>>> {
         Ok(HashMap::new())
     }
 
@@ -203,12 +224,12 @@ impl Document {
         let text = text.trim();
 
         // Common indicators of MathType equations in text
-        text.contains("MathType") ||
-        text.contains("MTExtra") ||
-        text.contains("\\") ||
-        text.contains("{") ||
-        text.contains("}") ||
-        (text.len() > 10 && (text.contains("^") || text.contains("_")))
+        text.contains("MathType")
+            || text.contains("MTExtra")
+            || text.contains("\\")
+            || text.contains("{")
+            || text.contains("}")
+            || (text.len() > 10 && (text.contains("^") || text.contains("_")))
     }
 
     /// Parse MTEF data for a given text pattern
@@ -226,7 +247,7 @@ impl Document {
 
         None
     }
-    
+
     /// Parse MTEF data for a given text pattern (fallback when formula feature is disabled)
     #[cfg(not(feature = "formula"))]
     fn parse_mtef_for_text(&self, _text: &str) -> Option<Vec<()>> {
@@ -318,23 +339,32 @@ impl Document {
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         let mut all_paragraphs = Vec::new();
         let text = self.text()?;
-        
+
         // Get all subdocument ranges from FIB
         let subdoc_ranges = self.fib.get_all_subdoc_ranges();
-        
+
         eprintln!("DEBUG: Found {} subdocument ranges", subdoc_ranges.len());
         for (name, start, end) in &subdoc_ranges {
-            eprintln!("DEBUG:   {}: CP range {}..{} ({} chars)", name, start, end, end - start);
+            eprintln!(
+                "DEBUG:   {}: CP range {}..{} ({} chars)",
+                name,
+                start,
+                end,
+                end - start
+            );
         }
-        
+
         // Parse each subdocument range
         for (subdoc_name, start_cp, end_cp) in subdoc_ranges {
             if start_cp >= end_cp {
                 continue;
             }
-            
-            eprintln!("DEBUG: Parsing subdocument '{}' (CP {}..{})", subdoc_name, start_cp, end_cp);
-            
+
+            eprintln!(
+                "DEBUG: Parsing subdocument '{}' (CP {}..{})",
+                subdoc_name, start_cp, end_cp
+            );
+
             // Create extractor for this CP range
             let para_extractor = ParagraphExtractor::new_with_range(
                 &self.fib,
@@ -343,18 +373,25 @@ impl Document {
                 text.clone(),
                 (start_cp, end_cp),
             )?;
-            
+
             let extracted_paras = para_extractor.extract_paragraphs()?;
-            eprintln!("DEBUG:   Extracted {} paragraphs from '{}'", extracted_paras.len(), subdoc_name);
-            
+            eprintln!(
+                "DEBUG:   Extracted {} paragraphs from '{}'",
+                extracted_paras.len(),
+                subdoc_name
+            );
+
             // Convert to Paragraph objects and add to result
             self.convert_to_paragraphs(extracted_paras, &mut all_paragraphs);
         }
-        
-        eprintln!("DEBUG: Total paragraphs extracted: {}", all_paragraphs.len());
+
+        eprintln!(
+            "DEBUG: Total paragraphs extracted: {}",
+            all_paragraphs.len()
+        );
         Ok(all_paragraphs)
     }
-    
+
     /// Convert extracted paragraph data to Paragraph objects.
     ///
     /// This is a helper method used by paragraphs() to convert the raw extracted
@@ -380,13 +417,15 @@ impl Document {
                             }
                         }
                     }
-                    
+
                     // Secondary matching: Check if this is an OLE2 object without pic_offset
-                    if props.is_ole2 && Self::is_potential_mtef_formula(&text) 
-                        && let Some(mtef_ast) = self.parse_mtef_for_text(&text) {
+                    if props.is_ole2
+                        && Self::is_potential_mtef_formula(&text)
+                        && let Some(mtef_ast) = self.parse_mtef_for_text(&text)
+                    {
                         return Run::with_mtef_formula(text, props, mtef_ast);
                     }
-                    
+
                     // Regular run without formula
                     Run::new(text, props)
                 })
@@ -428,4 +467,3 @@ impl Document {
 mod tests {
     // Tests will be added as implementation progresses
 }
-

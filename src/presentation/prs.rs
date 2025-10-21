@@ -1,8 +1,11 @@
 //! PowerPoint presentation implementation.
 
-use crate::common::{Error, Result};
-use super::types::{PresentationImpl, PresentationFormat, detect_presentation_format, detect_presentation_format_from_bytes, PptxSlideData, PptSlideData};
 use super::Slide;
+use super::types::{
+    PptSlideData, PptxSlideData, PresentationFormat, PresentationImpl, detect_presentation_format,
+    detect_presentation_format_from_bytes,
+};
+use crate::common::{Error, Result};
 
 #[cfg(feature = "ole")]
 use crate::ole;
@@ -83,72 +86,66 @@ impl Presentation {
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
-        
+
         // Try to detect the format by reading the file header
         let mut file = File::open(path)?;
         let initial_format = detect_presentation_format(&mut file)?;
-        
+
         // Refine ZIP-based format detection (distinguish PPTX from Keynote)
         let format = super::types::refine_presentation_format(&mut file, initial_format)?;
-        
+
         // Open with the appropriate parser
         match format {
             #[cfg(feature = "ole")]
             PresentationFormat::Ppt => {
-                let mut package = ole::ppt::Package::open(path)
-                    .map_err(Error::from)?;
-                let pres = package.presentation()
-                    .map_err(Error::from)?;
-                
+                let mut package = ole::ppt::Package::open(path).map_err(Error::from)?;
+                let pres = package.presentation().map_err(Error::from)?;
+
                 Ok(Self {
                     inner: PresentationImpl::Ppt(pres),
                     #[cfg(feature = "ooxml")]
                     _package: None,
                 })
-            }
+            },
             #[cfg(not(feature = "ole"))]
-            PresentationFormat::Ppt => {
-                Err(Error::FeatureDisabled("ole".to_string()))
-            }
+            PresentationFormat::Ppt => Err(Error::FeatureDisabled("ole".to_string())),
             #[cfg(feature = "ooxml")]
             PresentationFormat::Pptx => {
-                let package = Box::new(ooxml::pptx::Package::open(path)
-                    .map_err(Error::from)?);
-                
+                let package = Box::new(ooxml::pptx::Package::open(path).map_err(Error::from)?);
+
                 // SAFETY: We're using unsafe here to extend the lifetime of the presentation
                 // reference. This is safe because we're storing the package in the same
                 // struct, ensuring it lives as long as the presentation reference.
                 let pres_ref = unsafe {
                     let pkg_ptr = &*package as *const ooxml::pptx::Package;
-                    let pres = (*pkg_ptr).presentation()
-                        .map_err(Error::from)?;
-                    std::mem::transmute::<ooxml::pptx::Presentation<'_>, ooxml::pptx::Presentation<'static>>(pres)
+                    let pres = (*pkg_ptr).presentation().map_err(Error::from)?;
+                    std::mem::transmute::<
+                        ooxml::pptx::Presentation<'_>,
+                        ooxml::pptx::Presentation<'static>,
+                    >(pres)
                 };
-                
+
                 Ok(Self {
                     inner: PresentationImpl::Pptx(Box::new(pres_ref)),
                     _package: Some(package),
                 })
-            }
+            },
             #[cfg(not(feature = "ooxml"))]
-            PresentationFormat::Pptx => {
-                Err(Error::FeatureDisabled("ooxml".to_string()))
-            }
+            PresentationFormat::Pptx => Err(Error::FeatureDisabled("ooxml".to_string())),
             #[cfg(feature = "iwa")]
             PresentationFormat::Keynote => {
-                let doc = crate::iwa::keynote::KeynoteDocument::open(path)
-                    .map_err(|e| Error::ParseError(format!("Failed to open Keynote presentation: {}", e)))?;
-                
+                let doc = crate::iwa::keynote::KeynoteDocument::open(path).map_err(|e| {
+                    Error::ParseError(format!("Failed to open Keynote presentation: {}", e))
+                })?;
+
                 Ok(Self {
                     inner: PresentationImpl::Keynote(doc),
                     #[cfg(feature = "ooxml")]
                     _package: None,
                 })
-            }
+            },
             #[cfg(not(feature = "iwa"))]
-            PresentationFormat::Keynote => {
-                Err(Error::FeatureDisabled("iwa".to_string()))
-            }
+            PresentationFormat::Keynote => Err(Error::FeatureDisabled("iwa".to_string())),
         }
     }
 
@@ -184,7 +181,7 @@ impl Presentation {
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         // Detect format from byte signature
         let initial_format = detect_presentation_format_from_bytes(&bytes)?;
-        
+
         // Refine ZIP-based format detection for bytes
         let format = if initial_format == PresentationFormat::Pptx {
             // Check if it's a Keynote presentation
@@ -198,68 +195,64 @@ impl Presentation {
         } else {
             initial_format
         };
-        
+
         match format {
             #[cfg(feature = "ole")]
             PresentationFormat::Ppt => {
                 // For OLE2, create cursor from bytes
                 let cursor = Cursor::new(bytes);
-                
-                let mut package = ole::ppt::Package::from_reader(cursor)
-                    .map_err(Error::from)?;
-                let pres = package.presentation()
-                    .map_err(Error::from)?;
-                
+
+                let mut package = ole::ppt::Package::from_reader(cursor).map_err(Error::from)?;
+                let pres = package.presentation().map_err(Error::from)?;
+
                 Ok(Self {
                     inner: PresentationImpl::Ppt(pres),
                     #[cfg(feature = "ooxml")]
                     _package: None,
                 })
-            }
+            },
             #[cfg(not(feature = "ole"))]
-            PresentationFormat::Ppt => {
-                Err(Error::FeatureDisabled("ole".to_string()))
-            }
+            PresentationFormat::Ppt => Err(Error::FeatureDisabled("ole".to_string())),
             #[cfg(feature = "ooxml")]
             PresentationFormat::Pptx => {
                 // For OOXML/ZIP, Cursor<Vec<u8>> implements Read + Seek
                 let cursor = Cursor::new(bytes);
-                
-                let package = Box::new(ooxml::pptx::Package::from_reader(cursor)
-                    .map_err(Error::from)?);
-                
+
+                let package =
+                    Box::new(ooxml::pptx::Package::from_reader(cursor).map_err(Error::from)?);
+
                 // SAFETY: Same lifetime extension as in `open()`
                 let pres_ref = unsafe {
                     let pkg_ptr = &*package as *const ooxml::pptx::Package;
-                    let pres = (*pkg_ptr).presentation()
-                        .map_err(Error::from)?;
-                    std::mem::transmute::<ooxml::pptx::Presentation<'_>, ooxml::pptx::Presentation<'static>>(pres)
+                    let pres = (*pkg_ptr).presentation().map_err(Error::from)?;
+                    std::mem::transmute::<
+                        ooxml::pptx::Presentation<'_>,
+                        ooxml::pptx::Presentation<'static>,
+                    >(pres)
                 };
-                
+
                 Ok(Self {
                     inner: PresentationImpl::Pptx(Box::new(pres_ref)),
                     _package: Some(package),
                 })
-            }
+            },
             #[cfg(not(feature = "ooxml"))]
-            PresentationFormat::Pptx => {
-                Err(Error::FeatureDisabled("ooxml".to_string()))
-            }
+            PresentationFormat::Pptx => Err(Error::FeatureDisabled("ooxml".to_string())),
             #[cfg(feature = "iwa")]
             PresentationFormat::Keynote => {
-                let doc = crate::iwa::keynote::KeynoteDocument::from_bytes(&bytes)
-                    .map_err(|e| Error::ParseError(format!("Failed to open Keynote from bytes: {}", e)))?;
-                
+                let doc =
+                    crate::iwa::keynote::KeynoteDocument::from_bytes(&bytes).map_err(|e| {
+                        Error::ParseError(format!("Failed to open Keynote from bytes: {}", e))
+                    })?;
+
                 Ok(Self {
                     inner: PresentationImpl::Keynote(doc),
                     #[cfg(feature = "ooxml")]
                     _package: None,
                 })
-            }
+            },
             #[cfg(not(feature = "iwa"))]
-            PresentationFormat::Keynote => {
-                Err(Error::FeatureDisabled("iwa".to_string()))
-            }
+            PresentationFormat::Keynote => Err(Error::FeatureDisabled("iwa".to_string())),
         }
     }
 
@@ -280,25 +273,25 @@ impl Presentation {
     pub fn text(&self) -> Result<String> {
         match &self.inner {
             #[cfg(feature = "ole")]
-            PresentationImpl::Ppt(pres) => {
-                pres.text().map_err(Error::from)
-            }
+            PresentationImpl::Ppt(pres) => pres.text().map_err(Error::from),
             #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(pres) => {
                 // PPTX presentations need to extract text from all slides
                 let slides = pres.slides().map_err(Error::from)?;
                 let mut texts = Vec::new();
                 for slide in slides {
-                    if let Ok(text) = slide.text() && !text.is_empty() {
+                    if let Ok(text) = slide.text()
+                        && !text.is_empty()
+                    {
                         texts.push(text);
                     }
                 }
                 Ok(texts.join("\n\n"))
-            }
+            },
             #[cfg(feature = "iwa")]
-            PresentationImpl::Keynote(doc) => {
-                doc.text().map_err(|e| Error::ParseError(format!("Failed to extract text from Keynote: {}", e)))
-            }
+            PresentationImpl::Keynote(doc) => doc.text().map_err(|e| {
+                Error::ParseError(format!("Failed to extract text from Keynote: {}", e))
+            }),
         }
     }
 
@@ -317,19 +310,16 @@ impl Presentation {
     pub fn slide_count(&self) -> Result<usize> {
         match &self.inner {
             #[cfg(feature = "ole")]
-            PresentationImpl::Ppt(pres) => {
-                Ok(pres.slide_count())
-            }
+            PresentationImpl::Ppt(pres) => Ok(pres.slide_count()),
             #[cfg(feature = "ooxml")]
-            PresentationImpl::Pptx(pres) => {
-                pres.slide_count().map_err(Error::from)
-            }
+            PresentationImpl::Pptx(pres) => pres.slide_count().map_err(Error::from),
             #[cfg(feature = "iwa")]
             PresentationImpl::Keynote(doc) => {
-                let slides = doc.slides()
+                let slides = doc
+                    .slides()
                     .map_err(|e| Error::ParseError(format!("Failed to get slides: {}", e)))?;
                 Ok(slides.len())
-            }
+            },
         }
     }
 
@@ -352,7 +342,8 @@ impl Presentation {
             PresentationImpl::Ppt(pres) => {
                 // Extract slide data to avoid lifetime issues
                 let ppt_slides = pres.slides().map_err(Error::from)?;
-                ppt_slides.iter()
+                ppt_slides
+                    .iter()
                     .map(|s| {
                         let text = s.text().map_err(Error::from)?.to_string();
                         let slide_number = s.slide_number();
@@ -364,28 +355,27 @@ impl Presentation {
                         }))
                     })
                     .collect()
-            }
+            },
             #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(pres) => {
-                let slides = pres.slides()
-                    .map_err(Error::from)?;
+                let slides = pres.slides().map_err(Error::from)?;
                 // Extract slide data immediately to avoid lifetime issues
-                slides.iter()
+                slides
+                    .iter()
                     .map(|s| {
                         let text = s.text().map_err(Error::from)?;
                         let name = s.name().ok();
                         Ok(Slide::Pptx(PptxSlideData { text, name }))
                     })
                     .collect()
-            }
+            },
             #[cfg(feature = "iwa")]
             PresentationImpl::Keynote(doc) => {
-                let keynote_slides = doc.slides()
+                let keynote_slides = doc
+                    .slides()
                     .map_err(|e| Error::ParseError(format!("Failed to get slides: {}", e)))?;
-                Ok(keynote_slides.into_iter()
-                    .map(Slide::Keynote)
-                    .collect())
-            }
+                Ok(keynote_slides.into_iter().map(Slide::Keynote).collect())
+            },
         }
     }
 
@@ -409,9 +399,7 @@ impl Presentation {
             #[cfg(feature = "ole")]
             PresentationImpl::Ppt(_) => Ok(None),
             #[cfg(feature = "ooxml")]
-            PresentationImpl::Pptx(pres) => {
-                pres.slide_width().map_err(Error::from)
-            }
+            PresentationImpl::Pptx(pres) => pres.slide_width().map_err(Error::from),
             #[cfg(feature = "iwa")]
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
         }
@@ -437,12 +425,9 @@ impl Presentation {
             #[cfg(feature = "ole")]
             PresentationImpl::Ppt(_) => Ok(None),
             #[cfg(feature = "ooxml")]
-            PresentationImpl::Pptx(pres) => {
-                pres.slide_height().map_err(Error::from)
-            }
+            PresentationImpl::Pptx(pres) => pres.slide_height().map_err(Error::from),
             #[cfg(feature = "iwa")]
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
         }
     }
 }
-

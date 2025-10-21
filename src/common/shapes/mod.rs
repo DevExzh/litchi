@@ -7,4 +7,4 @@
 pub mod types;
 
 // Re-exports
-pub use types::{ShapeType, PlaceholderType};
+pub use types::{PlaceholderType, ShapeType};

@@ -86,9 +86,7 @@ impl ObjectIndex {
         for object in &archive.objects {
             if let Some(identifier) = object.archive_info.identifier {
                 // Determine object type from first message
-                let object_type = object.messages.first()
-                    .map(|msg| msg.type_)
-                    .unwrap_or(0);
+                let object_type = object.messages.first().map(|msg| msg.type_).unwrap_or(0);
 
                 let entry = ObjectIndexEntry {
                     id: identifier,
@@ -99,7 +97,8 @@ impl ObjectIndex {
                 };
 
                 self.entries.insert(identifier, entry);
-                self.fragment_objects.entry(archive_name.to_string())
+                self.fragment_objects
+                    .entry(archive_name.to_string())
                     .or_default()
                     .push(identifier);
             }
@@ -115,18 +114,20 @@ impl ObjectIndex {
     /// reference their drawables, etc.).
     fn parse_object_references(&mut self, object_id: u64, object: &ArchiveObject) -> Result<()> {
         use prost::Message;
-        
+
         // For each raw message, try to extract references
         for raw_msg in &object.messages {
             let msg_type = raw_msg.type_;
-            
+
             // Extract references based on message type
             // We decode the specific protobuf message and extract its Reference fields
             match msg_type {
                 // TST (Table) types
                 6000 | 6001 => {
                     // TST.TableModelArchive contains multiple style and data references
-                    if let Ok(table) = crate::iwa::protobuf::tst::TableModelArchive::decode(&*raw_msg.data) {
+                    if let Ok(table) =
+                        crate::iwa::protobuf::tst::TableModelArchive::decode(&*raw_msg.data)
+                    {
                         // Extract style references
                         self.extract_reference(object_id, &table.table_style);
                         self.extract_reference(object_id, &table.body_text_style);
@@ -137,7 +138,7 @@ impl ObjectIndex {
                         self.extract_reference(object_id, &table.header_row_style);
                         self.extract_reference(object_id, &table.header_column_style);
                         self.extract_reference(object_id, &table.footer_row_style);
-                        
+
                         // Extract optional style references
                         if let Some(ref table_name_style) = table.table_name_style {
                             self.extract_reference(object_id, table_name_style);
@@ -145,7 +146,7 @@ impl ObjectIndex {
                         if let Some(ref table_name_shape_style) = table.table_name_shape_style {
                             self.extract_reference(object_id, table_name_shape_style);
                         }
-                        
+
                         // Extract data store sub-references
                         // DataStore contains references to column_headers, string_table, style_table, etc.
                         self.extract_reference(object_id, &table.data_store.column_headers);
@@ -153,56 +154,63 @@ impl ObjectIndex {
                         self.extract_reference(object_id, &table.data_store.style_table);
                         self.extract_reference(object_id, &table.data_store.formula_table);
                         self.extract_reference(object_id, &table.data_store.format_table);
-                        
+
                         // Optional references
-                        if let Some(ref formula_error_table) = table.data_store.formula_error_table {
+                        if let Some(ref formula_error_table) = table.data_store.formula_error_table
+                        {
                             self.extract_reference(object_id, formula_error_table);
                         }
-                        if let Some(ref choice_list) = table.data_store.multiple_choice_list_format_table {
+                        if let Some(ref choice_list) =
+                            table.data_store.multiple_choice_list_format_table
+                        {
                             self.extract_reference(object_id, choice_list);
                         }
                         if let Some(ref merge_map) = table.data_store.merge_region_map {
                             self.extract_reference(object_id, merge_map);
                         }
                     }
-                }
-                
+                },
+
                 6005 | 6201 => {
                     // TST.TableDataList - may contain references to other data structures
                     // The actual cell data is stored here
-                }
-                
+                },
+
                 // TSWP (Word Processing/Text) types
                 2001..=2022 => {
                     // TSWP.StorageArchive contains text content and may reference styles
-                    if let Ok(storage) = crate::iwa::protobuf::tswp::StorageArchive::decode(&*raw_msg.data) {
+                    if let Ok(storage) =
+                        crate::iwa::protobuf::tswp::StorageArchive::decode(&*raw_msg.data)
+                    {
                         // Extract stylesheet reference if present
                         if let Some(ref style_sheet) = storage.style_sheet {
                             self.extract_reference(object_id, style_sheet);
                         }
-                        
+
                         // Note: Attachments are stored in separate fields in the attribute tables
                         // They're not directly accessible as simple references in StorageArchive
                     }
-                }
-                
+                },
+
                 // KN (Keynote) types
                 5 | 6 => {
                     // KN.SlideArchive contains references to drawables, builds, and transitions
-                    if let Ok(slide) = crate::iwa::protobuf::kn::SlideArchive::decode(&*raw_msg.data) {
+                    if let Ok(slide) =
+                        crate::iwa::protobuf::kn::SlideArchive::decode(&*raw_msg.data)
+                    {
                         // Extract style reference
                         self.extract_reference(object_id, &slide.style);
-                        
+
                         // Extract drawable references (shapes, images, text boxes)
                         for drawable in &slide.drawables {
                             self.extract_reference(object_id, drawable);
                         }
-                        
+
                         // Extract build animation references
                         for build in &slide.builds {
                             self.extract_reference(object_id, build);
                         }
-                        
+
                         // Extract placeholder references
                         if let Some(ref title) = slide.title_placeholder {
                             self.extract_reference(object_id, title);
@@ -216,7 +224,7 @@ impl ObjectIndex {
                         if let Some(ref slide_num) = slide.slide_number_placeholder {
                             self.extract_reference(object_id, slide_num);
                         }
-                        
+
                         // Extract style references
                         for para_style in &slide.body_paragraph_styles {
                             self.extract_reference(object_id, para_style);
@@ -225,40 +233,43 @@ impl ObjectIndex {
                             self.extract_reference(object_id, list_style);
                         }
                     }
-                }
-                
+                },
+
                 2 => {
                     // KN.ShowArchive (conflicts with TSP.MessageInfo, handle by context)
                     // Try to decode as ShowArchive for Keynote documents
-                    if let Ok(show) = crate::iwa::protobuf::kn::ShowArchive::decode(&*raw_msg.data) {
+                    if let Ok(show) = crate::iwa::protobuf::kn::ShowArchive::decode(&*raw_msg.data)
+                    {
                         // Extract theme and stylesheet references
                         self.extract_reference(object_id, &show.theme);
                         self.extract_reference(object_id, &show.stylesheet);
-                        
+
                         // Extract UI state reference
                         if let Some(ref ui_state) = show.ui_state {
                             self.extract_reference(object_id, ui_state);
                         }
-                        
+
                         // Extract recording reference if present
                         if let Some(ref recording) = show.recording {
                             self.extract_reference(object_id, recording);
                         }
-                        
+
                         // Note: Slide references are in the slide_tree structure
                         // which is not a simple Reference type
                     }
-                }
-                
+                },
+
                 // TN (Numbers) types
                 3 => {
                     // TN.SheetArchive / TN.FormBasedSheetArchive
-                    if let Ok(sheet) = crate::iwa::protobuf::tn::SheetArchive::decode(&*raw_msg.data) {
+                    if let Ok(sheet) =
+                        crate::iwa::protobuf::tn::SheetArchive::decode(&*raw_msg.data)
+                    {
                         // Extract drawable info references
                         for drawable_ref in &sheet.drawable_infos {
                             self.extract_reference(object_id, drawable_ref);
                         }
-                        
+
                         // Extract header/footer storage references if present
                         if let Some(ref header) = sheet.header_storage {
                             self.extract_reference(object_id, header);
@@ -267,8 +278,8 @@ impl ObjectIndex {
                             self.extract_reference(object_id, footer);
                         }
                     }
-                }
-                
+                },
+
                 // TSD (Drawing/Shape) types
                 3002..=3009 => {
                     // TSD.DrawableArchive and related types (includes 3004 ShapeArchive)
@@ -277,47 +288,49 @@ impl ObjectIndex {
                     // A full implementation would parse the specific drawable type
                     // ShapeArchive (3004) has a complex structure with nested messages
                     // References are embedded in sub-structures like GeometryArchive
-                }
-                
+                },
+
                 // TSCH (Chart) types
                 5000 | 5004 | 5021 => {
                     // TSCH.ChartArchive and related types
                     // Note: Chart archives have complex nested structures
                     // A full implementation would parse chart-specific references
-                }
-                
+                },
+
                 // TP (Pages) types
                 10000 => {
                     // TP.DocumentArchive
-                    if let Ok(doc) = crate::iwa::protobuf::tp::DocumentArchive::decode(&*raw_msg.data) {
+                    if let Ok(doc) =
+                        crate::iwa::protobuf::tp::DocumentArchive::decode(&*raw_msg.data)
+                    {
                         // Extract theme reference
                         if let Some(ref theme) = doc.theme {
                             self.extract_reference(object_id, theme);
                         }
-                        
+
                         // Extract stylesheet reference
                         if let Some(ref stylesheet) = doc.stylesheet {
                             self.extract_reference(object_id, stylesheet);
                         }
                     }
-                }
-                
+                },
+
                 10011 => {
                     // TP.SectionArchive
                     // Note: SectionArchive has a complex structure
                     // References are embedded in nested structures
-                }
-                
+                },
+
                 _ => {
                     // For unknown types, we don't extract references
                     // This is fine as we handle the most common types above
-                }
+                },
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Helper function to extract a single TSP.Reference
     ///
     /// Adds the referenced object ID to the reference graph, creating edges
@@ -335,14 +348,18 @@ impl ObjectIndex {
     ///
     /// O(1) average case for HashMap insertion. Uses efficient deduplication
     /// to avoid storing duplicate references.
-    fn extract_reference(&mut self, source_id: u64, reference: &crate::iwa::protobuf::tsp::Reference) {
+    fn extract_reference(
+        &mut self,
+        source_id: u64,
+        reference: &crate::iwa::protobuf::tsp::Reference,
+    ) {
         let target_id = reference.identifier;
-        
+
         // Ignore null/zero references (0 typically means "no reference")
         if target_id == 0 {
             return;
         }
-        
+
         // Build the reference graph: track both outgoing and incoming references
         // This enables bidirectional graph traversal
         self.reference_graph.add_reference(source_id, target_id);
@@ -370,7 +387,8 @@ impl ObjectIndex {
 
     /// Find objects by type
     pub fn find_objects_by_type(&self, object_type: u32) -> Vec<&ObjectIndexEntry> {
-        self.entries.values()
+        self.entries
+            .values()
             .filter(|entry| entry.object_type == object_type)
             .collect()
     }
@@ -416,7 +434,8 @@ impl ObjectIndex {
     ///
     /// Optional slice of referenced object IDs, or None if object has no outgoing references
     pub fn get_dependencies(&self, object_id: u64) -> Option<&[u64]> {
-        self.reference_graph.get_outgoing_refs(object_id)
+        self.reference_graph
+            .get_outgoing_refs(object_id)
             .map(|v| v.as_slice())
     }
 
@@ -432,7 +451,8 @@ impl ObjectIndex {
     ///
     /// Optional slice of referencing object IDs, or None if no objects reference this one
     pub fn get_dependents(&self, object_id: u64) -> Option<&[u64]> {
-        self.reference_graph.get_incoming_refs(object_id)
+        self.reference_graph
+            .get_incoming_refs(object_id)
             .map(|v| v.as_slice())
     }
 
@@ -505,13 +525,20 @@ impl ObjectIndex {
     ///     }
     /// }
     /// ```
-    pub fn resolve_object(&self, bundle: &Bundle, object_id: u64) -> Result<Option<ResolvedObject>> {
+    pub fn resolve_object(
+        &self,
+        bundle: &Bundle,
+        object_id: u64,
+    ) -> Result<Option<ResolvedObject>> {
         let Some(entry) = self.get_entry(object_id) else {
             return Ok(None);
         };
 
         let Some(archive) = bundle.get_archive(&entry.fragment_name) else {
-            return Err(Error::Bundle(format!("Archive {} not found", entry.fragment_name)));
+            return Err(Error::Bundle(format!(
+                "Archive {} not found",
+                entry.fragment_name
+            )));
         };
 
         // Find the object in the archive
@@ -527,7 +554,7 @@ impl ObjectIndex {
 
         Ok(None)
     }
-    
+
     /// Batch resolve multiple object references
     ///
     /// More efficient than calling `resolve_object` multiple times
@@ -541,36 +568,43 @@ impl ObjectIndex {
     /// # Returns
     ///
     /// Vector of successfully resolved objects (may be smaller than input if some IDs don't exist)
-    pub fn resolve_objects(&self, bundle: &Bundle, object_ids: &[u64]) -> Result<Vec<ResolvedObject>> {
+    pub fn resolve_objects(
+        &self,
+        bundle: &Bundle,
+        object_ids: &[u64],
+    ) -> Result<Vec<ResolvedObject>> {
         let mut resolved = Vec::with_capacity(object_ids.len());
-        
+
         // Group object IDs by their archive to minimize archive lookups
-        let mut objects_by_archive: std::collections::HashMap<&str, Vec<u64>> = std::collections::HashMap::new();
-        
+        let mut objects_by_archive: std::collections::HashMap<&str, Vec<u64>> =
+            std::collections::HashMap::new();
+
         for &object_id in object_ids {
             if let Some(entry) = self.get_entry(object_id) {
-                objects_by_archive.entry(&entry.fragment_name)
+                objects_by_archive
+                    .entry(&entry.fragment_name)
                     .or_default()
                     .push(object_id);
             }
         }
-        
+
         // Resolve objects archive by archive
         for (archive_name, ids) in objects_by_archive {
             if let Some(archive) = bundle.get_archive(archive_name) {
                 for object in &archive.objects {
                     if let Some(obj_id) = object.archive_info.identifier
-                        && ids.contains(&obj_id) {
-                            resolved.push(ResolvedObject {
-                                id: obj_id,
-                                archive_info: object.archive_info.clone(),
-                                messages: object.messages.clone(),
-                            });
-                        }
+                        && ids.contains(&obj_id)
+                    {
+                        resolved.push(ResolvedObject {
+                            id: obj_id,
+                            archive_info: object.archive_info.clone(),
+                            messages: object.messages.clone(),
+                        });
+                    }
                 }
             }
         }
-        
+
         Ok(resolved)
     }
 }
@@ -627,7 +661,7 @@ mod tests {
     #[test]
     fn test_object_index_with_reference_graph() {
         let index = ObjectIndex::new();
-        
+
         assert!(index.reference_graph().is_empty());
         assert_eq!(index.get_dependencies(1), None);
         assert_eq!(index.get_dependents(1), None);

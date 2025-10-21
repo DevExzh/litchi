@@ -15,7 +15,9 @@ impl From<crate::ole::OleError> for Error {
             crate::ole::OleError::InvalidData(s) => Error::InvalidFormat(s),
             crate::ole::OleError::NotOleFile => Error::NotOfficeFile,
             crate::ole::OleError::CorruptedFile(s) => Error::CorruptedFile(s),
-            crate::ole::OleError::StreamNotFound => Error::ComponentNotFound("Stream not found".to_string()),
+            crate::ole::OleError::StreamNotFound => {
+                Error::ComponentNotFound("Stream not found".to_string())
+            },
         }
     }
 }
@@ -62,7 +64,7 @@ impl From<crate::ooxml::error::OoxmlError> for Error {
             crate::ooxml::error::OoxmlError::PartNotFound(s) => Error::ComponentNotFound(s),
             crate::ooxml::error::OoxmlError::InvalidContentType { expected, got } => {
                 Error::InvalidContentType { expected, got }
-            }
+            },
             crate::ooxml::error::OoxmlError::InvalidRelationship(s) => Error::Other(s),
             crate::ooxml::error::OoxmlError::InvalidFormat(s) => Error::InvalidFormat(s),
             crate::ooxml::error::OoxmlError::Opc(e) => Error::from_opc_error(e),
@@ -97,4 +99,3 @@ impl From<zip::result::ZipError> for Error {
         Error::ZipError(err.to_string())
     }
 }
-

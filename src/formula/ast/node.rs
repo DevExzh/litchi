@@ -227,5 +227,3 @@ pub enum MathNode<'a> {
     /// Error node for invalid formulas
     Error(Cow<'a, str>),
 }
-
-

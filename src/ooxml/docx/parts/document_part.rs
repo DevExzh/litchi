@@ -3,8 +3,8 @@ use crate::ooxml::docx::paragraph::Paragraph;
 use crate::ooxml::docx::table::Table;
 use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::opc::part::Part;
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 use smallvec::SmallVec;
 
 /// The main document part of a Word document.
@@ -59,20 +59,20 @@ impl<'a> DocumentPart<'a> {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = true;
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_text_element => {
                     // Extract text content - use unsafe conversion for better performance
                     let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
                     result.push_str(text);
-                }
+                },
                 Ok(Event::End(e)) => {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = false;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -96,10 +96,10 @@ impl<'a> DocumentPart<'a> {
                     if e.local_name().as_ref() == b"p" {
                         count += 1;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -123,10 +123,10 @@ impl<'a> DocumentPart<'a> {
                     if e.local_name().as_ref() == b"tbl" {
                         count += 1;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -182,7 +182,7 @@ impl<'a> DocumentPart<'a> {
                         }
                         current_para_xml.push(b'>');
                     }
-                }
+                },
                 Ok(Event::End(e)) => {
                     if in_para {
                         current_para_xml.extend_from_slice(b"</");
@@ -195,10 +195,10 @@ impl<'a> DocumentPart<'a> {
                             in_para = false;
                         }
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_para => {
                     current_para_xml.extend_from_slice(e.as_ref());
-                }
+                },
                 Ok(Event::Empty(e)) if in_para => {
                     current_para_xml.push(b'<');
                     current_para_xml.extend_from_slice(e.name().as_ref());
@@ -210,10 +210,10 @@ impl<'a> DocumentPart<'a> {
                         current_para_xml.push(b'"');
                     }
                     current_para_xml.extend_from_slice(b"/>");
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -268,7 +268,7 @@ impl<'a> DocumentPart<'a> {
                         }
                         current_table_xml.push(b'>');
                     }
-                }
+                },
                 Ok(Event::End(e)) => {
                     if in_table {
                         current_table_xml.extend_from_slice(b"</");
@@ -281,10 +281,10 @@ impl<'a> DocumentPart<'a> {
                             in_table = false;
                         }
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_table => {
                     current_table_xml.extend_from_slice(e.as_ref());
-                }
+                },
                 Ok(Event::Empty(e)) if in_table => {
                     current_table_xml.push(b'<');
                     current_table_xml.extend_from_slice(e.name().as_ref());
@@ -296,10 +296,10 @@ impl<'a> DocumentPart<'a> {
                         current_table_xml.push(b'"');
                     }
                     current_table_xml.extend_from_slice(b"/>");
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }

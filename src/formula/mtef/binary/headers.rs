@@ -15,7 +15,7 @@ use zerocopy_derive::FromBytes as DeriveFromBytes;
 ///
 /// Note: This structure is kept for reference and future zerocopy-based parsing.
 /// Current implementation uses manual parsing for better error handling.
-#[allow(dead_code)]  // Kept for reference and future zerocopy parsing
+#[allow(dead_code)] // Kept for reference and future zerocopy parsing
 #[derive(Debug, Clone, DeriveFromBytes)]
 #[repr(C)]
 pub struct OleFileHeader {
@@ -39,7 +39,7 @@ pub struct OleFileHeader {
 ///
 /// Note: Kept for reference and documentation. Parser uses manual parsing
 /// to handle different MTEF versions (1-5) with varying header layouts.
-#[allow(dead_code)]  // Kept for reference and documentation
+#[allow(dead_code)] // Kept for reference and documentation
 #[derive(Debug, Clone, DeriveFromBytes)]
 #[repr(C)]
 pub struct MtefHeader {

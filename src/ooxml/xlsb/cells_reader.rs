@@ -1,11 +1,11 @@
 //! XLSB cells reader implementation
 
-use std::io::{Read, Seek};
-use crate::sheet::CellValue;
+use crate::common::binary;
+use crate::ooxml::xlsb::cell::XlsbCell;
 use crate::ooxml::xlsb::error::XlsbResult;
 use crate::ooxml::xlsb::records::RecordIter;
-use crate::ooxml::xlsb::cell::XlsbCell;
-use crate::common::binary;
+use crate::sheet::CellValue;
+use std::io::{Read, Seek};
 
 /// Dimensions of a worksheet
 #[derive(Debug, Clone, Copy)]
@@ -39,10 +39,7 @@ impl<RS> XlsbCellsReader<RS>
 where
     RS: Read + Seek,
 {
-    pub fn new(
-        mut iter: RecordIter<RS>,
-        shared_strings: Vec<String>,
-    ) -> XlsbResult<Self> {
+    pub fn new(mut iter: RecordIter<RS>, shared_strings: Vec<String>) -> XlsbResult<Self> {
         let mut buf = Vec::with_capacity(1024);
 
         // Skip to BrtWsDim (worksheet dimensions)
@@ -98,14 +95,14 @@ where
                 0x0000 => {
                     // BrtRowHdr
                     self.current_row = binary::read_u32_le_at(&self.buf, 0)?;
-                }
+                },
                 0x0001 => {
                     // BrtCellBlank
                     if self.buf.len() >= 6 {
                         let col = binary::read_u32_le_at(&self.buf, 0)?;
                         return Ok(Some(XlsbCell::new(self.current_row, col, CellValue::Empty)));
                     }
-                }
+                },
                 0x0002 => {
                     // BrtCellRk
                     if self.buf.len() >= 12 {
@@ -114,7 +111,7 @@ where
                         let value = Self::parse_rk_value(rk_val);
                         return Ok(Some(XlsbCell::new(self.current_row, col, value)));
                     }
-                }
+                },
                 0x0003 => {
                     // BrtCellError
                     if self.buf.len() >= 9 {
@@ -131,49 +128,65 @@ where
                             0x2B => "#GETTING_DATA",
                             _ => "#ERR!",
                         };
-                        return Ok(Some(XlsbCell::new(self.current_row, col, CellValue::Error(error_msg.to_string()))));
+                        return Ok(Some(XlsbCell::new(
+                            self.current_row,
+                            col,
+                            CellValue::Error(error_msg.to_string()),
+                        )));
                     }
-                }
+                },
                 0x0004 => {
                     // BrtCellBool
                     if self.buf.len() >= 9 {
                         let col = binary::read_u32_le_at(&self.buf, 0)?;
                         let value = self.buf[8] != 0;
-                        return Ok(Some(XlsbCell::new(self.current_row, col, CellValue::Bool(value))));
+                        return Ok(Some(XlsbCell::new(
+                            self.current_row,
+                            col,
+                            CellValue::Bool(value),
+                        )));
                     }
-                }
+                },
                 0x0005 => {
                     // BrtCellReal
                     if self.buf.len() >= 16 {
                         let col = binary::read_u32_le_at(&self.buf, 0)?;
                         let value = binary::read_f64_le_at(&self.buf, 8)?;
-                        return Ok(Some(XlsbCell::new(self.current_row, col, CellValue::Float(value))));
+                        return Ok(Some(XlsbCell::new(
+                            self.current_row,
+                            col,
+                            CellValue::Float(value),
+                        )));
                     }
-                }
+                },
                 0x0006 => {
                     // BrtCellSt
                     if self.buf.len() >= 8 {
                         let col = binary::read_u32_le_at(&self.buf, 0)?;
                         let (string, _) = super::records::wide_str_with_len(&self.buf[8..])?;
-                        return Ok(Some(XlsbCell::new(self.current_row, col, CellValue::String(string))));
+                        return Ok(Some(XlsbCell::new(
+                            self.current_row,
+                            col,
+                            CellValue::String(string),
+                        )));
                     }
-                }
-                       0x0007 => {
-                           // BrtCellIsst
-                           if self.buf.len() >= 12 {
-                               let col = binary::read_u32_le_at(&self.buf, 0)?;
-                               let idx = binary::read_u32_le_at(&self.buf, 8)? as usize;
-                               let value = if idx < self.shared_strings.len() {
-                                   CellValue::String(self.shared_strings[idx].clone())
-                               } else {
-                                   CellValue::Error("Invalid SST index".to_string())
-                               };
-                               return Ok(Some(XlsbCell::new(self.current_row, col, value)));
-                           }
-                       }
+                },
+                0x0007 => {
+                    // BrtCellIsst
+                    if self.buf.len() >= 12 {
+                        let col = binary::read_u32_le_at(&self.buf, 0)?;
+                        let idx = binary::read_u32_le_at(&self.buf, 8)? as usize;
+                        let value = if idx < self.shared_strings.len() {
+                            CellValue::String(self.shared_strings[idx].clone())
+                        } else {
+                            CellValue::Error("Invalid SST index".to_string())
+                        };
+                        return Ok(Some(XlsbCell::new(self.current_row, col, value)));
+                    }
+                },
                 _ => {
                     // Skip unknown records
-                }
+                },
             }
         }
     }

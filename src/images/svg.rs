@@ -12,11 +12,26 @@ pub enum PathCommand {
     /// Line to absolute position
     LineTo { x: f64, y: f64 },
     /// Cubic Bezier curve
-    CubicBezier { x1: f64, y1: f64, x2: f64, y2: f64, x: f64, y: f64 },
+    CubicBezier {
+        x1: f64,
+        y1: f64,
+        x2: f64,
+        y2: f64,
+        x: f64,
+        y: f64,
+    },
     /// Quadratic Bezier curve
     QuadraticBezier { x1: f64, y1: f64, x: f64, y: f64 },
     /// Arc
-    Arc { rx: f64, ry: f64, x_axis_rotation: f64, large_arc: bool, sweep: bool, x: f64, y: f64 },
+    Arc {
+        rx: f64,
+        ry: f64,
+        x_axis_rotation: f64,
+        large_arc: bool,
+        sweep: bool,
+        x: f64,
+        y: f64,
+    },
     /// Close path
     ClosePath,
 }
@@ -27,13 +42,28 @@ impl PathCommand {
         match self {
             Self::MoveTo { x, y } => format!("M {} {}", x, y),
             Self::LineTo { x, y } => format!("L {} {}", x, y),
-            Self::CubicBezier { x1, y1, x2, y2, x, y } => {
+            Self::CubicBezier {
+                x1,
+                y1,
+                x2,
+                y2,
+                x,
+                y,
+            } => {
                 format!("C {} {} {} {} {} {}", x1, y1, x2, y2, x, y)
-            }
+            },
             Self::QuadraticBezier { x1, y1, x, y } => {
                 format!("Q {} {} {} {}", x1, y1, x, y)
-            }
-            Self::Arc { rx, ry, x_axis_rotation, large_arc, sweep, x, y } => {
+            },
+            Self::Arc {
+                rx,
+                ry,
+                x_axis_rotation,
+                large_arc,
+                sweep,
+                x,
+                y,
+            } => {
                 format!(
                     "A {} {} {} {} {} {} {}",
                     rx,
@@ -44,7 +74,7 @@ impl PathCommand {
                     x,
                     y
                 )
-            }
+            },
             Self::ClosePath => "Z".to_string(),
         }
     }
@@ -241,7 +271,10 @@ pub struct SvgText {
 impl SvgText {
     /// Generate SVG text string
     pub fn to_svg(&self) -> String {
-        let mut attrs = format!(r#"x="{}" y="{}" font-size="{}""#, self.x, self.y, self.font_size);
+        let mut attrs = format!(
+            r#"x="{}" y="{}" font-size="{}""#,
+            self.x, self.y, self.font_size
+        );
 
         if let Some(ref family) = self.font_family {
             write!(attrs, r#" font-family="{}""#, family).unwrap();
@@ -273,7 +306,7 @@ impl SvgImage {
         let base64_engine = base64::engine::general_purpose::STANDARD;
         let encoded = base64_engine.encode(png_data);
         let href = format!("data:image/png;base64,{}", encoded);
-        
+
         Self {
             x,
             y,
@@ -289,7 +322,7 @@ impl SvgImage {
         let base64_engine = base64::engine::general_purpose::STANDARD;
         let encoded = base64_engine.encode(jpeg_data);
         let href = format!("data:image/jpeg;base64,{}", encoded);
-        
+
         Self {
             x,
             y,
@@ -394,7 +427,7 @@ impl SvgBuilder {
     /// Generate complete SVG document
     pub fn build(&self) -> String {
         let mut svg = String::new();
-        
+
         // XML declaration
         svg.push_str(r#"<?xml version="1.0" encoding="UTF-8"?>"#);
         svg.push('\n');
@@ -485,4 +518,3 @@ mod tests {
         assert_eq!(color::colorref_to_hex(0x0000FF), "#FF0000");
     }
 }
-

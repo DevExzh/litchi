@@ -1,7 +1,10 @@
 //! Iterator implementations for text-based formats
 
-use crate::sheet::{CellIterator, RowIterator, Cell, CellValue, WorksheetIterator, Worksheet, WorkbookTrait, Result as SheetResult};
 use super::cell::TextCell;
+use crate::sheet::{
+    Cell, CellIterator, CellValue, Result as SheetResult, RowIterator, WorkbookTrait, Worksheet,
+    WorksheetIterator,
+};
 
 /// Iterator over worksheets in a text workbook
 pub struct TextWorksheetIterator<'a> {

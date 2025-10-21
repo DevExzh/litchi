@@ -58,38 +58,38 @@ pub mod presentation;
 pub mod slide;
 
 // Submodules (organized by functionality)
-pub mod records;
 pub mod parsers;
 pub mod persist;
-pub mod text;
+pub mod records;
 pub mod shapes;
+pub mod text;
 
 // Drawing layer (Escher) support
 pub mod escher;
 
 // Legacy compatibility modules
 pub mod current_user;
-pub mod text_run;
-pub mod text_prop;
 pub mod escher_textbox;
+pub mod text_prop;
+pub mod text_run;
 
 // Re-export main types for convenience
 pub use package::Package;
 pub use presentation::Presentation;
-pub use slide::{Slide, SlideFactory, SlideData};
+pub use slide::{Slide, SlideData, SlideFactory};
 
 // Re-export record types
-pub use records::{PptRecord, DocumentInfo, SlideInfo, SlideAtomsSet};
 pub use parsers::PptRecordParser;
+pub use records::{DocumentInfo, PptRecord, SlideAtomsSet, SlideInfo};
 
 // Re-export persist types
-pub use persist::{PersistPtrHolder, PersistMapping};
+pub use persist::{PersistMapping, PersistPtrHolder};
 
 // Re-export shape types
-pub use shapes::{Shape, TextBox, Placeholder, PlaceholderType, PlaceholderSize, AutoShape};
+pub use shapes::{AutoShape, Placeholder, PlaceholderSize, PlaceholderType, Shape, TextBox};
 
 // Re-export legacy types
 pub use current_user::CurrentUser;
-pub use text_run::{TextRun, TextRunExtractor, TextRunFormatting};
-pub use text_prop::{TextProp, TextPropCollection, TextPropType};
 pub use escher_textbox::EscherTextboxWrapper;
+pub use text_prop::{TextProp, TextPropCollection, TextPropType};
+pub use text_run::{TextRun, TextRunExtractor, TextRunFormatting};

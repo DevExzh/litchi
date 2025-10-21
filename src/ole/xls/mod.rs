@@ -23,7 +23,7 @@ mod cell;
 /// Shared parsing utilities
 mod utils;
 
+pub use cell::XlsCell;
 pub use error::{XlsError, XlsResult};
 pub use workbook::XlsWorkbook;
 pub use worksheet::XlsWorksheet;
-pub use cell::XlsCell;

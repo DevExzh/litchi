@@ -51,7 +51,7 @@ pub(super) fn detect_document_format<R: Read + Seek>(reader: &mut R) -> Result<D
     // Read the first 8 bytes
     let mut header = [0u8; 8];
     reader.read_exact(&mut header)?;
-    
+
     // Reset to the beginning
     reader.seek(SeekFrom::Start(0))?;
 
@@ -64,9 +64,11 @@ pub(super) fn detect_document_format<R: Read + Seek>(reader: &mut R) -> Result<D
 #[inline]
 pub(super) fn detect_document_format_from_bytes(bytes: &[u8]) -> Result<DocumentFormat> {
     if bytes.len() < 4 {
-        return Err(Error::InvalidFormat("File too small to determine format".to_string()));
+        return Err(Error::InvalidFormat(
+            "File too small to determine format".to_string(),
+        ));
     }
-    
+
     detect_document_format_from_signature(&bytes[0..8.min(bytes.len())])
 }
 
@@ -92,16 +94,16 @@ fn detect_document_format_from_signature(header: &[u8]) -> Result<DocumentFormat
 #[cfg(feature = "iwa")]
 fn is_pages_document<R: Read + Seek>(reader: &mut R) -> bool {
     use std::io::SeekFrom;
-    
+
     // Try to open as ZIP and look for iWork format indicators
     reader.seek(SeekFrom::Start(0)).ok();
-    
+
     if let Ok(mut archive) = zip::ZipArchive::new(reader) {
         // Check for Index.zip (older iWork format)
         if archive.by_name("Index.zip").is_ok() {
             return true;
         }
-        
+
         // Check for Index/ directory with .iwa files (newer iWork format)
         for i in 0..archive.len() {
             if let Ok(file) = archive.by_index(i) {
@@ -112,30 +114,32 @@ fn is_pages_document<R: Read + Seek>(reader: &mut R) -> bool {
             }
         }
     }
-    
+
     false
 }
 
 /// Refine ZIP-based document format detection (DOCX vs Pages)
-pub(super) fn refine_document_format<R: Read + Seek>(reader: &mut R, initial_format: DocumentFormat) -> Result<DocumentFormat> {
+pub(super) fn refine_document_format<R: Read + Seek>(
+    reader: &mut R,
+    initial_format: DocumentFormat,
+) -> Result<DocumentFormat> {
     use std::io::SeekFrom;
-    
+
     // Only refine if initial detection was Docx (ZIP file)
     if initial_format != DocumentFormat::Docx {
         return Ok(initial_format);
     }
-    
+
     reader.seek(SeekFrom::Start(0))?;
-    
+
     // Check if it's a Pages document
     #[cfg(feature = "iwa")]
     if is_pages_document(reader) {
         reader.seek(SeekFrom::Start(0))?;
         return Ok(DocumentFormat::Pages);
     }
-    
+
     // Otherwise it's DOCX
     reader.seek(SeekFrom::Start(0))?;
     Ok(DocumentFormat::Docx)
 }
-

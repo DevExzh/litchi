@@ -1,9 +1,9 @@
 use crate::ooxml::opc::constants::target_mode;
 use crate::ooxml::opc::error::{OpcError, Result};
-use crate::ooxml::opc::packuri::{PackURI, PACKAGE_URI};
+use crate::ooxml::opc::packuri::{PACKAGE_URI, PackURI};
 use crate::ooxml::opc::phys_pkg::PhysPkgReader;
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 /// Low-level, read-only API to a serialized Open Packaging Convention (OPC) package.
 ///
 /// This module provides the PackageReader for parsing OPC packages, including
@@ -124,18 +124,18 @@ impl ContentTypeMap {
                                 match attr.key.as_ref() {
                                     b"Extension" => {
                                         extension = Some(attr.unescape_value()?.to_string());
-                                    }
+                                    },
                                     b"ContentType" => {
                                         content_type = Some(attr.unescape_value()?.to_string());
-                                    }
-                                    _ => {}
+                                    },
+                                    _ => {},
                                 }
                             }
 
                             if let (Some(ext), Some(ct)) = (extension, content_type) {
                                 map.add_default(ext, ct);
                             }
-                        }
+                        },
                         b"Override" => {
                             // Parse Override element: <Override PartName="/word/document.xml" ContentType="..."/>
                             let mut partname = None;
@@ -146,29 +146,29 @@ impl ContentTypeMap {
                                 match attr.key.as_ref() {
                                     b"PartName" => {
                                         partname = Some(attr.unescape_value()?.to_string());
-                                    }
+                                    },
                                     b"ContentType" => {
                                         content_type = Some(attr.unescape_value()?.to_string());
-                                    }
-                                    _ => {}
+                                    },
+                                    _ => {},
                                 }
                             }
 
                             if let (Some(pn), Some(ct)) = (partname, content_type) {
                                 map.add_override(pn, ct);
                             }
-                        }
-                        _ => {}
+                        },
+                        _ => {},
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => {
                     return Err(OpcError::XmlError(format!(
                         "Content types parse error: {}",
                         e
-                    )))
-                }
-                _ => {}
+                    )));
+                },
+                _ => {},
             }
             buf.clear();
         }
@@ -277,7 +277,7 @@ impl PackageReader {
                                 b"Type" => reltype = Some(attr.unescape_value()?.to_string()),
                                 b"Target" => target_ref = Some(attr.unescape_value()?.to_string()),
                                 b"TargetMode" => target_mode = attr.unescape_value()?.to_string(),
-                                _ => {}
+                                _ => {},
                             }
                         }
 
@@ -291,10 +291,10 @@ impl PackageReader {
                             });
                         }
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OpcError::XmlError(format!("Rels parse error: {}", e))),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }

@@ -1,7 +1,7 @@
 //! Functions for opening workbooks.
 
-use super::types::Result;
 use super::traits::WorkbookTrait;
+use super::types::Result;
 
 /// Open a workbook from a file path.
 ///
@@ -29,7 +29,9 @@ pub fn open_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> 
 ///
 /// **Note**: This requires the `ole` feature to be enabled.
 #[cfg(feature = "ole")]
-pub fn open_xls_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<crate::ole::xls::XlsWorkbook<std::fs::File>> {
+pub fn open_xls_workbook<P: AsRef<std::path::Path>>(
+    path: P,
+) -> Result<crate::ole::xls::XlsWorkbook<std::fs::File>> {
     use std::fs::File;
     let file = File::open(path)?;
     let workbook = crate::ole::xls::XlsWorkbook::new(file)?;
@@ -40,7 +42,9 @@ pub fn open_xls_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<crate::ol
 ///
 /// **Note**: This requires the `ole` feature to be enabled.
 #[cfg(feature = "ole")]
-pub fn open_xls_workbook_from_bytes(bytes: &[u8]) -> Result<crate::ole::xls::XlsWorkbook<std::io::Cursor<&[u8]>>> {
+pub fn open_xls_workbook_from_bytes(
+    bytes: &[u8],
+) -> Result<crate::ole::xls::XlsWorkbook<std::io::Cursor<&[u8]>>> {
     use std::io::Cursor;
     let cursor = Cursor::new(bytes);
     let workbook = crate::ole::xls::XlsWorkbook::new(cursor)?;
@@ -71,7 +75,9 @@ pub fn open_xls_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn Workbook
 ///
 /// **Note**: This requires the `ooxml` feature to be enabled.
 #[cfg(feature = "ooxml")]
-pub fn open_xlsb_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<crate::ooxml::xlsb::XlsbWorkbook> {
+pub fn open_xlsb_workbook<P: AsRef<std::path::Path>>(
+    path: P,
+) -> Result<crate::ooxml::xlsb::XlsbWorkbook> {
     use std::fs::File;
     let file = File::open(path)?;
     let workbook = crate::ooxml::xlsb::XlsbWorkbook::new(file)?;
@@ -93,7 +99,9 @@ pub fn open_xlsb_workbook_from_bytes(bytes: &[u8]) -> Result<crate::ooxml::xlsb:
 ///
 /// **Note**: This requires the `ooxml` feature to be enabled.
 #[cfg(feature = "ooxml")]
-pub fn open_xlsb_workbook_dyn<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn WorkbookTrait>> {
+pub fn open_xlsb_workbook_dyn<P: AsRef<std::path::Path>>(
+    path: P,
+) -> Result<Box<dyn WorkbookTrait>> {
     let workbook = open_xlsb_workbook(path)?;
     Ok(Box::new(workbook))
 }
@@ -117,7 +125,10 @@ pub fn open_csv_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn W
 
 /// Open a CSV workbook from bytes.
 pub fn open_csv_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
-    let workbook = crate::sheet::text::TextWorkbook::from_bytes(bytes, crate::sheet::text::TextConfig::default())?;
+    let workbook = crate::sheet::text::TextWorkbook::from_bytes(
+        bytes,
+        crate::sheet::text::TextConfig::default(),
+    )?;
     Ok(Box::new(workbook))
 }
 
@@ -152,7 +163,7 @@ pub fn open_prn_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn WorkbookTrai
 /// Open a text workbook with custom configuration from a file path.
 pub fn open_text_workbook_with_config<P: AsRef<std::path::Path>>(
     path: P,
-    config: crate::sheet::text::TextConfig
+    config: crate::sheet::text::TextConfig,
 ) -> Result<Box<dyn WorkbookTrait>> {
     let workbook = crate::sheet::text::TextWorkbook::from_path_with_config(path, config)?;
     Ok(Box::new(workbook))
@@ -161,9 +172,8 @@ pub fn open_text_workbook_with_config<P: AsRef<std::path::Path>>(
 /// Open a text workbook with custom configuration from bytes.
 pub fn open_text_workbook_from_bytes_with_config(
     bytes: &[u8],
-    config: crate::sheet::text::TextConfig
+    config: crate::sheet::text::TextConfig,
 ) -> Result<Box<dyn WorkbookTrait>> {
     let workbook = crate::sheet::text::TextWorkbook::from_bytes(bytes, config)?;
     Ok(Box::new(workbook))
 }
-

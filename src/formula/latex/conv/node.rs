@@ -3,13 +3,20 @@
 // This module contains the core node conversion logic for converting
 // MathNode AST elements to LaTeX format with optimized performance.
 
-use crate::formula::ast::{MathNode, PredefinedSymbol, FunctionName, Position, VerticalAlignment, LimitType};
-use super::error::LatexError;
 use super::converter::LatexConverter;
-use crate::formula::latex::templates::needs_grouping_for_scripts;
-use crate::formula::latex::utils::{needs_latex_protection, escape_latex_special_chars, is_valid_number_fast};
-use crate::formula::latex::operators::{operator_to_latex, fence_to_latex, large_operator_to_latex, accent_to_latex, space_to_latex, style_to_latex, is_standard_function};
+use super::error::LatexError;
+use crate::formula::ast::{
+    FunctionName, LimitType, MathNode, Position, PredefinedSymbol, VerticalAlignment,
+};
+use crate::formula::latex::operators::{
+    accent_to_latex, fence_to_latex, is_standard_function, large_operator_to_latex,
+    operator_to_latex, space_to_latex, style_to_latex,
+};
 use crate::formula::latex::symbols::convert_symbol;
+use crate::formula::latex::templates::needs_grouping_for_scripts;
+use crate::formula::latex::utils::{
+    escape_latex_special_chars, is_valid_number_fast, needs_latex_protection,
+};
 use std::fmt::Write;
 
 /// Convert predefined symbol to LaTeX
@@ -122,13 +129,20 @@ impl LatexConverter {
 }
 
 /// Internal node conversion function
-fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Result<(), LatexError> {
+fn convert_node_internal(
+    converter: &mut LatexConverter,
+    node: &MathNode,
+) -> Result<(), LatexError> {
     converter.stats.record_node();
 
     match node {
         MathNode::Text(text) => {
             if needs_latex_protection(text) {
-                super::utils::extend_buffer_with_capacity(&mut converter.buffer, "\\text{", text.len() + 2);
+                super::utils::extend_buffer_with_capacity(
+                    &mut converter.buffer,
+                    "\\text{",
+                    text.len() + 2,
+                );
                 converter.buffer.push_str("\\text{");
                 if escape_latex_special_chars(text, &mut converter.buffer) {
                     converter.stats.record_allocation(text.len());
@@ -137,24 +151,28 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
             } else {
                 super::utils::extend_buffer_with_capacity(&mut converter.buffer, text, 0);
             }
-        }
+        },
         MathNode::Number(num) => {
             // Fast validation for numbers (helps with malformed input)
             debug_assert!(is_valid_number_fast(num), "Invalid number format: {num}");
             super::utils::extend_buffer_with_capacity(&mut converter.buffer, num, 0);
-        }
+        },
         MathNode::Operator(op) => {
             let op_str = operator_to_latex(*op);
             converter.append_cached_command(op_str);
-        }
+        },
         MathNode::Symbol(sym) => {
             convert_symbol(&mut converter.buffer, sym)?;
-        }
+        },
         MathNode::PredefinedSymbol(symbol) => {
             let symbol_str = predefined_symbol_to_latex(*symbol);
             converter.append_cached_command(symbol_str);
-        }
-        MathNode::Frac { numerator, denominator, .. } => {
+        },
+        MathNode::Frac {
+            numerator,
+            denominator,
+            ..
+        } => {
             converter.append_cached_command("\\frac{");
             for n in numerator.iter() {
                 convert_node_internal(converter, n)?;
@@ -164,7 +182,7 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
+        },
         MathNode::Root { base, index } => {
             if let Some(idx) = index {
                 converter.buffer.push_str("\\sqrt[");
@@ -179,7 +197,7 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
+        },
         MathNode::Power { base, exponent } => {
             if needs_grouping_for_scripts(base) {
                 converter.buffer.push('{');
@@ -197,7 +215,7 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
+        },
         MathNode::Sub { base, subscript } => {
             if needs_grouping_for_scripts(base) {
                 converter.buffer.push('{');
@@ -215,8 +233,12 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
-        MathNode::SubSup { base, subscript, superscript } => {
+        },
+        MathNode::SubSup {
+            base,
+            subscript,
+            superscript,
+        } => {
             if needs_grouping_for_scripts(base) {
                 converter.buffer.push('{');
                 for n in base.iter() {
@@ -237,8 +259,11 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
-        MathNode::PreSub { base, pre_subscript } => {
+        },
+        MathNode::PreSub {
+            base,
+            pre_subscript,
+        } => {
             converter.buffer.push_str("\\presub{");
             for n in base.iter() {
                 convert_node_internal(converter, n)?;
@@ -248,8 +273,11 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
-        MathNode::PreSup { base, pre_superscript } => {
+        },
+        MathNode::PreSup {
+            base,
+            pre_superscript,
+        } => {
             converter.buffer.push_str("\\presup{");
             for n in base.iter() {
                 convert_node_internal(converter, n)?;
@@ -259,8 +287,12 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
-        MathNode::PreSubSup { base, pre_subscript, pre_superscript } => {
+        },
+        MathNode::PreSubSup {
+            base,
+            pre_subscript,
+            pre_superscript,
+        } => {
             converter.buffer.push_str("\\presubsup{");
             for n in base.iter() {
                 convert_node_internal(converter, n)?;
@@ -274,8 +306,12 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
-        MathNode::Under { base, under, position: _ } => {
+        },
+        MathNode::Under {
+            base,
+            under,
+            position: _,
+        } => {
             converter.append_cached_command("\\underset{");
             for n in under.iter() {
                 convert_node_internal(converter, n)?;
@@ -285,8 +321,12 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
-        MathNode::Over { base, over, position: _ } => {
+        },
+        MathNode::Over {
+            base,
+            over,
+            position: _,
+        } => {
             converter.append_cached_command("\\overset{");
             for n in over.iter() {
                 convert_node_internal(converter, n)?;
@@ -296,8 +336,13 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
-        MathNode::UnderOver { base, under, over, position: _ } => {
+        },
+        MathNode::UnderOver {
+            base,
+            under,
+            over,
+            position: _,
+        } => {
             converter.buffer.push_str("\\overset{");
             for n in over.iter() {
                 convert_node_internal(converter, n)?;
@@ -311,16 +356,30 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push_str("}}");
-        }
-        MathNode::Fenced { open, content, close, separator: _ } => {
+        },
+        MathNode::Fenced {
+            open,
+            content,
+            close,
+            separator: _,
+        } => {
             converter.buffer.push_str(fence_to_latex(*open, true));
             for n in content.iter() {
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push_str(fence_to_latex(*close, false));
-        }
-        MathNode::LargeOp { operator, lower_limit, upper_limit, integrand, hide_lower: _, hide_upper: _ } => {
-            converter.buffer.push_str(large_operator_to_latex(*operator));
+        },
+        MathNode::LargeOp {
+            operator,
+            lower_limit,
+            upper_limit,
+            integrand,
+            hide_lower: _,
+            hide_upper: _,
+        } => {
+            converter
+                .buffer
+                .push_str(large_operator_to_latex(*operator));
 
             if let Some(lower) = lower_limit {
                 converter.buffer.push_str("_{");
@@ -344,7 +403,7 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                     convert_node_internal(converter, n)?;
                 }
             }
-        }
+        },
         MathNode::Function { name, argument } => {
             if is_standard_function(name) {
                 write!(&mut converter.buffer, "\\{}", name)
@@ -358,7 +417,7 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
+        },
         MathNode::PredefinedFunction { function, argument } => {
             converter.buffer.push_str(function_name_to_latex(*function));
             converter.buffer.push('{');
@@ -366,11 +425,23 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
-        MathNode::Matrix { rows, fence_type, properties } => {
-            super::matrix::convert_matrix_optimized_internal(converter, rows, *fence_type, properties.as_ref())?;
-        }
-        MathNode::EqArray { rows, properties: _ } => {
+        },
+        MathNode::Matrix {
+            rows,
+            fence_type,
+            properties,
+        } => {
+            super::matrix::convert_matrix_optimized_internal(
+                converter,
+                rows,
+                *fence_type,
+                properties.as_ref(),
+            )?;
+        },
+        MathNode::EqArray {
+            rows,
+            properties: _,
+        } => {
             converter.buffer.push_str("\\begin{align*}");
             for (i, row) in rows.iter().enumerate() {
                 if i > 0 {
@@ -381,30 +452,39 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                 }
             }
             converter.buffer.push_str("\\end{align*}");
-        }
-        MathNode::Accent { base, accent, position: _ } => {
+        },
+        MathNode::Accent {
+            base,
+            accent,
+            position: _,
+        } => {
             converter.buffer.push_str(accent_to_latex(*accent));
             converter.buffer.push('{');
             for n in base.iter() {
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
+        },
         MathNode::Bar { base, position: _ } => {
             converter.buffer.push_str("\\bar{");
             for n in base.iter() {
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
+        },
         MathNode::BorderBox { content, style: _ } => {
             converter.buffer.push_str("\\boxed{");
             for n in content.iter() {
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
-        MathNode::GroupChar { base, character, position, vertical_alignment } => {
+        },
+        MathNode::GroupChar {
+            base,
+            character,
+            position,
+            vertical_alignment,
+        } => {
             let cmd = match (position, vertical_alignment) {
                 (Some(Position::Top), _) => "\\overbrace",
                 (Some(Position::Bottom), _) => "\\underbrace",
@@ -423,13 +503,13 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                 converter.buffer.push_str(char);
                 converter.buffer.push('}');
             }
-        }
+        },
         MathNode::Space(space_type) => {
             converter.buffer.push_str(space_to_latex(*space_type));
-        }
+        },
         MathNode::LineBreak => {
             converter.buffer.push_str("\\\\");
-        }
+        },
         MathNode::Style { style, content } => {
             converter.buffer.push_str(style_to_latex(*style));
             converter.buffer.push('{');
@@ -437,24 +517,34 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
+        },
         MathNode::Row(nodes) => {
             for n in nodes {
                 convert_node_internal(converter, n)?;
             }
-        }
+        },
         MathNode::Phantom(content) => {
             converter.buffer.push_str("\\phantom{");
             for n in content.iter() {
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
+        },
         MathNode::Error(msg) => {
             write!(&mut converter.buffer, "\\text{{[Error: {}]}}", msg)
                 .map_err(|e| LatexError::FormatError(e.to_string()))?;
-        }
-        MathNode::Run { content, literal: _, style, font, color, underline, overline, strike_through, double_strike_through } => {
+        },
+        MathNode::Run {
+            content,
+            literal: _,
+            style,
+            font,
+            color,
+            underline,
+            overline,
+            strike_through,
+            double_strike_through,
+        } => {
             if let Some(s) = style {
                 converter.buffer.push_str(style_to_latex(*s));
                 converter.buffer.push('{');
@@ -501,8 +591,11 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
             if style.is_some() {
                 converter.buffer.push('}');
             }
-        }
-        MathNode::Limit { content, limit_type } => {
+        },
+        MathNode::Limit {
+            content,
+            limit_type,
+        } => {
             let cmd = match limit_type {
                 LimitType::Lower => "\\lim_{",
                 LimitType::Upper => "\\lim^{",
@@ -512,14 +605,19 @@ fn convert_node_internal(converter: &mut LatexConverter, node: &MathNode) -> Res
                 convert_node_internal(converter, n)?;
             }
             converter.buffer.push('}');
-        }
-        MathNode::Degree(content) | MathNode::Base(content) | MathNode::Argument(content) |
-        MathNode::Numerator(content) | MathNode::Denominator(content) |
-        MathNode::Integrand(content) | MathNode::LowerLimit(content) | MathNode::UpperLimit(content) => {
+        },
+        MathNode::Degree(content)
+        | MathNode::Base(content)
+        | MathNode::Argument(content)
+        | MathNode::Numerator(content)
+        | MathNode::Denominator(content)
+        | MathNode::Integrand(content)
+        | MathNode::LowerLimit(content)
+        | MathNode::UpperLimit(content) => {
             for n in content.iter() {
                 convert_node_internal(converter, n)?;
             }
-        }
+        },
     }
 
     Ok(())

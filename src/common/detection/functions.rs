@@ -1,11 +1,11 @@
 //! Core file format detection functions.
 
+use std::fs::File;
 use std::io::{Read, Seek};
 use std::path::Path;
-use std::fs::File;
 
 use super::types::FileFormat;
-use super::{ole2, ooxml, iwork, utils};
+use super::{iwork, ole2, ooxml, utils};
 
 #[cfg(feature = "odf")]
 use super::odf;
@@ -128,14 +128,18 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
             let _ = reader.seek(std::io::SeekFrom::Start(0));
             if let Ok(mut zip_archive) = zip::ZipArchive::new(&mut *reader) {
                 let has_iwa_files = (0..zip_archive.len()).any(|i| {
-                    zip_archive.by_index(i).ok()
+                    zip_archive
+                        .by_index(i)
+                        .ok()
                         .map(|file| file.name().ends_with(".iwa"))
                         .unwrap_or(false)
                 });
 
                 if has_iwa_files {
                     // This is an iWork file, detect the specific type
-                    if let Some(result) = iwork::detect_application_from_zip_archive(&mut zip_archive) {
+                    if let Some(result) =
+                        iwork::detect_application_from_zip_archive(&mut zip_archive)
+                    {
                         return Some(result);
                     }
                     return None;
@@ -221,11 +225,15 @@ mod tests {
 
             // Add [Content_Types].xml
             zip.start_file("[Content_Types].xml", options).unwrap();
-            zip.write_all(b"<Types><Default Extension=\"xml\" ContentType=\"application/xml\"/></Types>").unwrap();
+            zip.write_all(
+                b"<Types><Default Extension=\"xml\" ContentType=\"application/xml\"/></Types>",
+            )
+            .unwrap();
 
             // Add word/document.xml
             zip.start_file("word/document.xml", options).unwrap();
-            zip.write_all(b"<document><body><p>Hello</p></body></document>").unwrap();
+            zip.write_all(b"<document><body><p>Hello</p></body></document>")
+                .unwrap();
 
             zip.finish().unwrap();
         }
@@ -233,4 +241,3 @@ mod tests {
         buffer
     }
 }
-

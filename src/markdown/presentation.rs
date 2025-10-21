@@ -1,3 +1,6 @@
+use super::config::MarkdownOptions;
+use super::traits::ToMarkdown;
+use super::writer::MarkdownWriter;
 /// ToMarkdown implementations for Presentation types.
 ///
 /// This module implements the `ToMarkdown` trait for PowerPoint presentation types,
@@ -6,9 +9,6 @@
 /// **Note**: This module is only available when the `ole` or `ooxml` feature is enabled.
 use crate::common::Result;
 use crate::presentation::{Presentation, Slide};
-use super::config::MarkdownOptions;
-use super::traits::ToMarkdown;
-use super::writer::MarkdownWriter;
 
 impl ToMarkdown for Presentation {
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
@@ -54,22 +54,26 @@ fn extract_slide_title(slide: &Slide) -> Result<String> {
             let text = slide.text()?;
             let first_line = text.lines().next().unwrap_or("");
             Ok(first_line.to_string())
-        }
+        },
         Slide::Pptx(pptx_data) => {
             // For PPTX slides, use the slide name if available
             // In a full implementation, we'd parse the slide content to find title placeholders
             Ok(pptx_data.name.clone().unwrap_or_default())
-        }
+        },
         #[cfg(feature = "iwa")]
         Slide::Keynote(keynote_slide) => {
             // For Keynote slides, use the title if available
             Ok(keynote_slide.title.clone().unwrap_or_default())
-        }
+        },
     }
 }
 
 /// Write slide content with proper markdown formatting.
-fn write_slide_content(writer: &mut MarkdownWriter, slide: &Slide, _options: &MarkdownOptions) -> Result<()> {
+fn write_slide_content(
+    writer: &mut MarkdownWriter,
+    slide: &Slide,
+    _options: &MarkdownOptions,
+) -> Result<()> {
     match slide {
         Slide::Ppt(_) => {
             // Write PPT slide text content
@@ -78,7 +82,7 @@ fn write_slide_content(writer: &mut MarkdownWriter, slide: &Slide, _options: &Ma
                 writer.push_str(&text);
                 writer.push_str("\n\n");
             }
-        }
+        },
         Slide::Pptx(_) => {
             // For PPTX slides, we have limited access to structured content
             // Just write the plain text for now
@@ -87,7 +91,7 @@ fn write_slide_content(writer: &mut MarkdownWriter, slide: &Slide, _options: &Ma
                 writer.push_str(&text);
                 writer.push_str("\n\n");
             }
-        }
+        },
         #[cfg(feature = "iwa")]
         Slide::Keynote(_) => {
             // For Keynote slides, write the text content
@@ -96,7 +100,7 @@ fn write_slide_content(writer: &mut MarkdownWriter, slide: &Slide, _options: &Ma
                 writer.push_str(&text);
                 writer.push_str("\n\n");
             }
-        }
+        },
     }
 
     Ok(())
@@ -109,4 +113,3 @@ impl ToMarkdown for Slide {
         self.text()
     }
 }
-

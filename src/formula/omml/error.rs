@@ -23,9 +23,13 @@ impl std::fmt::Display for OmmlError {
             OmmlError::ValidationError(msg) => write!(f, "OMML validation error: {}", msg),
             OmmlError::UnsupportedFeature(msg) => write!(f, "Unsupported OMML feature: {}", msg),
             OmmlError::EncodingError(msg) => write!(f, "Text encoding error: {}", msg),
-            OmmlError::DepthLimitExceeded(limit) => write!(f, "XML depth limit exceeded: {}", limit),
+            OmmlError::DepthLimitExceeded(limit) => {
+                write!(f, "XML depth limit exceeded: {}", limit)
+            },
             OmmlError::MalformedElement(msg) => write!(f, "Malformed element: {}", msg),
-            OmmlError::MissingRequiredElement(msg) => write!(f, "Missing required element: {}", msg),
+            OmmlError::MissingRequiredElement(msg) => {
+                write!(f, "Missing required element: {}", msg)
+            },
             OmmlError::InvalidAttribute(msg) => write!(f, "Invalid attribute: {}", msg),
             OmmlError::ArenaAllocationError(msg) => write!(f, "Arena allocation error: {}", msg),
         }

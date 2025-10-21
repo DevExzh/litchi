@@ -100,14 +100,14 @@ static DECODERS: DecoderMap = phf_map! {
     // TSP (Core Protocol) types - used by all applications
     1u32 => decode_archive_info,
     2u32 => decode_message_info,
-    
+
     // TST (Table) types - Numbers spreadsheet tables and cells
     // Message type 6001 is TST.TableModelArchive
     6000u32 => decode_table_model,
     6001u32 => decode_table_model,
     6005u32 => decode_table_data_list,
     6201u32 => decode_table_data_list,
-    
+
     // TSD (Drawing) types - Shapes, images, and drawables
     3002u32 => decode_drawable_archive,
     3003u32 => decode_drawable_archive,  // ContainerArchive
@@ -117,12 +117,12 @@ static DECODERS: DecoderMap = phf_map! {
     3007u32 => decode_shape_archive,     // MovieArchive
     3008u32 => decode_shape_archive,     // GroupArchive
     3009u32 => decode_shape_archive,     // ConnectionLineArchive
-    
+
     // TSCH (Charts) types
     5000u32 => decode_chart_archive,
     5004u32 => decode_chart_archive,  // ChartMediatorArchive
     5021u32 => decode_chart_archive,  // ChartDrawableArchive
-    
+
     // TSWP (Word Processing) types - Text storage used across all apps
     2001u32 => decode_storage_archive,
     2002u32 => decode_storage_archive,
@@ -139,12 +139,12 @@ static DECODERS: DecoderMap = phf_map! {
     2013u32 => decode_storage_archive,
     2014u32 => decode_storage_archive,
     2022u32 => decode_storage_archive,
-    
+
     // Pages-specific document types (TP namespace)
     10000u32 => decode_pages_document,
     10001u32 => decode_pages_document,  // ThemeArchive
     10011u32 => decode_pages_document,  // SectionArchive
-    
+
     // Numbers-specific document types (TN namespace)
     // Note: Numbers uses low message type numbers that conflict with TSP types
     // Type 1 for TN.DocumentArchive conflicts with TSP.ArchiveInfo
@@ -152,7 +152,7 @@ static DECODERS: DecoderMap = phf_map! {
     // We prioritize TSP types in the decoder map and handle app-specific
     // types through context-aware parsing in the document parsers
     3u32 => decode_numbers_sheet,       // TN.FormBasedSheetArchive
-    
+
     // Keynote-specific document types (KN namespace)
     // Note: Keynote uses low message type numbers (1-25, 100-199)
     // Type 2 is KN.ShowArchive but conflicts with TSP.MessageInfo
@@ -187,7 +187,9 @@ pub trait DecodedMessage: std::fmt::Debug {
 pub struct ArchiveInfoWrapper(pub tsp::ArchiveInfo);
 
 impl DecodedMessage for ArchiveInfoWrapper {
-    fn message_type(&self) -> u32 { 1 }
+    fn message_type(&self) -> u32 {
+        1
+    }
 
     fn extract_text(&self) -> Vec<String> {
         Vec::new() // ArchiveInfo doesn't contain text
@@ -199,7 +201,9 @@ impl DecodedMessage for ArchiveInfoWrapper {
 pub struct MessageInfoWrapper(pub tsp::MessageInfo);
 
 impl DecodedMessage for MessageInfoWrapper {
-    fn message_type(&self) -> u32 { 2 }
+    fn message_type(&self) -> u32 {
+        2
+    }
 
     fn extract_text(&self) -> Vec<String> {
         Vec::new() // MessageInfo doesn't contain text
@@ -211,7 +215,9 @@ impl DecodedMessage for MessageInfoWrapper {
 pub struct StorageArchiveWrapper(pub tswp::StorageArchive);
 
 impl DecodedMessage for StorageArchiveWrapper {
-    fn message_type(&self) -> u32 { 200 }
+    fn message_type(&self) -> u32 {
+        200
+    }
 
     fn extract_text(&self) -> Vec<String> {
         self.0.text.clone()
@@ -223,7 +229,9 @@ impl DecodedMessage for StorageArchiveWrapper {
 pub struct PagesDocumentWrapper(pub tp::DocumentArchive);
 
 impl DecodedMessage for PagesDocumentWrapper {
-    fn message_type(&self) -> u32 { 1001 }
+    fn message_type(&self) -> u32 {
+        1001
+    }
 
     fn extract_text(&self) -> Vec<String> {
         Vec::new() // Document metadata doesn't contain direct text
@@ -235,7 +243,9 @@ impl DecodedMessage for PagesDocumentWrapper {
 pub struct NumbersSheetWrapper(pub tn::SheetArchive);
 
 impl DecodedMessage for NumbersSheetWrapper {
-    fn message_type(&self) -> u32 { 1003 }
+    fn message_type(&self) -> u32 {
+        1003
+    }
 
     fn extract_text(&self) -> Vec<String> {
         if !self.0.name.is_empty() {
@@ -251,14 +261,17 @@ impl DecodedMessage for NumbersSheetWrapper {
 pub struct KeynoteSlideWrapper(pub kn::SlideArchive);
 
 impl DecodedMessage for KeynoteSlideWrapper {
-    fn message_type(&self) -> u32 { 1102 }
+    fn message_type(&self) -> u32 {
+        1102
+    }
 
     fn extract_text(&self) -> Vec<String> {
         let mut text = Vec::new();
         if let Some(ref name) = self.0.name
-            && !name.is_empty() {
-                text.push(name.clone());
-            }
+            && !name.is_empty()
+        {
+            text.push(name.clone());
+        }
         // if let Some(ref note) = self.0.note {
         //     // Note is a reference, not direct text - we can't extract text from it here
         //     // without additional processing
@@ -272,7 +285,9 @@ impl DecodedMessage for KeynoteSlideWrapper {
 pub struct TableModelWrapper(pub tst::TableModelArchive);
 
 impl DecodedMessage for TableModelWrapper {
-    fn message_type(&self) -> u32 { 100 }
+    fn message_type(&self) -> u32 {
+        100
+    }
 
     fn extract_text(&self) -> Vec<String> {
         let mut text = Vec::new();
@@ -291,19 +306,23 @@ impl DecodedMessage for TableModelWrapper {
 pub struct TableDataListWrapper(pub tst::TableDataList);
 
 impl DecodedMessage for TableDataListWrapper {
-    fn message_type(&self) -> u32 { 101 }
+    fn message_type(&self) -> u32 {
+        101
+    }
 
     fn extract_text(&self) -> Vec<String> {
         // TableDataList contains actual cell data as ListEntry items
         // Extract string values from entries
         let mut strings = Vec::new();
-        
+
         for entry in &self.0.entries {
-            if let Some(ref string_val) = entry.string && !string_val.is_empty() {
+            if let Some(ref string_val) = entry.string
+                && !string_val.is_empty()
+            {
                 strings.push(string_val.clone());
             }
         }
-        
+
         strings
     }
 }
@@ -313,27 +332,33 @@ impl DecodedMessage for TableDataListWrapper {
 pub struct ShapeArchiveWrapper(pub tsd::ShapeArchive);
 
 impl DecodedMessage for ShapeArchiveWrapper {
-    fn message_type(&self) -> u32 { 500 }
+    fn message_type(&self) -> u32 {
+        500
+    }
 
     fn extract_text(&self) -> Vec<String> {
         // Shapes can contain text, particularly text boxes
         // Text is typically stored in the DrawableArchive's accessibility description
         // or in referenced TSWP.StorageArchive objects (handled by shape text extractor)
         let mut text = Vec::new();
-        
+
         // super_ is a required field, not Optional
         let drawable = &self.0.super_;
-        
+
         // Extract accessibility description if present (often used for alt text/labels)
-        if let Some(ref desc) = drawable.accessibility_description && !desc.is_empty() {
+        if let Some(ref desc) = drawable.accessibility_description
+            && !desc.is_empty()
+        {
             text.push(desc.clone());
         }
-        
+
         // Hyperlink URLs can also contain meaningful text
-        if let Some(ref url) = drawable.hyperlink_url && !url.is_empty() {
+        if let Some(ref url) = drawable.hyperlink_url
+            && !url.is_empty()
+        {
             text.push(url.clone());
         }
-        
+
         text
     }
 }
@@ -343,7 +368,9 @@ impl DecodedMessage for ShapeArchiveWrapper {
 pub struct DrawableArchiveWrapper(pub tsd::DrawableArchive);
 
 impl DecodedMessage for DrawableArchiveWrapper {
-    fn message_type(&self) -> u32 { 501 }
+    fn message_type(&self) -> u32 {
+        501
+    }
 
     fn extract_text(&self) -> Vec<String> {
         // Drawables are visual elements without direct text
@@ -356,13 +383,15 @@ impl DecodedMessage for DrawableArchiveWrapper {
 pub struct ChartArchiveWrapper(pub tsch::ChartArchive);
 
 impl DecodedMessage for ChartArchiveWrapper {
-    fn message_type(&self) -> u32 { 600 }
+    fn message_type(&self) -> u32 {
+        600
+    }
 
     fn extract_text(&self) -> Vec<String> {
         // Charts contain text in grid data (row/column names)
         // and may have titles in referenced text storage objects
         let mut text = Vec::new();
-        
+
         // Extract grid data (row and column names)
         if let Some(ref grid) = self.0.grid {
             // Add row names
@@ -371,7 +400,7 @@ impl DecodedMessage for ChartArchiveWrapper {
                     text.push(row_name.clone());
                 }
             }
-            
+
             // Add column names
             for col_name in &grid.column_name {
                 if !col_name.is_empty() {
@@ -379,7 +408,7 @@ impl DecodedMessage for ChartArchiveWrapper {
                 }
             }
         }
-        
+
         text
     }
 }
@@ -426,4 +455,3 @@ mod tests {
         }
     }
 }
-

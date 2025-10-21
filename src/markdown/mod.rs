@@ -101,8 +101,8 @@
 // Module declarations
 mod config;
 mod traits;
-mod writer;
 pub mod unicode;
+mod writer;
 
 // Document and presentation markdown implementations are only available when their respective features are enabled
 #[cfg(any(feature = "ole", feature = "ooxml"))]
@@ -112,5 +112,5 @@ mod document;
 mod presentation;
 
 // Re-export public API
-pub use config::{MarkdownOptions, TableStyle, FormulaStyle, ScriptStyle, StrikethroughStyle};
+pub use config::{FormulaStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle};
 pub use traits::ToMarkdown;

@@ -6,8 +6,8 @@
 //! - Lazy: Parses on-demand via iterators
 //! - Efficient: Single-pass with minimal allocations
 
+use super::container::{EscherChildIterator, EscherContainer};
 use super::record::EscherRecord;
-use super::container::{EscherContainer, EscherChildIterator};
 use super::types::EscherRecordType;
 use crate::ole::ppt::package::Result;
 
@@ -23,7 +23,7 @@ impl<'data> EscherParser<'data> {
     pub fn new(data: &'data [u8]) -> Self {
         Self { data }
     }
-    
+
     /// Get the root DgContainer (Drawing Container).
     ///
     /// # Performance
@@ -34,22 +34,20 @@ impl<'data> EscherParser<'data> {
         if self.data.len() < 8 {
             return None;
         }
-        
+
         match EscherRecord::parse(self.data, 0) {
-            Ok((record, _)) if record.is_container() => {
-                Some(Ok(EscherContainer::new(record)))
-            }
+            Ok((record, _)) if record.is_container() => Some(Ok(EscherContainer::new(record))),
             Ok(_) => None,
             Err(e) => Some(Err(e)),
         }
     }
-    
+
     /// Iterate over all top-level records.
     #[inline]
     pub fn records(&self) -> EscherChildIterator<'data> {
         EscherChildIterator::new(self.data)
     }
-    
+
     /// Find all SpContainer (Shape Container) records recursively.
     ///
     /// # Performance
@@ -59,16 +57,16 @@ impl<'data> EscherParser<'data> {
     /// - Pre-allocated result vector
     pub fn find_all_shapes(&self) -> Result<Vec<EscherRecord<'data>>> {
         let mut shapes = Vec::new();
-        
+
         // Parse root container
         if let Some(root_result) = self.root_container() {
             let root = root_result?;
             shapes.extend(root.find_recursive(EscherRecordType::SpContainer));
         }
-        
+
         Ok(shapes)
     }
-    
+
     /// Find all ClientTextbox records (contains text).
     ///
     /// # Performance
@@ -77,13 +75,13 @@ impl<'data> EscherParser<'data> {
     /// - Only traverses text-bearing containers
     pub fn find_all_textboxes(&self) -> Result<Vec<EscherRecord<'data>>> {
         let mut textboxes = Vec::new();
-        
+
         // Parse root container
         if let Some(root_result) = self.root_container() {
             let root = root_result?;
             textboxes.extend(root.find_recursive(EscherRecordType::ClientTextbox));
         }
-        
+
         Ok(textboxes)
     }
 }
@@ -91,7 +89,7 @@ impl<'data> EscherParser<'data> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_parser_creation() {
         let data = vec![
@@ -100,11 +98,10 @@ mod tests {
             0x04, 0x00, 0x00, 0x00, // length = 4
             0x01, 0x02, 0x03, 0x04, // data
         ];
-        
+
         let parser = EscherParser::new(&data);
         let root = parser.root_container().unwrap().unwrap();
-        
+
         assert_eq!(root.record().record_type, EscherRecordType::DgContainer);
     }
 }
-

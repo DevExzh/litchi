@@ -1,9 +1,9 @@
+use super::super::package::PptError;
 /// Base shape trait and common shape functionality.
 ///
 /// This module defines the core Shape trait that all shape types implement,
 /// along with common properties and methods for working with shapes.
 use std::fmt;
-use super::super::package::PptError;
 
 /// Types of shapes in PowerPoint presentations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -300,4 +300,3 @@ impl Shape for ShapeContainer {
         self
     }
 }
-

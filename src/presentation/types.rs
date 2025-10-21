@@ -60,13 +60,15 @@ pub(super) enum PresentationFormat {
 ///
 /// This function reads the first few bytes of the file to determine if it's
 /// an OLE2 file (.ppt) or a ZIP file (.pptx).
-pub(super) fn detect_presentation_format<R: Read + Seek>(reader: &mut R) -> Result<PresentationFormat> {
+pub(super) fn detect_presentation_format<R: Read + Seek>(
+    reader: &mut R,
+) -> Result<PresentationFormat> {
     use std::io::SeekFrom;
 
     // Read the first 8 bytes
     let mut header = [0u8; 8];
     reader.read_exact(&mut header)?;
-    
+
     // Reset to the beginning
     reader.seek(SeekFrom::Start(0))?;
 
@@ -79,9 +81,11 @@ pub(super) fn detect_presentation_format<R: Read + Seek>(reader: &mut R) -> Resu
 #[inline]
 pub(super) fn detect_presentation_format_from_bytes(bytes: &[u8]) -> Result<PresentationFormat> {
     if bytes.len() < 4 {
-        return Err(Error::InvalidFormat("File too small to determine format".to_string()));
+        return Err(Error::InvalidFormat(
+            "File too small to determine format".to_string(),
+        ));
     }
-    
+
     detect_presentation_format_from_signature(&bytes[0..8.min(bytes.len())])
 }
 
@@ -107,16 +111,16 @@ fn detect_presentation_format_from_signature(header: &[u8]) -> Result<Presentati
 #[cfg(feature = "iwa")]
 fn is_keynote_presentation<R: Read + Seek>(reader: &mut R) -> bool {
     use std::io::SeekFrom;
-    
+
     // Try to open as ZIP and look for iWork format indicators
     reader.seek(SeekFrom::Start(0)).ok();
-    
+
     if let Ok(mut archive) = zip::ZipArchive::new(reader) {
         // Check for Index.zip (older iWork format)
         if archive.by_name("Index.zip").is_ok() {
             return true;
         }
-        
+
         // Check for Index/ directory with .iwa files (newer iWork format)
         for i in 0..archive.len() {
             if let Ok(file) = archive.by_index(i) {
@@ -127,30 +131,32 @@ fn is_keynote_presentation<R: Read + Seek>(reader: &mut R) -> bool {
             }
         }
     }
-    
+
     false
 }
 
 /// Refine ZIP-based presentation format detection (PPTX vs Keynote)
-pub(super) fn refine_presentation_format<R: Read + Seek>(reader: &mut R, initial_format: PresentationFormat) -> Result<PresentationFormat> {
+pub(super) fn refine_presentation_format<R: Read + Seek>(
+    reader: &mut R,
+    initial_format: PresentationFormat,
+) -> Result<PresentationFormat> {
     use std::io::SeekFrom;
-    
+
     // Only refine if initial detection was Pptx (ZIP file)
     if initial_format != PresentationFormat::Pptx {
         return Ok(initial_format);
     }
-    
+
     reader.seek(SeekFrom::Start(0))?;
-    
+
     // Check if it's a Keynote presentation
     #[cfg(feature = "iwa")]
     if is_keynote_presentation(reader) {
         reader.seek(SeekFrom::Start(0))?;
         return Ok(PresentationFormat::Keynote);
     }
-    
+
     // Otherwise it's PPTX
     reader.seek(SeekFrom::Start(0))?;
     Ok(PresentationFormat::Pptx)
 }
-

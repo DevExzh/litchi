@@ -1,15 +1,28 @@
-/// OMML element types and context
-mod elements;
 /// OMML attribute parsing
 ///
 /// This module handles parsing of OMML element attributes and properties.
 mod attributes;
+/// OMML element types and context
+mod elements;
+/// OMML Error Types
+///
+/// This module defines all error types that can occur during OMML parsing.
+mod error;
 /// OMML element handlers
 ///
 /// This module contains handlers for specific OMML elements that require
 /// complex parsing logic. Each handler is organized into separate modules
 /// for better maintainability.
 mod handlers;
+/// Performance-optimized lookup tables for OMML parsing
+///
+/// This module provides compile-time generated perfect hash function (PHF)
+/// lookup tables for fast element and attribute name resolution.
+mod lookup;
+/// OMML Parser Implementation
+///
+/// This module contains the main OMML parsing logic with performance optimizations.
+mod parser;
 /// OMML property parsing
 ///
 /// This module handles parsing of OMML property elements and attributes.
@@ -20,31 +33,17 @@ mod properties;
 /// This module provides utility functions for OMML parsing, including
 /// performance optimizations, string processing, and helper functions.
 mod utils;
-/// Performance-optimized lookup tables for OMML parsing
-///
-/// This module provides compile-time generated perfect hash function (PHF)
-/// lookup tables for fast element and attribute name resolution.
-mod lookup;
-/// OMML Parser Implementation
-///
-/// This module contains the main OMML parsing logic with performance optimizations.
-mod parser;
-/// OMML Error Types
-///
-/// This module defines all error types that can occur during OMML parsing.
-mod error;
 
 use crate::formula::ast::MathNode;
 
-
+pub use error::OmmlError;
 /// Re-export public API
 pub use parser::OmmlParser;
-pub use error::OmmlError;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::formula::ast::{Formula, Fence, AccentType, LargeOperator};
+    use crate::formula::ast::{AccentType, Fence, Formula, LargeOperator};
 
     #[test]
     fn test_parse_simple_text() {
@@ -84,7 +83,7 @@ mod tests {
                         _ => unreachable!(),
                     };
                     assert_eq!(text.as_ref(), expected);
-                }
+                },
                 _ => panic!("Expected text node at position {}", i),
             }
         }
@@ -105,10 +104,14 @@ mod tests {
         let nodes = parser.parse(xml).unwrap();
         assert!(!nodes.is_empty());
         match &nodes[0] {
-            MathNode::Frac { numerator, denominator, .. } => {
+            MathNode::Frac {
+                numerator,
+                denominator,
+                ..
+            } => {
                 assert!(!numerator.is_empty());
                 assert!(!denominator.is_empty());
-            }
+            },
             _ => panic!("Expected fraction node"),
         }
     }
@@ -129,10 +132,14 @@ mod tests {
         let nodes = parser.parse(xml).unwrap();
         assert!(!nodes.is_empty());
         match &nodes[0] {
-            MathNode::Frac { numerator, denominator, .. } => {
+            MathNode::Frac {
+                numerator,
+                denominator,
+                ..
+            } => {
                 assert!(!numerator.is_empty());
                 assert!(!denominator.is_empty());
-            }
+            },
             _ => panic!("Expected fraction node"),
         }
     }
@@ -158,7 +165,7 @@ mod tests {
             MathNode::Fenced { open, close, .. } => {
                 assert_eq!(*open, Fence::Paren);
                 assert_eq!(*close, Fence::Paren);
-            }
+            },
             _ => panic!("Expected fenced node"),
         }
     }
@@ -184,7 +191,7 @@ mod tests {
             MathNode::Fenced { open, close, .. } => {
                 assert_eq!(*open, Fence::Bracket);
                 assert_eq!(*close, Fence::Bracket);
-            }
+            },
             _ => panic!("Expected fenced node"),
         }
     }
@@ -206,7 +213,7 @@ mod tests {
         match &nodes[0] {
             MathNode::Function { name, .. } => {
                 assert_eq!(name.as_ref(), "sin");
-            }
+            },
             _ => panic!("Expected function node"),
         }
     }
@@ -234,7 +241,7 @@ mod tests {
             MathNode::Function { name, argument } => {
                 assert_eq!(name.as_ref(), "log");
                 assert!(!argument.is_empty());
-            }
+            },
             _ => panic!("Expected function node"),
         }
     }
@@ -258,7 +265,7 @@ mod tests {
         match &nodes[0] {
             MathNode::Accent { accent, .. } => {
                 assert_eq!(*accent, AccentType::Hat);
-            }
+            },
             _ => panic!("Expected accent node"),
         }
     }
@@ -282,7 +289,7 @@ mod tests {
         match &nodes[0] {
             MathNode::Accent { accent, .. } => {
                 assert_eq!(*accent, AccentType::Bar);
-            }
+            },
             _ => panic!("Expected accent node"),
         }
     }
@@ -303,7 +310,7 @@ mod tests {
         match &nodes[0] {
             MathNode::Bar { .. } => {
                 // Bar is represented as Bar node
-            }
+            },
             _ => panic!("Expected bar node"),
         }
     }
@@ -329,15 +336,20 @@ mod tests {
             Err(e) => {
                 println!("Parse error: {:?}", e);
                 panic!("Parse failed: {:?}", e);
-            }
+            },
         };
         assert!(!nodes.is_empty());
         match &nodes[0] {
-            MathNode::LargeOp { operator, lower_limit, upper_limit, .. } => {
+            MathNode::LargeOp {
+                operator,
+                lower_limit,
+                upper_limit,
+                ..
+            } => {
                 assert_eq!(*operator, LargeOperator::Sum);
                 assert!(lower_limit.is_some());
                 assert!(upper_limit.is_some());
-            }
+            },
             _ => panic!("Expected large operator node"),
         }
     }
@@ -361,11 +373,16 @@ mod tests {
         let nodes = parser.parse(xml).unwrap();
         assert!(!nodes.is_empty());
         match &nodes[0] {
-            MathNode::LargeOp { operator, lower_limit, upper_limit, .. } => {
+            MathNode::LargeOp {
+                operator,
+                lower_limit,
+                upper_limit,
+                ..
+            } => {
                 assert_eq!(*operator, LargeOperator::Integral);
                 assert!(lower_limit.is_some());
                 assert!(upper_limit.is_some());
-            }
+            },
             _ => panic!("Expected large operator node"),
         }
     }
@@ -388,7 +405,7 @@ mod tests {
             MathNode::Power { base, exponent } => {
                 assert!(!base.is_empty());
                 assert!(!exponent.is_empty());
-            }
+            },
             _ => panic!("Expected power node"),
         }
     }
@@ -411,7 +428,7 @@ mod tests {
             MathNode::Sub { base, subscript } => {
                 assert!(!base.is_empty());
                 assert!(!subscript.is_empty());
-            }
+            },
             _ => panic!("Expected sub node"),
         }
     }
@@ -432,11 +449,15 @@ mod tests {
         let nodes = parser.parse(xml).unwrap();
         assert!(!nodes.is_empty());
         match &nodes[0] {
-            MathNode::SubSup { base, subscript, superscript } => {
+            MathNode::SubSup {
+                base,
+                subscript,
+                superscript,
+            } => {
                 assert!(!base.is_empty());
                 assert!(!subscript.is_empty());
                 assert!(!superscript.is_empty());
-            }
+            },
             _ => panic!("Expected subsup node"),
         }
     }
@@ -459,7 +480,7 @@ mod tests {
             MathNode::Root { base, index } => {
                 assert!(!base.is_empty());
                 assert!(index.is_some());
-            }
+            },
             _ => panic!("Expected root node"),
         }
     }
@@ -481,7 +502,7 @@ mod tests {
             MathNode::Root { base, index } => {
                 assert!(!base.is_empty());
                 assert!(index.is_none());
-            }
+            },
             _ => panic!("Expected root node"),
         }
     }
@@ -519,7 +540,7 @@ mod tests {
         match &nodes[0] {
             MathNode::Matrix { rows, .. } => {
                 assert!(!rows.is_empty());
-            }
+            },
             _ => panic!("Expected matrix node"),
         }
     }
@@ -541,7 +562,7 @@ mod tests {
             MathNode::Fenced { open, close, .. } => {
                 assert_eq!(*open, Fence::None);
                 assert_eq!(*close, Fence::None);
-            }
+            },
             _ => panic!("Expected fenced node"),
         }
     }
@@ -562,7 +583,7 @@ mod tests {
         match &nodes[0] {
             MathNode::Phantom(content) => {
                 assert!(!content.is_empty());
-            }
+            },
             _ => panic!("Expected phantom node"),
         }
     }
@@ -584,7 +605,7 @@ mod tests {
             MathNode::Fenced { open, close, .. } => {
                 assert_eq!(*open, Fence::None);
                 assert_eq!(*close, Fence::None);
-            }
+            },
             _ => panic!("Expected fenced node"),
         }
     }
@@ -609,7 +630,7 @@ mod tests {
         match &nodes[0] {
             MathNode::EqArray { rows, .. } => {
                 assert!(!rows.is_empty());
-            }
+            },
             _ => panic!("Expected equation array node"),
         }
     }
@@ -634,7 +655,7 @@ mod tests {
         match &nodes[0] {
             MathNode::GroupChar { .. } => {
                 // Group char is represented as GroupChar node
-            }
+            },
             _ => panic!("Expected group char node"),
         }
     }
@@ -685,7 +706,7 @@ mod tests {
             MathNode::Function { name, argument } => {
                 assert_eq!(name.as_ref(), "sin");
                 assert!(!argument.is_empty());
-            }
+            },
             _ => panic!("Expected function node"),
         }
     }
@@ -738,7 +759,7 @@ mod tests {
                 assert_eq!(a.as_ref(), "α");
                 assert_eq!(b.as_ref(), "β");
                 assert_eq!(c.as_ref(), "∑");
-            }
+            },
             _ => panic!("Expected text nodes"),
         }
     }
@@ -772,7 +793,7 @@ mod tests {
             MathNode::Power { base, exponent } => {
                 assert!(!base.is_empty());
                 assert!(!exponent.is_empty());
-            }
+            },
             _ => panic!("Expected power node"),
         }
     }
@@ -812,7 +833,7 @@ mod tests {
                 assert_eq!(rows.len(), 2);
                 assert_eq!(rows[0].len(), 2);
                 assert_eq!(rows[1].len(), 2);
-            }
+            },
             _ => panic!("Expected matrix node"),
         }
     }
@@ -846,12 +867,18 @@ mod tests {
         let nodes = parser.parse(xml).unwrap();
         assert!(!nodes.is_empty());
         match &nodes[0] {
-            MathNode::LargeOp { operator, lower_limit, upper_limit, integrand, .. } => {
+            MathNode::LargeOp {
+                operator,
+                lower_limit,
+                upper_limit,
+                integrand,
+                ..
+            } => {
                 assert_eq!(*operator, LargeOperator::Sum);
                 assert!(lower_limit.is_some());
                 assert!(upper_limit.is_some());
                 assert!(integrand.is_some());
-            }
+            },
             _ => panic!("Expected large operator node"),
         }
     }
@@ -876,7 +903,7 @@ mod tests {
             MathNode::Accent { accent, base, .. } => {
                 assert_eq!(*accent, AccentType::Vec);
                 assert!(!base.is_empty());
-            }
+            },
             _ => panic!("Expected accent node"),
         }
     }
@@ -905,12 +932,20 @@ mod tests {
         let nodes = parser.parse(xml).unwrap();
         assert!(!nodes.is_empty());
         match &nodes[0] {
-            MathNode::GroupChar { base, character, position, vertical_alignment } => {
+            MathNode::GroupChar {
+                base,
+                character,
+                position,
+                vertical_alignment,
+            } => {
                 assert!(!base.is_empty());
                 assert_eq!(character.as_deref(), Some("{"));
                 assert_eq!(*position, Some(crate::formula::ast::Position::Top));
-                assert_eq!(*vertical_alignment, Some(crate::formula::ast::VerticalAlignment::Center));
-            }
+                assert_eq!(
+                    *vertical_alignment,
+                    Some(crate::formula::ast::VerticalAlignment::Center)
+                );
+            },
             _ => panic!("Expected group character node"),
         }
     }
@@ -931,7 +966,7 @@ mod tests {
         match &nodes[0] {
             MathNode::Phantom(content) => {
                 assert!(!content.is_empty());
-            }
+            },
             _ => panic!("Expected phantom node"),
         }
     }
@@ -954,7 +989,7 @@ mod tests {
             MathNode::Root { base, index } => {
                 assert!(!base.is_empty());
                 assert!(index.is_some());
-            }
+            },
             _ => panic!("Expected root node with index"),
         }
     }
@@ -1081,14 +1116,19 @@ mod tests {
         let nodes = parser.parse(xml).unwrap();
         assert!(!nodes.is_empty());
         match &nodes[0] {
-            MathNode::Run { content, literal, style, font, .. } => {
+            MathNode::Run {
+                content,
+                literal,
+                style,
+                font,
+                ..
+            } => {
                 assert!(!content.is_empty());
                 assert!(literal.unwrap_or(false));
                 assert_eq!(*style, Some(crate::formula::StyleType::BoldItalic));
                 assert_eq!(font.as_deref(), Some("Times New Roman"));
-            }
+            },
             _ => panic!("Expected run node"),
         }
     }
 }
-

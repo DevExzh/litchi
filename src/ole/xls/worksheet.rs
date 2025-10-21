@@ -1,9 +1,9 @@
 //! Worksheet implementation for XLS files
 
-use std::collections::BTreeMap;
-use crate::sheet::{Worksheet, Cell as SheetCell, CellValue, CellIterator, RowIterator};
 use crate::ole::xls::cell::XlsCell;
 use crate::ole::xls::error::XlsError;
+use crate::sheet::{Cell as SheetCell, CellIterator, CellValue, RowIterator, Worksheet};
+use std::collections::BTreeMap;
 
 /// XLS worksheet implementation
 #[derive(Debug, Clone)]
@@ -47,7 +47,13 @@ impl XlsWorksheet {
     }
 
     /// Set worksheet dimensions
-    pub fn set_dimensions(&mut self, _first_row: u32, last_row: u32, _first_col: u32, last_col: u32) {
+    pub fn set_dimensions(
+        &mut self,
+        _first_row: u32,
+        last_row: u32,
+        _first_col: u32,
+        last_col: u32,
+    ) {
         // Adjust max_row and max_col based on dimensions
         self.max_row = self.max_row.max(last_row.saturating_sub(1));
         self.max_col = self.max_col.max(last_col.saturating_sub(1));
@@ -85,18 +91,25 @@ impl Worksheet for XlsWorksheet {
         }
     }
 
-    fn cell(&self, row: u32, column: u32) -> Result<Box<dyn SheetCell + '_>, Box<dyn std::error::Error>> {
+    fn cell(
+        &self,
+        row: u32,
+        column: u32,
+    ) -> Result<Box<dyn SheetCell + '_>, Box<dyn std::error::Error>> {
         match self.cells.get(&(row, column)) {
             Some(cell) => Ok(Box::new(cell.clone())),
             None => {
                 // Return empty cell for missing positions
                 let empty_cell = XlsCell::new(row, column, CellValue::Empty);
                 Ok(Box::new(empty_cell))
-            }
+            },
         }
     }
 
-    fn cell_by_coordinate(&self, coordinate: &str) -> Result<Box<dyn SheetCell + '_>, Box<dyn std::error::Error>> {
+    fn cell_by_coordinate(
+        &self,
+        coordinate: &str,
+    ) -> Result<Box<dyn SheetCell + '_>, Box<dyn std::error::Error>> {
         let (row, col) = crate::ole::xls::utils::parse_cell_reference(coordinate)
             .ok_or_else(|| XlsError::InvalidCellReference(coordinate.to_string()))?;
         self.cell(row, col)

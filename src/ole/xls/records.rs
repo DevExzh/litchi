@@ -76,7 +76,7 @@ impl<R: Read + Seek> Iterator for RecordIter<R> {
             Ok(record) => {
                 self.current_pos += 4 + record.header.data_len as u64;
                 Some(Ok(record))
-            }
+            },
             Err(e) => Some(Err(e)),
         }
     }
@@ -184,7 +184,7 @@ impl DimensionsRecord {
                     first_col: binary::read_u16_le_at(data, 4)? as u32,
                     last_col: binary::read_u16_le_at(data, 6)? as u32,
                 })
-            }
+            },
             14 => {
                 // BIFF8 with 32-bit row indices
                 Ok(DimensionsRecord {
@@ -193,7 +193,7 @@ impl DimensionsRecord {
                     first_col: binary::read_u16_le_at(data, 8)? as u32,
                     last_col: binary::read_u16_le_at(data, 10)? as u32,
                 })
-            }
+            },
             _ => Err(XlsError::InvalidLength {
                 expected: 10,
                 found: data.len(),
@@ -310,14 +310,17 @@ impl XlsEncoding {
                 if !data.len().is_multiple_of(2) {
                     return Err(XlsError::Encoding("Invalid UTF-16 data length".to_string()));
                 }
-                let utf16_data: Vec<u16> = data.chunks_exact(2)
-                    .map(|chunk| U16::<LE>::read_from_bytes(chunk)
-                        .map(|v| v.get())
-                        .unwrap_or(0))
+                let utf16_data: Vec<u16> = data
+                    .chunks_exact(2)
+                    .map(|chunk| {
+                        U16::<LE>::read_from_bytes(chunk)
+                            .map(|v| v.get())
+                            .unwrap_or(0)
+                    })
                     .collect();
                 String::from_utf16(&utf16_data)
                     .map_err(|e| XlsError::Encoding(format!("UTF-16 decoding error: {}", e)))
-            }
+            },
             XlsEncoding::Codepage(cp) => {
                 // For now, assume Latin-1 for common codepages
                 // In production, use proper codepage conversion
@@ -326,8 +329,10 @@ impl XlsEncoding {
                         // Fallback to lossy conversion
                         Ok(String::from_utf8_lossy(data).into_owned())
                     })
-                    .map_err(|e: std::string::FromUtf8Error| XlsError::Encoding(format!("Codepage {} decoding error: {}", cp, e)))
-            }
+                    .map_err(|e: std::string::FromUtf8Error| {
+                        XlsError::Encoding(format!("Codepage {} decoding error: {}", cp, e))
+                    })
+            },
         }
     }
 }
@@ -342,7 +347,9 @@ impl SharedStringTable {
     /// Parse SST from potentially multiple records (SST + CONTINUE)
     pub fn parse_from_records(records: &[Record], encoding: &XlsEncoding) -> XlsResult<Self> {
         if records.is_empty() {
-            return Ok(SharedStringTable { strings: Vec::new() });
+            return Ok(SharedStringTable {
+                strings: Vec::new(),
+            });
         }
 
         // Combine all SST and CONTINUE record data
@@ -351,7 +358,8 @@ impl SharedStringTable {
 
         for record in records {
             match record.header.record_type {
-                0x00FC => { // SST
+                0x00FC => {
+                    // SST
                     if found_sst {
                         // Multiple SST records? Shouldn't happen
                         break;
@@ -360,23 +368,26 @@ impl SharedStringTable {
                     // Skip the SST record header (4 bytes record type + 4 bytes length = 8 bytes total)
                     // But we need to include the SST data header (cstTotal + cstUnique = 8 bytes)
                     combined_data.extend_from_slice(&record.data);
-                }
-                0x003C => { // CONTINUE
+                },
+                0x003C => {
+                    // CONTINUE
                     if found_sst {
                         combined_data.extend_from_slice(&record.data);
                     }
-                }
+                },
                 _ => {
                     if found_sst {
                         // Stop when we hit a non-CONTINUE record after SST
                         break;
                     }
-                }
+                },
             }
         }
 
         if combined_data.is_empty() {
-            return Ok(SharedStringTable { strings: Vec::new() });
+            return Ok(SharedStringTable {
+                strings: Vec::new(),
+            });
         }
 
         Self::parse(&combined_data, encoding)
@@ -443,13 +454,17 @@ impl SharedStringTable {
 
             let string = if is_unicode {
                 // UTF-16 LE
-                String::from_utf16(&string_data
-                    .chunks_exact(2)
-                    .map(|chunk| U16::<LE>::read_from_bytes(chunk)
-                        .map(|v| v.get())
-                        .unwrap_or(0))
-                    .collect::<Vec<_>>())
-                    .unwrap_or_default()
+                String::from_utf16(
+                    &string_data
+                        .chunks_exact(2)
+                        .map(|chunk| {
+                            U16::<LE>::read_from_bytes(chunk)
+                                .map(|v| v.get())
+                                .unwrap_or(0)
+                        })
+                        .collect::<Vec<_>>(),
+                )
+                .unwrap_or_default()
             } else {
                 // 8-bit characters
                 encoding.decode(string_data).unwrap_or_default()
@@ -482,7 +497,9 @@ impl SharedStringTable {
         // Rich text formatting (optional)
         if (flags & 0x08) != 0 {
             if offset + 2 > data.len() {
-                return Err(XlsError::InvalidData("Incomplete rich text header".to_string()));
+                return Err(XlsError::InvalidData(
+                    "Incomplete rich text header".to_string(),
+                ));
             }
             let _c_run = binary::read_u16_le(data, offset)?;
             offset += 2;
@@ -492,7 +509,9 @@ impl SharedStringTable {
         // Phonetic information (optional)
         if (flags & 0x04) != 0 {
             if offset + 4 > data.len() {
-                return Err(XlsError::InvalidData("Incomplete phonetic header".to_string()));
+                return Err(XlsError::InvalidData(
+                    "Incomplete phonetic header".to_string(),
+                ));
             }
             let _cch_phonetic = binary::read_u32_le(data, offset)?;
             offset += 4;
@@ -508,7 +527,9 @@ impl SharedStringTable {
             // UTF-16 LE
             let expected_bytes = cch * 2;
             if offset + expected_bytes > data.len() {
-                return Err(XlsError::InvalidData("Incomplete Unicode string".to_string()));
+                return Err(XlsError::InvalidData(
+                    "Incomplete Unicode string".to_string(),
+                ));
             }
             string_data = &data[offset..offset + expected_bytes];
             string_consumed = expected_bytes;
@@ -516,9 +537,11 @@ impl SharedStringTable {
             // Convert UTF-16 LE to String
             let utf16_words: Vec<u16> = string_data
                 .chunks_exact(2)
-                .map(|chunk| U16::<LE>::read_from_bytes(chunk)
-                    .map(|v| v.get())
-                    .unwrap_or(0))
+                .map(|chunk| {
+                    U16::<LE>::read_from_bytes(chunk)
+                        .map(|v| v.get())
+                        .unwrap_or(0)
+                })
                 .collect();
 
             match String::from_utf16(&utf16_words) {
@@ -528,7 +551,9 @@ impl SharedStringTable {
         } else {
             // Compressed (8-bit characters)
             if offset + cch > data.len() {
-                return Err(XlsError::InvalidData("Incomplete compressed string".to_string()));
+                return Err(XlsError::InvalidData(
+                    "Incomplete compressed string".to_string(),
+                ));
             }
             string_data = &data[offset..offset + cch];
             string_consumed = cch;
@@ -659,13 +684,13 @@ impl CellRecord {
 
     pub fn parse(record_type: u16, data: &[u8], encoding: &XlsEncoding) -> XlsResult<Self> {
         match record_type {
-            0x0201 => Self::parse_blank(data), // Blank
-            0x0203 => Self::parse_number(data), // Number
+            0x0201 => Self::parse_blank(data),           // Blank
+            0x0203 => Self::parse_number(data),          // Number
             0x0204 => Self::parse_label(data, encoding), // Label
-            0x0205 => Self::parse_bool_err(data), // BoolErr
-            0x027E => Self::parse_rk(data), // RK
-            0x00FD => Self::parse_label_sst(data), // LabelSst
-            0x0006 => Self::parse_formula(data), // Formula
+            0x0205 => Self::parse_bool_err(data),        // BoolErr
+            0x027E => Self::parse_rk(data),              // RK
+            0x00FD => Self::parse_label_sst(data),       // LabelSst
+            0x0006 => Self::parse_formula(data),         // Formula
             _ => Err(XlsError::InvalidRecord {
                 record_type,
                 message: "Unknown cell record type".to_string(),

@@ -16,4 +16,3 @@ pub struct SlideInfo {
     /// Whether the slide has notes
     pub has_notes: bool,
 }
-

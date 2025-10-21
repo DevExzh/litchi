@@ -12,8 +12,7 @@ impl RadicalHandler {
         parent_context: Option<&mut ElementContext<'arena>>,
         _arena: &'arena bumpalo::Bump,
     ) {
-        let base = context.base.take()
-            .unwrap_or_default();
+        let base = context.base.take().unwrap_or_default();
         let index = context.degree.take();
 
         let node = MathNode::Root { base, index };

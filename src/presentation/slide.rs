@@ -1,7 +1,7 @@
 //! Slide implementation for PowerPoint presentations.
 
+use super::types::{PptSlideData, PptxSlideData};
 use crate::common::Result;
-use super::types::{PptxSlideData, PptSlideData};
 
 /// A slide in a PowerPoint presentation.
 pub enum Slide {
@@ -44,7 +44,7 @@ impl Slide {
                 }
                 text.push_str(&slide.text_content.join("\n"));
                 Ok(text)
-            }
+            },
         }
     }
 
@@ -126,4 +126,3 @@ impl Slide {
         }
     }
 }
-

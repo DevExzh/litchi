@@ -32,7 +32,7 @@ impl MediaType {
         match ext.to_lowercase().as_str() {
             "png" | "jpg" | "jpeg" | "gif" | "tiff" | "tif" | "bmp" | "heic" | "heif" => {
                 MediaType::Image
-            }
+            },
             "mp4" | "mov" | "m4v" | "avi" | "mkv" => MediaType::Video,
             "mp3" | "aac" | "m4a" | "wav" | "aiff" => MediaType::Audio,
             "pdf" => MediaType::Pdf,
@@ -131,7 +131,10 @@ impl MediaManager {
     }
 
     /// Scan a directory bundle for media assets
-    fn scan_directory_bundle(bundle_path: &Path, assets: &mut HashMap<String, MediaAsset>) -> Result<()> {
+    fn scan_directory_bundle(
+        bundle_path: &Path,
+        assets: &mut HashMap<String, MediaAsset>,
+    ) -> Result<()> {
         let data_dir = bundle_path.join("Data");
         if !data_dir.exists() || !data_dir.is_dir() {
             return Ok(()); // No Data directory is not an error
@@ -156,16 +159,17 @@ impl MediaManager {
             if path.is_dir() {
                 Self::scan_directory_recursive(&path, bundle_root, assets)?;
             } else if path.is_file()
-                && let Ok(metadata) = fs::metadata(&path) {
-                    let relative_path = path
-                        .strip_prefix(bundle_root)
-                        .unwrap_or(&path)
-                        .to_path_buf();
+                && let Ok(metadata) = fs::metadata(&path)
+            {
+                let relative_path = path
+                    .strip_prefix(bundle_root)
+                    .unwrap_or(&path)
+                    .to_path_buf();
 
-                    let asset = MediaAsset::new(relative_path.clone(), metadata.len());
-                    let filename = asset.filename.clone();
-                    assets.insert(filename, asset);
-                }
+                let asset = MediaAsset::new(relative_path.clone(), metadata.len());
+                let filename = asset.filename.clone();
+                assets.insert(filename, asset);
+            }
         }
 
         Ok(())
@@ -357,10 +361,14 @@ mod tests {
             if stats.total_count > 0 {
                 println!("Found {} media assets", stats.total_count);
                 for (filename, asset) in manager.assets() {
-                    println!("  - {}: {} ({})", filename, asset.media_type.name(), format_bytes(asset.size));
+                    println!(
+                        "  - {}: {} ({})",
+                        filename,
+                        asset.media_type.name(),
+                        format_bytes(asset.size)
+                    );
                 }
             }
         }
     }
 }
-

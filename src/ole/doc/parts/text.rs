@@ -81,19 +81,21 @@ impl TextExtractor {
         if clx_offset >= table_stream.len() {
             return Err(DocError::Corrupted(format!(
                 "CLX offset {} is beyond table stream length {}",
-                clx_offset, table_stream.len()
+                clx_offset,
+                table_stream.len()
             )));
         }
 
         if clx_offset + clx_length > table_stream.len() {
             return Err(DocError::Corrupted(format!(
                 "CLX extends beyond table stream: offset={}, length={}, stream_len={}",
-                clx_offset, clx_length, table_stream.len()
+                clx_offset,
+                clx_length,
+                table_stream.len()
             )));
         }
 
         let clx_data = &table_stream[clx_offset..clx_offset + clx_length];
-
 
         // Try to parse the piece table from CLX
         match Self::parse_piece_table(clx_data, word_document) {
@@ -101,7 +103,7 @@ impl TextExtractor {
             _ => {
                 // If CLX parsing fails or returns empty, fall back to simple text extraction
                 Self::extract_text_simple(word_document)
-            }
+            },
         }
     }
 
@@ -118,7 +120,9 @@ impl TextExtractor {
         // Skip GRPPR L sections (type 0x01) until we find the piece table
         while offset < clx_data.len() {
             if offset >= clx_data.len() {
-                return Err(DocError::Corrupted("Unexpected end of CLX data".to_string()));
+                return Err(DocError::Corrupted(
+                    "Unexpected end of CLX data".to_string(),
+                ));
             }
 
             let section_type = clx_data[offset];
@@ -133,18 +137,22 @@ impl TextExtractor {
 
                     let size = read_u16_le(clx_data, offset).unwrap_or(0) as usize;
                     offset += 2 + size;
-                }
+                },
                 0x02 => {
                     // TEXT_PIECE_TABLE_TYPE - this is the piece table
                     if offset + 4 > clx_data.len() {
-                        return Err(DocError::Corrupted("Piece table size field truncated".to_string()));
+                        return Err(DocError::Corrupted(
+                            "Piece table size field truncated".to_string(),
+                        ));
                     }
 
                     let piece_table_size = read_u32_le(clx_data, offset).unwrap_or(0) as usize;
                     offset += 4;
 
                     if offset + piece_table_size > clx_data.len() {
-                        return Err(DocError::Corrupted("Piece table data truncated".to_string()));
+                        return Err(DocError::Corrupted(
+                            "Piece table data truncated".to_string(),
+                        ));
                     }
 
                     let piece_table_data = &clx_data[offset..offset + piece_table_size];
@@ -154,16 +162,18 @@ impl TextExtractor {
 
                     // Extract text from the parsed pieces
                     return Self::extract_text_from_piece_descriptors(&pieces, word_document);
-                }
+                },
                 0x14 => {
                     // Document Properties Descriptor - contains document-wide properties
                     if offset + 2 > clx_data.len() {
-                        return Err(DocError::Corrupted("Document Properties section truncated".to_string()));
+                        return Err(DocError::Corrupted(
+                            "Document Properties section truncated".to_string(),
+                        ));
                     }
 
                     let size = read_u16_le(clx_data, offset).unwrap_or(0) as usize;
                     offset += 2 + size;
-                }
+                },
                 _ => {
                     // For unknown section types, try to skip them gracefully
                     if offset + 2 <= clx_data.len() {
@@ -171,10 +181,11 @@ impl TextExtractor {
                         offset += 2 + size;
                     } else {
                         return Err(DocError::Corrupted(format!(
-                            "Unexpected CLX section type 0x{:02X} at end of data", section_type
+                            "Unexpected CLX section type 0x{:02X} at end of data",
+                            section_type
                         )));
                     }
-                }
+                },
             }
         }
 
@@ -208,7 +219,8 @@ impl TextExtractor {
         if plex_data.len() < expected_size {
             return Err(DocError::Corrupted(format!(
                 "PlexOfCps truncated: expected {} bytes, got {}",
-                expected_size, plex_data.len()
+                expected_size,
+                plex_data.len()
             )));
         }
 
@@ -229,7 +241,8 @@ impl TextExtractor {
 
             if offset + PIECE_DESCRIPTOR_SIZE > plex_data.len() {
                 return Err(DocError::Corrupted(format!(
-                    "PieceDescriptor {} truncated", i
+                    "PieceDescriptor {} truncated",
+                    i
                 )));
             }
 
@@ -261,8 +274,6 @@ impl TextExtractor {
         Ok(pieces)
     }
 
-
-
     /// Extract text from piece descriptors.
     ///
     /// Based on Apache POI's TextPieceTable logic, each piece descriptor maps
@@ -293,12 +304,21 @@ impl TextExtractor {
             let end = start + byte_count;
 
             if start >= word_document.len() {
-                eprintln!("Warning: Piece file position {} beyond document length {}", start, word_document.len());
+                eprintln!(
+                    "Warning: Piece file position {} beyond document length {}",
+                    start,
+                    word_document.len()
+                );
                 continue;
             }
 
             if end > word_document.len() {
-                eprintln!("Warning: Piece extends beyond document: start={}, end={}, doc_len={}", start, end, word_document.len());
+                eprintln!(
+                    "Warning: Piece extends beyond document: start={}, end={}, doc_len={}",
+                    start,
+                    end,
+                    word_document.len()
+                );
                 // Try to read what we can
                 let available_end = word_document.len();
                 if start >= available_end {
@@ -438,9 +458,9 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, // cp_start = 0
             0x10, 0x00, 0x00, 0x00, // cp_end = 16 (16 characters)
             // PieceDescriptor (8 bytes)
-            0x00, 0x00,             // descriptor
+            0x00, 0x00, // descriptor
             0x00, 0x00, 0x00, 0x00, // fc = 0 (Unicode at position 0)
-            0x00, 0x00,             // prm
+            0x00, 0x00, // prm
         ];
 
         // Should parse successfully
@@ -454,4 +474,3 @@ mod tests {
         assert!(!pieces[0].is_ansi); // Bit 30 not set = Unicode
     }
 }
-

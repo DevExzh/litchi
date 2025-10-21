@@ -8,13 +8,12 @@
 /// - Style definitions
 /// - Table structures
 pub mod chp;
+pub mod chp_bin_table;
 pub mod fib;
-pub mod pap;
-pub mod paragraph_extractor;
-pub mod tap;
-pub mod text;
 pub mod fields;
 pub mod fkp;
-pub mod chp_bin_table;
+pub mod pap;
+pub mod paragraph_extractor;
 pub mod piece_table;
-
+pub mod tap;
+pub mod text;

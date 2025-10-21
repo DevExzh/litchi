@@ -1,6 +1,6 @@
 use crate::ooxml::opc::constants::relationship_type;
 use crate::ooxml::opc::error::{OpcError, Result};
-use crate::ooxml::opc::packuri::{PackURI, PACKAGE_URI};
+use crate::ooxml::opc::packuri::{PACKAGE_URI, PackURI};
 use crate::ooxml::opc::part::{Part, PartFactory};
 use crate::ooxml::opc::phys_pkg::PhysPkgReader;
 use crate::ooxml::opc::pkgreader::PackageReader;
@@ -90,7 +90,8 @@ impl OpcPackage {
 
         // First pass: Create all parts
         // Pre-allocate with estimated capacity to avoid reallocations
-        let mut parts_map: HashMap<PackURI, Box<dyn Part>> = HashMap::with_capacity(pkg_reader.iter_sparts().count());
+        let mut parts_map: HashMap<PackURI, Box<dyn Part>> =
+            HashMap::with_capacity(pkg_reader.iter_sparts().count());
 
         for spart in pkg_reader.iter_sparts() {
             let part = PartFactory::load(
@@ -282,8 +283,8 @@ impl Default for OpcPackage {
 mod tests {
     use super::*;
     use std::io::{Cursor, Write};
-    use zip::write::SimpleFileOptions;
     use zip::ZipWriter;
+    use zip::write::SimpleFileOptions;
 
     fn create_minimal_docx() -> Vec<u8> {
         let mut zip_data = Vec::new();

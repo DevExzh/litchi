@@ -106,4 +106,3 @@ impl fmt::Display for Length {
         write!(f, "{:.2}\"", self.inches())
     }
 }
-

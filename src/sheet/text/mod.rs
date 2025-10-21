@@ -39,16 +39,16 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-pub mod workbook;
-pub mod worksheet;
 pub mod cell;
 pub mod iterators;
 pub mod parser;
+pub mod workbook;
+pub mod worksheet;
 
-pub use workbook::{TextWorkbook, TextConfig};
-pub use worksheet::TextWorksheet;
 pub use cell::TextCell;
 pub use parser::TextParser;
+pub use workbook::{TextConfig, TextWorkbook};
+pub use worksheet::TextWorksheet;
 
 #[cfg(test)]
 mod tests;

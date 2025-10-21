@@ -20,4 +20,3 @@ pub struct DocumentInfo {
     /// Whether the document has a PPDrawingGroup record
     pub has_drawing_group: bool,
 }
-

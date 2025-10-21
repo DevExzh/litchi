@@ -1,8 +1,8 @@
 // N-ary operator element handler
 
 use crate::formula::ast::*;
-use crate::formula::omml::elements::ElementContext;
 use crate::formula::omml::attributes::{get_attribute_value, parse_large_operator};
+use crate::formula::omml::elements::ElementContext;
 use crate::formula::omml::properties::parse_nary_properties;
 use quick_xml::events::BytesStart;
 
@@ -34,7 +34,10 @@ impl NaryHandler {
         _arena: &'arena bumpalo::Bump,
     ) {
         // Get operator from properties (set by chr child element)
-        let operator = context.properties.chr.as_ref()
+        let operator = context
+            .properties
+            .chr
+            .as_ref()
             .and_then(|chr| parse_large_operator(Some(chr)))
             .or(context.operator);
 

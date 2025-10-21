@@ -4,8 +4,8 @@
 // including Greek letters, special symbols, and Unicode character mapping.
 // Uses efficient lookup tables and SIMD operations for performance.
 
-use crate::formula::ast::Symbol;
 use super::LatexError;
+use crate::formula::ast::Symbol;
 
 // Static lookup table for common Greek letters and symbols
 static GREEK_SYMBOLS: phf::Map<&'static str, &'static str> = phf::phf_map! {
@@ -272,7 +272,6 @@ pub fn convert_symbol(buffer: &mut String, symbol: &Symbol) -> Result<(), LatexE
 
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -176,4 +176,3 @@ mod tests {
         assert_eq!(bool_num.as_number(), Some(0.0));
     }
 }
-

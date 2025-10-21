@@ -3,8 +3,8 @@
 //! This module provides a unified API for working with OpenDocument presentations,
 //! equivalent to Microsoft PowerPoint presentations.
 
-use crate::common::{Error, Result, Metadata};
-use crate::odf::core::{Content, Meta, Package, Styles, Manifest};
+use crate::common::{Error, Metadata, Result};
+use crate::odf::core::{Content, Manifest, Meta, Package, Styles};
 use std::io::Cursor;
 use std::path::Path;
 
@@ -36,7 +36,8 @@ impl Presentation {
         let mime_type = package.mimetype();
         if !mime_type.contains("opendocument.presentation") {
             return Err(Error::InvalidFormat(format!(
-                "Not an ODP file: MIME type is {}", mime_type
+                "Not an ODP file: MIME type is {}",
+                mime_type
             )));
         }
 
@@ -80,8 +81,8 @@ impl Presentation {
         let content_bytes = self._package.get_file("content.xml")?;
         let content = Content::from_bytes(&content_bytes)?;
 
-        use quick_xml::events::Event;
         use quick_xml::Reader;
+        use quick_xml::events::Event;
 
         let mut reader = Reader::from_str(content.xml_content());
         let mut buf = Vec::new();
@@ -113,12 +114,13 @@ impl Presentation {
                             current_slide_title = None;
                             for attr_result in e.attributes() {
                                 if let Ok(attr) = attr_result
-                                    && attr.key.as_ref() == b"draw:name" {
-                                        if let Ok(name) = String::from_utf8(attr.value.to_vec()) {
-                                            current_slide_title = Some(name);
-                                        }
-                                        break;
+                                    && attr.key.as_ref() == b"draw:name"
+                                {
+                                    if let Ok(name) = String::from_utf8(attr.value.to_vec()) {
+                                        current_slide_title = Some(name);
                                     }
+                                    break;
+                                }
                             }
                             if current_slide_title.is_none() {
                                 current_slide_title = Some(format!("Slide{}", slide_index + 1));
@@ -126,23 +128,24 @@ impl Presentation {
 
                             current_slide_text.clear();
                             in_slide = true;
-                        }
+                        },
                         b"text:p" | b"text:span" => {
                             // Continue - text will be collected in Text event
-                        }
-                        _ => {}
+                        },
+                        _ => {},
                     }
-                }
+                },
                 Ok(Event::Text(ref t)) => {
                     if in_slide
                         && let Ok(text) = String::from_utf8(t.to_vec())
-                            && !text.trim().is_empty() {
-                                if !current_slide_text.is_empty() {
-                                    current_slide_text.push(' ');
-                                }
-                                current_slide_text.push_str(text.trim());
-                            }
-                }
+                        && !text.trim().is_empty()
+                    {
+                        if !current_slide_text.is_empty() {
+                            current_slide_text.push(' ');
+                        }
+                        current_slide_text.push_str(text.trim());
+                    }
+                },
                 Ok(Event::End(ref e)) => {
                     if e.name().as_ref() == b"draw:page" {
                         // Finish current slide
@@ -157,10 +160,15 @@ impl Presentation {
                         }
                         in_slide = false;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
-                Err(e) => return Err(crate::common::Error::InvalidFormat(format!("XML parsing error: {}", e))),
-                _ => {}
+                Err(e) => {
+                    return Err(crate::common::Error::InvalidFormat(format!(
+                        "XML parsing error: {}",
+                        e
+                    )));
+                },
+                _ => {},
             }
             buf.clear();
         }
@@ -244,7 +252,6 @@ impl Slide {
     }
 }
 
-
 /// A shape (element) on a slide
 pub struct Shape {
     // Placeholder for shape implementation
@@ -266,4 +273,3 @@ impl Shape {
         false // Placeholder
     }
 }
-

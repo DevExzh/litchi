@@ -3,8 +3,8 @@
 //! iWork applications use integer type IDs to identify different protobuf message types.
 //! This registry provides mappings from type IDs to message names for different applications.
 
-use std::{collections::HashMap, str::FromStr};
 use once_cell::sync::Lazy;
+use std::{collections::HashMap, str::FromStr};
 
 /// Application type for iWork documents
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -27,7 +27,7 @@ impl FromStr for Application {
             "keynote" => Ok(Self::Keynote),
             "numbers" => Ok(Self::Numbers),
             "common" => Ok(Self::Common),
-            _ => Err("Invalid input")
+            _ => Err("Invalid input"),
         }
     }
 }
@@ -72,7 +72,8 @@ impl MessageRegistry {
 
     /// Get all message types for a specific application
     pub fn types_for_application(&self, app: Application) -> Vec<(u32, &MessageType)> {
-        self.types.iter()
+        self.types
+            .iter()
             .filter(|(_, mt)| mt.application == app)
             .map(|(id, mt)| (*id, mt))
             .collect()
@@ -125,10 +126,26 @@ fn register_keynote_types(registry: &mut MessageRegistry) {
     registry.register(107, "KN.SlideStyleArchive", Application::Keynote);
 
     // KN Command Archives
-    registry.register(148, "KN.CommandSlideReapplyMasterArchive", Application::Keynote);
-    registry.register(147, "KN.SlideCollectionCommandSelectionBehaviorArchive", Application::Keynote);
-    registry.register(146, "KN.CommandSlideReapplyMasterArchive", Application::Keynote);
-    registry.register(145, "KN.CommandMasterSetBodyStylesArchive", Application::Keynote);
+    registry.register(
+        148,
+        "KN.CommandSlideReapplyMasterArchive",
+        Application::Keynote,
+    );
+    registry.register(
+        147,
+        "KN.SlideCollectionCommandSelectionBehaviorArchive",
+        Application::Keynote,
+    );
+    registry.register(
+        146,
+        "KN.CommandSlideReapplyMasterArchive",
+        Application::Keynote,
+    );
+    registry.register(
+        145,
+        "KN.CommandMasterSetBodyStylesArchive",
+        Application::Keynote,
+    );
 
     // Additional Keynote types
     registry.register(200, "KN.PresentationArchive", Application::Keynote);
@@ -236,7 +253,8 @@ pub fn detect_application(message_type_ids: &[u32]) -> Option<Application> {
     }
 
     // Return the application with the most message types
-    app_counts.into_iter()
+    app_counts
+        .into_iter()
         .max_by_key(|&(_, count)| count)
         .map(|(app, _)| app)
 }

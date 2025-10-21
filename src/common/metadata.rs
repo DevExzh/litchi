@@ -1,10 +1,10 @@
+use crate::common::Result;
+use chrono::{DateTime, Utc};
 /// Unified metadata representation for Word documents.
 ///
 /// This module provides a unified interface for document metadata
 /// that works with both OLE (.doc) and OOXML (.docx) formats.
 use serde::{Deserialize, Serialize};
-use crate::common::Result;
-use chrono::{DateTime, Utc};
 
 /// Unified document metadata structure.
 ///
@@ -91,8 +91,9 @@ impl Metadata {
             return Ok(String::new());
         }
 
-        let yaml_string = serde_saphyr::to_string(self)
-            .map_err(|e| crate::common::Error::Other(format!("Failed to serialize metadata to YAML: {}", e)))?;
+        let yaml_string = serde_saphyr::to_string(self).map_err(|e| {
+            crate::common::Error::Other(format!("Failed to serialize metadata to YAML: {}", e))
+        })?;
 
         // Add YAML front matter delimiters
         Ok(format!("---\n{}---\n\n", yaml_string))

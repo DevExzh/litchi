@@ -7,4 +7,3 @@ use crate::formula::ast::MathNode;
 pub fn needs_grouping_for_scripts(nodes: &[MathNode]) -> bool {
     nodes.len() > 1
 }
-

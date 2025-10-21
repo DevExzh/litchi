@@ -10,8 +10,8 @@
 // - Inside Macintosh: Imaging With QuickDraw
 // - Apple Technical Note TN1023: Understanding the PICT Format
 
-pub mod parser;
 pub mod converter;
+pub mod parser;
 
 /// Common data types for PICT format
 mod types;
@@ -19,8 +19,8 @@ mod types;
 /// Data manipulation and compression utilities
 mod data;
 
-pub use parser::{PictParser, PictVersion};
 pub use converter::{PictConverter, PictToRasterOptions};
+pub use parser::{PictParser, PictVersion};
 
 use crate::common::error::Result;
 use image::ImageFormat;
@@ -58,7 +58,7 @@ pub fn convert_pict(
         height,
         background_color: image::Rgba([255, 255, 255, 255]),
     };
-    
+
     let converter = PictConverter::new(parser, options);
     converter.convert_to_format(format)
 }
@@ -89,4 +89,3 @@ pub fn convert_pict_to_webp(
 ) -> Result<Vec<u8>> {
     convert_pict(pict_data, ImageFormat::WebP, width, height)
 }
-

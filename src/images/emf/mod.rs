@@ -10,12 +10,12 @@
 // - [MS-EMF]: Enhanced Metafile Format Specification
 // - https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-emf/
 
-pub mod parser;
 pub mod converter;
+pub mod parser;
 pub mod svg_converter;
 
-pub use parser::EmfParser;
 pub use converter::{EmfConverter, EmfToRasterOptions};
+pub use parser::EmfParser;
 pub use svg_converter::EmfSvgConverter;
 
 use crate::common::error::Result;
@@ -54,7 +54,7 @@ pub fn convert_emf(
         height,
         background_color: image::Rgba([255, 255, 255, 255]),
     };
-    
+
     let converter = EmfConverter::new(parser, options);
     converter.convert_to_format(format)
 }
@@ -140,4 +140,3 @@ pub fn convert_emf_to_svg(emf_data: &[u8]) -> Result<String> {
 pub fn convert_emf_to_svg_bytes(emf_data: &[u8]) -> Result<Vec<u8>> {
     Ok(convert_emf_to_svg(emf_data)?.into_bytes())
 }
-

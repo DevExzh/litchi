@@ -1,12 +1,15 @@
 //! Workbook implementation for XLS files
 
-use std::io::{Read, Seek};
-use crate::sheet::{Worksheet as SheetTrait, WorksheetIterator};
-use crate::ole::xls::error::{XlsError, XlsResult};
-use crate::ole::xls::records::{RecordIter, BofRecord, BoundSheetRecord, SharedStringTable, XlsEncoding, BiffVersion, CellRecord, DimensionsRecord};
-use crate::ole::xls::worksheet::XlsWorksheet;
-use crate::ole::xls::cell::XlsCell;
 use crate::ole::file::OleFile;
+use crate::ole::xls::cell::XlsCell;
+use crate::ole::xls::error::{XlsError, XlsResult};
+use crate::ole::xls::records::{
+    BiffVersion, BofRecord, BoundSheetRecord, CellRecord, DimensionsRecord, RecordIter,
+    SharedStringTable, XlsEncoding,
+};
+use crate::ole::xls::worksheet::XlsWorksheet;
+use crate::sheet::{Worksheet as SheetTrait, WorksheetIterator};
+use std::io::{Read, Seek};
 
 /// XLS workbook implementation
 #[derive(Debug)]
@@ -40,7 +43,9 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// Parse the workbook stream
     fn parse_workbook(&mut self) -> XlsResult<()> {
         // Find and read the Workbook stream
-        let workbook_data = self.ole_file.open_stream(&["Workbook"])
+        let workbook_data = self
+            .ole_file
+            .open_stream(&["Workbook"])
             .or_else(|_| self.ole_file.open_stream(&["Book"]))?;
 
         let mut record_iter = RecordIter::new(std::io::Cursor::new(&workbook_data))?;
@@ -49,7 +54,12 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut strings = Vec::new();
 
         // Parse workbook globals
-        self.parse_workbook_globals(&mut record_iter, &mut encoding, &mut bound_sheets, &mut strings)?;
+        self.parse_workbook_globals(
+            &mut record_iter,
+            &mut encoding,
+            &mut bound_sheets,
+            &mut strings,
+        )?;
 
         self.shared_strings = Some(strings);
         self.worksheet_names = bound_sheets.iter().map(|s| s.name.clone()).collect();
@@ -57,15 +67,21 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         // Parse worksheets from positions in the workbook stream
         println!("DEBUG: Found {} bound sheets", bound_sheets.len());
         for bound_sheet in &bound_sheets {
-            println!("DEBUG: Parsing worksheet '{}' at position {}", bound_sheet.name, bound_sheet.position);
+            println!(
+                "DEBUG: Parsing worksheet '{}' at position {}",
+                bound_sheet.name, bound_sheet.position
+            );
             match self.parse_worksheet_from_position(bound_sheet, &encoding, &mut record_iter) {
                 Ok(worksheet) => {
                     println!("DEBUG: Successfully parsed worksheet");
                     self.worksheets.push(worksheet);
-                }
+                },
                 Err(e) => {
-                    println!("DEBUG: Failed to parse worksheet {}: {}", bound_sheet.name, e);
-                }
+                    println!(
+                        "DEBUG: Failed to parse worksheet {}: {}",
+                        bound_sheet.name, e
+                    );
+                },
             }
         }
 
@@ -91,28 +107,33 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             let record = &records[i];
 
             match record.header.record_type {
-                0x0809 => { // BOF
+                0x0809 => {
+                    // BOF
                     let bof = BofRecord::parse(&record.data)?;
                     self.biff_version = bof.version;
                     self.is_1904_date_system = bof.is_1904_date_system;
-                }
-                0x0042 => { // CodePage
+                },
+                0x0042 => {
+                    // CodePage
                     if record.data.len() >= 2 {
                         let codepage = crate::common::binary::read_u16_le_at(&record.data, 0)?;
                         *encoding = XlsEncoding::from_codepage(codepage)?;
                     }
-                }
-                0x0022 => { // Date1904
+                },
+                0x0022 => {
+                    // Date1904
                     if record.data.len() >= 2 {
                         let flag = crate::common::binary::read_u16_le_at(&record.data, 0)?;
                         self.is_1904_date_system = flag == 1;
                     }
-                }
-                0x0085 => { // BoundSheet8
+                },
+                0x0085 => {
+                    // BoundSheet8
                     let sheet = BoundSheetRecord::parse(&record.data, encoding)?;
                     bound_sheets.push(sheet);
-                }
-                0x00FC => { // SST
+                },
+                0x00FC => {
+                    // SST
                     // SST may span multiple records, collect them all
                     let mut sst_records = vec![record.clone()];
                     let mut sst_idx = i + 1;
@@ -128,13 +149,14 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
                     // Skip the CONTINUE records we consumed
                     i = sst_idx - 1;
-                }
-                0x000A => { // EOF - End of workbook globals
+                },
+                0x000A => {
+                    // EOF - End of workbook globals
                     break;
-                }
+                },
                 _ => {
                     // Skip other records for now
-                }
+                },
             }
             i += 1;
         }
@@ -155,7 +177,8 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         // Skip the BOF record at the beginning of the worksheet
         if let Some(record_result) = record_iter.next() {
             let record = record_result?;
-            if record.header.record_type != 0x0809 { // BOF
+            if record.header.record_type != 0x0809 {
+                // BOF
                 return Err(XlsError::UnexpectedRecordType {
                     expected: 0x0809,
                     found: record.header.record_type,
@@ -175,7 +198,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         record_iter: &mut RecordIter<Reader>,
         encoding: &XlsEncoding,
         name: &str,
-        shared_strings: Vec<String>
+        shared_strings: Vec<String>,
     ) -> XlsResult<XlsWorksheet> {
         let mut worksheet = XlsWorksheet::with_shared_strings(name.to_string(), shared_strings);
 
@@ -224,7 +247,9 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 impl<R: Read + Seek + std::fmt::Debug> crate::sheet::WorkbookTrait for XlsWorkbook<R> {
     fn active_worksheet(&self) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
         if self.worksheets.is_empty() {
-            return Err(Box::new(XlsError::WorksheetNotFound("No worksheets found".to_string())));
+            return Err(Box::new(XlsError::WorksheetNotFound(
+                "No worksheets found".to_string(),
+            )));
         }
         Ok(Box::new(self.worksheets[0].clone()))
     }
@@ -233,7 +258,10 @@ impl<R: Read + Seek + std::fmt::Debug> crate::sheet::WorkbookTrait for XlsWorkbo
         self.worksheet_names.clone()
     }
 
-    fn worksheet_by_name(&self, name: &str) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
+    fn worksheet_by_name(
+        &self,
+        name: &str,
+    ) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
         for worksheet in &self.worksheets {
             if worksheet.name() == name {
                 return Ok(Box::new(worksheet.clone()));
@@ -242,9 +270,15 @@ impl<R: Read + Seek + std::fmt::Debug> crate::sheet::WorkbookTrait for XlsWorkbo
         Err(Box::new(XlsError::WorksheetNotFound(name.to_string())))
     }
 
-    fn worksheet_by_index(&self, index: usize) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
+    fn worksheet_by_index(
+        &self,
+        index: usize,
+    ) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
         if index >= self.worksheets.len() {
-            return Err(Box::new(XlsError::WorksheetNotFound(format!("Index {} out of bounds", index))));
+            return Err(Box::new(XlsError::WorksheetNotFound(format!(
+                "Index {} out of bounds",
+                index
+            ))));
         }
         Ok(Box::new(self.worksheets[index].clone()))
     }

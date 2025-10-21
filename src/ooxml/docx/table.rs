@@ -1,8 +1,8 @@
 /// Table, Row, and Cell structures for Word documents.
 use crate::ooxml::docx::paragraph::Paragraph;
 use crate::ooxml::error::{OoxmlError, Result};
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 use smallvec::SmallVec;
 
 /// A table in a Word document.
@@ -48,10 +48,10 @@ impl Table {
                     if e.local_name().as_ref() == b"tr" {
                         count += 1;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -116,7 +116,7 @@ impl Table {
                         }
                         current_row_xml.push(b'>');
                     }
-                }
+                },
                 Ok(Event::End(e)) => {
                     if in_row {
                         current_row_xml.extend_from_slice(b"</");
@@ -129,10 +129,10 @@ impl Table {
                             in_row = false;
                         }
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_row => {
                     current_row_xml.extend_from_slice(e.as_ref());
-                }
+                },
                 Ok(Event::Empty(e)) if in_row => {
                     current_row_xml.push(b'<');
                     current_row_xml.extend_from_slice(e.name().as_ref());
@@ -144,10 +144,10 @@ impl Table {
                         current_row_xml.push(b'"');
                     }
                     current_row_xml.extend_from_slice(b"/>");
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -198,10 +198,10 @@ impl Row {
                     if e.local_name().as_ref() == b"tc" {
                         count += 1;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -254,7 +254,7 @@ impl Row {
                         }
                         current_cell_xml.push(b'>');
                     }
-                }
+                },
                 Ok(Event::End(e)) => {
                     if in_cell {
                         current_cell_xml.extend_from_slice(b"</");
@@ -267,10 +267,10 @@ impl Row {
                             in_cell = false;
                         }
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_cell => {
                     current_cell_xml.extend_from_slice(e.as_ref());
-                }
+                },
                 Ok(Event::Empty(e)) if in_cell => {
                     current_cell_xml.push(b'<');
                     current_cell_xml.extend_from_slice(e.name().as_ref());
@@ -282,10 +282,10 @@ impl Row {
                         current_cell_xml.push(b'"');
                     }
                     current_cell_xml.extend_from_slice(b"/>");
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -326,19 +326,19 @@ impl Cell {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = true;
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_text_element => {
                     let text = std::str::from_utf8(e.as_ref()).unwrap_or("");
                     result.push_str(text);
-                }
+                },
                 Ok(Event::End(e)) => {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = false;
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }
@@ -391,7 +391,7 @@ impl Cell {
                         }
                         current_para_xml.push(b'>');
                     }
-                }
+                },
                 Ok(Event::End(e)) => {
                     if in_para {
                         current_para_xml.extend_from_slice(b"</");
@@ -404,10 +404,10 @@ impl Cell {
                             in_para = false;
                         }
                     }
-                }
+                },
                 Ok(Event::Text(e)) if in_para => {
                     current_para_xml.extend_from_slice(e.as_ref());
-                }
+                },
                 Ok(Event::Empty(e)) if in_para => {
                     current_para_xml.push(b'<');
                     current_para_xml.extend_from_slice(e.name().as_ref());
@@ -419,10 +419,10 @@ impl Cell {
                         current_para_xml.push(b'"');
                     }
                     current_para_xml.extend_from_slice(b"/>");
-                }
+                },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {}
+                _ => {},
             }
             buf.clear();
         }

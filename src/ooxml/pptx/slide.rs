@@ -48,7 +48,7 @@ impl<'a> Slide<'a> {
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
     /// let slides = pres.slides()?;
-    /// 
+    ///
     /// if let Some(slide) = slides.first() {
     ///     println!("First slide name: {}", slide.name()?);
     /// }
@@ -105,7 +105,7 @@ impl<'a> Slide<'a> {
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
     /// let slides = pres.slides()?;
-    /// 
+    ///
     /// if let Some(slide) = slides.first() {
     ///     for shape in slide.shapes()? {
     ///         let mut shape_mut = shape;
@@ -213,7 +213,7 @@ impl<'a> SlideMaster<'a> {
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
     /// let masters = pres.slide_masters()?;
-    /// 
+    ///
     /// if let Some(master) = masters.first() {
     ///     println!("First master name: {}", master.name()?);
     /// }
@@ -242,4 +242,3 @@ impl<'a> SlideMaster<'a> {
 mod tests {
     // Tests will be added as implementation progresses
 }
-

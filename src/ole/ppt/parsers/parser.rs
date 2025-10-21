@@ -53,13 +53,13 @@ impl PptRecordParser {
                     if consumed == 0 {
                         break;
                     }
-                }
+                },
                 Err(_) => {
                     offset += 1;
                     if offset + 8 > data.len() {
                         break;
                     }
-                }
+                },
             }
         }
 
@@ -73,7 +73,7 @@ impl PptRecordParser {
     /// Based on POI's QuickButCruddyTextExtractor approach.
     fn extract_slide_text_from_document(&mut self) -> Result<()> {
         let all_text = self.extract_all_text()?;
-        
+
         // For now, treat all text as a single slide
         // TODO: Properly associate text with individual slides
         if !all_text.is_empty() && all_text != "No text content found" {
@@ -95,7 +95,9 @@ impl PptRecordParser {
 
     /// Find a record of a specific type.
     pub fn find_record(&self, record_type: PptRecordType) -> Option<&PptRecord> {
-        self.records.iter().find(|record| record.record_type == record_type)
+        self.records
+            .iter()
+            .find(|record| record.record_type == record_type)
     }
 
     /// Get all records recursively (for building persist mapping).
@@ -105,17 +107,17 @@ impl PptRecordParser {
         Self::collect_records_recursive(&self.records, &mut all_records);
         all_records
     }
-    
+
     /// Get all record references recursively (zero-copy version).
     pub fn find_records_ref(&self) -> Vec<&PptRecord> {
         let mut all_records = Vec::new();
         Self::collect_records_recursive_ref(&self.records, &mut all_records);
         all_records
     }
-    
+
     /// Recursively collect all records including children (cloning version).
-    /// 
-    /// Note: This clones records. Consider using `collect_records_recursive_ref` 
+    ///
+    /// Note: This clones records. Consider using `collect_records_recursive_ref`
     /// for zero-copy collection when ownership is not needed.
     fn collect_records_recursive(records: &[PptRecord], collector: &mut Vec<PptRecord>) {
         for record in records {
@@ -125,9 +127,12 @@ impl PptRecordParser {
             }
         }
     }
-    
+
     /// Recursively collect all record references including children (zero-copy).
-    fn collect_records_recursive_ref<'a>(records: &'a [PptRecord], collector: &mut Vec<&'a PptRecord>) {
+    fn collect_records_recursive_ref<'a>(
+        records: &'a [PptRecord],
+        collector: &mut Vec<&'a PptRecord>,
+    ) {
         for record in records {
             collector.push(record);
             if !record.children.is_empty() {
@@ -135,10 +140,12 @@ impl PptRecordParser {
             }
         }
     }
-    
+
     /// Find all records matching a specific type (filtered).
     pub fn filter_records(&self, record_type: PptRecordType) -> impl Iterator<Item = &PptRecord> {
-        self.records.iter().filter(move |record| record.record_type == record_type)
+        self.records
+            .iter()
+            .filter(move |record| record.record_type == record_type)
     }
 
     /// Extract all text content from the document.
@@ -156,7 +163,7 @@ impl PptRecordParser {
                             }
                         }
                     }
-                }
+                },
                 Err(_) => continue,
             }
         }
@@ -196,4 +203,3 @@ mod tests {
         assert!(parser.slides().is_empty());
     }
 }
-

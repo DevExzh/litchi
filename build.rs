@@ -21,19 +21,23 @@ fn main() -> std::io::Result<()> {
             })
             .collect::<Vec<_>>();
 
-        println!("Compiling all {} protobuf files together for proper dependency resolution", all_proto_files.len());
+        println!(
+            "Compiling all {} protobuf files together for proper dependency resolution",
+            all_proto_files.len()
+        );
 
         // Compile all protobuf files - will fail the build if any errors occur
         match config
             .enable_type_names()
             .include_file("iwa_protos.rs")
-            .compile_protos(&all_proto_files, &["src/iwa/protos"]) {
-                Ok(_) => println!("Successfully compiled all protobuf files"),
-                Err(e) => {
-                    eprintln!("Failed to compile protobuf files: {}\n", e);
-                    panic!("Protobuf compilation failed - check for syntax errors in .proto files");
-                }
-            }
+            .compile_protos(&all_proto_files, &["src/iwa/protos"])
+        {
+            Ok(_) => println!("Successfully compiled all protobuf files"),
+            Err(e) => {
+                eprintln!("Failed to compile protobuf files: {}\n", e);
+                panic!("Protobuf compilation failed - check for syntax errors in .proto files");
+            },
+        }
     }
 
     Ok(())

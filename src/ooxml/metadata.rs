@@ -11,8 +11,8 @@ use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::opc::constants::content_type as ct;
 use crate::ooxml::opc::{OpcPackage, PackURI};
 use chrono::{DateTime, Utc};
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 use std::io::BufRead;
 
 /// Extract metadata from an OOXML package.
@@ -48,9 +48,10 @@ fn find_core_properties_part(package: &OpcPackage) -> Result<&dyn crate::ooxml::
         .map_err(|e| OoxmlError::Other(format!("Invalid core properties URI: {}", e)))?;
 
     if let Ok(part) = package.get_part(&standard_uri)
-        && part.content_type() == ct::OPC_CORE_PROPERTIES {
-            return Ok(part);
-        }
+        && part.content_type() == ct::OPC_CORE_PROPERTIES
+    {
+        return Ok(part);
+    }
 
     // Fallback: search through all parts for core properties content type
     for part in package.iter_parts() {
@@ -59,7 +60,9 @@ fn find_core_properties_part(package: &OpcPackage) -> Result<&dyn crate::ooxml::
         }
     }
 
-    Err(OoxmlError::PartNotFound("Core properties part not found".to_string()))
+    Err(OoxmlError::PartNotFound(
+        "Core properties part not found".to_string(),
+    ))
 }
 
 /// Parse core properties XML and extract metadata.
@@ -81,76 +84,80 @@ fn parse_core_properties_xml(xml: &str) -> Result<Metadata> {
                         if let Some(text) = read_text_element(&mut reader, &mut buf)? {
                             metadata.title = Some(text);
                         }
-                    }
+                    },
                     b"dc:subject" | b"cp:subject" => {
                         if let Some(text) = read_text_element(&mut reader, &mut buf)? {
                             metadata.subject = Some(text);
                         }
-                    }
+                    },
                     b"dc:creator" | b"cp:creator" | b"dc:author" | b"cp:author" => {
                         if let Some(text) = read_text_element(&mut reader, &mut buf)? {
                             metadata.author = Some(text);
                         }
-                    }
+                    },
                     b"cp:keywords" => {
                         if let Some(text) = read_text_element(&mut reader, &mut buf)? {
                             metadata.keywords = Some(text);
                         }
-                    }
+                    },
                     b"dc:description" | b"cp:description" | b"cp:comment" => {
                         if let Some(text) = read_text_element(&mut reader, &mut buf)? {
                             metadata.description = Some(text);
                         }
-                    }
+                    },
                     b"cp:lastModifiedBy" => {
                         if let Some(text) = read_text_element(&mut reader, &mut buf)? {
                             metadata.last_modified_by = Some(text);
                         }
-                    }
+                    },
                     b"cp:revision" => {
                         if let Some(text) = read_text_element(&mut reader, &mut buf)?
-                            && let Ok(rev) = text.parse::<u32>() {
-                                metadata.revision = Some(rev.to_string());
-                            }
-                    }
+                            && let Ok(rev) = text.parse::<u32>()
+                        {
+                            metadata.revision = Some(rev.to_string());
+                        }
+                    },
                     b"cp:category" => {
                         if let Some(text) = read_text_element(&mut reader, &mut buf)? {
                             metadata.category = Some(text);
                         }
-                    }
+                    },
                     b"cp:contentStatus" => {
                         if let Some(text) = read_text_element(&mut reader, &mut buf)? {
                             metadata.content_status = Some(text);
                         }
-                    }
+                    },
                     b"dcterms:created" | b"cp:created" => {
                         if let Some(text) = read_text_element(&mut reader, &mut buf)?
-                            && let Ok(dt) = parse_datetime(&text) {
-                                metadata.created = Some(dt);
-                            }
-                    }
+                            && let Ok(dt) = parse_datetime(&text)
+                        {
+                            metadata.created = Some(dt);
+                        }
+                    },
                     b"dcterms:modified" | b"cp:modified" => {
                         if let Some(text) = read_text_element(&mut reader, &mut buf)?
-                            && let Ok(dt) = parse_datetime(&text) {
-                                metadata.modified = Some(dt);
-                            }
-                    }
+                            && let Ok(dt) = parse_datetime(&text)
+                        {
+                            metadata.modified = Some(dt);
+                        }
+                    },
                     b"cp:lastPrinted" => {
                         if let Some(text) = read_text_element(&mut reader, &mut buf)?
-                            && let Ok(dt) = parse_datetime(&text) {
-                                metadata.last_printed_time = Some(dt);
-                            }
-                    }
+                            && let Ok(dt) = parse_datetime(&text)
+                        {
+                            metadata.last_printed_time = Some(dt);
+                        }
+                    },
                     _ => {
                         // Skip unknown elements
-                    }
+                    },
                 }
-            }
+            },
             Ok(Event::Eof) => break,
             Err(e) => return Err(OoxmlError::Xml(format!("XML parsing error: {}", e))),
             _ => {
                 // Skip other events
-            }
+            },
         }
         buf.clear();
     }
@@ -159,23 +166,27 @@ fn parse_core_properties_xml(xml: &str) -> Result<Metadata> {
 }
 
 /// Read the text content of an XML element.
-fn read_text_element<B: BufRead>(reader: &mut Reader<B>, buf: &mut Vec<u8>) -> Result<Option<String>> {
+fn read_text_element<B: BufRead>(
+    reader: &mut Reader<B>,
+    buf: &mut Vec<u8>,
+) -> Result<Option<String>> {
     let mut text = String::new();
 
     loop {
         match reader.read_event_into(buf) {
             Ok(Event::Text(e)) => {
                 // Convert bytes to string (XML should be UTF-8)
-                let text_content = std::str::from_utf8(e.as_ref())
-                    .map_err(|e| OoxmlError::Xml(format!("Invalid UTF-8 in text content: {}", e)))?;
+                let text_content = std::str::from_utf8(e.as_ref()).map_err(|e| {
+                    OoxmlError::Xml(format!("Invalid UTF-8 in text content: {}", e))
+                })?;
                 text.push_str(text_content);
-            }
+            },
             Ok(Event::End(_)) => break,
             Ok(Event::Eof) => break,
             Err(e) => return Err(OoxmlError::Xml(format!("XML parsing error: {}", e))),
             _ => {
                 // Skip other events
-            }
+            },
         }
     }
 
@@ -211,7 +222,10 @@ fn parse_datetime(s: &str) -> Result<DateTime<Utc>> {
         return Ok(DateTime::from_naive_utc_and_offset(dt, Utc));
     }
 
-    Err(OoxmlError::InvalidFormat(format!("Invalid datetime format: {}", s)))
+    Err(OoxmlError::InvalidFormat(format!(
+        "Invalid datetime format: {}",
+        s
+    )))
 }
 
 #[cfg(test)]

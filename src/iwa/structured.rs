@@ -7,12 +7,12 @@
 
 use std::collections::HashMap;
 
-use crate::iwa::bundle::Bundle;
-use crate::iwa::object_index::ObjectIndex;
 use crate::iwa::Result;
-use crate::iwa::numbers::table_extractor::TableDataExtractor;
-use crate::iwa::shapes::text_extractor::ShapeTextExtractor;
+use crate::iwa::bundle::Bundle;
 use crate::iwa::charts::metadata_extractor::ChartMetadataExtractor;
+use crate::iwa::numbers::table_extractor::TableDataExtractor;
+use crate::iwa::object_index::ObjectIndex;
+use crate::iwa::shapes::text_extractor::ShapeTextExtractor;
 
 /// Represents a table extracted from a Numbers document
 #[derive(Debug, Clone)]
@@ -182,29 +182,32 @@ impl Section {
 pub fn extract_tables(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec<Table>> {
     let extractor = TableDataExtractor::new(bundle, object_index);
     let numbers_tables = extractor.extract_all_tables()?;
-    
+
     // Convert NumbersTable to our Table type for compatibility
-    let tables = numbers_tables.into_iter().map(|nt| {
-        let mut table = Table::new(nt.name.clone());
-        table.row_count = nt.row_count;
-        table.column_count = nt.column_count;
-        
-        // Convert cells from NumbersTable format to our CellValue format
-        for ((row, col), cell) in nt.cells {
-            let cell_value = convert_numbers_cell_to_structured(cell);
-            table.cells.insert((row, col), cell_value);
-        }
-        
-        table
-    }).collect();
-    
+    let tables = numbers_tables
+        .into_iter()
+        .map(|nt| {
+            let mut table = Table::new(nt.name.clone());
+            table.row_count = nt.row_count;
+            table.column_count = nt.column_count;
+
+            // Convert cells from NumbersTable format to our CellValue format
+            for ((row, col), cell) in nt.cells {
+                let cell_value = convert_numbers_cell_to_structured(cell);
+                table.cells.insert((row, col), cell_value);
+            }
+
+            table
+        })
+        .collect();
+
     Ok(tables)
 }
 
 /// Convert Numbers CellValue to structured CellValue
 fn convert_numbers_cell_to_structured(cell: crate::iwa::numbers::CellValue) -> CellValue {
     use crate::iwa::numbers::CellValue as NC;
-    
+
     match cell {
         NC::Empty => CellValue::Empty,
         NC::Text(s) => CellValue::Text(s),
@@ -272,10 +275,7 @@ pub fn extract_sections(bundle: &Bundle, _object_index: &ObjectIndex) -> Result<
 /// - TableDataExtractor for Numbers tables with full cell parsing
 /// - ShapeTextExtractor for text in shapes and text boxes
 /// - ChartMetadataExtractor for chart data
-pub fn extract_all(
-    bundle: &Bundle,
-    object_index: &ObjectIndex,
-) -> Result<StructuredData> {
+pub fn extract_all(bundle: &Bundle, object_index: &ObjectIndex) -> Result<StructuredData> {
     let tables = extract_tables(bundle, object_index)?;
     let slides = extract_slides(bundle, object_index)?;
     let sections = extract_sections(bundle, object_index)?;
@@ -300,7 +300,10 @@ pub fn extract_shape_text(bundle: &Bundle, object_index: &ObjectIndex) -> Result
 ///
 /// Returns metadata from all charts in the document, including titles,
 /// row/column names, and data series information.
-pub fn extract_chart_metadata(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec<crate::iwa::charts::ChartMetadata>> {
+pub fn extract_chart_metadata(
+    bundle: &Bundle,
+    object_index: &ObjectIndex,
+) -> Result<Vec<crate::iwa::charts::ChartMetadata>> {
     let extractor = ChartMetadataExtractor::new(bundle, object_index);
     extractor.extract_all_charts()
 }
@@ -446,4 +449,3 @@ mod tests {
         assert!(summary.contains("Sections: 1"));
     }
 }
-

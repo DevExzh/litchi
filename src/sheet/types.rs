@@ -21,4 +21,3 @@ pub enum CellValue {
     /// Error value
     Error(String),
 }
-

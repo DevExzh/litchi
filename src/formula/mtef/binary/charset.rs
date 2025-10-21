@@ -27,7 +27,7 @@ pub struct CharsetAttributes {
 ///
 /// Combines attributes with a descriptive name for debugging and validation.
 /// This structure is kept for future typeface validation and extended debugging features.
-#[allow(dead_code)]  // Kept for future typeface validation and debugging infrastructure
+#[allow(dead_code)] // Kept for future typeface validation and debugging infrastructure
 #[derive(Debug, Clone)]
 pub struct CharsetInfo {
     /// Character set attributes
@@ -41,11 +41,10 @@ pub struct CharsetInfo {
 /// Based on rtf2latex2e typeFaceName array. These names are used for
 /// debugging and logging purposes via the `get_typeface_name` function.
 const TYPEFACE_NAMES: &[&str] = &[
-    "ZERO", "TEXT", "FUNCTION", "VARIABLE", "LCGREEK", "UCGREEK", "SYMBOL",
-    "VECTOR", "NUMBER", "USER1", "USER2", "MTEXTRA", "UNKNOWN", "UNKNOWN",
-    "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN",
-    "UNKNOWN", "TEXT_FE", "EXPAND", "MARKER", "SPACE", "UNKNOWN", "UNKNOWN",
-    "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN"
+    "ZERO", "TEXT", "FUNCTION", "VARIABLE", "LCGREEK", "UCGREEK", "SYMBOL", "VECTOR", "NUMBER",
+    "USER1", "USER2", "MTEXTRA", "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN",
+    "UNKNOWN", "UNKNOWN", "UNKNOWN", "TEXT_FE", "EXPAND", "MARKER", "SPACE", "UNKNOWN", "UNKNOWN",
+    "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN",
 ];
 
 /// Get typeface name for debugging
@@ -58,7 +57,7 @@ const TYPEFACE_NAMES: &[&str] = &[
 /// let name = get_typeface_name(1); // Returns "TEXT"
 /// eprintln!("Processing typeface: {}", name);
 /// ```
-#[allow(dead_code)]  // Kept for debugging and future error reporting
+#[allow(dead_code)] // Kept for debugging and future error reporting
 pub fn get_typeface_name(typeface_index: usize) -> &'static str {
     if typeface_index < TYPEFACE_NAMES.len() {
         TYPEFACE_NAMES[typeface_index]
@@ -69,81 +68,209 @@ pub fn get_typeface_name(typeface_index: usize) -> &'static str {
 
 /// Default character set attributes for each typeface slot
 const DEFAULT_CHARSET_ATTRIBUTES: &[CharsetAttributes] = &[
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // ZERO
-    CharsetAttributes { math_attr: 2, do_lookup: true, use_codepoint: true }, // TEXT
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // FUNCTION
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // VARIABLE
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // LCGREEK
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // UCGREEK
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SYMBOL
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SYMBOL2
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // MTEXTRA
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL2
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL3
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL4
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL5
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL6
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL7
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL8
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL9
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL10
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL11
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL12
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL13
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL14
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL15
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL16
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL17
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL18
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL19
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL20
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL21
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL22
-    CharsetAttributes { math_attr: 1, do_lookup: true, use_codepoint: true }, // SPECIAL23
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // ZERO
+    CharsetAttributes {
+        math_attr: 2,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // TEXT
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // FUNCTION
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // VARIABLE
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // LCGREEK
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // UCGREEK
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SYMBOL
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SYMBOL2
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // MTEXTRA
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL2
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL3
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL4
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL5
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL6
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL7
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL8
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL9
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL10
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL11
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL12
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL13
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL14
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL15
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL16
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL17
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL18
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL19
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL20
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL21
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL22
+    CharsetAttributes {
+        math_attr: 1,
+        do_lookup: true,
+        use_codepoint: true,
+    }, // SPECIAL23
 ];
 
 /// Embellishment templates (math template,text template)
 /// Each embellishment type has a template string with %1 as placeholder for the base character
 pub const EMBELLISHMENT_TEMPLATES: &[&str] = &[
-    "", // 0 - None
-    "", // 1 - None
-    "\\dot{%1} ,\\.%1 ", // 2 - embDOT
-    "\\ddot{%1} ,\\\"%1 ", // 3 - embDDOT
-    "\\dddot{%1} ,%1 ", // 4 - embTDOT
-    "%1' ,%1 ", // 5 - embPRIME
-    "%1'' ,%1 ", // 6 - embDPRIME
-    "\\backprime %1 , %1", // 7 - embBPRIME
-    "\\tilde{%1} ,\\~%1 ", // 8 - embTILDE
-    "\\hat{%1} ,\\^%1 ", // 9 - embHAT
-    "", // 10 - embNOT (empty in original)
-    "\\vec{%1} ,%1 ", // 11 - embRARROW
-    "\\overleftarrow1{%1} ,%1 ", // 12 - embLARROW
+    "",                              // 0 - None
+    "",                              // 1 - None
+    "\\dot{%1} ,\\.%1 ",             // 2 - embDOT
+    "\\ddot{%1} ,\\\"%1 ",           // 3 - embDDOT
+    "\\dddot{%1} ,%1 ",              // 4 - embTDOT
+    "%1' ,%1 ",                      // 5 - embPRIME
+    "%1'' ,%1 ",                     // 6 - embDPRIME
+    "\\backprime %1 , %1",           // 7 - embBPRIME
+    "\\tilde{%1} ,\\~%1 ",           // 8 - embTILDE
+    "\\hat{%1} ,\\^%1 ",             // 9 - embHAT
+    "",                              // 10 - embNOT (empty in original)
+    "\\vec{%1} ,%1 ",                // 11 - embRARROW
+    "\\overleftarrow1{%1} ,%1 ",     // 12 - embLARROW
     "\\overleftrightarrow{%1} ,%1 ", // 13 - embBARROW
-    "\\overrightarrow{%1} ,%1 ", // 14 - embR1ARROW
-    "\\overleftarrow{%1} ,%1 ", // 15 - embL1ARROW
-    "\\underline{%1} ,%1 ", // 16 - embMBAR
-    "\\bar{%1} ,\\=%1 ", // 17 - embOBAR
-    "%1''' ,", // 18 - embTPRIME
-    "\\widehat{%1} ,%1 ", // 19 - embFROWN
-    "\\breve{%1} ,%1 ", // 20 - embSMILE
-    "{%1} ,%1 ", // 21 - embX_BARS
-    "{%1} ,%1 ", // 22 - embUP_BAR
-    "{%1} ,%1 ", // 23 - embDOWN_BAR
-    "{%1} ,%1 ", // 24 - emb4DOT
-    "\\d{%1} ,\\d{%1} ", // 25 - embU_1DOT
-    "{%1} ,%1 ", // 26 - embU_2DOT
-    "{%1} ,%1 ", // 27 - embU_3DOT
-    "{%1} ,%1 ", // 28 - embU_4DOT
-    "{%1} ,%1 ", // 29 - embU_BAR
-    "{%1} ,%1 ", // 30 - embU_TILDE
-    "{%1} ,%1 ", // 31 - embU_FROWN
-    "{%1} ,%1 ", // 32 - embU_SMILE
-    "{%1} ,%1 ", // 33 - embU_RARROW
-    "{%1} ,%1 ", // 34 - embU_LARROW
-    "{%1} ,%1 ", // 35 - embU_BARROW
-    "{%1} ,%1 ", // 36 - embU_R1ARROW
-    "{%1} ,%1 ", // 37 - embU_L1ARROW
+    "\\overrightarrow{%1} ,%1 ",     // 14 - embR1ARROW
+    "\\overleftarrow{%1} ,%1 ",      // 15 - embL1ARROW
+    "\\underline{%1} ,%1 ",          // 16 - embMBAR
+    "\\bar{%1} ,\\=%1 ",             // 17 - embOBAR
+    "%1''' ,",                       // 18 - embTPRIME
+    "\\widehat{%1} ,%1 ",            // 19 - embFROWN
+    "\\breve{%1} ,%1 ",              // 20 - embSMILE
+    "{%1} ,%1 ",                     // 21 - embX_BARS
+    "{%1} ,%1 ",                     // 22 - embUP_BAR
+    "{%1} ,%1 ",                     // 23 - embDOWN_BAR
+    "{%1} ,%1 ",                     // 24 - emb4DOT
+    "\\d{%1} ,\\d{%1} ",             // 25 - embU_1DOT
+    "{%1} ,%1 ",                     // 26 - embU_2DOT
+    "{%1} ,%1 ",                     // 27 - embU_3DOT
+    "{%1} ,%1 ",                     // 28 - embU_4DOT
+    "{%1} ,%1 ",                     // 29 - embU_BAR
+    "{%1} ,%1 ",                     // 30 - embU_TILDE
+    "{%1} ,%1 ",                     // 31 - embU_FROWN
+    "{%1} ,%1 ",                     // 32 - embU_SMILE
+    "{%1} ,%1 ",                     // 33 - embU_RARROW
+    "{%1} ,%1 ",                     // 34 - embU_LARROW
+    "{%1} ,%1 ",                     // 35 - embU_BARROW
+    "{%1} ,%1 ",                     // 36 - embU_R1ARROW
+    "{%1} ,%1 ",                     // 37 - embU_L1ARROW
 ];
 
 /// Function name lookup table (based on rtf2latex2e Profile_FUNCTIONS)

@@ -34,8 +34,9 @@ impl<R: Read + Seek> Package<R> {
 
     /// Read MIME type from the mimetype file
     fn read_mimetype(archive: &mut zip::ZipArchive<R>) -> Result<String> {
-        let mut mimetype_file = archive.by_name("mimetype")
-            .map_err(|_| Error::InvalidFormat("No mimetype file found in ODF package".to_string()))?;
+        let mut mimetype_file = archive.by_name("mimetype").map_err(|_| {
+            Error::InvalidFormat("No mimetype file found in ODF package".to_string())
+        })?;
 
         let mut content = String::new();
         mimetype_file.read_to_string(&mut content)?;
@@ -49,7 +50,9 @@ impl<R: Read + Seek> Package<R> {
 
     /// Get a file from the package by path
     pub fn get_file(&mut self, path: &str) -> Result<Vec<u8>> {
-        let mut file = self.archive.by_name(path)
+        let mut file = self
+            .archive
+            .by_name(path)
             .map_err(|_| Error::InvalidFormat(format!("File not found: {}", path)))?;
 
         let mut content = Vec::new();

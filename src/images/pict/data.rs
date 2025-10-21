@@ -39,14 +39,18 @@ pub fn unpack_bits(compressed: &[u8], expected_size: usize) -> Result<Vec<u8>> {
             // Run-length encoded: repeat next byte (1 - code) times
             let run_length = (1i32 - code as i32) as usize;
             if input_pos >= compressed.len() {
-                return Err(Error::ParseError("Invalid PackBits data: unexpected end of input".into()));
+                return Err(Error::ParseError(
+                    "Invalid PackBits data: unexpected end of input".into(),
+                ));
             }
             let byte = compressed[input_pos];
             input_pos += 1;
 
             // Extend output with repeated byte
             if bytes_done + run_length > expected_size {
-                return Err(Error::ParseError("PackBits decompression exceeded expected size".into()));
+                return Err(Error::ParseError(
+                    "PackBits decompression exceeded expected size".into(),
+                ));
             }
             output.extend(std::iter::repeat_n(byte, run_length));
             bytes_done += run_length;
@@ -54,10 +58,14 @@ pub fn unpack_bits(compressed: &[u8], expected_size: usize) -> Result<Vec<u8>> {
             // Literal bytes: copy (code + 1) bytes directly
             let literal_count = (code as usize) + 1;
             if input_pos + literal_count > compressed.len() {
-                return Err(Error::ParseError("Invalid PackBits data: not enough literal bytes".into()));
+                return Err(Error::ParseError(
+                    "Invalid PackBits data: not enough literal bytes".into(),
+                ));
             }
             if bytes_done + literal_count > expected_size {
-                return Err(Error::ParseError("PackBits decompression exceeded expected size".into()));
+                return Err(Error::ParseError(
+                    "PackBits decompression exceeded expected size".into(),
+                ));
             }
             output.extend_from_slice(&compressed[input_pos..input_pos + literal_count]);
             input_pos += literal_count;

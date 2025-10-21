@@ -35,21 +35,6 @@
 /// The design is inspired by the plurimath Ruby project but adapted for Rust's
 /// type system and performance characteristics.
 pub mod ast;
-/// OMML (Office Math Markup Language) Parser
-///
-/// This module parses Microsoft Office Math Markup Language (OMML) into our AST.
-/// OMML is used in modern Office documents (.docx, .pptx, etc.) to represent
-/// mathematical formulas.
-///
-/// This implementation provides comprehensive OMML parsing with:
-/// - High-performance streaming XML parsing
-/// - Modular element handlers for different OMML constructs
-/// - Comprehensive attribute parsing
-/// - Memory-efficient arena-based allocation
-/// - Support for all OMML elements and properties
-///
-/// Reference: https://devblogs.microsoft.com/math-in-office/officemath/
-mod omml;
 /// LaTeX Converter
 ///
 /// This module converts our formula AST to LaTeX format.
@@ -67,15 +52,30 @@ pub mod latex;
 /// - http://rtf2latex2e.sourceforge.net/MTEF5.html
 /// - rtf2latex2e source code
 mod mtef;
+/// OMML (Office Math Markup Language) Parser
+///
+/// This module parses Microsoft Office Math Markup Language (OMML) into our AST.
+/// OMML is used in modern Office documents (.docx, .pptx, etc.) to represent
+/// mathematical formulas.
+///
+/// This implementation provides comprehensive OMML parsing with:
+/// - High-performance streaming XML parsing
+/// - Modular element handlers for different OMML constructs
+/// - Comprehensive attribute parsing
+/// - Memory-efficient arena-based allocation
+/// - Support for all OMML elements and properties
+///
+/// Reference: https://devblogs.microsoft.com/math-in-office/officemath/
+mod omml;
 
 // Re-export public API
 pub use ast::{
-    Formula, FormulaBuilder, MathNode, Operator, Symbol, Fence, LargeOperator,
-    MatrixFence, AccentType, SpaceType, StyleType,
+    AccentType, Fence, Formula, FormulaBuilder, LargeOperator, MathNode, MatrixFence, Operator,
+    SpaceType, StyleType, Symbol,
 };
-pub use omml::{OmmlParser, OmmlError};
 pub use latex::{LatexConverter, LatexError};
-pub use mtef::{MtefParser, MtefError};
+pub use mtef::{MtefError, MtefParser};
+pub use omml::{OmmlError, OmmlParser};
 
 /// Conversion error that wraps all possible formula errors
 #[derive(Debug)]
