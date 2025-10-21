@@ -150,6 +150,10 @@ pub mod pages;
 pub mod numbers;
 pub mod keynote;
 
+/// Cross-application content extractors
+pub mod shapes;
+pub mod charts;
+
 /// Re-export commonly used types
 pub use archive::{ArchiveInfo, MessageInfo};
 pub use bundle::{Bundle, BundleMetadata, PropertyValue};
@@ -183,6 +187,9 @@ pub enum Error {
 
     #[error("Bundle structure error: {0}")]
     Bundle(String),
+
+    #[error("Parse error: {0}")]
+    ParseError(String),
 }
 
 /// Result type alias

@@ -10,6 +10,9 @@ use std::collections::HashMap;
 use crate::iwa::bundle::Bundle;
 use crate::iwa::object_index::ObjectIndex;
 use crate::iwa::Result;
+use crate::iwa::numbers::table_extractor::TableDataExtractor;
+use crate::iwa::shapes::text_extractor::ShapeTextExtractor;
+use crate::iwa::charts::metadata_extractor::ChartMetadataExtractor;
 
 /// Represents a table extracted from a Numbers document
 #[derive(Debug, Clone)]
@@ -173,25 +176,45 @@ impl Section {
 }
 
 /// Extract tables from a Numbers document
-pub fn extract_tables(bundle: &Bundle, _object_index: &ObjectIndex) -> Result<Vec<Table>> {
-    let mut tables = Vec::new();
-
-    // Find all table model objects (message type 100)
-    let table_objects = bundle.find_objects_by_type(100);
-
-    for (_archive_name, object) in table_objects {
-        for decoded_msg in &object.decoded_messages {
-            // Try to downcast to TableModelWrapper
-            if let Some(table_msg) = decoded_msg.extract_text().first() {
-                let table = Table::new(table_msg.clone());
-                // In a full implementation, we would parse the table structure
-                // and extract cell data. For now, we just create a table with the name.
-                tables.push(table);
-            }
+///
+/// Uses the TableDataExtractor to parse complete table structures including
+/// cell values, formulas, and formatting information.
+pub fn extract_tables(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec<Table>> {
+    let extractor = TableDataExtractor::new(bundle, object_index);
+    let numbers_tables = extractor.extract_all_tables()?;
+    
+    // Convert NumbersTable to our Table type for compatibility
+    let tables = numbers_tables.into_iter().map(|nt| {
+        let mut table = Table::new(nt.name.clone());
+        table.row_count = nt.row_count;
+        table.column_count = nt.column_count;
+        
+        // Convert cells from NumbersTable format to our CellValue format
+        for ((row, col), cell) in nt.cells {
+            let cell_value = convert_numbers_cell_to_structured(cell);
+            table.cells.insert((row, col), cell_value);
         }
-    }
-
+        
+        table
+    }).collect();
+    
     Ok(tables)
+}
+
+/// Convert Numbers CellValue to structured CellValue
+fn convert_numbers_cell_to_structured(cell: crate::iwa::numbers::CellValue) -> CellValue {
+    use crate::iwa::numbers::CellValue as NC;
+    
+    match cell {
+        NC::Empty => CellValue::Empty,
+        NC::Text(s) => CellValue::Text(s),
+        NC::Number(n) => CellValue::Number(n),
+        NC::Boolean(b) => CellValue::Boolean(b),
+        NC::Date(d) => CellValue::Date(d),
+        NC::Duration(_) => CellValue::Empty, // Duration not supported in structured format
+        NC::Formula(f) => CellValue::Formula(f),
+        NC::Error(e) => CellValue::Text(format!("ERROR: {}", e)),
+    }
 }
 
 /// Extract slides from a Keynote presentation
@@ -244,6 +267,11 @@ pub fn extract_sections(bundle: &Bundle, _object_index: &ObjectIndex) -> Result<
 }
 
 /// Extract all structured data from a document based on its type
+///
+/// This function uses specialized extractors for each content type:
+/// - TableDataExtractor for Numbers tables with full cell parsing
+/// - ShapeTextExtractor for text in shapes and text boxes
+/// - ChartMetadataExtractor for chart data
 pub fn extract_all(
     bundle: &Bundle,
     object_index: &ObjectIndex,
@@ -257,6 +285,24 @@ pub fn extract_all(
         slides,
         sections,
     })
+}
+
+/// Extract text from shapes and text boxes
+///
+/// This extracts text content from TSD.ShapeArchive objects, including
+/// text boxes, callouts, and grouped shapes.
+pub fn extract_shape_text(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec<String>> {
+    let extractor = ShapeTextExtractor::new(bundle, object_index);
+    extractor.extract_all_shape_text()
+}
+
+/// Extract chart metadata
+///
+/// Returns metadata from all charts in the document, including titles,
+/// row/column names, and data series information.
+pub fn extract_chart_metadata(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec<crate::iwa::charts::ChartMetadata>> {
+    let extractor = ChartMetadataExtractor::new(bundle, object_index);
+    extractor.extract_all_charts()
 }
 
 /// Container for all structured data extracted from a document

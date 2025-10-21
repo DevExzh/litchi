@@ -294,10 +294,17 @@ impl DecodedMessage for TableDataListWrapper {
     fn message_type(&self) -> u32 { 101 }
 
     fn extract_text(&self) -> Vec<String> {
-        // TableDataList contains actual cell data
-        // In a full implementation, we would extract string cell values here
-        // For now, return empty as the structure is complex
-        Vec::new()
+        // TableDataList contains actual cell data as ListEntry items
+        // Extract string values from entries
+        let mut strings = Vec::new();
+        
+        for entry in &self.0.entries {
+            if let Some(ref string_val) = entry.string && !string_val.is_empty() {
+                strings.push(string_val.clone());
+            }
+        }
+        
+        strings
     }
 }
 
@@ -309,9 +316,25 @@ impl DecodedMessage for ShapeArchiveWrapper {
     fn message_type(&self) -> u32 { 500 }
 
     fn extract_text(&self) -> Vec<String> {
-        // Shapes themselves don't contain text, but text boxes do
-        // In a full implementation, we would check for text box content
-        Vec::new()
+        // Shapes can contain text, particularly text boxes
+        // Text is typically stored in the DrawableArchive's accessibility description
+        // or in referenced TSWP.StorageArchive objects (handled by shape text extractor)
+        let mut text = Vec::new();
+        
+        // super_ is a required field, not Optional
+        let drawable = &self.0.super_;
+        
+        // Extract accessibility description if present (often used for alt text/labels)
+        if let Some(ref desc) = drawable.accessibility_description && !desc.is_empty() {
+            text.push(desc.clone());
+        }
+        
+        // Hyperlink URLs can also contain meaningful text
+        if let Some(ref url) = drawable.hyperlink_url && !url.is_empty() {
+            text.push(url.clone());
+        }
+        
+        text
     }
 }
 
@@ -336,9 +359,28 @@ impl DecodedMessage for ChartArchiveWrapper {
     fn message_type(&self) -> u32 { 600 }
 
     fn extract_text(&self) -> Vec<String> {
-        // Charts may have titles and labels
-        // In a full implementation, we would extract chart metadata
-        Vec::new()
+        // Charts contain text in grid data (row/column names)
+        // and may have titles in referenced text storage objects
+        let mut text = Vec::new();
+        
+        // Extract grid data (row and column names)
+        if let Some(ref grid) = self.0.grid {
+            // Add row names
+            for row_name in &grid.row_name {
+                if !row_name.is_empty() {
+                    text.push(row_name.clone());
+                }
+            }
+            
+            // Add column names
+            for col_name in &grid.column_name {
+                if !col_name.is_empty() {
+                    text.push(col_name.clone());
+                }
+            }
+        }
+        
+        text
     }
 }
 

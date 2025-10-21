@@ -33,9 +33,11 @@ pub mod document;
 pub mod sheet;
 pub mod table;
 pub mod cell;
+pub mod table_extractor;
 
 pub use document::NumbersDocument;
 pub use sheet::NumbersSheet;
 pub use table::NumbersTable;
 pub use cell::{CellValue, CellType};
+pub use table_extractor::TableDataExtractor;
 
