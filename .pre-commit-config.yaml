@@ -1,0 +1,15 @@
+repos:
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: Run cargo fmt
+        entry: cargo fmt
+        language: system
+        types: [rust]
+        pass_filenames: false
+      - id: cargo-sort
+        name: Run cargo sort
+        entry: cargo sort
+        language: system
+        files: ^Cargo\.toml$
+        pass_filenames: false
