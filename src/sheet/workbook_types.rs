@@ -25,6 +25,7 @@ pub(super) enum WorkbookImpl {
 
 /// Format of the workbook file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(unused)] // Since the library is feature-gated, this enum may not be used
 pub(super) enum WorkbookFormat {
     /// Legacy Excel Binary Format (.xls)
     Xls,

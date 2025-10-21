@@ -1,7 +1,7 @@
 //! Tests for text-based spreadsheet formats
 
 use super::*;
-use crate::sheet::{CellValue, Workbook};
+use crate::sheet::{CellValue, WorkbookTrait};
 
 #[test]
 fn test_csv_parsing() {
