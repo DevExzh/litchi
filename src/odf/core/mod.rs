@@ -13,6 +13,8 @@ mod package;
 mod xml;
 
 // Re-export main types for convenience
+// Manifest is internal to the package system
+#[allow(unused_imports)]
 pub use manifest::Manifest;
 pub use package::Package;
 pub use xml::{Content, Meta, Styles};

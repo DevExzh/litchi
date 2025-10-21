@@ -49,14 +49,11 @@ impl Paragraph {
     /// Get all text spans within this paragraph
     pub fn spans(&self) -> Result<Vec<Span>> {
         let mut spans = Vec::new();
-        for child in self.element.children() {
-            if child.tag_name() == "text:span" {
-                // This is a simplified conversion - in practice you'd need proper downcasting
-                if let Ok(span) =
-                    Span::from_element(unsafe { &*(child as *const _ as *const Element) }.clone())
-                {
-                    spans.push(span);
-                }
+        for child in self.element.children.iter() {
+            if child.tag_name() == "text:span"
+                && let Ok(span) = Span::from_element(child.clone())
+            {
+                spans.push(span);
             }
         }
         Ok(spans)
@@ -242,11 +239,9 @@ impl List {
     /// Get list items
     pub fn items(&self) -> Result<Vec<ListItem>> {
         let mut items = Vec::new();
-        for child in self.element.children() {
+        for child in self.element.children.iter() {
             if child.tag_name() == "text:list-item"
-                && let Ok(item) = ListItem::from_element(
-                    unsafe { &*(child as *const _ as *const Element) }.clone(),
-                )
+                && let Ok(item) = ListItem::from_element(child.clone())
             {
                 items.push(item);
             }
@@ -319,11 +314,9 @@ impl ListItem {
     /// Get nested paragraphs
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         let mut paragraphs = Vec::new();
-        for child in self.element.children() {
+        for child in self.element.children.iter() {
             if child.tag_name() == "text:p"
-                && let Ok(para) = Paragraph::from_element(
-                    unsafe { &*(child as *const _ as *const Element) }.clone(),
-                )
+                && let Ok(para) = Paragraph::from_element(child.clone())
             {
                 paragraphs.push(para);
             }

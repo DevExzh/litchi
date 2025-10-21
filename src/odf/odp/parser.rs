@@ -81,11 +81,13 @@ impl OdpParser {
                             // Finish previous slide if any
                             if in_slide {
                                 slides.push(Slide {
-                                    title: current_slide_title.clone(),
-                                    text: current_slide_text.trim().to_string(),
+                                    title: current_slide_title.take(),
+                                    text: std::mem::take(&mut current_slide_text)
+                                        .trim()
+                                        .to_string(),
                                     index: slide_index,
                                     notes: None,
-                                    shapes: current_shapes.clone(),
+                                    shapes: std::mem::take(&mut current_shapes),
                                 });
                                 slide_index += 1;
                             }
@@ -93,8 +95,6 @@ impl OdpParser {
                             // Start new slide
                             current_slide_title = Self::get_attr(e.attributes(), b"draw:name")
                                 .or_else(|| Some(format!("Slide{}", slide_index + 1)));
-                            current_slide_text.clear();
-                            current_shapes.clear();
                             in_slide = true;
                         },
                         b"draw:frame" | b"draw:rect" | b"draw:ellipse" | b"draw:line"
@@ -188,11 +188,13 @@ impl OdpParser {
                             // Finish current slide
                             if in_slide {
                                 slides.push(Slide {
-                                    title: current_slide_title.clone(),
-                                    text: current_slide_text.trim().to_string(),
+                                    title: current_slide_title.take(),
+                                    text: std::mem::take(&mut current_slide_text)
+                                        .trim()
+                                        .to_string(),
                                     index: slide_index,
                                     notes: None,
-                                    shapes: current_shapes.clone(),
+                                    shapes: std::mem::take(&mut current_shapes),
                                 });
                                 slide_index += 1;
                             }

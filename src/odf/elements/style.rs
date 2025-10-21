@@ -5,6 +5,7 @@
 
 use super::element::{Element, ElementBase};
 use crate::common::Result;
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 /// Style family types
@@ -65,66 +66,66 @@ impl StyleFamily {
 
 /// Style properties container
 #[derive(Debug, Clone, Default)]
-pub struct StyleProperties {
+pub struct StyleProperties<'a> {
     /// Text properties
-    pub text: TextProperties,
+    pub text: TextProperties<'a>,
     /// Paragraph properties
-    pub paragraph: ParagraphProperties,
+    pub paragraph: ParagraphProperties<'a>,
     /// Table properties
-    pub table: TableProperties,
+    pub table: TableProperties<'a>,
     /// Graphic properties
-    pub graphic: GraphicProperties,
+    pub graphic: GraphicProperties<'a>,
 }
 
 /// Text/character style properties
 #[derive(Debug, Clone, Default)]
-pub struct TextProperties {
-    pub font_name: Option<String>,
-    pub font_size: Option<String>,
-    pub font_weight: Option<String>,
-    pub font_style: Option<String>,
-    pub color: Option<String>,
-    pub background_color: Option<String>,
-    pub underline: Option<String>,
-    pub strikethrough: Option<String>,
-    pub text_shadow: Option<String>,
+pub struct TextProperties<'a> {
+    pub font_name: Option<Cow<'a, str>>,
+    pub font_size: Option<Cow<'a, str>>,
+    pub font_weight: Option<Cow<'a, str>>,
+    pub font_style: Option<Cow<'a, str>>,
+    pub color: Option<Cow<'a, str>>,
+    pub background_color: Option<Cow<'a, str>>,
+    pub underline: Option<Cow<'a, str>>,
+    pub strikethrough: Option<Cow<'a, str>>,
+    pub text_shadow: Option<Cow<'a, str>>,
 }
 
 /// Paragraph style properties
 #[derive(Debug, Clone, Default)]
-pub struct ParagraphProperties {
-    pub margin_left: Option<String>,
-    pub margin_right: Option<String>,
-    pub margin_top: Option<String>,
-    pub margin_bottom: Option<String>,
-    pub text_align: Option<String>,
-    pub line_height: Option<String>,
-    pub background_color: Option<String>,
-    pub border: Option<String>,
+pub struct ParagraphProperties<'a> {
+    pub margin_left: Option<Cow<'a, str>>,
+    pub margin_right: Option<Cow<'a, str>>,
+    pub margin_top: Option<Cow<'a, str>>,
+    pub margin_bottom: Option<Cow<'a, str>>,
+    pub text_align: Option<Cow<'a, str>>,
+    pub line_height: Option<Cow<'a, str>>,
+    pub background_color: Option<Cow<'a, str>>,
+    pub border: Option<Cow<'a, str>>,
 }
 
 /// Table style properties
 #[derive(Debug, Clone, Default)]
-pub struct TableProperties {
-    pub width: Option<String>,
-    pub background_color: Option<String>,
-    pub border: Option<String>,
-    pub align: Option<String>,
+pub struct TableProperties<'a> {
+    pub width: Option<Cow<'a, str>>,
+    pub background_color: Option<Cow<'a, str>>,
+    pub border: Option<Cow<'a, str>>,
+    pub align: Option<Cow<'a, str>>,
 }
 
 /// Graphic style properties
 #[derive(Debug, Clone, Default)]
-pub struct GraphicProperties {
-    pub background_color: Option<String>,
-    pub border: Option<String>,
-    pub shadow: Option<String>,
+pub struct GraphicProperties<'a> {
+    pub background_color: Option<Cow<'a, str>>,
+    pub border: Option<Cow<'a, str>>,
+    pub shadow: Option<Cow<'a, str>>,
 }
 
 /// A style definition element
 #[derive(Debug, Clone)]
 pub struct Style {
     element: Element,
-    properties: StyleProperties,
+    properties: StyleProperties<'static>,
 }
 
 impl Default for Style {
@@ -156,114 +157,128 @@ impl Style {
     fn parse_properties(&mut self) -> Result<()> {
         // Parse text properties
         if let Some(text_prop_elem) = self.find_property_element("style:text-properties") {
-            self.properties.text = Self::parse_text_properties(&text_prop_elem);
+            self.properties.text = Self::parse_text_properties(text_prop_elem);
         }
 
         // Parse paragraph properties
         if let Some(para_prop_elem) = self.find_property_element("style:paragraph-properties") {
-            self.properties.paragraph = Self::parse_paragraph_properties(&para_prop_elem);
+            self.properties.paragraph = Self::parse_paragraph_properties(para_prop_elem);
         }
 
         // Parse table properties
         if let Some(table_prop_elem) = self.find_property_element("style:table-properties") {
-            self.properties.table = Self::parse_table_properties(&table_prop_elem);
+            self.properties.table = Self::parse_table_properties(table_prop_elem);
         }
 
         // Parse graphic properties
         if let Some(graphic_prop_elem) = self.find_property_element("style:graphic-properties") {
-            self.properties.graphic = Self::parse_graphic_properties(&graphic_prop_elem);
+            self.properties.graphic = Self::parse_graphic_properties(graphic_prop_elem);
         }
 
         Ok(())
     }
 
-    /// Find a property element by tag name
-    fn find_property_element(&self, tag_name: &str) -> Option<Element> {
-        for child in self.element.children() {
-            if child.tag_name() == tag_name {
-                return Some(unsafe { &*(child as *const _ as *const Element) }.clone());
-            }
-        }
-        None
+    /// Find a property element by tag name, returning a reference
+    fn find_property_element(&self, tag_name: &str) -> Option<&Element> {
+        self.element
+            .children
+            .iter()
+            .find(|child| child.tag_name() == tag_name)
     }
 
     /// Parse text properties from element
-    fn parse_text_properties(element: &Element) -> TextProperties {
+    fn parse_text_properties(element: &Element) -> TextProperties<'static> {
         TextProperties {
             font_name: element
                 .get_attribute("style:font-name")
-                .map(|s| s.to_string()),
-            font_size: element.get_attribute("fo:font-size").map(|s| s.to_string()),
+                .map(|s| Cow::Owned(s.to_string())),
+            font_size: element
+                .get_attribute("fo:font-size")
+                .map(|s| Cow::Owned(s.to_string())),
             font_weight: element
                 .get_attribute("fo:font-weight")
-                .map(|s| s.to_string()),
+                .map(|s| Cow::Owned(s.to_string())),
             font_style: element
                 .get_attribute("fo:font-style")
-                .map(|s| s.to_string()),
-            color: element.get_attribute("fo:color").map(|s| s.to_string()),
+                .map(|s| Cow::Owned(s.to_string())),
+            color: element
+                .get_attribute("fo:color")
+                .map(|s| Cow::Owned(s.to_string())),
             background_color: element
                 .get_attribute("fo:background-color")
-                .map(|s| s.to_string()),
+                .map(|s| Cow::Owned(s.to_string())),
             underline: element
                 .get_attribute("style:text-underline-style")
-                .map(|s| s.to_string()),
+                .map(|s| Cow::Owned(s.to_string())),
             strikethrough: element
                 .get_attribute("style:text-line-through-style")
-                .map(|s| s.to_string()),
+                .map(|s| Cow::Owned(s.to_string())),
             text_shadow: element
                 .get_attribute("fo:text-shadow")
-                .map(|s| s.to_string()),
+                .map(|s| Cow::Owned(s.to_string())),
         }
     }
 
     /// Parse paragraph properties from element
-    fn parse_paragraph_properties(element: &Element) -> ParagraphProperties {
+    fn parse_paragraph_properties(element: &Element) -> ParagraphProperties<'static> {
         ParagraphProperties {
             margin_left: element
                 .get_attribute("fo:margin-left")
-                .map(|s| s.to_string()),
+                .map(|s| Cow::Owned(s.to_string())),
             margin_right: element
                 .get_attribute("fo:margin-right")
-                .map(|s| s.to_string()),
+                .map(|s| Cow::Owned(s.to_string())),
             margin_top: element
                 .get_attribute("fo:margin-top")
-                .map(|s| s.to_string()),
+                .map(|s| Cow::Owned(s.to_string())),
             margin_bottom: element
                 .get_attribute("fo:margin-bottom")
-                .map(|s| s.to_string()),
+                .map(|s| Cow::Owned(s.to_string())),
             text_align: element
                 .get_attribute("fo:text-align")
-                .map(|s| s.to_string()),
+                .map(|s| Cow::Owned(s.to_string())),
             line_height: element
                 .get_attribute("fo:line-height")
-                .map(|s| s.to_string()),
+                .map(|s| Cow::Owned(s.to_string())),
             background_color: element
                 .get_attribute("fo:background-color")
-                .map(|s| s.to_string()),
-            border: element.get_attribute("fo:border").map(|s| s.to_string()),
+                .map(|s| Cow::Owned(s.to_string())),
+            border: element
+                .get_attribute("fo:border")
+                .map(|s| Cow::Owned(s.to_string())),
         }
     }
 
     /// Parse table properties from element
-    fn parse_table_properties(element: &Element) -> TableProperties {
+    fn parse_table_properties(element: &Element) -> TableProperties<'static> {
         TableProperties {
-            width: element.get_attribute("style:width").map(|s| s.to_string()),
+            width: element
+                .get_attribute("style:width")
+                .map(|s| Cow::Owned(s.to_string())),
             background_color: element
                 .get_attribute("fo:background-color")
-                .map(|s| s.to_string()),
-            border: element.get_attribute("fo:border").map(|s| s.to_string()),
-            align: element.get_attribute("table:align").map(|s| s.to_string()),
+                .map(|s| Cow::Owned(s.to_string())),
+            border: element
+                .get_attribute("fo:border")
+                .map(|s| Cow::Owned(s.to_string())),
+            align: element
+                .get_attribute("table:align")
+                .map(|s| Cow::Owned(s.to_string())),
         }
     }
 
     /// Parse graphic properties from element
-    fn parse_graphic_properties(element: &Element) -> GraphicProperties {
+    fn parse_graphic_properties(element: &Element) -> GraphicProperties<'static> {
         GraphicProperties {
             background_color: element
                 .get_attribute("draw:fill-color")
-                .map(|s| s.to_string()),
-            border: element.get_attribute("draw:stroke").map(|s| s.to_string()),
-            shadow: element.get_attribute("draw:shadow").map(|s| s.to_string()),
+                .map(|s| Cow::Owned(s.to_string())),
+            border: element
+                .get_attribute("draw:stroke")
+                .map(|s| Cow::Owned(s.to_string())),
+            shadow: element
+                .get_attribute("draw:shadow")
+                .map(|s| Cow::Owned(s.to_string())),
         }
     }
 
@@ -285,7 +300,7 @@ impl Style {
     }
 
     /// Get style properties
-    pub fn properties(&self) -> &StyleProperties {
+    pub fn properties(&self) -> &StyleProperties<'static> {
         &self.properties
     }
 
@@ -326,16 +341,16 @@ impl StyleRegistry {
     }
 
     /// Get resolved properties for a style (with inheritance)
-    pub fn get_resolved_properties(&self, style_name: &str) -> StyleProperties {
+    pub fn get_resolved_properties(&self, style_name: &str) -> StyleProperties<'static> {
         let mut resolved = StyleProperties::default();
 
         // Walk up the inheritance chain
-        let mut current_name = Some(style_name.to_string());
+        let mut current_name = Some(style_name);
         while let Some(name) = current_name {
-            if let Some(style) = self.styles.get(&name) {
+            if let Some(style) = self.styles.get(name) {
                 // Merge properties (child overrides parent)
                 Self::merge_properties(&mut resolved, &style.properties);
-                current_name = style.parent_style_name().map(|s| s.to_string());
+                current_name = style.parent_style_name();
             } else {
                 break;
             }
@@ -345,63 +360,59 @@ impl StyleRegistry {
     }
 
     /// Merge source properties into target (source takes precedence)
-    fn merge_properties(target: &mut StyleProperties, source: &StyleProperties) {
+    ///
+    /// Uses a macro to reduce boilerplate while maintaining zero-copy semantics
+    /// where possible. The clone is necessary here because we're merging from
+    /// a reference into a mutable target.
+    fn merge_properties(target: &mut StyleProperties<'static>, source: &StyleProperties<'static>) {
+        macro_rules! merge_prop {
+            ($target_field:expr, $source_field:expr) => {
+                if $source_field.is_some() {
+                    $target_field = $source_field.clone();
+                }
+            };
+        }
+
         // Merge text properties
-        if source.text.font_name.is_some() {
-            target.text.font_name = source.text.font_name.clone();
-        }
-        if source.text.font_size.is_some() {
-            target.text.font_size = source.text.font_size.clone();
-        }
-        if source.text.font_weight.is_some() {
-            target.text.font_weight = source.text.font_weight.clone();
-        }
-        if source.text.font_style.is_some() {
-            target.text.font_style = source.text.font_style.clone();
-        }
-        if source.text.color.is_some() {
-            target.text.color = source.text.color.clone();
-        }
-        if source.text.background_color.is_some() {
-            target.text.background_color = source.text.background_color.clone();
-        }
-        if source.text.underline.is_some() {
-            target.text.underline = source.text.underline.clone();
-        }
-        if source.text.strikethrough.is_some() {
-            target.text.strikethrough = source.text.strikethrough.clone();
-        }
-        if source.text.text_shadow.is_some() {
-            target.text.text_shadow = source.text.text_shadow.clone();
-        }
+        merge_prop!(target.text.font_name, source.text.font_name);
+        merge_prop!(target.text.font_size, source.text.font_size);
+        merge_prop!(target.text.font_weight, source.text.font_weight);
+        merge_prop!(target.text.font_style, source.text.font_style);
+        merge_prop!(target.text.color, source.text.color);
+        merge_prop!(target.text.background_color, source.text.background_color);
+        merge_prop!(target.text.underline, source.text.underline);
+        merge_prop!(target.text.strikethrough, source.text.strikethrough);
+        merge_prop!(target.text.text_shadow, source.text.text_shadow);
 
         // Merge paragraph properties
-        if source.paragraph.margin_left.is_some() {
-            target.paragraph.margin_left = source.paragraph.margin_left.clone();
-        }
-        if source.paragraph.margin_right.is_some() {
-            target.paragraph.margin_right = source.paragraph.margin_right.clone();
-        }
-        if source.paragraph.margin_top.is_some() {
-            target.paragraph.margin_top = source.paragraph.margin_top.clone();
-        }
-        if source.paragraph.margin_bottom.is_some() {
-            target.paragraph.margin_bottom = source.paragraph.margin_bottom.clone();
-        }
-        if source.paragraph.text_align.is_some() {
-            target.paragraph.text_align = source.paragraph.text_align.clone();
-        }
-        if source.paragraph.line_height.is_some() {
-            target.paragraph.line_height = source.paragraph.line_height.clone();
-        }
-        if source.paragraph.background_color.is_some() {
-            target.paragraph.background_color = source.paragraph.background_color.clone();
-        }
-        if source.paragraph.border.is_some() {
-            target.paragraph.border = source.paragraph.border.clone();
-        }
+        merge_prop!(target.paragraph.margin_left, source.paragraph.margin_left);
+        merge_prop!(target.paragraph.margin_right, source.paragraph.margin_right);
+        merge_prop!(target.paragraph.margin_top, source.paragraph.margin_top);
+        merge_prop!(
+            target.paragraph.margin_bottom,
+            source.paragraph.margin_bottom
+        );
+        merge_prop!(target.paragraph.text_align, source.paragraph.text_align);
+        merge_prop!(target.paragraph.line_height, source.paragraph.line_height);
+        merge_prop!(
+            target.paragraph.background_color,
+            source.paragraph.background_color
+        );
+        merge_prop!(target.paragraph.border, source.paragraph.border);
 
-        // Similar merging for table and graphic properties...
+        // Merge table properties
+        merge_prop!(target.table.width, source.table.width);
+        merge_prop!(target.table.background_color, source.table.background_color);
+        merge_prop!(target.table.border, source.table.border);
+        merge_prop!(target.table.align, source.table.align);
+
+        // Merge graphic properties
+        merge_prop!(
+            target.graphic.background_color,
+            source.graphic.background_color
+        );
+        merge_prop!(target.graphic.border, source.graphic.border);
+        merge_prop!(target.graphic.shadow, source.graphic.shadow);
     }
 
     /// Parse styles from XML content

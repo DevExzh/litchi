@@ -2,7 +2,7 @@
 
 use super::Slide;
 use crate::common::{Error, Metadata, Result};
-use crate::odf::core::{Content, Manifest, Meta, Package, Styles};
+use crate::odf::core::{Content, Meta, Package, Styles};
 use std::io::Cursor;
 use std::path::Path;
 
@@ -37,8 +37,6 @@ pub struct Presentation {
     #[allow(dead_code)]
     styles: Option<Styles>,
     meta: Option<Meta>,
-    #[allow(dead_code)]
-    manifest: Manifest,
 }
 
 impl Presentation {
@@ -119,14 +117,11 @@ impl Presentation {
             None
         };
 
-        let manifest = package.manifest().clone();
-
         Ok(Self {
             package,
             content,
             styles,
             meta,
-            manifest,
         })
     }
 

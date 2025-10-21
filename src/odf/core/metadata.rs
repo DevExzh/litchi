@@ -71,7 +71,7 @@ impl OdfMetadata {
                     let name = e.name();
                     let name_str = String::from_utf8(name.as_ref().to_vec()).unwrap_or_default();
 
-                    current_element.push(name_str.clone());
+                    current_element.push(name_str);
 
                     match name.as_ref() {
                         b"dc:title" => {

@@ -58,11 +58,9 @@ impl Table {
     /// Get all rows in the table
     pub fn rows(&self) -> Result<Vec<TableRow>> {
         let mut rows = Vec::new();
-        for child in self.element.children() {
+        for child in self.element.children.iter() {
             if child.tag_name() == "table:table-row"
-                && let Ok(row) = TableRow::from_element(
-                    unsafe { &*(child as *const _ as *const Element) }.clone(),
-                )
+                && let Ok(row) = TableRow::from_element(child.clone())
             {
                 rows.push(row);
             }
@@ -137,11 +135,9 @@ impl TableRow {
     /// Get all cells in the row
     pub fn cells(&self) -> Result<Vec<TableCell>> {
         let mut cells = Vec::new();
-        for child in self.element.children() {
+        for child in self.element.children.iter() {
             if child.tag_name() == "table:table-cell"
-                && let Ok(cell) = TableCell::from_element(
-                    unsafe { &*(child as *const _ as *const Element) }.clone(),
-                )
+                && let Ok(cell) = TableCell::from_element(child.clone())
             {
                 cells.push(cell);
             }

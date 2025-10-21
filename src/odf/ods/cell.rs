@@ -48,15 +48,15 @@ impl Cell {
     ///
     /// Returns the displayed text value, which may differ from the
     /// underlying typed value for formatted numbers, dates, etc.
-    pub fn text(&self) -> Result<String> {
-        Ok(self.text.clone())
+    pub fn text(&self) -> Result<&str> {
+        Ok(&self.text)
     }
 
     /// Get the cell value.
     ///
     /// Returns the typed value stored in the cell.
-    pub fn value(&self) -> Result<CellValue> {
-        Ok(self.value.clone())
+    pub fn value(&self) -> Result<&CellValue> {
+        Ok(&self.value)
     }
 
     /// Get the numeric value of the cell (if applicable).
@@ -76,8 +76,8 @@ impl Cell {
     ///
     /// Returns the formula string if the cell contains a formula,
     /// None otherwise.
-    pub fn formula(&self) -> Result<Option<String>> {
-        Ok(self.formula.clone())
+    pub fn formula(&self) -> Result<Option<&str>> {
+        Ok(self.formula.as_deref())
     }
 
     /// Get the cell coordinates (row, column).

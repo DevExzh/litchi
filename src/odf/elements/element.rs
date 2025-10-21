@@ -149,7 +149,7 @@ pub struct Element {
     attributes: HashMap<String, String>,
     namespace_context: NamespaceContext,
     text_content: String,
-    children: Vec<Element>,
+    pub(crate) children: Vec<Element>,
 }
 
 impl Element {

@@ -70,11 +70,15 @@ impl OdsParser {
                         b"table:table-cell" => {
                             if let Some(cell_builder) = current_cell.take() {
                                 let repeated = cell_builder.repeated;
-                                let cell = cell_builder.build(text_content.clone());
                                 if let Some(ref mut row_builder) = current_row {
-                                    // Handle repeated cells
-                                    for _ in 0..repeated {
-                                        row_builder.add_cell(cell.clone());
+                                    // Handle repeated cells - build cell once for first occurrence
+                                    if repeated > 0 {
+                                        let cell = cell_builder.build(&text_content);
+                                        row_builder.add_cell(cell);
+                                        // Clone only for additional repetitions
+                                        for _ in 1..repeated {
+                                            row_builder.add_cell(cell_builder.build(&text_content));
+                                        }
                                     }
                                 }
                             }
@@ -250,13 +254,14 @@ pub(crate) struct CellBuilder {
 }
 
 impl CellBuilder {
-    pub fn build(self, text_content: String) -> Cell {
-        let value = self.parse_value(&text_content);
+    pub fn build(&self, text_content: &str) -> Cell {
+        let value = self.parse_value(text_content);
 
         Cell {
             value,
-            text: text_content,
-            formula: self.formula,
+            text: text_content.to_string(),
+            // Clone necessary: formula may be reused for repeated cells
+            formula: self.formula.clone(),
             row: 0, // Will be set by parent
             col: 0, // Will be set by parent
         }
@@ -278,8 +283,7 @@ impl CellBuilder {
             Some("currency") => {
                 if let Some(ref val_str) = self.value_str {
                     if let Ok(num) = val_str.parse::<f64>() {
-                        let currency_code =
-                            self.currency.clone().unwrap_or_else(|| "USD".to_string());
+                        let currency_code = self.currency.as_deref().unwrap_or("USD").to_string();
                         CellValue::Currency(num, currency_code)
                     } else {
                         CellValue::Text(text_content.to_string())
@@ -312,14 +316,14 @@ impl CellBuilder {
             },
             Some("date") => {
                 if let Some(ref val_str) = self.value_str {
-                    CellValue::Date(val_str.clone())
+                    CellValue::Date(val_str.to_string())
                 } else {
                     CellValue::Text(text_content.to_string())
                 }
             },
             Some("time") => {
                 if let Some(ref val_str) = self.value_str {
-                    CellValue::Time(val_str.clone())
+                    CellValue::Time(val_str.to_string())
                 } else {
                     CellValue::Text(text_content.to_string())
                 }

@@ -16,8 +16,8 @@ pub struct Row {
 
 impl Row {
     /// Get all cells in the row.
-    pub fn cells(&self) -> Result<Vec<Cell>> {
-        Ok(self.cells.clone())
+    pub fn cells(&self) -> Result<&[Cell]> {
+        Ok(&self.cells)
     }
 
     /// Get a cell by column index.
@@ -28,9 +28,9 @@ impl Row {
     /// # Arguments
     ///
     /// * `col` - Column index (0-based)
-    pub fn cell(&self, col: usize) -> Result<Option<Cell>> {
+    pub fn cell(&self, col: usize) -> Result<Option<&Cell>> {
         if col < self.cells.len() {
-            Ok(Some(self.cells[col].clone()))
+            Ok(Some(&self.cells[col]))
         } else {
             Ok(None)
         }

@@ -1,7 +1,7 @@
 //! OpenDocument Text document structure and API.
 
 use crate::common::{Error, Metadata, Result};
-use crate::odf::core::{Content, Manifest, Meta, Package, Styles};
+use crate::odf::core::{Content, Meta, Package, Styles};
 use crate::odf::elements::style::{StyleElements, StyleRegistry};
 use crate::odf::elements::table::Table as ElementTable;
 use crate::odf::elements::text::{Paragraph as ElementParagraph, TextElements};
@@ -51,8 +51,6 @@ pub struct Document {
     styles: Option<Styles>,
     /// Parsed meta.xml (document metadata), if present
     meta: Option<Meta>,
-    /// Parsed META-INF/manifest.xml (file manifest)
-    manifest: Manifest,
     /// Registry of all styles in the document
     style_registry: StyleRegistry,
 }
@@ -145,8 +143,6 @@ impl Document {
             None
         };
 
-        let manifest = package.manifest().clone();
-
         // Initialize style registry
         let mut style_registry = StyleRegistry::new();
 
@@ -170,7 +166,6 @@ impl Document {
             content,
             styles,
             meta,
-            manifest,
             style_registry,
         })
     }
@@ -340,7 +335,7 @@ impl Document {
     pub fn get_style_properties(
         &self,
         style_name: &str,
-    ) -> crate::odf::elements::style::StyleProperties {
+    ) -> crate::odf::elements::style::StyleProperties<'_> {
         self.style_registry.get_resolved_properties(style_name)
     }
 }

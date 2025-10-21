@@ -9,6 +9,7 @@ use std::io::{Read, Seek};
 /// An ODF package (ZIP file containing XML documents)
 pub struct Package<R> {
     archive: zip::ZipArchive<R>,
+    #[allow(dead_code)]
     manifest: super::manifest::Manifest,
     mimetype: String,
 }
@@ -66,6 +67,7 @@ impl<R: Read + Seek> Package<R> {
     }
 
     /// Get the manifest
+    #[allow(dead_code)]
     pub fn manifest(&self) -> &super::manifest::Manifest {
         &self.manifest
     }

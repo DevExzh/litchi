@@ -16,13 +16,13 @@ pub struct Sheet {
 
 impl Sheet {
     /// Get the name of the sheet.
-    pub fn name(&self) -> Result<String> {
-        Ok(self.name.clone())
+    pub fn name(&self) -> Result<&str> {
+        Ok(&self.name)
     }
 
     /// Get all rows in the sheet.
-    pub fn rows(&self) -> Result<Vec<Row>> {
-        Ok(self.rows.clone())
+    pub fn rows(&self) -> Result<&[Row]> {
+        Ok(&self.rows)
     }
 
     /// Get the number of rows in the sheet.

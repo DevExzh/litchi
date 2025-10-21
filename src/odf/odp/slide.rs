@@ -23,22 +23,22 @@ impl Slide {
     /// Get the title of the slide.
     ///
     /// Returns the slide title if present, None otherwise.
-    pub fn title(&self) -> Result<Option<String>> {
-        Ok(self.title.clone())
+    pub fn title(&self) -> Result<Option<&str>> {
+        Ok(self.title.as_deref())
     }
 
     /// Extract all text content from the slide.
     ///
     /// Returns the combined text from all text elements on the slide.
-    pub fn text(&self) -> Result<String> {
-        Ok(self.text.clone())
+    pub fn text(&self) -> Result<&str> {
+        Ok(&self.text)
     }
 
     /// Get all shapes on the slide.
     ///
-    /// Returns a vector of shapes contained in this slide.
-    pub fn shapes(&self) -> Result<Vec<Shape>> {
-        Ok(self.shapes.clone())
+    /// Returns a slice of shapes contained in this slide.
+    pub fn shapes(&self) -> Result<&[Shape]> {
+        Ok(&self.shapes)
     }
 
     /// Get the slide index.
@@ -51,8 +51,8 @@ impl Slide {
     /// Get the slide notes.
     ///
     /// Returns speaker notes for this slide if present, None otherwise.
-    pub fn notes(&self) -> Result<Option<String>> {
-        Ok(self.notes.clone())
+    pub fn notes(&self) -> Result<Option<&str>> {
+        Ok(self.notes.as_deref())
     }
 }
 
@@ -95,8 +95,8 @@ impl Shape {
     }
 
     /// Get the text content of the shape.
-    pub fn text(&self) -> Result<String> {
-        Ok(self.text.clone())
+    pub fn text(&self) -> Result<&str> {
+        Ok(&self.text)
     }
 
     /// Get the shape type.

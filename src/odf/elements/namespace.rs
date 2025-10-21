@@ -18,17 +18,23 @@ pub struct QualifiedName {
 
 impl QualifiedName {
     /// Create a new qualified name
+    ///
+    /// Note: A clone of `local_name` is necessary when no prefix is needed,
+    /// as both fields must be owned strings in the struct.
     pub fn new(namespace_uri: Option<String>, local_name: String) -> Self {
-        let qualified_name = if let Some(ref uri) = namespace_uri {
-            // For common ODF namespaces, use standard prefixes
-            let prefix = Self::uri_to_prefix(uri);
-            if prefix.is_empty() {
-                local_name.clone()
-            } else {
-                format!("{}:{}", prefix, local_name)
-            }
-        } else {
-            local_name.clone()
+        let qualified_name = match namespace_uri {
+            Some(ref uri) => {
+                // For common ODF namespaces, use standard prefixes
+                let prefix = Self::uri_to_prefix(uri);
+                if prefix.is_empty() {
+                    // Clone needed: local_name used in both fields
+                    local_name.clone()
+                } else {
+                    format!("{}:{}", prefix, local_name)
+                }
+            },
+            // Clone needed: local_name used in both fields
+            None => local_name.clone(),
         };
 
         Self {

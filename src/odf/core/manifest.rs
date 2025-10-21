@@ -63,14 +63,16 @@ impl Manifest {
                     if e.name().as_ref() == b"manifest:file-entry"
                         && let Some(entry) = Self::parse_file_entry(e)?
                     {
-                        entries.insert(entry.full_path.clone(), entry);
+                        let full_path = entry.full_path.clone();
+                        entries.insert(full_path, entry);
                     }
                 },
                 Ok(Event::Empty(ref e)) => {
                     if e.name().as_ref() == b"manifest:file-entry"
                         && let Some(entry) = Self::parse_file_entry(e)?
                     {
-                        entries.insert(entry.full_path.clone(), entry);
+                        let full_path = entry.full_path.clone();
+                        entries.insert(full_path, entry);
                     }
                 },
                 Ok(Event::Eof) => break,
@@ -81,6 +83,7 @@ impl Manifest {
         }
 
         // Extract mimetype from root document entry
+        // Note: Clone necessary here as we need an owned String for the struct field
         let mimetype = entries
             .get("/")
             .map(|entry| entry.media_type.clone())
