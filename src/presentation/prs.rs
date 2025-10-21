@@ -86,7 +86,10 @@ impl Presentation {
         
         // Try to detect the format by reading the file header
         let mut file = File::open(path)?;
-        let format = detect_presentation_format(&mut file)?;
+        let initial_format = detect_presentation_format(&mut file)?;
+        
+        // Refine ZIP-based format detection (distinguish PPTX from Keynote)
+        let format = super::types::refine_presentation_format(&mut file, initial_format)?;
         
         // Open with the appropriate parser
         match format {
@@ -131,6 +134,21 @@ impl Presentation {
             PresentationFormat::Pptx => {
                 Err(Error::FeatureDisabled("ooxml".to_string()))
             }
+            #[cfg(feature = "iwa")]
+            PresentationFormat::Keynote => {
+                let doc = crate::iwa::keynote::KeynoteDocument::open(path)
+                    .map_err(|e| Error::ParseError(format!("Failed to open Keynote presentation: {}", e)))?;
+                
+                Ok(Self {
+                    inner: PresentationImpl::Keynote(doc),
+                    #[cfg(feature = "ooxml")]
+                    _package: None,
+                })
+            }
+            #[cfg(not(feature = "iwa"))]
+            PresentationFormat::Keynote => {
+                Err(Error::FeatureDisabled("iwa".to_string()))
+            }
         }
     }
 
@@ -165,7 +183,21 @@ impl Presentation {
     /// - No temporary files created
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         // Detect format from byte signature
-        let format = detect_presentation_format_from_bytes(&bytes)?;
+        let initial_format = detect_presentation_format_from_bytes(&bytes)?;
+        
+        // Refine ZIP-based format detection for bytes
+        let format = if initial_format == PresentationFormat::Pptx {
+            // Check if it's a Keynote presentation
+            #[cfg(feature = "iwa")]
+            {
+                let mut cursor = Cursor::new(&bytes);
+                super::types::refine_presentation_format(&mut cursor, initial_format)?
+            }
+            #[cfg(not(feature = "iwa"))]
+            initial_format
+        } else {
+            initial_format
+        };
         
         match format {
             #[cfg(feature = "ole")]
@@ -213,6 +245,21 @@ impl Presentation {
             PresentationFormat::Pptx => {
                 Err(Error::FeatureDisabled("ooxml".to_string()))
             }
+            #[cfg(feature = "iwa")]
+            PresentationFormat::Keynote => {
+                let doc = crate::iwa::keynote::KeynoteDocument::from_bytes(&bytes)
+                    .map_err(|e| Error::ParseError(format!("Failed to open Keynote from bytes: {}", e)))?;
+                
+                Ok(Self {
+                    inner: PresentationImpl::Keynote(doc),
+                    #[cfg(feature = "ooxml")]
+                    _package: None,
+                })
+            }
+            #[cfg(not(feature = "iwa"))]
+            PresentationFormat::Keynote => {
+                Err(Error::FeatureDisabled("iwa".to_string()))
+            }
         }
     }
 
@@ -248,6 +295,10 @@ impl Presentation {
                 }
                 Ok(texts.join("\n\n"))
             }
+            #[cfg(feature = "iwa")]
+            PresentationImpl::Keynote(doc) => {
+                doc.text().map_err(|e| Error::ParseError(format!("Failed to extract text from Keynote: {}", e)))
+            }
         }
     }
 
@@ -272,6 +323,12 @@ impl Presentation {
             #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(pres) => {
                 pres.slide_count().map_err(Error::from)
+            }
+            #[cfg(feature = "iwa")]
+            PresentationImpl::Keynote(doc) => {
+                let slides = doc.slides()
+                    .map_err(|e| Error::ParseError(format!("Failed to get slides: {}", e)))?;
+                Ok(slides.len())
             }
         }
     }
@@ -321,6 +378,14 @@ impl Presentation {
                     })
                     .collect()
             }
+            #[cfg(feature = "iwa")]
+            PresentationImpl::Keynote(doc) => {
+                let keynote_slides = doc.slides()
+                    .map_err(|e| Error::ParseError(format!("Failed to get slides: {}", e)))?;
+                Ok(keynote_slides.into_iter()
+                    .map(Slide::Keynote)
+                    .collect())
+            }
         }
     }
 
@@ -347,6 +412,8 @@ impl Presentation {
             PresentationImpl::Pptx(pres) => {
                 pres.slide_width().map_err(Error::from)
             }
+            #[cfg(feature = "iwa")]
+            PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
         }
     }
 
@@ -373,6 +440,8 @@ impl Presentation {
             PresentationImpl::Pptx(pres) => {
                 pres.slide_height().map_err(Error::from)
             }
+            #[cfg(feature = "iwa")]
+            PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
         }
     }
 }

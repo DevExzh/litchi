@@ -134,6 +134,7 @@ pub mod archive;
 pub mod bundle;
 pub mod registry;
 pub mod object_index;
+pub mod ref_graph;
 pub mod protobuf;
 pub mod media;
 pub mod structured;
@@ -157,6 +158,7 @@ pub use snappy::SnappyStream;
 pub use media::{MediaManager, MediaAsset, MediaType, MediaStats};
 pub use structured::{Table, Slide, Section, StructuredData, CellValue};
 pub use text::{TextExtractor, TextStorage, TextFragment, TextStyle, ParagraphStyle};
+pub use ref_graph::ReferenceGraph;
 
 /// Error types for iWork parsing
 #[derive(Debug, thiserror::Error)]

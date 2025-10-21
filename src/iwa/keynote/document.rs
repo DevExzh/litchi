@@ -156,6 +156,8 @@ impl KeynoteDocument {
 
     /// Parse a single slide from an object
     fn parse_slide(&self, index: usize, object: &crate::iwa::archive::ArchiveObject) -> Result<KeynoteSlide> {
+        use prost::Message;
+        
         let mut slide = KeynoteSlide::new(index);
 
         // Extract text content from the slide object
@@ -169,13 +171,47 @@ impl KeynoteDocument {
             slide.text_content = text_parts.into_iter().skip(1).collect();
         }
 
-        // In a full implementation, we would:
-        // 1. Parse the SlideArchive protobuf message
-        // 2. Resolve references to drawable objects (shapes, text boxes, images)
-        // 3. Extract build animations (KN.BuildArchive)
-        // 4. Parse transition effects
-        // 5. Resolve master slide references
-        // 6. Extract speaker notes (KN.NoteArchive)
+        // Parse the SlideArchive protobuf message
+        // KN.SlideArchive contains:
+        // - name: string (slide title)
+        // - note: reference to KN.NoteArchive (speaker notes)
+        // - drawables: references to drawable objects (shapes, text boxes, images)
+        // - builds: references to KN.BuildArchive (animations)
+        // - transition: reference to KN.TransitionArchive
+        // - master_slide: reference to master slide
+        
+        if let Some(raw_message) = object.messages.first() {
+            // Try to decode as SlideArchive
+            if let Ok(slide_archive) = crate::iwa::protobuf::kn::SlideArchive::decode(&*raw_message.data) {
+                // Extract slide name if available
+                if let Some(ref name) = slide_archive.name 
+                    && !name.is_empty() {
+                        slide.title = Some(name.clone());
+                    }
+                
+                // TODO: Extract build animations
+                // The builds field contains references to KN.BuildArchive objects
+                // which define the animation effects for objects on the slide
+                
+                // TODO: Extract transition
+                // The transition field contains a reference to a transition effect
+                
+                // TODO: Resolve drawable references to get text boxes and other content
+                // The drawables field contains references to TSD.DrawableArchive objects
+                // which can include text boxes, shapes, images, etc.
+                
+                // TODO: Extract speaker notes
+                // The note field contains a reference to KN.NoteArchive
+                // which has the speaker notes text
+            }
+        }
+
+        // Extract text from text storages
+        let extractor = TextExtractor::new();
+        if let Ok(storage) = extractor.extract_from_object(object)
+            && !storage.is_empty() {
+                slide.text_storages.push(storage);
+            }
 
         Ok(slide)
     }

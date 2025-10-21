@@ -1,7 +1,7 @@
 //! Workbook implementation for XLS files
 
 use std::io::{Read, Seek};
-use crate::sheet::{Workbook, Worksheet as SheetTrait, WorksheetIterator};
+use crate::sheet::{Worksheet as SheetTrait, WorksheetIterator};
 use crate::ole::xls::error::{XlsError, XlsResult};
 use crate::ole::xls::records::{RecordIter, BofRecord, BoundSheetRecord, SharedStringTable, XlsEncoding, BiffVersion, CellRecord, DimensionsRecord};
 use crate::ole::xls::worksheet::XlsWorksheet;
@@ -221,7 +221,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     }
 }
 
-impl<R: Read + Seek + std::fmt::Debug> Workbook for XlsWorkbook<R> {
+impl<R: Read + Seek + std::fmt::Debug> crate::sheet::WorkbookTrait for XlsWorkbook<R> {
     fn active_worksheet(&self) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
         if self.worksheets.is_empty() {
             return Err(Box::new(XlsError::WorksheetNotFound("No worksheets found".to_string())));

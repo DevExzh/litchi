@@ -14,6 +14,8 @@ pub enum Run {
     Doc(ole::doc::Run),
     #[cfg(feature = "ooxml")]
     Docx(ooxml::docx::Run),
+    #[cfg(feature = "iwa")]
+    Pages(String),
 }
 
 impl Run {
@@ -24,6 +26,8 @@ impl Run {
             Run::Doc(r) => r.text().map(|s| s.to_string()).map_err(Error::from),
             #[cfg(feature = "ooxml")]
             Run::Docx(r) => r.text().map(|s| s.to_string()).map_err(Error::from),
+            #[cfg(feature = "iwa")]
+            Run::Pages(text) => Ok(text.clone()),
         }
     }
 
@@ -34,6 +38,8 @@ impl Run {
             Run::Doc(r) => Ok(r.bold()),
             #[cfg(feature = "ooxml")]
             Run::Docx(r) => r.bold().map_err(Error::from),
+            #[cfg(feature = "iwa")]
+            Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
         }
     }
 
@@ -44,6 +50,8 @@ impl Run {
             Run::Doc(r) => Ok(r.italic()),
             #[cfg(feature = "ooxml")]
             Run::Docx(r) => r.italic().map_err(Error::from),
+            #[cfg(feature = "iwa")]
+            Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
         }
     }
 
@@ -54,6 +62,8 @@ impl Run {
             Run::Doc(r) => Ok(r.strikethrough()),
             #[cfg(feature = "ooxml")]
             Run::Docx(r) => r.strikethrough().map_err(Error::from),
+            #[cfg(feature = "iwa")]
+            Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
         }
     }
 
@@ -62,7 +72,7 @@ impl Run {
     /// Returns the vertical positioning if specified, None if normal.
     ///
     /// **Note**: This method requires the `ole` or `ooxml` feature to be enabled.
-    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    #[cfg(any(feature = "ole", feature = "ooxml", feature = "iwa"))]
     pub fn vertical_position(&self) -> Result<Option<crate::common::VerticalPosition>> {
         use crate::common::VerticalPosition;
         
@@ -84,6 +94,8 @@ impl Run {
                     Some(OoxmlVerticalPosition::Normal) | None => Ok(None),
                 }
             }
+            #[cfg(feature = "iwa")]
+            Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
         }
     }
 }

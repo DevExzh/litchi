@@ -9,7 +9,10 @@ use crate::ole;
 #[cfg(feature = "ooxml")]
 use crate::ooxml;
 
-/// A Word document implementation that can be either .doc or .docx format.
+#[cfg(feature = "iwa")]
+use zip;
+
+/// A Word document implementation that can be .doc, .docx, or .pages format.
 ///
 /// This enum wraps the format-specific implementations and provides
 /// a unified API. Users typically don't interact with this enum directly,
@@ -22,6 +25,9 @@ pub(super) enum DocumentImpl {
     /// Modern .docx format
     #[cfg(feature = "ooxml")]
     Docx(Box<ooxml::docx::Document<'static>>, crate::common::Metadata),
+    /// Apple Pages format
+    #[cfg(feature = "iwa")]
+    Pages(crate::iwa::pages::PagesDocument),
 }
 
 /// Document format detection.
@@ -31,6 +37,8 @@ pub(super) enum DocumentFormat {
     Doc,
     /// Modern .docx format (OOXML/ZIP)
     Docx,
+    /// Apple Pages format (IWA/ZIP)
+    Pages,
 }
 
 /// Detect the document format by reading the file header.
@@ -71,10 +79,63 @@ fn detect_document_format_from_signature(header: &[u8]) -> Result<DocumentFormat
     }
 
     // Check for ZIP signature (PK\x03\x04)
+    // Note: Both DOCX and Pages are ZIP files, so we return Docx here
+    // and will need to distinguish them by inspecting the ZIP contents
     if header.len() >= 4 && header[0..4] == [0x50, 0x4B, 0x03, 0x04] {
         return Ok(DocumentFormat::Docx);
     }
 
     Err(Error::NotOfficeFile)
+}
+
+/// Detect if a ZIP file is a Pages document by checking for iWork markers
+#[cfg(feature = "iwa")]
+fn is_pages_document<R: Read + Seek>(reader: &mut R) -> bool {
+    use std::io::SeekFrom;
+    
+    // Try to open as ZIP and look for iWork format indicators
+    reader.seek(SeekFrom::Start(0)).ok();
+    
+    if let Ok(mut archive) = zip::ZipArchive::new(reader) {
+        // Check for Index.zip (older iWork format)
+        if archive.by_name("Index.zip").is_ok() {
+            return true;
+        }
+        
+        // Check for Index/ directory with .iwa files (newer iWork format)
+        for i in 0..archive.len() {
+            if let Ok(file) = archive.by_index(i) {
+                let name = file.name();
+                if name.starts_with("Index/") && name.ends_with(".iwa") {
+                    return true;
+                }
+            }
+        }
+    }
+    
+    false
+}
+
+/// Refine ZIP-based document format detection (DOCX vs Pages)
+pub(super) fn refine_document_format<R: Read + Seek>(reader: &mut R, initial_format: DocumentFormat) -> Result<DocumentFormat> {
+    use std::io::SeekFrom;
+    
+    // Only refine if initial detection was Docx (ZIP file)
+    if initial_format != DocumentFormat::Docx {
+        return Ok(initial_format);
+    }
+    
+    reader.seek(SeekFrom::Start(0))?;
+    
+    // Check if it's a Pages document
+    #[cfg(feature = "iwa")]
+    if is_pages_document(reader) {
+        reader.seek(SeekFrom::Start(0))?;
+        return Ok(DocumentFormat::Pages);
+    }
+    
+    // Otherwise it's DOCX
+    reader.seek(SeekFrom::Start(0))?;
+    Ok(DocumentFormat::Docx)
 }
 

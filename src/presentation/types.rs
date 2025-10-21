@@ -9,6 +9,9 @@ use crate::ole;
 #[cfg(feature = "ooxml")]
 use crate::ooxml;
 
+#[cfg(feature = "iwa")]
+use zip;
+
 /// Extracted data from a PPTX slide (to avoid lifetime issues).
 #[derive(Debug, Clone)]
 pub struct PptxSlideData {
@@ -24,11 +27,12 @@ pub struct PptSlideData {
     pub shape_count: usize,
 }
 
-/// A PowerPoint presentation implementation that can be either .ppt or .pptx format.
+/// A PowerPoint presentation implementation that can be .ppt, .pptx, or .key format.
 ///
 /// This enum wraps the format-specific implementations and provides
 /// a unified API. Users typically don't interact with this enum directly,
 /// but instead use the methods on `Presentation`.
+#[allow(clippy::large_enum_variant)]
 pub(super) enum PresentationImpl {
     /// Legacy .ppt format
     #[cfg(feature = "ole")]
@@ -36,6 +40,9 @@ pub(super) enum PresentationImpl {
     /// Modern .pptx format
     #[cfg(feature = "ooxml")]
     Pptx(Box<ooxml::pptx::Presentation<'static>>),
+    /// Apple Keynote format
+    #[cfg(feature = "iwa")]
+    Keynote(crate::iwa::keynote::KeynoteDocument),
 }
 
 /// Presentation format detection.
@@ -45,6 +52,8 @@ pub(super) enum PresentationFormat {
     Ppt,
     /// Modern .pptx format (OOXML/ZIP)
     Pptx,
+    /// Apple Keynote format (IWA/ZIP)
+    Keynote,
 }
 
 /// Detect the presentation format by reading the file header.
@@ -85,10 +94,63 @@ fn detect_presentation_format_from_signature(header: &[u8]) -> Result<Presentati
     }
 
     // Check for ZIP signature (PK\x03\x04)
+    // Note: Both PPTX and Keynote are ZIP files, so we return Pptx here
+    // and will need to distinguish them by inspecting the ZIP contents
     if header.len() >= 4 && header[0..4] == [0x50, 0x4B, 0x03, 0x04] {
         return Ok(PresentationFormat::Pptx);
     }
 
     Err(Error::NotOfficeFile)
+}
+
+/// Detect if a ZIP file is a Keynote presentation by checking for iWork markers
+#[cfg(feature = "iwa")]
+fn is_keynote_presentation<R: Read + Seek>(reader: &mut R) -> bool {
+    use std::io::SeekFrom;
+    
+    // Try to open as ZIP and look for iWork format indicators
+    reader.seek(SeekFrom::Start(0)).ok();
+    
+    if let Ok(mut archive) = zip::ZipArchive::new(reader) {
+        // Check for Index.zip (older iWork format)
+        if archive.by_name("Index.zip").is_ok() {
+            return true;
+        }
+        
+        // Check for Index/ directory with .iwa files (newer iWork format)
+        for i in 0..archive.len() {
+            if let Ok(file) = archive.by_index(i) {
+                let name = file.name();
+                if name.starts_with("Index/") && name.ends_with(".iwa") {
+                    return true;
+                }
+            }
+        }
+    }
+    
+    false
+}
+
+/// Refine ZIP-based presentation format detection (PPTX vs Keynote)
+pub(super) fn refine_presentation_format<R: Read + Seek>(reader: &mut R, initial_format: PresentationFormat) -> Result<PresentationFormat> {
+    use std::io::SeekFrom;
+    
+    // Only refine if initial detection was Pptx (ZIP file)
+    if initial_format != PresentationFormat::Pptx {
+        return Ok(initial_format);
+    }
+    
+    reader.seek(SeekFrom::Start(0))?;
+    
+    // Check if it's a Keynote presentation
+    #[cfg(feature = "iwa")]
+    if is_keynote_presentation(reader) {
+        reader.seek(SeekFrom::Start(0))?;
+        return Ok(PresentationFormat::Keynote);
+    }
+    
+    // Otherwise it's PPTX
+    reader.seek(SeekFrom::Start(0))?;
+    Ok(PresentationFormat::Pptx)
 }
 

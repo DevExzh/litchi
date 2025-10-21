@@ -236,9 +236,8 @@ mod tests {
         let text_result = doc.text();
         assert!(text_result.is_ok());
         
-        let text = text_result.unwrap();
         // Text might be empty for some documents, but extraction should succeed
-        assert!(text_result.is_ok());
+        let _text = text_result.unwrap();
     }
 
     #[test]

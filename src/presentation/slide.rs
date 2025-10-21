@@ -9,6 +9,9 @@ pub enum Slide {
     Ppt(PptSlideData),
     /// Modern PPTX slide with extracted data
     Pptx(PptxSlideData),
+    /// Apple Keynote slide
+    #[cfg(feature = "iwa")]
+    Keynote(crate::iwa::keynote::KeynoteSlide),
 }
 
 impl Slide {
@@ -29,12 +32,25 @@ impl Slide {
         match self {
             Slide::Ppt(data) => Ok(data.text.clone()),
             Slide::Pptx(data) => Ok(data.text.clone()),
+            #[cfg(feature = "iwa")]
+            Slide::Keynote(slide) => {
+                // Combine title and content
+                let mut text = String::new();
+                if let Some(ref title) = slide.title {
+                    text.push_str(title);
+                    if !slide.text_content.is_empty() {
+                        text.push_str("\n\n");
+                    }
+                }
+                text.push_str(&slide.text_content.join("\n"));
+                Ok(text)
+            }
         }
     }
 
     /// Get the slide number (1-based).
     ///
-    /// Only available for .ppt format. Returns None for .pptx files.
+    /// Only available for .ppt format. Returns None for .pptx and .key files.
     ///
     /// # Examples
     ///
@@ -53,12 +69,14 @@ impl Slide {
         match self {
             Slide::Ppt(data) => Some(data.slide_number),
             Slide::Pptx(_) => None,
+            #[cfg(feature = "iwa")]
+            Slide::Keynote(slide) => Some(slide.index + 1), // Convert 0-based to 1-based
         }
     }
 
     /// Get the number of shapes on the slide.
     ///
-    /// Only available for .ppt format. Returns None for .pptx files.
+    /// Only available for .ppt format. Returns None for .pptx and .key files.
     ///
     /// # Examples
     ///
@@ -77,12 +95,14 @@ impl Slide {
         match self {
             Slide::Ppt(data) => Some(data.shape_count),
             Slide::Pptx(_) => None,
+            #[cfg(feature = "iwa")]
+            Slide::Keynote(_) => None, // Shape count not currently exposed for Keynote
         }
     }
 
     /// Get the slide name.
     ///
-    /// Only available for .pptx format. Returns None for .ppt files.
+    /// Only available for .pptx and .key formats. Returns None for .ppt files.
     ///
     /// # Examples
     ///
@@ -101,6 +121,8 @@ impl Slide {
         match self {
             Slide::Ppt(_) => Ok(None),
             Slide::Pptx(data) => Ok(data.name.clone()),
+            #[cfg(feature = "iwa")]
+            Slide::Keynote(slide) => Ok(slide.title.clone()),
         }
     }
 }

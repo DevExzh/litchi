@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::{BufReader, Read, Seek};
 use std::path::Path;
 
-use crate::sheet::{Workbook, Worksheet, WorksheetIterator, CellValue, Result as SheetResult};
+use crate::sheet::{WorkbookTrait, Worksheet, WorksheetIterator, CellValue, Result as SheetResult};
 use super::iterators::TextWorksheetIterator;
 
 /// Configuration for parsing text-based spreadsheet files
@@ -165,7 +165,7 @@ impl TextWorkbook {
     }
 }
 
-impl Workbook for TextWorkbook {
+impl WorkbookTrait for TextWorkbook {
     fn active_worksheet(&self) -> SheetResult<Box<dyn Worksheet + '_>> {
         Ok(Box::new(super::worksheet::TextWorksheet::from_data(
             &self.data,

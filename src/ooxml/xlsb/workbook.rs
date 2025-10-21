@@ -1,7 +1,7 @@
 //! Workbook implementation for XLSB files
 
 use std::io::{Read, Seek, BufReader, Cursor};
-use crate::sheet::{Workbook, Worksheet as SheetTrait, WorksheetIterator};
+use crate::sheet::{Worksheet as SheetTrait, WorksheetIterator};
 use crate::ooxml::xlsb::error::XlsbResult;
 use crate::ooxml::xlsb::worksheet::XlsbWorksheet;
 use crate::ooxml::xlsb::records::{XlsbRecordIter, record_types};
@@ -177,7 +177,7 @@ impl XlsbWorkbook {
     }
 }
 
-impl Workbook for XlsbWorkbook {
+impl crate::sheet::WorkbookTrait for XlsbWorkbook {
     fn active_sheet_index(&self) -> usize {
         0
     }

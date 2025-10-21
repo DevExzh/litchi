@@ -28,22 +28,10 @@ fn decode_pages_document(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
     Ok(Box::new(PagesDocumentWrapper(msg)) as Box<dyn DecodedMessage>)
 }
 
-/// Static decoder function for Numbers DocumentArchive messages
-fn decode_numbers_document(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = tn::DocumentArchive::decode(data)?;
-    Ok(Box::new(NumbersDocumentWrapper(msg)) as Box<dyn DecodedMessage>)
-}
-
 /// Static decoder function for Numbers SheetArchive messages
 fn decode_numbers_sheet(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
     let msg = tn::SheetArchive::decode(data)?;
     Ok(Box::new(NumbersSheetWrapper(msg)) as Box<dyn DecodedMessage>)
-}
-
-/// Static decoder function for Keynote ShowArchive messages
-fn decode_keynote_show(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = kn::ShowArchive::decode(data)?;
-    Ok(Box::new(KeynoteShowWrapper(msg)) as Box<dyn DecodedMessage>)
 }
 
 /// Static decoder function for Keynote SlideArchive messages
@@ -93,51 +81,85 @@ type DecoderMap = phf::Map<u32, fn(&[u8]) -> Result<Box<dyn DecodedMessage>>>;
 /// Perfect hash map of message type IDs to decoder functions
 /// This provides O(1) lookup performance at compile time
 ///
-/// Based on analysis of iWork documents, common message types include:
-/// - 1, 2: TSP ArchiveInfo and MessageInfo
-/// - 100-199: Table-related (TST)
-/// - 200-299: Storage/Text-related (TSWP)
-/// - 1000-1999: Application-specific (Pages, Numbers, Keynote)
-/// - 2000-2999: Common content types (TSWP, TSD, TSCH)
-/// - 3000+: Various specialized types
+/// Based on analysis of iWork documents and official message type registry:
+/// - 1-2: TSP (Core Protocol) ArchiveInfo and MessageInfo
+/// - 200-299: TSK (Document Core)
+/// - 400-499: TSS (Stylesheets)
+/// - 600-699: TSA (Application Core)
+/// - 2000-2999: TSWP (Word Processing / Text)
+/// - 3000-3999: TSD (Drawing / Shapes)
+/// - 4000-4999: TSCE (Calculation Engine)
+/// - 5000-5999: TSCH (Charts)
+/// - 6000-6999: TST (Tables)
+/// - 10000-10999: TP (Pages-specific)
+/// - 12000-12999: TN (Numbers-specific)
+/// - 1-25, 100-199: KN (Keynote-specific)
+///
+/// Note: Message types are application-specific and may overlap between apps
 static DECODERS: DecoderMap = phf_map! {
-    // TSP (Core Protocol) types
+    // TSP (Core Protocol) types - used by all applications
     1u32 => decode_archive_info,
     2u32 => decode_message_info,
     
-    // TST (Table) types - Numbers spreadsheet tables
-    100u32 => decode_table_model,
-    101u32 => decode_table_data_list,
+    // TST (Table) types - Numbers spreadsheet tables and cells
+    // Message type 6001 is TST.TableModelArchive
+    6000u32 => decode_table_model,
+    6001u32 => decode_table_model,
+    6005u32 => decode_table_data_list,
+    6201u32 => decode_table_data_list,
     
     // TSD (Drawing) types - Shapes, images, and drawables
-    500u32 => decode_shape_archive,
-    501u32 => decode_drawable_archive,
+    3002u32 => decode_drawable_archive,
+    3003u32 => decode_drawable_archive,  // ContainerArchive
+    3004u32 => decode_shape_archive,
+    3005u32 => decode_shape_archive,     // ImageArchive (shape variant)
+    3006u32 => decode_shape_archive,     // MaskArchive
+    3007u32 => decode_shape_archive,     // MovieArchive
+    3008u32 => decode_shape_archive,     // GroupArchive
+    3009u32 => decode_shape_archive,     // ConnectionLineArchive
     
     // TSCH (Charts) types
-    600u32 => decode_chart_archive,
+    5000u32 => decode_chart_archive,
+    5004u32 => decode_chart_archive,  // ChartMediatorArchive
+    5021u32 => decode_chart_archive,  // ChartDrawableArchive
     
-    // TSWP (Word Processing) types - Text storage across all apps
-    200u32 => decode_storage_archive,
-    201u32 => decode_storage_archive,
-    202u32 => decode_storage_archive,
-    203u32 => decode_storage_archive,
-    204u32 => decode_storage_archive,
-    205u32 => decode_storage_archive,
+    // TSWP (Word Processing) types - Text storage used across all apps
     2001u32 => decode_storage_archive,
     2002u32 => decode_storage_archive,
     2003u32 => decode_storage_archive,
     2004u32 => decode_storage_archive,
     2005u32 => decode_storage_archive,
+    2006u32 => decode_storage_archive,
+    2007u32 => decode_storage_archive,
+    2008u32 => decode_storage_archive,
+    2009u32 => decode_storage_archive,
+    2010u32 => decode_storage_archive,
     2011u32 => decode_storage_archive,
     2012u32 => decode_storage_archive,
+    2013u32 => decode_storage_archive,
+    2014u32 => decode_storage_archive,
     2022u32 => decode_storage_archive,
     
-    // Application-specific document types
-    1001u32 => decode_pages_document,
-    1002u32 => decode_numbers_document,
-    1003u32 => decode_numbers_sheet,
-    1101u32 => decode_keynote_show,
-    1102u32 => decode_keynote_slide,
+    // Pages-specific document types (TP namespace)
+    10000u32 => decode_pages_document,
+    10001u32 => decode_pages_document,  // ThemeArchive
+    10011u32 => decode_pages_document,  // SectionArchive
+    
+    // Numbers-specific document types (TN namespace)
+    // Note: Numbers uses low message type numbers that conflict with TSP types
+    // Type 1 for TN.DocumentArchive conflicts with TSP.ArchiveInfo
+    // Type 2 for TN.SheetArchive conflicts with TSP.MessageInfo
+    // We prioritize TSP types in the decoder map and handle app-specific
+    // types through context-aware parsing in the document parsers
+    3u32 => decode_numbers_sheet,       // TN.FormBasedSheetArchive
+    
+    // Keynote-specific document types (KN namespace)
+    // Note: Keynote uses low message type numbers (1-25, 100-199)
+    // Type 2 is KN.ShowArchive but conflicts with TSP.MessageInfo
+    // Type 5/6 are KN.SlideArchive
+    5u32 => decode_keynote_slide,       // KN.SlideArchive
+    6u32 => decode_keynote_slide,       // KN.SlideArchive (variant)
+    8u32 => decode_keynote_slide,       // KN.BuildArchive (slide-related)
 };
 
 /// Decode a message of the given type using the perfect hash map for O(1) lookup
@@ -208,18 +230,6 @@ impl DecodedMessage for PagesDocumentWrapper {
     }
 }
 
-/// Document wrapper for TN.DocumentArchive
-#[derive(Debug)]
-pub struct NumbersDocumentWrapper(pub tn::DocumentArchive);
-
-impl DecodedMessage for NumbersDocumentWrapper {
-    fn message_type(&self) -> u32 { 1002 }
-
-    fn extract_text(&self) -> Vec<String> {
-        Vec::new() // Document metadata doesn't contain direct text
-    }
-}
-
 /// Sheet wrapper for TN.SheetArchive
 #[derive(Debug)]
 pub struct NumbersSheetWrapper(pub tn::SheetArchive);
@@ -233,19 +243,6 @@ impl DecodedMessage for NumbersSheetWrapper {
         } else {
             Vec::new()
         }
-    }
-}
-
-/// Wrapper for Keynote Show Archive
-#[derive(Debug)]
-pub struct KeynoteShowWrapper(pub kn::ShowArchive);
-
-impl DecodedMessage for KeynoteShowWrapper {
-    fn message_type(&self) -> u32 { 1101 }
-
-    fn extract_text(&self) -> Vec<String> {
-        // ShowArchive doesn't have a title field, return empty
-        Vec::new()
     }
 }
 
@@ -352,18 +349,17 @@ mod tests {
     #[test]
     fn test_message_decoder_creation() {
         // Test that all expected decoders are available in the static map
-        assert!(DECODERS.contains_key(&1)); // ArchiveInfo
-        assert!(DECODERS.contains_key(&2)); // MessageInfo
-        assert!(DECODERS.contains_key(&100)); // TableModelArchive
-        assert!(DECODERS.contains_key(&200)); // StorageArchive
-        assert!(DECODERS.contains_key(&201)); // StorageArchive variant
-        assert!(DECODERS.contains_key(&202)); // StorageArchive variant
+        assert!(DECODERS.contains_key(&1)); // ArchiveInfo / TN.DocumentArchive
+        assert!(DECODERS.contains_key(&2)); // MessageInfo / TN.SheetArchive
+        assert!(DECODERS.contains_key(&6001)); // TST.TableModelArchive
+        assert!(DECODERS.contains_key(&2001)); // TSWP.StorageArchive
+        assert!(DECODERS.contains_key(&2002)); // StorageArchive variant
+        assert!(DECODERS.contains_key(&2003)); // StorageArchive variant
         assert!(DECODERS.contains_key(&2022)); // Common StorageArchive type
-        assert!(DECODERS.contains_key(&1001)); // Pages Document
-        assert!(DECODERS.contains_key(&1002)); // Numbers Document
-        assert!(DECODERS.contains_key(&1003)); // Numbers Sheet
-        assert!(DECODERS.contains_key(&1101)); // Keynote Show
-        assert!(DECODERS.contains_key(&1102)); // Keynote Slide
+        assert!(DECODERS.contains_key(&10000)); // TP.DocumentArchive (Pages)
+        assert!(DECODERS.contains_key(&3)); // TN.FormBasedSheetArchive (Numbers)
+        assert!(DECODERS.contains_key(&5)); // KN.SlideArchive (Keynote)
+        assert!(DECODERS.contains_key(&6)); // KN.SlideArchive variant (Keynote)
     }
 
     #[test]
@@ -376,7 +372,7 @@ mod tests {
     fn test_decoder_performance() {
         // Test that decoding is fast with phf::Map
         // This test ensures the static map lookup is working
-        let message_types = [1, 2, 100, 200, 201, 202, 1001, 1002, 1101];
+        let message_types = [1, 2, 6001, 2001, 2002, 2003, 10000, 3, 5];
 
         // Create some dummy data that will fail to decode but test the lookup
         let dummy_data = vec![0u8; 10];

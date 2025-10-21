@@ -15,6 +15,8 @@ pub enum Paragraph {
     Doc(ole::doc::Paragraph),
     #[cfg(feature = "ooxml")]
     Docx(ooxml::docx::Paragraph),
+    #[cfg(feature = "iwa")]
+    Pages(String),
 }
 
 impl Paragraph {
@@ -25,6 +27,8 @@ impl Paragraph {
             Paragraph::Doc(p) => p.text().map(|s| s.to_string()).map_err(Error::from),
             #[cfg(feature = "ooxml")]
             Paragraph::Docx(p) => p.text().map(|s| s.to_string()).map_err(Error::from),
+            #[cfg(feature = "iwa")]
+            Paragraph::Pages(text) => Ok(text.clone()),
         }
     }
 
@@ -40,6 +44,12 @@ impl Paragraph {
             Paragraph::Docx(p) => {
                 let runs = p.runs().map_err(Error::from)?;
                 Ok(runs.into_iter().map(Run::Docx).collect())
+            }
+            #[cfg(feature = "iwa")]
+            Paragraph::Pages(text) => {
+                // Pages paragraphs are simple strings without run-level formatting
+                // Return a single run with the entire text
+                Ok(vec![Run::Pages(text.clone())])
             }
         }
     }

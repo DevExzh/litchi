@@ -1,13 +1,13 @@
 //! Functions for opening workbooks.
 
 use super::types::Result;
-use super::traits::Workbook;
+use super::traits::WorkbookTrait;
 
 /// Open a workbook from a file path.
 ///
 /// **Note**: This requires the `ooxml` feature to be enabled.
 #[cfg(feature = "ooxml")]
-pub fn open_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn Workbook>> {
+pub fn open_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn WorkbookTrait>> {
     let package = crate::ooxml::opc::OpcPackage::open(path)?;
     let workbook = crate::ooxml::xlsx::Workbook::new(package)?;
     Ok(Box::new(workbook))
@@ -17,7 +17,7 @@ pub fn open_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn Workb
 ///
 /// **Note**: This requires the `ooxml` feature to be enabled.
 #[cfg(feature = "ooxml")]
-pub fn open_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn Workbook>> {
+pub fn open_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
     use std::io::Cursor;
     let cursor = Cursor::new(bytes);
     let package = crate::ooxml::opc::OpcPackage::from_reader(cursor)?;
@@ -51,7 +51,7 @@ pub fn open_xls_workbook_from_bytes(bytes: &[u8]) -> Result<crate::ole::xls::Xls
 ///
 /// **Note**: This requires the `ole` feature to be enabled.
 #[cfg(feature = "ole")]
-pub fn open_xls_workbook_dyn<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn Workbook>> {
+pub fn open_xls_workbook_dyn<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn WorkbookTrait>> {
     let workbook = open_xls_workbook(path)?;
     Ok(Box::new(workbook))
 }
@@ -60,7 +60,7 @@ pub fn open_xls_workbook_dyn<P: AsRef<std::path::Path>>(path: P) -> Result<Box<d
 ///
 /// **Note**: This requires the `ole` feature to be enabled.
 #[cfg(feature = "ole")]
-pub fn open_xls_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn Workbook>> {
+pub fn open_xls_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
     use std::io::Cursor;
     let cursor = Cursor::new(bytes.to_vec());
     let workbook = crate::ole::xls::XlsWorkbook::new(cursor)?;
@@ -93,7 +93,7 @@ pub fn open_xlsb_workbook_from_bytes(bytes: &[u8]) -> Result<crate::ooxml::xlsb:
 ///
 /// **Note**: This requires the `ooxml` feature to be enabled.
 #[cfg(feature = "ooxml")]
-pub fn open_xlsb_workbook_dyn<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn Workbook>> {
+pub fn open_xlsb_workbook_dyn<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn WorkbookTrait>> {
     let workbook = open_xlsb_workbook(path)?;
     Ok(Box::new(workbook))
 }
@@ -102,7 +102,7 @@ pub fn open_xlsb_workbook_dyn<P: AsRef<std::path::Path>>(path: P) -> Result<Box<
 ///
 /// **Note**: This requires the `ooxml` feature to be enabled.
 #[cfg(feature = "ooxml")]
-pub fn open_xlsb_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn Workbook>> {
+pub fn open_xlsb_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
     use std::io::Cursor;
     let cursor = Cursor::new(bytes.to_vec());
     let workbook = crate::ooxml::xlsb::XlsbWorkbook::new(cursor)?;
@@ -110,40 +110,40 @@ pub fn open_xlsb_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn Workboo
 }
 
 /// Open a CSV workbook from a file path.
-pub fn open_csv_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn Workbook>> {
+pub fn open_csv_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn WorkbookTrait>> {
     let workbook = crate::sheet::text::TextWorkbook::open(path)?;
     Ok(Box::new(workbook))
 }
 
 /// Open a CSV workbook from bytes.
-pub fn open_csv_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn Workbook>> {
+pub fn open_csv_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
     let workbook = crate::sheet::text::TextWorkbook::from_bytes(bytes, crate::sheet::text::TextConfig::default())?;
     Ok(Box::new(workbook))
 }
 
 /// Open a TSV workbook from a file path.
-pub fn open_tsv_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn Workbook>> {
+pub fn open_tsv_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn WorkbookTrait>> {
     let config = crate::sheet::text::TextConfig::tsv();
     let workbook = crate::sheet::text::TextWorkbook::from_path_with_config(path, config)?;
     Ok(Box::new(workbook))
 }
 
 /// Open a TSV workbook from bytes.
-pub fn open_tsv_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn Workbook>> {
+pub fn open_tsv_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
     let config = crate::sheet::text::TextConfig::tsv();
     let workbook = crate::sheet::text::TextWorkbook::from_bytes(bytes, config)?;
     Ok(Box::new(workbook))
 }
 
 /// Open a PRN workbook from a file path.
-pub fn open_prn_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn Workbook>> {
+pub fn open_prn_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn WorkbookTrait>> {
     let config = crate::sheet::text::TextConfig::prn();
     let workbook = crate::sheet::text::TextWorkbook::from_path_with_config(path, config)?;
     Ok(Box::new(workbook))
 }
 
 /// Open a PRN workbook from bytes.
-pub fn open_prn_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn Workbook>> {
+pub fn open_prn_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
     let config = crate::sheet::text::TextConfig::prn();
     let workbook = crate::sheet::text::TextWorkbook::from_bytes(bytes, config)?;
     Ok(Box::new(workbook))
@@ -153,7 +153,7 @@ pub fn open_prn_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn Workbook>> {
 pub fn open_text_workbook_with_config<P: AsRef<std::path::Path>>(
     path: P,
     config: crate::sheet::text::TextConfig
-) -> Result<Box<dyn Workbook>> {
+) -> Result<Box<dyn WorkbookTrait>> {
     let workbook = crate::sheet::text::TextWorkbook::from_path_with_config(path, config)?;
     Ok(Box::new(workbook))
 }
@@ -162,7 +162,7 @@ pub fn open_text_workbook_with_config<P: AsRef<std::path::Path>>(
 pub fn open_text_workbook_from_bytes_with_config(
     bytes: &[u8],
     config: crate::sheet::text::TextConfig
-) -> Result<Box<dyn Workbook>> {
+) -> Result<Box<dyn WorkbookTrait>> {
     let workbook = crate::sheet::text::TextWorkbook::from_bytes(bytes, config)?;
     Ok(Box::new(workbook))
 }

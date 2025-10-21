@@ -4,7 +4,7 @@
 //! for Excel (.xlsx) files using the Office Open XML format.
 
 use crate::ooxml::opc::{OpcPackage, PackURI};
-use crate::sheet::{Workbook as WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator, Result as SheetResult};
+use crate::sheet::{WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator, Result as SheetResult};
 use crate::ooxml::xlsx::{SharedStrings, Styles};
 
 use super::worksheet::{Worksheet, WorksheetInfo, WorksheetIterator as XlsxWorksheetIterator};

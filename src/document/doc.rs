@@ -86,7 +86,10 @@ impl Document {
         
         // Try to detect the format by reading the file header
         let mut file = File::open(path)?;
-        let format = detect_document_format(&mut file)?;
+        let initial_format = detect_document_format(&mut file)?;
+        
+        // Refine ZIP-based format detection (distinguish DOCX from Pages)
+        let format = super::types::refine_document_format(&mut file, initial_format)?;
         
         // Reopen the file for the appropriate parser
         match format {
@@ -140,6 +143,21 @@ impl Document {
             DocumentFormat::Docx => {
                 Err(Error::FeatureDisabled("ooxml".to_string()))
             }
+            #[cfg(feature = "iwa")]
+            DocumentFormat::Pages => {
+                let doc = crate::iwa::pages::PagesDocument::open(path)
+                    .map_err(|e| Error::ParseError(format!("Failed to open Pages document: {}", e)))?;
+                
+                Ok(Self {
+                    inner: DocumentImpl::Pages(doc),
+                    #[cfg(feature = "ooxml")]
+                    _package: None,
+                })
+            }
+            #[cfg(not(feature = "iwa"))]
+            DocumentFormat::Pages => {
+                Err(Error::FeatureDisabled("iwa".to_string()))
+            }
         }
     }
 
@@ -174,7 +192,21 @@ impl Document {
     /// - No temporary files created
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         // Detect format from byte signature
-        let format = detect_document_format_from_bytes(&bytes)?;
+        let initial_format = detect_document_format_from_bytes(&bytes)?;
+        
+        // Refine ZIP-based format detection for bytes
+        let format = if initial_format == DocumentFormat::Docx {
+            // Check if it's a Pages document
+            #[cfg(feature = "iwa")]
+            {
+                let mut cursor = Cursor::new(&bytes);
+                super::types::refine_document_format(&mut cursor, initial_format)?
+            }
+            #[cfg(not(feature = "iwa"))]
+            initial_format
+        } else {
+            initial_format
+        };
         
         match format {
             #[cfg(feature = "ole")]
@@ -231,6 +263,21 @@ impl Document {
             DocumentFormat::Docx => {
                 Err(Error::FeatureDisabled("ooxml".to_string()))
             }
+            #[cfg(feature = "iwa")]
+            DocumentFormat::Pages => {
+                let doc = crate::iwa::pages::PagesDocument::from_bytes(&bytes)
+                    .map_err(|e| Error::ParseError(format!("Failed to open Pages document from bytes: {}", e)))?;
+                
+                Ok(Self {
+                    inner: DocumentImpl::Pages(doc),
+                    #[cfg(feature = "ooxml")]
+                    _package: None,
+                })
+            }
+            #[cfg(not(feature = "iwa"))]
+            DocumentFormat::Pages => {
+                Err(Error::FeatureDisabled("iwa".to_string()))
+            }
         }
     }
 
@@ -258,6 +305,10 @@ impl Document {
             DocumentImpl::Docx(doc, _) => {
                 doc.text().map_err(Error::from)
             }
+            #[cfg(feature = "iwa")]
+            DocumentImpl::Pages(doc) => {
+                doc.text().map_err(|e| Error::ParseError(format!("Failed to extract text from Pages: {}", e)))
+            }
         }
     }
 
@@ -282,6 +333,13 @@ impl Document {
             #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(doc, _) => {
                 doc.paragraph_count().map_err(Error::from)
+            }
+            #[cfg(feature = "iwa")]
+            DocumentImpl::Pages(doc) => {
+                // Pages documents are organized by sections
+                let sections = doc.sections()
+                    .map_err(|e| Error::ParseError(format!("Failed to get sections: {}", e)))?;
+                Ok(sections.iter().map(|s| s.paragraphs.len()).sum())
             }
         }
     }
@@ -313,6 +371,18 @@ impl Document {
                     .map_err(Error::from)?;
                 Ok(paras.into_iter().map(Paragraph::Docx).collect())
             }
+            #[cfg(feature = "iwa")]
+            DocumentImpl::Pages(doc) => {
+                // Pages documents have sections, each with paragraphs
+                let sections = doc.sections()
+                    .map_err(|e| Error::ParseError(format!("Failed to get sections: {}", e)))?;
+                let paragraphs: Vec<_> = sections.iter()
+                    .flat_map(|section| {
+                        section.paragraphs.iter().map(|text| Paragraph::Pages(text.clone()))
+                    })
+                    .collect();
+                Ok(paragraphs)
+            }
         }
     }
 
@@ -342,6 +412,12 @@ impl Document {
                 let tables = doc.tables()
                     .map_err(Error::from)?;
                 Ok(tables.into_iter().map(Table::Docx).collect())
+            }
+            #[cfg(feature = "iwa")]
+            DocumentImpl::Pages(_doc) => {
+                // Pages tables are not currently supported in the paragraph/table extraction API
+                // Tables in Pages are embedded as structured data which requires different extraction
+                Ok(Vec::new())
             }
         }
     }
@@ -373,6 +449,29 @@ impl Document {
             #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(_, metadata) => {
                 Ok(metadata.clone())
+            }
+            #[cfg(feature = "iwa")]
+            DocumentImpl::Pages(doc) => {
+                // Extract metadata from Pages bundle metadata
+                let bundle_metadata = doc.bundle().metadata();
+                let mut metadata = crate::common::Metadata::default();
+                
+                // Extract title from properties
+                if let Some(title) = bundle_metadata.get_property_string("Title") {
+                    metadata.title = Some(title);
+                }
+                
+                // Extract author from properties
+                if let Some(author) = bundle_metadata.get_property_string("Author") {
+                    metadata.author = Some(author);
+                }
+                
+                // Extract document identifier
+                if let Some(doc_id) = bundle_metadata.document_identifier() {
+                    metadata.description = Some(format!("Document ID: {}", doc_id));
+                }
+                
+                Ok(metadata)
             }
         }
     }

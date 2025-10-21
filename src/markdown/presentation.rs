@@ -60,6 +60,11 @@ fn extract_slide_title(slide: &Slide) -> Result<String> {
             // In a full implementation, we'd parse the slide content to find title placeholders
             Ok(pptx_data.name.clone().unwrap_or_default())
         }
+        #[cfg(feature = "iwa")]
+        Slide::Keynote(keynote_slide) => {
+            // For Keynote slides, use the title if available
+            Ok(keynote_slide.title.clone().unwrap_or_default())
+        }
     }
 }
 
@@ -77,6 +82,15 @@ fn write_slide_content(writer: &mut MarkdownWriter, slide: &Slide, _options: &Ma
         Slide::Pptx(_) => {
             // For PPTX slides, we have limited access to structured content
             // Just write the plain text for now
+            let text = slide.text()?;
+            if !text.is_empty() {
+                writer.push_str(&text);
+                writer.push_str("\n\n");
+            }
+        }
+        #[cfg(feature = "iwa")]
+        Slide::Keynote(_) => {
+            // For Keynote slides, write the text content
             let text = slide.text()?;
             if !text.is_empty() {
                 writer.push_str(&text);

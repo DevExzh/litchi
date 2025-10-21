@@ -85,8 +85,11 @@ pub trait WorksheetIterator<'a> {
     fn next(&mut self) -> Option<Result<Box<dyn Worksheet + 'a>>>;
 }
 
-/// Represents a workbook (spreadsheet file).
-pub trait Workbook: Debug {
+/// Trait representing a workbook (spreadsheet file).
+///
+/// **Note**: This is the low-level trait API. For high-level usage, use the
+/// unified `Workbook` struct from `crate::sheet::Workbook`.
+pub trait WorkbookTrait: Debug {
     /// Get the active worksheet.
     fn active_worksheet(&self) -> Result<Box<dyn Worksheet + '_>>;
 
