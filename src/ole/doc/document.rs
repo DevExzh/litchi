@@ -275,6 +275,9 @@ impl Document {
 
     /// Get the number of paragraphs in the document.
     ///
+    /// This method counts paragraphs using the PAPBinTable (Paragraph Properties Binary Table)
+    /// which provides accurate paragraph boundaries from the document's binary structures.
+    ///
     /// # Examples
     ///
     /// ```rust,no_run
@@ -287,12 +290,35 @@ impl Document {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn paragraph_count(&self) -> Result<usize> {
-        // TODO: Implement proper paragraph counting from binary structures
-        // For now, approximate by counting newlines
-        Ok(self.text()?.lines().count())
+        // Parse PAP PLCF to get accurate paragraph count
+        // Based on Apache POI's PAPBinTable approach
+        use crate::ole::plcf::PlcfParser;
+
+        // Get PAP bin table location from FIB
+        // Index 13 in FibRgFcLcb97 is fcPlcfBtePapx/lcbPlcfBtePapx
+        if let Some((offset, length)) = self.fib.get_table_pointer(13)
+            && length > 0
+            && (offset as usize) < self.table_stream.len()
+        {
+            let pap_data = &self.table_stream[offset as usize..];
+            let pap_len = length.min((self.table_stream.len() - offset as usize) as u32) as usize;
+
+            // Each entry in PAP PLCF represents a paragraph boundary
+            if let Some(plcf) = PlcfParser::parse(&pap_data[..pap_len], 4) {
+                // PLCF count represents the number of paragraph boundaries
+                // The actual paragraph count is the number of intervals
+                return Ok(plcf.count().saturating_sub(1).max(0));
+            }
+        }
+
+        // Fallback: count from extracted paragraphs
+        Ok(self.paragraphs()?.len())
     }
 
     /// Get the number of tables in the document.
+    ///
+    /// Counts top-level tables (table_level == 1) by scanning paragraph properties
+    /// for table markers. Based on Apache POI's table detection algorithm.
     ///
     /// # Examples
     ///
@@ -306,8 +332,30 @@ impl Document {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn table_count(&self) -> Result<usize> {
-        // TODO: Implement proper table counting from binary structures
-        Ok(0)
+        // Count tables by iterating through paragraphs and tracking table boundaries
+        // A new table starts when we encounter a paragraph with in_table=true and
+        // table_level=1 after a paragraph that was not in a table or had a different level
+        let paragraphs = self.paragraphs()?;
+        let mut table_count = 0;
+        let mut in_table_level_1 = false;
+
+        for para in paragraphs {
+            let props = para.properties();
+
+            // Check if this paragraph is in a top-level table (level 1)
+            if props.in_table && props.table_level == 1 {
+                // If we weren't previously in a level-1 table, this is a new table
+                if !in_table_level_1 {
+                    table_count += 1;
+                    in_table_level_1 = true;
+                }
+            } else {
+                // We've exited the table
+                in_table_level_1 = false;
+            }
+        }
+
+        Ok(table_count)
     }
 
     /// Get access to the File Information Block.
@@ -441,6 +489,9 @@ impl Document {
 
     /// Get all tables in the document.
     ///
+    /// Extracts tables by grouping paragraphs that have table markers.
+    /// Based on Apache POI's TableIterator algorithm.
+    ///
     /// Returns a vector of `Table` objects representing tables
     /// in the document.
     ///
@@ -458,8 +509,185 @@ impl Document {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn tables(&self) -> Result<Vec<Table>> {
-        // TODO: Implement proper table extraction from binary structures
-        Ok(Vec::new())
+        self.extract_tables_from_paragraphs(&self.paragraphs()?, 1)
+    }
+
+    /// Extract tables from a list of paragraphs at a specific nesting level.
+    ///
+    /// This is based on Apache POI's table extraction algorithm that scans
+    /// paragraphs for table markers and groups them into Table structures.
+    ///
+    /// # Arguments
+    ///
+    /// * `paragraphs` - List of paragraphs to scan
+    /// * `level` - Table nesting level to extract (1 for top-level tables)
+    ///
+    /// # Returns
+    ///
+    /// Vector of Table objects found at the specified nesting level
+    fn extract_tables_from_paragraphs(
+        &self,
+        paragraphs: &[Paragraph],
+        level: i32,
+    ) -> Result<Vec<Table>> {
+        let mut tables = Vec::new();
+        let mut i = 0;
+
+        while i < paragraphs.len() {
+            let para = &paragraphs[i];
+            let props = para.properties();
+
+            // Check if this paragraph starts a table at the requested level
+            if props.in_table && props.table_level == level {
+                // Found the start of a table - collect all paragraphs in this table
+                let table_start = i;
+                let mut table_paras = Vec::new();
+
+                // Collect paragraphs until we exit the table
+                while i < paragraphs.len() {
+                    let current_para = &paragraphs[i];
+                    let current_props = current_para.properties();
+
+                    if !current_props.in_table || current_props.table_level < level {
+                        // Exited the table
+                        break;
+                    }
+
+                    table_paras.push(current_para.clone());
+                    i += 1;
+                }
+
+                // Now extract rows from the collected table paragraphs
+                let rows = self.extract_rows_from_table_paragraphs(&table_paras, level)?;
+
+                if !rows.is_empty() {
+                    tables.push(Table::new(rows));
+                }
+
+                eprintln!(
+                    "DEBUG: Extracted table starting at para {}, with {} rows",
+                    table_start,
+                    tables.last().map_or(0, |t| t.row_count().unwrap_or(0))
+                );
+            } else {
+                i += 1;
+            }
+        }
+
+        Ok(tables)
+    }
+
+    /// Extract rows from table paragraphs.
+    ///
+    /// Groups consecutive paragraphs into rows based on the is_table_row_end marker.
+    /// Based on Apache POI's Table.initRows() logic.
+    ///
+    /// # Arguments
+    ///
+    /// * `table_paras` - Paragraphs belonging to a table
+    /// * `level` - Table nesting level
+    ///
+    /// # Returns
+    ///
+    /// Vector of Row objects
+    fn extract_rows_from_table_paragraphs(
+        &self,
+        table_paras: &[Paragraph],
+        level: i32,
+    ) -> Result<Vec<super::table::Row>> {
+        use super::table::Row;
+
+        let mut rows = Vec::new();
+        let mut current_row_paras = Vec::new();
+
+        for para in table_paras {
+            let props = para.properties();
+
+            // Skip paragraphs from nested tables (higher level)
+            if props.table_level > level {
+                continue;
+            }
+
+            // Add paragraph to current row
+            current_row_paras.push(para.clone());
+
+            // Check if this paragraph marks the end of a row
+            if props.is_table_row_end && props.table_level == level {
+                // End of row - create cells from the collected paragraphs
+                let cells = self.extract_cells_from_row_paragraphs(&current_row_paras)?;
+
+                if !cells.is_empty() {
+                    rows.push(Row::new(cells));
+                }
+
+                current_row_paras.clear();
+            }
+        }
+
+        // Handle any remaining paragraphs (incomplete row)
+        if !current_row_paras.is_empty() {
+            let cells = self.extract_cells_from_row_paragraphs(&current_row_paras)?;
+            if !cells.is_empty() {
+                rows.push(Row::new(cells));
+            }
+        }
+
+        Ok(rows)
+    }
+
+    /// Extract cells from row paragraphs.
+    ///
+    /// Each cell typically consists of one or more paragraphs.
+    /// The exact cell boundaries are determined by table properties (TAP).
+    /// For now, we create a simple cell structure from the paragraphs.
+    ///
+    /// # Arguments
+    ///
+    /// * `row_paras` - Paragraphs belonging to a row
+    ///
+    /// # Returns
+    ///
+    /// Vector of Cell objects
+    fn extract_cells_from_row_paragraphs(
+        &self,
+        row_paras: &[Paragraph],
+    ) -> Result<Vec<super::table::Cell>> {
+        use super::table::Cell;
+
+        // For a proper implementation, we'd need to parse TAP (Table Properties)
+        // to get exact cell boundaries. For now, we create one cell per paragraph
+        // which is a simplified approach but works for basic tables.
+
+        let mut cells = Vec::new();
+
+        // Group paragraphs into cells
+        // In Word's binary format, cell boundaries are marked in table properties
+        // For now, we use a simple heuristic: each paragraph is a cell
+        // unless it's the row-end marker
+        for para in row_paras {
+            let props = para.properties();
+
+            // Skip the row-end marker paragraph as it doesn't contain cell content
+            if props.is_table_row_end {
+                continue;
+            }
+
+            // Create a cell with this paragraph
+            let cell = Cell::with_properties(vec![para.clone()], None);
+            cells.push(cell);
+        }
+
+        // If we have no cells but have a row-end marker, create at least one empty cell
+        if cells.is_empty() && !row_paras.is_empty() {
+            let text = row_paras
+                .iter()
+                .filter_map(|p| p.text().ok())
+                .collect::<Vec<_>>()
+                .join(" ");
+            cells.push(Cell::new(text));
+        }
+
+        Ok(cells)
     }
 }
 
