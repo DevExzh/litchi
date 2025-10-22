@@ -32,6 +32,7 @@ pub(super) enum DocumentImpl {
 
 /// Document format detection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(unused)] // The corresponding enum would only be used when the feature is enabled
 pub(super) enum DocumentFormat {
     /// Legacy .doc format (OLE2)
     Doc,

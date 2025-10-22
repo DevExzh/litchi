@@ -47,6 +47,7 @@ pub(super) enum PresentationImpl {
 
 /// Presentation format detection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(unused)] // The corresponding enum would only be used when the feature is enabled
 pub(super) enum PresentationFormat {
     /// Legacy .ppt format (OLE2)
     Ppt,
