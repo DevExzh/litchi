@@ -8,14 +8,14 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::io::{Cursor, Read};
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use plist::Value;
 use zip::ZipArchive;
 
 use crate::iwa::archive::{Archive, ArchiveObject};
-use crate::iwa::snappy::SnappyStream;
+use crate::iwa::zip_utils::parse_iwa_files_from_zip;
 use crate::iwa::{Error, Result};
 
 /// Represents an iWork document bundle
@@ -157,7 +157,7 @@ impl Bundle {
         let mut zip_archive = ZipArchive::new(file)
             .map_err(|e| Error::Bundle(format!("Failed to open Index.zip: {}", e)))?;
 
-        Self::parse_iwa_files_from_zip(&mut zip_archive)
+        parse_iwa_files_from_zip(&mut zip_archive)
     }
 
     /// Parse a single-file bundle (zip archive) and extract all IWA files
@@ -167,7 +167,7 @@ impl Bundle {
         let mut zip_archive = ZipArchive::new(file)
             .map_err(|e| Error::Bundle(format!("Failed to open bundle file: {}", e)))?;
 
-        Self::parse_iwa_files_from_zip(&mut zip_archive)
+        parse_iwa_files_from_zip(&mut zip_archive)
     }
 
     /// Parse a ZIP archive from raw bytes and extract all IWA files
@@ -176,38 +176,7 @@ impl Bundle {
         let mut zip_archive = ZipArchive::new(cursor)
             .map_err(|e| Error::Bundle(format!("Failed to open ZIP archive from bytes: {}", e)))?;
 
-        Self::parse_iwa_files_from_zip(&mut zip_archive)
-    }
-
-    /// Parse IWA files from a zip archive
-    fn parse_iwa_files_from_zip<R: Read + std::io::Seek>(
-        zip_archive: &mut ZipArchive<R>,
-    ) -> Result<HashMap<String, Archive>> {
-        let mut archives = HashMap::new();
-
-        for i in 0..zip_archive.len() {
-            let mut zip_file = zip_archive
-                .by_index(i)
-                .map_err(|e| Error::Bundle(format!("Failed to read zip entry: {}", e)))?;
-
-            if zip_file.name().ends_with(".iwa") {
-                let mut compressed_data = Vec::new();
-                zip_file
-                    .read_to_end(&mut compressed_data)
-                    .map_err(Error::Io)?;
-
-                // Decompress IWA file
-                let mut cursor = Cursor::new(&compressed_data);
-                let decompressed = SnappyStream::decompress(&mut cursor)?;
-
-                // Parse archive
-                let archive = Archive::parse(decompressed.data())?;
-                let name = zip_file.name().to_string();
-                archives.insert(name, archive);
-            }
-        }
-
-        Ok(archives)
+        parse_iwa_files_from_zip(&mut zip_archive)
     }
 
     /// Parse metadata from Metadata/ directory

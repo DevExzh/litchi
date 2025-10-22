@@ -138,6 +138,7 @@ pub mod registry;
 pub mod snappy;
 pub mod structured;
 pub mod varint;
+pub mod zip_utils;
 
 /// Shared text extraction utilities
 pub mod text;
@@ -163,6 +164,10 @@ pub use ref_graph::ReferenceGraph;
 pub use snappy::SnappyStream;
 pub use structured::{CellValue, Section, Slide, StructuredData, Table};
 pub use text::{ParagraphStyle, TextExtractor, TextFragment, TextStorage, TextStyle};
+pub use zip_utils::{
+    FileStructureInfo, analyze_file_structure, extract_message_types_from_zip,
+    parse_iwa_files_from_zip,
+};
 
 /// Error types for iWork parsing
 #[derive(Debug, thiserror::Error)]

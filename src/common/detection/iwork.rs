@@ -6,7 +6,7 @@
 
 use crate::common::detection::FileFormat;
 #[cfg(feature = "iwa")]
-use std::io::{Cursor, Read};
+use std::io::Read;
 use std::path::Path;
 
 /// Detect iWork formats from bytes.
@@ -206,60 +206,29 @@ fn detect_iwork_format_from_files(bundle_path: &Path) -> Option<FileFormat> {
 pub fn detect_application_from_zip_archive<R: Read + std::io::Seek>(
     archive: &mut zip::ZipArchive<R>,
 ) -> Option<FileFormat> {
-    let mut table_file_count = 0;
-    let mut has_calculation_engine = false;
-    let mut slide_file_count = 0;
-    let mut file_names = Vec::new();
-
-    // Check file structure patterns
-    for i in 0..archive.len() {
-        if let Ok(zip_file) = archive.by_index(i) {
-            let name = zip_file.name();
-            file_names.push(name.to_string());
-
-            // Count table files
-            if name.starts_with("Index/Tables/") && name.ends_with(".iwa") {
-                table_file_count += 1;
-            }
-
-            // Check for Numbers-specific patterns
-            if name == "Index/CalculationEngine.iwa" {
-                has_calculation_engine = true;
-            }
-
-            // Count presentation files (slides and templates)
-            if (name.starts_with("Index/Slide") || name.starts_with("Index/TemplateSlide"))
-                && name.ends_with(".iwa")
-            {
-                slide_file_count += 1;
-            }
-        }
-    }
-
-    // Debug: print summary for complex cases
-    // println!("DEBUG: Archive files: {} total, {} table files, {} slide files, calc_engine={}",
-    //          file_names.len(), table_file_count, slide_file_count, has_calculation_engine);
+    // Use shared utility to analyze file structure
+    let info = crate::iwa::zip_utils::analyze_file_structure(archive);
 
     // Apply detection logic based on file patterns with priorities
-    if slide_file_count > 0 && table_file_count == 0 {
+    if info.slide_file_count > 0 && info.table_file_count == 0 {
         // Pure Keynote: has slides but no tables
         Some(FileFormat::Keynote)
-    } else if slide_file_count > 0 && has_calculation_engine {
+    } else if info.slide_file_count > 0 && info.has_calculation_engine {
         // Document with slides and calc engine: Keynote (prioritize presentation aspect)
         Some(FileFormat::Keynote)
-    } else if table_file_count > 0 && slide_file_count == 0 {
+    } else if info.table_file_count > 0 && info.slide_file_count == 0 {
         // Pure document with tables: could be Pages or Numbers
-        if has_calculation_engine {
+        if info.has_calculation_engine {
             // Has calc engine: Numbers
             Some(FileFormat::Numbers)
         } else {
             // No calc engine: Pages
             Some(FileFormat::Pages)
         }
-    } else if slide_file_count > 0 {
+    } else if info.slide_file_count > 0 {
         // Has slides: Keynote
         Some(FileFormat::Keynote)
-    } else if has_calculation_engine {
+    } else if info.has_calculation_engine {
         // Has calculation engine: Numbers
         Some(FileFormat::Numbers)
     } else {
@@ -273,36 +242,8 @@ pub fn detect_application_from_zip_archive<R: Read + std::io::Seek>(
 fn detect_application_from_message_types<R: Read + std::io::Seek>(
     archive: &mut zip::ZipArchive<R>,
 ) -> Option<FileFormat> {
-    let mut all_message_types = Vec::new();
-
-    // Process each IWA file in the archive
-    for i in 0..archive.len() {
-        if let Ok(mut zip_file) = archive.by_index(i)
-            && zip_file.name().ends_with(".iwa")
-        {
-            // Read the compressed IWA data
-            let mut compressed_data = Vec::new();
-            if zip_file.read_to_end(&mut compressed_data).is_err() {
-                continue; // Skip files we can't read
-            }
-
-            // Try to decompress and parse the IWA file
-            let Ok(decompressed) =
-                crate::iwa::snappy::SnappyStream::decompress(&mut Cursor::new(&compressed_data))
-            else {
-                continue; // Skip files we can't read
-            };
-            let Ok(iwa_archive) = crate::iwa::archive::Archive::parse(decompressed.data()) else {
-                continue; // Skip files we can't read
-            };
-            // Extract message types from all objects in this archive
-            for object in &iwa_archive.objects {
-                for message in &object.messages {
-                    all_message_types.push(message.type_);
-                }
-            }
-        }
-    }
+    // Use shared utility to extract message types
+    let all_message_types = crate::iwa::zip_utils::extract_message_types_from_zip(archive).ok()?;
 
     // Simple heuristic: look for known message type ranges
     // This is a rough approximation based on observed patterns
