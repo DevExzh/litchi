@@ -33,13 +33,17 @@
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub mod blip;
+pub mod bse;
 pub mod emf;
+pub mod extractor;
 pub mod pict;
 pub mod svg;
 pub mod wmf;
 
 use crate::common::error::Result;
-pub use blip::{BitmapBlip, Blip, BlipType, MetafileBlip};
+pub use blip::{BitmapBlip, Blip, BlipType, MetafileBlip, RecordHeader};
+pub use bse::{BlipStore, BlipStoreEntry};
+pub use extractor::{ExtractedImage, ImageExtractor};
 use image::ImageFormat;
 
 /// Convert a BLIP record to a raster image format
@@ -55,8 +59,8 @@ use image::ImageFormat;
 ///
 /// # Returns
 /// Encoded image bytes in the target format
-pub fn convert_blip_to_format(
-    blip: &Blip,
+pub fn convert_blip_to_format<'data>(
+    blip: &Blip<'data>,
     format: ImageFormat,
     width: Option<u32>,
     height: Option<u32>,
@@ -76,7 +80,7 @@ pub fn convert_blip_to_format(
         Blip::Bitmap(bitmap) => {
             // For bitmap formats that are already in a modern format, we may just need
             // to re-encode or pass through
-            let img = image::load_from_memory(&bitmap.picture_data).map_err(|e| {
+            let img = image::load_from_memory(&bitmap.picture_data[..]).map_err(|e| {
                 crate::common::error::Error::ParseError(format!("Failed to load bitmap: {}", e))
             })?;
 
@@ -143,8 +147,8 @@ pub fn convert_blip_to_format(
 /// let png = convert_blip_to_png(&blip, Some(800), None)?;
 /// # Ok::<(), litchi::common::error::Error>(())
 /// ```
-pub fn convert_blip_to_png(
-    blip: &Blip,
+pub fn convert_blip_to_png<'data>(
+    blip: &Blip<'data>,
     width: Option<u32>,
     height: Option<u32>,
 ) -> Result<Vec<u8>> {
@@ -152,8 +156,8 @@ pub fn convert_blip_to_png(
 }
 
 /// Convert a BLIP record to JPEG format
-pub fn convert_blip_to_jpeg(
-    blip: &Blip,
+pub fn convert_blip_to_jpeg<'data>(
+    blip: &Blip<'data>,
     width: Option<u32>,
     height: Option<u32>,
 ) -> Result<Vec<u8>> {
@@ -161,12 +165,110 @@ pub fn convert_blip_to_jpeg(
 }
 
 /// Convert a BLIP record to WebP format
-pub fn convert_blip_to_webp(
-    blip: &Blip,
+pub fn convert_blip_to_webp<'data>(
+    blip: &Blip<'data>,
     width: Option<u32>,
     height: Option<u32>,
 ) -> Result<Vec<u8>> {
     convert_blip_to_format(blip, ImageFormat::WebP, width, height)
+}
+
+// User-friendly convenience functions for extracting images from Office files
+
+/// Extract all images from a PPT presentation file
+///
+/// # Arguments
+/// * `path` - Path to the .ppt file
+///
+/// # Returns
+/// Vector of extracted images with metadata
+///
+/// # Example
+/// ```no_run
+/// use litchi::images::extract_images_from_ppt;
+///
+/// let images = extract_images_from_ppt("presentation.ppt")?;
+/// for (i, img) in images.iter().enumerate() {
+///     let png_data = img.to_png(None, None)?;
+///     std::fs::write(format!("image_{}.png", i), png_data)?;
+/// }
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+#[cfg(feature = "ole")]
+pub fn extract_images_from_ppt<P: AsRef<std::path::Path>>(
+    path: P,
+) -> Result<Vec<ExtractedImage<'static>>> {
+    use crate::ole::OleFile;
+    use std::fs::File;
+
+    let file = File::open(path).map_err(crate::common::error::Error::Io)?;
+    let mut ole = OleFile::open(file).map_err(|e| {
+        crate::common::error::Error::ParseError(format!("Failed to open OLE file: {}", e))
+    })?;
+
+    ImageExtractor::extract_from_ppt(&mut ole)
+}
+
+/// Extract all images from a DOC document file
+///
+/// # Arguments
+/// * `path` - Path to the .doc file
+///
+/// # Returns
+/// Vector of extracted images with metadata
+///
+/// # Example
+/// ```no_run
+/// use litchi::images::extract_images_from_doc;
+///
+/// let images = extract_images_from_doc("document.doc")?;
+/// for img in images {
+///     let filename = img.suggested_filename();
+///     let data = img.decompressed_data()?;
+///     std::fs::write(filename, &*data)?;
+/// }
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+#[cfg(feature = "ole")]
+pub fn extract_images_from_doc<P: AsRef<std::path::Path>>(
+    path: P,
+) -> Result<Vec<ExtractedImage<'static>>> {
+    use crate::ole::OleFile;
+    use std::fs::File;
+
+    let file = File::open(path).map_err(crate::common::error::Error::Io)?;
+    let mut ole = OleFile::open(file).map_err(|e| {
+        crate::common::error::Error::ParseError(format!("Failed to open OLE file: {}", e))
+    })?;
+
+    ImageExtractor::extract_from_doc(&mut ole)
+}
+
+/// Extract images from raw Escher drawing data
+///
+/// This is a lower-level function useful when you already have Escher data
+/// extracted from a document.
+///
+/// # Arguments
+/// * `escher_data` - Raw Escher drawing layer data
+///
+/// # Returns
+/// Vector of extracted images
+pub fn extract_images_from_escher(escher_data: &[u8]) -> Result<Vec<ExtractedImage<'static>>> {
+    ImageExtractor::extract_blips(escher_data)
+}
+
+/// Parse a BLIP store (BSE index) from Escher data
+///
+/// The BLIP store provides metadata about all images in a document.
+///
+/// # Arguments
+/// * `escher_data` - Raw Escher drawing layer data
+///
+/// # Returns
+/// BlipStore with all BSE entries
+pub fn parse_blip_store(escher_data: &[u8]) -> Result<BlipStore<'_>> {
+    ImageExtractor::extract_blip_store(escher_data)
 }
 
 #[cfg(test)]

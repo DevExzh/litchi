@@ -163,7 +163,7 @@ impl<'doc> Slide<'doc> {
 
             EscherShapeType::Picture => {
                 // Create PictureShape
-                let mut picture = shape_enum::PictureShape::new(shape_id);
+                let mut picture = crate::ole::ppt::shapes::PictureShape::new(shape_id);
 
                 if let Some(a) = anchor {
                     picture.set_bounds(a.left, a.top, a.width(), a.height());

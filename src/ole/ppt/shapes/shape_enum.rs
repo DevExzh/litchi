@@ -2,6 +2,7 @@
 //!
 //! Idiomatic Rust implementation using enum variants instead of trait objects.
 
+use super::picture::PictureShape;
 use super::shape::{Shape, ShapeType};
 use super::{AutoShape, Placeholder, TextBox};
 use crate::ole::ppt::package::Result;
@@ -113,71 +114,27 @@ impl ShapeEnum {
             _ => None,
         }
     }
-}
 
-/// Picture/image shape.
-///
-/// Represents an embedded image (JPEG, PNG, EMF, WMF, etc.)
-#[derive(Debug, Clone)]
-pub struct PictureShape {
-    /// Shape ID
-    id: u32,
-    /// Picture blip ID (reference to image data)
-    blip_id: Option<u32>,
-    /// Picture name/filename
-    name: Option<String>,
-    /// Left coordinate
-    left: i32,
-    /// Top coordinate
-    top: i32,
-    /// Width
-    width: i32,
-    /// Height
-    height: i32,
-}
-
-impl PictureShape {
-    /// Create a new picture shape.
-    pub fn new(id: u32) -> Self {
-        Self {
-            id,
-            blip_id: None,
-            name: None,
-            left: 0,
-            top: 0,
-            width: 0,
-            height: 0,
+    /// Get shape as PictureShape if it is one.
+    #[inline]
+    pub fn as_picture(&self) -> Option<&PictureShape> {
+        match self {
+            ShapeEnum::Picture(pic) => Some(pic),
+            _ => None,
         }
     }
 
-    /// Set picture coordinates and size.
-    pub fn set_bounds(&mut self, left: i32, top: i32, width: i32, height: i32) {
-        self.left = left;
-        self.top = top;
-        self.width = width;
-        self.height = height;
-    }
-
-    /// Set blip ID.
-    pub fn set_blip_id(&mut self, blip_id: u32) {
-        self.blip_id = Some(blip_id);
-    }
-
-    /// Set picture name.
-    pub fn set_name(&mut self, name: String) {
-        self.name = Some(name);
-    }
-
-    /// Get shape ID.
-    pub fn id(&self) -> u32 {
-        self.id
-    }
-
-    /// Get blip ID.
-    pub fn blip_id(&self) -> Option<u32> {
-        self.blip_id
+    /// Get shape as mutable PictureShape if it is one.
+    #[inline]
+    pub fn as_picture_mut(&mut self) -> Option<&mut PictureShape> {
+        match self {
+            ShapeEnum::Picture(pic) => Some(pic),
+            _ => None,
+        }
     }
 }
+
+// PictureShape is now defined in picture.rs and re-exported
 
 /// Table shape.
 ///

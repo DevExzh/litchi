@@ -4,6 +4,8 @@ use super::package::{PptError, Result};
 use super::parsers::PptRecordParser;
 use super::persist::PersistMapping;
 use super::slide::{Slide, SlideFactory};
+#[cfg(feature = "imgconv")]
+use crate::images::{BlipStore, ExtractedImage, ImageExtractor};
 use std::io::{Read, Seek};
 
 /// A PowerPoint presentation (.ppt) with high-performance zero-copy parsing.
@@ -37,6 +39,12 @@ pub struct Presentation {
     pub(crate) parser: PptRecordParser,
     /// Persist ID to offset mapping
     pub(crate) persist_mapping: PersistMapping,
+    /// Pictures stream data (for image extraction)
+    #[cfg(feature = "imgconv")]
+    pictures_data: Option<Vec<u8>>,
+    /// BLIP store (image metadata index)
+    #[cfg(feature = "imgconv")]
+    blip_store: Option<BlipStore<'static>>,
 }
 
 impl Presentation {
@@ -53,10 +61,26 @@ impl Presentation {
         let all_records = parser.find_records(crate::ole::consts::PptRecordType::Unknown);
         let persist_mapping = PersistMapping::build_from_records(&all_records);
 
+        // Try to read Pictures stream for image extraction
+        #[cfg(feature = "imgconv")]
+        let (pictures_data, blip_store) = if let Ok(pictures) = ole.open_stream(&["Pictures"]) {
+            // Extract BLIP store from pictures data
+            let store = ImageExtractor::extract_blip_store(&pictures)
+                .ok()
+                .map(|store| store.into_owned()); // Convert to 'static lifetime
+            (Some(pictures), store)
+        } else {
+            (None, None)
+        };
+
         Ok(Self {
             powerpoint_document,
             parser,
             persist_mapping,
+            #[cfg(feature = "imgconv")]
+            pictures_data,
+            #[cfg(feature = "imgconv")]
+            blip_store,
         })
     }
 
@@ -123,5 +147,73 @@ impl Presentation {
         } else {
             text_parts.join("\n\n")
         })
+    }
+
+    /// Extract all images from the presentation
+    ///
+    /// This extracts all embedded images from the Pictures stream.
+    ///
+    /// # Returns
+    /// Vector of all extracted images with metadata
+    ///
+    /// # Example
+    /// ```no_run
+    /// use litchi::ole::ppt::Package;
+    ///
+    /// let mut pkg = Package::open("presentation.ppt")?;
+    /// let pres = pkg.presentation()?;
+    ///
+    /// for image in pres.extract_all_images()? {
+    ///     let png_data = image.to_png(None, None)?;
+    ///     std::fs::write(image.suggested_filename(), png_data)?;
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    #[cfg(feature = "imgconv")]
+    pub fn extract_all_images(&self) -> Result<Vec<ExtractedImage<'static>>> {
+        if let Some(ref pictures_data) = self.pictures_data {
+            ImageExtractor::extract_from_pictures_stream(pictures_data)
+                .map_err(|e| PptError::Corrupted(format!("Failed to extract images: {}", e)))
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    /// Extract an image by BLIP ID
+    ///
+    /// This method is used internally by PictureShape to resolve
+    /// BLIP ID references to actual image data.
+    ///
+    /// # Arguments
+    /// * `blip_id` - The BLIP ID from the shape's Escher properties
+    ///
+    /// # Returns
+    /// The extracted image, or None if not found
+    #[cfg(feature = "imgconv")]
+    pub(crate) fn extract_image_by_blip_id(
+        &self,
+        blip_id: u32,
+    ) -> Result<Option<ExtractedImage<'static>>> {
+        // Extract all images and find the one matching the BLIP ID
+        let images = self.extract_all_images()?;
+
+        // BLIP ID is 1-based index
+        let index = (blip_id.saturating_sub(1)) as usize;
+
+        Ok(images.into_iter().nth(index))
+    }
+
+    /// Get the BLIP store (image metadata index)
+    ///
+    /// This provides access to image metadata without extracting the full image data.
+    #[cfg(feature = "imgconv")]
+    pub fn blip_store(&self) -> Option<&BlipStore<'static>> {
+        self.blip_store.as_ref()
+    }
+
+    /// Check if the presentation has a Pictures stream
+    #[cfg(feature = "imgconv")]
+    pub fn has_pictures(&self) -> bool {
+        self.pictures_data.is_some()
     }
 }

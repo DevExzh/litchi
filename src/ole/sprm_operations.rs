@@ -24,8 +24,7 @@
 /// - 7: 3-byte operand
 // CHP (Character Properties) SPRM opcodes
 // Based on Apache POI's CharacterProperties and CharacterSprmUncompressor
-
-/// sprmCFRMarkDel - Mark deleted revision (operation 0x00)
+///   sprmCFRMarkDel - Mark deleted revision (operation 0x00)
 pub const SPRM_C_F_RMARK_DEL: u16 = 0x0800;
 
 /// sprmCFRMark - Mark revision (operation 0x01)

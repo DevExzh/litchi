@@ -11,6 +11,7 @@ pub mod autoshape;
 /// - `TextBox`: Text box shapes
 /// - `Placeholder`: Placeholder shapes for titles, content, etc.
 /// - `AutoShape`: Auto shapes (rectangles, ovals, etc.)
+/// - `PictureShape`: Picture shapes with embedded images
 /// - `EscherRecord`: Parser for Escher binary records
 ///
 /// # PPT Shape Structure
@@ -42,6 +43,7 @@ pub mod autoshape;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub mod escher;
+pub mod picture;
 pub mod placeholder;
 pub mod shape;
 pub mod shape_enum;
@@ -55,5 +57,8 @@ pub use shape_enum::ShapeEnum;
 
 // Re-export concrete shape types
 pub use autoshape::AutoShape;
+pub use picture::PictureShape;
+#[cfg(feature = "imgconv")]
+pub use picture::extract_blip_id_from_escher;
 pub use placeholder::{Placeholder, PlaceholderSize, PlaceholderType};
 pub use textbox::TextBox;

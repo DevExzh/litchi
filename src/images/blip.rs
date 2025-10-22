@@ -10,6 +10,7 @@
 
 use crate::common::binary::{read_u16_le, read_u32_le};
 use crate::common::error::Result;
+use std::borrow::Cow;
 use std::io::Read;
 use zerocopy::FromBytes;
 
@@ -125,7 +126,7 @@ impl RecordHeader {
 ///
 /// These formats include additional metadata and may be compressed
 #[derive(Debug, Clone)]
-pub struct MetafileBlip {
+pub struct MetafileBlip<'data> {
     /// Record header
     pub header: RecordHeader,
     /// Primary UID (16 bytes MD4/MD5 hash)
@@ -144,8 +145,8 @@ pub struct MetafileBlip {
     pub compression: u8,
     /// Filter byte (usually 0xFE)
     pub filter: u8,
-    /// Picture data (may be compressed)
-    pub picture_data: Vec<u8>,
+    /// Picture data (may be compressed) - uses Cow for zero-copy when possible
+    pub picture_data: Cow<'data, [u8]>,
 }
 
 /// Raw metafile metadata for zerocopy parsing (34 bytes)
@@ -174,7 +175,7 @@ struct RawMetafileMetadata {
     pub filter: u8,
 }
 
-impl MetafileBlip {
+impl<'data> MetafileBlip<'data> {
     /// Parse a metafile BLIP record
     ///
     /// # Arguments
@@ -182,7 +183,7 @@ impl MetafileBlip {
     ///
     /// # Returns
     /// The parsed metafile BLIP or an error
-    pub fn parse(data: &[u8]) -> Result<Self> {
+    pub fn parse(data: &'data [u8]) -> Result<Self> {
         let header = RecordHeader::parse(data)?;
         let mut offset = 8;
 
@@ -226,14 +227,14 @@ impl MetafileBlip {
             })?;
         offset += 34;
 
-        // Extract picture data
+        // Extract picture data (zero-copy borrow)
         let pic_data_len = metadata.compressed_size as usize;
         if offset + pic_data_len > data.len() {
             return Err(crate::common::error::Error::ParseError(
                 "Insufficient data for picture data".into(),
             ));
         }
-        let picture_data = data[offset..offset + pic_data_len].to_vec();
+        let picture_data = Cow::Borrowed(&data[offset..offset + pic_data_len]);
 
         Ok(Self {
             header,
@@ -273,7 +274,7 @@ impl MetafileBlip {
     ///
     /// # Returns
     /// Uncompressed picture data or the original data if not compressed
-    pub fn decompress(&self) -> Result<Vec<u8>> {
+    pub fn decompress(&self) -> Result<Cow<'data, [u8]>> {
         if !self.is_compressed() {
             return Ok(self.picture_data.clone());
         }
@@ -286,7 +287,7 @@ impl MetafileBlip {
             crate::common::error::Error::ParseError(format!("Decompression failed: {}", e))
         })?;
 
-        Ok(decompressed)
+        Ok(Cow::Owned(decompressed))
     }
 
     /// Get the BLIP type
@@ -299,18 +300,18 @@ impl MetafileBlip {
 ///
 /// These formats have simpler structure without compression metadata
 #[derive(Debug, Clone)]
-pub struct BitmapBlip {
+pub struct BitmapBlip<'data> {
     /// Record header
     pub header: RecordHeader,
     /// Primary UID (16 bytes MD4/MD5 hash)
     pub uid: [u8; 16],
     /// Marker byte (0xFF for external files)
     pub marker: u8,
-    /// Picture data (already in the target format)
-    pub picture_data: Vec<u8>,
+    /// Picture data (already in the target format) - uses Cow for zero-copy when possible
+    pub picture_data: Cow<'data, [u8]>,
 }
 
-impl BitmapBlip {
+impl<'data> BitmapBlip<'data> {
     /// Parse a bitmap BLIP record
     ///
     /// # Arguments
@@ -318,7 +319,7 @@ impl BitmapBlip {
     ///
     /// # Returns
     /// The parsed bitmap BLIP or an error
-    pub fn parse(data: &[u8]) -> Result<Self> {
+    pub fn parse(data: &'data [u8]) -> Result<Self> {
         let header = RecordHeader::parse(data)?;
         let mut offset = 8;
 
@@ -341,8 +342,8 @@ impl BitmapBlip {
         let marker = data[offset];
         offset += 1;
 
-        // Extract picture data
-        let picture_data = data[offset..].to_vec();
+        // Extract picture data (zero-copy borrow)
+        let picture_data = Cow::Borrowed(&data[offset..]);
 
         Ok(Self {
             header,
@@ -360,14 +361,14 @@ impl BitmapBlip {
 
 /// General BLIP record that can be either metafile or bitmap
 #[derive(Debug, Clone)]
-pub enum Blip {
+pub enum Blip<'data> {
     /// Metafile format (EMF, WMF, PICT)
-    Metafile(MetafileBlip),
+    Metafile(MetafileBlip<'data>),
     /// Bitmap format (JPEG, PNG, DIB, TIFF)
-    Bitmap(BitmapBlip),
+    Bitmap(BitmapBlip<'data>),
 }
 
-impl Blip {
+impl<'data> Blip<'data> {
     /// Parse a BLIP record from bytes
     ///
     /// # Arguments
@@ -382,8 +383,9 @@ impl Blip {
     ///
     /// let data = vec![/* BLIP record bytes */];
     /// let blip = Blip::parse(&data)?;
+    /// # Ok::<(), litchi::common::error::Error>(())
     /// ```
-    pub fn parse(data: &[u8]) -> Result<Self> {
+    pub fn parse(data: &'data [u8]) -> Result<Self> {
         if data.len() < 8 {
             return Err(crate::common::error::Error::ParseError(
                 "Insufficient data for BLIP record".into(),
@@ -431,10 +433,34 @@ impl Blip {
     ///
     /// For bitmap BLIPs, this returns the data as-is.
     /// For metafile BLIPs, this decompresses if necessary.
-    pub fn get_decompressed_data(&self) -> Result<Vec<u8>> {
+    pub fn get_decompressed_data(&self) -> Result<Cow<'data, [u8]>> {
         match self {
             Self::Metafile(m) => m.decompress(),
             Self::Bitmap(b) => Ok(b.picture_data.clone()),
+        }
+    }
+
+    /// Convert to owned data (useful when lifetime constraints are problematic)
+    pub fn into_owned(self) -> Blip<'static> {
+        match self {
+            Self::Metafile(m) => Blip::Metafile(MetafileBlip {
+                header: m.header,
+                uid: m.uid,
+                secondary_uid: m.secondary_uid,
+                uncompressed_size: m.uncompressed_size,
+                bounds: m.bounds,
+                size_emu: m.size_emu,
+                compressed_size: m.compressed_size,
+                compression: m.compression,
+                filter: m.filter,
+                picture_data: Cow::Owned(m.picture_data.into_owned()),
+            }),
+            Self::Bitmap(b) => Blip::Bitmap(BitmapBlip {
+                header: b.header,
+                uid: b.uid,
+                marker: b.marker,
+                picture_data: Cow::Owned(b.picture_data.into_owned()),
+            }),
         }
     }
 }
