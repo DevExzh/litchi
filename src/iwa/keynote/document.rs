@@ -316,7 +316,7 @@ mod tests {
         );
 
         let doc = doc_result.unwrap();
-        assert!(doc.object_index.all_object_ids().len() > 0);
+        assert!(!doc.object_index.all_object_ids().is_empty());
     }
 
     #[test]

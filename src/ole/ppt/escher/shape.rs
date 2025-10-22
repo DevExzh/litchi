@@ -371,7 +371,7 @@ mod tests {
         assert_eq!(shape.shape_type(), EscherShapeType::Group);
         let children = shape.child_shapes();
         // Should have extracted child shapes (exact count depends on test data)
-        assert!(children.len() > 0);
+        assert!(!children.is_empty());
     }
 
     // Helper function to create a simple TextBox SpContainer
@@ -496,7 +496,7 @@ mod tests {
 
         // Get children of outer group
         let children = shape.child_shapes();
-        assert!(children.len() > 0);
+        assert!(!children.is_empty());
 
         // First child should be another group
         if let Some(first_child) = children.first() {
@@ -504,7 +504,7 @@ mod tests {
 
             // Get children of inner group
             let inner_children = first_child.child_shapes();
-            assert!(inner_children.len() > 0);
+            assert!(!inner_children.is_empty());
         }
     }
 
