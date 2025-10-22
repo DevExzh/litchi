@@ -2,6 +2,7 @@
 
 use crate::ooxml::xlsb::cell::XlsbCell;
 use crate::sheet::{Cell as SheetCell, CellIterator, CellValue, RowIterator, Worksheet};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 /// XLSB worksheet implementation
@@ -96,7 +97,7 @@ impl Worksheet for XlsbWorksheet {
         })
     }
 
-    fn row(&self, row_idx: usize) -> Result<Vec<CellValue>, Box<dyn std::error::Error>> {
+    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>, Box<dyn std::error::Error>> {
         let row_idx = row_idx as u32;
         let mut row_data = Vec::new();
 
@@ -107,13 +108,17 @@ impl Worksheet for XlsbWorksheet {
             }
         }
 
-        Ok(row_data)
+        Ok(Cow::Owned(row_data))
     }
 
-    fn cell_value(&self, row: u32, column: u32) -> Result<CellValue, Box<dyn std::error::Error>> {
+    fn cell_value(
+        &self,
+        row: u32,
+        column: u32,
+    ) -> Result<Cow<'_, CellValue>, Box<dyn std::error::Error>> {
         match self.cells.get(&(row, column)) {
-            Some(cell) => Ok(cell.value().clone()),
-            None => Ok(CellValue::Empty),
+            Some(cell) => Ok(Cow::Borrowed(cell.value())),
+            None => Ok(Cow::Borrowed(CellValue::EMPTY)),
         }
     }
 }
@@ -143,7 +148,7 @@ struct XlsbRowIterator<'a> {
 }
 
 impl<'a> RowIterator<'a> for XlsbRowIterator<'a> {
-    fn next(&mut self) -> Option<Result<Vec<CellValue>, Box<dyn std::error::Error>>> {
+    fn next(&mut self) -> Option<Result<Cow<'a, [CellValue]>, Box<dyn std::error::Error>>> {
         if self.current_row >= self.worksheet.row_count() {
             None
         } else {

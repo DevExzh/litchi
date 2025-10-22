@@ -142,3 +142,26 @@ impl Cell for XlsCell {
         self.formula.is_some()
     }
 }
+
+// Implement Cell for &XlsCell to allow zero-copy reference returns
+impl Cell for &XlsCell {
+    fn row(&self) -> u32 {
+        (*self).row()
+    }
+
+    fn column(&self) -> u32 {
+        (*self).column()
+    }
+
+    fn coordinate(&self) -> String {
+        (*self).coordinate()
+    }
+
+    fn value(&self) -> &CellValue {
+        (*self).value()
+    }
+
+    fn is_formula(&self) -> bool {
+        (*self).is_formula()
+    }
+}

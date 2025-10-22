@@ -4,6 +4,7 @@ use super::cell::TextCell;
 use super::iterators::{TextCellIterator, TextRowIterator};
 use super::parser::TextParser;
 use crate::sheet::{Cell, CellIterator, CellValue, Result as SheetResult, RowIterator, Worksheet};
+use std::borrow::Cow;
 use std::io::{Read, Seek};
 
 /// Worksheet implementation for text-based formats
@@ -122,30 +123,32 @@ impl Worksheet for TextWorksheet {
         Box::new(TextRowIterator::new(&self.data))
     }
 
-    fn row(&self, row_idx: usize) -> SheetResult<Vec<CellValue>> {
+    fn row(&self, row_idx: usize) -> SheetResult<Cow<'_, [CellValue]>> {
         if row_idx >= self.data.len() {
             return Err(format!("Row {} not found", row_idx + 1).into());
         }
-        Ok(self.data[row_idx].clone())
+        // Return borrowed data - zero-copy!
+        Ok(Cow::Borrowed(&self.data[row_idx]))
     }
 
-    fn cell_value(&self, row: u32, column: u32) -> SheetResult<CellValue> {
+    fn cell_value(&self, row: u32, column: u32) -> SheetResult<Cow<'_, CellValue>> {
         if row < 1 || column < 1 {
-            return Ok(CellValue::Empty);
+            return Ok(Cow::Borrowed(CellValue::EMPTY));
         }
 
         let row_idx = (row - 1) as usize;
         let col_idx = (column - 1) as usize;
 
         if row_idx >= self.data.len() {
-            return Ok(CellValue::Empty);
+            return Ok(Cow::Borrowed(CellValue::EMPTY));
         }
 
         let row_data = &self.data[row_idx];
         if col_idx >= row_data.len() {
-            Ok(CellValue::Empty)
+            Ok(Cow::Borrowed(CellValue::EMPTY))
         } else {
-            Ok(row_data[col_idx].clone())
+            // Return borrowed - zero-copy!
+            Ok(Cow::Borrowed(&row_data[col_idx]))
         }
     }
 }

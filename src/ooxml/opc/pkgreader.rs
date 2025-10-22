@@ -384,6 +384,16 @@ impl PackageReader {
     pub fn pkg_srels(&self) -> &[SerializedRelationship] {
         &self.pkg_srels
     }
+
+    /// Take ownership of package-level relationships (zero-copy move).
+    pub fn take_pkg_srels(&mut self) -> SmallVec<[SerializedRelationship; 8]> {
+        std::mem::take(&mut self.pkg_srels)
+    }
+
+    /// Take ownership of all serialized parts (zero-copy move).
+    pub fn take_sparts(&mut self) -> Vec<SerializedPart> {
+        std::mem::take(&mut self.sparts)
+    }
 }
 
 #[cfg(test)]

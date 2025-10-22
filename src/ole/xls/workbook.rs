@@ -10,6 +10,7 @@ use crate::ole::xls::records::{
 use crate::ole::xls::worksheet::XlsWorksheet;
 use crate::sheet::{Worksheet as SheetTrait, WorksheetIterator};
 use std::io::{Read, Seek};
+use std::sync::Arc;
 
 /// XLS workbook implementation
 #[derive(Debug)]
@@ -17,7 +18,8 @@ pub struct XlsWorkbook<R: Read + Seek> {
     ole_file: OleFile<R>,
     worksheets: Vec<XlsWorksheet>,
     worksheet_names: Vec<String>,
-    shared_strings: Option<Vec<String>>,
+    /// Shared string table (Arc for zero-copy sharing across worksheets)
+    shared_strings: Option<Arc<Vec<String>>>,
     biff_version: BiffVersion,
     is_1904_date_system: bool,
 }
@@ -61,7 +63,8 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             &mut strings,
         )?;
 
-        self.shared_strings = Some(strings);
+        // Use Arc for zero-copy sharing across worksheets
+        self.shared_strings = Some(Arc::new(strings));
         self.worksheet_names = bound_sheets.iter().map(|s| s.name.clone()).collect();
 
         // Parse worksheets from positions in the workbook stream
@@ -188,8 +191,11 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             return Err(XlsError::Eof("Expected BOF record for worksheet"));
         }
 
-        // Parse worksheet records
-        let shared_strings = self.shared_strings.as_ref().unwrap_or(&Vec::new()).clone();
+        // Parse worksheet records (clone Arc is cheap - just increments ref count)
+        let shared_strings = self
+            .shared_strings
+            .clone()
+            .unwrap_or_else(|| Arc::new(Vec::new()));
         Self::parse_worksheet_records(record_iter, encoding, &bound_sheet.name, shared_strings)
     }
 
@@ -198,7 +204,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         record_iter: &mut RecordIter<Reader>,
         encoding: &XlsEncoding,
         name: &str,
-        shared_strings: Vec<String>,
+        shared_strings: Arc<Vec<String>>,
     ) -> XlsResult<XlsWorksheet> {
         let mut worksheet = XlsWorksheet::with_shared_strings(name.to_string(), shared_strings);
 
@@ -251,11 +257,13 @@ impl<R: Read + Seek + std::fmt::Debug> crate::sheet::WorkbookTrait for XlsWorkbo
                 "No worksheets found".to_string(),
             )));
         }
-        Ok(Box::new(self.worksheets[0].clone()))
+        // Return reference instead of clone - zero-copy!
+        Ok(Box::new(&self.worksheets[0]))
     }
 
-    fn worksheet_names(&self) -> Vec<String> {
-        self.worksheet_names.clone()
+    fn worksheet_names(&self) -> &[String] {
+        // Return slice reference - zero-copy!
+        &self.worksheet_names
     }
 
     fn worksheet_by_name(
@@ -264,7 +272,8 @@ impl<R: Read + Seek + std::fmt::Debug> crate::sheet::WorkbookTrait for XlsWorkbo
     ) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
         for worksheet in &self.worksheets {
             if worksheet.name() == name {
-                return Ok(Box::new(worksheet.clone()));
+                // Return reference instead of clone - zero-copy!
+                return Ok(Box::new(worksheet));
             }
         }
         Err(Box::new(XlsError::WorksheetNotFound(name.to_string())))
@@ -280,7 +289,8 @@ impl<R: Read + Seek + std::fmt::Debug> crate::sheet::WorkbookTrait for XlsWorkbo
                 index
             ))));
         }
-        Ok(Box::new(self.worksheets[index].clone()))
+        // Return reference instead of clone - zero-copy!
+        Ok(Box::new(&self.worksheets[index]))
     }
 
     fn worksheets(&self) -> Box<dyn WorksheetIterator<'_> + '_> {
@@ -312,7 +322,8 @@ impl<'a> WorksheetIterator<'a> for XlsWorksheetIterator<'a> {
         } else {
             let worksheet = self.worksheets[self.index];
             self.index += 1;
-            Some(Ok(Box::new(worksheet.clone())))
+            // Return reference instead of clone - zero-copy!
+            Some(Ok(Box::new(worksheet)))
         }
     }
 }

@@ -149,26 +149,26 @@ impl<'arena> MtefExtractor<'arena> {
             .list_directory_entries(&["ObjectPool"])
             .map_err(|e| MtefExtractionError::IoError(std::io::Error::other(e.to_string())))?;
 
+        // Collect entry names first to avoid borrow conflicts
+        let storage_names: Vec<String> = entries
+            .iter()
+            .filter(|entry| {
+                // Skip if not a storage (embedded OLE objects are storages)
+                // STGTY_STORAGE = 1
+                entry.entry_type == 1 && entry.name.starts_with('_')
+            })
+            .map(|entry| entry.name.clone())
+            .collect();
+
         // Process each entry in ObjectPool
-        for entry in entries {
-            // Skip if not a storage (embedded OLE objects are storages)
-            // STGTY_STORAGE = 1
-            if entry.entry_type != 1 {
-                continue;
-            }
-
-            // Object names typically start with "_"
-            if !entry.name.starts_with('_') {
-                continue;
-            }
-
+        for entry_name in storage_names {
             // Try to extract "Equation Native" stream from this embedded object
             // The stream path is: ObjectPool/<object_name>/Equation Native
             if let Ok(Some(mtef_data)) = Self::extract_mtef_from_stream(
                 ole_file,
-                &["ObjectPool", &entry.name, "Equation Native"],
+                &["ObjectPool", &entry_name, "Equation Native"],
             ) {
-                mtef_map.insert(entry.name.clone(), mtef_data);
+                mtef_map.insert(entry_name, mtef_data);
             }
         }
 
@@ -201,37 +201,39 @@ impl<'arena> MtefExtractor<'arena> {
             .list_directory_entries(&[])
             .map_err(|e| MtefExtractionError::IoError(std::io::Error::other(e.to_string())))?;
 
+        // Collect storage names first to avoid borrow conflicts
+        let storage_names: Vec<String> = entries
+            .iter()
+            .filter(|entry| {
+                // Skip if not a storage
+                if entry.entry_type != 1 {
+                    return false;
+                }
+                // Look for storages that might contain equations
+                // Common patterns: "MBD[hex]", "Equation Native", or names starting with "_"
+                entry.name.starts_with("MBD")
+                    || entry.name == "Equation Native"
+                    || entry.name.starts_with('_')
+            })
+            .map(|entry| entry.name.clone())
+            .collect();
+
         // Process each entry at root level
-        for entry in entries {
-            // Skip if not a storage
-            if entry.entry_type != 1 {
-                continue;
-            }
-
-            // Look for storages that might contain equations
-            // Common patterns: "MBD[hex]", "Equation Native", or names starting with "_"
-            let is_equation_storage = entry.name.starts_with("MBD")
-                || entry.name == "Equation Native"
-                || entry.name.starts_with('_');
-
-            if !is_equation_storage {
-                continue;
-            }
-
+        for entry_name in storage_names {
             // Try to extract "Equation Native" stream from this storage
             if let Ok(Some(mtef_data)) =
-                Self::extract_mtef_from_stream(ole_file, &[&entry.name, "Equation Native"])
+                Self::extract_mtef_from_stream(ole_file, &[&entry_name, "Equation Native"])
             {
-                mtef_map.insert(entry.name.clone(), mtef_data);
+                mtef_map.insert(entry_name.clone(), mtef_data);
                 continue;
             }
 
             // Try alternative stream names
             for stream_name in &["CONTENTS", "\x01Ole", "\x01Ole10Native"] {
                 if let Ok(Some(mtef_data)) =
-                    Self::extract_mtef_from_stream(ole_file, &[&entry.name, stream_name])
+                    Self::extract_mtef_from_stream(ole_file, &[&entry_name, stream_name])
                 {
-                    mtef_map.insert(entry.name.clone(), mtef_data);
+                    mtef_map.insert(entry_name.clone(), mtef_data);
                     break;
                 }
             }

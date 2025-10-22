@@ -12,7 +12,7 @@ use crate::document::{Document, Paragraph, Run, Table};
 
 impl ToMarkdown for Document {
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
-        let mut writer = MarkdownWriter::new(options.clone());
+        let mut writer = MarkdownWriter::new(*options);
 
         // Write metadata as YAML front matter if enabled
         if options.include_metadata {
@@ -44,7 +44,7 @@ impl ToMarkdown for Document {
 
 impl ToMarkdown for Paragraph {
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
-        let mut writer = MarkdownWriter::new(options.clone());
+        let mut writer = MarkdownWriter::new(*options);
         writer.write_paragraph(self)?;
         Ok(writer.finish().trim_end().to_string())
     }
@@ -52,7 +52,7 @@ impl ToMarkdown for Paragraph {
 
 impl ToMarkdown for Run {
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
-        let mut writer = MarkdownWriter::new(options.clone());
+        let mut writer = MarkdownWriter::new(*options);
         writer.write_run(self)?;
         Ok(writer.finish())
     }
@@ -60,7 +60,7 @@ impl ToMarkdown for Run {
 
 impl ToMarkdown for Table {
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
-        let mut writer = MarkdownWriter::new(options.clone());
+        let mut writer = MarkdownWriter::new(*options);
         writer.write_table(self)?;
         Ok(writer.finish().trim_end().to_string())
     }

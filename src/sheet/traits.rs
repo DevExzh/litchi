@@ -1,6 +1,7 @@
 //! Traits for spreadsheet abstraction.
 
 use super::types::{CellValue, Result};
+use std::borrow::Cow;
 use std::fmt::Debug;
 
 /// Represents an individual cell in a worksheet.
@@ -41,8 +42,8 @@ pub trait CellIterator<'a> {
 
 /// Iterator over rows in a worksheet.
 pub trait RowIterator<'a> {
-    /// Get the next row (as a vector of cell values).
-    fn next(&mut self) -> Option<Result<Vec<CellValue>>>;
+    /// Get the next row (as a vector of cell values wrapped in Cow for zero-copy when possible).
+    fn next(&mut self) -> Option<Result<Cow<'a, [CellValue]>>>;
 }
 
 /// Represents a worksheet (sheet) in a workbook.
@@ -73,10 +74,16 @@ pub trait Worksheet {
     fn rows(&self) -> Box<dyn RowIterator<'_> + '_>;
 
     /// Get a specific row by index (0-based).
-    fn row(&self, row_idx: usize) -> Result<Vec<CellValue>>;
+    ///
+    /// Returns a Cow to allow zero-copy when possible while supporting
+    /// both owned and borrowed data depending on implementation.
+    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>>;
 
     /// Get cell value by row and column (1-based indexing).
-    fn cell_value(&self, row: u32, column: u32) -> Result<CellValue>;
+    ///
+    /// Returns a Cow to allow zero-copy when possible while supporting
+    /// implementations that need to compute values (e.g., shared string resolution).
+    fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>>;
 }
 
 /// Iterator over worksheets in a workbook.
@@ -93,8 +100,11 @@ pub trait WorkbookTrait: Debug {
     /// Get the active worksheet.
     fn active_worksheet(&self) -> Result<Box<dyn Worksheet + '_>>;
 
-    /// Get all worksheet names.
-    fn worksheet_names(&self) -> Vec<String>;
+    /// Get all worksheet names (zero-copy).
+    ///
+    /// Returns a slice reference to avoid cloning. Implementations
+    /// should store worksheet names internally.
+    fn worksheet_names(&self) -> &[String];
 
     /// Get a worksheet by name.
     fn worksheet_by_name(&self, name: &str) -> Result<Box<dyn Worksheet + '_>>;

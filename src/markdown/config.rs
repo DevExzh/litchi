@@ -21,7 +21,11 @@
 ///     .with_metadata(false)
 ///     .with_table_style(TableStyle::MinimalHtml);
 /// ```
-#[derive(Debug, Clone)]
+///
+/// # Note
+/// This struct is `Copy` since it only contains simple values,
+/// making it cheap to pass around without cloning overhead.
+#[derive(Debug, Copy, Clone)]
 pub struct MarkdownOptions {
     /// Whether to include text styles (bold, italic, underline, etc.)
     pub include_styles: bool,

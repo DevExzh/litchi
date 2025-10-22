@@ -5,6 +5,7 @@ use crate::sheet::{
     Cell, CellIterator, CellValue, Result as SheetResult, RowIterator, WorkbookTrait, Worksheet,
     WorksheetIterator,
 };
+use std::borrow::Cow;
 
 /// Iterator over worksheets in a text workbook
 pub struct TextWorksheetIterator<'a> {
@@ -93,9 +94,9 @@ impl<'a> TextRowIterator<'a> {
 }
 
 impl<'a> RowIterator<'a> for TextRowIterator<'a> {
-    fn next(&mut self) -> Option<SheetResult<Vec<CellValue>>> {
+    fn next(&mut self) -> Option<SheetResult<Cow<'a, [CellValue]>>> {
         if self.current_row < self.data.len() {
-            let row = self.data[self.current_row].clone();
+            let row = Cow::Borrowed(self.data[self.current_row].as_slice()); // Zero-copy!
             self.current_row += 1;
             Some(Ok(row))
         } else {

@@ -19,6 +19,8 @@ pub struct Workbook {
     package: OpcPackage,
     /// Cached worksheet information
     worksheets: Vec<WorksheetInfo>,
+    /// Cached worksheet names for zero-copy returns
+    worksheet_names: Vec<String>,
     /// Active worksheet index (0-based)
     active_sheet_index: usize,
     /// Shared strings table for efficient string storage
@@ -33,6 +35,7 @@ impl Workbook {
         let mut workbook = Workbook {
             package,
             worksheets: Vec::new(),
+            worksheet_names: Vec::new(),
             active_sheet_index: 0,
             shared_strings: SharedStrings::new(),
             styles: Styles::new(),
@@ -55,6 +58,9 @@ impl Workbook {
 
         // Extract sheets from workbook.xml
         let (worksheets, active_sheet_index) = workbook_parser::parse_workbook_xml(content)?;
+
+        // Cache worksheet names for zero-copy returns
+        self.worksheet_names = worksheets.iter().map(|ws| ws.name.clone()).collect();
         self.worksheets = worksheets;
         self.active_sheet_index = active_sheet_index;
 
@@ -114,8 +120,9 @@ impl WorkbookTrait for Workbook {
         Ok(Box::new(worksheet))
     }
 
-    fn worksheet_names(&self) -> Vec<String> {
-        self.worksheets.iter().map(|ws| ws.name.clone()).collect()
+    fn worksheet_names(&self) -> &[String] {
+        // Return cached slice - zero-copy!
+        &self.worksheet_names
     }
 
     fn worksheet_by_name(&self, name: &str) -> SheetResult<Box<dyn WorksheetTrait + '_>> {

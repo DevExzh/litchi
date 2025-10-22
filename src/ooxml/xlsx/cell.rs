@@ -4,6 +4,7 @@
 //! for Excel (.xlsx) files.
 
 use crate::sheet::{Cell as CellTrait, CellValue, Result};
+use std::borrow::Cow;
 
 /// Concrete implementation of the Cell trait for Excel files.
 #[derive(Debug, Clone)]
@@ -132,14 +133,16 @@ impl RowIterator {
     }
 }
 
-impl crate::sheet::RowIterator<'_> for RowIterator {
-    fn next(&mut self) -> Option<Result<Vec<CellValue>>> {
+impl<'a> crate::sheet::RowIterator<'a> for RowIterator {
+    fn next(&mut self) -> Option<Result<Cow<'a, [CellValue]>>> {
         if self.index >= self.rows.len() {
             return None;
         }
 
-        let row = self.rows[self.index].clone();
+        // Since we own the data, we must return Cow::Owned
+        // We use std::mem::take to move the row out without cloning
+        let row = std::mem::take(&mut self.rows[self.index]);
         self.index += 1;
-        Some(Ok(row))
+        Some(Ok(Cow::Owned(row)))
     }
 }

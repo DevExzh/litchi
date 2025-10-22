@@ -173,8 +173,9 @@ impl WorkbookTrait for TextWorkbook {
         )))
     }
 
-    fn worksheet_names(&self) -> Vec<String> {
-        vec![self.worksheet_name.clone()]
+    fn worksheet_names(&self) -> &[String] {
+        // Return slice containing the single worksheet name
+        std::slice::from_ref(&self.worksheet_name)
     }
 
     fn worksheet_by_name(&self, name: &str) -> SheetResult<Box<dyn Worksheet + '_>> {

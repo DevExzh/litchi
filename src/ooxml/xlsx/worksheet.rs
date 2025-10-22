@@ -3,6 +3,7 @@
 //! This module provides the concrete implementation of worksheets
 //! for Excel (.xlsx) files.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use crate::ooxml::opc::PackURI;
@@ -319,13 +320,13 @@ impl<'a> WorksheetTrait for Worksheet<'a> {
         Box::new(XlsxRowIterator::new(rows))
     }
 
-    fn row(&self, row_idx: usize) -> SheetResult<Vec<CellValue>> {
+    fn row(&self, row_idx: usize) -> SheetResult<Cow<'_, [CellValue]>> {
         if let Some((min_row, min_col, max_col)) =
             self.dimensions.map(|(mr, mc, _, mc2)| (mr, mc, mc2))
         {
             let row_num = min_row + row_idx as u32;
             if row_num > self.dimensions.unwrap().2 {
-                return Ok(Vec::new());
+                return Ok(Cow::Owned(Vec::new()));
             }
 
             let mut row_data = Vec::new();
@@ -333,14 +334,15 @@ impl<'a> WorksheetTrait for Worksheet<'a> {
                 let value = self.get_cell_value(row_num, col).clone();
                 row_data.push(value);
             }
-            Ok(row_data)
+            Ok(Cow::Owned(row_data))
         } else {
-            Ok(Vec::new())
+            Ok(Cow::Owned(Vec::new()))
         }
     }
 
-    fn cell_value(&self, row: u32, column: u32) -> SheetResult<CellValue> {
-        Ok(self.get_cell_value(row, column).clone())
+    fn cell_value(&self, row: u32, column: u32) -> SheetResult<Cow<'_, CellValue>> {
+        // XLSX values need shared string resolution, so we return owned
+        Ok(Cow::Owned(self.get_cell_value(row, column)))
     }
 }
 

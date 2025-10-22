@@ -3,7 +3,9 @@
 use crate::ole::xls::cell::XlsCell;
 use crate::ole::xls::error::XlsError;
 use crate::sheet::{Cell as SheetCell, CellIterator, CellValue, RowIterator, Worksheet};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 /// XLS worksheet implementation
 #[derive(Debug, Clone)]
@@ -12,7 +14,8 @@ pub struct XlsWorksheet {
     cells: BTreeMap<(u32, u32), XlsCell>,
     max_row: u32,
     max_col: u32,
-    shared_strings: Option<Vec<String>>,
+    /// Shared string table (Arc for zero-copy sharing across worksheets)
+    shared_strings: Option<Arc<Vec<String>>>,
 }
 
 impl XlsWorksheet {
@@ -27,8 +30,8 @@ impl XlsWorksheet {
         }
     }
 
-    /// Create a new worksheet with shared strings
-    pub fn with_shared_strings(name: String, shared_strings: Vec<String>) -> Self {
+    /// Create a new worksheet with shared strings (Arc for zero-copy sharing)
+    pub fn with_shared_strings(name: String, shared_strings: Arc<Vec<String>>) -> Self {
         XlsWorksheet {
             name,
             cells: BTreeMap::new(),
@@ -61,7 +64,7 @@ impl XlsWorksheet {
 
     /// Get shared strings reference
     pub fn shared_strings(&self) -> Option<&[String]> {
-        self.shared_strings.as_deref()
+        self.shared_strings.as_ref().map(|arc| arc.as_slice())
     }
 
     /// Get cell at position
@@ -97,9 +100,10 @@ impl Worksheet for XlsWorksheet {
         column: u32,
     ) -> Result<Box<dyn SheetCell + '_>, Box<dyn std::error::Error>> {
         match self.cells.get(&(row, column)) {
-            Some(cell) => Ok(Box::new(cell.clone())),
+            // Return reference instead of clone - zero-copy!
+            Some(cell) => Ok(Box::new(cell)),
             None => {
-                // Return empty cell for missing positions
+                // Return empty cell for missing positions (owned, unavoidable)
                 let empty_cell = XlsCell::new(row, column, CellValue::Empty);
                 Ok(Box::new(empty_cell))
             },
@@ -129,7 +133,7 @@ impl Worksheet for XlsWorksheet {
         })
     }
 
-    fn row(&self, row_idx: usize) -> Result<Vec<CellValue>, Box<dyn std::error::Error>> {
+    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>, Box<dyn std::error::Error>> {
         let row_idx = row_idx as u32;
         let mut row_data = Vec::new();
 
@@ -140,14 +144,73 @@ impl Worksheet for XlsWorksheet {
             }
         }
 
-        Ok(row_data)
+        // Return owned data wrapped in Cow
+        Ok(Cow::Owned(row_data))
     }
 
-    fn cell_value(&self, row: u32, column: u32) -> Result<CellValue, Box<dyn std::error::Error>> {
+    fn cell_value(
+        &self,
+        row: u32,
+        column: u32,
+    ) -> Result<Cow<'_, CellValue>, Box<dyn std::error::Error>> {
         match self.cells.get(&(row, column)) {
-            Some(cell) => Ok(cell.value().clone()),
-            None => Ok(CellValue::Empty),
+            Some(cell) => Ok(Cow::Borrowed(cell.value())),
+            None => Ok(Cow::Borrowed(CellValue::EMPTY)),
         }
+    }
+}
+
+// Implement Worksheet for &XlsWorksheet to allow zero-copy reference returns
+impl Worksheet for &XlsWorksheet {
+    fn name(&self) -> &str {
+        (*self).name()
+    }
+
+    fn row_count(&self) -> usize {
+        (*self).row_count()
+    }
+
+    fn column_count(&self) -> usize {
+        (*self).column_count()
+    }
+
+    fn dimensions(&self) -> Option<(u32, u32, u32, u32)> {
+        (*self).dimensions()
+    }
+
+    fn cell(
+        &self,
+        row: u32,
+        column: u32,
+    ) -> Result<Box<dyn SheetCell + '_>, Box<dyn std::error::Error>> {
+        (*self).cell(row, column)
+    }
+
+    fn cell_by_coordinate(
+        &self,
+        coordinate: &str,
+    ) -> Result<Box<dyn SheetCell + '_>, Box<dyn std::error::Error>> {
+        (*self).cell_by_coordinate(coordinate)
+    }
+
+    fn cells(&self) -> Box<dyn CellIterator<'_> + '_> {
+        (*self).cells()
+    }
+
+    fn rows(&self) -> Box<dyn RowIterator<'_> + '_> {
+        (*self).rows()
+    }
+
+    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>, Box<dyn std::error::Error>> {
+        (*self).row(row_idx)
+    }
+
+    fn cell_value(
+        &self,
+        row: u32,
+        column: u32,
+    ) -> Result<Cow<'_, CellValue>, Box<dyn std::error::Error>> {
+        (*self).cell_value(row, column)
     }
 }
 
@@ -164,7 +227,8 @@ impl<'a> CellIterator<'a> for XlsCellIterator<'a> {
         } else {
             let cell = self.cells[self.index];
             self.index += 1;
-            Some(Ok(Box::new(cell.clone())))
+            // Return reference instead of clone - zero-copy!
+            Some(Ok(Box::new(cell)))
         }
     }
 }
@@ -176,7 +240,7 @@ struct XlsRowIterator<'a> {
 }
 
 impl<'a> RowIterator<'a> for XlsRowIterator<'a> {
-    fn next(&mut self) -> Option<Result<Vec<CellValue>, Box<dyn std::error::Error>>> {
+    fn next(&mut self) -> Option<Result<Cow<'a, [CellValue]>, Box<dyn std::error::Error>>> {
         if self.current_row >= self.worksheet.row_count() {
             None
         } else {

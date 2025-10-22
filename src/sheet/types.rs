@@ -21,3 +21,8 @@ pub enum CellValue {
     /// Error value
     Error(String),
 }
+
+impl CellValue {
+    /// Static reference to an empty cell value for zero-copy returns.
+    pub const EMPTY: &'static CellValue = &CellValue::Empty;
+}

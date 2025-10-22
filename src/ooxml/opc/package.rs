@@ -85,45 +85,50 @@ impl OpcPackage {
     ///
     /// This is the main deserialization logic that converts serialized parts
     /// and relationships into the in-memory object graph.
-    fn unmarshal(pkg_reader: PackageReader) -> Result<Self> {
+    ///
+    /// Optimized to minimize clones by consuming the package reader and moving data.
+    fn unmarshal(mut pkg_reader: PackageReader) -> Result<Self> {
         let mut package = Self::new();
 
-        // First pass: Create all parts
-        // Pre-allocate with estimated capacity to avoid reallocations
-        let mut parts_map: HashMap<PackURI, Box<dyn Part>> =
-            HashMap::with_capacity(pkg_reader.iter_sparts().count());
+        // Get ownership of package relationships and parts
+        let pkg_srels = pkg_reader.take_pkg_srels();
+        let sparts = pkg_reader.take_sparts();
 
-        for spart in pkg_reader.iter_sparts() {
-            let part = PartFactory::load(
-                spart.partname.clone(),
-                spart.content_type.clone(),
-                spart.blob.clone(), // Clone blob but use Arc internally for sharing
+        // Pre-allocate with known capacity to avoid reallocations
+        let mut parts_map: HashMap<PackURI, Box<dyn Part>> = HashMap::with_capacity(sparts.len());
+
+        // Create all parts - move data instead of cloning
+        for spart in sparts {
+            let partname = spart.partname.clone(); // Need to clone partname for the HashMap key
+            let mut part = PartFactory::load(
+                spart.partname,     // Move
+                spart.content_type, // Move
+                spart.blob,         // Move (blob is Arc internally if large)
             )?;
-            parts_map.insert(spart.partname.clone(), part);
-        }
 
-        // Second pass: Load package relationships
-        for srel in pkg_reader.pkg_srels() {
-            package.rels.add_relationship(
-                srel.reltype.clone(),
-                srel.target_ref.clone(),
-                srel.r_id.clone(),
-                srel.is_external(),
-            );
-        }
-
-        // Load part relationships
-        for spart in pkg_reader.iter_sparts() {
-            if let Some(part) = parts_map.get_mut(&spart.partname) {
-                for srel in &spart.srels {
-                    part.rels_mut().add_relationship(
-                        srel.reltype.clone(),
-                        srel.target_ref.clone(),
-                        srel.r_id.clone(),
-                        srel.is_external(),
-                    );
-                }
+            // Load part relationships
+            for srel in spart.srels {
+                let is_external = srel.is_external(); // Evaluate before move
+                part.rels_mut().add_relationship(
+                    srel.reltype,    // Move
+                    srel.target_ref, // Move
+                    srel.r_id,       // Move
+                    is_external,
+                );
             }
+
+            parts_map.insert(partname, part);
+        }
+
+        // Load package relationships - move instead of clone
+        for srel in pkg_srels {
+            let is_external = srel.is_external(); // Evaluate before move
+            package.rels.add_relationship(
+                srel.reltype,    // Move
+                srel.target_ref, // Move
+                srel.r_id,       // Move
+                is_external,
+            );
         }
 
         package.parts = parts_map;

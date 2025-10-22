@@ -203,8 +203,9 @@ impl crate::sheet::WorkbookTrait for XlsbWorkbook {
         self.worksheet_names.len()
     }
 
-    fn worksheet_names(&self) -> Vec<String> {
-        self.worksheet_names.clone()
+    fn worksheet_names(&self) -> &[String] {
+        // Return slice reference - zero-copy!
+        &self.worksheet_names
     }
 
     fn worksheet_by_index(

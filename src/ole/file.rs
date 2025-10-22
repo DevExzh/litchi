@@ -545,15 +545,15 @@ impl<R: Read + Seek> OleFile<R> {
     /// * `path` - Path to the directory as a slice of strings (empty for root)
     ///
     /// # Returns
-    /// * `Result<Vec<DirectoryEntry>, OleError>` - List of directory entries
-    pub fn list_directory_entries(&self, path: &[&str]) -> Result<Vec<DirectoryEntry>, OleError> {
+    /// * `Result<Vec<&DirectoryEntry>, OleError>` - List of directory entry references (zero-copy)
+    pub fn list_directory_entries(&self, path: &[&str]) -> Result<Vec<&DirectoryEntry>, OleError> {
         let mut entries = Vec::new();
 
         // Get the directory entry
         let dir_entry = if path.is_empty() {
             self.root.as_ref().ok_or(OleError::StreamNotFound)?
         } else {
-            &self.find_entry(path)?
+            self.find_entry(path)?
         };
 
         // Ensure it's a storage/directory
@@ -569,20 +569,20 @@ impl<R: Read + Seek> OleFile<R> {
         Ok(entries)
     }
 
-    /// Recursively collect all children from a directory
-    fn collect_directory_children(&self, sid: u32, entries: &mut Vec<DirectoryEntry>) {
+    /// Recursively collect all children from a directory (as references - zero-copy)
+    fn collect_directory_children<'a>(&'a self, sid: u32, entries: &mut Vec<&'a DirectoryEntry>) {
         if sid == NOSTREAM || sid as usize >= self.dir_entries.len() {
             return;
         }
 
-        if let Some(ref entry) = self.dir_entries[sid as usize] {
+        if let Some(entry) = self.dir_entries[sid as usize].as_ref() {
             // Traverse left
             if entry.sid_left != NOSTREAM {
                 self.collect_directory_children(entry.sid_left, entries);
             }
 
-            // Add current entry
-            entries.push(entry.clone());
+            // Add reference instead of clone - zero-copy!
+            entries.push(entry);
 
             // Traverse right
             if entry.sid_right != NOSTREAM {
@@ -609,18 +609,19 @@ impl<R: Read + Seek> OleFile<R> {
     fn collect_streams(
         &self,
         entry: &DirectoryEntry,
-        path: &mut [String],
+        path: &mut Vec<String>,
         streams: &mut Vec<Vec<String>>,
     ) {
         // Add current entry to path
-        let mut current_path = path.to_owned();
+        let path_len_before = path.len();
         if !entry.name.is_empty() && entry.entry_type != STGTY_ROOT {
-            current_path.push(entry.name.clone());
+            path.push(entry.name.clone()); // Clone needed as we're building the path
         }
 
         // If this is a stream, add it to the list
         if entry.entry_type == STGTY_STREAM {
-            streams.push(current_path);
+            streams.push(path.clone()); // Clone needed to save the path
+            path.truncate(path_len_before); // Restore path
             return;
         }
 
@@ -628,13 +629,16 @@ impl<R: Read + Seek> OleFile<R> {
         if entry.entry_type == STGTY_STORAGE || entry.entry_type == STGTY_ROOT {
             // Process children by traversing the red-black tree
             if entry.sid_child != NOSTREAM {
-                self.traverse_children(entry.sid_child, &current_path, streams);
+                self.traverse_children(entry.sid_child, path, streams);
             }
         }
+
+        // Restore path to original state
+        path.truncate(path_len_before);
     }
 
     /// Traverse children in red-black tree
-    fn traverse_children(&self, sid: u32, path: &Vec<String>, streams: &mut Vec<Vec<String>>) {
+    fn traverse_children(&self, sid: u32, path: &mut Vec<String>, streams: &mut Vec<Vec<String>>) {
         if sid == NOSTREAM || sid as usize >= self.dir_entries.len() {
             return;
         }
@@ -645,9 +649,8 @@ impl<R: Read + Seek> OleFile<R> {
                 self.traverse_children(entry.sid_left, path, streams);
             }
 
-            // Process current
-            let mut current_path = path.clone();
-            self.collect_streams(entry, &mut current_path, streams);
+            // Process current (path is modified in-place and restored)
+            self.collect_streams(entry, path, streams);
 
             // Traverse right
             if entry.sid_right != NOSTREAM {
@@ -664,28 +667,32 @@ impl<R: Read + Seek> OleFile<R> {
     /// # Returns
     /// * `Result<Vec<u8>, OleError>` - Stream contents or error
     pub fn open_stream(&mut self, path: &[&str]) -> Result<Vec<u8>, OleError> {
-        // Find the entry
-        let entry = self.find_entry(path)?;
+        // Find the entry and extract needed values to avoid borrow conflicts
+        let (is_minifat, start_sector, size) = {
+            let entry = self.find_entry(path)?;
 
-        // Ensure it's a stream
-        if entry.entry_type != STGTY_STREAM {
-            return Err(OleError::InvalidFormat("Not a stream".to_string()));
-        }
+            // Ensure it's a stream
+            if entry.entry_type != STGTY_STREAM {
+                return Err(OleError::InvalidFormat("Not a stream".to_string()));
+            }
+
+            (entry.is_minifat, entry.start_sector, entry.size)
+        };
 
         // Read the stream based on whether it uses FAT or MiniFAT
-        if entry.is_minifat {
-            self.read_stream_from_minifat(entry.start_sector, entry.size)
+        if is_minifat {
+            self.read_stream_from_minifat(start_sector, size)
         } else {
-            let mut data = self.read_stream_from_fat(entry.start_sector)?;
-            data.truncate(entry.size as usize);
+            let mut data = self.read_stream_from_fat(start_sector)?;
+            data.truncate(size as usize);
             Ok(data)
         }
     }
 
     /// Find a directory entry by path
-    fn find_entry(&self, path: &[&str]) -> Result<DirectoryEntry, OleError> {
+    fn find_entry(&self, path: &[&str]) -> Result<&DirectoryEntry, OleError> {
         if path.is_empty() {
-            return self.root.clone().ok_or(OleError::StreamNotFound);
+            return self.root.as_ref().ok_or(OleError::StreamNotFound);
         }
 
         // Start from root
@@ -709,7 +716,7 @@ impl<R: Read + Seek> OleFile<R> {
     }
 
     /// Find a child entry by name in a red-black tree
-    fn find_child_by_name(&self, sid: u32, name: &str) -> Result<DirectoryEntry, OleError> {
+    fn find_child_by_name(&self, sid: u32, name: &str) -> Result<&DirectoryEntry, OleError> {
         if sid == NOSTREAM || sid as usize >= self.dir_entries.len() {
             return Err(OleError::StreamNotFound);
         }
@@ -720,7 +727,7 @@ impl<R: Read + Seek> OleFile<R> {
 
         // Case-insensitive comparison
         if entry.name.to_lowercase() == name.to_lowercase() {
-            return Ok(entry.clone());
+            return Ok(entry);
         }
 
         // Search left subtree

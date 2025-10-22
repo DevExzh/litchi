@@ -12,7 +12,7 @@ use crate::presentation::{Presentation, Slide};
 
 impl ToMarkdown for Presentation {
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
-        let mut writer = MarkdownWriter::new(options.clone());
+        let mut writer = MarkdownWriter::new(*options);
 
         // TODO: Add metadata support when Presentation metadata API is available
         // if options.include_metadata {
