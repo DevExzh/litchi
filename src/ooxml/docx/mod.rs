@@ -11,6 +11,8 @@
 /// - `Paragraph`: A paragraph with runs
 /// - `Run`: A text run with formatting
 /// - `Table`: A table with rows and cells
+/// - `Section`: A document section with page properties
+/// - `Styles`: Collection of document styles
 /// - `DocumentPart`: The core document.xml part
 ///
 /// # Example
@@ -38,15 +40,27 @@
 ///         }
 ///     }
 /// }
+///
+/// // Access sections
+/// let mut sections = doc.sections()?;
+/// for section in sections.iter_mut() {
+///     println!("Page width: {:?}", section.page_width());
+/// }
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub mod document;
+pub mod enums;
 pub mod package;
 pub mod paragraph;
 pub mod parts;
+pub mod section;
+pub mod styles;
 pub mod table;
 
 pub use document::Document;
+pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
 pub use package::Package;
 pub use paragraph::{Paragraph, Run};
+pub use section::{Emu, Margins, PageSize, Section, Sections};
+pub use styles::{Style, Styles};
 pub use table::{Cell, Row, Table};

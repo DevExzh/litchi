@@ -122,8 +122,8 @@ impl Package {
         // Create DocumentPart wrapper
         let doc_part = DocumentPart::from_part(main_part)?;
 
-        // Create and return Document
-        Ok(Document::new(doc_part))
+        // Create and return Document with reference to OPC package
+        Ok(Document::new(doc_part, &self.opc))
     }
 
     /// Get the underlying OPC package.
