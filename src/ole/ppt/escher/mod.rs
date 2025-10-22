@@ -28,7 +28,9 @@ pub mod types;
 
 pub use container::EscherContainer;
 pub use parser::EscherParser;
-pub use properties::{EscherProperties, EscherPropertyId, ShapeAnchor};
+pub use properties::{
+    EscherArrayProperty, EscherProperties, EscherPropertyId, EscherPropertyValue, ShapeAnchor,
+};
 pub use record::EscherRecord;
 pub use shape::{EscherShape, EscherShapeType};
 pub use shape_factory::EscherShapeFactory;

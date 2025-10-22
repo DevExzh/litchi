@@ -50,7 +50,7 @@ pub struct EscherShape<'data> {
     /// Shape ID
     shape_id: Option<u32>,
     /// Shape properties (position, size, colors, etc.)
-    properties: EscherProperties,
+    properties: EscherProperties<'data>,
     /// Shape anchor (position and size)
     anchor: Option<ShapeAnchor>,
 }
@@ -86,7 +86,7 @@ impl<'data> EscherShape<'data> {
 
     /// Get shape properties.
     #[inline]
-    pub fn properties(&self) -> &EscherProperties {
+    pub fn properties(&self) -> &EscherProperties<'data> {
         &self.properties
     }
 
