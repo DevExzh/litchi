@@ -155,22 +155,58 @@ impl PagesDocument {
             }
         } else {
             // Parse explicit sections
-            for (index, (_archive_name, _object)) in section_objects.iter().enumerate() {
-                let section = PagesSection::new(index, PagesSectionType::Body);
-
-                // In a full implementation, we would:
-                // 1. Parse the section protobuf message
-                // 2. Resolve references to text storage objects
-                // 3. Extract section-specific properties (margins, headers, footers)
-                // 4. Build the complete section structure
-                //
-                // For now, we create placeholder sections
-
-                sections.push(section);
+            for (index, (_archive_name, object)) in section_objects.iter().enumerate() {
+                let section = self.parse_section(index, object)?;
+                if !section.is_empty() {
+                    sections.push(section);
+                }
             }
         }
 
         Ok(sections)
+    }
+
+    /// Parse a single section from an object
+    fn parse_section(
+        &self,
+        index: usize,
+        object: &crate::iwa::archive::ArchiveObject,
+    ) -> Result<PagesSection> {
+        let mut section = PagesSection::new(index, PagesSectionType::Body);
+
+        // Extract text content from the section object
+        let text_parts = object.extract_text();
+        section.paragraphs = text_parts;
+
+        // Parse the SectionArchive protobuf message
+        // TP.SectionArchive contains references to:
+        // - Body storage (main text content)
+        // - Header/footer storages
+        // - Section properties (margins, columns, etc.)
+
+        if let Some(_raw_message) = object.messages.first() {
+            // The SectionArchive structure is complex with many references
+            // For a production implementation, we would:
+            // 1. Parse the SectionArchive protobuf message
+            // 2. Resolve references to text storage objects
+            // 3. Extract section-specific properties (margins, headers, footers)
+            // 4. Build the complete section structure
+            //
+            // Note: The SectionArchive fields use names like:
+            // - obsolete_headers, obsolete_footers (legacy)
+            // - current implementations use different field names
+            // This would require careful mapping from the proto definitions
+        }
+
+        // Extract text storages
+        let extractor = TextExtractor::new();
+        if let Ok(storage) = extractor.extract_from_object(object)
+            && !storage.is_empty()
+        {
+            section.text_storages.push(storage);
+        }
+
+        Ok(section)
     }
 
     /// Get the underlying bundle

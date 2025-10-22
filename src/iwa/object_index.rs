@@ -607,6 +607,80 @@ impl ObjectIndex {
 
         Ok(resolved)
     }
+
+    /// Resolve an object and all its dependencies transitively
+    ///
+    /// This performs a breadth-first traversal of the object graph,
+    /// resolving the given object and all objects it references.
+    ///
+    /// # Arguments
+    ///
+    /// * `bundle` - The document bundle
+    /// * `object_id` - The root object ID to start resolving from
+    ///
+    /// # Returns
+    ///
+    /// Vector of all resolved objects reachable from the root
+    ///
+    /// # Performance
+    ///
+    /// O(V + E) where V is the number of reachable objects and E is edges.
+    /// Uses batch resolution to minimize archive lookups.
+    pub fn resolve_with_dependencies(
+        &self,
+        bundle: &Bundle,
+        object_id: u64,
+    ) -> Result<Vec<ResolvedObject>> {
+        let all_ids = self.get_transitive_dependencies(object_id);
+        self.resolve_objects(bundle, &all_ids)
+    }
+
+    /// Check if an object exists in the index
+    pub fn contains_object(&self, object_id: u64) -> bool {
+        self.entries.contains_key(&object_id)
+    }
+
+    /// Get the total number of indexed objects
+    pub fn object_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Get the number of fragments (IWA files) in the index
+    pub fn fragment_count(&self) -> usize {
+        self.fragment_objects.len()
+    }
+
+    /// Get statistics about the object index
+    pub fn stats(&self) -> ObjectIndexStats {
+        let total_objects = self.entries.len();
+        let total_fragments = self.fragment_objects.len();
+        let total_references = self.reference_graph.edge_count();
+        let avg_refs_per_object = if total_objects > 0 {
+            total_references as f64 / total_objects as f64
+        } else {
+            0.0
+        };
+
+        ObjectIndexStats {
+            total_objects,
+            total_fragments,
+            total_references,
+            avg_refs_per_object,
+        }
+    }
+}
+
+/// Statistics about the object index
+#[derive(Debug, Clone)]
+pub struct ObjectIndexStats {
+    /// Total number of objects in the index
+    pub total_objects: usize,
+    /// Total number of IWA fragments
+    pub total_fragments: usize,
+    /// Total number of object references
+    pub total_references: usize,
+    /// Average references per object
+    pub avg_refs_per_object: f64,
 }
 
 /// A resolved object with its full data

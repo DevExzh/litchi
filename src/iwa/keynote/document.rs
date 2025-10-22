@@ -185,8 +185,8 @@ impl KeynoteDocument {
         // - note: reference to KN.NoteArchive (speaker notes)
         // - drawables: references to drawable objects (shapes, text boxes, images)
         // - builds: references to KN.BuildArchive (animations)
-        // - transition: reference to KN.TransitionArchive
-        // - master_slide: reference to master slide
+        // - transition: TransitionArchive (transition effect)
+        // - master: reference to master slide
 
         if let Some(raw_message) = object.messages.first() {
             // Try to decode as SlideArchive
@@ -200,20 +200,36 @@ impl KeynoteDocument {
                     slide.title = Some(name.clone());
                 }
 
-                // TODO: Extract build animations
-                // The builds field contains references to KN.BuildArchive objects
-                // which define the animation effects for objects on the slide
+                // Extract master slide reference
+                if let Some(ref master) = slide_archive.master {
+                    slide.master_slide_id = Some(master.identifier);
+                }
 
-                // TODO: Extract transition
-                // The transition field contains a reference to a transition effect
+                // Extract build animations
+                for build_ref in &slide_archive.builds {
+                    if let Ok(build) = self.extract_build_animation(build_ref.identifier) {
+                        slide.builds.push(build);
+                    }
+                }
 
-                // TODO: Resolve drawable references to get text boxes and other content
-                // The drawables field contains references to TSD.DrawableArchive objects
-                // which can include text boxes, shapes, images, etc.
+                // Extract transition
+                slide.transition = self.parse_transition(&slide_archive.transition);
 
-                // TODO: Extract speaker notes
-                // The note field contains a reference to KN.NoteArchive
-                // which has the speaker notes text
+                // Resolve drawable references to get text boxes and other content
+                for drawable_ref in &slide_archive.drawables {
+                    if let Ok(text_content) = self.extract_drawable_text(drawable_ref.identifier)
+                        && !text_content.is_empty()
+                    {
+                        slide.text_content.push(text_content);
+                    }
+                }
+
+                // Extract speaker notes
+                if let Some(ref note_ref) = slide_archive.note
+                    && let Ok(notes) = self.extract_speaker_notes(note_ref.identifier)
+                {
+                    slide.notes = Some(notes);
+                }
             }
         }
 
@@ -226,6 +242,138 @@ impl KeynoteDocument {
         }
 
         Ok(slide)
+    }
+
+    /// Extract build animation from a BuildArchive object
+    fn extract_build_animation(&self, build_id: u64) -> Result<super::slide::BuildAnimation> {
+        use super::slide::{BuildAnimation, BuildAnimationType};
+        use prost::Message;
+
+        if let Some(resolved) = self.object_index.resolve_object(&self.bundle, build_id)? {
+            for msg in &resolved.messages {
+                if let Ok(build_archive) =
+                    crate::iwa::protobuf::kn::BuildArchive::decode(&*msg.data)
+                {
+                    let animation_type = Self::parse_build_delivery(&build_archive.delivery);
+                    let target_id = Some(build_archive.drawable.identifier);
+                    let duration = build_archive.duration as f32;
+
+                    return Ok(BuildAnimation {
+                        animation_type,
+                        target_id,
+                        duration,
+                    });
+                }
+            }
+        }
+
+        // Return a default build if parsing failed
+        Ok(BuildAnimation {
+            animation_type: BuildAnimationType::Other,
+            target_id: None,
+            duration: 0.0,
+        })
+    }
+
+    /// Parse build delivery string into animation type
+    fn parse_build_delivery(delivery: &str) -> super::slide::BuildAnimationType {
+        use super::slide::BuildAnimationType;
+
+        match delivery.to_lowercase().as_str() {
+            s if s.contains("appear") => BuildAnimationType::Appear,
+            s if s.contains("dissolve") => BuildAnimationType::Dissolve,
+            s if s.contains("move") => BuildAnimationType::MoveIn,
+            s if s.contains("scale") && s.contains("fade") => BuildAnimationType::FadeAndScale,
+            s if s.contains("scale") => BuildAnimationType::Scale,
+            _ => BuildAnimationType::Other,
+        }
+    }
+
+    /// Parse transition archive into slide transition
+    fn parse_transition(
+        &self,
+        transition: &crate::iwa::protobuf::kn::TransitionArchive,
+    ) -> Option<super::slide::SlideTransition> {
+        use super::slide::{SlideTransition, TransitionType};
+
+        // Extract duration from attributes
+        // The attributes field is required (not Optional)
+        let duration = transition.attributes.database_duration.unwrap_or(0.0) as f32;
+
+        // Determine transition type from attributes
+        // The actual transition type is embedded in the attributes structure
+        // For now, we use a generic transition type
+        let transition_type = TransitionType::Other;
+
+        Some(SlideTransition {
+            transition_type,
+            duration,
+        })
+    }
+
+    /// Extract text content from a drawable object
+    fn extract_drawable_text(&self, drawable_id: u64) -> Result<String> {
+        use prost::Message;
+
+        if let Some(resolved) = self
+            .object_index
+            .resolve_object(&self.bundle, drawable_id)?
+        {
+            // Drawables can contain text storages
+            for msg in &resolved.messages {
+                // Try to extract text from TSWP storage messages (types 2001-2022)
+                if msg.type_ >= 2001
+                    && msg.type_ <= 2022
+                    && let Ok(storage) =
+                        crate::iwa::protobuf::tswp::StorageArchive::decode(&*msg.data)
+                    && !storage.text.is_empty()
+                {
+                    return Ok(storage.text.join(" "));
+                }
+            }
+
+            // Also try generic text extraction from the resolved object
+            for msg in &resolved.messages {
+                if let Ok(storage) = crate::iwa::protobuf::tswp::StorageArchive::decode(&*msg.data)
+                    && !storage.text.is_empty()
+                {
+                    return Ok(storage.text.join(" "));
+                }
+            }
+        }
+
+        Ok(String::new())
+    }
+
+    /// Extract speaker notes from a NoteArchive object
+    fn extract_speaker_notes(&self, note_id: u64) -> Result<String> {
+        use prost::Message;
+
+        if let Some(resolved) = self.object_index.resolve_object(&self.bundle, note_id)? {
+            for msg in &resolved.messages {
+                if let Ok(note_archive) = crate::iwa::protobuf::kn::NoteArchive::decode(&*msg.data)
+                {
+                    // The note contains a reference to a TSWP.StorageArchive
+                    let storage_id = note_archive.contained_storage.identifier;
+                    if let Some(storage_obj) =
+                        self.object_index.resolve_object(&self.bundle, storage_id)?
+                    {
+                        for storage_msg in &storage_obj.messages {
+                            if let Ok(storage) = crate::iwa::protobuf::tswp::StorageArchive::decode(
+                                &*storage_msg.data,
+                            ) {
+                                let notes_text = storage.text.join("\n");
+                                if !notes_text.is_empty() {
+                                    return Ok(notes_text);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(String::new())
     }
 
     /// Extract the full show structure with all slides

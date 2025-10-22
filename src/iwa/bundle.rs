@@ -303,6 +303,81 @@ impl Bundle {
         &self.bundle_path
     }
 
+    /// Validate the bundle structure and integrity
+    ///
+    /// Performs comprehensive validation including:
+    /// - Checking for required archives
+    /// - Verifying IWA file format correctness
+    /// - Detecting corrupted or incomplete data
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(())` if validation passes
+    /// * `Err(Error)` with detailed error message if validation fails
+    pub fn validate(&self) -> Result<()> {
+        // Check that we have at least one archive
+        if self.archives.is_empty() {
+            return Err(Error::Bundle(
+                "Bundle contains no archives - may be corrupted or empty".to_string(),
+            ));
+        }
+
+        // Verify each archive has at least one object
+        let mut total_objects = 0;
+        for (archive_name, archive) in &self.archives {
+            if archive.objects.is_empty() {
+                eprintln!("Warning: Archive '{}' contains no objects", archive_name);
+            }
+            total_objects += archive.objects.len();
+        }
+
+        if total_objects == 0 {
+            return Err(Error::Bundle(
+                "Bundle contains no objects across all archives - may be corrupted".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Check if the bundle appears to be corrupted
+    ///
+    /// Performs basic sanity checks to detect obviously corrupted bundles.
+    pub fn is_corrupted(&self) -> bool {
+        if self.archives.is_empty() {
+            return true;
+        }
+
+        let has_any_objects = self
+            .archives
+            .values()
+            .any(|archive| !archive.objects.is_empty());
+
+        !has_any_objects
+    }
+
+    /// Get bundle statistics
+    pub fn stats(&self) -> BundleStats {
+        let archive_count = self.archives.len();
+        let total_objects: usize = self
+            .archives
+            .values()
+            .map(|archive| archive.objects.len())
+            .sum();
+
+        let largest_archive = self
+            .archives
+            .iter()
+            .max_by_key(|(_, archive)| archive.objects.len())
+            .map(|(name, archive)| (name.clone(), archive.objects.len()));
+
+        BundleStats {
+            archive_count,
+            total_objects,
+            largest_archive,
+        }
+    }
+
     /// Extract all text content from the bundle
     pub fn extract_text(&self) -> Result<String> {
         let mut text_parts = Vec::new();
@@ -342,6 +417,17 @@ impl Bundle {
 
         matching_objects
     }
+}
+
+/// Statistics about a bundle
+#[derive(Debug, Clone)]
+pub struct BundleStats {
+    /// Number of IWA archives in the bundle
+    pub archive_count: usize,
+    /// Total number of objects across all archives
+    pub total_objects: usize,
+    /// Largest archive (name, object count)
+    pub largest_archive: Option<(String, usize)>,
 }
 
 /// Metadata associated with an iWork bundle

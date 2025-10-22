@@ -346,6 +346,18 @@ impl ReferenceGraph {
         self.incoming_refs.is_empty() && self.outgoing_refs.is_empty()
     }
 
+    /// Get the total number of edges (references) in the graph
+    ///
+    /// Returns the total count of references between objects.
+    ///
+    /// # Performance
+    ///
+    /// O(V) where V is the number of objects with outgoing references
+    #[inline]
+    pub fn edge_count(&self) -> usize {
+        self.outgoing_refs.values().map(|v| v.len()).sum()
+    }
+
     /// Get statistics about the reference graph
     ///
     /// Returns a tuple of:

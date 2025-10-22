@@ -131,7 +131,7 @@ impl NumbersDocument {
 
         // If no sheets found, try to extract tables directly
         if sheets.is_empty() {
-            let tables = self.extract_tables()?;
+            let tables = self.extract_all_tables()?;
             if !tables.is_empty() {
                 let mut default_sheet = NumbersSheet::new("Sheet 1".to_string(), 0);
                 for table in tables {
@@ -150,6 +150,8 @@ impl NumbersDocument {
         index: usize,
         object: &crate::iwa::archive::ArchiveObject,
     ) -> Result<NumbersSheet> {
+        use prost::Message;
+
         // Extract sheet name from decoded messages
         let text_parts = object.extract_text();
         let sheet_name = text_parts
@@ -159,91 +161,81 @@ impl NumbersDocument {
 
         let mut sheet = NumbersSheet::new(sheet_name, index);
 
-        // Extract tables for this sheet
-        // In a full implementation, we would parse the sheet protobuf message
-        // to get references to table objects and resolve them
-        let tables = self.extract_tables()?;
-        for table in tables {
-            sheet.add_table(table);
+        // Parse the SheetArchive protobuf message to get table references
+        if let Some(raw_message) = object.messages.first()
+            && let Ok(sheet_archive) =
+                crate::iwa::protobuf::tn::SheetArchive::decode(&*raw_message.data)
+        {
+            // Extract table references from drawable_infos
+            // Tables in Numbers are stored as drawables
+            for drawable_ref in &sheet_archive.drawable_infos {
+                if let Ok(table) = self.extract_table_from_drawable(drawable_ref.identifier) {
+                    sheet.add_table(table);
+                }
+            }
+        }
+
+        // Fallback: Extract all tables from the document if sheet has none
+        if sheet.table_count() == 0 {
+            let tables = self.extract_all_tables()?;
+            for table in tables {
+                sheet.add_table(table);
+            }
         }
 
         Ok(sheet)
     }
 
-    /// Extract tables from the document
-    fn extract_tables(&self) -> Result<Vec<NumbersTable>> {
-        let mut tables = Vec::new();
+    /// Extract all tables from the document
+    fn extract_all_tables(&self) -> Result<Vec<NumbersTable>> {
+        use super::table_extractor::TableDataExtractor;
 
-        // Find table model objects (message type 100 is TST.TableModelArchive)
-        let table_objects = self.bundle.find_objects_by_type(100);
-
-        for (_archive_name, object) in table_objects {
-            let table = self.parse_table(object)?;
-            if !table.is_empty() || !table.name.is_empty() {
-                tables.push(table);
-            }
-        }
-
-        Ok(tables)
+        let extractor = TableDataExtractor::new(&self.bundle, &self.object_index);
+        extractor.extract_all_tables()
     }
 
-    /// Parse a single table from an object
-    fn parse_table(&self, object: &crate::iwa::archive::ArchiveObject) -> Result<NumbersTable> {
+    /// Extract a table from a drawable reference
+    fn extract_table_from_drawable(&self, drawable_id: u64) -> Result<NumbersTable> {
         use prost::Message;
 
-        // Extract table name from decoded messages
-        let text_parts = object.extract_text();
-        let table_name = text_parts
-            .first()
-            .cloned()
-            .unwrap_or_else(|| "Table".to_string());
-
-        let mut table = NumbersTable::new(table_name);
-
-        // Parse the TableModelArchive protobuf message
-        // TableModelArchive contains:
-        // - table_name: string
-        // - number_of_rows: uint32
-        // - number_of_columns: uint32
-        // - data_store: reference to TableDataList
-        // - table_id: UUID
-
-        if let Some(raw_message) = object.messages.first() {
-            // Try to decode as TableModelArchive
-            if let Ok(table_model) =
-                crate::iwa::protobuf::tst::TableModelArchive::decode(&*raw_message.data)
-            {
-                // Set table dimensions from protobuf fields
-                // These are required uint32 fields in the proto, so they're always present
-                table.row_count = table_model.number_of_rows as usize;
-                table.column_count = table_model.number_of_columns as usize;
-
-                // Extract table name if available
-                if !table_model.table_name.is_empty() {
-                    table.name = table_model.table_name.clone();
-                }
-
-                // TODO: Parse cell data from data_store reference
-                // The data_store field contains a reference to a TableDataList object
-                // which stores the actual cell values. We would need to:
-                // 1. Extract the data_store object ID
-                // 2. Resolve it using the object_index
-                // 3. Parse the TableDataList to extract cell values
-                //
-                // For now, we'll extract any text content found in the object
-                // as cell values (this will work for simple cases)
-                if !text_parts.is_empty() {
-                    // Place text parts as cells in the first column
-                    for (idx, text) in text_parts.iter().skip(1).enumerate() {
-                        if !text.is_empty() && idx < table.row_count {
-                            table.set_cell(idx, 0, super::cell::CellValue::Text(text.clone()));
-                        }
-                    }
+        if let Some(resolved) = self
+            .object_index
+            .resolve_object(&self.bundle, drawable_id)?
+        {
+            // Look for TableInfoArchive which wraps the table model
+            for msg in &resolved.messages {
+                if let Ok(table_info) =
+                    crate::iwa::protobuf::tst::TableInfoArchive::decode(&*msg.data)
+                {
+                    // The table_model field contains a reference to the TableModelArchive
+                    let table_model_id = table_info.table_model.identifier;
+                    return self.extract_table_from_model(table_model_id);
                 }
             }
         }
 
-        Ok(table)
+        Err(crate::iwa::Error::ParseError(
+            "Could not extract table from drawable".to_string(),
+        ))
+    }
+
+    /// Extract a table from a TableModelArchive reference
+    fn extract_table_from_model(&self, table_model_id: u64) -> Result<NumbersTable> {
+        use super::table_extractor::TableDataExtractor;
+
+        let extractor = TableDataExtractor::new(&self.bundle, &self.object_index);
+
+        if let Some(resolved) = self
+            .object_index
+            .resolve_object(&self.bundle, table_model_id)?
+            && let Some(table) = extractor.extract_table_from_object(&resolved)?
+        {
+            return Ok(table);
+        }
+
+        Err(crate::iwa::Error::ParseError(
+            "Could not extract table from model".to_string(),
+        ))
     }
 
     /// Get the underlying bundle
