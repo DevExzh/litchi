@@ -8,6 +8,7 @@
 //! - `.xls` - Microsoft Excel 97-2003 (OLE2)
 //! - `.xlsx` - Microsoft Excel 2007+ (Office Open XML)
 //! - `.xlsb` - Microsoft Excel Binary Workbook
+//! - `.ods` - OpenDocument Spreadsheet
 //! - `.numbers` - Apple Numbers (iWork Archive)
 //!
 //! # Quick Start

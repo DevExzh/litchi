@@ -132,10 +132,14 @@ pub mod images;
 #[cfg(any(feature = "ole", feature = "ooxml"))]
 pub mod presentation;
 
-/// Unified Excel spreadsheet API (placeholder for future functionality)
+/// Unified Excel/Spreadsheet API (.xls, .xlsx, .xlsb, .ods, .numbers)
 ///
-/// **Note**: This requires at least one of the `ole` or `ooxml` features to be enabled.
-#[cfg(any(feature = "ole", feature = "ooxml"))]
+/// Requires the corresponding feature flags:
+/// - `ole` for .xls
+/// - `ooxml` for .xlsx and .xlsb
+/// - `odf` for .ods
+/// - `iwa` for .numbers
+#[cfg(any(feature = "ole", feature = "ooxml", feature = "odf", feature = "iwa"))]
 pub mod sheet;
 
 /// Markdown conversion module

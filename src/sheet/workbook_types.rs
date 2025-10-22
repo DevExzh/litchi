@@ -3,7 +3,8 @@
 use crate::common::Error;
 use std::io::{Read, Seek, SeekFrom};
 
-#[cfg(feature = "iwa")]
+// ZIP is needed for refining detection of OOXML, iWork and ODF containers
+#[cfg(any(feature = "iwa", feature = "ooxml", feature = "odf"))]
 use zip;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -16,6 +17,22 @@ type Result<T> = std::result::Result<T, Error>;
 pub(super) enum WorkbookImpl {
     #[cfg(feature = "iwa")]
     Numbers(crate::iwa::numbers::NumbersDocument),
+
+    // OOXML-based formats
+    #[cfg(feature = "ooxml")]
+    Xlsx(crate::ooxml::xlsx::Workbook),
+    #[cfg(feature = "ooxml")]
+    Xlsb(crate::ooxml::xlsb::XlsbWorkbook),
+
+    // Legacy OLE-based Excel
+    #[cfg(feature = "ole")]
+    XlsFile(crate::ole::xls::XlsWorkbook<std::io::BufReader<std::fs::File>>),
+    #[cfg(feature = "ole")]
+    XlsMem(crate::ole::xls::XlsWorkbook<std::io::Cursor<Vec<u8>>>),
+
+    // OpenDocument Spreadsheet
+    #[cfg(feature = "odf")]
+    Ods(std::cell::RefCell<crate::odf::Spreadsheet>),
 
     // For other formats, we just indicate they're not yet fully unified
     #[cfg(any(feature = "ole", feature = "ooxml"))]
@@ -33,6 +50,8 @@ pub(super) enum WorkbookFormat {
     Xlsx,
     /// Office Open XML Binary Workbook (.xlsb)
     Xlsb,
+    /// OpenDocument Spreadsheet (.ods)
+    Ods,
     /// Apple Numbers (.numbers)
     Numbers,
 }
@@ -79,6 +98,23 @@ pub(super) fn refine_workbook_format<R: Read + Seek>(
         Ok(archive) => archive,
         Err(_) => return Ok(initial_format),
     };
+
+    // Check for ODF by inspecting the mimetype file
+    #[cfg(feature = "odf")]
+    {
+        if let Ok(mut mimetype_file) = archive.by_name("mimetype") {
+            use std::io::Read as _;
+            let mut mime = String::new();
+            // Best-effort read; if it fails, just continue detection
+            let _ = mimetype_file.read_to_string(&mut mime);
+            let mime_trimmed = mime.trim();
+            if mime_trimmed == "application/vnd.oasis.opendocument.spreadsheet"
+                || mime_trimmed == "application/vnd.oasis.opendocument.spreadsheet-template"
+            {
+                return Ok(WorkbookFormat::Ods);
+            }
+        }
+    }
 
     // Check for iWork Numbers format (Index/*.iwa files)
     #[cfg(feature = "iwa")]

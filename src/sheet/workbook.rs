@@ -5,6 +5,7 @@ use super::workbook_types::{
     WorkbookFormat, WorkbookImpl, detect_workbook_format_from_signature, refine_workbook_format,
 };
 use crate::common::{Error, Metadata};
+use crate::sheet::WorkbookTrait;
 use std::fs::File;
 use std::io::{BufReader, Cursor, Seek};
 use std::path::Path;
@@ -91,20 +92,53 @@ impl Workbook {
                 WorkbookImpl::Numbers(doc)
             },
 
-            #[cfg(any(feature = "ole", feature = "ooxml"))]
-            _ => {
-                return Err(Box::new(Error::ParseError(
-                    "This unified Workbook API currently only supports Apple Numbers. \
-                     For Excel formats (.xls, .xlsx, .xlsb), use the format-specific APIs: \
-                     crate::ole::xls::XlsWorkbook or crate::ooxml::xlsx::Workbook"
-                        .to_string(),
-                )) as Box<dyn std::error::Error>);
+            #[cfg(feature = "ole")]
+            WorkbookFormat::Xls => {
+                let file = File::open(path.as_ref())
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                let reader = std::io::BufReader::new(file);
+                let xls = crate::ole::xls::XlsWorkbook::new(reader)
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                WorkbookImpl::XlsFile(xls)
             },
 
-            #[cfg(not(any(feature = "ole", feature = "ooxml", feature = "iwa")))]
+            #[cfg(feature = "ooxml")]
+            WorkbookFormat::Xlsx => {
+                let pkg = crate::ooxml::OpcPackage::open(path.as_ref())
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                let xlsx = crate::ooxml::xlsx::Workbook::new(pkg)?;
+                WorkbookImpl::Xlsx(xlsx)
+            },
+
+            #[cfg(feature = "ooxml")]
+            WorkbookFormat::Xlsb => {
+                let file = File::open(path.as_ref())
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                let reader = std::io::BufReader::new(file);
+                let xlsb = crate::ooxml::xlsb::XlsbWorkbook::new(reader)
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                WorkbookImpl::Xlsb(xlsb)
+            },
+
+            #[cfg(feature = "odf")]
+            WorkbookFormat::Ods => {
+                let ods = crate::odf::Spreadsheet::open(path.as_ref())
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                WorkbookImpl::Ods(std::cell::RefCell::new(ods))
+            },
+
+            #[cfg(not(any(feature = "ole", feature = "ooxml", feature = "iwa", feature = "odf")))]
             _ => {
                 return Err(Box::new(Error::ParseError(
                     "No workbook format support enabled".to_string(),
+                )) as Box<dyn std::error::Error>);
+            },
+
+            // Fallback for unsupported combinations at compile-time
+            #[allow(unreachable_patterns)]
+            _ => {
+                return Err(Box::new(Error::ParseError(
+                    "Unsupported workbook format for current build features".to_string(),
                 )) as Box<dyn std::error::Error>);
             },
         };
@@ -149,19 +183,48 @@ impl Workbook {
                 WorkbookImpl::Numbers(doc)
             },
 
-            #[cfg(any(feature = "ole", feature = "ooxml"))]
-            _ => {
-                return Err(Box::new(Error::ParseError(
-                    "This unified Workbook API currently only supports Apple Numbers. \
-                     For Excel formats (.xls, .xlsx, .xlsb), use the format-specific APIs"
-                        .to_string(),
-                )) as Box<dyn std::error::Error>);
+            #[cfg(feature = "ole")]
+            WorkbookFormat::Xls => {
+                let reader = std::io::Cursor::new(bytes);
+                let xls = crate::ole::xls::XlsWorkbook::new(reader)
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                WorkbookImpl::XlsMem(xls)
             },
 
-            #[cfg(not(any(feature = "ole", feature = "ooxml", feature = "iwa")))]
+            #[cfg(feature = "ooxml")]
+            WorkbookFormat::Xlsx => {
+                let pkg = crate::ooxml::OpcPackage::from_reader(std::io::Cursor::new(bytes))
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                let xlsx = crate::ooxml::xlsx::Workbook::new(pkg)?;
+                WorkbookImpl::Xlsx(xlsx)
+            },
+
+            #[cfg(feature = "ooxml")]
+            WorkbookFormat::Xlsb => {
+                let xlsb = crate::ooxml::xlsb::XlsbWorkbook::new(std::io::Cursor::new(bytes))
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                WorkbookImpl::Xlsb(xlsb)
+            },
+
+            #[cfg(feature = "odf")]
+            WorkbookFormat::Ods => {
+                let ods = crate::odf::Spreadsheet::from_bytes(bytes)
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                WorkbookImpl::Ods(std::cell::RefCell::new(ods))
+            },
+
+            #[cfg(not(any(feature = "ole", feature = "ooxml", feature = "iwa", feature = "odf")))]
             _ => {
                 return Err(Box::new(Error::ParseError(
                     "No workbook format support enabled".to_string(),
+                )) as Box<dyn std::error::Error>);
+            },
+
+            // Fallback for unsupported combinations at compile-time
+            #[allow(unreachable_patterns)]
+            _ => {
+                return Err(Box::new(Error::ParseError(
+                    "Unsupported workbook format for current build features".to_string(),
                 )) as Box<dyn std::error::Error>);
             },
         };
@@ -194,9 +257,29 @@ impl Workbook {
                 Ok(sheets.iter().map(|s| s.name.clone()).collect())
             },
 
+            #[cfg(feature = "ooxml")]
+            WorkbookImpl::Xlsx(xlsx) => Ok(xlsx.worksheet_names().to_vec()),
+
+            #[cfg(feature = "ooxml")]
+            WorkbookImpl::Xlsb(xlsb) => Ok(xlsb.worksheet_names().to_vec()),
+
+            #[cfg(feature = "ole")]
+            WorkbookImpl::XlsFile(xls) => Ok(xls.worksheet_names().to_vec()),
+            #[cfg(feature = "ole")]
+            WorkbookImpl::XlsMem(xls) => Ok(xls.worksheet_names().to_vec()),
+
+            #[cfg(feature = "odf")]
+            WorkbookImpl::Ods(ods_ref) => {
+                let mut ods = ods_ref.borrow_mut();
+                let sheets = ods
+                    .sheets()
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                Ok(sheets.iter().map(|s| s.name.clone()).collect())
+            },
+
             #[cfg(any(feature = "ole", feature = "ooxml"))]
             WorkbookImpl::Other => Err(Box::new(Error::ParseError(
-                "Not a Numbers workbook".to_string(),
+                "Unsupported workbook type in this build".to_string(),
             )) as Box<dyn std::error::Error>),
         }
     }
@@ -213,7 +296,35 @@ impl Workbook {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn worksheet_count(&self) -> Result<usize> {
-        Ok(self.worksheet_names()?.len())
+        match &self.inner {
+            #[cfg(feature = "iwa")]
+            WorkbookImpl::Numbers(doc) => {
+                let sheets = doc
+                    .sheets()
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                Ok(sheets.len())
+            },
+            #[cfg(feature = "ooxml")]
+            WorkbookImpl::Xlsx(xlsx) => Ok(xlsx.worksheet_count()),
+            #[cfg(feature = "ooxml")]
+            WorkbookImpl::Xlsb(xlsb) => Ok(xlsb.worksheet_count()),
+            #[cfg(feature = "ole")]
+            WorkbookImpl::XlsFile(xls) => Ok(xls.worksheet_count()),
+            #[cfg(feature = "ole")]
+            WorkbookImpl::XlsMem(xls) => Ok(xls.worksheet_count()),
+            #[cfg(feature = "odf")]
+            WorkbookImpl::Ods(ods_ref) => {
+                let mut ods = ods_ref.borrow_mut();
+                let count = ods
+                    .sheet_count()
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                Ok(count)
+            },
+            #[cfg(any(feature = "ole", feature = "ooxml"))]
+            WorkbookImpl::Other => Err(Box::new(Error::ParseError(
+                "Unsupported workbook type in this build".to_string(),
+            )) as Box<dyn std::error::Error>),
+        }
     }
 
     /// Extract all text from all worksheets.
@@ -238,9 +349,144 @@ impl Workbook {
                 ))) as Box<dyn std::error::Error>
             }),
 
+            #[cfg(feature = "ooxml")]
+            WorkbookImpl::Xlsx(xlsx) => {
+                // Iterate rows across worksheets
+                let mut out = String::new();
+                for i in 0..xlsx.worksheet_count() {
+                    let ws = xlsx.worksheet_by_index(i)?;
+                    let mut rows = ws.rows();
+                    while let Some(row) = rows.next() {
+                        let row = row?;
+                        for (idx, cell) in row.iter().enumerate() {
+                            if idx > 0 {
+                                out.push('\t');
+                            }
+                            match cell {
+                                crate::sheet::CellValue::Empty => {},
+                                crate::sheet::CellValue::Bool(b) => {
+                                    out.push_str(if *b { "TRUE" } else { "FALSE" })
+                                },
+                                crate::sheet::CellValue::Int(n) => out.push_str(&n.to_string()),
+                                crate::sheet::CellValue::Float(f) => out.push_str(&f.to_string()),
+                                crate::sheet::CellValue::String(s) => out.push_str(s),
+                                crate::sheet::CellValue::DateTime(dt) => {
+                                    out.push_str(&dt.to_string())
+                                },
+                                crate::sheet::CellValue::Error(e) => out.push_str(e),
+                            }
+                        }
+                        out.push('\n');
+                    }
+                }
+                Ok(out)
+            },
+
+            #[cfg(feature = "ooxml")]
+            WorkbookImpl::Xlsb(xlsb) => {
+                let mut out = String::new();
+                for i in 0..xlsb.worksheet_count() {
+                    let ws = xlsb.worksheet_by_index(i)?;
+                    let mut rows = ws.rows();
+                    while let Some(row) = rows.next() {
+                        let row = row?;
+                        for (idx, cell) in row.iter().enumerate() {
+                            if idx > 0 {
+                                out.push('\t');
+                            }
+                            match cell {
+                                crate::sheet::CellValue::Empty => {},
+                                crate::sheet::CellValue::Bool(b) => {
+                                    out.push_str(if *b { "TRUE" } else { "FALSE" })
+                                },
+                                crate::sheet::CellValue::Int(n) => out.push_str(&n.to_string()),
+                                crate::sheet::CellValue::Float(f) => out.push_str(&f.to_string()),
+                                crate::sheet::CellValue::String(s) => out.push_str(s),
+                                crate::sheet::CellValue::DateTime(dt) => {
+                                    out.push_str(&dt.to_string())
+                                },
+                                crate::sheet::CellValue::Error(e) => out.push_str(e),
+                            }
+                        }
+                        out.push('\n');
+                    }
+                }
+                Ok(out)
+            },
+
+            #[cfg(feature = "ole")]
+            WorkbookImpl::XlsFile(xls) => {
+                let mut out = String::new();
+                for i in 0..xls.worksheet_count() {
+                    let ws = xls.worksheet_by_index(i)?;
+                    let mut rows = ws.rows();
+                    while let Some(row) = rows.next() {
+                        let row = row?;
+                        for (idx, cell) in row.iter().enumerate() {
+                            if idx > 0 {
+                                out.push('\t');
+                            }
+                            match cell {
+                                crate::sheet::CellValue::Empty => {},
+                                crate::sheet::CellValue::Bool(b) => {
+                                    out.push_str(if *b { "TRUE" } else { "FALSE" })
+                                },
+                                crate::sheet::CellValue::Int(n) => out.push_str(&n.to_string()),
+                                crate::sheet::CellValue::Float(f) => out.push_str(&f.to_string()),
+                                crate::sheet::CellValue::String(s) => out.push_str(s),
+                                crate::sheet::CellValue::DateTime(dt) => {
+                                    out.push_str(&dt.to_string())
+                                },
+                                crate::sheet::CellValue::Error(e) => out.push_str(e),
+                            }
+                        }
+                        out.push('\n');
+                    }
+                }
+                Ok(out)
+            },
+            #[cfg(feature = "ole")]
+            WorkbookImpl::XlsMem(xls) => {
+                let mut out = String::new();
+                for i in 0..xls.worksheet_count() {
+                    let ws = xls.worksheet_by_index(i)?;
+                    let mut rows = ws.rows();
+                    while let Some(row) = rows.next() {
+                        let row = row?;
+                        for (idx, cell) in row.iter().enumerate() {
+                            if idx > 0 {
+                                out.push('\t');
+                            }
+                            match cell {
+                                crate::sheet::CellValue::Empty => {},
+                                crate::sheet::CellValue::Bool(b) => {
+                                    out.push_str(if *b { "TRUE" } else { "FALSE" })
+                                },
+                                crate::sheet::CellValue::Int(n) => out.push_str(&n.to_string()),
+                                crate::sheet::CellValue::Float(f) => out.push_str(&f.to_string()),
+                                crate::sheet::CellValue::String(s) => out.push_str(s),
+                                crate::sheet::CellValue::DateTime(dt) => {
+                                    out.push_str(&dt.to_string())
+                                },
+                                crate::sheet::CellValue::Error(e) => out.push_str(e),
+                            }
+                        }
+                        out.push('\n');
+                    }
+                }
+                Ok(out)
+            },
+
+            #[cfg(feature = "odf")]
+            WorkbookImpl::Ods(ods_ref) => {
+                let mut ods = ods_ref.borrow_mut();
+                ods.text()
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+            },
+
             #[cfg(any(feature = "ole", feature = "ooxml"))]
             WorkbookImpl::Other => Err(Box::new(Error::ParseError(
-                "Not a Numbers workbook".to_string(),
+                "Unsupported workbook type in this build".to_string(),
             )) as Box<dyn std::error::Error>),
         }
     }
@@ -266,6 +512,23 @@ impl Workbook {
                 // For now, return empty metadata for Numbers
                 // TODO: Extract metadata from bundle when API is available
                 Ok(Metadata::default())
+            },
+
+            #[cfg(feature = "ooxml")]
+            WorkbookImpl::Xlsx(_xlsx) => Ok(Metadata::default()),
+
+            #[cfg(feature = "ooxml")]
+            WorkbookImpl::Xlsb(_xlsb) => Ok(Metadata::default()),
+
+            #[cfg(feature = "ole")]
+            WorkbookImpl::XlsFile(_xls) => Ok(Metadata::default()),
+            #[cfg(feature = "ole")]
+            WorkbookImpl::XlsMem(_xls) => Ok(Metadata::default()),
+
+            #[cfg(feature = "odf")]
+            WorkbookImpl::Ods(ods_ref) => {
+                let ods = ods_ref.borrow();
+                Ok(ods.metadata().unwrap_or_default())
             },
 
             #[cfg(any(feature = "ole", feature = "ooxml"))]
