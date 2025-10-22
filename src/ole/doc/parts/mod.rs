@@ -16,4 +16,5 @@ pub mod pap;
 pub mod paragraph_extractor;
 pub mod piece_table;
 pub mod tap;
+pub mod tap_parser;
 pub mod text;

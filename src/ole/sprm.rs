@@ -52,6 +52,10 @@ pub struct Sprm {
     pub operation: SprmOperation,
     /// SPRM operand data
     pub operand: Vec<u8>,
+    /// Offset in original grpprl array (for accessing raw data)
+    pub offset: usize,
+    /// Total size of this SPRM in bytes (opcode + size byte if any + operand)
+    pub size: usize,
 }
 
 impl Sprm {
@@ -110,6 +114,8 @@ fn parse_sprms_two_byte(grpprl: &[u8]) -> Vec<Sprm> {
     let mut offset = 0;
 
     while offset + 2 <= grpprl.len() {
+        let sprm_start = offset; // Track start of SPRM for offset field
+
         // Read SPRM opcode (2 bytes in Word 97+)
         let opcode = read_u16_le(grpprl, offset).unwrap_or(0);
 
@@ -161,10 +167,14 @@ fn parse_sprms_two_byte(grpprl: &[u8]) -> Vec<Sprm> {
         let operand = grpprl[offset..offset + operand_size].to_vec();
         offset += operand_size;
 
+        let total_size = offset - sprm_start; // Total size including opcode
+
         sprms.push(Sprm {
             opcode,
             operation,
             operand,
+            offset: sprm_start,
+            size: total_size,
         });
     }
 
@@ -247,11 +257,15 @@ mod tests {
                 opcode: 0x0835,
                 operation: SprmOperation::Byte,
                 operand: vec![1],
+                offset: 0,
+                size: 3,
             },
             Sprm {
                 opcode: 0x4A43,
                 operation: SprmOperation::Word,
                 operand: vec![24, 0],
+                offset: 3,
+                size: 4,
             },
         ];
 
@@ -266,6 +280,8 @@ mod tests {
             opcode: 0x0835,
             operation: SprmOperation::Byte,
             operand: vec![1],
+            offset: 0,
+            size: 3,
         };
         assert!(get_bool_from_sprm(&sprm));
 
@@ -273,6 +289,8 @@ mod tests {
             opcode: 0x0835,
             operation: SprmOperation::Byte,
             operand: vec![0],
+            offset: 0,
+            size: 3,
         };
         assert!(!get_bool_from_sprm(&sprm_false));
     }

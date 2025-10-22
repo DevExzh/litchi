@@ -10,38 +10,49 @@ use super::super::package::Result;
 /// Table Properties structure.
 ///
 /// Contains formatting and structural information for a table.
+/// Based on Apache POI's TableProperties class.
 #[derive(Debug, Clone)]
 pub struct TableProperties {
     /// Number of cells in the row
     pub cell_count: usize,
-    /// Cell boundaries (positions in twips)
+    /// Cell boundaries (positions in twips from left margin)
     pub cell_boundaries: Vec<i16>,
     /// Cell properties for each cell
     pub cell_properties: Vec<CellProperties>,
-    /// Table justification
+    /// Table justification (alignment)
     pub justification: TableJustification,
+    /// Half the width of spacing between cells (dxaGapHalf)
+    pub gap_half: i16,
     /// Table indent from left margin (twips)
     pub indent_left: i16,
-    /// Preferred table width (twips or percentage)
+    /// Preferred table width
     pub preferred_width: Option<TableWidth>,
-    /// Row height (twips)
+    /// Row height (twips, negative = at least)
     pub row_height: Option<i16>,
     /// Row is header row
     pub is_header_row: bool,
     /// Allow row to break across pages
     pub allow_row_break: bool,
+    /// Table borders
+    pub border_top: Option<BorderStyle>,
+    pub border_left: Option<BorderStyle>,
+    pub border_bottom: Option<BorderStyle>,
+    pub border_right: Option<BorderStyle>,
+    pub border_horizontal: Option<BorderStyle>,
+    pub border_vertical: Option<BorderStyle>,
 }
 
 /// Cell Properties structure.
 ///
 /// Contains formatting for an individual table cell.
+/// Based on Apache POI's TableCellDescriptor class.
 #[derive(Debug, Clone, Default)]
 pub struct CellProperties {
     /// Merged cell status
     pub merge_status: CellMergeStatus,
     /// Vertical alignment
     pub vertical_alignment: VerticalAlignment,
-    /// Cell background color
+    /// Cell background color (RGB)
     pub background_color: Option<(u8, u8, u8)>,
     /// Cell borders
     pub borders: CellBorders,
@@ -49,6 +60,11 @@ pub struct CellProperties {
     pub text_direction: TextDirection,
     /// Preferred cell width
     pub preferred_width: Option<TableWidth>,
+    /// Cell padding (in twips)
+    pub padding_top: Option<i16>,
+    pub padding_left: Option<i16>,
+    pub padding_bottom: Option<i16>,
+    pub padding_right: Option<i16>,
 }
 
 /// Cell merge status.
@@ -161,11 +177,18 @@ impl Default for TableProperties {
             cell_boundaries: Vec::new(),
             cell_properties: Vec::new(),
             justification: TableJustification::Left,
+            gap_half: 0,
             indent_left: 0,
             preferred_width: None,
             row_height: None,
             is_header_row: false,
             allow_row_break: true,
+            border_top: None,
+            border_left: None,
+            border_bottom: None,
+            border_right: None,
+            border_horizontal: None,
+            border_vertical: None,
         }
     }
 }
@@ -174,6 +197,18 @@ impl TableProperties {
     /// Create new TableProperties with default values.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Create TableProperties with specified cell count.
+    ///
+    /// Initializes cell boundaries and properties arrays.
+    pub fn with_cell_count(cell_count: usize) -> Self {
+        Self {
+            cell_count,
+            cell_boundaries: vec![0; cell_count + 1],
+            cell_properties: vec![CellProperties::default(); cell_count],
+            ..Default::default()
+        }
     }
 
     /// Parse table properties from SPRM (Single Property Modifier) data.
