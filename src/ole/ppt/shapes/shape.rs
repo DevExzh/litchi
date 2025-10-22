@@ -225,6 +225,9 @@ impl Clone for Box<dyn Shape> {
 }
 
 /// Shape container that holds shape data and provides common operations.
+///
+/// This container includes Escher text properties extracted from the shape's
+/// OfficeArtFOPT records, following Apache POI's EscherProperties model.
 #[derive(Clone)]
 pub struct ShapeContainer {
     /// Shape properties
@@ -235,27 +238,146 @@ pub struct ShapeContainer {
     pub text_content: Option<String>,
     /// Child shapes (for group shapes)
     pub children: Vec<Box<dyn Shape>>,
+
+    // Escher text properties (from OfficeArtFOPT records)
+    /// Text left margin in master units (1/576 inch)
+    /// Property ID: 0x0081 (TEXT_LEFT)
+    pub text_left: Option<i32>,
+
+    /// Text top margin in master units (1/576 inch)
+    /// Property ID: 0x0082 (TEXT_TOP)
+    pub text_top: Option<i32>,
+
+    /// Text right margin in master units (1/576 inch)
+    /// Property ID: 0x0083 (TEXT_RIGHT)
+    pub text_right: Option<i32>,
+
+    /// Text bottom margin in master units (1/576 inch)
+    /// Property ID: 0x0084 (TEXT_BOTTOM)
+    pub text_bottom: Option<i32>,
+
+    /// Text flow direction
+    /// Property ID: 0x0085 (TEXT_FLOW)
+    /// Values: 0=horizontal, 1=vertical, 2=vertical rotated, 3=word art vertical
+    pub text_flow: Option<u16>,
+
+    /// Wrap text in text box
+    /// Property ID: 0x0086 (WRAP_TEXT)
+    pub wrap_text: Option<bool>,
+
+    /// Text anchor (vertical alignment)
+    /// Property ID: 0x0087 (ANCHOR_TEXT)
+    /// Values: 0=top, 1=middle, 2=bottom, 3=top centered, 4=middle centered,
+    ///         5=bottom centered, 6=top baseline, 7=bottom baseline, 8=top centered baseline
+    pub anchor_text: Option<u16>,
+
+    /// Rotate text with shape
+    /// Property ID: 0x00BF (ROTATE_TEXT)
+    pub rotate_text: Option<bool>,
+
+    /// Text ID (identifier for the text)
+    /// Property ID: 0x0080 (TEXT_ID)
+    pub text_id: Option<u32>,
+
+    /// Scale text to fit shape
+    /// Property ID: 0x0089 (SCALE_TEXT)
+    pub scale_text: Option<bool>,
+
+    /// Size text to fit shape bounds
+    /// Property ID: 0x008A (SIZE_TEXT_TO_FIT_SHAPE)
+    pub size_text_to_fit_shape: Option<bool>,
+
+    /// Size shape to fit text content
+    /// Property ID: 0x008B (SIZE_SHAPE_TO_FIT_TEXT)
+    pub size_shape_to_fit_text: Option<bool>,
+
+    /// Font rotation angle (16.16 fixed-point degrees)
+    /// Property ID: 0x008D (FONT_ROTATION)
+    pub font_rotation: Option<u32>,
+
+    /// Bidirectional text flag
+    /// Property ID: 0x0088 (BIDI)
+    pub bidi: Option<bool>,
+
+    /// Use host margins (use container's margins)
+    /// Property ID: 0x008E (USE_HOST_MARGINS)
+    pub use_host_margins: Option<bool>,
+
+    /// Single click selects text
+    /// Property ID: 0x008F (SINGLE_CLICK_SELECTS)
+    pub single_click_selects: Option<bool>,
+
+    /// ID of next shape in sequence
+    /// Property ID: 0x0082 (ID_OF_NEXT_SHAPE) - Note: different context than TEXT_TOP
+    pub id_of_next_shape: Option<u32>,
 }
 
 impl std::fmt::Debug for ShapeContainer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ShapeContainer")
+        let mut debug = f.debug_struct("ShapeContainer");
+        debug
             .field("properties", &self.properties)
-            .field("raw_data", &self.raw_data.len())
+            .field("raw_data_len", &self.raw_data.len())
             .field("text_content", &self.text_content)
-            .field("children", &self.children.len())
-            .finish()
+            .field("children_count", &self.children.len());
+
+        // Only show Escher text properties if they're set
+        if self.text_left.is_some()
+            || self.text_top.is_some()
+            || self.text_right.is_some()
+            || self.text_bottom.is_some()
+        {
+            debug.field(
+                "text_margins",
+                &format_args!(
+                    "L:{:?} T:{:?} R:{:?} B:{:?}",
+                    self.text_left, self.text_top, self.text_right, self.text_bottom
+                ),
+            );
+        }
+        if let Some(flow) = self.text_flow {
+            debug.field("text_flow", &flow);
+        }
+        if let Some(anchor) = self.anchor_text {
+            debug.field("anchor_text", &anchor);
+        }
+        if let Some(wrap) = self.wrap_text {
+            debug.field("wrap_text", &wrap);
+        }
+
+        debug.finish()
     }
 }
 
 impl ShapeContainer {
     /// Create a new shape container.
+    ///
+    /// All Escher text properties are initialized to `None` and can be
+    /// populated later by parsing OfficeArtFOPT records.
     pub fn new(properties: ShapeProperties, raw_data: Vec<u8>) -> Self {
         Self {
             properties,
             raw_data,
             text_content: None,
             children: Vec::new(),
+            // Initialize all Escher text properties to None
+            text_left: None,
+            text_top: None,
+            text_right: None,
+            text_bottom: None,
+            text_flow: None,
+            wrap_text: None,
+            anchor_text: None,
+            rotate_text: None,
+            text_id: None,
+            scale_text: None,
+            size_text_to_fit_shape: None,
+            size_shape_to_fit_text: None,
+            font_rotation: None,
+            bidi: None,
+            use_host_margins: None,
+            single_click_selects: None,
+            id_of_next_shape: None,
         }
     }
 
@@ -272,6 +394,95 @@ impl ShapeContainer {
     /// Set the text content of this shape.
     pub fn set_text(&mut self, text: String) {
         self.text_content = Some(text);
+    }
+
+    /// Set text margins from a 4-value tuple (left, top, right, bottom).
+    ///
+    /// # Arguments
+    ///
+    /// * `margins` - Tuple of (left, top, right, bottom) margins in master units
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// container.set_text_margins(Some((91440, 45720, 91440, 45720)));
+    /// ```
+    pub fn set_text_margins(&mut self, margins: Option<(i32, i32, i32, i32)>) {
+        if let Some((left, top, right, bottom)) = margins {
+            self.text_left = Some(left);
+            self.text_top = Some(top);
+            self.text_right = Some(right);
+            self.text_bottom = Some(bottom);
+        }
+    }
+
+    /// Get text margins as a 4-value tuple.
+    ///
+    /// # Returns
+    ///
+    /// `Some((left, top, right, bottom))` if all four margins are set, `None` otherwise
+    pub fn text_margins(&self) -> Option<(i32, i32, i32, i32)> {
+        match (
+            self.text_left,
+            self.text_top,
+            self.text_right,
+            self.text_bottom,
+        ) {
+            (Some(l), Some(t), Some(r), Some(b)) => Some((l, t, r, b)),
+            _ => None,
+        }
+    }
+
+    /// Set text flow direction.
+    ///
+    /// # Values
+    ///
+    /// - 0: Horizontal (left to right)
+    /// - 1: Vertical (top to bottom)
+    /// - 2: Vertical rotated
+    /// - 3: Word art vertical
+    pub fn set_text_flow(&mut self, flow: Option<u16>) {
+        self.text_flow = flow;
+    }
+
+    /// Set text anchor (vertical alignment).
+    ///
+    /// # Values
+    ///
+    /// - 0: Top
+    /// - 1: Middle
+    /// - 2: Bottom
+    /// - 3: Top centered
+    /// - 4: Middle centered
+    /// - 5: Bottom centered
+    /// - 6: Top baseline
+    /// - 7: Bottom baseline
+    /// - 8: Top centered baseline
+    pub fn set_anchor_text(&mut self, anchor: Option<u16>) {
+        self.anchor_text = anchor;
+    }
+
+    /// Set wrap text flag.
+    pub fn set_wrap_text(&mut self, wrap: Option<bool>) {
+        self.wrap_text = wrap;
+    }
+
+    /// Set rotate text with shape flag.
+    pub fn set_rotate_text(&mut self, rotate: Option<bool>) {
+        self.rotate_text = rotate;
+    }
+
+    /// Set font rotation angle (16.16 fixed-point degrees).
+    pub fn set_font_rotation(&mut self, rotation: Option<u32>) {
+        self.font_rotation = rotation;
+    }
+
+    /// Get font rotation in degrees as a float.
+    ///
+    /// Converts from 16.16 fixed-point to f32.
+    pub fn font_rotation_degrees(&self) -> Option<f32> {
+        self.font_rotation
+            .map(|rot| (rot >> 16) as f32 + ((rot & 0xFFFF) as f32 / 65536.0))
     }
 }
 

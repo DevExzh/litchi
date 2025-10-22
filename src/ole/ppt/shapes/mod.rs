@@ -43,6 +43,7 @@ pub mod autoshape;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub mod escher;
+pub mod geometry;
 pub mod picture;
 pub mod placeholder;
 pub mod shape;
