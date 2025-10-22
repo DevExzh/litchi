@@ -9,7 +9,7 @@ use crate::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator,
 };
 
-use super::parsers::{styles_parser, workbook_parser};
+use super::parsers::workbook_parser;
 use super::worksheet::{Worksheet, WorksheetInfo, WorksheetIterator as XlsxWorksheetIterator};
 
 /// Concrete implementation of a Workbook for Excel files.
@@ -83,7 +83,8 @@ impl Workbook {
         let styles_uri = PackURI::new("/xl/styles.xml")?;
         if let Ok(styles_part) = self.package.get_part(&styles_uri) {
             let content = std::str::from_utf8(styles_part.blob())?;
-            self.styles = styles_parser::parse_styles_xml(content)?;
+            self.styles = Styles::parse(content)
+                .map_err(|e| -> Box<dyn std::error::Error> { Box::new(e) })?;
         }
         Ok(())
     }

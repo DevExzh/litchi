@@ -40,6 +40,6 @@ pub mod worksheet;
 // Re-export main types for convenience
 pub use cell::Cell;
 pub use shared_strings::SharedStrings;
-pub use styles::Styles;
+pub use styles::{Alignment, Border, BorderStyle, CellStyle, Fill, Font, NumberFormat, Styles};
 pub use workbook::Workbook;
 pub use worksheet::Worksheet;
