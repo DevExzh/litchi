@@ -30,6 +30,7 @@ use super::tap::{
 };
 use crate::common::binary::{BinaryResult, read_i16_le, read_u16_le};
 use crate::ole::sprm::{Sprm, parse_sprms};
+use crate::ole::sprm_operations::get_sprm_operation;
 use bumpalo::Bump;
 
 /// TAP parser with arena allocation for temporary structures.
@@ -121,7 +122,8 @@ impl<'arena> TapParser<'arena> {
         sprm: &Sprm,
         grpprl: &[u8],
     ) -> Result<()> {
-        let operation = (sprm.opcode >> 3) & 0x1FF;
+        // Use shared SPRM operation extraction
+        let operation = get_sprm_operation(sprm.opcode);
 
         match operation {
             // sprmTJc (0x5400) - Table justification
@@ -183,13 +185,23 @@ impl<'arena> TapParser<'arena> {
             0x08 => {
                 self.parse_table_definition(tap, sprm, grpprl)?;
             },
-            // sprmTDefTableShd (0xD609) - Table shading
-            0x09 => {
-                // TODO: Implement cell shading parsing
+            // sprmTDefTableShd (0xD609 / 0xD60A) - Table shading
+            0x09 | 0x0A => {
+                // Parse cell shading information
+                // Format: variable length array of ShadingDescriptor80 (2 bytes each)
+                // Based on Apache POI's handling of sprmTDefTableShd
+                self.parse_cell_shading(tap, sprm, grpprl)?;
             },
-            // sprmTTlp (0x740A) - Table look specifier
-            0x0A => {
-                // TODO: Implement table style parsing
+            // sprmTTlp (0x740B) - Table look specifier
+            0x0B => {
+                // Table look specifier for table styles
+                // This is a complex structure that defines table style properties
+                // For basic parsing, we can skip this as it's mainly for styling
+                if let Some(tlp) = sprm.operand_dword() {
+                    // TLP structure contains bit flags for various table style options
+                    // Not critical for basic text extraction
+                    let _ = tlp;
+                }
             },
             // sprmTInsert (0x7621) - Insert cells
             0x21 => {
@@ -364,15 +376,14 @@ impl<'arena> TapParser<'arena> {
             _ => BorderType::Single,
         };
 
-        // Simple color extraction (Word uses complex color tables)
-        // For now, use simplified RGB extraction
+        // Color extraction from Word color format (based on POI)
         let color = if color_word == 0 || color_word == 0xFFFF {
             None
         } else {
             Some((
-                (color_word & 0x1F) as u8 * 8,         // Red
-                ((color_word >> 5) & 0x1F) as u8 * 8,  // Green
-                ((color_word >> 10) & 0x1F) as u8 * 8, // Blue
+                (color_word & 0x1F) as u8 * 8,         // Red (5 bits)
+                ((color_word >> 5) & 0x1F) as u8 * 8,  // Green (5 bits)
+                ((color_word >> 10) & 0x1F) as u8 * 8, // Blue (5 bits)
             ))
         };
 
@@ -504,6 +515,73 @@ impl<'arena> TapParser<'arena> {
             }
             if (grf_brc & 0x08) != 0 {
                 cell.padding_right = Some(w_width);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Convert ico (color index) to RGB.
+    ///
+    /// Based on POI's color index mapping.
+    fn ico_to_rgb(ico: u8) -> (u8, u8, u8) {
+        match ico {
+            0 => (0, 0, 0),        // Auto/Black
+            1 => (0, 0, 0),        // Black
+            2 => (0, 0, 255),      // Blue
+            3 => (0, 255, 255),    // Cyan
+            4 => (0, 255, 0),      // Green
+            5 => (255, 0, 255),    // Magenta
+            6 => (255, 0, 0),      // Red
+            7 => (255, 255, 0),    // Yellow
+            8 => (255, 255, 255),  // White
+            9 => (0, 0, 128),      // Dark Blue
+            10 => (0, 128, 128),   // Dark Cyan
+            11 => (0, 128, 0),     // Dark Green
+            12 => (128, 0, 128),   // Dark Magenta
+            13 => (128, 0, 0),     // Dark Red
+            14 => (128, 128, 0),   // Dark Yellow
+            15 => (128, 128, 128), // Dark Gray
+            16 => (192, 192, 192), // Light Gray
+            _ => (0, 0, 0),        // Default to black
+        }
+    }
+
+    /// Parse cell shading (sprmTDefTableShd).
+    ///
+    /// This SPRM contains an array of ShadingDescriptor80 structures (2 bytes each),
+    /// one for each cell in the table.
+    ///
+    /// Based on Apache POI's table shading handling.
+    fn parse_cell_shading(
+        &self,
+        tap: &mut TableProperties,
+        sprm: &Sprm,
+        _grpprl: &[u8],
+    ) -> Result<()> {
+        let bytes = sprm.operand_bytes();
+        let shd_size = 2; // ShadingDescriptor80 is 2 bytes
+
+        // Parse shading descriptors for each cell
+        let num_shd = bytes.len() / shd_size;
+        for i in 0..num_shd.min(tap.cell_count) {
+            let offset = i * shd_size;
+            if offset + 1 < bytes.len()
+                && let Ok(shd) = read_u16_le(bytes, offset)
+            {
+                // Parse Shd80 structure
+                let ico_fore = (shd & 0x1F) as u8;
+                let ico_back = ((shd >> 5) & 0x1F) as u8;
+                let ipat = ((shd >> 10) & 0x3F) as u8;
+
+                // Apply shading to cell if pattern is not Clear
+                if ipat != 0 && i < tap.cell_properties.len() {
+                    let _fg_color = Self::ico_to_rgb(ico_fore);
+                    let _bg_color = Self::ico_to_rgb(ico_back);
+                    // Store shading info in cell properties if needed
+                    // For now, we mainly extract structure without applying
+                    let _ = ipat;
+                }
             }
         }
 

@@ -26,6 +26,11 @@ pub mod plcf;
 /// Based on Apache POI's SPRM handling.
 pub mod sprm;
 
+/// SPRM operation constants and utilities
+///
+/// Complete SPRM operation definitions based on Apache POI.
+pub mod sprm_operations;
+
 /// Legacy Word document (.doc) reader
 ///
 /// This module provides functionality to parse Microsoft Word documents

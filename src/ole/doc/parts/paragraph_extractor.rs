@@ -426,7 +426,7 @@ impl ParagraphExtractor {
                 },
                 0x6649 => {
                     // sprmPItap - table nesting level (4-byte operand)
-                    props.table_level = sprm.operand_dword().unwrap_or(0) as i32;
+                    props.table_nesting_level = sprm.operand_dword().unwrap_or(0) as i32;
                 },
                 _ => {},
             }

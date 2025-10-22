@@ -343,7 +343,7 @@ impl Document {
             let props = para.properties();
 
             // Check if this paragraph is in a top-level table (level 1)
-            if props.in_table && props.table_level == 1 {
+            if props.in_table && props.table_nesting_level == 1 {
                 // If we weren't previously in a level-1 table, this is a new table
                 if !in_table_level_1 {
                     table_count += 1;
@@ -538,7 +538,7 @@ impl Document {
             let props = para.properties();
 
             // Check if this paragraph starts a table at the requested level
-            if props.in_table && props.table_level == level {
+            if props.in_table && props.table_nesting_level == level {
                 // Found the start of a table - collect all paragraphs in this table
                 let table_start = i;
                 let mut table_paras = Vec::new();
@@ -548,7 +548,7 @@ impl Document {
                     let current_para = &paragraphs[i];
                     let current_props = current_para.properties();
 
-                    if !current_props.in_table || current_props.table_level < level {
+                    if !current_props.in_table || current_props.table_nesting_level < level {
                         // Exited the table
                         break;
                     }
@@ -604,7 +604,7 @@ impl Document {
             let props = para.properties();
 
             // Skip paragraphs from nested tables (higher level)
-            if props.table_level > level {
+            if props.table_nesting_level > level {
                 continue;
             }
 
@@ -612,7 +612,7 @@ impl Document {
             current_row_paras.push(para.clone());
 
             // Check if this paragraph marks the end of a row
-            if props.is_table_row_end && props.table_level == level {
+            if props.is_table_row_end && props.table_nesting_level == level {
                 // End of row - create cells from the collected paragraphs
                 let cells = self.extract_cells_from_row_paragraphs(&current_row_paras)?;
 
