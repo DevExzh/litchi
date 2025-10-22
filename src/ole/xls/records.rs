@@ -294,44 +294,36 @@ pub enum XlsEncoding {
 }
 
 impl XlsEncoding {
+    /// Create encoding from codepage identifier
+    ///
+    /// # Arguments
+    ///
+    /// * `codepage` - Windows codepage identifier (e.g., 1252 for Western European, 1200 for UTF-16LE)
     pub fn from_codepage(codepage: u16) -> XlsResult<Self> {
-        // Use codepage crate for proper encoding support
-        // For now, we'll handle common codepages
         match codepage {
             1200 => Ok(XlsEncoding::Utf16Le),
             cp => Ok(XlsEncoding::Codepage(cp)),
         }
     }
 
+    /// Decode byte data using this encoding
+    ///
+    /// This method uses the shared codepage module for efficient and correct decoding.
+    ///
+    /// # Performance
+    ///
+    /// Uses zero-copy operations where possible and leverages optimized encoding_rs
+    /// for codepage conversion.
     pub fn decode(&self, data: &[u8]) -> XlsResult<String> {
         match self {
             XlsEncoding::Utf16Le => {
-                // UTF-16 LE decoding
-                if !data.len().is_multiple_of(2) {
-                    return Err(XlsError::Encoding("Invalid UTF-16 data length".to_string()));
-                }
-                let utf16_data: Vec<u16> = data
-                    .chunks_exact(2)
-                    .map(|chunk| {
-                        U16::<LE>::read_from_bytes(chunk)
-                            .map(|v| v.get())
-                            .unwrap_or(0)
-                    })
-                    .collect();
-                String::from_utf16(&utf16_data)
-                    .map_err(|e| XlsError::Encoding(format!("UTF-16 decoding error: {}", e)))
+                // Use shared UTF-16 LE decoder
+                Ok(crate::ole::codepage::decode_utf16le(data))
             },
             XlsEncoding::Codepage(cp) => {
-                // For now, assume Latin-1 for common codepages
-                // In production, use proper codepage conversion
-                String::from_utf8(data.to_vec())
-                    .or_else(|_| {
-                        // Fallback to lossy conversion
-                        Ok(String::from_utf8_lossy(data).into_owned())
-                    })
-                    .map_err(|e: std::string::FromUtf8Error| {
-                        XlsError::Encoding(format!("Codepage {} decoding error: {}", cp, e))
-                    })
+                // Use shared codepage decoder
+                crate::ole::codepage::decode_bytes(data, Some(*cp as u32))
+                    .ok_or_else(|| XlsError::Encoding(format!("Unsupported codepage: {}", cp)))
             },
         }
     }

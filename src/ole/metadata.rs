@@ -443,65 +443,6 @@ fn extract_document_summary_info(metadata: &mut OleMetadata, props: &HashMap<u32
     }
 }
 
-/// Decode ANSI string bytes to UTF-8 using the specified codepage
-///
-/// Return `None` if the encoding is not supported.
-///
-/// The full code page list is [here](https://learn.microsoft.com/en-us/windows/win32/intl/code-page-identifiers).
-fn decode_ansi_string(bytes: &[u8], codepage: Option<u32>) -> Option<String> {
-    // Remove null terminators
-    let bytes = bytes
-        .iter()
-        .take_while(|&&b| b != 0)
-        .cloned()
-        .collect::<Vec<_>>();
-
-    // Try to detect the encoding from codepage
-    let encoding = match codepage {
-        Some(cp) => {
-            // Try to find the encoding by codepage number
-            match cp {
-                437 => encoding_rs::IBM866,        // IBM866
-                874 => encoding_rs::WINDOWS_874,   // Thai
-                932 => encoding_rs::SHIFT_JIS,     // Japanese
-                936 => encoding_rs::GBK,           // GB2312/GBK (Chinese)
-                949 => encoding_rs::EUC_KR,        // Korean
-                950 => encoding_rs::BIG5,          // Big5 (Traditional Chinese)
-                1250 => encoding_rs::WINDOWS_1250, // Windows-1250 (Central European)
-                1251 => encoding_rs::WINDOWS_1251, // Windows-1251 (Cyrillic)
-                1252 => encoding_rs::WINDOWS_1252, // Windows-1252 (Western European)
-                1253 => encoding_rs::WINDOWS_1253, // Windows-1253 (Greek)
-                1254 => encoding_rs::WINDOWS_1254, // Windows-1254 (Turkish)
-                1255 => encoding_rs::WINDOWS_1255, // Windows-1255 (Hebrew)
-                1256 => encoding_rs::WINDOWS_1256, // Windows-1256 (Arabic)
-                1257 => encoding_rs::WINDOWS_1257, // Windows-1257 (Baltic)
-                1258 => encoding_rs::WINDOWS_1258, // Windows-1258 (Vietnamese)
-                10000 => encoding_rs::MACINTOSH,   // Macintosh Roman
-                20932 => encoding_rs::EUC_JP,      // Japanese
-                28592 => encoding_rs::ISO_8859_2,  // Latin 2 (Latin 2)
-                28593 => encoding_rs::ISO_8859_3,  // Latin 3 (Latin 3)
-                28594 => encoding_rs::ISO_8859_4,  // Latin 4 (Latin 4)
-                28595 => encoding_rs::ISO_8859_5,  // Cyrillic (Cyrillic)
-                28596 => encoding_rs::ISO_8859_6,  // Arabic (Arabic)
-                28597 => encoding_rs::ISO_8859_7,  // Greek (Greek)
-                28598 => encoding_rs::ISO_8859_8,  // Hebrew (Hebrew)
-                28605 => encoding_rs::ISO_8859_15, // Latin 9 (Latin 9)
-                54936 => encoding_rs::GB18030,     // GB18030 (Chinese)
-                65001 => encoding_rs::UTF_8,
-                _ => {
-                    return None;
-                },
-            }
-        },
-        None => {
-            return None;
-        },
-    };
-
-    // Decode the bytes using the determined encoding
-    Some(encoding.decode(&bytes).0.into_owned())
-}
-
 /// Extract string from property value with proper encoding
 fn extract_string(value: &PropertyValue, codepage: Option<u32>) -> Option<String> {
     match value {
@@ -509,7 +450,7 @@ fn extract_string(value: &PropertyValue, codepage: Option<u32>) -> Option<String
             if bytes.is_empty() {
                 None
             } else {
-                decode_ansi_string(bytes, codepage)
+                super::codepage::decode_bytes(bytes, codepage)
             }
         },
         PropertyValue::Lpwstr(s) => {

@@ -1,6 +1,9 @@
 /// Constants for OLE file format
 pub mod consts;
 
+/// Codepage decoding utilities for OLE file formats
+pub mod codepage;
+
 /// Main OLE file parsing implementation
 mod file;
 
