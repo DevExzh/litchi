@@ -37,6 +37,12 @@ impl EscherShapeFactory {
     }
 
     /// Recursively extract shapes from a container.
+    ///
+    /// # Implementation Notes
+    ///
+    /// Follows Apache POI's logic:
+    /// - SpContainer: Single shape, add to results
+    /// - SpgrContainer: Group shape, process with skip-first logic
     fn extract_shapes_from_container<'data>(
         container: &EscherContainer<'data>,
         shapes: &mut Vec<EscherShape<'data>>,
@@ -50,11 +56,54 @@ impl EscherShapeFactory {
                     shapes.push(shape);
                 },
                 // SpgrContainer holds a group of shapes
+                // Process the group itself as a shape (which will recursively load children)
                 EscherRecordType::SpgrContainer => {
                     let group_container = EscherContainer::new(child);
-                    Self::extract_shapes_from_container(&group_container, shapes);
+                    Self::extract_shapes_from_spgr_container(&group_container, shapes);
                 },
                 // Other containers - recurse
+                _ if child.is_container() => {
+                    let child_container = EscherContainer::new(child);
+                    Self::extract_shapes_from_container(&child_container, shapes);
+                },
+                _ => {},
+            }
+        }
+    }
+
+    /// Extract shapes from SpgrContainer with proper skip-first logic.
+    ///
+    /// Based on Apache POI's HSLFGroupShape.getShapes():
+    /// - The first SpContainer in SpgrContainer is the group shape itself
+    /// - Remaining SpContainer children are the actual child shapes
+    fn extract_shapes_from_spgr_container<'data>(
+        container: &EscherContainer<'data>,
+        shapes: &mut Vec<EscherShape<'data>>,
+    ) {
+        let mut is_first = true;
+
+        for child in container.children().flatten() {
+            match child.record_type {
+                EscherRecordType::SpContainer => {
+                    let sp_container = EscherContainer::new(child);
+
+                    // The first SpContainer is the group shape itself
+                    if is_first {
+                        is_first = false;
+                        // Create the group shape (which will recursively parse its children)
+                        let group_shape = EscherShape::from_container(sp_container);
+                        shapes.push(group_shape);
+                    } else {
+                        // Regular child shapes
+                        let child_shape = EscherShape::from_container(sp_container);
+                        shapes.push(child_shape);
+                    }
+                },
+                EscherRecordType::SpgrContainer => {
+                    // Nested group
+                    let nested_group = EscherContainer::new(child);
+                    Self::extract_shapes_from_spgr_container(&nested_group, shapes);
+                },
                 _ if child.is_container() => {
                     let child_container = EscherContainer::new(child);
                     Self::extract_shapes_from_container(&child_container, shapes);

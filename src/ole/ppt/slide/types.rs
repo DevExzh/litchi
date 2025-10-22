@@ -209,14 +209,21 @@ impl<'doc> Slide<'doc> {
             },
 
             EscherShapeType::Group => {
-                // Create GroupShape (children would be parsed recursively)
+                // Create GroupShape and parse children recursively
                 let mut group = shape_enum::GroupShape::new(shape_id);
 
                 if let Some(a) = anchor {
                     group.set_bounds(a.left, a.top, a.width(), a.height());
                 }
 
-                // TODO: Parse child shapes recursively
+                // Recursively parse child shapes
+                // This follows Apache POI's approach: iterate child shapes and convert them
+                let child_escher_shapes = escher_shape.child_shapes();
+                for child_escher in &child_escher_shapes {
+                    if let Some(child_shape) = Self::convert_escher_to_shape_enum(child_escher) {
+                        group.add_child(child_shape);
+                    }
+                }
 
                 Some(ShapeEnum::Group(group))
             },

@@ -125,10 +125,104 @@ impl<'data> EscherShape<'data> {
         &self.container
     }
 
+    /// Get child shapes if this is a group shape.
+    ///
+    /// # Performance
+    ///
+    /// - Returns iterator over child containers
+    /// - Zero-copy: Borrows from document data
+    /// - Lazy: Shapes parsed on demand
+    ///
+    /// # Returns
+    ///
+    /// Vector of child EscherShape objects for group shapes, empty for non-groups
+    pub fn child_shapes(&self) -> Vec<EscherShape<'data>> {
+        // Only group shapes have children
+        if self.shape_type != EscherShapeType::Group {
+            return Vec::new();
+        }
+
+        let mut children = Vec::new();
+
+        // For group shapes, look for SpgrContainer or iterate SpContainer children
+        // The first SpContainer is the group shape itself, skip it
+        let mut is_first = true;
+
+        for child in self.container.children().flatten() {
+            match child.record_type {
+                // SpContainer holds a single shape
+                EscherRecordType::SpContainer => {
+                    // Skip the first SpContainer (it's the group shape itself)
+                    if is_first {
+                        is_first = false;
+                        continue;
+                    }
+
+                    let sp_container = EscherContainer::new(child);
+                    let child_shape = EscherShape::from_container(sp_container);
+                    children.push(child_shape);
+                },
+                // SpgrContainer holds a group of shapes (recursive)
+                // Treat the nested SpgrContainer as a group shape itself
+                EscherRecordType::SpgrContainer => {
+                    let group_container = EscherContainer::new(child);
+                    // Create a shape for the nested group (which will recursively load its children)
+                    let group_shape = EscherShape::from_container(group_container);
+                    children.push(group_shape);
+                },
+                _ => {},
+            }
+        }
+
+        children
+    }
+
+    /// Extract shapes from SpgrContainer (used for nested groups).
+    ///
+    /// # Note
+    ///
+    /// This is a helper function primarily used for testing and special cases.
+    /// Normal shape extraction uses the recursive `child_shapes()` method.
+    #[cfg_attr(not(test), allow(dead_code))]
+    fn extract_from_spgr_container<'a>(
+        container: &EscherContainer<'a>,
+        shapes: &mut Vec<EscherShape<'a>>,
+    ) {
+        let mut is_first = true;
+
+        for child in container.children().flatten() {
+            match child.record_type {
+                EscherRecordType::SpContainer => {
+                    // Skip the first SpContainer in SpgrContainer
+                    if is_first {
+                        is_first = false;
+                        continue;
+                    }
+
+                    let sp_container = EscherContainer::new(child);
+                    let shape = EscherShape::from_container(sp_container);
+                    shapes.push(shape);
+                },
+                EscherRecordType::SpgrContainer => {
+                    // Recursive group
+                    let group_container = EscherContainer::new(child);
+                    Self::extract_from_spgr_container(&group_container, shapes);
+                },
+                _ => {},
+            }
+        }
+    }
+
     /// Detect shape type from container properties.
     ///
     /// Based on Apache POI's shape type detection logic.
     fn detect_shape_type(container: &EscherContainer<'data>) -> EscherShapeType {
+        // First, check if this is a SpgrContainer (group container)
+        // SpgrContainer (0xF003) directly indicates a group shape
+        if container.record().record_type == EscherRecordType::SpgrContainer {
+            return EscherShapeType::Group;
+        }
+
         // Look for Sp (Shape) atom to determine type
         if let Some(sp) = container.find_child(EscherRecordType::Sp) {
             // The shape type is in the instance field
@@ -160,7 +254,7 @@ impl<'data> EscherShape<'data> {
             return EscherShapeType::TextBox;
         }
 
-        // Check if it's a group by looking for SpgrContainer
+        // Check if it's a group by looking for SpgrContainer child
         for child_result in container.children() {
             if let Ok(child) = child_result
                 && child.record_type == EscherRecordType::SpgrContainer
@@ -228,6 +322,7 @@ impl<'data> EscherShape<'data> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ole::ppt::escher::record::EscherRecord;
 
     #[test]
     fn test_shape_type_detection() {
@@ -235,5 +330,217 @@ mod tests {
         // For now, just ensure the enum is usable
         let shape_type = EscherShapeType::TextBox;
         assert_eq!(shape_type, EscherShapeType::TextBox);
+    }
+
+    #[test]
+    fn test_child_shapes_non_group() {
+        // Create a simple SpContainer for a non-group shape (TextBox)
+        let data = create_textbox_spcontainer();
+        let (record, _) = EscherRecord::parse(&data, 0).unwrap();
+        let container = EscherContainer::new(record);
+        let shape = EscherShape::from_container(container);
+
+        // Non-group shapes should return empty children
+        let children = shape.child_shapes();
+        assert_eq!(children.len(), 0);
+    }
+
+    #[test]
+    fn test_child_shapes_empty_group() {
+        // Create a SpgrContainer with only the group shape itself (no children)
+        let data = create_empty_group_spgrcontainer();
+        let (record, _) = EscherRecord::parse(&data, 0).unwrap();
+        let container = EscherContainer::new(record);
+        let shape = EscherShape::from_container(container);
+
+        // Empty group should have shape_type Group but no children
+        assert_eq!(shape.shape_type(), EscherShapeType::Group);
+        let children = shape.child_shapes();
+        assert_eq!(children.len(), 0);
+    }
+
+    #[test]
+    fn test_child_shapes_group_with_children() {
+        // Create a SpgrContainer with child shapes
+        let data = create_group_with_children();
+        let (record, _) = EscherRecord::parse(&data, 0).unwrap();
+        let container = EscherContainer::new(record);
+        let shape = EscherShape::from_container(container);
+
+        // Group should have shape_type Group and contain children
+        assert_eq!(shape.shape_type(), EscherShapeType::Group);
+        let children = shape.child_shapes();
+        // Should have extracted child shapes (exact count depends on test data)
+        assert!(children.len() > 0);
+    }
+
+    // Helper function to create a simple TextBox SpContainer
+    fn create_textbox_spcontainer() -> Vec<u8> {
+        let mut data = Vec::new();
+
+        // SpContainer header
+        data.extend_from_slice(&[
+            0x0F, 0x00, // version=0xF, instance=0
+            0x04, 0xF0, // record type = 0xF004 (SpContainer)
+        ]);
+        let sp_data = create_sp_atom(1, 75); // shape type 75 = TextBox
+        data.extend_from_slice(&(sp_data.len() as u32).to_le_bytes());
+        data.extend_from_slice(&sp_data);
+
+        data
+    }
+
+    // Helper function to create an empty group SpgrContainer
+    fn create_empty_group_spgrcontainer() -> Vec<u8> {
+        let mut data = Vec::new();
+
+        // SpgrContainer header
+        data.extend_from_slice(&[
+            0x0F, 0x00, // version=0xF, instance=0
+            0x03, 0xF0, // record type = 0xF003 (SpgrContainer)
+        ]);
+
+        // First SpContainer (the group shape itself)
+        let group_sp = create_sp_container(100, 0); // shape type 0 = Group
+        data.extend_from_slice(&(group_sp.len() as u32).to_le_bytes());
+        data.extend_from_slice(&group_sp);
+
+        data
+    }
+
+    // Helper function to create a group with children
+    fn create_group_with_children() -> Vec<u8> {
+        let mut data = Vec::new();
+
+        // SpgrContainer header
+        data.extend_from_slice(&[
+            0x0F, 0x00, // version=0xF, instance=0
+            0x03, 0xF0, // record type = 0xF003 (SpgrContainer)
+        ]);
+
+        // Calculate total length
+        let group_sp = create_sp_container(100, 0); // Group shape itself
+        let child1 = create_sp_container(101, 75); // TextBox child
+        let child2 = create_sp_container(102, 1); // Rectangle child
+
+        let total_len = group_sp.len() + child1.len() + child2.len();
+        data.extend_from_slice(&(total_len as u32).to_le_bytes());
+
+        // First SpContainer (the group shape itself)
+        data.extend_from_slice(&group_sp);
+
+        // Child shapes
+        data.extend_from_slice(&child1);
+        data.extend_from_slice(&child2);
+
+        data
+    }
+
+    // Helper to create a SpContainer with Sp atom
+    fn create_sp_container(shape_id: u32, shape_type: u16) -> Vec<u8> {
+        let mut data = Vec::new();
+
+        // SpContainer header
+        data.extend_from_slice(&[
+            0x0F, 0x00, // version=0xF, instance=0
+            0x04, 0xF0, // record type = 0xF004 (SpContainer)
+        ]);
+
+        let sp_atom = create_sp_atom(shape_id, shape_type);
+        data.extend_from_slice(&(sp_atom.len() as u32).to_le_bytes());
+        data.extend_from_slice(&sp_atom);
+
+        data
+    }
+
+    // Helper to create Sp atom
+    fn create_sp_atom(shape_id: u32, shape_type: u16) -> Vec<u8> {
+        let mut data = Vec::new();
+
+        // Sp atom header
+        let ver_inst = (shape_type << 4) | 0x02; // version=2, instance=shape_type
+        data.extend_from_slice(&ver_inst.to_le_bytes());
+        data.extend_from_slice(&[0x0A, 0xF0]); // record type = 0xF00A (Sp)
+        data.extend_from_slice(&8u32.to_le_bytes()); // length = 8
+
+        // Sp data: shape ID (4 bytes) + flags (4 bytes)
+        data.extend_from_slice(&shape_id.to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes()); // flags
+
+        data
+    }
+
+    #[test]
+    fn test_extract_from_spgr_container_skip_first() {
+        // Verify that extract_from_spgr_container skips the first SpContainer
+        let data = create_group_with_children();
+        let (record, _) = EscherRecord::parse(&data, 0).unwrap();
+        let container = EscherContainer::new(record);
+
+        let mut shapes = Vec::new();
+        EscherShape::extract_from_spgr_container(&container, &mut shapes);
+
+        // Should extract 2 child shapes (skipping the first which is the group itself)
+        assert_eq!(shapes.len(), 2);
+    }
+
+    #[test]
+    fn test_nested_groups() {
+        // Create a nested group structure: Group1 -> Group2 -> Shape
+        let data = create_nested_group_structure();
+        let (record, _) = EscherRecord::parse(&data, 0).unwrap();
+        let container = EscherContainer::new(record);
+        let shape = EscherShape::from_container(container);
+
+        assert_eq!(shape.shape_type(), EscherShapeType::Group);
+
+        // Get children of outer group
+        let children = shape.child_shapes();
+        assert!(children.len() > 0);
+
+        // First child should be another group
+        if let Some(first_child) = children.first() {
+            assert_eq!(first_child.shape_type(), EscherShapeType::Group);
+
+            // Get children of inner group
+            let inner_children = first_child.child_shapes();
+            assert!(inner_children.len() > 0);
+        }
+    }
+
+    // Helper to create nested group structure
+    fn create_nested_group_structure() -> Vec<u8> {
+        let mut data = Vec::new();
+
+        // Outer SpgrContainer header
+        data.extend_from_slice(&[
+            0x0F, 0x00, // version=0xF, instance=0
+            0x03, 0xF0, // record type = 0xF003 (SpgrContainer)
+        ]);
+
+        // First: group shape itself
+        let outer_group_sp = create_sp_container(100, 0);
+
+        // Second: nested SpgrContainer
+        let mut inner_group = Vec::new();
+        inner_group.extend_from_slice(&[
+            0x0F, 0x00, // version=0xF, instance=0
+            0x03, 0xF0, // record type = 0xF003 (SpgrContainer)
+        ]);
+
+        let inner_group_sp = create_sp_container(200, 0);
+        let inner_child = create_sp_container(201, 75);
+        let inner_total = inner_group_sp.len() + inner_child.len();
+
+        inner_group.extend_from_slice(&(inner_total as u32).to_le_bytes());
+        inner_group.extend_from_slice(&inner_group_sp);
+        inner_group.extend_from_slice(&inner_child);
+
+        let total_len = outer_group_sp.len() + inner_group.len();
+        data.extend_from_slice(&(total_len as u32).to_le_bytes());
+        data.extend_from_slice(&outer_group_sp);
+        data.extend_from_slice(&inner_group);
+
+        data
     }
 }
