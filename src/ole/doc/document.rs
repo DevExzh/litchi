@@ -12,6 +12,14 @@ use crate::ole::mtef_extractor::MtefExtractor;
 use std::collections::HashMap;
 use std::io::{Read, Seek};
 
+/// Type alias for parsed MTEF formula data with arena allocations
+#[cfg(feature = "formula")]
+type ParsedMtefData = (
+    Vec<crate::formula::Formula<'static>>,
+    Vec<Box<[u8]>>,
+    HashMap<String, Vec<crate::formula::MathNode<'static>>>,
+);
+
 /// A Word document (.doc).
 ///
 /// This is the main API for reading and manipulating legacy Word document content.
@@ -49,6 +57,16 @@ pub struct Document {
     /// Extracted MTEF data from OLE streams (stream_name -> mtef_data)
     #[allow(dead_code)] // Stored for debugging and raw access
     mtef_data: std::collections::HashMap<String, Vec<u8>>,
+    /// Formula arenas that own the memory for parsed formulas
+    /// These must be stored to keep the arena allocations alive for the lifetime of Document
+    #[cfg(feature = "formula")]
+    #[allow(dead_code)] // Stored for arena lifetime management, not directly accessed
+    formula_arenas: Vec<crate::formula::Formula<'static>>,
+    /// Data buffers that store the MTEF binary data with 'static lifetime
+    /// These must be stored to keep the buffer allocations alive for the lifetime of Document
+    #[cfg(feature = "formula")]
+    #[allow(dead_code)] // Stored for buffer lifetime management, not directly accessed
+    data_buffers: Vec<Box<[u8]>>,
     /// Parsed MTEF formulas (stream_name -> parsed_ast)
     #[cfg(feature = "formula")]
     parsed_mtef: std::collections::HashMap<String, Vec<crate::formula::MathNode<'static>>>,
@@ -92,6 +110,9 @@ impl Document {
         let mtef_data = Self::extract_mtef_data(ole)?;
 
         // Parse MTEF data into AST nodes
+        #[cfg(feature = "formula")]
+        let (formula_arenas, data_buffers, parsed_mtef) = Self::parse_all_mtef_data(&mtef_data)?;
+        #[cfg(not(feature = "formula"))]
         let parsed_mtef = Self::parse_all_mtef_data(&mtef_data)?;
 
         Ok(Self {
@@ -101,6 +122,10 @@ impl Document {
             text_extractor,
             fields_table,
             mtef_data,
+            #[cfg(feature = "formula")]
+            formula_arenas,
+            #[cfg(feature = "formula")]
+            data_buffers,
             parsed_mtef,
         })
     }
@@ -136,29 +161,44 @@ impl Document {
         Ok(HashMap::new())
     }
 
-    /// Parse all extracted MTEF data into AST nodes
+    /// Parse all extracted MTEF data into AST nodes using proper arena allocation.
+    ///
+    /// This function creates Formula arenas for each MTEF stream and stores them
+    /// to ensure the arena allocations remain valid for the lifetime of the Document.
+    /// Both arenas and data buffers are kept in Vecs so they can be properly dropped
+    /// when the Document is dropped, completely avoiding memory leaks.
+    ///
+    /// # Safety
+    ///
+    /// This function uses `unsafe` to extend lifetimes to 'static. This is safe because:
+    /// - The formula arenas are stored in the returned Vec and owned by Document
+    /// - The data buffers are stored in the returned Vec and owned by Document  
+    /// - Both will live as long as the Document struct
+    /// - The MathNode references remain valid because they point into these owned arenas
     #[cfg(feature = "formula")]
-    fn parse_all_mtef_data(
-        mtef_data: &HashMap<String, Vec<u8>>,
-    ) -> Result<HashMap<String, Vec<crate::formula::MathNode<'static>>>> {
+    fn parse_all_mtef_data(mtef_data: &HashMap<String, Vec<u8>>) -> Result<ParsedMtefData> {
+        let mut formula_arenas = Vec::new();
+        let mut data_buffers = Vec::new();
         let mut parsed_mtef = HashMap::new();
 
         for (stream_name, data) in mtef_data {
             // Create a formula arena for parsing
             let formula = crate::formula::Formula::new();
 
-            // Clone data to extend its lifetime for the parser
-            // We'll need to leak the arena to make the parsed nodes 'static
-            // This is necessary because we're storing them in the Document
-            let arena_box = Box::new(formula);
-            let arena_ptr = Box::leak(arena_box);
-
-            // Create a buffer that will live as long as we need
+            // Clone data into a boxed slice - we'll store this to avoid leaking
             let data_box = data.clone().into_boxed_slice();
-            let data_ptr: &'static [u8] = Box::leak(data_box);
+
+            // Get 'static references for parsing
+            // Safety: We store both the arena and data buffer in the Document,
+            // so they will live as long as the Document. The 'static lifetime is sound.
+            let arena_ref: &'static bumpalo::Bump = unsafe {
+                std::mem::transmute::<&bumpalo::Bump, &'static bumpalo::Bump>(formula.arena())
+            };
+            let data_ptr: &'static [u8] =
+                unsafe { std::mem::transmute::<&[u8], &'static [u8]>(data_box.as_ref()) };
 
             // Parse the MTEF data
-            let mut parser = crate::formula::MtefParser::new(arena_ptr.arena(), data_ptr);
+            let mut parser = crate::formula::MtefParser::new(arena_ref, data_ptr);
 
             eprintln!(
                 "DEBUG: Parsing MTEF stream '{}', {} bytes, is_valid={}",
@@ -170,45 +210,44 @@ impl Document {
             if parser.is_valid() {
                 match parser.parse() {
                     Ok(nodes) if !nodes.is_empty() => {
-                        // Successfully parsed - store the AST nodes
+                        // Successfully parsed - store the AST nodes, arena, and buffer
                         parsed_mtef.insert(stream_name.clone(), nodes);
+                        formula_arenas.push(formula);
+                        data_buffers.push(data_box);
                     },
                     Ok(_) => {
-                        // Empty result - skip
+                        // Empty result - skip, arena and buffer will be dropped
                     },
                     Err(e) => {
-                        // Parse error - store placeholder text
-                        // We need to create a new arena for the placeholder
-                        let placeholder_formula = crate::formula::Formula::new();
-                        let placeholder_arena = Box::leak(Box::new(placeholder_formula));
-                        let error_text = placeholder_arena
-                            .arena()
-                            .alloc_str(&format!("[Formula parsing error: {}]", e));
+                        // Parse error - store placeholder text using the arena
+                        let error_text =
+                            arena_ref.alloc_str(&format!("[Formula parsing error: {}]", e));
                         parsed_mtef.insert(
                             stream_name.clone(),
                             vec![crate::formula::MathNode::Text(std::borrow::Cow::Borrowed(
                                 error_text,
                             ))],
                         );
+                        formula_arenas.push(formula);
+                        data_buffers.push(data_box);
                     },
                 }
             } else {
-                // Invalid MTEF format - store placeholder
-                let placeholder_formula = crate::formula::Formula::new();
-                let placeholder_arena = Box::leak(Box::new(placeholder_formula));
-                let error_text = placeholder_arena
-                    .arena()
-                    .alloc_str(&format!("[Invalid MTEF format ({} bytes)]", data.len()));
+                // Invalid MTEF format - store placeholder using the arena
+                let error_text =
+                    arena_ref.alloc_str(&format!("[Invalid MTEF format ({} bytes)]", data.len()));
                 parsed_mtef.insert(
                     stream_name.clone(),
                     vec![crate::formula::MathNode::Text(std::borrow::Cow::Borrowed(
                         error_text,
                     ))],
                 );
+                formula_arenas.push(formula);
+                data_buffers.push(data_box);
             }
         }
 
-        Ok(parsed_mtef)
+        Ok((formula_arenas, data_buffers, parsed_mtef))
     }
 
     /// Parse all extracted MTEF data fallback (when formula feature is disabled)
