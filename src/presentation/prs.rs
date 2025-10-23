@@ -53,9 +53,14 @@ pub struct Presentation {
     /// variant holds a reference with extended lifetime to data owned by this Box.
     /// Dropping this would invalidate those references (use-after-free).
     ///
-    /// Only used for PPTX files; None for PPT files.
+    /// Only used for PPTX files; None for PPT and Keynote files.
     #[cfg(feature = "ooxml")]
-    pub(super) _package: Option<Box<ooxml::pptx::Package>>,
+    pub(super) _pptx_package: Option<Box<ooxml::pptx::Package>>,
+    /// Cached metadata extracted during presentation creation.
+    ///
+    /// Metadata is extracted once during `open()` or `from_bytes()` and cached here
+    /// for efficient access. This avoids needing mutable access during `metadata()` calls.
+    pub(super) cached_metadata: Option<crate::common::Metadata>,
 }
 
 impl Presentation {
@@ -98,13 +103,30 @@ impl Presentation {
         match format {
             #[cfg(feature = "ole")]
             PresentationFormat::Ppt => {
-                let mut package = ole::ppt::Package::open(path).map_err(Error::from)?;
+                let mut package = Box::new(ole::ppt::Package::open(path).map_err(Error::from)?);
+
+                // Extract metadata from OLE property streams
+                let cached_metadata =
+                    package
+                        .ole_file()
+                        .get_metadata()
+                        .ok()
+                        .and_then(|ole_metadata| {
+                            let metadata: crate::common::Metadata = ole_metadata.into();
+                            if metadata.has_data() {
+                                Some(metadata)
+                            } else {
+                                None
+                            }
+                        });
+
                 let pres = package.presentation().map_err(Error::from)?;
 
                 Ok(Self {
                     inner: PresentationImpl::Ppt(pres),
                     #[cfg(feature = "ooxml")]
-                    _package: None,
+                    _pptx_package: None,
+                    cached_metadata,
                 })
             },
             #[cfg(not(feature = "ole"))]
@@ -112,6 +134,18 @@ impl Presentation {
             #[cfg(feature = "ooxml")]
             PresentationFormat::Pptx => {
                 let package = Box::new(ooxml::pptx::Package::open(path).map_err(Error::from)?);
+
+                // Extract metadata from OOXML package before transferring ownership
+                let cached_metadata =
+                    crate::ooxml::metadata::extract_metadata(package.opc_package())
+                        .ok()
+                        .and_then(|metadata| {
+                            if metadata.has_data() {
+                                Some(metadata)
+                            } else {
+                                None
+                            }
+                        });
 
                 // SAFETY: We're using unsafe here to extend the lifetime of the presentation
                 // reference. This is safe because we're storing the package in the same
@@ -127,7 +161,8 @@ impl Presentation {
 
                 Ok(Self {
                     inner: PresentationImpl::Pptx(Box::new(pres_ref)),
-                    _package: Some(package),
+                    _pptx_package: Some(package),
+                    cached_metadata,
                 })
             },
             #[cfg(not(feature = "ooxml"))]
@@ -138,10 +173,20 @@ impl Presentation {
                     Error::ParseError(format!("Failed to open Keynote presentation: {}", e))
                 })?;
 
+                // Extract Keynote metadata from bundle properties
+                let cached_metadata = doc.metadata().ok().flatten().and_then(|metadata| {
+                    if metadata.has_data() {
+                        Some(metadata)
+                    } else {
+                        None
+                    }
+                });
+
                 Ok(Self {
                     inner: PresentationImpl::Keynote(doc),
                     #[cfg(feature = "ooxml")]
-                    _package: None,
+                    _pptx_package: None,
+                    cached_metadata,
                 })
             },
             #[cfg(not(feature = "iwa"))]
@@ -202,13 +247,31 @@ impl Presentation {
                 // For OLE2, create cursor from bytes
                 let cursor = Cursor::new(bytes);
 
-                let mut package = ole::ppt::Package::from_reader(cursor).map_err(Error::from)?;
+                let mut package =
+                    Box::new(ole::ppt::Package::from_reader(cursor).map_err(Error::from)?);
+
+                // Extract metadata from OLE property streams
+                let cached_metadata =
+                    package
+                        .ole_file()
+                        .get_metadata()
+                        .ok()
+                        .and_then(|ole_metadata| {
+                            let metadata: crate::common::Metadata = ole_metadata.into();
+                            if metadata.has_data() {
+                                Some(metadata)
+                            } else {
+                                None
+                            }
+                        });
+
                 let pres = package.presentation().map_err(Error::from)?;
 
                 Ok(Self {
                     inner: PresentationImpl::Ppt(pres),
                     #[cfg(feature = "ooxml")]
-                    _package: None,
+                    _pptx_package: None,
+                    cached_metadata,
                 })
             },
             #[cfg(not(feature = "ole"))]
@@ -220,6 +283,18 @@ impl Presentation {
 
                 let package =
                     Box::new(ooxml::pptx::Package::from_reader(cursor).map_err(Error::from)?);
+
+                // Extract metadata from OOXML package before transferring ownership
+                let cached_metadata =
+                    crate::ooxml::metadata::extract_metadata(package.opc_package())
+                        .ok()
+                        .and_then(|metadata| {
+                            if metadata.has_data() {
+                                Some(metadata)
+                            } else {
+                                None
+                            }
+                        });
 
                 // SAFETY: Same lifetime extension as in `open()`
                 let pres_ref = unsafe {
@@ -233,7 +308,8 @@ impl Presentation {
 
                 Ok(Self {
                     inner: PresentationImpl::Pptx(Box::new(pres_ref)),
-                    _package: Some(package),
+                    _pptx_package: Some(package),
+                    cached_metadata,
                 })
             },
             #[cfg(not(feature = "ooxml"))]
@@ -245,10 +321,20 @@ impl Presentation {
                         Error::ParseError(format!("Failed to open Keynote from bytes: {}", e))
                     })?;
 
+                // Extract Keynote metadata from bundle properties
+                let cached_metadata = doc.metadata().ok().flatten().and_then(|metadata| {
+                    if metadata.has_data() {
+                        Some(metadata)
+                    } else {
+                        None
+                    }
+                });
+
                 Ok(Self {
                     inner: PresentationImpl::Keynote(doc),
                     #[cfg(feature = "ooxml")]
-                    _package: None,
+                    _pptx_package: None,
+                    cached_metadata,
                 })
             },
             #[cfg(not(feature = "iwa"))]
@@ -454,40 +540,7 @@ impl Presentation {
     /// # Ok::<(), litchi::common::Error>(())
     /// ```
     pub fn metadata(&self) -> Result<Option<crate::common::Metadata>> {
-        match &self.inner {
-            #[cfg(feature = "ole")]
-            PresentationImpl::Ppt(_) => {
-                // For PPT files, we need to access the package to get metadata
-                // Since we don't store the package, return None for now
-                // TODO: Refactor to store package reference for metadata access
-                Ok(None)
-            },
-            #[cfg(feature = "ooxml")]
-            PresentationImpl::Pptx(pres) => {
-                // Extract metadata from the OOXML package
-                let package = pres.package();
-                match crate::ooxml::metadata::extract_metadata(package) {
-                    Ok(metadata) => {
-                        // Only return Some if there's actual data
-                        if metadata.has_data() {
-                            Ok(Some(metadata))
-                        } else {
-                            Ok(None)
-                        }
-                    },
-                    Err(e) => {
-                        // If metadata extraction fails, log the error and return None
-                        // This is not a fatal error as metadata is optional
-                        eprintln!("Warning: Failed to extract metadata: {}", e);
-                        Ok(None)
-                    },
-                }
-            },
-            #[cfg(feature = "iwa")]
-            PresentationImpl::Keynote(_) => {
-                // TODO: Implement metadata extraction for Keynote presentations
-                Ok(None)
-            },
-        }
+        // Return cached metadata that was extracted during presentation creation
+        Ok(self.cached_metadata.clone())
     }
 }

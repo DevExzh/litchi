@@ -376,6 +376,128 @@ impl KeynoteDocument {
         Ok(String::new())
     }
 
+    /// Extract presentation metadata.
+    ///
+    /// Returns metadata from the Keynote bundle's Properties.plist file.
+    /// This includes document properties like title, author, creation date, etc.
+    ///
+    /// # Performance
+    ///
+    /// This method performs minimal parsing, extracting only standard metadata
+    /// fields from the bundle's Properties.plist. The metadata is not cached
+    /// within KeynoteDocument to avoid duplication with the Presentation cache.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::iwa::keynote::KeynoteDocument;
+    ///
+    /// let doc = KeynoteDocument::open("presentation.key")?;
+    /// if let Some(metadata) = doc.metadata()? {
+    ///     if let Some(title) = metadata.title {
+    ///         println!("Title: {}", title);
+    ///     }
+    ///     if let Some(author) = metadata.author {
+    ///         println!("Author: {}", author);
+    ///     }
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    #[allow(unused_assignments)] // has_data is intentionally reassigned to track if any field was set
+    pub fn metadata(&self) -> Result<Option<crate::common::Metadata>> {
+        let bundle_metadata = self.bundle.metadata();
+
+        // Extract standard metadata fields from Properties.plist and bundle structure
+        let mut metadata = crate::common::Metadata::default();
+        let mut has_data = false;
+
+        // Extract title (Keynote may store in show structure, try there first)
+        let show_title = self.show().ok().and_then(|show| show.title);
+        if let Some(title) = show_title {
+            metadata.title = Some(title);
+            has_data = true;
+        }
+
+        // Try alternative title keys from Properties.plist
+        if metadata.title.is_none() {
+            if let Some(title) = bundle_metadata.get_property_string("Title") {
+                metadata.title = Some(title);
+                has_data = true;
+            } else if let Some(title) = bundle_metadata.get_property_string("kDocumentTitleKey") {
+                metadata.title = Some(title);
+                has_data = true;
+            }
+        }
+
+        // Extract author
+        if let Some(author) = bundle_metadata.get_property_string("Author") {
+            metadata.author = Some(author);
+            has_data = true;
+        } else if let Some(author) = bundle_metadata.get_property_string("kDocumentAuthorKey") {
+            metadata.author = Some(author);
+            has_data = true;
+        } else if let Some(author) = bundle_metadata.get_property_string("kSFWPAuthorPropertyKey") {
+            metadata.author = Some(author);
+            has_data = true;
+        }
+
+        // Extract keywords
+        if let Some(keywords) = bundle_metadata.get_property_string("Keywords") {
+            metadata.keywords = Some(keywords);
+            has_data = true;
+        }
+
+        // Extract comments/description
+        if let Some(comments) = bundle_metadata.get_property_string("Comments") {
+            metadata.description = Some(comments);
+            has_data = true;
+        }
+
+        // Extract application name (Keynote applications)
+        if let Some(app) = bundle_metadata.detected_application.as_ref() {
+            metadata.application = Some(app.clone());
+            has_data = true;
+        } else {
+            // Default to Keynote if not detected
+            metadata.application = Some("Keynote".to_string());
+            has_data = true;
+        }
+
+        // Extract revision from Properties.plist
+        if let Some(revision) = bundle_metadata.get_property_string("revision") {
+            metadata.revision = Some(revision);
+            has_data = true;
+        }
+
+        // Extract build version as additional version info
+        if let Some(version) = bundle_metadata.latest_build_version() {
+            // If we don't have revision yet, use build version
+            if metadata.revision.is_none() {
+                metadata.revision = Some(version.to_string());
+                has_data = true;
+            }
+        }
+
+        // Extract file format version
+        if let Some(format_version) = bundle_metadata.get_property_string("fileFormatVersion") {
+            // Store in content_status as it doesn't have a perfect mapping
+            metadata.content_status = Some(format!("Keynote Format Version {}", format_version));
+            has_data = true;
+        }
+
+        // Note: User-facing metadata like creation date, modification date, etc.
+        // are typically stored in DocumentMetadata.iwa or Metadata.iwa files,
+        // which would require additional IWA parsing. The current implementation
+        // extracts what's readily available from Properties.plist and show structure.
+
+        // If we found any metadata, return it
+        if has_data {
+            Ok(Some(metadata))
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Extract the full show structure with all slides
     ///
     /// # Examples
