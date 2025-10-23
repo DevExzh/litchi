@@ -430,4 +430,64 @@ impl Presentation {
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
         }
     }
+
+    /// Extract presentation metadata.
+    ///
+    /// Returns document properties like title, author, creation date, etc.
+    /// The availability of metadata depends on the file format and whether
+    /// the properties were set when the presentation was created.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::Presentation;
+    ///
+    /// let pres = Presentation::open("presentation.pptx")?;
+    /// if let Some(metadata) = pres.metadata()? {
+    ///     if let Some(title) = metadata.title {
+    ///         println!("Title: {}", title);
+    ///     }
+    ///     if let Some(author) = metadata.author {
+    ///         println!("Author: {}", author);
+    ///     }
+    /// }
+    /// # Ok::<(), litchi::common::Error>(())
+    /// ```
+    pub fn metadata(&self) -> Result<Option<crate::common::Metadata>> {
+        match &self.inner {
+            #[cfg(feature = "ole")]
+            PresentationImpl::Ppt(_) => {
+                // For PPT files, we need to access the package to get metadata
+                // Since we don't store the package, return None for now
+                // TODO: Refactor to store package reference for metadata access
+                Ok(None)
+            },
+            #[cfg(feature = "ooxml")]
+            PresentationImpl::Pptx(pres) => {
+                // Extract metadata from the OOXML package
+                let package = pres.package();
+                match crate::ooxml::metadata::extract_metadata(package) {
+                    Ok(metadata) => {
+                        // Only return Some if there's actual data
+                        if metadata.has_data() {
+                            Ok(Some(metadata))
+                        } else {
+                            Ok(None)
+                        }
+                    },
+                    Err(e) => {
+                        // If metadata extraction fails, log the error and return None
+                        // This is not a fatal error as metadata is optional
+                        eprintln!("Warning: Failed to extract metadata: {}", e);
+                        Ok(None)
+                    },
+                }
+            },
+            #[cfg(feature = "iwa")]
+            PresentationImpl::Keynote(_) => {
+                // TODO: Implement metadata extraction for Keynote presentations
+                Ok(None)
+            },
+        }
+    }
 }

@@ -14,10 +14,12 @@ impl ToMarkdown for Presentation {
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
         let mut writer = MarkdownWriter::new(*options);
 
-        // TODO: Add metadata support when Presentation metadata API is available
-        // if options.include_metadata {
-        //     writer.write_metadata(...)?;
-        // }
+        // Write metadata as YAML front matter if available and enabled
+        if options.include_metadata
+            && let Some(metadata) = self.metadata()?
+        {
+            writer.write_metadata(&metadata)?;
+        }
 
         let slides = self.slides()?;
         for (i, slide) in slides.iter().enumerate() {

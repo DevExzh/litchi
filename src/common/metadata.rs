@@ -13,46 +13,67 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Metadata {
     /// Document title
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     /// Document subject
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub subject: Option<String>,
     /// Document author/creator
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub author: Option<String>,
     /// Keywords associated with the document
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub keywords: Option<String>,
     /// Document description/comments
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// Template used to create the document
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub template: Option<String>,
     /// Last person to modify the document
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub last_modified_by: Option<String>,
     /// Revision number
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub revision: Option<String>,
     /// Creation date (Unix timestamp)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub created: Option<DateTime<Utc>>,
     /// Last modification date (Unix timestamp)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub modified: Option<DateTime<Utc>>,
     /// Number of pages
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub page_count: Option<u32>,
     /// Number of words
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub word_count: Option<u32>,
     /// Number of characters
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub character_count: Option<u32>,
     /// Application that created the document
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub application: Option<String>,
     /// Document category
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub category: Option<String>,
     /// Company/organization
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub company: Option<String>,
     /// Manager name
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub manager: Option<String>,
     /// Content status (draft, final, etc.)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub content_status: Option<String>,
     /// Last printed time
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub last_printed_time: Option<DateTime<Utc>>,
     /// Security level
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub security: Option<u32>,
     /// Codepage for text encoding
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub codepage: Option<u32>,
 }
 
