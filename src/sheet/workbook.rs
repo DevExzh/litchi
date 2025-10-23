@@ -47,6 +47,8 @@ use std::path::Path;
 /// ```
 pub struct Workbook {
     inner: WorkbookImpl,
+    /// Cached metadata extracted during workbook initialization
+    cached_metadata: Metadata,
 }
 
 impl Workbook {
@@ -80,8 +82,8 @@ impl Workbook {
             .seek(std::io::SeekFrom::Start(0))
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        // Open with appropriate implementation
-        let inner = match format {
+        // Open with appropriate implementation and extract metadata
+        let (inner, metadata) = match format {
             #[cfg(feature = "iwa")]
             WorkbookFormat::Numbers => {
                 let doc =
@@ -89,42 +91,70 @@ impl Workbook {
                         Box::new(Error::ParseError(format!("Failed to open Numbers: {}", e)))
                             as Box<dyn std::error::Error>
                     })?;
-                WorkbookImpl::Numbers(doc)
+
+                // Extract metadata from Numbers bundle
+                let metadata = Self::extract_numbers_metadata(&doc);
+                (WorkbookImpl::Numbers(doc), metadata)
             },
 
             #[cfg(feature = "ole")]
             WorkbookFormat::Xls => {
+                // Open file and extract metadata
+                let file_for_metadata = File::open(path.as_ref())
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                let reader_for_metadata = std::io::BufReader::new(file_for_metadata);
+                let mut ole_file = crate::ole::OleFile::open(reader_for_metadata)
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+
+                let metadata = ole_file
+                    .get_metadata()
+                    .map(|m| m.into())
+                    .unwrap_or_default();
+
+                // Create XLS workbook with a fresh file reader
                 let file = File::open(path.as_ref())
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
                 let reader = std::io::BufReader::new(file);
                 let xls = crate::ole::xls::XlsWorkbook::new(reader)
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-                WorkbookImpl::XlsFile(xls)
+                (WorkbookImpl::XlsFile(xls), metadata)
             },
 
             #[cfg(feature = "ooxml")]
             WorkbookFormat::Xlsx => {
                 let pkg = crate::ooxml::OpcPackage::open(path.as_ref())
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+
+                // Extract metadata from OPC package
+                let metadata = crate::ooxml::metadata::extract_metadata(&pkg).unwrap_or_default();
+
                 let xlsx = crate::ooxml::xlsx::Workbook::new(pkg)?;
-                WorkbookImpl::Xlsx(xlsx)
+                (WorkbookImpl::Xlsx(xlsx), metadata)
             },
 
             #[cfg(feature = "ooxml")]
             WorkbookFormat::Xlsb => {
+                // First, get metadata from the package
+                let pkg_for_metadata = crate::ooxml::OpcPackage::open(path.as_ref())
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                let metadata =
+                    crate::ooxml::metadata::extract_metadata(&pkg_for_metadata).unwrap_or_default();
+
+                // Now create the XLSB workbook with a fresh reader
                 let file = File::open(path.as_ref())
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
                 let reader = std::io::BufReader::new(file);
                 let xlsb = crate::ooxml::xlsb::XlsbWorkbook::new(reader)
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-                WorkbookImpl::Xlsb(xlsb)
+                (WorkbookImpl::Xlsb(xlsb), metadata)
             },
 
             #[cfg(feature = "odf")]
             WorkbookFormat::Ods => {
                 let ods = crate::odf::Spreadsheet::open(path.as_ref())
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-                WorkbookImpl::Ods(std::cell::RefCell::new(ods))
+                let metadata = ods.metadata().unwrap_or_default();
+                (WorkbookImpl::Ods(std::cell::RefCell::new(ods)), metadata)
             },
 
             #[cfg(not(any(feature = "ole", feature = "ooxml", feature = "iwa", feature = "odf")))]
@@ -143,7 +173,10 @@ impl Workbook {
             },
         };
 
-        Ok(Self { inner })
+        Ok(Self {
+            inner,
+            cached_metadata: metadata,
+        })
     }
 
     /// Create a workbook from bytes.
@@ -171,8 +204,8 @@ impl Workbook {
         let format = refine_workbook_format(&mut cursor, initial_format)
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        // Open with appropriate implementation
-        let inner = match format {
+        // Open with appropriate implementation and extract metadata
+        let (inner, metadata) = match format {
             #[cfg(feature = "iwa")]
             WorkbookFormat::Numbers => {
                 let doc =
@@ -180,37 +213,62 @@ impl Workbook {
                         Box::new(Error::ParseError(format!("Failed to parse Numbers: {}", e)))
                             as Box<dyn std::error::Error>
                     })?;
-                WorkbookImpl::Numbers(doc)
+
+                // Extract metadata from Numbers bundle
+                let metadata = Self::extract_numbers_metadata(&doc);
+                (WorkbookImpl::Numbers(doc), metadata)
             },
 
             #[cfg(feature = "ole")]
             WorkbookFormat::Xls => {
+                // Extract metadata from OLE file first
+                let mut ole_file = crate::ole::OleFile::open(std::io::Cursor::new(&bytes))
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                let metadata = ole_file
+                    .get_metadata()
+                    .map(|m| m.into())
+                    .unwrap_or_default();
+
+                // Create XLS workbook with a fresh cursor
                 let reader = std::io::Cursor::new(bytes);
                 let xls = crate::ole::xls::XlsWorkbook::new(reader)
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-                WorkbookImpl::XlsMem(xls)
+                (WorkbookImpl::XlsMem(xls), metadata)
             },
 
             #[cfg(feature = "ooxml")]
             WorkbookFormat::Xlsx => {
                 let pkg = crate::ooxml::OpcPackage::from_reader(std::io::Cursor::new(bytes))
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+
+                // Extract metadata from OPC package
+                let metadata = crate::ooxml::metadata::extract_metadata(&pkg).unwrap_or_default();
+
                 let xlsx = crate::ooxml::xlsx::Workbook::new(pkg)?;
-                WorkbookImpl::Xlsx(xlsx)
+                (WorkbookImpl::Xlsx(xlsx), metadata)
             },
 
             #[cfg(feature = "ooxml")]
             WorkbookFormat::Xlsb => {
+                // Extract metadata from package first
+                let pkg_for_metadata =
+                    crate::ooxml::OpcPackage::from_reader(std::io::Cursor::new(&bytes))
+                        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                let metadata =
+                    crate::ooxml::metadata::extract_metadata(&pkg_for_metadata).unwrap_or_default();
+
+                // Create XLSB workbook with a fresh cursor
                 let xlsb = crate::ooxml::xlsb::XlsbWorkbook::new(std::io::Cursor::new(bytes))
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-                WorkbookImpl::Xlsb(xlsb)
+                (WorkbookImpl::Xlsb(xlsb), metadata)
             },
 
             #[cfg(feature = "odf")]
             WorkbookFormat::Ods => {
                 let ods = crate::odf::Spreadsheet::from_bytes(bytes)
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-                WorkbookImpl::Ods(std::cell::RefCell::new(ods))
+                let metadata = ods.metadata().unwrap_or_default();
+                (WorkbookImpl::Ods(std::cell::RefCell::new(ods)), metadata)
             },
 
             #[cfg(not(any(feature = "ole", feature = "ooxml", feature = "iwa", feature = "odf")))]
@@ -229,7 +287,10 @@ impl Workbook {
             },
         };
 
-        Ok(Self { inner })
+        Ok(Self {
+            inner,
+            cached_metadata: metadata,
+        })
     }
 
     /// Get all worksheet names.
@@ -493,6 +554,8 @@ impl Workbook {
 
     /// Get metadata from the workbook.
     ///
+    /// Returns the cached metadata that was extracted during workbook initialization.
+    ///
     /// # Examples
     ///
     /// ```rust,no_run
@@ -506,33 +569,68 @@ impl Workbook {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn metadata(&self) -> Result<Metadata> {
-        match &self.inner {
-            #[cfg(feature = "iwa")]
-            WorkbookImpl::Numbers(_doc) => {
-                // For now, return empty metadata for Numbers
-                // TODO: Extract metadata from bundle when API is available
-                Ok(Metadata::default())
-            },
+        Ok(self.cached_metadata.clone())
+    }
 
-            #[cfg(feature = "ooxml")]
-            WorkbookImpl::Xlsx(_xlsx) => Ok(Metadata::default()),
+    /// Extract metadata from a Numbers document.
+    ///
+    /// This extracts metadata from the Numbers bundle, similar to how
+    /// Keynote metadata is extracted.
+    #[cfg(feature = "iwa")]
+    fn extract_numbers_metadata(doc: &crate::iwa::numbers::NumbersDocument) -> Metadata {
+        let bundle_metadata = doc.bundle().metadata();
+        let mut metadata = Metadata::default();
 
-            #[cfg(feature = "ooxml")]
-            WorkbookImpl::Xlsb(_xlsb) => Ok(Metadata::default()),
-
-            #[cfg(feature = "ole")]
-            WorkbookImpl::XlsFile(_xls) => Ok(Metadata::default()),
-            #[cfg(feature = "ole")]
-            WorkbookImpl::XlsMem(_xls) => Ok(Metadata::default()),
-
-            #[cfg(feature = "odf")]
-            WorkbookImpl::Ods(ods_ref) => {
-                let ods = ods_ref.borrow();
-                Ok(ods.metadata().unwrap_or_default())
-            },
-
-            #[cfg(any(feature = "ole", feature = "ooxml"))]
-            WorkbookImpl::Other => Ok(Metadata::default()),
+        // Extract title from properties
+        if let Some(title) = bundle_metadata.get_property_string("Title") {
+            metadata.title = Some(title);
+        } else if let Some(title) = bundle_metadata.get_property_string("kDocumentTitleKey") {
+            metadata.title = Some(title);
         }
+
+        // Extract author
+        if let Some(author) = bundle_metadata.get_property_string("Author") {
+            metadata.author = Some(author);
+        } else if let Some(author) = bundle_metadata.get_property_string("kDocumentAuthorKey") {
+            metadata.author = Some(author);
+        } else if let Some(author) = bundle_metadata.get_property_string("kSFWPAuthorPropertyKey") {
+            metadata.author = Some(author);
+        }
+
+        // Extract keywords
+        if let Some(keywords) = bundle_metadata.get_property_string("Keywords") {
+            metadata.keywords = Some(keywords);
+        }
+
+        // Extract comments/description
+        if let Some(comments) = bundle_metadata.get_property_string("Comments") {
+            metadata.description = Some(comments);
+        }
+
+        // Extract application name
+        if let Some(app) = bundle_metadata.detected_application.as_ref() {
+            metadata.application = Some(app.clone());
+        } else {
+            metadata.application = Some("Numbers".to_string());
+        }
+
+        // Extract revision from Properties.plist
+        if let Some(revision) = bundle_metadata.get_property_string("revision") {
+            metadata.revision = Some(revision);
+        }
+
+        // Extract build version as additional version info
+        if let Some(version) = bundle_metadata.latest_build_version()
+            && metadata.revision.is_none()
+        {
+            metadata.revision = Some(version.to_string());
+        }
+
+        // Extract file format version
+        if let Some(format_version) = bundle_metadata.get_property_string("fileFormatVersion") {
+            metadata.content_status = Some(format!("Numbers Format Version {}", format_version));
+        }
+
+        metadata
     }
 }
