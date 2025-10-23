@@ -16,6 +16,8 @@ pub enum Run {
     Docx(ooxml::docx::Run),
     #[cfg(feature = "iwa")]
     Pages(String),
+    #[cfg(feature = "rtf")]
+    Rtf(crate::rtf::Run<'static>),
 }
 
 impl Run {
@@ -28,6 +30,8 @@ impl Run {
             Run::Docx(r) => r.text().map(|s| s.to_string()).map_err(Error::from),
             #[cfg(feature = "iwa")]
             Run::Pages(text) => Ok(text.clone()),
+            #[cfg(feature = "rtf")]
+            Run::Rtf(r) => Ok(r.text().to_string()),
         }
     }
 
@@ -40,6 +44,8 @@ impl Run {
             Run::Docx(r) => r.bold().map_err(Error::from),
             #[cfg(feature = "iwa")]
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
+            #[cfg(feature = "rtf")]
+            Run::Rtf(r) => Ok(Some(r.formatting.bold)),
         }
     }
 
@@ -52,6 +58,8 @@ impl Run {
             Run::Docx(r) => r.italic().map_err(Error::from),
             #[cfg(feature = "iwa")]
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
+            #[cfg(feature = "rtf")]
+            Run::Rtf(r) => Ok(Some(r.formatting.italic)),
         }
     }
 
@@ -64,6 +72,8 @@ impl Run {
             Run::Docx(r) => r.strikethrough().map_err(Error::from),
             #[cfg(feature = "iwa")]
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
+            #[cfg(feature = "rtf")]
+            Run::Rtf(r) => Ok(Some(r.formatting.strike)),
         }
     }
 
@@ -98,6 +108,16 @@ impl Run {
             },
             #[cfg(feature = "iwa")]
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
+            #[cfg(feature = "rtf")]
+            Run::Rtf(r) => {
+                if r.formatting.superscript {
+                    Ok(Some(VerticalPosition::Superscript))
+                } else if r.formatting.subscript {
+                    Ok(Some(VerticalPosition::Subscript))
+                } else {
+                    Ok(None)
+                }
+            },
         }
     }
 }

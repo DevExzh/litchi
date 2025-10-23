@@ -115,6 +115,20 @@ impl Document {
             },
             #[cfg(not(feature = "ole"))]
             DocumentFormat::Doc => Err(Error::FeatureDisabled("ole".to_string())),
+            #[cfg(feature = "rtf")]
+            DocumentFormat::Rtf => {
+                let doc = crate::rtf::RtfDocument::open(path).map_err(|e| {
+                    Error::ParseError(format!("Failed to parse RTF document: {}", e))
+                })?;
+
+                Ok(Self {
+                    inner: DocumentImpl::Rtf(doc),
+                    #[cfg(feature = "ooxml")]
+                    _package: None,
+                })
+            },
+            #[cfg(not(feature = "rtf"))]
+            DocumentFormat::Rtf => Err(Error::FeatureDisabled("rtf".to_string())),
             #[cfg(feature = "ooxml")]
             DocumentFormat::Docx => {
                 let package = Box::new(ooxml::docx::Package::open(path).map_err(Error::from)?);
@@ -229,6 +243,23 @@ impl Document {
             },
             #[cfg(not(feature = "ole"))]
             DocumentFormat::Doc => Err(Error::FeatureDisabled("ole".to_string())),
+            #[cfg(feature = "rtf")]
+            DocumentFormat::Rtf => {
+                let text = String::from_utf8(bytes)
+                    .map_err(|e| Error::ParseError(format!("Invalid UTF-8 in RTF: {}", e)))?;
+
+                let doc = crate::rtf::RtfDocument::parse(&text).map_err(|e| {
+                    Error::ParseError(format!("Failed to parse RTF document: {}", e))
+                })?;
+
+                Ok(Self {
+                    inner: DocumentImpl::Rtf(doc),
+                    #[cfg(feature = "ooxml")]
+                    _package: None,
+                })
+            },
+            #[cfg(not(feature = "rtf"))]
+            DocumentFormat::Rtf => Err(Error::FeatureDisabled("rtf".to_string())),
             #[cfg(feature = "ooxml")]
             DocumentFormat::Docx => {
                 // For OOXML/ZIP, Cursor<Vec<u8>> implements Read + Seek
@@ -298,6 +329,8 @@ impl Document {
             DocumentImpl::Pages(doc) => doc.text().map_err(|e| {
                 Error::ParseError(format!("Failed to extract text from Pages: {}", e))
             }),
+            #[cfg(feature = "rtf")]
+            DocumentImpl::Rtf(doc) => Ok(doc.text()),
         }
     }
 
@@ -327,6 +360,8 @@ impl Document {
                     .map_err(|e| Error::ParseError(format!("Failed to get sections: {}", e)))?;
                 Ok(sections.iter().map(|s| s.paragraphs.len()).sum())
             },
+            #[cfg(feature = "rtf")]
+            DocumentImpl::Rtf(doc) => Ok(doc.paragraph_count()),
         }
     }
 
@@ -372,6 +407,11 @@ impl Document {
                     .collect();
                 Ok(paragraphs)
             },
+            #[cfg(feature = "rtf")]
+            DocumentImpl::Rtf(doc) => {
+                let paras = doc.paragraphs();
+                Ok(paras.into_iter().map(Paragraph::Rtf).collect())
+            },
         }
     }
 
@@ -405,6 +445,28 @@ impl Document {
                 // Pages tables are not currently supported in the paragraph/table extraction API
                 // Tables in Pages are embedded as structured data which requires different extraction
                 Ok(Vec::new())
+            },
+            #[cfg(feature = "rtf")]
+            DocumentImpl::Rtf(doc) => {
+                let tables = doc.tables();
+                Ok(tables
+                    .iter()
+                    .map(|t| {
+                        // Convert RTF table to owned Table
+                        let mut owned_table = crate::rtf::Table::new();
+                        for row in t.rows() {
+                            let mut owned_row = crate::rtf::Row::new();
+                            for cell in row.cells() {
+                                let owned_cell = crate::rtf::Cell::new(std::borrow::Cow::Owned(
+                                    cell.text().to_string(),
+                                ));
+                                owned_row.add_cell(owned_cell);
+                            }
+                            owned_table.add_row(owned_row);
+                        }
+                        Table::Rtf(owned_table)
+                    })
+                    .collect())
             },
         }
     }
@@ -455,6 +517,12 @@ impl Document {
                 }
 
                 Ok(metadata)
+            },
+            #[cfg(feature = "rtf")]
+            DocumentImpl::Rtf(_doc) => {
+                // RTF doesn't have standard metadata in the same way
+                // Metadata would need to be parsed from \info group
+                Ok(crate::common::Metadata::default())
             },
         }
     }

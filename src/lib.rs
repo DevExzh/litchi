@@ -197,6 +197,16 @@ pub mod iwa;
 #[cfg(feature = "odf")]
 pub mod odf;
 
+/// RTF (Rich Text Format) Support
+///
+/// Provides high-performance parsing of RTF documents with support for RTF 1.9.1.
+/// RTF documents are automatically integrated with the unified Document API.
+/// Use [`Document::open()`] to parse RTF files.
+///
+/// **Note**: This requires the `rtf` feature to be enabled.
+#[cfg(feature = "rtf")]
+pub mod rtf;
+
 // Re-export high-level APIs
 pub use common::{Error, Result};
 

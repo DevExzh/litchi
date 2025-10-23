@@ -14,6 +14,8 @@ pub enum Table {
     Doc(ole::doc::Table),
     #[cfg(feature = "ooxml")]
     Docx(ooxml::docx::Table),
+    #[cfg(feature = "rtf")]
+    Rtf(crate::rtf::Table<'static>),
 }
 
 impl Table {
@@ -24,6 +26,8 @@ impl Table {
             Table::Doc(t) => t.row_count().map_err(Error::from),
             #[cfg(feature = "ooxml")]
             Table::Docx(t) => t.row_count().map_err(Error::from),
+            #[cfg(feature = "rtf")]
+            Table::Rtf(t) => Ok(t.row_count()),
         }
     }
 
@@ -40,6 +44,11 @@ impl Table {
                 let rows = t.rows().map_err(Error::from)?;
                 Ok(rows.into_iter().map(Row::Docx).collect())
             },
+            #[cfg(feature = "rtf")]
+            Table::Rtf(t) => {
+                let rows = t.rows();
+                Ok(rows.iter().cloned().map(Row::Rtf).collect())
+            },
         }
     }
 }
@@ -50,6 +59,8 @@ pub enum Row {
     Doc(ole::doc::Row),
     #[cfg(feature = "ooxml")]
     Docx(ooxml::docx::Row),
+    #[cfg(feature = "rtf")]
+    Rtf(crate::rtf::Row<'static>),
 }
 
 impl Row {
@@ -66,6 +77,11 @@ impl Row {
                 let cells = r.cells().map_err(Error::from)?;
                 Ok(cells.into_iter().map(Cell::Docx).collect())
             },
+            #[cfg(feature = "rtf")]
+            Row::Rtf(r) => {
+                let cells = r.cells();
+                Ok(cells.iter().cloned().map(Cell::Rtf).collect())
+            },
         }
     }
 }
@@ -76,6 +92,8 @@ pub enum Cell {
     Doc(ole::doc::Cell),
     #[cfg(feature = "ooxml")]
     Docx(ooxml::docx::Cell),
+    #[cfg(feature = "rtf")]
+    Rtf(crate::rtf::Cell<'static>),
 }
 
 impl Cell {
@@ -86,6 +104,8 @@ impl Cell {
             Cell::Doc(c) => c.text().map(|s| s.to_string()).map_err(Error::from),
             #[cfg(feature = "ooxml")]
             Cell::Docx(c) => c.text().map(|s| s.to_string()).map_err(Error::from),
+            #[cfg(feature = "rtf")]
+            Cell::Rtf(c) => Ok(c.text().to_string()),
         }
     }
 }

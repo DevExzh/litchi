@@ -56,6 +56,7 @@ iwa = [
 odf = ["dep:zip", "dep:quick-xml"]
 ole = ["dep:encoding_rs", "dep:bumpalo"]
 ooxml = ["dep:zip", "dep:quick-xml", "dep:encoding_rs"]
+rtf = ["dep:bumpalo", "dep:crc-fast"]
 # Additional functionality features
 formula = ["dep:rowan", "dep:bumpalo", "dep:quick-xml"]
 imgconv = ["dep:image"]
@@ -66,6 +67,7 @@ base64 = "0.22" # Base64 encoding/decoding for embedded binary data in XML
 bumpalo = { version = "3", features = ["collections"], optional = true } # Fast bump allocator for temporary formula parsing data
 bytes = { version = "1", features = ["serde"] } # Efficient byte buffer operations with zero-copy slicing
 chrono = { version = "0", features = ["serde"] } # Date and time types for Office timestamps
+crc-fast = { version = "1.5", features = ["optimize_crc32_auto"], optional = true } # Fast CRC32 implementation for verifying file integrity
 encoding_rs = { version = "0.8", optional = true } # Used by both OLE (.doc, .xls, .ppt) and OOXML (.xlsb) formats for UTF-16LE decoding
 fast-float2 = "0.2" # Fast string-to-float conversion with correct rounding
 flate2 = { version = "1", features = ["zlib-rs"], default-features = false } # Compression/decompression for Office file formats

@@ -12,7 +12,7 @@ use crate::ooxml;
 #[cfg(feature = "iwa")]
 use zip;
 
-/// A Word document implementation that can be .doc, .docx, or .pages format.
+/// A Word document implementation that can be .doc, .docx, .pages, or .rtf format.
 ///
 /// This enum wraps the format-specific implementations and provides
 /// a unified API. Users typically don't interact with this enum directly,
@@ -28,6 +28,9 @@ pub(super) enum DocumentImpl {
     /// Apple Pages format
     #[cfg(feature = "iwa")]
     Pages(crate::iwa::pages::PagesDocument),
+    /// RTF format
+    #[cfg(feature = "rtf")]
+    Rtf(crate::rtf::RtfDocument<'static>),
 }
 
 /// Document format detection.
@@ -40,6 +43,8 @@ pub(super) enum DocumentFormat {
     Docx,
     /// Apple Pages format (IWA/ZIP)
     Pages,
+    /// RTF format (plain text)
+    Rtf,
 }
 
 /// Detect the document format by reading the file header.
@@ -86,6 +91,14 @@ fn detect_document_format_from_signature(header: &[u8]) -> Result<DocumentFormat
     // and will need to distinguish them by inspecting the ZIP contents
     if header.len() >= 4 && header[0..4] == [0x50, 0x4B, 0x03, 0x04] {
         return Ok(DocumentFormat::Docx);
+    }
+
+    // Check for RTF signature ({\rtf or {\rtf1)
+    if header.len() >= 5 {
+        let text = std::str::from_utf8(&header[0..5.min(header.len())]).unwrap_or("");
+        if text.starts_with("{\\rtf") {
+            return Ok(DocumentFormat::Rtf);
+        }
     }
 
     Err(Error::NotOfficeFile)
