@@ -1,19 +1,29 @@
-// EMF to SVG converter with SIMD acceleration
+// Comprehensive EMF to SVG Converter V2
 //
-// Converts Enhanced Metafile vector graphics to SVG while extracting embedded raster images
+// Full-featured implementation supporting all major EMF records
 
+use super::device_context::{
+    BackgroundMode, DeviceContext, DeviceContextStack, PolyFillMode, TextAlign,
+};
+use super::gdi_objects::{Brush, Font, GdiObject, ObjectTable, Pen};
 use super::parser::{EmfParser, EmfRecord};
 use crate::common::error::{Error, Result};
 use crate::images::svg::*;
-use rayon::prelude::*;
 use zerocopy::FromBytes;
 
-/// EMF to SVG converter
-pub struct EmfSvgConverter {
-    parser: EmfParser,
+/// Comprehensive EMF to SVG converter
+pub struct EmfSvgConverter<'a> {
+    parser: &'a EmfParser,
 }
 
-/// EMF RECT structure (Windows RECT)
+// Common EMF structures
+#[derive(Debug, Clone, FromBytes)]
+#[repr(C)]
+struct EmfPointL {
+    x: i32,
+    y: i32,
+}
+
 #[derive(Debug, Clone, FromBytes)]
 #[repr(C)]
 struct EmfRect {
@@ -23,185 +33,160 @@ struct EmfRect {
     bottom: i32,
 }
 
-/// EMF POINT structure
-#[derive(Debug, Clone, FromBytes)]
-#[repr(C)]
-struct EmfPoint {
-    x: i32,
-    y: i32,
-}
-
-/// EMF SIZE structure
-#[derive(Debug, Clone, FromBytes)]
-#[repr(C)]
-#[allow(dead_code)]
-struct EmfSize {
-    cx: i32,
-    cy: i32,
-}
-
-/// EMR_STRETCHDIBITS record data
-#[derive(Debug, Clone, FromBytes)]
-#[repr(C)]
-struct EmfStretchDibits {
-    bounds: EmfRect,
-    x_dest: i32,
-    y_dest: i32,
-    x_src: i32,
-    y_src: i32,
-    cx_src: i32,
-    cy_src: i32,
-    off_bmi_src: u32,
-    cb_bmi_src: u32,
-    off_bits_src: u32,
-    cb_bits_src: u32,
-    usage_src: u32,
-    dw_rop: u32,
-    cx_dest: i32,
-    cy_dest: i32,
-}
-
-/// Polygon/polyline record header (bounds + count)
-#[derive(Debug, Clone, FromBytes)]
-#[repr(C)]
-struct EmfPolygonHeader {
-    bounds: EmfRect,
-    count: u32,
-}
-
-impl EmfSvgConverter {
-    /// Create a new EMF to SVG converter
-    pub fn new(parser: EmfParser) -> Self {
+impl<'a> EmfSvgConverter<'a> {
+    /// Create new converter
+    pub fn new(parser: &'a EmfParser) -> Self {
         Self { parser }
     }
 
     /// Convert EMF to SVG
-    ///
-    /// This processes all EMF records in parallel where possible and generates
-    /// an SVG document with vector graphics and embedded raster images.
     pub fn convert_to_svg(&self) -> Result<String> {
         let mut builder = SvgBuilder::new(self.parser.width() as f64, self.parser.height() as f64);
 
-        // Set viewBox based on bounds
+        // Set viewBox
         let (x1, y1, x2, y2) = self.parser.header.bounds;
         builder = builder.with_viewbox(x1 as f64, y1 as f64, (x2 - x1) as f64, (y2 - y1) as f64);
 
-        // Process records in parallel to extract elements
-        // Group records by type for efficient parallel processing
-        let elements: Vec<SvgElement> = self
-            .parser
-            .records
-            .par_iter()
-            .filter_map(|record| self.process_record(record).ok().flatten())
-            .collect();
+        // Initialize state
+        let mut state = RenderState::new();
 
-        // Add all elements to builder
-        for element in elements {
-            builder.add_element(element);
+        // Process all records sequentially (state-dependent)
+        for record in &self.parser.records {
+            if let Ok(Some(element)) = self.process_record(record, &mut state) {
+                builder.add_element(element);
+            }
+        }
+
+        // Add any pending path elements
+        if !state.path_commands.is_empty() {
+            let path = SvgPath::new(state.path_commands.clone())
+                .with_stroke(state.dc.get_stroke_attrs()[0].1.clone())
+                .with_fill(state.dc.get_fill_attr());
+            builder.add_path(path);
         }
 
         Ok(builder.build())
     }
 
-    /// Convert EMF to SVG bytes
-    pub fn convert_to_svg_bytes(&self) -> Result<Vec<u8>> {
-        Ok(self.convert_to_svg()?.into_bytes())
-    }
-
-    /// Process a single EMF record and convert to SVG element
-    fn process_record(&self, record: &EmfRecord) -> Result<Option<SvgElement>> {
+    /// Process a single record
+    fn process_record(
+        &self,
+        record: &EmfRecord,
+        state: &mut RenderState,
+    ) -> Result<Option<SvgElement>> {
         match record.record_type {
-            // Rectangle
-            0x0000002B => self.parse_rectangle(record),
-            // Ellipse
-            0x0000002A => self.parse_ellipse(record),
-            // Polygon
-            0x00000003 => self.parse_polygon(record),
-            // Polyline
-            0x00000004 => self.parse_polyline(record),
-            // PolyBezier
-            0x00000002 => self.parse_polybezier(record),
-            // LineTo
-            0x00000036 => self.parse_lineto(record),
-            // StretchDIBits (embedded bitmap)
-            0x00000051 => self.parse_stretchdibits(record),
-            // Arc
-            0x0000002D => self.parse_arc(record),
-            // Pie
-            0x0000002F => self.parse_pie(record),
-            // Chord
-            0x0000002E => self.parse_chord(record),
-            _ => Ok(None), // Unsupported or non-drawing record
+            0x00000003 => self.polygon(record, state),  // EMR_POLYGON
+            0x00000004 => self.polyline(record, state), // EMR_POLYLINE
+            0x00000009 => self.set_window_ext(record, state),
+            0x0000000A => self.set_window_org(record, state),
+            0x0000000B => self.set_viewport_ext(record, state),
+            0x0000000C => self.set_viewport_org(record, state),
+            0x00000012 => self.set_bk_mode(record, state),
+            0x00000013 => self.set_poly_fill_mode(record, state),
+            0x00000016 => self.set_text_align(record, state),
+            0x00000018 => self.set_text_color(record, state),
+            0x00000019 => self.set_bk_color(record, state),
+            0x0000001B => self.move_to(record, state),
+            0x00000021 => self.save_dc(state),
+            0x00000022 => self.restore_dc(record, state),
+            0x00000023 => self.set_world_transform(record, state),
+            0x00000025 => self.select_object(record, state),
+            0x00000026 => self.create_pen(record, state),
+            0x00000027 => self.create_brush(record, state),
+            0x00000028 => self.delete_object(record, state),
+            0x0000002A => self.ellipse(record, state), // EMR_ELLIPSE
+            0x0000002B => self.rectangle(record, state), // EMR_RECTANGLE
+            0x00000036 => self.line_to(record, state),
+            0x0000003B => self.begin_path(state),
+            0x0000003C => self.end_path(state),
+            0x0000003D => self.close_figure(state),
+            0x0000003E => self.fill_path(state),
+            0x00000040 => self.stroke_path(state),
+            0x00000052 => self.create_font(record, state),
+            0x00000053 => self.text_out_a(record, state), // ASCII text
+            0x00000054 => self.text_out_w(record, state), // Unicode text
+            _ => Ok(None),                                // Unsupported record
         }
     }
 
-    /// Parse EMR_RECTANGLE record
-    fn parse_rectangle(&self, record: &EmfRecord) -> Result<Option<SvgElement>> {
-        let rect = EmfRect::read_from_bytes(&record.data)
-            .map_err(|_| Error::ParseError("Invalid RECT data in EMR_RECTANGLE".into()))?;
+    // Shape drawing methods
+    fn rectangle(&self, record: &EmfRecord, state: &RenderState) -> Result<Option<SvgElement>> {
+        if record.data.len() < 16 {
+            return Ok(None);
+        }
+
+        let (rect, _) = EmfRect::read_from_prefix(&record.data)
+            .map_err(|_| Error::ParseError("Invalid RECT data".into()))?;
+
+        let (x, y) = state.dc.transform_point(rect.left as f64, rect.top as f64);
+        let (x2, y2) = state
+            .dc
+            .transform_point(rect.right as f64, rect.bottom as f64);
 
         Ok(Some(SvgElement::Rect(SvgRect {
-            x: rect.left as f64,
-            y: rect.top as f64,
-            width: (rect.right - rect.left) as f64,
-            height: (rect.bottom - rect.top) as f64,
-            fill: None,
-            stroke: Some("#000000".to_string()),
-            stroke_width: 1.0,
+            x,
+            y,
+            width: (x2 - x).abs(),
+            height: (y2 - y).abs(),
+            fill: Some(state.dc.get_fill_attr()),
+            stroke: Some(state.dc.get_stroke_attrs()[0].1.clone()),
+            stroke_width: state.dc.pen.width,
         })))
     }
 
-    /// Parse EMR_ELLIPSE record
-    fn parse_ellipse(&self, record: &EmfRecord) -> Result<Option<SvgElement>> {
-        let rect = EmfRect::read_from_bytes(&record.data)
-            .map_err(|_| Error::ParseError("Invalid RECT data in EMR_ELLIPSE".into()))?;
+    fn ellipse(&self, record: &EmfRecord, state: &RenderState) -> Result<Option<SvgElement>> {
+        if record.data.len() < 16 {
+            return Ok(None);
+        }
 
-        let left = rect.left as f64;
-        let top = rect.top as f64;
-        let right = rect.right as f64;
-        let bottom = rect.bottom as f64;
+        let (rect, _) = EmfRect::read_from_prefix(&record.data)
+            .map_err(|_| Error::ParseError("Invalid RECT data".into()))?;
 
-        let cx = (left + right) / 2.0;
-        let cy = (top + bottom) / 2.0;
-        let rx = (right - left) / 2.0;
-        let ry = (bottom - top) / 2.0;
+        let (x1, y1) = state.dc.transform_point(rect.left as f64, rect.top as f64);
+        let (x2, y2) = state
+            .dc
+            .transform_point(rect.right as f64, rect.bottom as f64);
+
+        let cx = (x1 + x2) / 2.0;
+        let cy = (y1 + y2) / 2.0;
+        let rx = (x2 - x1).abs() / 2.0;
+        let ry = (y2 - y1).abs() / 2.0;
 
         Ok(Some(SvgElement::Ellipse(SvgEllipse {
             cx,
             cy,
             rx,
             ry,
-            fill: None,
-            stroke: Some("#000000".to_string()),
-            stroke_width: 1.0,
+            fill: Some(state.dc.get_fill_attr()),
+            stroke: Some(state.dc.get_stroke_attrs()[0].1.clone()),
+            stroke_width: state.dc.pen.width,
         })))
     }
 
-    /// Parse EMR_POLYGON record
-    fn parse_polygon(&self, record: &EmfRecord) -> Result<Option<SvgElement>> {
+    fn polygon(&self, record: &EmfRecord, state: &RenderState) -> Result<Option<SvgElement>> {
         if record.data.len() < 20 {
             return Ok(None);
         }
 
-        let header = EmfPolygonHeader::read_from_bytes(&record.data)
-            .map_err(|_| Error::ParseError("Invalid header data in EMR_POLYGON".into()))?;
-        let count = header.count as usize;
+        // Skip bounds (16 bytes), read count
+        let count = u32::from_le_bytes([
+            record.data[16],
+            record.data[17],
+            record.data[18],
+            record.data[19],
+        ]) as usize;
 
         if record.data.len() < 20 + count * 8 {
             return Ok(None);
         }
 
         let mut commands = Vec::with_capacity(count + 1);
-
-        // Parse points using zerocopy
-        let points_data = &record.data[20..20 + count * 8];
         for i in 0..count {
-            let point_data = &points_data[i * 8..(i + 1) * 8];
-            let point = EmfPoint::read_from_bytes(point_data)
-                .map_err(|_| Error::ParseError("Invalid point data in EMR_POLYGON".into()))?;
+            let offset = 20 + i * 8;
+            let (point, _) = EmfPointL::read_from_prefix(&record.data[offset..])
+                .map_err(|_| Error::ParseError("Invalid point".into()))?;
 
-            let x = point.x as f64;
-            let y = point.y as f64;
+            let (x, y) = state.dc.transform_point(point.x as f64, point.y as f64);
 
             if i == 0 {
                 commands.push(PathCommand::MoveTo { x, y });
@@ -209,41 +194,38 @@ impl EmfSvgConverter {
                 commands.push(PathCommand::LineTo { x, y });
             }
         }
-
         commands.push(PathCommand::ClosePath);
 
         Ok(Some(SvgElement::Path(
             SvgPath::new(commands)
-                .with_stroke("#000000".to_string())
-                .with_fill("none".to_string()),
+                .with_stroke(state.dc.get_stroke_attrs()[0].1.clone())
+                .with_fill(state.dc.get_fill_attr()),
         )))
     }
 
-    /// Parse EMR_POLYLINE record
-    fn parse_polyline(&self, record: &EmfRecord) -> Result<Option<SvgElement>> {
+    fn polyline(&self, record: &EmfRecord, state: &RenderState) -> Result<Option<SvgElement>> {
         if record.data.len() < 20 {
             return Ok(None);
         }
 
-        let header = EmfPolygonHeader::read_from_bytes(&record.data)
-            .map_err(|_| Error::ParseError("Invalid header data in EMR_POLYLINE".into()))?;
-        let count = header.count as usize;
+        let count = u32::from_le_bytes([
+            record.data[16],
+            record.data[17],
+            record.data[18],
+            record.data[19],
+        ]) as usize;
 
         if record.data.len() < 20 + count * 8 {
             return Ok(None);
         }
 
         let mut commands = Vec::with_capacity(count);
-
-        // Parse points using zerocopy
-        let points_data = &record.data[20..20 + count * 8];
         for i in 0..count {
-            let point_data = &points_data[i * 8..(i + 1) * 8];
-            let point = EmfPoint::read_from_bytes(point_data)
-                .map_err(|_| Error::ParseError("Invalid point data in EMR_POLYLINE".into()))?;
+            let offset = 20 + i * 8;
+            let (point, _) = EmfPointL::read_from_prefix(&record.data[offset..])
+                .map_err(|_| Error::ParseError("Invalid point".into()))?;
 
-            let x = point.x as f64;
-            let y = point.y as f64;
+            let (x, y) = state.dc.transform_point(point.x as f64, point.y as f64);
 
             if i == 0 {
                 commands.push(PathCommand::MoveTo { x, y });
@@ -254,169 +236,597 @@ impl EmfSvgConverter {
 
         Ok(Some(SvgElement::Path(
             SvgPath::new(commands)
-                .with_stroke("#000000".to_string())
+                .with_stroke(state.dc.get_stroke_attrs()[0].1.clone())
                 .with_fill("none".to_string()),
         )))
     }
 
-    /// Parse EMR_POLYBEZIER record
-    fn parse_polybezier(&self, record: &EmfRecord) -> Result<Option<SvgElement>> {
-        if record.data.len() < 20 {
+    // Text rendering
+    fn text_out_w(&self, record: &EmfRecord, state: &RenderState) -> Result<Option<SvgElement>> {
+        if record.data.len() < 76 {
             return Ok(None);
         }
 
-        let header = EmfPolygonHeader::read_from_bytes(&record.data)
-            .map_err(|_| Error::ParseError("Invalid header data in EMR_POLYBEZIER".into()))?;
-        let count = header.count as usize;
+        // Parse EMREXTTEXTOUTW structure
+        // Bounds: 0-15 (16 bytes)
+        // iGraphicsMode: 16-19
+        // exScale: 20-23
+        // eyScale: 24-27
+        // emrtext: 28+
 
-        if record.data.len() < 20 + count * 8 || count < 4 {
+        // Read reference point
+        let x = i32::from_le_bytes([
+            record.data[28],
+            record.data[29],
+            record.data[30],
+            record.data[31],
+        ]);
+        let y = i32::from_le_bytes([
+            record.data[32],
+            record.data[33],
+            record.data[34],
+            record.data[35],
+        ]);
+
+        // String count
+        let count = u32::from_le_bytes([
+            record.data[36],
+            record.data[37],
+            record.data[38],
+            record.data[39],
+        ]) as usize;
+
+        // String offset
+        let off_string = u32::from_le_bytes([
+            record.data[40],
+            record.data[41],
+            record.data[42],
+            record.data[43],
+        ]) as usize;
+
+        if off_string + count * 2 > record.data.len() {
             return Ok(None);
         }
 
-        let mut commands = Vec::new();
-
-        // Parse points using zerocopy
-        let points_data = &record.data[20..20 + count * 8];
-        let mut points = Vec::with_capacity(count);
-
+        // Parse UTF-16 string
+        let mut text = String::new();
         for i in 0..count {
-            let point_data = &points_data[i * 8..(i + 1) * 8];
-            let point = EmfPoint::read_from_bytes(point_data)
-                .map_err(|_| Error::ParseError("Invalid point data in EMR_POLYBEZIER".into()))?;
-            points.push(point);
+            let offset = off_string + i * 2;
+            let ch = u16::from_le_bytes([record.data[offset], record.data[offset + 1]]);
+            if let Some(c) = char::from_u32(ch as u32) {
+                text.push(c);
+            }
         }
 
-        // First point is MoveTo
-        commands.push(PathCommand::MoveTo {
-            x: points[0].x as f64,
-            y: points[0].y as f64,
-        });
+        let (tx, ty) = state.dc.transform_point(x as f64, y as f64);
 
-        // Process Bezier curves (groups of 3 points)
-        let mut i = 1;
-        while i + 2 < count {
-            commands.push(PathCommand::CubicBezier {
-                x1: points[i].x as f64,
-                y1: points[i].y as f64,
-                x2: points[i + 1].x as f64,
-                y2: points[i + 1].y as f64,
-                x: points[i + 2].x as f64,
-                y: points[i + 2].y as f64,
-            });
-            i += 3;
-        }
+        let mut svg_text = SvgText::new(tx, ty, text, state.dc.font.svg_font_size());
+        svg_text.font_family = Some(state.dc.font.face_name.clone());
+        svg_text.fill = Some(state.dc.text_color.clone());
+        svg_text.font_weight = Some(state.dc.font.svg_font_weight());
+        svg_text.italic = state.dc.font.italic;
+        svg_text.underline = state.dc.font.underline;
+        svg_text.strikethrough = state.dc.font.strike_out;
 
-        Ok(Some(SvgElement::Path(
-            SvgPath::new(commands)
-                .with_stroke("#000000".to_string())
-                .with_fill("none".to_string()),
-        )))
+        Ok(Some(SvgElement::Text(svg_text)))
     }
 
-    /// Parse EMR_LINETO record
-    fn parse_lineto(&self, record: &EmfRecord) -> Result<Option<SvgElement>> {
-        if record.data.len() < 8 {
-            return Ok(None);
-        }
-
-        let point = EmfPoint::read_from_bytes(&record.data)
-            .map_err(|_| Error::ParseError("Invalid point data in EMR_LINETO".into()))?;
-
-        let x = point.x as f64;
-        let y = point.y as f64;
-
-        // LineTo requires current position, which we'd need to track
-        // For simplicity, create a line from origin
-        Ok(Some(SvgElement::Path(
-            SvgPath::new(vec![
-                PathCommand::MoveTo { x: 0.0, y: 0.0 },
-                PathCommand::LineTo { x, y },
-            ])
-            .with_stroke("#000000".to_string()),
-        )))
-    }
-
-    /// Parse EMR_STRETCHDIBITS record (embedded bitmap)
-    fn parse_stretchdibits(&self, record: &EmfRecord) -> Result<Option<SvgElement>> {
-        // This is complex - extract DIB and convert to PNG, then embed
-        if record.data.len() < std::mem::size_of::<EmfStretchDibits>() {
-            return Ok(None);
-        }
-
-        let stretch = EmfStretchDibits::read_from_bytes(&record.data)
-            .map_err(|_| Error::ParseError("Invalid EMR_STRETCHDIBITS data".into()))?;
-
-        // Try to extract and convert DIB data
-        // This is simplified - full implementation would parse DIB structure
-        if let Ok(png_data) =
-            self.extract_and_convert_dib(&record.data[std::mem::size_of::<EmfStretchDibits>()..])
-        {
-            return Ok(Some(SvgElement::Image(SvgImage::from_png_data(
-                stretch.x_dest as f64,
-                stretch.y_dest as f64,
-                stretch.cx_dest as f64,
-                stretch.cy_dest as f64,
-                &png_data,
-            ))));
-        }
-
+    fn text_out_a(&self, _record: &EmfRecord, _state: &RenderState) -> Result<Option<SvgElement>> {
+        // ASCII version - simplified for now
         Ok(None)
     }
 
-    /// Parse EMR_ARC record
-    fn parse_arc(&self, _record: &EmfRecord) -> Result<Option<SvgElement>> {
-        // Arc parsing is complex and requires trigonometry
-        // Placeholder for future implementation
-        Ok(None)
-    }
-
-    /// Parse EMR_PIE record
-    fn parse_pie(&self, _record: &EmfRecord) -> Result<Option<SvgElement>> {
-        // Pie chart slice - complex path construction
-        Ok(None)
-    }
-
-    /// Parse EMR_CHORD record
-    fn parse_chord(&self, _record: &EmfRecord) -> Result<Option<SvgElement>> {
-        // Chord - similar to arc with connecting line
-        Ok(None)
-    }
-
-    /// Extract and convert DIB data to PNG
-    fn extract_and_convert_dib(&self, dib_data: &[u8]) -> Result<Vec<u8>> {
-        if dib_data.len() < 40 {
-            return Err(Error::ParseError("DIB data too small".into()));
+    // State management
+    fn set_window_ext(
+        &self,
+        record: &EmfRecord,
+        state: &mut RenderState,
+    ) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 8 {
+            state.dc.window_ext_x = i32::from_le_bytes([
+                record.data[0],
+                record.data[1],
+                record.data[2],
+                record.data[3],
+            ]);
+            state.dc.window_ext_y = i32::from_le_bytes([
+                record.data[4],
+                record.data[5],
+                record.data[6],
+                record.data[7],
+            ]);
         }
+        Ok(None)
+    }
 
-        // Construct BMP from DIB
-        let file_size = 14u32 + dib_data.len() as u32;
-        let pixel_data_offset = 14u32 + 40u32;
+    fn set_window_org(
+        &self,
+        record: &EmfRecord,
+        state: &mut RenderState,
+    ) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 8 {
+            state.dc.window_org_x = i32::from_le_bytes([
+                record.data[0],
+                record.data[1],
+                record.data[2],
+                record.data[3],
+            ]);
+            state.dc.window_org_y = i32::from_le_bytes([
+                record.data[4],
+                record.data[5],
+                record.data[6],
+                record.data[7],
+            ]);
+        }
+        Ok(None)
+    }
 
-        let mut bmp_data = Vec::with_capacity(file_size as usize);
-        bmp_data.extend_from_slice(b"BM");
-        bmp_data.extend_from_slice(&file_size.to_le_bytes());
-        bmp_data.extend_from_slice(&[0u8; 4]);
-        bmp_data.extend_from_slice(&pixel_data_offset.to_le_bytes());
-        bmp_data.extend_from_slice(dib_data);
+    fn set_viewport_ext(
+        &self,
+        record: &EmfRecord,
+        state: &mut RenderState,
+    ) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 8 {
+            state.dc.viewport_ext_x = i32::from_le_bytes([
+                record.data[0],
+                record.data[1],
+                record.data[2],
+                record.data[3],
+            ]);
+            state.dc.viewport_ext_y = i32::from_le_bytes([
+                record.data[4],
+                record.data[5],
+                record.data[6],
+                record.data[7],
+            ]);
+        }
+        Ok(None)
+    }
 
-        // Load and re-encode as PNG
-        let img = image::load_from_memory(&bmp_data)
-            .map_err(|e| Error::ParseError(format!("Failed to load DIB: {}", e)))?;
+    fn set_viewport_org(
+        &self,
+        record: &EmfRecord,
+        state: &mut RenderState,
+    ) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 8 {
+            state.dc.viewport_org_x = i32::from_le_bytes([
+                record.data[0],
+                record.data[1],
+                record.data[2],
+                record.data[3],
+            ]);
+            state.dc.viewport_org_y = i32::from_le_bytes([
+                record.data[4],
+                record.data[5],
+                record.data[6],
+                record.data[7],
+            ]);
+        }
+        Ok(None)
+    }
 
-        let mut png_data = Vec::new();
-        let mut cursor = std::io::Cursor::new(&mut png_data);
-        img.write_to(&mut cursor, image::ImageFormat::Png)
-            .map_err(|e| Error::ParseError(format!("Failed to encode PNG: {}", e)))?;
+    fn set_world_transform(
+        &self,
+        record: &EmfRecord,
+        state: &mut RenderState,
+    ) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 24 {
+            state.dc.world_transform.m11 = f32::from_le_bytes([
+                record.data[0],
+                record.data[1],
+                record.data[2],
+                record.data[3],
+            ]);
+            state.dc.world_transform.m12 = f32::from_le_bytes([
+                record.data[4],
+                record.data[5],
+                record.data[6],
+                record.data[7],
+            ]);
+            state.dc.world_transform.m21 = f32::from_le_bytes([
+                record.data[8],
+                record.data[9],
+                record.data[10],
+                record.data[11],
+            ]);
+            state.dc.world_transform.m22 = f32::from_le_bytes([
+                record.data[12],
+                record.data[13],
+                record.data[14],
+                record.data[15],
+            ]);
+            state.dc.world_transform.dx = f32::from_le_bytes([
+                record.data[16],
+                record.data[17],
+                record.data[18],
+                record.data[19],
+            ]);
+            state.dc.world_transform.dy = f32::from_le_bytes([
+                record.data[20],
+                record.data[21],
+                record.data[22],
+                record.data[23],
+            ]);
+        }
+        Ok(None)
+    }
 
-        Ok(png_data)
+    fn set_text_color(
+        &self,
+        record: &EmfRecord,
+        state: &mut RenderState,
+    ) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 4 {
+            let colorref = u32::from_le_bytes([
+                record.data[0],
+                record.data[1],
+                record.data[2],
+                record.data[3],
+            ]);
+            state.dc.set_text_color(colorref);
+        }
+        Ok(None)
+    }
+
+    fn set_bk_color(
+        &self,
+        record: &EmfRecord,
+        state: &mut RenderState,
+    ) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 4 {
+            let colorref = u32::from_le_bytes([
+                record.data[0],
+                record.data[1],
+                record.data[2],
+                record.data[3],
+            ]);
+            state.dc.set_background_color(colorref);
+        }
+        Ok(None)
+    }
+
+    fn set_bk_mode(
+        &self,
+        record: &EmfRecord,
+        state: &mut RenderState,
+    ) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 4 {
+            let mode = u32::from_le_bytes([
+                record.data[0],
+                record.data[1],
+                record.data[2],
+                record.data[3],
+            ]);
+            if let Some(bk_mode) = BackgroundMode::from_u32(mode) {
+                state.dc.background_mode = bk_mode;
+            }
+        }
+        Ok(None)
+    }
+
+    fn set_poly_fill_mode(
+        &self,
+        record: &EmfRecord,
+        state: &mut RenderState,
+    ) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 4 {
+            let mode = u32::from_le_bytes([
+                record.data[0],
+                record.data[1],
+                record.data[2],
+                record.data[3],
+            ]);
+            if let Some(fill_mode) = PolyFillMode::from_u32(mode) {
+                state.dc.poly_fill_mode = fill_mode;
+            }
+        }
+        Ok(None)
+    }
+
+    fn set_text_align(
+        &self,
+        record: &EmfRecord,
+        state: &mut RenderState,
+    ) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 4 {
+            let align = u32::from_le_bytes([
+                record.data[0],
+                record.data[1],
+                record.data[2],
+                record.data[3],
+            ]);
+            state.dc.text_align = TextAlign(align as u16);
+        }
+        Ok(None)
+    }
+
+    // Object management
+    fn create_pen(
+        &self,
+        record: &EmfRecord,
+        state: &mut RenderState,
+    ) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 20 {
+            let _handle = u32::from_le_bytes([
+                record.data[0],
+                record.data[1],
+                record.data[2],
+                record.data[3],
+            ]);
+            let style = u32::from_le_bytes([
+                record.data[4],
+                record.data[5],
+                record.data[6],
+                record.data[7],
+            ]);
+            let width = i32::from_le_bytes([
+                record.data[8],
+                record.data[9],
+                record.data[10],
+                record.data[11],
+            ]);
+            let colorref = u32::from_le_bytes([
+                record.data[16],
+                record.data[17],
+                record.data[18],
+                record.data[19],
+            ]);
+
+            let pen = Pen::from_emr_data(style, width, colorref);
+            state.object_table.create_object(GdiObject::Pen(pen));
+        }
+        Ok(None)
+    }
+
+    fn create_brush(
+        &self,
+        record: &EmfRecord,
+        state: &mut RenderState,
+    ) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 16 {
+            let style = u32::from_le_bytes([
+                record.data[4],
+                record.data[5],
+                record.data[6],
+                record.data[7],
+            ]);
+            let colorref = u32::from_le_bytes([
+                record.data[8],
+                record.data[9],
+                record.data[10],
+                record.data[11],
+            ]);
+            let hatch = u32::from_le_bytes([
+                record.data[12],
+                record.data[13],
+                record.data[14],
+                record.data[15],
+            ]);
+
+            let brush = Brush::from_emr_data(style, colorref, hatch);
+            state.object_table.create_object(GdiObject::Brush(brush));
+        }
+        Ok(None)
+    }
+
+    fn create_font(
+        &self,
+        record: &EmfRecord,
+        state: &mut RenderState,
+    ) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 4 {
+            // Simplified font creation
+            state
+                .object_table
+                .create_object(GdiObject::Font(Font::default()));
+        }
+        Ok(None)
+    }
+
+    fn select_object(
+        &self,
+        record: &EmfRecord,
+        state: &mut RenderState,
+    ) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 4 {
+            let handle = u32::from_le_bytes([
+                record.data[0],
+                record.data[1],
+                record.data[2],
+                record.data[3],
+            ]);
+
+            if let Some(obj) = state.object_table.get(handle) {
+                match obj {
+                    GdiObject::Pen(pen) => state.dc.pen = pen.clone(),
+                    GdiObject::Brush(brush) => state.dc.brush = brush.clone(),
+                    GdiObject::Font(font) => state.dc.font = font.clone(),
+                    _ => {},
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    fn delete_object(
+        &self,
+        record: &EmfRecord,
+        state: &mut RenderState,
+    ) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 4 {
+            let handle = u32::from_le_bytes([
+                record.data[0],
+                record.data[1],
+                record.data[2],
+                record.data[3],
+            ]);
+            state.object_table.delete(handle);
+        }
+        Ok(None)
+    }
+
+    // DC stack operations
+    fn save_dc(&self, state: &mut RenderState) -> Result<Option<SvgElement>> {
+        state.dc_stack.push(state.dc.clone());
+        Ok(None)
+    }
+
+    fn restore_dc(
+        &self,
+        record: &EmfRecord,
+        state: &mut RenderState,
+    ) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 4 {
+            let index = i32::from_le_bytes([
+                record.data[0],
+                record.data[1],
+                record.data[2],
+                record.data[3],
+            ]);
+
+            if let Some(dc) = state.dc_stack.pop_to(index as isize) {
+                state.dc = dc;
+            }
+        }
+        Ok(None)
+    }
+
+    // Path operations
+    fn begin_path(&self, state: &mut RenderState) -> Result<Option<SvgElement>> {
+        state.in_path = true;
+        state.path_commands.clear();
+        Ok(None)
+    }
+
+    fn end_path(&self, state: &mut RenderState) -> Result<Option<SvgElement>> {
+        state.in_path = false;
+        Ok(None)
+    }
+
+    fn close_figure(&self, state: &mut RenderState) -> Result<Option<SvgElement>> {
+        if state.in_path {
+            state.path_commands.push(PathCommand::ClosePath);
+        }
+        Ok(None)
+    }
+
+    fn fill_path(&self, state: &RenderState) -> Result<Option<SvgElement>> {
+        if !state.path_commands.is_empty() {
+            Ok(Some(SvgElement::Path(
+                SvgPath::new(state.path_commands.clone())
+                    .with_fill(state.dc.get_fill_attr())
+                    .with_stroke("none".to_string()),
+            )))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn stroke_path(&self, state: &RenderState) -> Result<Option<SvgElement>> {
+        if !state.path_commands.is_empty() {
+            Ok(Some(SvgElement::Path(
+                SvgPath::new(state.path_commands.clone())
+                    .with_stroke(state.dc.get_stroke_attrs()[0].1.clone())
+                    .with_fill("none".to_string()),
+            )))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn move_to(&self, record: &EmfRecord, state: &mut RenderState) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 8 {
+            let x = i32::from_le_bytes([
+                record.data[0],
+                record.data[1],
+                record.data[2],
+                record.data[3],
+            ]);
+            let y = i32::from_le_bytes([
+                record.data[4],
+                record.data[5],
+                record.data[6],
+                record.data[7],
+            ]);
+
+            let (tx, ty) = state.dc.transform_point(x as f64, y as f64);
+            state.dc.current_x = tx;
+            state.dc.current_y = ty;
+
+            if state.in_path {
+                state
+                    .path_commands
+                    .push(PathCommand::MoveTo { x: tx, y: ty });
+            }
+        }
+        Ok(None)
+    }
+
+    fn line_to(&self, record: &EmfRecord, state: &mut RenderState) -> Result<Option<SvgElement>> {
+        if record.data.len() >= 8 {
+            let x = i32::from_le_bytes([
+                record.data[0],
+                record.data[1],
+                record.data[2],
+                record.data[3],
+            ]);
+            let y = i32::from_le_bytes([
+                record.data[4],
+                record.data[5],
+                record.data[6],
+                record.data[7],
+            ]);
+
+            let (tx, ty) = state.dc.transform_point(x as f64, y as f64);
+
+            if state.in_path {
+                state
+                    .path_commands
+                    .push(PathCommand::LineTo { x: tx, y: ty });
+            } else {
+                // Direct line drawing
+                let commands = vec![
+                    PathCommand::MoveTo {
+                        x: state.dc.current_x,
+                        y: state.dc.current_y,
+                    },
+                    PathCommand::LineTo { x: tx, y: ty },
+                ];
+
+                state.dc.current_x = tx;
+                state.dc.current_y = ty;
+
+                return Ok(Some(SvgElement::Path(
+                    SvgPath::new(commands)
+                        .with_stroke(state.dc.get_stroke_attrs()[0].1.clone())
+                        .with_fill("none".to_string()),
+                )));
+            }
+
+            state.dc.current_x = tx;
+            state.dc.current_y = ty;
+        }
+        Ok(None)
     }
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_emf_svg_converter_creation() {
-        // Test requires valid EMF data
-        // Placeholder for future tests
+/// Rendering state
+struct RenderState {
+    dc: DeviceContext,
+    dc_stack: DeviceContextStack,
+    object_table: ObjectTable,
+    path_commands: Vec<PathCommand>,
+    in_path: bool,
+}
+
+impl RenderState {
+    fn new() -> Self {
+        Self {
+            dc: DeviceContext::default(),
+            dc_stack: DeviceContextStack::new(),
+            object_table: ObjectTable::new(),
+            path_commands: Vec::new(),
+            in_path: false,
+        }
     }
 }

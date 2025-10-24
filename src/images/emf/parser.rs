@@ -141,8 +141,8 @@ impl EmfHeader {
             return Err(Error::ParseError("EMF header too short".into()));
         }
 
-        // Parse header using zerocopy
-        let raw_header = RawEmfHeader::read_from_bytes(data)
+        // Parse header using zerocopy - read_from_prefix returns (value, remaining)
+        let (raw_header, _) = RawEmfHeader::read_from_prefix(data)
             .map_err(|_| Error::ParseError("Invalid EMF header format".into()))?;
 
         // Validate record type
@@ -237,7 +237,7 @@ impl EmfRecord {
         }
 
         // Parse record header using zerocopy
-        let header = RawEmfRecordHeader::read_from_bytes(&data[offset..offset + 8])
+        let (header, _) = RawEmfRecordHeader::read_from_prefix(&data[offset..])
             .map_err(|_| Error::ParseError("Invalid EMF record header".into()))?;
 
         let record_type = header.record_type;
@@ -283,7 +283,10 @@ impl EmfParser {
 
         let header = EmfHeader::parse(data)?;
         let mut records = Vec::new();
-        let mut offset = header.size as usize; // Skip header record
+
+        // Get header record size from offset 4 (not the file size field)
+        let header_record_size = u32::from_le_bytes([data[4], data[5], data[6], data[7]]) as usize;
+        let mut offset = header_record_size; // Skip header record
 
         // Parse remaining records
         while offset < data.len() {

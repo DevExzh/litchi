@@ -11,6 +11,8 @@
 // - https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-emf/
 
 pub mod converter;
+pub mod device_context;
+pub mod gdi_objects;
 pub mod parser;
 pub mod svg_converter;
 
@@ -132,7 +134,7 @@ pub fn convert_emf_to_webp(
 /// ```
 pub fn convert_emf_to_svg(emf_data: &[u8]) -> Result<String> {
     let parser = EmfParser::new(emf_data)?;
-    let converter = EmfSvgConverter::new(parser);
+    let converter = EmfSvgConverter::new(&parser);
     converter.convert_to_svg()
 }
 
