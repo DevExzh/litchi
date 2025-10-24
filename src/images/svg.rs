@@ -95,6 +95,12 @@ pub struct SvgPath {
     pub fill_opacity: f64,
     /// Stroke opacity
     pub stroke_opacity: f64,
+    /// Stroke dasharray pattern
+    pub stroke_dasharray: Option<String>,
+    /// Stroke linecap style
+    pub stroke_linecap: Option<String>,
+    /// Stroke linejoin style
+    pub stroke_linejoin: Option<String>,
 }
 
 impl Default for SvgPath {
@@ -106,6 +112,9 @@ impl Default for SvgPath {
             fill: None,
             fill_opacity: 1.0,
             stroke_opacity: 1.0,
+            stroke_dasharray: None,
+            stroke_linecap: None,
+            stroke_linejoin: None,
         }
     }
 }
@@ -149,6 +158,24 @@ impl SvgPath {
         self
     }
 
+    /// Set stroke dasharray pattern
+    pub fn with_stroke_dasharray(mut self, dasharray: String) -> Self {
+        self.stroke_dasharray = Some(dasharray);
+        self
+    }
+
+    /// Set stroke linecap style
+    pub fn with_stroke_linecap(mut self, linecap: String) -> Self {
+        self.stroke_linecap = Some(linecap);
+        self
+    }
+
+    /// Set stroke linejoin style
+    pub fn with_stroke_linejoin(mut self, linejoin: String) -> Self {
+        self.stroke_linejoin = Some(linejoin);
+        self
+    }
+
     /// Generate SVG path string
     pub fn to_svg(&self) -> String {
         let mut path_data = String::new();
@@ -181,6 +208,18 @@ impl SvgPath {
 
         if self.stroke_opacity < 1.0 {
             write!(attrs, r#" stroke-opacity="{}""#, self.stroke_opacity).unwrap();
+        }
+
+        if let Some(ref dasharray) = self.stroke_dasharray {
+            write!(attrs, r#" stroke-dasharray="{}""#, dasharray).unwrap();
+        }
+
+        if let Some(ref linecap) = self.stroke_linecap {
+            write!(attrs, r#" stroke-linecap="{}""#, linecap).unwrap();
+        }
+
+        if let Some(ref linejoin) = self.stroke_linejoin {
+            write!(attrs, r#" stroke-linejoin="{}""#, linejoin).unwrap();
         }
 
         format!(r#"<path {} />"#, attrs)
@@ -257,7 +296,7 @@ impl SvgEllipse {
     }
 }
 
-/// SVG text element
+/// SVG text element with full WMF support
 #[derive(Debug, Clone)]
 pub struct SvgText {
     pub x: f64,
@@ -266,25 +305,169 @@ pub struct SvgText {
     pub font_size: f64,
     pub font_family: Option<String>,
     pub fill: Option<String>,
+    /// Font weight (400 = normal, 700 = bold)
+    pub font_weight: Option<u16>,
+    /// Italic style
+    pub italic: bool,
+    /// Underline decoration
+    pub underline: bool,
+    /// Strikethrough decoration
+    pub strikethrough: bool,
+    /// Rotation angle in degrees
+    pub rotation: Option<f64>,
+    /// Transform matrix (6 values: a b c d e f)
+    pub transform: Option<[f64; 6]>,
+}
+
+impl Default for SvgText {
+    fn default() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.0,
+            text: String::new(),
+            font_size: 12.0,
+            font_family: None,
+            fill: Some("#000000".to_string()),
+            font_weight: None,
+            italic: false,
+            underline: false,
+            strikethrough: false,
+            rotation: None,
+            transform: None,
+        }
+    }
 }
 
 impl SvgText {
+    /// Create new text element
+    pub fn new(x: f64, y: f64, text: String, font_size: f64) -> Self {
+        Self {
+            x,
+            y,
+            text,
+            font_size,
+            ..Default::default()
+        }
+    }
+
+    /// Set font family
+    pub fn with_font_family(mut self, family: String) -> Self {
+        self.font_family = Some(family);
+        self
+    }
+
+    /// Set fill color
+    pub fn with_fill(mut self, fill: String) -> Self {
+        self.fill = Some(fill);
+        self
+    }
+
+    /// Set font weight
+    pub fn with_font_weight(mut self, weight: u16) -> Self {
+        self.font_weight = Some(weight);
+        self
+    }
+
+    /// Set italic style
+    pub fn with_italic(mut self, italic: bool) -> Self {
+        self.italic = italic;
+        self
+    }
+
+    /// Set underline
+    pub fn with_underline(mut self, underline: bool) -> Self {
+        self.underline = underline;
+        self
+    }
+
+    /// Set strikethrough
+    pub fn with_strikethrough(mut self, strikethrough: bool) -> Self {
+        self.strikethrough = strikethrough;
+        self
+    }
+
+    /// Set rotation angle in degrees
+    pub fn with_rotation(mut self, degrees: f64) -> Self {
+        self.rotation = Some(degrees);
+        self
+    }
+
+    /// Set transform matrix
+    pub fn with_transform(mut self, matrix: [f64; 6]) -> Self {
+        self.transform = Some(matrix);
+        self
+    }
+
     /// Generate SVG text string
     pub fn to_svg(&self) -> String {
-        let mut attrs = format!(
-            r#"x="{}" y="{}" font-size="{}""#,
-            self.x, self.y, self.font_size
-        );
+        let mut style_parts = Vec::new();
 
         if let Some(ref family) = self.font_family {
-            write!(attrs, r#" font-family="{}""#, family).unwrap();
+            style_parts.push(format!("font-family:{}", family));
+        }
+
+        style_parts.push(format!("font-size:{}px", self.font_size));
+
+        if let Some(weight) = self.font_weight {
+            style_parts.push(format!("font-weight:{}", weight));
+        }
+
+        if self.italic {
+            style_parts.push("font-style:italic".to_string());
         }
 
         if let Some(ref fill) = self.fill {
-            write!(attrs, r#" fill="{}""#, fill).unwrap();
+            style_parts.push(format!("fill:{}", fill));
         }
 
-        format!(r#"<text {}>{}</text>"#, attrs, self.text)
+        // Build text decorations
+        let mut decorations = Vec::new();
+        if self.underline {
+            decorations.push("underline");
+        }
+        if self.strikethrough {
+            decorations.push("line-through");
+        }
+        if !decorations.is_empty() {
+            style_parts.push(format!("text-decoration:{}", decorations.join(" ")));
+        }
+
+        let style = style_parts.join("; ");
+
+        // Build transform attribute
+        let mut transform_str = String::new();
+        if let Some(matrix) = self.transform {
+            // Transform matrix: matrix(a b c d e f)
+            write!(
+                transform_str,
+                r#" transform="matrix({} {} {} {} {} {})""#,
+                matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]
+            )
+            .unwrap();
+        } else if let Some(rotation) = self.rotation {
+            // Simple rotation around (x, y)
+            write!(
+                transform_str,
+                r#" transform="rotate({} {} {})""#,
+                rotation, self.x, self.y
+            )
+            .unwrap();
+        }
+
+        // Escape XML special characters in text
+        let escaped_text = self
+            .text
+            .replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;");
+
+        format!(
+            r#"<text x="{}" y="{}" style="{}"{}>{}
+
+</text>"#,
+            self.x, self.y, style, transform_str, escaped_text
+        )
     }
 }
 
