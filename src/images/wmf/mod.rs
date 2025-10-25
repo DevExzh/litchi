@@ -10,13 +10,16 @@
 // - [MS-WMF]: Windows Metafile Format Specification
 // - https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-wmf/
 
+mod constants;
 pub mod converter;
 pub mod parser;
-pub mod svg_converter;
+mod svg;
+
+pub use constants::*;
 
 pub use converter::{WmfConverter, WmfToRasterOptions};
 pub use parser::WmfParser;
-pub use svg_converter::WmfSvgConverter;
+pub use svg::WmfConverter as WmfSvgConverter;
 
 use crate::common::error::Result;
 use image::ImageFormat;
@@ -88,8 +91,6 @@ pub fn convert_wmf_to_webp(
 
 /// Convert WMF data to SVG format
 ///
-/// This converts vector graphics to minimal SVG while extracting embedded
-/// raster images as PNG data URLs. Uses parallel processing for performance.
 ///
 /// # Arguments
 /// * `wmf_data` - Raw WMF file data
@@ -109,7 +110,7 @@ pub fn convert_wmf_to_webp(
 pub fn convert_wmf_to_svg(wmf_data: &[u8]) -> Result<String> {
     let parser = WmfParser::new(wmf_data)?;
     let converter = WmfSvgConverter::new(parser);
-    converter.convert_to_svg()
+    converter.to_svg()
 }
 
 /// Convert WMF data to SVG bytes
