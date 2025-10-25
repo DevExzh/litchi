@@ -14,11 +14,15 @@ pub mod converter;
 pub mod device_context;
 pub mod gdi_objects;
 pub mod parser;
-pub mod svg_converter;
+pub mod record_parser;
+pub mod records;
+pub mod simd_ops;
+pub mod svg;
 
 pub use converter::{EmfConverter, EmfToRasterOptions};
-pub use parser::EmfParser;
-pub use svg_converter::EmfSvgConverter;
+pub use parser::{EmfParser, EmfRecord, EmfRecordRef, RecordRefIterator};
+pub use record_parser::*;
+pub use svg::EmfSvgConverter;
 
 use crate::common::error::Result;
 use image::ImageFormat;
@@ -135,7 +139,7 @@ pub fn convert_emf_to_webp(
 pub fn convert_emf_to_svg(emf_data: &[u8]) -> Result<String> {
     let parser = EmfParser::new(emf_data)?;
     let converter = EmfSvgConverter::new(&parser);
-    converter.convert_to_svg()
+    converter.convert()
 }
 
 /// Convert EMF data to SVG bytes
