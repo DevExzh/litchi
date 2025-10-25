@@ -108,6 +108,21 @@ impl EscherRecordType {
     pub const fn can_contain_text(self) -> bool {
         matches!(self, Self::ClientTextbox | Self::SpContainer)
     }
+
+    /// Check if this is a BLIP (image) record type.
+    #[inline]
+    pub const fn is_blip(self) -> bool {
+        matches!(
+            self,
+            Self::BlipEmf
+                | Self::BlipWmf
+                | Self::BlipPict
+                | Self::BlipJpeg
+                | Self::BlipPng
+                | Self::BlipDib
+                | Self::BlipTiff
+        )
+    }
 }
 
 impl From<u16> for EscherRecordType {

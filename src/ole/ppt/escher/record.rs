@@ -82,8 +82,9 @@ impl<'data> EscherRecord<'data> {
         // Verify record data is within bounds
         let data_end = offset + 8 + length as usize;
         if data_end > data.len() {
-            // Allow partial reads for container records
-            if record_type.is_container() && offset + 8 <= data.len() {
+            // Allow partial reads for container records and BLIP records
+            // BLIP records may have incorrect lengths in some files (especially in DOC files)
+            if (record_type.is_container() || record_type.is_blip()) && offset + 8 <= data.len() {
                 let available_length = (data.len() - offset - 8) as u32;
                 let record_data = &data[offset + 8..];
 

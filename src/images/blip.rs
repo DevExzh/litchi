@@ -9,10 +9,9 @@
 // - https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-odraw/5dc1b9ed-818c-436f-8a4f-905a7ebb1ba9
 
 use crate::common::binary::{read_u16_le, read_u32_le};
-use crate::common::error::Result;
+use crate::common::error::{Error, Result};
 use std::borrow::Cow;
 use std::io::Read;
-use zerocopy::FromBytes;
 
 /// Type of BLIP record
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -149,32 +148,6 @@ pub struct MetafileBlip<'data> {
     pub picture_data: Cow<'data, [u8]>,
 }
 
-/// Raw metafile metadata for zerocopy parsing (34 bytes)
-#[derive(Debug, Clone, FromBytes)]
-#[repr(C)]
-struct RawMetafileMetadata {
-    /// Uncompressed size in bytes
-    pub uncompressed_size: u32,
-    /// Bounds left
-    pub bounds_left: i32,
-    /// Bounds top
-    pub bounds_top: i32,
-    /// Bounds right
-    pub bounds_right: i32,
-    /// Bounds bottom
-    pub bounds_bottom: i32,
-    /// Size width in EMU
-    pub size_width: i32,
-    /// Size height in EMU
-    pub size_height: i32,
-    /// Compressed size in bytes
-    pub compressed_size: u32,
-    /// Compression flag
-    pub compression: u8,
-    /// Filter byte
-    pub filter: u8,
-}
-
 impl<'data> MetafileBlip<'data> {
     /// Parse a metafile BLIP record
     ///
@@ -214,43 +187,52 @@ impl<'data> MetafileBlip<'data> {
             None
         };
 
-        // Parse metadata using zerocopy
+        // Parse metadata manually (34 bytes total)
+        // According to [MS-ODRAW] 2.2.23:
+        // - uncompressed_size: 4 bytes
+        // - bounds: 16 bytes (4 x i32: left, top, right, bottom)
+        // - size_emu: 8 bytes (2 x i32: width, height)
+        // - compressed_size: 4 bytes
+        // - compression: 1 byte
+        // - filter: 1 byte
         if offset + 34 > data.len() {
             return Err(crate::common::error::Error::ParseError(
                 "Insufficient data for metafile metadata".into(),
             ));
         }
 
-        let metadata =
-            RawMetafileMetadata::read_from_bytes(&data[offset..offset + 34]).map_err(|_| {
-                crate::common::error::Error::ParseError("Invalid metafile metadata format".into())
-            })?;
+        // Manual parsing to avoid alignment issues
+        let uncompressed_size = read_u32_le(data, offset)?;
+        let bounds_left = read_u32_le(data, offset + 4)? as i32;
+        let bounds_top = read_u32_le(data, offset + 8)? as i32;
+        let bounds_right = read_u32_le(data, offset + 12)? as i32;
+        let bounds_bottom = read_u32_le(data, offset + 16)? as i32;
+        let size_width = read_u32_le(data, offset + 20)? as i32;
+        let size_height = read_u32_le(data, offset + 24)? as i32;
+        let compressed_size = read_u32_le(data, offset + 28)?;
+        let compression = data[offset + 32];
+        let filter = data[offset + 33];
         offset += 34;
 
         // Extract picture data (zero-copy borrow)
-        let pic_data_len = metadata.compressed_size as usize;
-        if offset + pic_data_len > data.len() {
-            return Err(crate::common::error::Error::ParseError(
-                "Insufficient data for picture data".into(),
-            ));
-        }
-        let picture_data = Cow::Borrowed(&data[offset..offset + pic_data_len]);
+        // Use the remaining data as the picture data, up to compressed_size
+        let pic_data_len = compressed_size as usize;
+        let available_data = data.len() - offset;
+
+        // If compressed_size is larger than available data, use what we have
+        let actual_pic_data_len = pic_data_len.min(available_data);
+        let picture_data = Cow::Borrowed(&data[offset..offset + actual_pic_data_len]);
 
         Ok(Self {
             header,
             uid,
             secondary_uid,
-            uncompressed_size: metadata.uncompressed_size,
-            bounds: (
-                metadata.bounds_left,
-                metadata.bounds_top,
-                metadata.bounds_right,
-                metadata.bounds_bottom,
-            ),
-            size_emu: (metadata.size_width, metadata.size_height),
-            compressed_size: metadata.compressed_size,
-            compression: metadata.compression,
-            filter: metadata.filter,
+            uncompressed_size,
+            bounds: (bounds_left, bounds_top, bounds_right, bounds_bottom),
+            size_emu: (size_width, size_height),
+            compressed_size,
+            compression,
+            filter,
             picture_data,
         })
     }
@@ -279,20 +261,108 @@ impl<'data> MetafileBlip<'data> {
             return Ok(self.picture_data.clone());
         }
 
-        // Use flate2 to decompress
-        let mut decoder = flate2::read::DeflateDecoder::new(&self.picture_data[..]);
+        // Check if data has ZLIB header (0x78 0x9C or similar)
+        // MS-ODRAW specifies DEFLATE (RFC1950) which uses ZLIB wrapping
+        let use_zlib = self.picture_data.len() >= 2 && self.picture_data[0] == 0x78;
+
         let mut decompressed = Vec::with_capacity(self.uncompressed_size as usize);
 
-        decoder.read_to_end(&mut decompressed).map_err(|e| {
-            crate::common::error::Error::ParseError(format!("Decompression failed: {}", e))
-        })?;
+        let result = if use_zlib {
+            // Use ZlibDecoder for data with ZLIB wrapper (0x78 0x9C header)
+            let mut decoder = flate2::read::ZlibDecoder::new(&self.picture_data[..]);
+            decoder.read_to_end(&mut decompressed)
+        } else {
+            // Use DeflateDecoder for raw DEFLATE data
+            let mut decoder = flate2::read::DeflateDecoder::new(&self.picture_data[..]);
+            decoder.read_to_end(&mut decompressed)
+        };
 
-        Ok(Cow::Owned(decompressed))
+        match result {
+            Ok(_) => Ok(Cow::Owned(decompressed)),
+            Err(e) => Err(Error::ParseError(format!("Decompression failed: {}", e))),
+        }
     }
 
     /// Get the BLIP type
     pub fn blip_type(&self) -> Option<BlipType> {
         BlipType::from_record_id(self.header.record_type)
+    }
+
+    /// Get WMF data with proper placeable header added
+    ///
+    /// WMF data in BLIP records doesn't include the placeable header, so we need to
+    /// reconstruct it using the bounds and size_emu metadata from the BLIP.
+    ///
+    /// According to MS-ODRAW and Apache POI:
+    /// - BLIP stores WMF without placeable header
+    /// - rcBounds contains the logical bounds
+    /// - ptSize contains the size in EMU (English Metric Units)
+    /// - We need to create a placeable header for proper WMF parsing
+    pub fn get_wmf_with_header(&self) -> Result<Cow<'data, [u8]>> {
+        // Only for WMF type
+        if self.blip_type() != Some(BlipType::Wmf) {
+            return Err(Error::ParseError("Not a WMF metafile".into()));
+        }
+
+        let wmf_data = self.decompress()?;
+
+        // Check if it already has a placeable header (shouldn't happen with BLIP data)
+        if wmf_data.len() >= 4 {
+            let first_u32 =
+                u32::from_le_bytes([wmf_data[0], wmf_data[1], wmf_data[2], wmf_data[3]]);
+            if first_u32 == 0x9AC6CDD7 {
+                // Already has placeable header
+                return Ok(wmf_data);
+            }
+        }
+
+        // Calculate proper bounds for placeable header
+        // ptSize is in EMU, convert to logical units
+        // 1 inch = 914400 EMU, and we use 1440 units per inch (twips)
+        let (left, top, right, bottom) =
+            if self.bounds.0 == 0 && self.bounds.1 == 0 && self.bounds.2 == 0 && self.bounds.3 == 0
+            {
+                // Bounds are zero, calculate from size_emu
+                // Convert EMU to twips: emu * 1440 / 914400
+                let width_twips = (self.size_emu.0 as i64 * 1440 / 914400) as i32;
+                let height_twips = (self.size_emu.1 as i64 * 1440 / 914400) as i32;
+                (0, 0, width_twips, height_twips)
+            } else {
+                // Use BLIP bounds - they're already in logical units
+                self.bounds
+            };
+
+        // Create placeable header (22 bytes)
+        let mut result = Vec::with_capacity(22 + wmf_data.len());
+
+        // Key: 0x9AC6CDD7 (Aldus Placeable Metafile magic number)
+        result.extend_from_slice(&0x9AC6CDD7u32.to_le_bytes());
+        // Handle (always 0)
+        result.extend_from_slice(&0u16.to_le_bytes());
+        // Left, Top, Right, Bottom (bounds in logical units)
+        result.extend_from_slice(&(left as i16).to_le_bytes());
+        result.extend_from_slice(&(top as i16).to_le_bytes());
+        result.extend_from_slice(&(right as i16).to_le_bytes());
+        result.extend_from_slice(&(bottom as i16).to_le_bytes());
+        // Inch (units per inch) - use 1440 (twips)
+        result.extend_from_slice(&1440u16.to_le_bytes());
+        // Reserved (always 0)
+        result.extend_from_slice(&0u32.to_le_bytes());
+
+        // Calculate checksum (XOR of all 16-bit words in header so far)
+        let mut checksum: u16 = 0;
+        for chunk in result[0..20].chunks(2) {
+            if chunk.len() == 2 {
+                let word = u16::from_le_bytes([chunk[0], chunk[1]]);
+                checksum ^= word;
+            }
+        }
+        result.extend_from_slice(&checksum.to_le_bytes());
+
+        // Append original WMF data
+        result.extend_from_slice(&wmf_data);
+
+        Ok(Cow::Owned(result))
     }
 }
 
@@ -461,6 +531,28 @@ impl<'data> Blip<'data> {
                 marker: b.marker,
                 picture_data: Cow::Owned(b.picture_data.into_owned()),
             }),
+        }
+    }
+
+    /// Get decompressed picture data with proper header for WMF
+    ///
+    /// For WMF metafiles, this adds the placeable header using BLIP metadata.
+    /// For other formats, this is equivalent to get_decompressed_data().
+    pub fn get_picture_data_for_conversion(&self) -> Result<Cow<'data, [u8]>> {
+        match self {
+            Blip::Metafile(m) => {
+                // For WMF, add placeable header
+                if m.blip_type() == Some(BlipType::Wmf) {
+                    m.get_wmf_with_header()
+                } else {
+                    // For EMF and PICT, just decompress
+                    m.decompress()
+                }
+            },
+            Blip::Bitmap(_) => {
+                // For bitmaps, use regular decompressed data
+                self.get_decompressed_data()
+            },
         }
     }
 }

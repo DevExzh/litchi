@@ -35,17 +35,40 @@ impl<'data> ExtractedImage<'data> {
         self.blip_type().map(|t| t.extension()).unwrap_or("bin")
     }
 
-    /// Get suggested filename
+    /// Get the recommended output extension for this image
+    ///
+    /// - EMF, WMF: Converted to SVG
+    /// - PICT: Converted to PNG (SVG not yet implemented)
+    /// - Bitmaps (PNG, JPEG, etc.): Keep their original extension
+    pub fn output_extension(&self) -> &'static str {
+        use crate::images::BlipType;
+
+        if let Some(blip_type) = self.blip_type() {
+            match blip_type {
+                BlipType::Emf | BlipType::Wmf => "svg",
+                BlipType::Pict => "png", // PICT to SVG not yet implemented
+                _ => blip_type.extension(),
+            }
+        } else {
+            "bin"
+        }
+    }
+
+    /// Get suggested filename for output
+    ///
+    /// Uses the output extension (SVG for metafiles, original extension for bitmaps)
     pub fn suggested_filename(&self) -> String {
         if let Some(name) = &self.name {
             // Check if name already has extension
             if name.contains('.') {
-                name.clone()
+                // Replace extension with output extension
+                let stem = name.split('.').next().unwrap_or(name);
+                format!("{}.{}", stem, self.output_extension())
             } else {
-                format!("{}.{}", name, self.extension())
+                format!("{}.{}", name, self.output_extension())
             }
         } else {
-            format!("image_{:03}.{}", self.index, self.extension())
+            format!("image_{:03}.{}", self.index, self.output_extension())
         }
     }
 
@@ -69,6 +92,68 @@ impl<'data> ExtractedImage<'data> {
     #[cfg(feature = "imgconv")]
     pub fn to_jpeg(&self, width: Option<u32>, height: Option<u32>) -> Result<Vec<u8>> {
         crate::images::convert_blip_to_jpeg(&self.blip, width, height)
+    }
+
+    /// Convert metafile to SVG format
+    ///
+    /// For EMF and WMF formats, converts to SVG.
+    /// PICT format is not yet supported for SVG conversion and will return an error.
+    /// Returns an error if the image is not a metafile.
+    #[cfg(feature = "imgconv")]
+    pub fn to_svg(&self) -> Result<String> {
+        use crate::images::BlipType;
+
+        // For WMF, we need to add the placeable header using BLIP metadata
+        // For EMF and others, just use decompressed data
+        let data = self.blip.get_picture_data_for_conversion()?;
+
+        match self.blip_type() {
+            Some(BlipType::Emf) => crate::images::emf::convert_emf_to_svg(&data),
+            Some(BlipType::Wmf) => crate::images::wmf::convert_wmf_to_svg(&data),
+            Some(BlipType::Pict) => {
+                // PICT to SVG conversion is not yet implemented
+                // Fall back to error for now
+                Err(crate::common::error::Error::ParseError(
+                    "PICT to SVG conversion is not yet implemented".into(),
+                ))
+            },
+            _ => Err(crate::common::error::Error::ParseError(
+                "Image is not a metafile format (EMF/WMF/PICT)".into(),
+            )),
+        }
+    }
+
+    /// Extract the image in its recommended format
+    ///
+    /// - For metafiles (EMF, WMF): Converts to SVG
+    /// - For PICT: Converts to PNG (SVG not yet implemented)
+    /// - For bitmaps (PNG, JPEG, DIB, TIFF): Returns raw decompressed data
+    ///
+    /// This is the recommended method for extracting images as it preserves
+    /// vector graphics as vectors and bitmaps as bitmaps.
+    #[cfg(feature = "imgconv")]
+    pub fn extract(&self) -> Result<Vec<u8>> {
+        use crate::images::BlipType;
+
+        if let Some(blip_type) = self.blip_type() {
+            match blip_type {
+                BlipType::Emf | BlipType::Wmf => {
+                    // Convert EMF/WMF to SVG
+                    self.to_svg().map(|s| s.into_bytes())
+                },
+                BlipType::Pict => {
+                    // PICT to SVG not yet implemented, convert to PNG instead
+                    self.to_png(Some(800), None)
+                },
+                _ => {
+                    // Extract bitmaps as-is
+                    self.decompressed_data().map(|cow| cow.into_owned())
+                },
+            }
+        } else {
+            // Unknown format, just return decompressed data
+            self.decompressed_data().map(|cow| cow.into_owned())
+        }
     }
 }
 
@@ -192,6 +277,79 @@ impl ImageExtractor {
                     },
                 }
             }
+        }
+
+        Ok(images)
+    }
+
+    /// Search for BLIP records in raw data (for DOC files)
+    ///
+    /// In DOC files, the Data stream may contain BLIP records at various offsets,
+    /// not necessarily starting at the beginning. This function searches for
+    /// BLIP record signatures throughout the data.
+    ///
+    /// # Arguments
+    /// * `data` - Raw data to search (typically from the Data stream)
+    ///
+    /// # Returns
+    /// Vector of extracted images
+    fn search_blips_in_data(data: &[u8]) -> Result<Vec<ExtractedImage<'static>>> {
+        let mut images = Vec::new();
+        let mut index = 0;
+
+        // BLIP record type IDs to search for
+        const BLIP_SIGNATURES: &[(u16, &str)] = &[
+            (0xF01A, "emf"),
+            (0xF01B, "wmf"),
+            (0xF01C, "pict"),
+            (0xF01D, "jpeg"),
+            (0xF01E, "png"),
+            (0xF01F, "dib"),
+            (0xF029, "tiff"),
+        ];
+
+        // Search through the data for BLIP signatures
+        let mut offset = 0;
+        while offset + 8 <= data.len() {
+            // Read potential record header
+            if offset + 4 <= data.len() {
+                let record_type = u16::from_le_bytes([data[offset + 2], data[offset + 3]]);
+
+                // Check if this looks like a BLIP record
+                let is_blip = BLIP_SIGNATURES.iter().any(|(sig, _)| *sig == record_type);
+
+                if is_blip && offset + 8 <= data.len() {
+                    // Read the length
+                    let length = u32::from_le_bytes([
+                        data[offset + 4],
+                        data[offset + 5],
+                        data[offset + 6],
+                        data[offset + 7],
+                    ]) as usize;
+
+                    // Validate length is reasonable
+                    if length > 0 && length < 100_000_000 && offset + 8 + length <= data.len() {
+                        // Extract the full BLIP record
+                        let blip_data = &data[offset..offset + 8 + length];
+
+                        // Try to parse it
+                        match Blip::parse(blip_data) {
+                            Ok(blip) => {
+                                images.push(ExtractedImage::new(blip.into_owned(), None, index));
+                                index += 1;
+                                // Skip past this record
+                                offset += 8 + length;
+                                continue;
+                            },
+                            Err(_) => {
+                                // Not a valid BLIP, continue searching
+                            },
+                        }
+                    }
+                }
+            }
+
+            offset += 1;
         }
 
         Ok(images)
@@ -352,6 +510,10 @@ pub mod doc {
     impl ImageExtractor {
         /// Extract all images from a DOC document
         ///
+        /// In DOC files, images are typically stored in the Data stream as raw BLIP records.
+        /// The table stream contains metadata about where these images are referenced in the text,
+        /// but the actual image data is in the Data stream or embedded in the ObjectPool.
+        ///
         /// # Arguments
         /// * `ole` - Opened OLE file for the DOC document
         ///
@@ -363,15 +525,23 @@ pub mod doc {
             let mut all_images = Vec::new();
 
             // Try to read Data stream (contains embedded objects and images)
+            // In DOC files, this is where the actual picture data is stored
             if ole.exists(&["Data"]) {
                 match ole.open_stream(&["Data"]) {
                     Ok(data) => {
-                        let images = Self::extract_blips(&data)?;
-                        all_images.extend(images.into_iter().map(|img| ExtractedImage {
-                            blip: img.blip.into_owned(),
-                            name: img.name,
-                            index: img.index,
-                        }));
+                        // The Data stream may contain multiple BLIP records at various offsets
+                        // Use the search function to find them all
+                        match Self::search_blips_in_data(&data) {
+                            Ok(images) => {
+                                all_images.extend(images);
+                            },
+                            Err(e) => {
+                                eprintln!(
+                                    "Warning: Failed to search for BLIPs in Data stream: {}",
+                                    e
+                                );
+                            },
+                        }
                     },
                     Err(e) => {
                         eprintln!("Warning: Failed to read Data stream: {}", e);
@@ -379,28 +549,10 @@ pub mod doc {
                 }
             }
 
-            // Also check 1Table/0Table streams for drawing data
-            for table_name in &["1Table", "0Table"] {
-                if ole.exists(&[table_name]) {
-                    match ole.open_stream(&[table_name]) {
-                        Ok(data) => {
-                            let images = Self::extract_blips(&data)?;
-                            let offset = all_images.len();
-                            all_images.extend(images.into_iter().map(|mut img| {
-                                img.index += offset;
-                                ExtractedImage {
-                                    blip: img.blip.into_owned(),
-                                    name: img.name,
-                                    index: img.index,
-                                }
-                            }));
-                        },
-                        Err(e) => {
-                            eprintln!("Warning: Failed to read {} stream: {}", table_name, e);
-                        },
-                    }
-                }
-            }
+            // Note: We don't try to parse the entire table stream as Escher data
+            // because it contains various other structures and the drawing data
+            // is at specific offsets that would need to be parsed from the FIB.
+            // For most practical purposes, the Data stream contains the images we need.
 
             Ok(all_images)
         }

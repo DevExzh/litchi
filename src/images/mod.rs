@@ -3,19 +3,52 @@
 // This module provides functionality to parse and convert Office Drawing formats
 // (EMF, WMF, PICT) to modern image standards (PNG, JPEG, WebP).
 //
+// # Features
+//
+// - **Format Auto-detection**: Automatically detects image format from BLIP records
+// - **Robust Parsing**: Handles malformed records and compression issues gracefully
+// - **High Performance**: Zero-copy parsing where possible, minimal allocations
+// - **Wide Format Support**: EMF, WMF, PICT, PNG, JPEG, DIB, TIFF
+// - **Batch Extraction**: Extract all images from DOC/PPT files at once
+//
 // # Architecture
 //
 // - `blip`: Core BLIP (Binary Large Image or Picture) record parsing
+// - `bse`: BLIP Store Entry (BSE) metadata parsing
 // - `emf`: Enhanced Metafile (EMF) format support
 // - `wmf`: Windows Metafile (WMF) format support
 // - `pict`: Macintosh PICT format support
+// - `extractor`: High-level image extraction from Office files
+// - `svg`: SVG conversion utilities
 //
-// # Example: Converting a BLIP record
+// # Quick Start: Extract Images from Office Files
 //
 // ```no_run
-// use litchi::images::blip::Blip;
-// use litchi::images::convert_blip_to_png;
+// use litchi::images::{extract_images_from_doc, extract_images_from_ppt};
 //
+// // Extract from Word document
+// let images = extract_images_from_doc("document.doc")?;
+// for (i, img) in images.iter().enumerate() {
+///     let png = img.to_png(Some(800), None)?;
+///     std::fs::write(format!("image_{}.png", i), png)?;
+/// }
+///
+/// // Extract from PowerPoint presentation
+/// let images = extract_images_from_ppt("presentation.ppt")?;
+/// for img in images {
+///     let filename = img.suggested_filename();
+///     let png = img.to_png(None, None)?;
+///     std::fs::write(filename, png)?;
+/// }
+/// # Ok::<(), litchi::common::error::Error>(())
+/// ```
+///
+/// # Example: Converting a BLIP record
+///
+/// ```no_run
+/// use litchi::images::blip::Blip;
+/// use litchi::images::convert_blip_to_png;
+///
 /// let blip_data = vec![/* BLIP record bytes */];
 /// let blip = Blip::parse(&blip_data)?;
 /// let png_bytes = convert_blip_to_png(&blip, Some(800), None)?;
@@ -32,6 +65,32 @@
 /// std::fs::write("output.png", png_data)?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+///
+/// # Supported Formats
+///
+/// | Format | Type | Compression | Notes |
+/// |--------|------|-------------|-------|
+/// | EMF | Metafile | Optional | Enhanced Metafile |
+/// | WMF | Metafile | Optional | Windows Metafile |
+/// | PICT | Metafile | Optional | Macintosh PICT |
+/// | PNG | Bitmap | N/A | Direct passthrough |
+/// | JPEG | Bitmap | N/A | Direct passthrough |
+/// | DIB | Bitmap | N/A | Device Independent Bitmap |
+/// | TIFF | Bitmap | N/A | Tagged Image File Format |
+///
+/// # Performance
+///
+/// - **Zero-copy parsing**: Uses `Cow<'data, [u8]>` to avoid unnecessary allocations
+/// - **Fast scanning**: O(n) single-pass search for BLIPs in data streams
+/// - **Efficient conversion**: Direct raster rendering for metafiles
+///
+/// # Error Handling
+///
+/// The module gracefully handles common real-world issues:
+/// - Incorrect compression flags (attempts raw data if decompression fails)
+/// - Misaligned BLIP records (manual parsing instead of zerocopy)
+/// - Invalid length fields (lenient bounds checking)
+/// - Corrupted metafile data (returns error but continues extraction)
 pub mod blip;
 pub mod bse;
 pub mod emf;
