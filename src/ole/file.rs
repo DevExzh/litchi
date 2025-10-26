@@ -1,4 +1,6 @@
 use super::consts::*;
+use fixedbitset::FixedBitSet;
+use std::fmt::Write;
 use std::io::{self, Read, Seek, SeekFrom};
 use zerocopy::{FromBytes, LE, U16, U32, U64};
 use zerocopy_derive::FromBytes as DeriveFromBytes;
@@ -300,15 +302,16 @@ impl<R: Read + Seek> OleFile<R> {
 
         // Now read all FAT sectors and build the FAT table
         let entries_per_sector = self.sector_size / 4;
-        self.fat.reserve(fat_sectors.len() * entries_per_sector);
+
+        // Pre-allocate with exact capacity needed (optimization)
+        self.fat = Vec::with_capacity(fat_sectors.len() * entries_per_sector);
 
         for &sector_id in &fat_sectors {
             let sector_data = self.read_sector(sector_id)?;
 
-            // Parse sector as array of u32 (little-endian)
-            for i in 0..entries_per_sector {
-                let offset = i * 4;
-                let entry = U32::<LE>::read_from_bytes(&sector_data[offset..offset + 4])
+            // Parse sector as array of u32 (little-endian) - use chunks for efficiency
+            for chunk in sector_data.chunks_exact(4) {
+                let entry = U32::<LE>::read_from_bytes(chunk)
                     .map(|v| v.get())
                     .unwrap_or(0);
                 self.fat.push(entry);
@@ -323,13 +326,12 @@ impl<R: Read + Seek> OleFile<R> {
         // Read the MiniFAT stream using the FAT
         let minifat_data = self.read_stream_from_fat(first_minifat_sector)?;
 
-        // Parse as array of u32 (little-endian)
+        // Parse as array of u32 (little-endian) - use chunks for efficiency
         let entries_count = minifat_data.len() / 4;
-        self.minifat.reserve(entries_count);
+        self.minifat = Vec::with_capacity(entries_count);
 
-        for i in 0..entries_count {
-            let offset = i * 4;
-            let entry = U32::<LE>::read_from_bytes(&minifat_data[offset..offset + 4])
+        for chunk in minifat_data.chunks_exact(4) {
+            let entry = U32::<LE>::read_from_bytes(chunk)
                 .map_err(|_| OleError::InvalidFormat("Failed to read u32".to_string()))?;
             self.minifat.push(entry.get());
         }
@@ -337,7 +339,7 @@ impl<R: Read + Seek> OleFile<R> {
         Ok(())
     }
 
-    /// Load directory entries
+    /// Load directory entries with optimized iterative parsing
     fn load_directory(&mut self) -> Result<(), OleError> {
         // Read the entire directory stream
         let dir_data = self.read_stream_from_fat(self.first_dir_sector)?;
@@ -352,8 +354,8 @@ impl<R: Read + Seek> OleFile<R> {
             let root_child_sid = root.sid_child;
             self.root = Some(root);
 
-            // Build storage tree starting from root's children
-            self.build_storage_tree(root_child_sid, &dir_data)?;
+            // Build storage tree using iterative approach (avoids recursion overhead)
+            self.build_storage_tree_iterative(root_child_sid, &dir_data)?;
         }
 
         Ok(())
@@ -398,41 +400,75 @@ impl<R: Read + Seek> OleFile<R> {
         })
     }
 
-    /// Recursively build storage tree from directory entries
-    fn build_storage_tree(&mut self, child_sid: u32, dir_data: &[u8]) -> Result<(), OleError> {
-        if child_sid == NOSTREAM {
+    /// Build storage tree using iterative approach (optimized, no recursion)
+    ///
+    /// This replaces the recursive `build_storage_tree` with an iterative
+    /// traversal using a work queue, eliminating function call overhead.
+    /// Uses FixedBitSet for better cache locality and memory efficiency.
+    fn build_storage_tree_iterative(
+        &mut self,
+        root_sid: u32,
+        dir_data: &[u8],
+    ) -> Result<(), OleError> {
+        if root_sid == NOSTREAM {
             return Ok(());
         }
 
-        let sid = child_sid as usize;
-        if sid >= dir_data.len() / DIRENTRY_SIZE {
-            return Err(OleError::CorruptedFile(
-                "Invalid directory entry index".to_string(),
-            ));
+        let max_entries = dir_data.len() / DIRENTRY_SIZE;
+
+        // Use a work queue for iterative traversal (pre-allocate for common case)
+        let mut queue = Vec::with_capacity(64);
+        queue.push(root_sid);
+
+        // Track visited SIDs using FixedBitSet for better cache locality
+        // Uses ~8x less memory than Vec<bool> (1 bit vs 1 byte per entry)
+        let mut visited = FixedBitSet::with_capacity(max_entries);
+
+        while let Some(sid) = queue.pop() {
+            if sid == NOSTREAM {
+                continue;
+            }
+
+            let sid_usize = sid as usize;
+
+            // Validate SID
+            if sid_usize >= max_entries {
+                return Err(OleError::CorruptedFile(
+                    "Invalid directory entry index".to_string(),
+                ));
+            }
+
+            // Skip if already visited (cycle detection)
+            if visited.contains(sid_usize) {
+                continue;
+            }
+            visited.insert(sid_usize);
+
+            // Parse entry if not already parsed
+            if self.dir_entries[sid_usize].is_none() {
+                let offset = sid_usize * DIRENTRY_SIZE;
+                let entry =
+                    self.parse_directory_entry(&dir_data[offset..offset + DIRENTRY_SIZE], sid)?;
+
+                // Extract child SIDs before moving entry
+                let left_sid = entry.sid_left;
+                let right_sid = entry.sid_right;
+                let child_sid = entry.sid_child;
+
+                self.dir_entries[sid_usize] = Some(entry);
+
+                // Add children to queue (in reverse order for depth-first-like traversal)
+                if child_sid != NOSTREAM {
+                    queue.push(child_sid);
+                }
+                if right_sid != NOSTREAM {
+                    queue.push(right_sid);
+                }
+                if left_sid != NOSTREAM {
+                    queue.push(left_sid);
+                }
+            }
         }
-
-        // Parse this entry if not already parsed
-        if self.dir_entries[sid].is_none() {
-            let offset = sid * DIRENTRY_SIZE;
-            let entry =
-                self.parse_directory_entry(&dir_data[offset..offset + DIRENTRY_SIZE], sid as u32)?;
-            self.dir_entries[sid] = Some(entry);
-        }
-
-        // Get the entry (we know it exists now)
-        let entry = self.dir_entries[sid].as_ref().unwrap();
-        let left_sid = entry.sid_left;
-        let right_sid = entry.sid_right;
-        let child_sid = entry.sid_child;
-
-        // Recursively build left subtree
-        self.build_storage_tree(left_sid, dir_data)?;
-
-        // Recursively build right subtree
-        self.build_storage_tree(right_sid, dir_data)?;
-
-        // Recursively build children if this is a storage
-        self.build_storage_tree(child_sid, dir_data)?;
 
         Ok(())
     }
@@ -448,35 +484,77 @@ impl<R: Read + Seek> OleFile<R> {
         Ok(buffer)
     }
 
-    /// Read a stream by following the FAT chain
+    /// Read a stream by following the FAT chain with optimized batching
+    ///
+    /// This implementation batches contiguous sector reads to minimize
+    /// system calls (lseek + read), which is a major performance bottleneck.
     fn read_stream_from_fat(&mut self, start_sector: u32) -> Result<Vec<u8>, OleError> {
-        let mut data = Vec::new();
+        if start_sector == ENDOFCHAIN {
+            return Ok(Vec::new());
+        }
+
+        // Build list of sectors in the chain
+        let mut sectors = Vec::new();
         let mut sector = start_sector;
 
-        // Follow the chain in FAT
-        loop {
-            if sector == ENDOFCHAIN {
-                break;
-            }
-
+        while sector != ENDOFCHAIN {
             if sector >= self.fat.len() as u32 {
                 return Err(OleError::CorruptedFile(
                     "Invalid sector index in FAT".to_string(),
                 ));
             }
 
-            // Read this sector
-            let sector_data = self.read_sector(sector)?;
-            data.extend_from_slice(&sector_data);
-
-            // Get next sector from FAT
+            sectors.push(sector);
             sector = self.fat[sector as usize];
         }
+
+        // Pre-allocate result buffer
+        let mut data = vec![0u8; sectors.len() * self.sector_size];
+
+        // Batch read contiguous sectors
+        self.read_sectors_batched(&sectors, &mut data)?;
 
         Ok(data)
     }
 
-    /// Read a stream by following the MiniFAT chain
+    /// Read multiple sectors with batching optimization
+    ///
+    /// Groups contiguous sectors and reads them in a single I/O operation
+    /// to minimize the number of lseek + read system calls.
+    fn read_sectors_batched(&mut self, sectors: &[u32], buffer: &mut [u8]) -> Result<(), OleError> {
+        if sectors.is_empty() {
+            return Ok(());
+        }
+
+        let mut i = 0;
+        while i < sectors.len() {
+            // Find run of contiguous sectors
+            let start_sector = sectors[i];
+            let mut count = 1;
+
+            while i + count < sectors.len() && sectors[i + count] == sectors[i + count - 1] + 1 {
+                count += 1;
+            }
+
+            // Read the entire contiguous run in one I/O operation
+            let position = ((start_sector as u64) + 1) * (self.sector_size as u64);
+            let read_size = count * self.sector_size;
+            let buffer_offset = i * self.sector_size;
+
+            self.reader.seek(SeekFrom::Start(position))?;
+            self.reader
+                .read_exact(&mut buffer[buffer_offset..buffer_offset + read_size])?;
+
+            i += count;
+        }
+
+        Ok(())
+    }
+
+    /// Read a stream by following the MiniFAT chain with optimized copying
+    ///
+    /// This implementation pre-allocates and copies data more efficiently
+    /// than the naive sector-by-sector approach.
     fn read_stream_from_minifat(
         &mut self,
         start_sector: u32,
@@ -493,22 +571,27 @@ impl<R: Read + Seek> OleFile<R> {
         }
 
         let ministream = self.ministream.as_ref().unwrap();
-        let mut data = Vec::new();
+
+        // Build list of mini sectors in the chain
+        let mut sectors = Vec::new();
         let mut sector = start_sector;
 
-        // Follow the chain in MiniFAT
-        loop {
-            if sector == ENDOFCHAIN {
-                break;
-            }
-
+        while sector != ENDOFCHAIN {
             if sector >= self.minifat.len() as u32 {
                 return Err(OleError::CorruptedFile(
                     "Invalid sector index in MiniFAT".to_string(),
                 ));
             }
 
-            // Calculate position in ministream
+            sectors.push(sector);
+            sector = self.minifat[sector as usize];
+        }
+
+        // Pre-allocate result buffer with exact size needed
+        let mut data = Vec::with_capacity(size as usize);
+
+        // Copy all mini sectors
+        for &sector in &sectors {
             let position = (sector as usize) * self.mini_sector_size;
             if position + self.mini_sector_size > ministream.len() {
                 return Err(OleError::CorruptedFile(
@@ -516,11 +599,7 @@ impl<R: Read + Seek> OleFile<R> {
                 ));
             }
 
-            // Read this mini sector
             data.extend_from_slice(&ministream[position..position + self.mini_sector_size]);
-
-            // Get next sector from MiniFAT
-            sector = self.minifat[sector as usize];
         }
 
         // Truncate to actual size
@@ -758,9 +837,13 @@ impl<R: Read + Seek> OleFile<R> {
     }
 }
 
-/// Decode UTF-16LE bytes to String
+/// Decode UTF-16LE bytes to String (optimized version)
+///
+/// Pre-allocates the UTF-16 buffer with exact capacity to avoid reallocations.
 fn decode_utf16le(bytes: &[u8]) -> String {
-    let mut utf16_chars = Vec::new();
+    // Pre-allocate with exact capacity needed
+    let capacity = bytes.len() / 2;
+    let mut utf16_chars = Vec::with_capacity(capacity);
 
     for chunk in bytes.chunks_exact(2) {
         let code_unit = U16::<LE>::read_from_bytes(chunk)
@@ -770,34 +853,55 @@ fn decode_utf16le(bytes: &[u8]) -> String {
     }
 
     // Decode UTF-16 to String, replacing invalid sequences
-    String::from_utf16_lossy(&utf16_chars)
-        .trim_end_matches('\0')
-        .to_string()
+    // Note: trim_end_matches returns a &str, so we only allocate once
+    let decoded = String::from_utf16_lossy(&utf16_chars);
+
+    // Check if trimming is needed to avoid unnecessary allocation
+    if decoded.ends_with('\0') {
+        decoded.trim_end_matches('\0').to_string()
+    } else {
+        decoded
+    }
 }
 
-/// Format CLSID as a human-readable string
+/// Format CLSID as a human-readable string (optimized version)
+///
+/// Uses pre-allocated buffer and `write!` instead of `format!` to avoid
+/// expensive heap allocations and formatting overhead. CLSID format is fixed
+/// at 36 characters: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
 fn format_clsid(bytes: &[u8]) -> String {
     if bytes.len() != 16 {
         return String::new();
     }
 
-    // Check if all zeros
+    // Check if all zeros (empty CLSID)
     if bytes.iter().all(|&b| b == 0) {
         return String::new();
     }
 
-    // Format as: {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}
-    format!(
+    // Pre-allocate with exact capacity: 36 chars for CLSID format
+    // XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX (8-4-4-4-12 = 36 chars total + four hyphens)
+    let mut result = String::with_capacity(40);
+
+    // Parse components (little-endian)
+    let data1 = U32::<LE>::read_from_bytes(&bytes[0..4])
+        .map(|v| v.get())
+        .unwrap_or(0);
+    let data2 = U16::<LE>::read_from_bytes(&bytes[4..6])
+        .map(|v| v.get())
+        .unwrap_or(0);
+    let data3 = U16::<LE>::read_from_bytes(&bytes[6..8])
+        .map(|v| v.get())
+        .unwrap_or(0);
+
+    // Use write! macro for efficient formatting directly into pre-allocated buffer
+    // This avoids the overhead of format! macro's heap allocations
+    write!(
+        &mut result,
         "{:08X}-{:04X}-{:04X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}",
-        U32::<LE>::read_from_bytes(&bytes[0..4])
-            .map(|v| v.get())
-            .unwrap_or(0),
-        U16::<LE>::read_from_bytes(&bytes[4..6])
-            .map(|v| v.get())
-            .unwrap_or(0),
-        U16::<LE>::read_from_bytes(&bytes[6..8])
-            .map(|v| v.get())
-            .unwrap_or(0),
+        data1,
+        data2,
+        data3,
         bytes[8],
         bytes[9],
         bytes[10],
@@ -807,6 +911,9 @@ fn format_clsid(bytes: &[u8]) -> String {
         bytes[14],
         bytes[15],
     )
+    .expect("Failed to write CLSID");
+
+    result
 }
 
 /// Check if a file/data is an OLE file by checking magic bytes

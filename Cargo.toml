@@ -71,6 +71,7 @@ chrono = { version = "0", features = ["serde"] } # Date and time types for Offic
 crc-fast = { version = "1.5", features = ["optimize_crc32_auto"], optional = true } # Fast CRC32 implementation for verifying file integrity
 encoding_rs = { version = "0.8", optional = true } # Used by both OLE (.doc, .xls, .ppt) and OOXML (.xlsb) formats for UTF-16LE decoding
 fast-float2 = "0.2" # Fast string-to-float conversion with correct rounding
+fixedbitset = "0.5" # Fixed-size bitset for efficient visited tracking with better cache locality
 flate2 = { version = "1", features = ["zlib-rs"], default-features = false } # Compression/decompression for Office file formats
 image = { version = "0.25", features = ["default-formats", "rayon"], optional = true } # Image format decoding/encoding for embedded media
 itoa = "1.0" # Fast integer-to-string conversion
@@ -101,3 +102,7 @@ prost-build = { version = "0.14", optional = true }
 [profile.release]
 lto = true
 panic = "abort"
+
+[profile.profiling]
+inherits = "release"
+debug = true
