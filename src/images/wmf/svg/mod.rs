@@ -94,6 +94,8 @@ mod transform;
 
 use super::parser::WmfParser;
 use crate::common::error::Result;
+use crate::images::svg_utils::write_num;
+use std::fmt::Write;
 
 pub use bounds::BoundsCalculator;
 pub use renderer::SvgRenderer;
@@ -127,13 +129,15 @@ impl WmfConverter {
         let mut svg = String::with_capacity(4096);
 
         // Minimal SVG header (no newlines, no DOCTYPE)
-        svg.push_str(&format!(
-            r#"<svg width="{}" height="{}" viewBox="0 0 {} {}" xmlns="http://www.w3.org/2000/svg">"#,
-            svg_width as u32,
-            svg_height as u32,
-            Self::fmt(svg_width),
-            Self::fmt(svg_height)
-        ));
+        svg.push_str(r#"<svg width=""#);
+        let _ = write!(&mut svg, "{}", svg_width as u32);
+        svg.push_str(r#"" height=""#);
+        let _ = write!(&mut svg, "{}", svg_height as u32);
+        svg.push_str(r#"" viewBox="0 0 "#);
+        write_num(&mut svg, svg_width);
+        svg.push(' ');
+        write_num(&mut svg, svg_height);
+        svg.push_str(r#"" xmlns="http://www.w3.org/2000/svg">"#);
 
         // Render elements
         let mut renderer = SvgRenderer::new(transform);
@@ -165,18 +169,6 @@ impl WmfConverter {
             (MAX_H / ratio, MAX_H)
         } else {
             (MAX_W, MAX_W * ratio)
-        }
-    }
-
-    /// Format number with minimal precision
-    fn fmt(n: f64) -> String {
-        if n.fract() == 0.0 && n.abs() < 1e10 {
-            format!("{}", n as i64)
-        } else {
-            // Round to 2 decimals, remove trailing zeros
-            let rounded = (n * 100.0).round() / 100.0;
-            let s = format!("{:.2}", rounded);
-            s.trim_end_matches('0').trim_end_matches('.').to_string()
         }
     }
 }

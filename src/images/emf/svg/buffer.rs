@@ -3,6 +3,7 @@
 /// This module provides buffering and optimization of SVG elements during conversion
 /// to minimize output size without post-processing.
 use super::state::DeviceContext;
+use crate::images::svg_utils::write_num;
 
 /// Buffer for grouping and optimizing SVG elements
 pub struct ElementBuffer {
@@ -137,7 +138,7 @@ impl ElementBuffer {
         self.pending_lines.clear();
     }
 
-    /// Output a path or individual lines depending on what's more efficient
+    /// Output a path or individual lines depending on what's more efficient (optimized)
     fn output_path_or_lines(
         elements: &mut Vec<String>,
         lines: &[(f64, f64, f64, f64)],
@@ -150,39 +151,58 @@ impl ElementBuffer {
         if lines.len() == 1 {
             // Single line - output as line element
             let (x1, y1, x2, y2) = lines[0];
-            elements.push(format!(
-                "<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" {}/>",
-                Self::fmt(x1),
-                Self::fmt(y1),
-                Self::fmt(x2),
-                Self::fmt(y2),
-                stroke
-            ));
+            let mut s = String::with_capacity(96);
+            s.push_str("<line x1=\"");
+            write_num(&mut s, x1);
+            s.push_str("\" y1=\"");
+            write_num(&mut s, y1);
+            s.push_str("\" x2=\"");
+            write_num(&mut s, x2);
+            s.push_str("\" y2=\"");
+            write_num(&mut s, y2);
+            s.push_str("\" ");
+            s.push_str(stroke);
+            s.push_str("/>");
+            elements.push(s);
         } else if lines.len() >= 3 {
             // Multiple connected lines - use path (more compact)
             let mut path_data = String::with_capacity(lines.len() * 15);
             let (x1, y1, _, _) = lines[0];
-            path_data.push_str(&format!("M{} {}", Self::fmt(x1), Self::fmt(y1)));
+            path_data.push('M');
+            write_num(&mut path_data, x1);
+            path_data.push(' ');
+            write_num(&mut path_data, y1);
 
             for &(_, _, x2, y2) in lines.iter() {
-                path_data.push_str(&format!("L{} {}", Self::fmt(x2), Self::fmt(y2)));
+                path_data.push('L');
+                write_num(&mut path_data, x2);
+                path_data.push(' ');
+                write_num(&mut path_data, y2);
             }
 
-            elements.push(format!(
-                "<path d=\"{}\" fill=\"none\" {}/>",
-                path_data, stroke
-            ));
+            let mut s = String::with_capacity(path_data.len() + stroke.len() + 32);
+            s.push_str("<path d=\"");
+            s.push_str(&path_data);
+            s.push_str("\" fill=\"none\" ");
+            s.push_str(stroke);
+            s.push_str("/>");
+            elements.push(s);
         } else {
             // 2 lines - output as individual lines (similar size to path)
             for &(x1, y1, x2, y2) in lines {
-                elements.push(format!(
-                    "<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" {}/>",
-                    Self::fmt(x1),
-                    Self::fmt(y1),
-                    Self::fmt(x2),
-                    Self::fmt(y2),
-                    stroke
-                ));
+                let mut s = String::with_capacity(96);
+                s.push_str("<line x1=\"");
+                write_num(&mut s, x1);
+                s.push_str("\" y1=\"");
+                write_num(&mut s, y1);
+                s.push_str("\" x2=\"");
+                write_num(&mut s, x2);
+                s.push_str("\" y2=\"");
+                write_num(&mut s, y2);
+                s.push_str("\" ");
+                s.push_str(stroke);
+                s.push_str("/>");
+                elements.push(s);
             }
         }
     }
@@ -193,17 +213,6 @@ impl ElementBuffer {
             self.flush_lines_as_path();
         }
         self.current_stroke = None;
-    }
-
-    /// Format number minimally (remove trailing zeros and unnecessary decimals)
-    #[inline]
-    fn fmt(n: f64) -> String {
-        if n.fract().abs() < 0.01 {
-            format!("{:.0}", n)
-        } else {
-            let s = format!("{:.2}", n);
-            s.trim_end_matches('0').trim_end_matches('.').to_string()
-        }
     }
 }
 
@@ -216,12 +225,14 @@ impl Default for ElementBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::images::svg_utils::fmt_num;
 
     #[test]
     fn test_number_formatting() {
-        assert_eq!(ElementBuffer::fmt(10.0), "10");
-        assert_eq!(ElementBuffer::fmt(10.5), "10.5");
-        assert_eq!(ElementBuffer::fmt(10.50), "10.5");
-        assert_eq!(ElementBuffer::fmt(10.123), "10.12");
+        // Test using the shared fmt_num function
+        assert_eq!(fmt_num(10.0), "10");
+        assert_eq!(fmt_num(10.5), "10.5");
+        assert_eq!(fmt_num(10.50), "10.5");
+        assert_eq!(fmt_num(10.123), "10.12");
     }
 }

@@ -5,27 +5,11 @@
 
 use super::state::{Brush, Pen};
 use super::transform::CoordinateTransform;
+use crate::images::svg_utils::{write_color_hex, write_num};
 
-/// Format a number with minimal precision (no trailing zeros)
-pub fn fmt_num(n: f64) -> String {
-    if n.fract() == 0.0 && n.abs() < 1e10 {
-        format!("{}", n as i64)
-    } else {
-        let rounded = (n * 100.0).round() / 100.0;
-        let s = format!("{:.2}", rounded);
-        s.trim_end_matches('0').trim_end_matches('.').to_string()
-    }
-}
-
-/// Convert COLORREF to #RRGGBB
-pub fn color_hex(c: u32) -> String {
-    format!(
-        "#{:02x}{:02x}{:02x}",
-        c & 0xFF,
-        (c >> 8) & 0xFF,
-        (c >> 16) & 0xFF
-    )
-}
+// Re-export commonly used functions from svg_utils for backward compatibility
+#[allow(unused_imports)]
+pub use crate::images::svg_utils::{color_hex, escape_xml, fmt_num, write_xml_escaped};
 
 /// Generate fill attribute (only if non-default)
 pub fn fill_attr(brush: &Brush, poly_fill_mode: u16) -> Option<String> {
@@ -61,12 +45,16 @@ pub fn stroke_attrs(pen: &Pen, transform: &CoordinateTransform) -> String {
 
     let mut attrs = String::with_capacity(96);
 
-    // Stroke color
-    attrs.push_str(&format!(r#" stroke="{}""#, color_hex(pen.color)));
+    // Stroke color - inline color_hex to avoid allocation
+    attrs.push_str(" stroke=\"");
+    write_color_hex(&mut attrs, pen.color);
+    attrs.push('"');
 
     // Stroke width (average of width and height like libwmf)
     let width = transform.width(pen.width.max(1) as f64);
-    attrs.push_str(&format!(r#" stroke-width="{}""#, fmt_num(width)));
+    attrs.push_str(r#" stroke-width=""#);
+    write_num(&mut attrs, width);
+    attrs.push('"');
 
     // Line cap
     let endcap = (pen.style >> 8) & 0x0F;
@@ -76,7 +64,9 @@ pub fn stroke_attrs(pen: &Pen, transform: &CoordinateTransform) -> String {
         _ => "butt",      // PS_ENDCAP_FLAT (default)
     };
     if cap != "butt" {
-        attrs.push_str(&format!(r#" stroke-linecap="{}""#, cap));
+        attrs.push_str(r#" stroke-linecap=""#);
+        attrs.push_str(cap);
+        attrs.push('"');
     }
 
     // Line join
@@ -87,7 +77,9 @@ pub fn stroke_attrs(pen: &Pen, transform: &CoordinateTransform) -> String {
         _ => "miter",    // PS_JOIN_MITER (default)
     };
     if join_style != "miter" {
-        attrs.push_str(&format!(r#" stroke-linejoin="{}""#, join_style));
+        attrs.push_str(r#" stroke-linejoin=""#);
+        attrs.push_str(join_style);
+        attrs.push('"');
     }
 
     // Dash array (scaled by pen width like libwmf)
@@ -95,49 +87,55 @@ pub fn stroke_attrs(pen: &Pen, transform: &CoordinateTransform) -> String {
         1 => {
             // PS_DASH - dashed line (10x width dash + 10x width gap)
             let dash = width * 10.0;
-            attrs.push_str(&format!(
-                r#" stroke-dasharray="{},{}"#,
-                fmt_num(dash),
-                fmt_num(dash)
-            ));
+            attrs.push_str(r#" stroke-dasharray=""#);
+            write_num(&mut attrs, dash);
+            attrs.push(',');
+            write_num(&mut attrs, dash);
+            attrs.push('"');
         },
         2 | 7 => {
             // PS_DOT or PS_ALTERNATE - dotted line (width dash + 2x width gap)
             let dash = width;
             let gap = width * 2.0;
-            attrs.push_str(&format!(
-                r#" stroke-dasharray="{},{}"#,
-                fmt_num(dash),
-                fmt_num(gap)
-            ));
+            attrs.push_str(r#" stroke-dasharray=""#);
+            write_num(&mut attrs, dash);
+            attrs.push(',');
+            write_num(&mut attrs, gap);
+            attrs.push('"');
         },
         3 => {
             // PS_DASHDOT - dash-dot pattern
             let long = width * 10.0;
             let short = width;
             let gap = width * 2.0;
-            attrs.push_str(&format!(
-                r#" stroke-dasharray="{},{},{},{}"#,
-                fmt_num(long),
-                fmt_num(gap),
-                fmt_num(short),
-                fmt_num(gap)
-            ));
+            attrs.push_str(r#" stroke-dasharray=""#);
+            write_num(&mut attrs, long);
+            attrs.push(',');
+            write_num(&mut attrs, gap);
+            attrs.push(',');
+            write_num(&mut attrs, short);
+            attrs.push(',');
+            write_num(&mut attrs, gap);
+            attrs.push('"');
         },
         4 => {
             // PS_DASHDOTDOT - dash-dot-dot pattern
             let long = width * 10.0;
             let short = width;
             let gap = width * 2.0;
-            attrs.push_str(&format!(
-                r#" stroke-dasharray="{},{},{},{},{},{}"#,
-                fmt_num(long),
-                fmt_num(gap),
-                fmt_num(short),
-                fmt_num(gap),
-                fmt_num(short),
-                fmt_num(gap)
-            ));
+            attrs.push_str(r#" stroke-dasharray=""#);
+            write_num(&mut attrs, long);
+            attrs.push(',');
+            write_num(&mut attrs, gap);
+            attrs.push(',');
+            write_num(&mut attrs, short);
+            attrs.push(',');
+            write_num(&mut attrs, gap);
+            attrs.push(',');
+            write_num(&mut attrs, short);
+            attrs.push(',');
+            write_num(&mut attrs, gap);
+            attrs.push('"');
         },
         _ => {}, // PS_SOLID (0) or PS_INSIDEFRAME (6) - no dasharray
     }

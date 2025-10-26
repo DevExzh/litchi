@@ -7,9 +7,10 @@
 use super::super::constants::record;
 use super::super::parser::WmfRecord;
 use super::state::{Brush, Font, GdiObject, GraphicsState, Pen};
-use super::style::{color_hex, fill_attr, fmt_num, map_font_family, stroke_attrs};
+use super::style::{fill_attr, map_font_family, stroke_attrs};
 use super::transform::CoordinateTransform;
 use crate::common::binary::{read_i16_le, read_u16_le};
+use crate::images::svg_utils::{write_color_hex, write_num};
 
 /// Type of arc rendering
 #[derive(Debug, Clone, Copy)]
@@ -173,13 +174,16 @@ impl SvgRenderer {
         let (x, y) = self.transform.point(left, top);
         let (x2, y2) = self.transform.point(right, bottom);
 
-        let mut s = format!(
-            r#"<rect x="{}" y="{}" width="{}" height="{}""#,
-            fmt_num(x),
-            fmt_num(y),
-            fmt_num((x2 - x).abs()),
-            fmt_num((y2 - y).abs())
-        );
+        let mut s = String::with_capacity(128);
+        s.push_str(r#"<rect x=""#);
+        write_num(&mut s, x);
+        s.push_str(r#"" y=""#);
+        write_num(&mut s, y);
+        s.push_str(r#"" width=""#);
+        write_num(&mut s, (x2 - x).abs());
+        s.push_str(r#"" height=""#);
+        write_num(&mut s, (y2 - y).abs());
+        s.push('"');
 
         if let Some(fill) = fill_attr(&self.state.brush, self.state.poly_fill_mode) {
             s.push_str(&fill);
@@ -208,13 +212,16 @@ impl SvgRenderer {
         let rx = (x2 - x1).abs() / 2.0;
         let ry = (y2 - y1).abs() / 2.0;
 
-        let mut s = format!(
-            r#"<ellipse cx="{}" cy="{}" rx="{}" ry="{}""#,
-            fmt_num(cx),
-            fmt_num(cy),
-            fmt_num(rx),
-            fmt_num(ry)
-        );
+        let mut s = String::with_capacity(128);
+        s.push_str(r#"<ellipse cx=""#);
+        write_num(&mut s, cx);
+        s.push_str(r#"" cy=""#);
+        write_num(&mut s, cy);
+        s.push_str(r#"" rx=""#);
+        write_num(&mut s, rx);
+        s.push_str(r#"" ry=""#);
+        write_num(&mut s, ry);
+        s.push('"');
 
         if let Some(fill) = fill_attr(&self.state.brush, self.state.poly_fill_mode) {
             s.push_str(&fill);
@@ -235,18 +242,22 @@ impl SvgRenderer {
             return None;
         }
 
-        let mut points = String::with_capacity(count * 12);
+        let mut s = String::with_capacity(128 + count * 12);
+        s.push_str(r#"<polygon points=""#);
+
         for i in 0..count {
             let x = read_i16_le(&rec.params, 2 + i * 4).unwrap_or(0);
             let y = read_i16_le(&rec.params, 4 + i * 4).unwrap_or(0);
             let (tx, ty) = self.transform.point(x, y);
             if i > 0 {
-                points.push(' ');
+                s.push(' ');
             }
-            points.push_str(&format!("{},{}", fmt_num(tx), fmt_num(ty)));
+            write_num(&mut s, tx);
+            s.push(',');
+            write_num(&mut s, ty);
         }
 
-        let mut s = format!(r#"<polygon points="{}""#, points);
+        s.push('"');
         if let Some(fill) = fill_attr(&self.state.brush, self.state.poly_fill_mode) {
             s.push_str(&fill);
         }
@@ -266,18 +277,22 @@ impl SvgRenderer {
             return None;
         }
 
-        let mut points = String::with_capacity(count * 12);
+        let mut s = String::with_capacity(128 + count * 12);
+        s.push_str(r#"<polyline points=""#);
+
         for i in 0..count {
             let x = read_i16_le(&rec.params, 2 + i * 4).unwrap_or(0);
             let y = read_i16_le(&rec.params, 4 + i * 4).unwrap_or(0);
             let (tx, ty) = self.transform.point(x, y);
             if i > 0 {
-                points.push(' ');
+                s.push(' ');
             }
-            points.push_str(&format!("{},{}", fmt_num(tx), fmt_num(ty)));
+            write_num(&mut s, tx);
+            s.push(',');
+            write_num(&mut s, ty);
         }
 
-        let mut s = format!(r#"<polyline points="{}" fill="none""#, points);
+        s.push_str(r#"" fill="none""#);
         s.push_str(&stroke_attrs(&self.state.pen, &self.transform));
         s.push_str("/>");
 
@@ -296,13 +311,16 @@ impl SvgRenderer {
             .point(self.state.position.0, self.state.position.1);
         let (x2, y2) = self.transform.point(x2, y2);
 
-        let mut s = format!(
-            r#"<line x1="{}" y1="{}" x2="{}" y2="{}""#,
-            fmt_num(x1),
-            fmt_num(y1),
-            fmt_num(x2),
-            fmt_num(y2)
-        );
+        let mut s = String::with_capacity(128);
+        s.push_str(r#"<line x1=""#);
+        write_num(&mut s, x1);
+        s.push_str(r#"" y1=""#);
+        write_num(&mut s, y1);
+        s.push_str(r#"" x2=""#);
+        write_num(&mut s, x2);
+        s.push_str(r#"" y2=""#);
+        write_num(&mut s, y2);
+        s.push('"');
         s.push_str(&stroke_attrs(&self.state.pen, &self.transform));
         s.push_str("/>");
 
@@ -361,17 +379,22 @@ impl SvgRenderer {
         let (tx, ty) = self.transform.point(x, y);
         let font_size = self.transform.height(self.state.font.height.abs() as f64);
 
-        let mut s = format!(
-            r#"<text x="{}" y="{}" font-size="{}" fill="{}""#,
-            fmt_num(tx),
-            fmt_num(ty),
-            fmt_num(font_size),
-            color_hex(self.state.text_color)
-        );
+        let mut s = String::with_capacity(128 + text.len());
+        s.push_str(r#"<text x=""#);
+        write_num(&mut s, tx);
+        s.push_str(r#"" y=""#);
+        write_num(&mut s, ty);
+        s.push_str(r#"" font-size=""#);
+        write_num(&mut s, font_size);
+        s.push_str("\" fill=\"");
+        write_color_hex(&mut s, self.state.text_color);
+        s.push('"');
 
         // Non-default font attributes
         if self.state.font.name != "serif" {
-            s.push_str(&format!(r#" font-family="{}""#, self.state.font.name));
+            s.push_str(r#" font-family=""#);
+            s.push_str(&self.state.font.name);
+            s.push('"');
         }
         if self.state.font.italic {
             s.push_str(r#" font-style="italic""#);
@@ -388,12 +411,13 @@ impl SvgRenderer {
         // Rotation transform if escapement is non-zero
         if self.state.font.escapement != 0 {
             let angle = -(self.state.font.escapement as f64 / 10.0);
-            s.push_str(&format!(
-                r#" transform="rotate({} {} {})""#,
-                fmt_num(angle),
-                fmt_num(tx),
-                fmt_num(ty)
-            ));
+            s.push_str(r#" transform="rotate("#);
+            write_num(&mut s, angle);
+            s.push(' ');
+            write_num(&mut s, tx);
+            s.push(' ');
+            write_num(&mut s, ty);
+            s.push_str(r#")""#);
         }
 
         s.push('>');
@@ -455,24 +479,30 @@ impl SvgRenderer {
         let cy = (tl_y + br_y) / 2.0;
 
         let mut s = String::with_capacity(128);
-        s.push_str(r#"<path d=""#);
+        s.push_str(r#"<path d="M"#);
 
         // Start at the start point
-        s.push_str(&format!("M{},{}", fmt_num(start_x), fmt_num(start_y)));
+        write_num(&mut s, start_x);
+        s.push(',');
+        write_num(&mut s, start_y);
 
         // Arc to end point (large-arc-flag=0, sweep-flag=1 for clockwise)
-        s.push_str(&format!(
-            "A{},{} 0 0,1 {},{}",
-            fmt_num(rx),
-            fmt_num(ry),
-            fmt_num(end_x),
-            fmt_num(end_y)
-        ));
+        s.push('A');
+        write_num(&mut s, rx);
+        s.push(',');
+        write_num(&mut s, ry);
+        s.push_str(" 0 0,1 ");
+        write_num(&mut s, end_x);
+        s.push(',');
+        write_num(&mut s, end_y);
 
         match arc_type {
             ArcType::Pie => {
                 // Line to center, then close
-                s.push_str(&format!("L{},{}", fmt_num(cx), fmt_num(cy)));
+                s.push('L');
+                write_num(&mut s, cx);
+                s.push(',');
+                write_num(&mut s, cy);
                 s.push('Z');
             },
             ArcType::Chord => {
@@ -509,13 +539,16 @@ impl SvgRenderer {
         let rx = (x2 - x1).abs() / 2.0;
         let ry = (y2 - y1).abs() / 2.0;
 
-        let mut s = format!(
-            r#"<ellipse cx="{}" cy="{}" rx="{}" ry="{}""#,
-            fmt_num(cx),
-            fmt_num(cy),
-            fmt_num(rx),
-            fmt_num(ry)
-        );
+        let mut s = String::with_capacity(128);
+        s.push_str(r#"<ellipse cx=""#);
+        write_num(&mut s, cx);
+        s.push_str(r#"" cy=""#);
+        write_num(&mut s, cy);
+        s.push_str(r#"" rx=""#);
+        write_num(&mut s, rx);
+        s.push_str(r#"" ry=""#);
+        write_num(&mut s, ry);
+        s.push('"');
 
         if let Some(fill) = fill_attr(&self.state.brush, self.state.poly_fill_mode) {
             s.push_str(&fill);
@@ -563,7 +596,11 @@ impl SvgRenderer {
             let x = read_i16_le(&rec.params, offset).unwrap_or(0);
             let y = read_i16_le(&rec.params, offset + 2).unwrap_or(0);
             let (tx, ty) = self.transform.point(x, y);
-            path_data.push_str(&format!("M{},{}L", fmt_num(tx), fmt_num(ty)));
+            path_data.push('M');
+            write_num(&mut path_data, tx);
+            path_data.push(',');
+            write_num(&mut path_data, ty);
+            path_data.push('L');
             offset += 4;
 
             // Remaining points - LineTo
@@ -574,7 +611,9 @@ impl SvgRenderer {
                 if i > 1 {
                     path_data.push(' ');
                 }
-                path_data.push_str(&format!("{},{}", fmt_num(tx), fmt_num(ty)));
+                write_num(&mut path_data, tx);
+                path_data.push(',');
+                write_num(&mut path_data, ty);
                 offset += 4;
             }
 
@@ -612,15 +651,20 @@ impl SvgRenderer {
         let rx = self.transform.width(w as f64 / 2.0);
         let ry = self.transform.height(h as f64 / 2.0);
 
-        let mut s = format!(
-            r#"<rect x="{}" y="{}" width="{}" height="{}" rx="{}" ry="{}""#,
-            fmt_num(x),
-            fmt_num(y),
-            fmt_num((x2 - x).abs()),
-            fmt_num((y2 - y).abs()),
-            fmt_num(rx),
-            fmt_num(ry)
-        );
+        let mut s = String::with_capacity(128);
+        s.push_str(r#"<rect x=""#);
+        write_num(&mut s, x);
+        s.push_str(r#"" y=""#);
+        write_num(&mut s, y);
+        s.push_str(r#"" width=""#);
+        write_num(&mut s, (x2 - x).abs());
+        s.push_str(r#"" height=""#);
+        write_num(&mut s, (y2 - y).abs());
+        s.push_str(r#"" rx=""#);
+        write_num(&mut s, rx);
+        s.push_str(r#"" ry=""#);
+        write_num(&mut s, ry);
+        s.push('"');
 
         if let Some(fill) = fill_attr(&self.state.brush, self.state.poly_fill_mode) {
             s.push_str(&fill);

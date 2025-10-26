@@ -16,6 +16,7 @@ use super::{
 use crate::common::error::Result;
 use crate::images::emf::parser::EmfParser;
 use crate::images::emf::records::*;
+use crate::images::svg_utils::{write_num, write_xml_escaped};
 use std::fmt::Write;
 use zerocopy::FromBytes;
 
@@ -335,31 +336,19 @@ impl<'a> EmfSvgConverter<'a> {
 
     /// Render a line (optimized format - minimal whitespace, no trailing zeros)
     fn render_line(&self, x1: f64, y1: f64, x2: f64, y2: f64, dc: &DeviceContext) -> String {
-        format!(
-            "<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" {}/>",
-            Self::fmt_num(x1),
-            Self::fmt_num(y1),
-            Self::fmt_num(x2),
-            Self::fmt_num(y2),
-            dc.get_stroke_attrs()
-        )
-    }
-
-    /// Format number with minimal precision (removes trailing zeros and decimals)
-    /// Examples: 10.0 -> "10", 10.5 -> "10.5", 10.50 -> "10.5", 10.123 -> "10.12"
-    #[inline]
-    fn fmt_num(n: f64) -> String {
-        // Round to 2 decimal places
-        let rounded = (n * 100.0).round() / 100.0;
-
-        // If it's effectively an integer, format without decimals
-        if (rounded - rounded.round()).abs() < 0.001 {
-            format!("{}", rounded as i32)
-        } else {
-            // Format with 2 decimals and trim trailing zeros
-            let s = format!("{:.2}", rounded);
-            s.trim_end_matches('0').trim_end_matches('.').to_string()
-        }
+        let mut s = String::with_capacity(128);
+        s.push_str("<line x1=\"");
+        write_num(&mut s, x1);
+        s.push_str("\" y1=\"");
+        write_num(&mut s, y1);
+        s.push_str("\" x2=\"");
+        write_num(&mut s, x2);
+        s.push_str("\" y2=\"");
+        write_num(&mut s, y2);
+        s.push_str("\" ");
+        s.push_str(&dc.get_stroke_attrs());
+        s.push_str("/>");
+        s
     }
 
     /// Render a rectangle (optimized)
@@ -371,15 +360,21 @@ impl<'a> EmfSvgConverter<'a> {
         height: f64,
         dc: &DeviceContext,
     ) -> String {
-        format!(
-            "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" {} {}/>",
-            Self::fmt_num(x),
-            Self::fmt_num(y),
-            Self::fmt_num(width),
-            Self::fmt_num(height),
-            dc.get_fill_attr(),
-            dc.get_stroke_attrs()
-        )
+        let mut s = String::with_capacity(128);
+        s.push_str("<rect x=\"");
+        write_num(&mut s, x);
+        s.push_str("\" y=\"");
+        write_num(&mut s, y);
+        s.push_str("\" width=\"");
+        write_num(&mut s, width);
+        s.push_str("\" height=\"");
+        write_num(&mut s, height);
+        s.push_str("\" ");
+        s.push_str(&dc.get_fill_attr());
+        s.push(' ');
+        s.push_str(&dc.get_stroke_attrs());
+        s.push_str("/>");
+        s
     }
 
     /// Render a rounded rectangle (optimized)
@@ -391,30 +386,44 @@ impl<'a> EmfSvgConverter<'a> {
     ) -> String {
         let (x, y, width, height) = rect;
         let (rx, ry) = corners;
-        format!(
-            "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"{}\" ry=\"{}\" {} {}/>",
-            Self::fmt_num(x),
-            Self::fmt_num(y),
-            Self::fmt_num(width),
-            Self::fmt_num(height),
-            Self::fmt_num(rx),
-            Self::fmt_num(ry),
-            dc.get_fill_attr(),
-            dc.get_stroke_attrs()
-        )
+        let mut s = String::with_capacity(128);
+        s.push_str("<rect x=\"");
+        write_num(&mut s, x);
+        s.push_str("\" y=\"");
+        write_num(&mut s, y);
+        s.push_str("\" width=\"");
+        write_num(&mut s, width);
+        s.push_str("\" height=\"");
+        write_num(&mut s, height);
+        s.push_str("\" rx=\"");
+        write_num(&mut s, rx);
+        s.push_str("\" ry=\"");
+        write_num(&mut s, ry);
+        s.push_str("\" ");
+        s.push_str(&dc.get_fill_attr());
+        s.push(' ');
+        s.push_str(&dc.get_stroke_attrs());
+        s.push_str("/>");
+        s
     }
 
     /// Render an ellipse (optimized)
     fn render_ellipse(&self, cx: f64, cy: f64, rx: f64, ry: f64, dc: &DeviceContext) -> String {
-        format!(
-            "<ellipse cx=\"{}\" cy=\"{}\" rx=\"{}\" ry=\"{}\" {} {}/>",
-            Self::fmt_num(cx),
-            Self::fmt_num(cy),
-            Self::fmt_num(rx),
-            Self::fmt_num(ry),
-            dc.get_fill_attr(),
-            dc.get_stroke_attrs()
-        )
+        let mut s = String::with_capacity(128);
+        s.push_str("<ellipse cx=\"");
+        write_num(&mut s, cx);
+        s.push_str("\" cy=\"");
+        write_num(&mut s, cy);
+        s.push_str("\" rx=\"");
+        write_num(&mut s, rx);
+        s.push_str("\" ry=\"");
+        write_num(&mut s, ry);
+        s.push_str("\" ");
+        s.push_str(&dc.get_fill_attr());
+        s.push(' ');
+        s.push_str(&dc.get_stroke_attrs());
+        s.push_str("/>");
+        s
     }
 
     /// Render polygon (32-bit coordinates)
@@ -547,14 +556,18 @@ impl<'a> EmfSvgConverter<'a> {
             };
 
             if !text.is_empty() {
-                let svg = format!(
-                    "<text x=\"{}\" y=\"{}\" fill=\"{}\" {}>{}</text>",
-                    Self::fmt_num(x),
-                    Self::fmt_num(y),
-                    state.dc.text_color.to_svg_color(),
-                    state.dc.font.to_svg_attrs(),
-                    Self::escape_xml(&text)
-                );
+                let mut svg = String::with_capacity(128 + text.len());
+                svg.push_str("<text x=\"");
+                write_num(&mut svg, x);
+                svg.push_str("\" y=\"");
+                write_num(&mut svg, y);
+                svg.push_str("\" fill=\"");
+                svg.push_str(&state.dc.text_color.to_svg_color());
+                svg.push_str("\" ");
+                svg.push_str(&state.dc.font.to_svg_attrs());
+                svg.push('>');
+                write_xml_escaped(&mut svg, &text);
+                svg.push_str("</text>");
                 Ok(Some(vec![svg]))
             } else {
                 Ok(None)
@@ -594,15 +607,6 @@ impl<'a> EmfSvgConverter<'a> {
         String::from_utf8_lossy(&data[offset..offset + count])
             .trim_end_matches('\0')
             .to_string()
-    }
-
-    /// Escape XML special characters
-    fn escape_xml(text: &str) -> String {
-        text.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('"', "&quot;")
-            .replace('\'', "&apos;")
     }
 
     /// Build final SVG document

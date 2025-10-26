@@ -97,6 +97,7 @@ pub mod emf;
 pub mod extractor;
 pub mod pict;
 pub mod svg;
+pub mod svg_utils;
 pub mod wmf;
 
 use crate::common::error::Result;

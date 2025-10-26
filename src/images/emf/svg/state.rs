@@ -3,6 +3,7 @@
 /// Manages device context stack, transforms, clipping, and graphics state
 use super::path::PathBuilder;
 use crate::images::emf::records::*;
+use crate::images::svg_utils::write_num;
 
 /// Complete rendering state
 pub struct RenderState {
@@ -154,22 +155,28 @@ impl DeviceContext {
         self.world_transform.transform_point(vx, vy)
     }
 
-    /// Get SVG stroke attributes
+    /// Get SVG stroke attributes (optimized - no format! macros)
     pub fn get_stroke_attrs(&self) -> String {
-        let mut attrs = String::new();
+        let mut attrs = String::with_capacity(64);
 
         // Stroke color
         if self.pen.style != pen_style::NULL {
-            attrs.push_str(&format!("stroke=\"{}\" ", self.pen.color.to_svg_color()));
+            attrs.push_str("stroke=\"");
+            attrs.push_str(&self.pen.color.to_svg_color());
+            attrs.push_str("\" ");
 
             // Stroke width
             if self.pen.width > 1.0 {
-                attrs.push_str(&format!("stroke-width=\"{}\" ", self.pen.width));
+                attrs.push_str("stroke-width=\"");
+                write_num(&mut attrs, self.pen.width);
+                attrs.push_str("\" ");
             }
 
             // Stroke dash array
             if let Some(ref dash) = self.pen.dash_pattern {
-                attrs.push_str(&format!("stroke-dasharray=\"{}\" ", dash));
+                attrs.push_str("stroke-dasharray=\"");
+                attrs.push_str(dash);
+                attrs.push_str("\" ");
             }
 
             // Line cap
@@ -179,7 +186,9 @@ impl DeviceContext {
                     pen_style::ENDCAP_SQUARE => "square",
                     _ => "butt",
                 };
-                attrs.push_str(&format!("stroke-linecap=\"{}\" ", cap));
+                attrs.push_str("stroke-linecap=\"");
+                attrs.push_str(cap);
+                attrs.push_str("\" ");
             }
 
             // Line join
@@ -189,12 +198,16 @@ impl DeviceContext {
                     pen_style::JOIN_BEVEL => "bevel",
                     _ => "miter",
                 };
-                attrs.push_str(&format!("stroke-linejoin=\"{}\" ", join));
+                attrs.push_str("stroke-linejoin=\"");
+                attrs.push_str(join);
+                attrs.push_str("\" ");
             }
 
             // Miter limit
             if self.miter_limit != 10.0 {
-                attrs.push_str(&format!("stroke-miterlimit=\"{}\" ", self.miter_limit));
+                attrs.push_str("stroke-miterlimit=\"");
+                write_num(&mut attrs, self.miter_limit);
+                attrs.push_str("\" ");
             }
         } else {
             attrs.push_str("stroke=\"none\" ");
@@ -208,7 +221,11 @@ impl DeviceContext {
         if self.brush.style == brush_style::NULL {
             "fill=\"none\"".to_string()
         } else {
-            format!("fill=\"{}\"", self.brush.color.to_svg_color())
+            let mut s = String::with_capacity(32);
+            s.push_str("fill=\"");
+            s.push_str(&self.brush.color.to_svg_color());
+            s.push('"');
+            s
         }
     }
 
