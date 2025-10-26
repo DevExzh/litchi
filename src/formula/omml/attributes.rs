@@ -160,8 +160,9 @@ pub fn parse_element_properties(
 ///
 /// # Performance
 /// - Zero-copy in most cases (no `_platform_memmove`)
-/// - Pre-computes `m:` prefix once per call
+/// - Uses stack-allocated array instead of SmallVec to avoid memcpy
 /// - Uses byte-level comparison to avoid UTF-8 validation overhead
+/// - Optimized for OMML keys which are typically short (<30 bytes)
 ///
 /// Use this version when you don't need to store the value long-term.
 #[inline]
@@ -169,19 +170,34 @@ pub fn get_attribute_value_borrowed<'a>(
     attrs: &'a [quick_xml::events::attributes::Attribute<'a>],
     key: &str,
 ) -> Option<std::borrow::Cow<'a, str>> {
-    // Pre-compute the m: prefixed key once to avoid allocation in the loop
     let key_bytes = key.as_bytes();
-    let mut m_prefixed = smallvec::SmallVec::<[u8; 32]>::with_capacity(key.len() + 2);
-    m_prefixed.extend_from_slice(b"m:");
-    m_prefixed.extend_from_slice(key_bytes);
+    let key_len = key_bytes.len();
+
+    // Optimize: Use stack array instead of SmallVec to avoid memcpy
+    // Most OMML keys are short (e.g., "val", "chr", "pos") so 32 bytes is plenty
+    debug_assert!(key_len <= 30, "OMML attribute key too long: {}", key);
+
+    if key_len > 30 {
+        // Fallback for unexpectedly long keys (should never happen in practice)
+        return None;
+    }
+
+    // Pre-compute the m: prefixed key on the stack (zero heap allocation)
+    let mut m_prefixed_buf = [0u8; 32]; // "m:" + key (max 30 bytes)
+    m_prefixed_buf[0] = b'm';
+    m_prefixed_buf[1] = b':';
+    m_prefixed_buf[2..2 + key_len].copy_from_slice(key_bytes);
+    let m_prefixed_len = 2 + key_len;
+    let m_prefixed = &m_prefixed_buf[..m_prefixed_len];
 
     // Fast path: iterate attributes with byte-level comparison
+    // Typically only 2-5 attributes per element, so linear search is optimal
     for attr in attrs {
         let attr_key = attr.key.as_ref();
 
         // Fast byte comparison (avoids UTF-8 validation overhead)
-        if attr_key == key_bytes || attr_key == m_prefixed.as_slice() {
-            // Only decode UTF-8 when we have a match
+        if attr_key == key_bytes || attr_key == m_prefixed {
+            // Only decode UTF-8 when we have a match (borrowing from attr.value)
             return Some(std::borrow::Cow::Borrowed(
                 std::str::from_utf8(&attr.value).ok()?,
             ));
@@ -550,77 +566,110 @@ impl<'a> AttributeCache<'a> {
         get_attribute_value(self.attrs, key)
     }
 
-    /// Get attribute as boolean
+    /// Get attribute as borrowed Cow (zero-copy when possible)
+    ///
+    /// Performance-optimized version that borrows from the XML attribute
+    /// instead of allocating. Use this for immediate parsing operations.
+    #[inline]
+    pub fn get_borrowed(&self, key: &str) -> Option<std::borrow::Cow<'a, str>> {
+        get_attribute_value_borrowed(self.attrs, key)
+    }
+
+    /// Get attribute as boolean (optimized: zero-copy)
+    ///
+    /// Uses borrowed string to avoid allocation overhead.
+    /// This is called very frequently during OMML parsing.
     #[allow(dead_code)] // Part of the AttributeCache API
+    #[inline]
     pub fn get_bool(&mut self, key: &str) -> Option<bool> {
-        self.get(key).and_then(|s| parse_bool_fast(&s))
+        // Optimize: Use borrowed version to avoid String allocation
+        self.get_borrowed(key).and_then(|s| parse_bool_fast(&s))
     }
 
-    /// Get attribute as integer with SIMD acceleration
+    /// Get attribute as integer with SIMD acceleration (optimized: zero-copy)
     #[allow(dead_code)] // Part of the AttributeCache API
+    #[inline]
     pub fn get_int(&mut self, key: &str) -> Option<i32> {
-        self.get(key).and_then(|s| parse_int_simd(&s))
+        self.get_borrowed(key).and_then(|s| parse_int_simd(&s))
     }
 
-    /// Get attribute as float with SIMD acceleration
+    /// Get attribute as float with SIMD acceleration (optimized: zero-copy)
     #[allow(dead_code)] // Part of the AttributeCache API
+    #[inline]
     pub fn get_float(&mut self, key: &str) -> Option<f32> {
-        self.get(key).and_then(|s| parse_float_simd(&s))
+        self.get_borrowed(key).and_then(|s| parse_float_simd(&s))
     }
 
-    /// Get attribute as space type
+    /// Get attribute as space type (optimized: zero-copy)
     #[allow(dead_code)] // Part of the AttributeCache API
+    #[inline]
     pub fn get_space(&mut self, key: &str) -> Option<SpaceType> {
-        self.get(key).and_then(|s| parse_space_type(Some(&s)))
+        self.get_borrowed(key)
+            .and_then(|s| parse_space_type(Some(&s)))
     }
 
-    /// Get attribute as alignment
+    /// Get attribute as alignment (optimized: zero-copy)
     #[allow(dead_code)] // Part of the AttributeCache API
+    #[inline]
     pub fn get_alignment(&mut self, key: &str) -> Option<Alignment> {
-        self.get(key).and_then(|s| parse_alignment_value(&s))
+        self.get_borrowed(key)
+            .and_then(|s| parse_alignment_value(&s))
     }
 
-    /// Get attribute as vertical alignment
+    /// Get attribute as vertical alignment (optimized: zero-copy)
     #[allow(dead_code)] // Part of the AttributeCache API
+    #[inline]
     pub fn get_vertical_alignment(&mut self, key: &str) -> Option<VerticalAlignment> {
-        self.get(key)
+        self.get_borrowed(key)
             .and_then(|s| parse_vertical_alignment(Some(&s)))
     }
 
-    /// Get attribute as position type
+    /// Get attribute as position type (optimized: zero-copy)
     #[allow(dead_code)] // Part of the AttributeCache API
+    #[inline]
     pub fn get_position(&mut self, key: &str) -> Option<Position> {
-        self.get(key).and_then(|s| parse_position_type(Some(&s)))
+        self.get_borrowed(key)
+            .and_then(|s| parse_position_type(Some(&s)))
     }
 
-    /// Get attribute as fraction type
+    /// Get attribute as fraction type (optimized: zero-copy)
     #[allow(dead_code)] // Part of the AttributeCache API
+    #[inline]
     pub fn get_fraction_type(&mut self, key: &str) -> Option<FractionType> {
-        self.get(key).and_then(|s| parse_fraction_type(Some(&s)))
+        self.get_borrowed(key)
+            .and_then(|s| parse_fraction_type(Some(&s)))
     }
 
-    /// Get attribute as shape type
+    /// Get attribute as shape type (optimized: zero-copy)
     #[allow(dead_code)] // Part of the AttributeCache API
+    #[inline]
     pub fn get_shape(&mut self, key: &str) -> Option<ShapeType> {
-        self.get(key).and_then(|s| parse_shape_type(Some(&s)))
+        self.get_borrowed(key)
+            .and_then(|s| parse_shape_type(Some(&s)))
     }
 
-    /// Get attribute as break type
+    /// Get attribute as break type (optimized: zero-copy)
     #[allow(dead_code)] // Part of the AttributeCache API
+    #[inline]
     pub fn get_break(&mut self, key: &str) -> Option<BreakType> {
-        self.get(key).and_then(|s| parse_break_type(Some(&s)))
+        self.get_borrowed(key)
+            .and_then(|s| parse_break_type(Some(&s)))
     }
 
-    /// Get attribute as line style
+    /// Get attribute as line style (optimized: zero-copy)
     #[allow(dead_code)] // Part of the AttributeCache API
+    #[inline]
     pub fn get_line_style(&mut self, key: &str) -> Option<LineStyle> {
-        self.get(key).and_then(|s| parse_line_style(Some(&s)))
+        self.get_borrowed(key)
+            .and_then(|s| parse_line_style(Some(&s)))
     }
 
-    /// Get attribute as strike style
+    /// Get attribute as strike style (optimized: zero-copy)
     #[allow(dead_code)] // Part of the AttributeCache API
+    #[inline]
     pub fn get_strike_style(&mut self, key: &str) -> Option<StrikeStyle> {
-        self.get(key).and_then(|s| parse_strike_style(Some(&s)))
+        self.get_borrowed(key)
+            .and_then(|s| parse_strike_style(Some(&s)))
     }
 }
 
