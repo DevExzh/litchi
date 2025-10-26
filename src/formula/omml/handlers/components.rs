@@ -10,7 +10,7 @@ impl NumeratorHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: component handlers move owned Vec between contexts
     ) {
         if let Some(parent) = parent_context {
             if parent.element_type == ElementType::Fraction {
@@ -30,7 +30,7 @@ impl DenominatorHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: component handlers move owned Vec between contexts
     ) {
         if let Some(parent) = parent_context {
             if parent.element_type == ElementType::Fraction {
@@ -50,7 +50,7 @@ impl DegreeHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: component handlers move owned Vec between contexts
     ) {
         if let Some(parent) = parent_context {
             if parent.element_type == ElementType::Radical {
@@ -70,7 +70,7 @@ impl BaseHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: component handlers move owned Vec between contexts
     ) {
         if let Some(parent) = parent_context {
             match parent.element_type {
@@ -107,7 +107,7 @@ impl LowerLimitHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: component handlers move owned Vec between contexts
     ) {
         if let Some(parent) = parent_context {
             if parent.element_type == ElementType::Nary {
@@ -127,7 +127,7 @@ impl UpperLimitHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: component handlers move owned Vec between contexts
     ) {
         if let Some(parent) = parent_context {
             if parent.element_type == ElementType::Nary {
@@ -147,7 +147,7 @@ impl IntegrandHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: component handlers move owned Vec between contexts
     ) {
         if let Some(parent) = parent_context {
             if parent.element_type == ElementType::Nary {
@@ -170,7 +170,7 @@ impl LimUppHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: component handlers move owned Vec between contexts
     ) {
         if let Some(parent) = parent_context {
             if parent.element_type == ElementType::Nary {
@@ -193,7 +193,7 @@ impl LimLowHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: component handlers move owned Vec between contexts
     ) {
         if let Some(parent) = parent_context {
             if parent.element_type == ElementType::Nary {

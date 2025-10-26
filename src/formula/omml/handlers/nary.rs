@@ -13,7 +13,7 @@ impl NaryHandler {
     pub fn handle_start<'arena>(
         elem: &BytesStart,
         context: &mut ElementContext<'arena>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: properties stored in context, no string allocation
     ) {
         let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
 
@@ -31,7 +31,7 @@ impl NaryHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: limits and integrand are owned Vec from context
     ) {
         // Get operator from properties (set by chr child element)
         let operator = context

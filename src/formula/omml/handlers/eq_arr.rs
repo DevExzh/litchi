@@ -15,7 +15,7 @@ impl EqArrHandler {
     pub fn handle_start<'arena>(
         elem: &BytesStart,
         context: &mut ElementContext<'arena>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: array rows are owned Vec, no arena allocation needed
     ) {
         let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
 
@@ -50,7 +50,7 @@ impl EqArrHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: array rows are owned Vec, no arena allocation needed
     ) {
         let rows = std::mem::take(&mut context.eq_array_rows);
 

@@ -13,7 +13,7 @@ impl MatrixHandler {
     pub fn handle_start<'arena>(
         elem: &BytesStart,
         context: &mut ElementContext<'arena>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: matrix elements are owned Vec, no string allocation
     ) {
         let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
 
@@ -28,7 +28,7 @@ impl MatrixHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: matrix elements are owned Vec, no string allocation
     ) {
         let fence_type = context.matrix_fence.unwrap_or(MatrixFence::None);
         let rows = std::mem::take(&mut context.matrix_rows);
@@ -84,7 +84,7 @@ impl MatrixRowHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: matrix elements are owned Vec, no string allocation
     ) {
         if let Some(parent) = parent_context
             && parent.element_type == ElementType::Matrix

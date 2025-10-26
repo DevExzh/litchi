@@ -11,7 +11,7 @@ impl CharHandler {
         elem: &[u8],
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: character value stored in context properties
     ) {
         if let Some(parent) = parent_context {
             // Get character value from either val attribute or text content

@@ -11,7 +11,7 @@ impl EqArrPrHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: property handler, only parses attributes into context
     ) {
         if let Some(parent) = parent_context {
             // Store the parsed properties in the parent context

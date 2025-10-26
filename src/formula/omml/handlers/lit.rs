@@ -9,7 +9,7 @@ impl LitHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: formatting handler, sets flags in context
     ) {
         if let Some(parent) = parent_context {
             // Set literal property based on element content

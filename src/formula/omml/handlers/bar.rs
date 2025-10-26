@@ -11,7 +11,7 @@ impl BarHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: simple wrapper, children are owned Vec
     ) {
         let base = if context.children.is_empty() {
             Vec::new()

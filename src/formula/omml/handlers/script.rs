@@ -10,7 +10,7 @@ impl SuperscriptHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: base and exponent are owned Vec from context
     ) {
         let base = context.base.take().unwrap_or_default();
         let exponent = context.superscript.take().unwrap_or_default();
@@ -30,7 +30,7 @@ impl SubscriptHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: base and subscript are owned Vec from context
     ) {
         let base = context.base.take().unwrap_or_default();
         let subscript = context.subscript.take().unwrap_or_default();
@@ -50,7 +50,7 @@ impl SubSupHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: base, subscript, and superscript are owned Vec from context
     ) {
         let base = context.base.take().unwrap_or_default();
         let subscript = context.subscript.take().unwrap_or_default();

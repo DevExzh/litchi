@@ -44,7 +44,7 @@ impl FunctionNameHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: function name stored as owned String in parent context
     ) {
         // Collect text from children to form function name
         let mut name = String::new();

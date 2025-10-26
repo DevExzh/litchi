@@ -13,7 +13,7 @@ impl SpacingHandler {
     pub fn handle_start<'arena>(
         elem: &BytesStart,
         context: &mut ElementContext<'arena>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: spacing just inserts space nodes
     ) {
         let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
 
@@ -30,7 +30,7 @@ impl SpacingHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: spacing just inserts space nodes
     ) {
         // Create a spacing node if spacing is specified
         if let Some(spacing) = &context.properties.spacing {

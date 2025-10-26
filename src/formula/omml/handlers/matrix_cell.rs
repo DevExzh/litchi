@@ -11,7 +11,7 @@ impl MatrixCellHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: cell content is owned Vec from context
     ) {
         if let Some(parent) = parent_context {
             // Matrix cells are processed by the matrix row handler

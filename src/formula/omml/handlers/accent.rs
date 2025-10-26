@@ -15,7 +15,7 @@ impl AccentHandler {
     pub fn handle_start<'arena>(
         elem: &BytesStart,
         context: &mut ElementContext<'arena>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: accent properties stored in context, no string allocation needed
     ) {
         let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
 
@@ -32,7 +32,7 @@ impl AccentHandler {
     pub fn handle_end<'arena>(
         context: &mut ElementContext<'arena>,
         parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: accent type is Copy, base is owned Vec
     ) {
         // Try to get accent type from properties if not set by attribute
         let accent_type = context.accent_type.or_else(|| {

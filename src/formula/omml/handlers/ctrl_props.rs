@@ -9,7 +9,7 @@ impl CtrlPropsHandler {
     pub fn handle_end<'arena>(
         _context: &mut ElementContext<'arena>,
         _parent_context: Option<&mut ElementContext<'arena>>,
-        _arena: &'arena bumpalo::Bump,
+        _arena: &'arena bumpalo::Bump, // Unused: property handler, only parses attributes into context
     ) {
         // Control properties are typically just consumed and not stored
         // They affect the formatting of the parent element
