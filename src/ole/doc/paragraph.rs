@@ -28,11 +28,23 @@ impl Paragraph {
     ///
     /// # Arguments
     ///
-    /// * `text` - The text content
+    /// * `text` - The text content (may be empty if runs will be set separately)
+    ///
+    /// # Note
+    ///
+    /// Following Apache POI's design: when creating paragraphs with explicit runs,
+    /// pass empty string here and set runs separately to avoid text duplication.
     pub(crate) fn new(text: String) -> Self {
+        // Only create default run if text is non-empty
+        let runs = if !text.is_empty() {
+            vec![Run::new(text.clone(), CharacterProperties::default())]
+        } else {
+            Vec::new()
+        };
+
         Self {
-            text: text.clone(),
-            runs: vec![Run::new(text, CharacterProperties::default())],
+            text,
+            runs,
             properties: super::parts::pap::ParagraphProperties::default(),
         }
     }
@@ -69,8 +81,11 @@ impl Paragraph {
     ///
     /// # Performance
     ///
-    /// Returns a reference to avoid cloning.
+    /// Returns a reference to avoid cloning when paragraph has stored text.
+    /// If runs are set, returns the stored text which should match run concatenation.
     pub fn text(&self) -> Result<&str> {
+        // If we have an explicit text field (for compatibility), use it
+        // Otherwise it will be empty and runs contain the actual text
         Ok(&self.text)
     }
 

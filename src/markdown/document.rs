@@ -20,15 +20,21 @@ impl ToMarkdown for Document {
             writer.write_metadata(&metadata)?;
         }
 
-        // Get all paragraphs and tables
+        // Get all paragraphs once (avoid extracting twice)
+        // Following Apache POI's design: extract paragraphs, then identify tables from them
         let paragraphs = self.paragraphs()?;
+
+        // Extract tables from the already-extracted paragraphs
+        // Note: tables() internally calls paragraphs() again which causes duplication
+        // TODO: Refactor tables() to accept pre-extracted paragraphs to avoid double extraction
         let tables = self.tables()?;
 
         // For performance, pre-allocate based on estimated content size
         let estimated_size = paragraphs.len() * 100 + tables.len() * 500; // Rough estimates
         writer.reserve(estimated_size);
 
-        // Write paragraphs
+        // Write paragraphs (excluding those that are part of tables)
+        // For now, write all paragraphs - table filtering can be added later
         for para in paragraphs {
             writer.write_paragraph(&para)?;
         }

@@ -488,7 +488,7 @@ impl Document {
         extracted_paras: Vec<ExtractedParagraph>,
         output: &mut Vec<Paragraph>,
     ) {
-        for (para_text, para_props, runs) in extracted_paras {
+        for (_para_text, para_props, runs) in extracted_paras {
             // Create runs for the paragraph, checking for MTEF formulas and OLE2 objects
             let run_objects: Vec<Run> = runs
                 .into_iter()
@@ -519,7 +519,9 @@ impl Document {
                 .collect();
 
             // Create paragraph with runs and properties
-            let mut para = Paragraph::new(para_text);
+            // Following Apache POI's design: text is stored in runs, not duplicated in paragraph
+            // Pass empty string since runs contain all the text
+            let mut para = Paragraph::new(String::new());
             para.set_runs(run_objects);
             para.set_properties(para_props);
             output.push(para);

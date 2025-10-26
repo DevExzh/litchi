@@ -72,32 +72,7 @@ impl ChpBinTable {
         // So n = (size - 4) / 8
         let n = (plcf_bte_chpx_data.len() - 4) / 8;
 
-        eprintln!(
-            "DEBUG: ChpBinTable parsing {} BTE entries from {} bytes",
-            n,
-            plcf_bte_chpx_data.len()
-        );
-
-        // Debug: show first few FC values and PN values
-        if n >= 5 {
-            eprintln!("DEBUG: First 5 FC values:");
-            for i in 0..=5 {
-                let fc_offset = i * 4;
-                if fc_offset + 4 <= plcf_bte_chpx_data.len() {
-                    let fc = read_u32_le(plcf_bte_chpx_data, fc_offset).unwrap_or(0);
-                    eprintln!("  aFc[{}] = {} (0x{:08X})", i, fc, fc);
-                }
-            }
-            eprintln!("DEBUG: First 5 PN values:");
-            for i in 0..5 {
-                let pn_offset = (n + 1) * 4 + i * 4;
-                if pn_offset + 4 <= plcf_bte_chpx_data.len() {
-                    let pn_raw = read_u32_le(plcf_bte_chpx_data, pn_offset).unwrap_or(0);
-                    let pn = pn_raw & 0x3FFFFF;
-                    eprintln!("  aPnBteChpx[{}] = {} (raw: 0x{:08X})", i, pn, pn_raw);
-                }
-            }
-        }
+        // Parsing PlcfBteChpx with n BTE entries
 
         let mut all_runs = Vec::new();
 
@@ -111,22 +86,6 @@ impl ChpBinTable {
 
             let pn_raw = read_u32_le(plcf_bte_chpx_data, pn_offset).unwrap_or(0);
 
-            if i < 5 {
-                eprintln!(
-                    "DEBUG: BTE {}: Reading from offset {} (n={}, pn_offset={}+{}*4), raw_bytes=[{:02X} {:02X} {:02X} {:02X}], pn_raw=0x{:08X}",
-                    i,
-                    pn_offset,
-                    n,
-                    (n + 1) * 4,
-                    i,
-                    plcf_bte_chpx_data[pn_offset],
-                    plcf_bte_chpx_data[pn_offset + 1],
-                    plcf_bte_chpx_data[pn_offset + 2],
-                    plcf_bte_chpx_data[pn_offset + 3],
-                    pn_raw
-                );
-            }
-
             // PnFkpChpx structure (from [MS-DOC]):
             // - Bits 0-21 (22 bits): pn (Page Number)
             // - Bits 22-31 (10 bits): unused (MUST be ignored)
@@ -137,38 +96,14 @@ impl ChpBinTable {
             // pageOffset = 512 * pn
             // FKP pages are stored in the WordDocument stream, not table stream!
             if pn == 0 || pn == 0x3FFFFF {
-                // Invalid PN
-                eprintln!(
-                    "DEBUG: Skipping BTE {} with invalid PN 0x{:08X} (masked: 0x{:08X})",
-                    i, pn_raw, pn
-                );
+                // Invalid PN - skip this entry
                 continue;
             }
 
             let page_offset = (pn as usize) * 512;
 
-            // Debug specific PNs we know should be valid
-            if pn == 133 || pn == 159 || pn == 204 || pn == 217 {
-                eprintln!(
-                    "DEBUG: BTE {}: Found valid PN={} (0x{:02X}), page_offset={}",
-                    i, pn, pn, page_offset
-                );
-            }
-
-            if i < 5 {
-                eprintln!(
-                    "DEBUG: BTE {}: PN=0x{:08X}, page_offset={}",
-                    i, pn, page_offset
-                );
-            }
-
             if page_offset + 512 > word_document.len() {
-                eprintln!(
-                    "DEBUG: Skipping BTE {}: page_offset {} exceeds WordDocument size {}",
-                    i,
-                    page_offset,
-                    word_document.len()
-                );
+                // Page offset exceeds document size - skip
                 continue;
             }
 
@@ -177,8 +112,6 @@ impl ChpBinTable {
 
             // Parse CHPX FKP
             if let Some(fkp) = ChpxFkp::parse(fkp_page, word_document) {
-                eprintln!("DEBUG: FKP {} has {} entries", i, fkp.count());
-
                 // Process each entry in the FKP
                 for j in 0..fkp.count() {
                     if let Some(entry) = fkp.entry(j) {
@@ -227,9 +160,47 @@ impl ChpBinTable {
             }
         }
 
-        eprintln!("DEBUG: ChpBinTable parsed {} total runs", all_runs.len());
+        eprintln!(
+            "DEBUG: ChpBinTable parsed {} total runs (before deduplication)",
+            all_runs.len()
+        );
 
-        Some(Self { runs: all_runs })
+        // Sort runs by start CP, then by end CP
+        // This is essential for proper merging and overlap detection
+        all_runs.sort_by_key(|r| (r.start_cp, r.end_cp));
+
+        // Remove overlapping/duplicate runs and fix boundaries
+        // Following Apache POI's approach: consecutive CHPXs should not overlap
+        let mut merged_runs = Vec::new();
+        let mut last_end_cp = 0u32;
+
+        for mut run in all_runs {
+            // Clamp run boundaries to avoid overlaps
+            if run.start_cp < last_end_cp {
+                // This run overlaps with the previous one - skip or adjust
+                if run.end_cp <= last_end_cp {
+                    // Completely contained in previous run - skip
+                    continue;
+                }
+                // Partially overlaps - adjust start to avoid overlap
+                run.start_cp = last_end_cp;
+            }
+
+            // Skip invalid runs
+            if run.start_cp >= run.end_cp {
+                continue;
+            }
+
+            last_end_cp = run.end_cp;
+            merged_runs.push(run);
+        }
+
+        eprintln!(
+            "DEBUG: ChpBinTable after deduplication: {} runs",
+            merged_runs.len()
+        );
+
+        Some(Self { runs: merged_runs })
     }
 
     /// Parse CHPX data (grpprl) into CharacterProperties.
