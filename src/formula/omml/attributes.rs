@@ -150,17 +150,34 @@ pub fn parse_element_properties(
     properties
 }
 
-/// Extract attribute value as string
+/// Extract attribute value as string (optimized for performance)
+///
+/// This function is called extensively during OMML parsing, so it's heavily optimized:
+/// - Uses byte-level comparison to avoid UTF-8 decoding when possible
+/// - Pre-computes the m: prefix to avoid format! allocation in the loop
+/// - Inlined for better performance
+/// - Returns owned String only when a match is found
+#[inline]
 pub fn get_attribute_value(
     attrs: &[quick_xml::events::attributes::Attribute],
     key: &str,
 ) -> Option<String> {
+    // Pre-compute the m: prefixed key once to avoid allocation in the loop
+    let key_bytes = key.as_bytes();
+    let mut m_prefixed = smallvec::SmallVec::<[u8; 32]>::with_capacity(key.len() + 2);
+    m_prefixed.extend_from_slice(b"m:");
+    m_prefixed.extend_from_slice(key_bytes);
+
+    // Fast path: iterate attributes with byte-level comparison
     for attr in attrs {
-        if let Ok(attr_key) = std::str::from_utf8(attr.key.as_ref())
-            && (attr_key == key || attr_key == format!("m:{}", key))
-            && let Ok(value) = std::str::from_utf8(&attr.value)
-        {
-            return Some(value.to_string());
+        let attr_key = attr.key.as_ref();
+
+        // Fast byte comparison (avoids UTF-8 validation overhead)
+        if attr_key == key_bytes || attr_key == m_prefixed.as_slice() {
+            // Only decode UTF-8 when we have a match
+            if let Ok(value) = std::str::from_utf8(&attr.value) {
+                return Some(value.to_string());
+            }
         }
     }
     None
@@ -481,28 +498,34 @@ pub fn parse_overline_style(val: Option<&str>) -> Option<String> {
     parse_underline_style(val) // Same as underline for overline
 }
 
-/// Fast attribute lookup with caching
+/// Fast attribute lookup without allocations
+///
+/// This uses direct linear search which is faster than HashMap for small attribute counts.
+/// OMML elements typically have 2-5 attributes, so linear search is O(n) where n is small,
+/// and avoids the overhead of HashMap allocation, hashing, and deallocation.
+///
+/// Performance characteristics:
+/// - Zero heap allocations (stack-only)
+/// - O(n) lookup where n is typically 2-5
+/// - No HashMap overhead (allocation, hashing, drop)
+/// - Cache-friendly (sequential access)
 pub struct AttributeCache<'a> {
     attrs: &'a [quick_xml::events::attributes::Attribute<'a>],
-    cache: std::collections::HashMap<String, Option<String>>,
 }
 
 impl<'a> AttributeCache<'a> {
+    #[inline]
     pub fn new(attrs: &'a [quick_xml::events::attributes::Attribute]) -> Self {
-        Self {
-            attrs,
-            cache: std::collections::HashMap::new(),
-        }
+        Self { attrs }
     }
 
+    /// Get attribute value directly without caching
+    ///
+    /// For small attribute counts (typical in OMML), direct linear search is faster
+    /// than HashMap lookup because it avoids allocation and hashing overhead.
+    #[inline]
     pub fn get(&mut self, key: &str) -> Option<String> {
-        if let Some(cached) = self.cache.get(key) {
-            return cached.clone();
-        }
-
-        let value = get_attribute_value(self.attrs, key);
-        self.cache.insert(key.to_string(), value.clone());
-        value
+        get_attribute_value(self.attrs, key)
     }
 
     /// Get attribute as boolean
