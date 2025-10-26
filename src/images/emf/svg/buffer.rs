@@ -42,17 +42,17 @@ impl ElementBuffer {
             let current_stroke_attrs = dc.get_stroke_attrs();
 
             // Check if stroke matches current buffer
-            if let Some(ref buffered_stroke) = self.current_stroke {
-                if buffered_stroke == &current_stroke_attrs {
-                    // Same stroke - buffer this line
-                    self.pending_lines.push((x1, y1, x2, y2));
+            if let Some(ref buffered_stroke) = self.current_stroke
+                && buffered_stroke == &current_stroke_attrs
+            {
+                // Same stroke - buffer this line
+                self.pending_lines.push((x1, y1, x2, y2));
 
-                    // Flush when buffer gets large enough
-                    if self.pending_lines.len() >= 10 {
-                        self.flush_lines_as_path();
-                    }
-                    return;
+                // Flush when buffer gets large enough
+                if self.pending_lines.len() >= 10 {
+                    self.flush_lines_as_path();
                 }
+                return;
             }
 
             // Different stroke - flush old lines and start new buffer

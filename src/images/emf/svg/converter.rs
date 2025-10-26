@@ -81,23 +81,19 @@ impl<'a> EmfSvgConverter<'a> {
             // Transform operations
             Some(EmrType::SetWorldTransform) => {
                 if let Ok((xform, _)) = XForm::read_from_prefix(&record.data) {
-                    state.dc.world_transform = xform.clone();
+                    state.dc.world_transform = xform;
                 }
                 Ok(None)
             },
             Some(EmrType::ModifyWorldTransform) => {
-                if record.data.len() >= 28 {
-                    if let Ok((xform, rest)) = XForm::read_from_prefix(&record.data) {
-                        let mode = u32::from_le_bytes([rest[0], rest[1], rest[2], rest[3]]);
-                        match mode {
-                            2 => {
-                                state.dc.world_transform = state.dc.world_transform.multiply(&xform)
-                            }, // Left multiply
-                            3 => {
-                                state.dc.world_transform = xform.multiply(&state.dc.world_transform)
-                            }, // Right multiply
-                            _ => state.dc.world_transform = xform.clone(), // Set
-                        }
+                if record.data.len() >= 28
+                    && let Ok((xform, rest)) = XForm::read_from_prefix(&record.data)
+                {
+                    let mode = u32::from_le_bytes([rest[0], rest[1], rest[2], rest[3]]);
+                    match mode {
+                        2 => state.dc.world_transform = state.dc.world_transform.multiply(&xform), // Left multiply
+                        3 => state.dc.world_transform = xform.multiply(&state.dc.world_transform), // Right multiply
+                        _ => state.dc.world_transform = xform, // Set
                     }
                 }
                 Ok(None)
@@ -133,9 +129,9 @@ impl<'a> EmfSvgConverter<'a> {
             Some(EmrType::SetTextColor) | Some(EmrType::SetBkColor) => {
                 if let Ok((color, _)) = ColorRef::read_from_prefix(&record.data) {
                     if record_type == Some(EmrType::SetTextColor) {
-                        state.dc.text_color = color.clone();
+                        state.dc.text_color = color;
                     } else {
-                        state.dc.bg_color = color.clone();
+                        state.dc.bg_color = color;
                     }
                 }
                 Ok(None)
@@ -293,12 +289,8 @@ impl<'a> EmfSvgConverter<'a> {
                     let ry = hdr.corner.cy as f64 / 2.0;
 
                     Ok(Some(vec![self.render_rounded_rectangle(
-                        x1,
-                        y1,
-                        x2 - x1,
-                        y2 - y1,
-                        rx,
-                        ry,
+                        (x1, y1, x2 - x1, y2 - y1),
+                        (rx, ry),
                         &state.dc,
                     )]))
                 } else {
@@ -393,14 +385,12 @@ impl<'a> EmfSvgConverter<'a> {
     /// Render a rounded rectangle (optimized)
     fn render_rounded_rectangle(
         &self,
-        x: f64,
-        y: f64,
-        width: f64,
-        height: f64,
-        rx: f64,
-        ry: f64,
+        rect: (f64, f64, f64, f64), // (x, y, width, height)
+        corners: (f64, f64),        // (rx, ry)
         dc: &DeviceContext,
     ) -> String {
+        let (x, y, width, height) = rect;
+        let (rx, ry) = corners;
         format!(
             "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"{}\" ry=\"{}\" {} {}/>",
             Self::fmt_num(x),

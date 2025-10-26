@@ -97,14 +97,14 @@ impl PathBuilder {
     /// Add Arc command
     pub fn arc(
         &mut self,
-        rx: f64,
-        ry: f64,
+        radii: (f64, f64), // (rx, ry)
         rotation: f64,
-        large_arc: bool,
-        sweep: bool,
-        x: f64,
-        y: f64,
+        flags: (bool, bool),   // (large_arc, sweep)
+        end_point: (f64, f64), // (x, y)
     ) {
+        let (rx, ry) = radii;
+        let (large_arc, sweep) = flags;
+        let (x, y) = end_point;
         self.commands.push(PathCommand::Arc {
             rx,
             ry,
