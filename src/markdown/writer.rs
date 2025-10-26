@@ -57,6 +57,22 @@ impl MarkdownWriter {
     /// **Note**: This method requires the `ole` or `ooxml` feature to be enabled.
     #[cfg(any(feature = "ole", feature = "ooxml"))]
     pub fn write_paragraph(&mut self, para: &Paragraph) -> Result<()> {
+        // First check for paragraph-level formulas (display math)
+        #[cfg(feature = "ooxml")]
+        {
+            use crate::document::Paragraph;
+            if let Paragraph::Docx(docx_para) = para {
+                let display_formulas = docx_para.paragraph_level_formulas()?;
+                if !display_formulas.is_empty() {
+                    // This paragraph contains display formulas
+                    // Process runs and formulas together in order
+                    self.write_paragraph_with_display_formulas(para, display_formulas)?;
+                    self.buffer.push_str("\n\n");
+                    return Ok(());
+                }
+            }
+        }
+
         let text = para.text()?;
 
         // Check if this is a list item
@@ -78,6 +94,75 @@ impl MarkdownWriter {
 
         // Add paragraph break
         self.buffer.push_str("\n\n");
+        Ok(())
+    }
+
+    /// Write a paragraph that contains display-level formulas.
+    ///
+    /// This handles paragraphs where formulas are direct children of the paragraph (not within runs).
+    #[cfg(all(feature = "ooxml", feature = "formula"))]
+    fn write_paragraph_with_display_formulas(
+        &mut self,
+        para: &Paragraph,
+        display_formulas: Vec<String>,
+    ) -> Result<()> {
+        use crate::formula::omml_to_latex;
+
+        // For display formulas, we'll write each formula on its own line
+        // and interleave with any text content from runs
+        let runs = para.runs()?;
+
+        // Write all runs first (if any)
+        for run in runs {
+            let text = run.text()?;
+            if !text.trim().is_empty() {
+                self.buffer.push_str(&text);
+            }
+        }
+
+        // Add line break if there was text before formulas
+        if !self.buffer.ends_with("\n\n") && !self.buffer.ends_with('\n') {
+            self.buffer.push('\n');
+        }
+
+        // Write display formulas
+        for omml_xml in display_formulas {
+            let latex = match omml_to_latex(&omml_xml) {
+                Ok(l) => l,
+                Err(_) => "[Formula conversion error]".to_string(),
+            };
+
+            // Display formulas use display style (false = display mode)
+            let formula_md = self.format_formula(&latex, false);
+            self.buffer.push_str(&formula_md);
+            self.buffer.push('\n');
+        }
+
+        Ok(())
+    }
+
+    /// Fallback for when formula feature is not enabled.
+    #[cfg(all(feature = "ooxml", not(feature = "formula")))]
+    fn write_paragraph_with_display_formulas(
+        &mut self,
+        para: &Paragraph,
+        display_formulas: Vec<String>,
+    ) -> Result<()> {
+        // Write runs normally
+        let runs = para.runs()?;
+        for run in runs {
+            let text = run.text()?;
+            if !text.trim().is_empty() {
+                self.buffer.push_str(&text);
+            }
+        }
+
+        // Add placeholder for formulas
+        for _ in display_formulas {
+            self.buffer
+                .push_str("\n[Formula - enable 'formula' feature]\n");
+        }
+
         Ok(())
     }
 
@@ -588,12 +673,18 @@ impl MarkdownWriter {
         // Try OOXML OMML formulas first
         #[cfg(feature = "ooxml")]
         if let crate::document::Run::Docx(docx_run) = run
-            && let Some(_omml_xml) = docx_run.omml_formula()?
+            && let Some(omml_xml) = docx_run.omml_formula()?
         {
-            // For now, return a placeholder. In a full implementation,
-            // this would parse the OMML XML and convert to LaTeX/markdown
+            // Parse OMML and convert to LaTeX
+            #[cfg(feature = "formula")]
+            {
+                let latex = self.convert_omml_to_latex(&omml_xml);
+                return Ok(Some(self.format_formula(&latex, true))); // true = inline
+            }
+
+            #[cfg(not(feature = "formula"))]
             return Ok(Some(
-                self.format_formula_placeholder("OMML formula detected"),
+                self.format_formula("[Formula - enable 'formula' feature]", true),
             ));
         }
 
@@ -638,6 +729,24 @@ impl MarkdownWriter {
     /// Convert MTEF AST nodes to LaTeX string (fallback when formula feature is disabled)
     #[cfg(not(feature = "formula"))]
     fn convert_mtef_to_latex(&self, _nodes: &[()]) -> String {
+        "[Formula support disabled - enable 'formula' feature]".to_string()
+    }
+
+    /// Convert OMML XML to LaTeX string
+    #[cfg(all(feature = "ooxml", feature = "formula"))]
+    fn convert_omml_to_latex(&self, omml_xml: &str) -> String {
+        use crate::formula::omml_to_latex;
+
+        // Use the high-level conversion function
+        match omml_to_latex(omml_xml) {
+            Ok(latex) => latex,
+            Err(_) => "[Formula conversion error]".to_string(),
+        }
+    }
+
+    /// Convert OMML XML to LaTeX string (fallback when formula feature is disabled)
+    #[cfg(all(feature = "ooxml", not(feature = "formula")))]
+    fn convert_omml_to_latex(&self, _omml_xml: &str) -> String {
         "[Formula support disabled - enable 'formula' feature]".to_string()
     }
 

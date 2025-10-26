@@ -98,8 +98,14 @@ impl Paragraph {
 
         loop {
             match reader.read_event_into(&mut buf) {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"r" && !in_run {
+                Ok(Event::Start(ref e)) => {
+                    // Check for w:r (word run) specifically using the full name
+                    // This avoids confusion with m:r (math run) which appears in OMML formulas
+                    let is_word_run = e.local_name().as_ref() == b"r"
+                        && !in_run
+                        && (e.name().as_ref() == b"w:r" || e.name().as_ref() == b"r");
+
+                    if is_word_run {
                         in_run = true;
                         depth = 1;
                         current_run_xml.clear();
@@ -130,14 +136,19 @@ impl Paragraph {
                         current_run_xml.push(b'>');
                     }
                 },
-                Ok(Event::End(e)) => {
+                Ok(Event::End(ref e)) => {
                     if in_run {
                         current_run_xml.extend_from_slice(b"</");
                         current_run_xml.extend_from_slice(e.name().as_ref());
                         current_run_xml.push(b'>');
 
+                        // Only decrement depth and check for run end when we see w:r or r (without namespace)
+                        // This prevents m:r (math run) from being mistaken for the end of w:r (word run)
+                        let is_word_run_end = e.local_name().as_ref() == b"r"
+                            && (e.name().as_ref() == b"w:r" || e.name().as_ref() == b"r");
+
                         depth -= 1;
-                        if depth == 0 && e.local_name().as_ref() == b"r" {
+                        if is_word_run_end && depth == 0 {
                             runs.push(Run::new(current_run_xml.clone()));
                             in_run = false;
                         }
@@ -171,6 +182,7 @@ impl Paragraph {
     /// Extract all OMML formulas from this paragraph.
     ///
     /// Returns a vector of OMML formula strings found in any run within this paragraph.
+    /// This extracts inline formulas (formulas within runs).
     pub fn omml_formulas(&self) -> Result<Vec<String>> {
         let mut formulas = Vec::new();
         for run in self.runs()? {
@@ -178,6 +190,195 @@ impl Paragraph {
                 formulas.push(formula);
             }
         }
+        Ok(formulas)
+    }
+
+    /// Extract paragraph-level OMML formulas.
+    ///
+    /// Returns a vector of OMML formula strings that are direct children of the paragraph
+    /// (display math), not nested within runs. These are block-level formulas.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let para = document.paragraphs()?[0];
+    /// let display_formulas = para.paragraph_level_formulas()?;
+    /// for formula in display_formulas {
+    ///     println!("Display formula: {}", formula);
+    /// }
+    /// ```
+    pub fn paragraph_level_formulas(&self) -> Result<Vec<String>> {
+        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        reader.config_mut().trim_text(true);
+
+        let mut formulas = Vec::new();
+        let mut in_omath = false;
+        let mut in_run = false;
+        let mut skip_word_element = false; // Track when we're skipping Word elements
+        let mut word_depth = 0; // Track nesting depth of Word elements
+        let mut depth = 0;
+        let mut omml_content = String::with_capacity(512);
+        let mut buf = Vec::with_capacity(256);
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(Event::Start(e)) => {
+                    let name = e.local_name();
+                    let full_name = e.name();
+                    let full_name_bytes = full_name.as_ref();
+
+                    // Track when we're inside a run to skip inline formulas
+                    if full_name_bytes == b"w:r" || name.as_ref() == b"r" {
+                        in_run = true;
+                    }
+
+                    // Only process oMath if we're NOT inside a run (paragraph-level formulas)
+                    if !in_run && name.as_ref() == b"oMath" {
+                        in_omath = true;
+                        depth = 1;
+                        skip_word_element = false;
+                        word_depth = 0;
+                        omml_content.clear();
+                        omml_content.push_str("<m:oMath>");
+                    } else if in_omath && !skip_word_element {
+                        // Check if this is a Word namespace element
+                        if full_name_bytes.starts_with(b"w:") {
+                            skip_word_element = true;
+                            word_depth = 1;
+                        } else {
+                            depth += 1;
+
+                            omml_content.push('<');
+                            if full_name_bytes.starts_with(b"m:") {
+                                omml_content
+                                    .push_str(std::str::from_utf8(full_name_bytes).unwrap());
+                            } else {
+                                omml_content.push_str("m:");
+                                omml_content.push_str(std::str::from_utf8(name.as_ref()).unwrap());
+                            }
+
+                            // Include math namespace attributes only
+                            for attr in e.attributes().flatten() {
+                                let key_bytes = attr.key.as_ref();
+                                if !key_bytes.starts_with(b"w:") {
+                                    omml_content.push(' ');
+                                    if key_bytes.starts_with(b"m:") {
+                                        omml_content
+                                            .push_str(std::str::from_utf8(key_bytes).unwrap());
+                                    } else if memchr::memchr(b':', key_bytes).is_some() {
+                                        let key_str = std::str::from_utf8(key_bytes).unwrap();
+                                        if let Some(idx) = key_str.find(':') {
+                                            omml_content.push_str("m:");
+                                            omml_content.push_str(&key_str[idx + 1..]);
+                                        } else {
+                                            omml_content.push_str(key_str);
+                                        }
+                                    } else {
+                                        omml_content.push_str("m:");
+                                        omml_content
+                                            .push_str(std::str::from_utf8(key_bytes).unwrap());
+                                    }
+                                    omml_content.push_str("=\"");
+                                    omml_content.push_str(
+                                        &attr.unescape_value().unwrap_or(Cow::Borrowed("")),
+                                    );
+                                    omml_content.push('"');
+                                }
+                            }
+                            omml_content.push('>');
+                        }
+                    } else if skip_word_element {
+                        word_depth += 1;
+                    }
+                },
+                Ok(Event::Empty(e)) => {
+                    let name = e.local_name();
+                    let full_name = e.name();
+                    let full_name_bytes = full_name.as_ref();
+
+                    if in_omath && !skip_word_element && !full_name_bytes.starts_with(b"w:") {
+                        omml_content.push('<');
+                        if full_name_bytes.starts_with(b"m:") {
+                            omml_content.push_str(std::str::from_utf8(full_name_bytes).unwrap());
+                        } else {
+                            omml_content.push_str("m:");
+                            omml_content.push_str(std::str::from_utf8(name.as_ref()).unwrap());
+                        }
+
+                        // Include math namespace attributes only
+                        for attr in e.attributes().flatten() {
+                            let key_bytes = attr.key.as_ref();
+                            if !key_bytes.starts_with(b"w:") {
+                                omml_content.push(' ');
+                                if key_bytes.starts_with(b"m:") {
+                                    omml_content.push_str(std::str::from_utf8(key_bytes).unwrap());
+                                } else if memchr::memchr(b':', key_bytes).is_some() {
+                                    let key_str = std::str::from_utf8(key_bytes).unwrap();
+                                    if let Some(idx) = key_str.find(':') {
+                                        omml_content.push_str("m:");
+                                        omml_content.push_str(&key_str[idx + 1..]);
+                                    } else {
+                                        omml_content.push_str(key_str);
+                                    }
+                                } else {
+                                    omml_content.push_str("m:");
+                                    omml_content.push_str(std::str::from_utf8(key_bytes).unwrap());
+                                }
+                                omml_content.push_str("=\"");
+                                omml_content
+                                    .push_str(&attr.unescape_value().unwrap_or(Cow::Borrowed("")));
+                                omml_content.push('"');
+                            }
+                        }
+                        omml_content.push_str("/>");
+                    }
+                },
+                Ok(Event::Text(e)) if in_omath && !skip_word_element => {
+                    let text = std::str::from_utf8(e.as_ref())
+                        .map_err(|_| OoxmlError::Xml("Invalid UTF-8 in OMML text".to_string()))?;
+                    omml_content.push_str(text);
+                },
+                Ok(Event::End(e)) => {
+                    let name = e.local_name();
+                    let full_name = e.name();
+                    let full_name_bytes = full_name.as_ref();
+
+                    // Track when we exit a run
+                    if full_name_bytes == b"w:r" || name.as_ref() == b"r" {
+                        in_run = false;
+                    }
+
+                    // Track exiting Word elements
+                    if skip_word_element {
+                        word_depth -= 1;
+                        if word_depth == 0 {
+                            skip_word_element = false;
+                        }
+                    } else if in_omath {
+                        omml_content.push_str("</");
+                        if full_name_bytes.starts_with(b"m:") {
+                            omml_content.push_str(std::str::from_utf8(full_name_bytes).unwrap());
+                        } else {
+                            omml_content.push_str("m:");
+                            omml_content.push_str(std::str::from_utf8(name.as_ref()).unwrap());
+                        }
+                        omml_content.push('>');
+
+                        depth -= 1;
+                        if depth == 0 && name.as_ref() == b"oMath" {
+                            // Complete formula extracted
+                            formulas.push(omml_content.clone());
+                            in_omath = false;
+                            omml_content.clear();
+                        }
+                    }
+                },
+                Ok(Event::Eof) => break,
+                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+                _ => {},
+            }
+            buf.clear();
+        }
+
         Ok(formulas)
     }
 }
@@ -468,60 +669,195 @@ impl Run {
     ///
     /// Returns the OMML XML content if this run contains a mathematical formula,
     /// None otherwise. This method looks for `<m:oMath>` elements embedded in the run.
+    ///
+    /// The extracted OMML is cleaned to remove or fix improperly nested Word namespace
+    /// elements that can cause XML parsing errors.
     pub fn omml_formula(&self) -> Result<Option<String>> {
         let mut reader = Reader::from_reader(&self.xml_bytes[..]);
         reader.config_mut().trim_text(true);
 
         let mut in_omath = false;
-        let mut omml_content = String::new();
-        let mut buf = Vec::new();
+        let mut skip_word_element = false; // Track when we're skipping Word namespace elements
+        let mut word_depth = 0; // Track nesting depth of Word elements to skip
+        let mut omml_content = String::with_capacity(512); // Pre-allocate for performance
+        let mut buf = Vec::with_capacity(256);
 
         loop {
             match reader.read_event_into(&mut buf) {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                Ok(Event::Start(e)) => {
                     let name = e.local_name();
+                    let full_name = e.name();
+                    let full_name_bytes = full_name.as_ref();
+
                     if name.as_ref() == b"oMath" {
                         in_omath = true;
-                        omml_content.push('<');
+                        omml_content.push_str("<m:");
                         omml_content.push_str(std::str::from_utf8(name.as_ref()).unwrap());
+
+                        // Include attributes
                         for attr in e.attributes().flatten() {
                             omml_content.push(' ');
-                            omml_content.push_str(std::str::from_utf8(attr.key.as_ref()).unwrap());
-                            omml_content.push_str("=\"");
-                            omml_content
-                                .push_str(&attr.unescape_value().unwrap_or(Cow::Borrowed("")));
-                            omml_content.push('"');
+                            let key_str = std::str::from_utf8(attr.key.as_ref()).unwrap();
+                            // Only include math namespace or unnamespaced attributes
+                            if key_str.starts_with("m:") || !key_str.contains(':') {
+                                omml_content.push_str(key_str);
+                                omml_content.push_str("=\"");
+                                omml_content
+                                    .push_str(&attr.unescape_value().unwrap_or(Cow::Borrowed("")));
+                                omml_content.push('"');
+                            }
                         }
                         omml_content.push('>');
-                    } else if in_omath {
-                        // Include nested elements in the OMML content
-                        omml_content.push('<');
-                        omml_content.push_str(std::str::from_utf8(name.as_ref()).unwrap());
-                        for attr in e.attributes().flatten() {
-                            omml_content.push(' ');
-                            omml_content.push_str(std::str::from_utf8(attr.key.as_ref()).unwrap());
-                            omml_content.push_str("=\"");
-                            omml_content
-                                .push_str(&attr.unescape_value().unwrap_or(Cow::Borrowed("")));
-                            omml_content.push('"');
+                    } else if in_omath && !skip_word_element {
+                        // Check if this is a Word namespace element (w: prefix or known Word elements)
+                        // These are formatting elements that should be skipped as they're often malformed
+                        if full_name_bytes.starts_with(b"w:") {
+                            skip_word_element = true;
+                            word_depth = 1;
+                        } else {
+                            // Include math namespace elements
+                            omml_content.push('<');
+
+                            // Ensure we prefix with m: if not already present
+                            if full_name_bytes.starts_with(b"m:") {
+                                // Already has m: prefix, use full name
+                                omml_content
+                                    .push_str(std::str::from_utf8(full_name_bytes).unwrap());
+                            } else {
+                                // No prefix, add m: and local name
+                                omml_content.push_str("m:");
+                                omml_content.push_str(std::str::from_utf8(name.as_ref()).unwrap());
+                            }
+
+                            // Include math namespace attributes only
+                            for attr in e.attributes().flatten() {
+                                let key_bytes = attr.key.as_ref();
+                                // Skip Word namespace attributes
+                                if !key_bytes.starts_with(b"w:") {
+                                    omml_content.push(' ');
+                                    // Ensure math namespace prefix on attributes
+                                    if key_bytes.starts_with(b"m:") {
+                                        // Already has m: prefix, use as-is
+                                        omml_content
+                                            .push_str(std::str::from_utf8(key_bytes).unwrap());
+                                    } else if memchr::memchr(b':', key_bytes).is_some() {
+                                        // Has some other namespace, replace with m:
+                                        let key_str = std::str::from_utf8(key_bytes).unwrap();
+                                        if let Some(idx) = key_str.find(':') {
+                                            omml_content.push_str("m:");
+                                            omml_content.push_str(&key_str[idx + 1..]);
+                                        } else {
+                                            omml_content.push_str(key_str);
+                                        }
+                                    } else {
+                                        // No namespace, add m:
+                                        omml_content.push_str("m:");
+                                        omml_content
+                                            .push_str(std::str::from_utf8(key_bytes).unwrap());
+                                    }
+                                    omml_content.push_str("=\"");
+                                    // Use Cow to avoid allocation when possible
+                                    omml_content.push_str(
+                                        &attr.unescape_value().unwrap_or(Cow::Borrowed("")),
+                                    );
+                                    omml_content.push('"');
+                                }
+                            }
+                            omml_content.push('>');
                         }
-                        if name.as_ref() == b"oMath" {
-                            omml_content.push('/');
-                            in_omath = false;
-                        }
-                        omml_content.push('>');
+                    } else if skip_word_element {
+                        word_depth += 1;
                     }
                 },
-                Ok(Event::Text(e)) if in_omath => {
-                    // Extract text content - OMML doesn't typically use entities that need unescaping
+                Ok(Event::Empty(e)) => {
+                    let name = e.local_name();
+                    let full_name = e.name();
+                    let full_name_bytes = full_name.as_ref();
+
+                    if in_omath && !skip_word_element {
+                        // Skip Word namespace empty elements
+                        if !full_name_bytes.starts_with(b"w:") {
+                            omml_content.push('<');
+                            if full_name_bytes.starts_with(b"m:") {
+                                // Already has m: prefix, use full name
+                                omml_content
+                                    .push_str(std::str::from_utf8(full_name_bytes).unwrap());
+                            } else {
+                                // No prefix, add m: and local name
+                                omml_content.push_str("m:");
+                                omml_content.push_str(std::str::from_utf8(name.as_ref()).unwrap());
+                            }
+
+                            // Include math namespace attributes only
+                            for attr in e.attributes().flatten() {
+                                let key_bytes = attr.key.as_ref();
+                                // Skip Word namespace attributes
+                                if !key_bytes.starts_with(b"w:") {
+                                    omml_content.push(' ');
+                                    // Ensure math namespace prefix on attributes
+                                    if key_bytes.starts_with(b"m:") {
+                                        // Already has m: prefix, use as-is
+                                        omml_content
+                                            .push_str(std::str::from_utf8(key_bytes).unwrap());
+                                    } else if memchr::memchr(b':', key_bytes).is_some() {
+                                        // Has some other namespace, replace with m:
+                                        let key_str = std::str::from_utf8(key_bytes).unwrap();
+                                        if let Some(idx) = key_str.find(':') {
+                                            omml_content.push_str("m:");
+                                            omml_content.push_str(&key_str[idx + 1..]);
+                                        } else {
+                                            omml_content.push_str(key_str);
+                                        }
+                                    } else {
+                                        // No namespace, add m:
+                                        omml_content.push_str("m:");
+                                        omml_content
+                                            .push_str(std::str::from_utf8(key_bytes).unwrap());
+                                    }
+                                    omml_content.push_str("=\"");
+                                    omml_content.push_str(
+                                        &attr.unescape_value().unwrap_or(Cow::Borrowed("")),
+                                    );
+                                    omml_content.push('"');
+                                }
+                            }
+                            omml_content.push_str("/>");
+                        }
+                    }
+                },
+                Ok(Event::Text(e)) if in_omath && !skip_word_element => {
+                    // Extract text content
                     let text = std::str::from_utf8(e.as_ref())
                         .map_err(|_| OoxmlError::Xml("Invalid UTF-8 in OMML text".to_string()))?;
                     omml_content.push_str(text);
                 },
-                Ok(Event::End(e)) if in_omath => {
-                    omml_content.push_str("</");
-                    omml_content.push_str(std::str::from_utf8(e.name().as_ref()).unwrap());
-                    omml_content.push('>');
+                Ok(Event::End(e)) => {
+                    if skip_word_element {
+                        word_depth -= 1;
+                        if word_depth == 0 {
+                            skip_word_element = false;
+                        }
+                    } else if in_omath {
+                        let name = e.local_name();
+                        let full_name = e.name();
+                        let full_name_bytes = full_name.as_ref();
+
+                        omml_content.push_str("</");
+                        if full_name_bytes.starts_with(b"m:") {
+                            // Already has m: prefix, use full name
+                            omml_content.push_str(std::str::from_utf8(full_name_bytes).unwrap());
+                        } else {
+                            // No prefix, add m: and local name
+                            omml_content.push_str("m:");
+                            omml_content.push_str(std::str::from_utf8(name.as_ref()).unwrap());
+                        }
+                        omml_content.push('>');
+
+                        // Check if this closes the oMath element
+                        if name.as_ref() == b"oMath" {
+                            break; // We've extracted the complete formula
+                        }
+                    }
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),

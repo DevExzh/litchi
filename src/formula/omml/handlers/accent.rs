@@ -43,28 +43,30 @@ impl AccentHandler {
                 .and_then(|s| parse_accent_type(Some(s)))
         });
 
-        if let Some(accent_type) = accent_type {
-            let base = context
-                .base
-                .clone()
-                .unwrap_or_else(|| context.children.clone());
+        // Use the detected accent type, or default to Bar (overline) if not recognized
+        // This matches the behavior of LibreOffice and plurimath
+        let accent_type = accent_type.unwrap_or(AccentType::Bar);
 
-            // Parse position using the dedicated position parsing function
-            let position = context
-                .properties
-                .accent_position
-                .as_ref()
-                .and_then(|s| parse_position_type(Some(s)));
+        let base = context
+            .base
+            .clone()
+            .unwrap_or_else(|| context.children.clone());
 
-            let node = MathNode::Accent {
-                base: Box::new(base),
-                accent: accent_type,
-                position,
-            };
+        // Parse position using the dedicated position parsing function
+        let position = context
+            .properties
+            .accent_position
+            .as_ref()
+            .and_then(|s| parse_position_type(Some(s)));
 
-            if let Some(parent) = parent_context {
-                parent.children.push(node);
-            }
+        let node = MathNode::Accent {
+            base: Box::new(base),
+            accent: accent_type,
+            position,
+        };
+
+        if let Some(parent) = parent_context {
+            parent.children.push(node);
         }
     }
 }

@@ -231,18 +231,39 @@ pub static OPERATORS: phf::Map<&'static str, Operator> = phf_map! {
 };
 
 /// Fast accent character to accent type lookup
+///
+/// Includes both standalone accent characters and Unicode combining characters
+/// commonly used in OMML (Office Math Markup Language).
+///
+/// Reference: LibreOffice starmath/inc/types.hxx and plurimath
 pub static ACCENTS: phf::Map<&'static str, AccentType> = phf_map! {
-    "¯" => AccentType::Bar,
-    "¨" => AccentType::DoubleDot,
-    "˙" => AccentType::Dot,
-    "`" => AccentType::Grave,
-    "´" => AccentType::Acute,
-    "˜" => AccentType::Tilde,
-    "^" => AccentType::Hat,
-    "ˇ" => AccentType::Check,
-    "˘" => AccentType::Breve,
-    "→" => AccentType::Vec,
-    "⃛" => AccentType::TripleDot,
+    // Standalone accent characters
+    "¯" => AccentType::Bar,      // U+00AF Macron
+    "¨" => AccentType::DoubleDot, // U+00A8 Diaeresis
+    "˙" => AccentType::Dot,      // U+02D9 Dot above
+    "`" => AccentType::Grave,    // U+0060 Grave accent
+    "´" => AccentType::Acute,    // U+00B4 Acute accent
+    "˜" => AccentType::Tilde,    // U+007E Tilde
+    "^" => AccentType::Hat,      // U+005E Circumflex
+    "ˇ" => AccentType::Check,    // U+02C7 Caron
+    "˘" => AccentType::Breve,    // U+02D8 Breve
+    "→" => AccentType::Vec,      // U+2192 Right arrow
+    "⃗" => AccentType::Vec,      // U+20D7 Combining right arrow above
+    "⃛" => AccentType::TripleDot, // U+20DB Combining three dots above
+
+    // Combining characters (Unicode U+0300-U+036F range)
+    // These are commonly used in OMML documents
+    "̀" => AccentType::Grave,    // U+0300 Combining grave accent
+    "́" => AccentType::Acute,    // U+0301 Combining acute accent
+    "̂" => AccentType::Hat,      // U+0302 Combining circumflex
+    "̃" => AccentType::Tilde,    // U+0303 Combining tilde
+    "̄" => AccentType::Bar,      // U+0304 Combining macron (bar)
+    "̅" => AccentType::Bar,      // U+0305 Combining overline - COMMON IN OMML!
+    "̆" => AccentType::Breve,    // U+0306 Combining breve
+    "̇" => AccentType::Dot,      // U+0307 Combining dot above
+    "̈" => AccentType::DoubleDot, // U+0308 Combining diaeresis
+    "̊" => AccentType::Dot,      // U+030A Combining ring above (treated as dot)
+    "̌" => AccentType::Check,    // U+030C Combining caron
 };
 
 /// Fast large operator character to operator lookup
