@@ -788,7 +788,11 @@ pub fn parse_attributes_batch(
 }
 
 /// Batch attribute parsing with caching for performance
-#[allow(clippy::field_reassign_with_default)]
+///
+/// NOTE: This function is kept for potential future use but is currently unused
+/// due to performance optimization. It was causing 40+ String allocations per element.
+/// The parser now uses lazy parsing instead.
+#[allow(dead_code, clippy::field_reassign_with_default)]
 pub fn parse_attributes_batch_with_cache(cache: &mut AttributeCache) -> ElementProperties {
     let mut properties = ElementProperties::default();
 

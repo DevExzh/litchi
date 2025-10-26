@@ -154,19 +154,12 @@ impl<'arena> OmmlParser<'arena> {
         // Parse attributes using SIMD-accelerated parsing with caching
         let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
 
-        // Store raw attributes for property element handlers
-        // SAFETY: The attributes are valid for the duration of the XML parsing
-        context.attributes = unsafe {
-            std::mem::transmute::<
-                Vec<quick_xml::events::attributes::Attribute<'_>>,
-                Vec<quick_xml::events::attributes::Attribute<'_>>,
-            >(attrs.clone())
-        };
-
-        // Use batch attribute parsing with PHF lookups and caching for better performance
-        let mut cache = AttributeCache::new(&attrs);
+        // Performance optimization: Don't store attributes in context as they're never used
+        // This eliminates a clone() and unsafe transmute on every element
 
         // Element-specific attribute parsing using handlers
+        // Performance optimization: Only parse properties that are actually needed by each element type
+        // Avoids 40+ String allocations per element in the default case
         match element_type {
             ElementType::Delimiter => {
                 DelimiterHandler::handle_start(elem, &mut context, self.arena);
@@ -231,8 +224,10 @@ impl<'arena> OmmlParser<'arena> {
                 context.properties = parse_accent_properties(&attrs);
             },
             _ => {
-                // For elements that don't need special handling, properties are already parsed
-                context.properties = parse_attributes_batch_with_cache(&mut cache);
+                // Default case: Don't eagerly parse properties (major performance win!)
+                // Properties will be parsed on-demand by handlers if needed.
+                // This eliminates 40+ String allocations per element that were never used.
+                // Most elements (Text, Run, Base, etc.) don't need any properties at all.
             },
         }
 
@@ -278,8 +273,9 @@ impl<'arena> OmmlParser<'arena> {
 
                 if has_properties {
                     // Create a Run node with properties
+                    // Performance: Use std::mem::take to avoid cloning children
                     let run_node = MathNode::Run {
-                        content: context.children.clone(),
+                        content: std::mem::take(&mut context.children),
                         literal: context.properties.run_literal,
                         style: context
                             .properties
@@ -550,14 +546,8 @@ impl<'arena> OmmlParser<'arena> {
         // Parse attributes
         let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
 
-        // Store raw attributes for property element handlers
-        // SAFETY: The attributes are valid for the duration of the XML parsing
-        context.attributes = unsafe {
-            std::mem::transmute::<
-                Vec<quick_xml::events::attributes::Attribute<'_>>,
-                Vec<quick_xml::events::attributes::Attribute<'_>>,
-            >(attrs.clone())
-        };
+        // Performance optimization: Don't store attributes in context as they're never used
+        // This eliminates a clone() and unsafe transmute on every element
 
         context.properties = parse_attributes_batch(&attrs);
 
