@@ -27,155 +27,32 @@ pub struct LatexConverter {
 impl LatexConverter {
     /// Create a new LaTeX converter with optimized initial capacity
     pub fn new() -> Self {
-        let mut converter = Self {
+        Self {
             buffer: String::with_capacity(2048), // Larger initial capacity for better performance
             temp_buffer: SmallVec::new(),
             string_cache: LatexStringCache::new(),
             stats: LatexConversionStats::default(),
-        };
-
-        // Pre-populate cache with common LaTeX commands for better performance
-        converter.initialize_cache();
-
-        converter
+        }
+        // NOTE: Cache initialization removed - it was O(n²) and never used.
+        // The cache will be populated lazily during conversion as needed.
     }
 
     /// Create a new LaTeX converter with custom initial capacity
     pub fn with_capacity(capacity: usize) -> Self {
-        let mut converter = Self {
+        Self {
             buffer: String::with_capacity(capacity),
             temp_buffer: SmallVec::new(),
             string_cache: LatexStringCache::new(),
             stats: LatexConversionStats::default(),
-        };
-
-        // Pre-populate cache with common LaTeX commands
-        converter.initialize_cache();
-
-        converter
-    }
-
-    /// Initialize the string cache with commonly used LaTeX commands
-    fn initialize_cache(&mut self) {
-        // Cache common operators
-        let common_commands = [
-            "+",
-            "-",
-            "\\cdot",
-            "\\div",
-            "=",
-            "\\neq",
-            "<",
-            ">",
-            "\\leq",
-            "\\geq",
-            "\\pm",
-            "\\mp",
-            "\\times",
-            "\\cdot",
-            "\\ast",
-            "\\circ",
-            "\\bullet",
-            "\\wedge",
-            "\\vee",
-            "\\cap",
-            "\\cup",
-            "\\in",
-            "\\notin",
-            "\\subset",
-            "\\supset",
-            "\\subseteq",
-            "\\supseteq",
-            "\\approx",
-            "\\cong",
-            "\\equiv",
-            "\\propto",
-            "\\parallel",
-            "\\perp",
-            "\\angle",
-            "\\nabla",
-            "\\partial",
-            "\\infty",
-            "\\emptyset",
-            "\\cup",
-            "\\cap",
-            "\\sim",
-            "\\simeq",
-            "\\asymp",
-            "\\mathrm{d}",
-            "\\ldots",
-            "\\cdots",
-            "\\vdots",
-            "\\ddots",
-            "\\leftarrow",
-            "\\rightarrow",
-            "\\uparrow",
-            "\\downarrow",
-            "\\leftrightarrow",
-            "\\updownarrow",
-            "\\forall",
-            "\\exists",
-            "\\neg",
-            "\\land",
-            "\\lor",
-            "\\implies",
-            "\\iff",
-            "\\therefore",
-            "\\because",
-            "\\Box",
-            "\\Diamond",
-            "\\square",
-            // Common environments and commands
-            "\\frac{",
-            "\\sqrt{",
-            "\\begin{pmatrix}",
-            "\\end{pmatrix}",
-            "\\begin{bmatrix}",
-            "\\end{bmatrix}",
-            "\\begin{Bmatrix}",
-            "\\end{Bmatrix}",
-            "\\begin{vmatrix}",
-            "\\end{vmatrix}",
-            "\\begin{Vmatrix}",
-            "\\end{Vmatrix}",
-            "\\begin{matrix}",
-            "\\end{matrix}",
-            "\\begin{align*}",
-            "\\end{align*}",
-            "\\text{",
-            "\\mathrm{",
-            "\\mathbf{",
-            "\\mathit{",
-            "\\mathsf{",
-            "\\mathtt{",
-            "\\mathcal{",
-            "\\mathfrak{",
-            "\\mathbb{",
-            "\\hat{",
-            "\\check{",
-            "\\tilde{",
-            "\\acute{",
-            "\\grave{",
-            "\\dot{",
-            "\\ddot{",
-            "\\dddot{",
-            "\\bar{",
-            "\\breve{",
-            "\\vec{",
-            "\\boxed{",
-            "\\overline{",
-            "\\underline{",
-            "\\sout{",
-            "\\phantom{",
-            "\\overset{",
-            "\\underset{",
-            "\\lim_{",
-        ];
-
-        for cmd in &common_commands {
-            self.string_cache.get_or_insert(cmd);
         }
+        // NOTE: Cache initialization removed - lazy population is more efficient
     }
+
+    // NOTE: initialize_cache() removed - was O(n²) complexity with 150+ string allocations.
+    // The cache now populated lazily during conversion, which is more efficient since:
+    // 1. Avoids upfront cost when converter is created but not used
+    // 2. Only caches strings that are actually needed
+    // 3. Eliminates wasteful linear search through growing cache (O(n²) → O(1) with lazy)
 
     /// Convert a formula to LaTeX
     ///

@@ -153,15 +153,22 @@ pub fn parse_element_properties(
 /// Extract attribute value as string (optimized for performance)
 ///
 /// This function is called extensively during OMML parsing, so it's heavily optimized:
-/// - Uses byte-level comparison to avoid UTF-8 decoding when possible
-/// - Pre-computes the m: prefix to avoid format! allocation in the loop
-/// - Inlined for better performance
-/// - Returns owned String only when a match is found
+/// Extract attribute value with zero-copy optimization (borrowed version)
+///
+/// Returns `Cow<str>` to avoid unnecessary allocations. The returned value
+/// borrows from the XML attribute when possible.
+///
+/// # Performance
+/// - Zero-copy in most cases (no `_platform_memmove`)
+/// - Pre-computes `m:` prefix once per call
+/// - Uses byte-level comparison to avoid UTF-8 validation overhead
+///
+/// Use this version when you don't need to store the value long-term.
 #[inline]
-pub fn get_attribute_value(
-    attrs: &[quick_xml::events::attributes::Attribute],
+pub fn get_attribute_value_borrowed<'a>(
+    attrs: &'a [quick_xml::events::attributes::Attribute<'a>],
     key: &str,
-) -> Option<String> {
+) -> Option<std::borrow::Cow<'a, str>> {
     // Pre-compute the m: prefixed key once to avoid allocation in the loop
     let key_bytes = key.as_bytes();
     let mut m_prefixed = smallvec::SmallVec::<[u8; 32]>::with_capacity(key.len() + 2);
@@ -175,12 +182,27 @@ pub fn get_attribute_value(
         // Fast byte comparison (avoids UTF-8 validation overhead)
         if attr_key == key_bytes || attr_key == m_prefixed.as_slice() {
             // Only decode UTF-8 when we have a match
-            if let Ok(value) = std::str::from_utf8(&attr.value) {
-                return Some(value.to_string());
-            }
+            return Some(std::borrow::Cow::Borrowed(
+                std::str::from_utf8(&attr.value).ok()?,
+            ));
         }
     }
     None
+}
+
+/// Extract attribute value as owned String
+///
+/// This is a convenience wrapper around `get_attribute_value_borrowed` that
+/// converts the result to an owned String for storage in structures.
+///
+/// For better performance when the value doesn't need to be stored,
+/// use `get_attribute_value_borrowed` instead.
+#[inline]
+pub fn get_attribute_value(
+    attrs: &[quick_xml::events::attributes::Attribute],
+    key: &str,
+) -> Option<String> {
+    get_attribute_value_borrowed(attrs, key).map(|cow| cow.into_owned())
 }
 
 /// Extract attribute value as integer with SIMD acceleration
@@ -188,7 +210,7 @@ pub fn get_attribute_value_int(
     attrs: &[quick_xml::events::attributes::Attribute],
     key: &str,
 ) -> Option<i32> {
-    get_attribute_value(attrs, key).and_then(|s| parse_int_simd(&s))
+    get_attribute_value_borrowed(attrs, key).and_then(|s| parse_int_simd(&s))
 }
 
 /// Extract attribute value as float with SIMD acceleration
@@ -196,7 +218,7 @@ pub fn get_attribute_value_float(
     attrs: &[quick_xml::events::attributes::Attribute],
     key: &str,
 ) -> Option<f32> {
-    get_attribute_value(attrs, key).and_then(|s| parse_float_simd(&s))
+    get_attribute_value_borrowed(attrs, key).and_then(|s| parse_float_simd(&s))
 }
 
 /// Extract attribute value as boolean with fast lookup
@@ -206,7 +228,7 @@ pub fn get_attribute_value_bool(
     attrs: &[quick_xml::events::attributes::Attribute],
     key: &str,
 ) -> Option<bool> {
-    get_attribute_value(attrs, key).and_then(|s| parse_bool_fast(&s))
+    get_attribute_value_borrowed(attrs, key).and_then(|s| parse_bool_fast(&s))
 }
 
 /// Extract attribute value as space type
@@ -216,7 +238,7 @@ pub fn get_attribute_value_space(
     attrs: &[quick_xml::events::attributes::Attribute],
     key: &str,
 ) -> Option<SpaceType> {
-    get_attribute_value(attrs, key).and_then(|s| parse_space_type(Some(&s)))
+    get_attribute_value_borrowed(attrs, key).and_then(|s| parse_space_type(Some(&s)))
 }
 
 /// Extract attribute value as alignment
@@ -226,7 +248,7 @@ pub fn get_attribute_value_alignment(
     attrs: &[quick_xml::events::attributes::Attribute],
     key: &str,
 ) -> Option<Alignment> {
-    get_attribute_value(attrs, key).and_then(|s| parse_alignment_value(&s))
+    get_attribute_value_borrowed(attrs, key).and_then(|s| parse_alignment_value(&s))
 }
 
 /// Extract attribute value as vertical alignment
@@ -236,7 +258,7 @@ pub fn get_attribute_value_vertical_alignment(
     attrs: &[quick_xml::events::attributes::Attribute],
     key: &str,
 ) -> Option<VerticalAlignment> {
-    get_attribute_value(attrs, key).and_then(|s| parse_vertical_alignment(Some(&s)))
+    get_attribute_value_borrowed(attrs, key).and_then(|s| parse_vertical_alignment(Some(&s)))
 }
 
 /// Extract attribute value as position
@@ -246,7 +268,7 @@ pub fn get_attribute_value_position(
     attrs: &[quick_xml::events::attributes::Attribute],
     key: &str,
 ) -> Option<Position> {
-    get_attribute_value(attrs, key).and_then(|s| parse_position_type(Some(&s)))
+    get_attribute_value_borrowed(attrs, key).and_then(|s| parse_position_type(Some(&s)))
 }
 
 /// Extract attribute value as fraction type
@@ -256,7 +278,7 @@ pub fn get_attribute_value_fraction_type(
     attrs: &[quick_xml::events::attributes::Attribute],
     key: &str,
 ) -> Option<FractionType> {
-    get_attribute_value(attrs, key).and_then(|s| parse_fraction_type(Some(&s)))
+    get_attribute_value_borrowed(attrs, key).and_then(|s| parse_fraction_type(Some(&s)))
 }
 
 /// Extract attribute value as shape type
@@ -266,7 +288,7 @@ pub fn get_attribute_value_shape(
     attrs: &[quick_xml::events::attributes::Attribute],
     key: &str,
 ) -> Option<ShapeType> {
-    get_attribute_value(attrs, key).and_then(|s| parse_shape_type(Some(&s)))
+    get_attribute_value_borrowed(attrs, key).and_then(|s| parse_shape_type(Some(&s)))
 }
 
 /// Extract attribute value as break type
@@ -276,7 +298,7 @@ pub fn get_attribute_value_break(
     attrs: &[quick_xml::events::attributes::Attribute],
     key: &str,
 ) -> Option<BreakType> {
-    get_attribute_value(attrs, key).and_then(|s| parse_break_type(Some(&s)))
+    get_attribute_value_borrowed(attrs, key).and_then(|s| parse_break_type(Some(&s)))
 }
 
 /// Extract attribute value as line style
@@ -286,7 +308,7 @@ pub fn get_attribute_value_line_style(
     attrs: &[quick_xml::events::attributes::Attribute],
     key: &str,
 ) -> Option<LineStyle> {
-    get_attribute_value(attrs, key).and_then(|s| parse_line_style(Some(&s)))
+    get_attribute_value_borrowed(attrs, key).and_then(|s| parse_line_style(Some(&s)))
 }
 
 /// Extract attribute value as strike style
@@ -296,7 +318,7 @@ pub fn get_attribute_value_strike_style(
     attrs: &[quick_xml::events::attributes::Attribute],
     key: &str,
 ) -> Option<StrikeStyle> {
-    get_attribute_value(attrs, key).and_then(|s| parse_strike_style(Some(&s)))
+    get_attribute_value_borrowed(attrs, key).and_then(|s| parse_strike_style(Some(&s)))
 }
 
 /// Parse spacing type from OMML attribute values
