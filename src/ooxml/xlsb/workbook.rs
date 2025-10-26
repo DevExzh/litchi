@@ -97,34 +97,25 @@ impl XlsbWorkbook {
     ) -> XlsbResult<()> {
         for record in iter.by_ref() {
             let record = record?;
-            // println!("DEBUG SST: Record type 0x{:04X}, data len {}", record.header.record_type, record.data.len());
             match record.header.record_type {
                 record_types::BEGIN_SST => {
-                    // println!("DEBUG SST: Found BEGIN_SST");
                     // SST header, continue reading
                 },
                 record_types::SST_ITEM => {
-                    // println!("DEBUG SST: Found SST_ITEM");
                     if let Ok(sst_item) =
                         crate::ooxml::xlsb::records::SstItemRecord::parse(&record.data)
                     {
-                        // println!("DEBUG SST: Parsed string: '{}'", sst_item.string);
                         strings.push(sst_item.string);
-                    } /* else {
-                    println!("DEBUG SST: Failed to parse SST_ITEM");
-                    }*/
+                    }
                 },
                 record_types::END_SST => {
-                    // println!("DEBUG SST: Found END_SST, breaking");
                     break;
                 },
                 _ => {
                     // Skip other records
-                    // println!("DEBUG SST: Skipping record type 0x{:04X}", record.header.record_type);
                 },
             }
         }
-        // println!("DEBUG SST: Total strings parsed: {}", strings.len());
         Ok(())
     }
 
@@ -136,10 +127,8 @@ impl XlsbWorkbook {
     ) -> XlsbResult<()> {
         for record in iter.by_ref() {
             let record = record?;
-            // println!("DEBUG: Record type 0x{:04X}, data len {}", record.header.record_type, record.data.len());
             match record.header.record_type {
                 record_types::WORKBOOK_PROP => {
-                    // println!("DEBUG: Found WORKBOOK_PROP");
                     if let Ok(prop) =
                         crate::ooxml::xlsb::records::WorkbookPropRecord::parse(&record.data)
                     {
@@ -147,19 +136,16 @@ impl XlsbWorkbook {
                     }
                 },
                 record_types::BUNDLE_SH => {
-                    // println!("DEBUG: Found BUNDLE_SH");
                     match crate::ooxml::xlsb::records::BundleSheetRecord::parse(&record.data) {
                         Ok(bundle_sh) => {
-                            // println!("DEBUG: Parsed sheet name: {}", bundle_sh.name);
                             worksheet_names.push(bundle_sh.name);
                         },
                         Err(_e) => {
-                            // println!("DEBUG: Failed to parse BundleSheetRecord: {:?}", e);
+                            // Failed to parse BundleSheetRecord
                         },
                     }
                 },
                 record_types::END_BUNDLE_SHS => {
-                    // println!("DEBUG: Found END_BUNDLE_SHS, breaking");
                     break;
                 },
                 _ => {

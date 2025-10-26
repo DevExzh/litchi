@@ -163,13 +163,6 @@ impl ChpxFkp {
 
             let cb = page_data[grpprl_offset] as usize;
 
-            if entries.len() < 2 && cb > 0 {
-                eprintln!(
-                    "DEBUG:           FKP entry {}: bx={}, grpprl_offset={}, cb={}",
-                    i, bx, grpprl_offset, cb
-                );
-            }
-
             // grpprl data starts at grpprl_offset + 1
             let grpprl_start = grpprl_offset + 1;
             let grpprl_end = grpprl_start + cb;

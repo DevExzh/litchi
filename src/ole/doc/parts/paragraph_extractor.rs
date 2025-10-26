@@ -51,46 +51,23 @@ impl ParagraphExtractor {
         word_document: &[u8],
         text: String,
     ) -> Result<Self> {
-        // Debug: Print all FIB table pointers to find CLX
-        eprintln!("DEBUG: FIB table pointers with non-zero length:");
-        for i in 0..50 {
-            if let Some((offset, length)) = fib.get_table_pointer(i)
-                && length > 0
-            {
-                eprintln!("DEBUG:   Index {}: offset={}, length={}", i, offset, length);
-            }
-        }
-
         // Get PAP bin table location from FIB
         // Index 13 in FibRgFcLcb97 is fcPlcfBtePapx/lcbPlcfBtePapx (PLCFBTEPAPX)
         let pap_plcf = if let Some((offset, length)) = fib.get_table_pointer(13) {
-            eprintln!(
-                "DEBUG: PAP table pointer: offset={}, length={}",
-                offset, length
-            );
             if length > 0 && (offset as usize) < table_stream.len() {
                 let pap_data = &table_stream[offset as usize..];
                 let pap_len = length.min((table_stream.len() - offset as usize) as u32) as usize;
-                eprintln!("DEBUG: PAP data length={}", pap_len);
                 if pap_len >= 4 {
                     // PAP PLCF uses 4-byte property descriptors initially
                     // Each entry points to a PAPX (paragraph properties) structure
-                    let result = PlcfParser::parse(&pap_data[..pap_len], 4);
-                    eprintln!("DEBUG: PAP PLCF parsed: {:?}", result.is_some());
-                    if let Some(ref plcf) = result {
-                        eprintln!("DEBUG: PAP PLCF has {} entries", plcf.count());
-                    }
-                    result
+                    PlcfParser::parse(&pap_data[..pap_len], 4)
                 } else {
-                    eprintln!("DEBUG: PAP data too small");
                     None
                 }
             } else {
-                eprintln!("DEBUG: Invalid PAP offset/length");
                 None
             }
         } else {
-            eprintln!("DEBUG: No PAP table pointer in FIB");
             None
         };
 
@@ -98,28 +75,14 @@ impl ParagraphExtractor {
         // According to [MS-DOC], fcClx is at FIB offset 0x01A2
         // In FibRgFcLcb97 (starting at FIB offset 154), this is index 33: (0x01A2 - 154) / 8 = 33
         let piece_table = if let Some((offset, length)) = fib.get_table_pointer(33) {
-            eprintln!("DEBUG: CLX pointer: offset={}, length={}", offset, length);
             if length > 0 && (offset as usize) < table_stream.len() {
                 let clx_data = &table_stream[offset as usize..];
                 let clx_len = length.min((table_stream.len() - offset as usize) as u32) as usize;
-                eprintln!("DEBUG: CLX data length={}", clx_len);
-                let result = PieceTable::parse(&clx_data[..clx_len]);
-                if let Some(ref pt) = result {
-                    eprintln!(
-                        "DEBUG: PieceTable has {} pieces, total_cps={}",
-                        pt.pieces().len(),
-                        pt.total_cps()
-                    );
-                } else {
-                    eprintln!("DEBUG: Failed to parse PieceTable");
-                }
-                result
+                PieceTable::parse(&clx_data[..clx_len])
             } else {
-                eprintln!("DEBUG: Invalid CLX offset/length");
                 None
             }
         } else {
-            eprintln!("DEBUG: No CLX pointer in FIB");
             None
         };
 
@@ -129,38 +92,20 @@ impl ParagraphExtractor {
         let chp_bin_table = if let (Some((offset, length)), Some(pt)) =
             (fib.get_table_pointer(12), &piece_table)
         {
-            eprintln!(
-                "DEBUG: CHP table pointer: offset={}, length={}",
-                offset, length
-            );
             if length > 0 && (offset as usize) < table_stream.len() {
                 let chp_data = &table_stream[offset as usize..];
                 let chp_len = length.min((table_stream.len() - offset as usize) as u32) as usize;
-                eprintln!("DEBUG: CHP data length={}", chp_len);
                 if chp_len >= 8 {
                     // Parse CHPBinTable (PlcfBteChpx with FKP pages)
                     // FKP pages are in WordDocument stream, not table stream!
-                    let result = ChpBinTable::parse(&chp_data[..chp_len], word_document, pt);
-                    if let Some(ref bin_table) = result {
-                        eprintln!("DEBUG: ChpBinTable has {} runs", bin_table.runs().len());
-                    } else {
-                        eprintln!("DEBUG: Failed to parse ChpBinTable");
-                    }
-                    result
+                    ChpBinTable::parse(&chp_data[..chp_len], word_document, pt)
                 } else {
-                    eprintln!("DEBUG: CHP data too small");
                     None
                 }
             } else {
-                eprintln!("DEBUG: Invalid CHP offset/length");
                 None
             }
         } else {
-            if piece_table.is_none() {
-                eprintln!("DEBUG: No piece table available for CHP parsing");
-            } else {
-                eprintln!("DEBUG: No CHP table pointer in FIB");
-            }
             None
         };
 

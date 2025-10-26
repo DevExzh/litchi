@@ -68,22 +68,13 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         self.worksheet_names = bound_sheets.iter().map(|s| s.name.clone()).collect();
 
         // Parse worksheets from positions in the workbook stream
-        println!("DEBUG: Found {} bound sheets", bound_sheets.len());
         for bound_sheet in &bound_sheets {
-            println!(
-                "DEBUG: Parsing worksheet '{}' at position {}",
-                bound_sheet.name, bound_sheet.position
-            );
             match self.parse_worksheet_from_position(bound_sheet, &encoding, &mut record_iter) {
                 Ok(worksheet) => {
-                    println!("DEBUG: Successfully parsed worksheet");
                     self.worksheets.push(worksheet);
                 },
-                Err(e) => {
-                    println!(
-                        "DEBUG: Failed to parse worksheet {}: {}",
-                        bound_sheet.name, e
-                    );
+                Err(_e) => {
+                    // Failed to parse worksheet, continue with next
                 },
             }
         }

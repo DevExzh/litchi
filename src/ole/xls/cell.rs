@@ -70,11 +70,6 @@ impl XlsCell {
                 ..
             } => {
                 let cell_value = if let Some(sst) = sst {
-                    println!(
-                        "DEBUG: SST index {} requested, SST has {} entries",
-                        sst_index,
-                        sst.len()
-                    );
                     if let Some(s) = sst.get(*sst_index as usize) {
                         CellValue::String(s.clone())
                     } else {

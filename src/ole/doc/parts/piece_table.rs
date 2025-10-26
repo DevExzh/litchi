@@ -93,19 +93,8 @@ impl PieceTable {
     /// Parsed piece table or None if invalid
     pub fn parse(clx_data: &[u8]) -> Option<Self> {
         if clx_data.is_empty() {
-            eprintln!("DEBUG: PieceTable: clx_data is empty");
             return None;
         }
-
-        eprintln!(
-            "DEBUG: PieceTable: parsing {} bytes of CLX data",
-            clx_data.len()
-        );
-        eprint!("DEBUG: PieceTable: first 36 bytes: ");
-        for item in clx_data.iter().take(clx_data.len().min(36)) {
-            eprint!("{:02X} ", item);
-        }
-        eprintln!();
 
         let mut offset = 0;
 
@@ -198,15 +187,6 @@ impl PieceTable {
 
         // Sort pieces by CP (should already be sorted, but ensure it)
         pieces.sort_by_key(|p| p.cp_start);
-
-        // Debug: print first few pieces
-        eprintln!("DEBUG: PieceTable parsed {} pieces:", pieces.len());
-        for (i, piece) in pieces.iter().take(5).enumerate() {
-            eprintln!(
-                "DEBUG:   Piece {}: cp={}..{}, fc={}, unicode={}",
-                i, piece.cp_start, piece.cp_end, piece.fc, piece.is_unicode
-            );
-        }
 
         Some(Self { pieces })
     }

@@ -130,24 +130,6 @@ impl ChpBinTable {
                         // Parse CHPX (grpprl) to get character properties
                         let properties = Self::parse_chpx(&entry.grpprl);
 
-                        if all_runs.len() < 5 && !entry.grpprl.is_empty() {
-                            eprint!(
-                                "DEBUG:       Entry {}: fc={}..{} -> cp={}..{}, grpprl_len={}, is_ole2={}, pic_offset={:?}, grpprl_bytes=",
-                                j,
-                                entry.fc,
-                                end_fc,
-                                start_cp,
-                                end_cp,
-                                entry.grpprl.len(),
-                                properties.is_ole2,
-                                properties.pic_offset
-                            );
-                            for b in entry.grpprl.iter().take(20) {
-                                eprint!("{:02X} ", b);
-                            }
-                            eprintln!();
-                        }
-
                         all_runs.push(CharacterRun {
                             start_cp,
                             end_cp,
@@ -155,15 +137,8 @@ impl ChpBinTable {
                         });
                     }
                 }
-            } else {
-                eprintln!("DEBUG: Failed to parse FKP at page offset {}", page_offset);
             }
         }
-
-        eprintln!(
-            "DEBUG: ChpBinTable parsed {} total runs (before deduplication)",
-            all_runs.len()
-        );
 
         // Sort runs by start CP, then by end CP
         // This is essential for proper merging and overlap detection
@@ -194,11 +169,6 @@ impl ChpBinTable {
             last_end_cp = run.end_cp;
             merged_runs.push(run);
         }
-
-        eprintln!(
-            "DEBUG: ChpBinTable after deduplication: {} runs",
-            merged_runs.len()
-        );
 
         Some(Self { runs: merged_runs })
     }
@@ -231,29 +201,15 @@ impl ChpBinTable {
                     // OLE2 object flag (SPRM_FOLE2)
                     let operand = sprm.operand_byte().unwrap_or(0);
                     props.is_ole2 = operand != 0;
-                    eprintln!(
-                        "DEBUG: Found SPRM_FOLE2 in FKP, operand=0x{:02X}, operand_len={}, is_ole2={}",
-                        operand,
-                        sprm.operand.len(),
-                        props.is_ole2
-                    );
                 },
                 0x6A03 => {
                     // Picture location (sprmCPicLocation)
                     // This is the FILE character position (fc) of the picture/object data
                     props.pic_offset = sprm.operand_dword();
-                    eprintln!(
-                        "DEBUG: Found sprmCPicLocation (0x6A03) in FKP, pic_offset={:?}",
-                        props.pic_offset
-                    );
                 },
                 0x680E => {
                     // Object location/pic offset (SPRM_OBJLOCATION)
                     props.pic_offset = sprm.operand_dword();
-                    eprintln!(
-                        "DEBUG: Found SPRM_OBJLOCATION (0x680E) in FKP, pic_offset={:?}",
-                        props.pic_offset
-                    );
                 },
                 _ => {},
             }

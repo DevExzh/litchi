@@ -200,13 +200,6 @@ impl Document {
             // Parse the MTEF data
             let mut parser = crate::formula::MtefParser::new(arena_ref, data_ptr);
 
-            eprintln!(
-                "DEBUG: Parsing MTEF stream '{}', {} bytes, is_valid={}",
-                stream_name,
-                data.len(),
-                parser.is_valid()
-            );
-
             if parser.is_valid() {
                 match parser.parse() {
                     Ok(nodes) if !nodes.is_empty() => {
@@ -430,27 +423,11 @@ impl Document {
         // Get all subdocument ranges from FIB
         let subdoc_ranges = self.fib.get_all_subdoc_ranges();
 
-        eprintln!("DEBUG: Found {} subdocument ranges", subdoc_ranges.len());
-        for (name, start, end) in &subdoc_ranges {
-            eprintln!(
-                "DEBUG:   {}: CP range {}..{} ({} chars)",
-                name,
-                start,
-                end,
-                end - start
-            );
-        }
-
         // Parse each subdocument range
-        for (subdoc_name, start_cp, end_cp) in subdoc_ranges {
+        for (_subdoc_name, start_cp, end_cp) in subdoc_ranges {
             if start_cp >= end_cp {
                 continue;
             }
-
-            eprintln!(
-                "DEBUG: Parsing subdocument '{}' (CP {}..{})",
-                subdoc_name, start_cp, end_cp
-            );
 
             // Create extractor for this CP range
             let para_extractor = ParagraphExtractor::new_with_range(
@@ -462,20 +439,11 @@ impl Document {
             )?;
 
             let extracted_paras = para_extractor.extract_paragraphs()?;
-            eprintln!(
-                "DEBUG:   Extracted {} paragraphs from '{}'",
-                extracted_paras.len(),
-                subdoc_name
-            );
 
             // Convert to Paragraph objects and add to result
             self.convert_to_paragraphs(extracted_paras, &mut all_paragraphs);
         }
 
-        eprintln!(
-            "DEBUG: Total paragraphs extracted: {}",
-            all_paragraphs.len()
-        );
         Ok(all_paragraphs)
     }
 
@@ -581,7 +549,6 @@ impl Document {
             // Check if this paragraph starts a table at the requested level
             if props.in_table && props.table_nesting_level == level {
                 // Found the start of a table - collect all paragraphs in this table
-                let table_start = i;
                 let mut table_paras = Vec::new();
 
                 // Collect paragraphs until we exit the table
@@ -604,12 +571,6 @@ impl Document {
                 if !rows.is_empty() {
                     tables.push(Table::new(rows));
                 }
-
-                eprintln!(
-                    "DEBUG: Extracted table starting at para {}, with {} rows",
-                    table_start,
-                    tables.last().map_or(0, |t| t.row_count().unwrap_or(0))
-                );
             } else {
                 i += 1;
             }
