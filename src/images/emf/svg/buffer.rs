@@ -107,7 +107,7 @@ impl ElementBuffer {
         let stroke = self.current_stroke.as_ref().unwrap().clone();
 
         for &line in &self.pending_lines {
-            let (x1, y1, x2, y2) = line;
+            let (x1, y1, _x2, _y2) = line;
 
             if current_path.is_empty() {
                 // Start new path
