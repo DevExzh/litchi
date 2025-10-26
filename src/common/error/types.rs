@@ -2,6 +2,7 @@
 //!
 //! This module provides a unified error type that encompasses errors from both
 //! OLE2 and OOXML parsing, presenting a consistent API to users.
+use crate::common::binary::BinaryError;
 use thiserror::Error;
 
 /// Main error type for Litchi operations.
@@ -54,6 +55,12 @@ pub enum Error {
     /// Generic error
     #[error("{0}")]
     Other(String),
+}
+
+impl From<BinaryError> for Error {
+    fn from(err: BinaryError) -> Self {
+        Error::ParseError(format!("Binary parsing error: {}", err))
+    }
 }
 
 /// Result type for Litchi operations.
