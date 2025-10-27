@@ -9,41 +9,104 @@ use super::writer::MarkdownWriter;
 /// **Note**: This module is only available when the `ole` or `ooxml` feature is enabled.
 use crate::common::Result;
 use crate::presentation::{Presentation, Slide};
+use rayon::prelude::*;
+
+/// Minimum number of slides to justify parallel processing overhead.
+const PARALLEL_THRESHOLD: usize = 10;
 
 impl ToMarkdown for Presentation {
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
-        let mut writer = MarkdownWriter::new(*options);
-
         // Write metadata as YAML front matter if available and enabled
-        if options.include_metadata
+        let metadata_md = if options.include_metadata
             && let Some(metadata) = self.metadata()?
         {
-            writer.write_metadata(&metadata)?;
-        }
+            let mut metadata_writer = MarkdownWriter::new(*options);
+            metadata_writer.write_metadata(&metadata)?;
+            metadata_writer.finish()
+        } else {
+            String::new()
+        };
 
         let slides = self.slides()?;
-        for (i, slide) in slides.iter().enumerate() {
-            if i > 0 {
-                // Separate slides with horizontal rule
-                writer.push_str("\n\n---\n\n");
+
+        // Decide whether to use parallel or sequential processing
+        let content_md = if options.use_parallel && slides.len() >= PARALLEL_THRESHOLD {
+            // PARALLEL PATH: Process slides in parallel for large presentations
+            // Use into_par_iter() to consume and own the slides
+            let slide_count = slides.len();
+            let slide_strings: Vec<Result<String>> = slides
+                .into_par_iter()
+                .enumerate()
+                .map(|(i, slide)| {
+                    let mut writer = MarkdownWriter::new(*options);
+
+                    // Format slide header with title placeholder if available
+                    let slide_title = extract_slide_title(&slide)?;
+                    let header_text = if slide_title.is_empty() {
+                        format!("# Slide {}", i + 1)
+                    } else {
+                        format!("# Slide {} {}", i + 1, slide_title)
+                    };
+
+                    writer.write_fmt(format_args!("{}\n", header_text))?;
+                    writer.push('\n');
+
+                    // Add slide content with proper markdown formatting
+                    write_slide_content(&mut writer, &slide, options)?;
+
+                    Ok(writer.finish())
+                })
+                .collect();
+
+            // Collect results and handle errors
+            let slide_strings: Result<Vec<String>> = slide_strings.into_iter().collect();
+            let slide_strings = slide_strings?;
+
+            // Estimate total size and pre-allocate
+            let total_size: usize = slide_strings.iter().map(|s| s.len()).sum();
+            // Add space for separators between slides
+            let separator_size = slide_count.saturating_sub(1) * 8; // "\n\n---\n\n"
+            let mut result = String::with_capacity(total_size + separator_size);
+
+            // Concatenate slides in order with separators
+            for (i, slide_md) in slide_strings.iter().enumerate() {
+                if i > 0 {
+                    result.push_str("\n\n---\n\n");
+                }
+                result.push_str(slide_md);
             }
 
-            // Format slide header with title placeholder if available
-            let slide_title = extract_slide_title(slide)?;
-            let header_text = if slide_title.is_empty() {
-                format!("# Slide {}", i + 1)
-            } else {
-                format!("# Slide {} {}", i + 1, slide_title)
-            };
+            result
+        } else {
+            // SEQUENTIAL PATH: Process slides sequentially for small presentations
+            let mut writer = MarkdownWriter::new(*options);
 
-            writer.write_fmt(format_args!("{}\n", header_text))?;
-            writer.push('\n');
+            for (i, slide) in slides.iter().enumerate() {
+                if i > 0 {
+                    // Separate slides with horizontal rule
+                    writer.push_str("\n\n---\n\n");
+                }
 
-            // Add slide content with proper markdown formatting
-            write_slide_content(&mut writer, slide, options)?;
-        }
+                // Format slide header with title placeholder if available
+                let slide_title = extract_slide_title(slide)?;
+                let header_text = if slide_title.is_empty() {
+                    format!("# Slide {}", i + 1)
+                } else {
+                    format!("# Slide {} {}", i + 1, slide_title)
+                };
 
-        Ok(writer.finish())
+                writer.write_fmt(format_args!("{}\n", header_text))?;
+                writer.push('\n');
+
+                // Add slide content with proper markdown formatting
+                write_slide_content(&mut writer, slide, options)?;
+            }
+
+            writer.finish()
+        };
+
+        // Combine metadata and content
+        Ok(format!("{}{}", metadata_md, content_md))
     }
 }
 

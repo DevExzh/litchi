@@ -2,7 +2,7 @@
 use super::package::Result;
 use super::paragraph::Paragraph;
 use super::parts::tap::{CellProperties, TableJustification, TableProperties};
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A table in a Word document.
 ///
@@ -23,11 +23,12 @@ use std::rc::Rc;
 ///
 /// # Performance
 ///
-/// Uses `Rc` for efficient cloning when passing around table data.
+/// Uses `Arc` for efficient cloning when passing around table data.
+/// Arc provides thread-safe reference counting, enabling Send + Sync.
 #[derive(Debug, Clone)]
 pub struct Table {
-    /// Rows in the table (shared via Rc for efficient cloning)
-    rows: Rc<Vec<Row>>,
+    /// Rows in the table (shared via Arc for efficient cloning)
+    rows: Arc<Vec<Row>>,
     /// Table-level properties (if available)
     properties: Option<TableProperties>,
 }
@@ -37,7 +38,7 @@ impl Table {
     #[allow(dead_code)]
     pub(crate) fn new(rows: Vec<Row>) -> Self {
         Self {
-            rows: Rc::new(rows),
+            rows: Arc::new(rows),
             properties: None,
         }
     }
@@ -46,7 +47,7 @@ impl Table {
     #[allow(dead_code)]
     pub(crate) fn with_properties(rows: Vec<Row>, properties: TableProperties) -> Self {
         Self {
-            rows: Rc::new(rows),
+            rows: Arc::new(rows),
             properties: Some(properties),
         }
     }
@@ -69,8 +70,8 @@ impl Table {
 
     /// Get all rows in this table.
     ///
-    /// Returns a cloned vector. Due to Rc-based sharing in Row/Cell structures,
-    /// cloning is relatively cheap (only increments reference counts).
+    /// Returns a cloned vector. Due to Arc-based sharing in Row/Cell structures,
+    /// cloning is relatively cheap (only increments atomic reference counts).
     pub fn rows(&self) -> Result<Vec<Row>> {
         Ok((*self.rows).clone())
     }
@@ -111,11 +112,12 @@ impl Table {
 ///
 /// # Performance
 ///
-/// Uses `Rc` for efficient cloning when passing around row data.
+/// Uses `Arc` for efficient cloning when passing around row data.
+/// Arc provides thread-safe reference counting, enabling Send + Sync.
 #[derive(Debug, Clone)]
 pub struct Row {
-    /// Cells in the row (shared via Rc for efficient cloning)
-    cells: Rc<Vec<Cell>>,
+    /// Cells in the row (shared via Arc for efficient cloning)
+    cells: Arc<Vec<Cell>>,
     /// Row-level properties (if available)
     row_properties: Option<TableProperties>,
 }
@@ -125,7 +127,7 @@ impl Row {
     #[allow(unused)]
     pub(crate) fn new(cells: Vec<Cell>) -> Self {
         Self {
-            cells: Rc::new(cells),
+            cells: Arc::new(cells),
             row_properties: None,
         }
     }
@@ -134,7 +136,7 @@ impl Row {
     #[allow(unused)]
     pub(crate) fn with_properties(cells: Vec<Cell>, properties: TableProperties) -> Self {
         Self {
-            cells: Rc::new(cells),
+            cells: Arc::new(cells),
             row_properties: Some(properties),
         }
     }
@@ -176,13 +178,14 @@ impl Row {
 ///
 /// # Performance
 ///
-/// Uses `Rc` for efficient cloning when passing around cell data.
+/// Uses `Arc` for efficient cloning when passing around cell data.
+/// Arc provides thread-safe reference counting, enabling Send + Sync.
 #[derive(Debug, Clone)]
 pub struct Cell {
-    /// Cell content (text) - shared via Rc for efficient cloning
-    text: Rc<String>,
-    /// Cell content (paragraphs) - shared via Rc for efficient cloning
-    paragraphs: Rc<Vec<Paragraph>>,
+    /// Cell content (text) - shared via Arc for efficient cloning
+    text: Arc<String>,
+    /// Cell content (paragraphs) - shared via Arc for efficient cloning
+    paragraphs: Arc<Vec<Paragraph>>,
     /// Cell properties (if available)
     properties: Option<CellProperties>,
 }
@@ -193,8 +196,8 @@ impl Cell {
     pub(crate) fn new(text: String) -> Self {
         let para = Paragraph::new(text.clone());
         Self {
-            text: Rc::new(text),
-            paragraphs: Rc::new(vec![para]),
+            text: Arc::new(text),
+            paragraphs: Arc::new(vec![para]),
             properties: None,
         }
     }
@@ -211,8 +214,8 @@ impl Cell {
             .collect::<Vec<&str>>()
             .join("\n");
         Self {
-            text: Rc::new(text),
-            paragraphs: Rc::new(paragraphs),
+            text: Arc::new(text),
+            paragraphs: Arc::new(paragraphs),
             properties,
         }
     }

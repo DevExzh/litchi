@@ -13,6 +13,14 @@ use std::fmt::Write as FmtWrite;
 #[cfg(any(feature = "ole", feature = "ooxml"))]
 use memchr::memchr;
 
+#[cfg(any(feature = "ole", feature = "ooxml"))]
+use rayon::prelude::*;
+
+/// Minimum number of table rows to justify parallel processing overhead.
+/// Tables are typically smaller than documents, so we use a lower threshold.
+#[cfg(any(feature = "ole", feature = "ooxml"))]
+const TABLE_PARALLEL_THRESHOLD: usize = 20;
+
 /// Information about a detected list item.
 #[derive(Debug, Clone)]
 struct ListItemInfo {
@@ -525,6 +533,7 @@ impl MarkdownWriter {
     /// Write a table in Markdown format.
     ///
     /// **Performance**: Uses efficient single-pass escaping and minimizes allocations.
+    /// For large tables (20+ rows), uses parallel processing to render rows concurrently.
     #[cfg(any(feature = "ole", feature = "ooxml"))]
     fn write_markdown_table(&mut self, table: &Table) -> Result<()> {
         let rows = table.rows()?;
@@ -536,7 +545,7 @@ impl MarkdownWriter {
         let total_cells: usize = rows.iter().map(|r| r.cell_count().unwrap_or(0)).sum();
         self.buffer.reserve(total_cells * 50); // Estimate: ~50 bytes per cell
 
-        // Write header row (first row)
+        // Write header row (first row) - always sequential
         let first_row = &rows[0];
         let first_row_cells = first_row.cells()?;
         let cell_count = first_row_cells.len();
@@ -558,17 +567,50 @@ impl MarkdownWriter {
         }
         self.buffer.push('\n');
 
-        // Write data rows
-        for row in &rows[1..] {
-            self.buffer.push('|');
-            let cells = row.cells()?;
-            for cell in &cells {
-                let text = cell.text()?;
-                self.buffer.push(' ');
-                self.write_markdown_escaped(&text);
-                self.buffer.push_str(" |");
+        // Write data rows - parallel if large enough
+        if self.options.use_parallel && rows.len() > TABLE_PARALLEL_THRESHOLD {
+            // PARALLEL PATH: Process rows in parallel for large tables
+            // First, extract all cell texts sequentially (to avoid borrowing issues with Row enum)
+            let mut row_texts: Vec<Vec<String>> = Vec::with_capacity(rows.len() - 1);
+            for row in &rows[1..] {
+                let cells = row.cells()?;
+                let cell_texts: Result<Vec<String>> = cells.iter().map(|c| c.text()).collect();
+                row_texts.push(cell_texts?);
             }
-            self.buffer.push('\n');
+
+            // Now process the texts in parallel
+            let row_strings: Vec<String> = row_texts
+                .par_iter()
+                .map(|cell_texts| {
+                    let mut row_buffer = String::with_capacity(cell_texts.len() * 50);
+                    row_buffer.push('|');
+                    for text in cell_texts {
+                        row_buffer.push(' ');
+                        Self::escape_markdown_to_buffer(&mut row_buffer, text);
+                        row_buffer.push_str(" |");
+                    }
+                    row_buffer.push('\n');
+                    row_buffer
+                })
+                .collect();
+
+            // Concatenate all row strings
+            for row_str in &row_strings {
+                self.buffer.push_str(row_str);
+            }
+        } else {
+            // SEQUENTIAL PATH: Process rows sequentially for small tables
+            for row in &rows[1..] {
+                self.buffer.push('|');
+                let cells = row.cells()?;
+                for cell in &cells {
+                    let text = cell.text()?;
+                    self.buffer.push(' ');
+                    self.write_markdown_escaped(&text);
+                    self.buffer.push_str(" |");
+                }
+                self.buffer.push('\n');
+            }
         }
 
         Ok(())
@@ -580,6 +622,17 @@ impl MarkdownWriter {
     /// Uses SIMD-accelerated memchr for fast searching.
     #[cfg(any(feature = "ole", feature = "ooxml"))]
     fn write_markdown_escaped(&mut self, text: &str) {
+        Self::escape_markdown_to_buffer(&mut self.buffer, text);
+    }
+
+    /// Helper function to escape markdown to a string buffer.
+    ///
+    /// This is extracted as a separate function so it can be used in parallel contexts.
+    ///
+    /// **Performance**: Single-pass escaping without intermediate allocations.
+    /// Uses SIMD-accelerated memchr for fast searching.
+    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    fn escape_markdown_to_buffer(buffer: &mut String, text: &str) {
         let bytes = text.as_bytes();
         let mut pos = 0;
 
@@ -596,20 +649,20 @@ impl MarkdownWriter {
             } else {
                 // No more special characters, write rest and return
                 if pos < bytes.len() {
-                    self.buffer.push_str(&text[pos..]);
+                    buffer.push_str(&text[pos..]);
                 }
                 return;
             };
 
             // Write everything up to the special character
             if next_special > pos {
-                self.buffer.push_str(&text[pos..next_special]);
+                buffer.push_str(&text[pos..next_special]);
             }
 
             // Write the escape sequence
             match bytes[next_special] {
-                b'|' => self.buffer.push_str("\\|"),
-                b'\n' => self.buffer.push(' '),
+                b'|' => buffer.push_str("\\|"),
+                b'\n' => buffer.push(' '),
                 _ => unreachable!(),
             }
 
@@ -620,6 +673,7 @@ impl MarkdownWriter {
     /// Write a table in HTML format.
     ///
     /// **Performance**: Uses efficient single-pass HTML escaping and minimizes allocations.
+    /// For large tables (20+ rows), uses parallel processing to render rows concurrently.
     #[cfg(any(feature = "ole", feature = "ooxml"))]
     fn write_html_table(&mut self, table: &Table, styled: bool) -> Result<()> {
         let indent = " ".repeat(self.options.html_table_indent);
@@ -638,34 +692,90 @@ impl MarkdownWriter {
         let total_cells: usize = rows.iter().map(|r| r.cell_count().unwrap_or(0)).sum();
         self.buffer.reserve(total_cells * 100);
 
-        for (i, row) in rows.iter().enumerate() {
-            // First row is typically header
-            let tag = if i == 0 { "th" } else { "td" };
-
-            self.buffer.push_str(&indent);
-            self.buffer.push_str("<tr>\n");
-
-            let cells = row.cells()?;
-            for cell in &cells {
-                let text = cell.text()?;
-
-                // Write opening tag
-                self.buffer.push_str(&double_indent);
-                self.buffer.push('<');
-                self.buffer.push_str(tag);
-                self.buffer.push('>');
-
-                // HTML escape and write text in a single pass (no intermediate allocations)
-                self.write_html_escaped(&text);
-
-                // Write closing tag
-                self.buffer.push_str("</");
-                self.buffer.push_str(tag);
-                self.buffer.push_str(">\n");
+        // Decide whether to use parallel processing
+        if self.options.use_parallel && rows.len() > TABLE_PARALLEL_THRESHOLD {
+            // PARALLEL PATH: Process rows in parallel for large tables
+            // First, extract all cell texts sequentially (to avoid borrowing issues with Row enum)
+            let mut all_row_texts: Vec<Vec<String>> = Vec::with_capacity(rows.len());
+            for row in &rows {
+                let cells = row.cells()?;
+                let cell_texts: Result<Vec<String>> = cells.iter().map(|c| c.text()).collect();
+                all_row_texts.push(cell_texts?);
             }
 
-            self.buffer.push_str(&indent);
-            self.buffer.push_str("</tr>\n");
+            // Now process the texts in parallel
+            let row_strings: Vec<String> = all_row_texts
+                .par_iter()
+                .enumerate()
+                .map(|(i, cell_texts)| {
+                    // First row is typically header
+                    let tag = if i == 0 { "th" } else { "td" };
+
+                    // Estimate buffer size for this row
+                    let row_capacity = cell_texts.len() * 100 + indent.len() * 2 + 10;
+                    let mut row_buffer = String::with_capacity(row_capacity);
+
+                    row_buffer.push_str(&indent);
+                    row_buffer.push_str("<tr>\n");
+
+                    for text in cell_texts {
+                        // Write opening tag
+                        row_buffer.push_str(&double_indent);
+                        row_buffer.push('<');
+                        row_buffer.push_str(tag);
+                        row_buffer.push('>');
+
+                        // HTML escape and write text
+                        Self::escape_html_to_buffer(&mut row_buffer, text);
+
+                        // Write closing tag
+                        row_buffer.push_str("</");
+                        row_buffer.push_str(tag);
+                        row_buffer.push_str(">\n");
+                    }
+
+                    row_buffer.push_str(&indent);
+                    row_buffer.push_str("</tr>\n");
+
+                    row_buffer
+                })
+                .collect();
+
+            // Concatenate all row strings
+            for row_str in &row_strings {
+                self.buffer.push_str(row_str);
+            }
+        } else {
+            // SEQUENTIAL PATH: Process rows sequentially for small tables
+            for (i, row) in rows.iter().enumerate() {
+                // First row is typically header
+                let tag = if i == 0 { "th" } else { "td" };
+
+                self.buffer.push_str(&indent);
+                self.buffer.push_str("<tr>\n");
+
+                let cells = row.cells()?;
+                for cell in &cells {
+                    let text = cell.text()?;
+
+                    // Write opening tag
+                    self.buffer.push_str(&double_indent);
+                    self.buffer.push('<');
+                    self.buffer.push_str(tag);
+                    self.buffer.push('>');
+
+                    // HTML escape and write text in a single pass (no intermediate allocations)
+                    self.write_html_escaped(&text);
+
+                    // Write closing tag
+                    self.buffer.push_str("</");
+                    self.buffer.push_str(tag);
+                    self.buffer.push_str(">\n");
+                }
+
+                self.buffer.push_str(&indent);
+                self.buffer.push_str("</tr>\n");
+            }
         }
 
         self.buffer.push_str("</table>");
@@ -679,6 +789,18 @@ impl MarkdownWriter {
     /// Uses SIMD-accelerated memchr for fast searching.
     #[cfg(any(feature = "ole", feature = "ooxml"))]
     fn write_html_escaped(&mut self, text: &str) {
+        Self::escape_html_to_buffer(&mut self.buffer, text);
+    }
+
+    /// Helper function to escape HTML to a string buffer.
+    ///
+    /// This is extracted as a separate function so it can be used in parallel contexts.
+    ///
+    /// **Performance**: Single-pass escaping that writes directly to the buffer,
+    /// avoiding the 4 intermediate string allocations from chained `replace()` calls.
+    /// Uses SIMD-accelerated memchr for fast searching.
+    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    fn escape_html_to_buffer(buffer: &mut String, text: &str) {
         let bytes = text.as_bytes();
         let mut pos = 0;
 
@@ -692,15 +814,15 @@ impl MarkdownWriter {
             if let Some(special_pos) = next_special {
                 // Write everything up to the special character
                 if special_pos > pos {
-                    self.buffer.push_str(&text[pos..special_pos]);
+                    buffer.push_str(&text[pos..special_pos]);
                 }
 
                 // Write the escape sequence
                 match bytes[special_pos] {
-                    b'&' => self.buffer.push_str("&amp;"),
-                    b'<' => self.buffer.push_str("&lt;"),
-                    b'>' => self.buffer.push_str("&gt;"),
-                    b'\n' => self.buffer.push_str("<br>"),
+                    b'&' => buffer.push_str("&amp;"),
+                    b'<' => buffer.push_str("&lt;"),
+                    b'>' => buffer.push_str("&gt;"),
+                    b'\n' => buffer.push_str("<br>"),
                     _ => unreachable!(),
                 }
 
@@ -708,7 +830,7 @@ impl MarkdownWriter {
             } else {
                 // No more special characters, write rest and return
                 if pos < bytes.len() {
-                    self.buffer.push_str(&text[pos..]);
+                    buffer.push_str(&text[pos..]);
                 }
                 return;
             }

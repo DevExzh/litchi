@@ -1,11 +1,11 @@
 /// Table, Row, and Cell structures for Word documents.
 use crate::ooxml::docx::paragraph::Paragraph;
 use crate::ooxml::error::{OoxmlError, Result};
+use parking_lot::RwLock;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use smallvec::SmallVec;
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A table in a Word document.
 ///
@@ -29,20 +29,21 @@ use std::rc::Rc;
 ///
 /// Uses lazy parsing with caching - XML is parsed once on first access,
 /// then cached results are returned on subsequent calls.
+/// Uses Arc and parking_lot RwLock for thread-safe caching, enabling Send + Sync.
 #[derive(Debug, Clone)]
 pub struct Table {
-    /// The raw XML bytes for this table (shared via Rc for efficient cloning)
-    xml_bytes: Rc<Vec<u8>>,
-    /// Cached parsed rows (lazy initialization)
-    cached_rows: Rc<RefCell<Option<SmallVec<[Row; 16]>>>>,
+    /// The raw XML bytes for this table (shared via Arc for efficient cloning)
+    xml_bytes: Arc<Vec<u8>>,
+    /// Cached parsed rows (lazy initialization with thread-safe parking_lot RwLock)
+    cached_rows: Arc<RwLock<Option<SmallVec<[Row; 16]>>>>,
 }
 
 impl Table {
     /// Create a new Table from XML bytes.
     pub fn new(xml_bytes: Vec<u8>) -> Self {
         Self {
-            xml_bytes: Rc::new(xml_bytes),
-            cached_rows: Rc::new(RefCell::new(None)),
+            xml_bytes: Arc::new(xml_bytes),
+            cached_rows: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -88,11 +89,11 @@ impl Table {
     /// # Performance
     ///
     /// Uses lazy parsing with caching - parses XML once on first call,
-    /// returns cached results on subsequent calls.
+    /// returns cached results on subsequent calls. Thread-safe via parking_lot RwLock.
     pub fn rows(&self) -> Result<SmallVec<[Row; 16]>> {
-        // Check if we have cached rows
+        // Check if we have cached rows (read lock)
         {
-            let cache = self.cached_rows.borrow();
+            let cache = self.cached_rows.read();
             if let Some(ref rows) = *cache {
                 return Ok(rows.clone());
             }
@@ -101,8 +102,8 @@ impl Table {
         // Parse rows from XML
         let rows = self.parse_rows()?;
 
-        // Cache the result
-        *self.cached_rows.borrow_mut() = Some(rows.clone());
+        // Cache the result (write lock)
+        *self.cached_rows.write() = Some(rows.clone());
 
         Ok(rows)
     }
@@ -215,18 +216,18 @@ impl Table {
 /// then cached results are returned on subsequent calls.
 #[derive(Debug, Clone)]
 pub struct Row {
-    /// The raw XML bytes for this row (shared via Rc for efficient cloning)
-    xml_bytes: Rc<Vec<u8>>,
-    /// Cached parsed cells (lazy initialization)
-    cached_cells: Rc<RefCell<Option<SmallVec<[Cell; 16]>>>>,
+    /// The raw XML bytes for this row (shared via Arc for efficient cloning)
+    xml_bytes: Arc<Vec<u8>>,
+    /// Cached parsed cells (lazy initialization with thread-safe parking_lot RwLock)
+    cached_cells: Arc<RwLock<Option<SmallVec<[Cell; 16]>>>>,
 }
 
 impl Row {
     /// Create a new Row from XML bytes.
     pub fn new(xml_bytes: Vec<u8>) -> Self {
         Self {
-            xml_bytes: Rc::new(xml_bytes),
-            cached_cells: Rc::new(RefCell::new(None)),
+            xml_bytes: Arc::new(xml_bytes),
+            cached_cells: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -260,11 +261,11 @@ impl Row {
     /// # Performance
     ///
     /// Uses lazy parsing with caching - parses XML once on first call,
-    /// returns cached results on subsequent calls.
+    /// returns cached results on subsequent calls. Thread-safe via parking_lot RwLock.
     pub fn cells(&self) -> Result<SmallVec<[Cell; 16]>> {
-        // Check if we have cached cells
+        // Check if we have cached cells (read lock)
         {
-            let cache = self.cached_cells.borrow();
+            let cache = self.cached_cells.read();
             if let Some(ref cells) = *cache {
                 return Ok(cells.clone());
             }
@@ -273,8 +274,8 @@ impl Row {
         // Parse cells from XML
         let cells = self.parse_cells()?;
 
-        // Cache the result
-        *self.cached_cells.borrow_mut() = Some(cells.clone());
+        // Cache the result (write lock)
+        *self.cached_cells.write() = Some(cells.clone());
 
         Ok(cells)
     }
@@ -373,18 +374,18 @@ impl Row {
 /// then cached results are returned on subsequent calls.
 #[derive(Debug, Clone)]
 pub struct Cell {
-    /// The raw XML bytes for this cell (shared via Rc for efficient cloning)
-    xml_bytes: Rc<Vec<u8>>,
-    /// Cached extracted text (lazy initialization)
-    cached_text: Rc<RefCell<Option<String>>>,
+    /// The raw XML bytes for this cell (shared via Arc for efficient cloning)
+    xml_bytes: Arc<Vec<u8>>,
+    /// Cached extracted text (lazy initialization with thread-safe parking_lot RwLock)
+    cached_text: Arc<RwLock<Option<String>>>,
 }
 
 impl Cell {
     /// Create a new Cell from XML bytes.
     pub fn new(xml_bytes: Vec<u8>) -> Self {
         Self {
-            xml_bytes: Rc::new(xml_bytes),
-            cached_text: Rc::new(RefCell::new(None)),
+            xml_bytes: Arc::new(xml_bytes),
+            cached_text: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -395,11 +396,11 @@ impl Cell {
     /// # Performance
     ///
     /// Uses lazy parsing with caching - parses XML once on first call,
-    /// returns cached results on subsequent calls.
+    /// returns cached results on subsequent calls. Thread-safe via parking_lot RwLock.
     pub fn text(&self) -> Result<String> {
-        // Check if we have cached text
+        // Check if we have cached text (read lock)
         {
-            let cache = self.cached_text.borrow();
+            let cache = self.cached_text.read();
             if let Some(ref text) = *cache {
                 return Ok(text.clone());
             }
@@ -408,8 +409,8 @@ impl Cell {
         // Extract text from XML
         let text = self.extract_text()?;
 
-        // Cache the result
-        *self.cached_text.borrow_mut() = Some(text.clone());
+        // Cache the result (write lock)
+        *self.cached_text.write() = Some(text.clone());
 
         Ok(text)
     }
