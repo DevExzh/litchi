@@ -97,13 +97,11 @@ impl Run {
             },
             #[cfg(feature = "ooxml")]
             Run::Docx(r) => {
-                use crate::ooxml::docx::paragraph::VerticalPosition as OoxmlVerticalPosition;
+                // Now ooxml::docx::Run also uses crate::common::VerticalPosition
                 match r.vertical_position().map_err(Error::from)? {
-                    Some(OoxmlVerticalPosition::Superscript) => {
-                        Ok(Some(VerticalPosition::Superscript))
-                    },
-                    Some(OoxmlVerticalPosition::Subscript) => Ok(Some(VerticalPosition::Subscript)),
-                    Some(OoxmlVerticalPosition::Normal) | None => Ok(None),
+                    Some(VerticalPosition::Superscript) => Ok(Some(VerticalPosition::Superscript)),
+                    Some(VerticalPosition::Subscript) => Ok(Some(VerticalPosition::Subscript)),
+                    Some(VerticalPosition::Normal) | None => Ok(None),
                 }
             },
             #[cfg(feature = "iwa")]
