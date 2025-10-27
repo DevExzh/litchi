@@ -47,6 +47,7 @@
 
 // Submodule declarations
 mod doc;
+mod element;
 mod paragraph;
 mod run;
 mod table;
@@ -54,6 +55,7 @@ mod types;
 
 // Re-exports
 pub use doc::Document;
+pub use element::DocumentElement;
 pub use paragraph::Paragraph;
 pub use run::Run;
 pub use table::{Cell, Row, Table};

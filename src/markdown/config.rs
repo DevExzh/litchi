@@ -43,6 +43,12 @@ pub struct MarkdownOptions {
     pub script_style: ScriptStyle,
     /// How to render strikethrough text
     pub strikethrough_style: StrikethroughStyle,
+    /// Whether to use parallel processing for large documents (default: true)
+    ///
+    /// When enabled, uses rayon to process paragraphs in parallel for documents
+    /// with 50+ paragraphs. Automatically uses sequential processing for smaller
+    /// documents to avoid parallelization overhead.
+    pub use_parallel: bool,
 }
 
 impl Default for MarkdownOptions {
@@ -56,6 +62,7 @@ impl Default for MarkdownOptions {
             list_indent: 2,
             script_style: ScriptStyle::Html,
             strikethrough_style: StrikethroughStyle::Markdown,
+            use_parallel: true, // Enable parallel processing by default
         }
     }
 }
@@ -206,6 +213,31 @@ impl MarkdownOptions {
     #[inline]
     pub fn with_strikethrough_style(mut self, style: StrikethroughStyle) -> Self {
         self.strikethrough_style = style;
+        self
+    }
+
+    /// Set whether to use parallel processing.
+    ///
+    /// When enabled, uses rayon to process paragraphs in parallel for large documents.
+    /// Automatically uses sequential processing for small documents (< 50 paragraphs)
+    /// to avoid parallelization overhead.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use litchi::markdown::MarkdownOptions;
+    ///
+    /// // Enable parallel processing (default)
+    /// let options = MarkdownOptions::new()
+    ///     .with_parallel(true);
+    ///
+    /// // Disable for deterministic single-threaded execution
+    /// let options = MarkdownOptions::new()
+    ///     .with_parallel(false);
+    /// ```
+    #[inline]
+    pub fn with_parallel(mut self, use_parallel: bool) -> Self {
+        self.use_parallel = use_parallel;
         self
     }
 }

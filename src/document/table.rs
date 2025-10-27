@@ -9,6 +9,7 @@ use crate::ole;
 use crate::ooxml;
 
 /// A table in a Word document.
+#[derive(Debug, Clone)]
 pub enum Table {
     #[cfg(feature = "ole")]
     Doc(ole::doc::Table),
@@ -32,6 +33,9 @@ impl Table {
     }
 
     /// Get the rows in this table.
+    ///
+    /// **Performance Note**: This method allocates and clones the entire row collection.
+    /// For better performance when iterating, consider using `row_count()` and `row_at(index)`.
     pub fn rows(&self) -> Result<Vec<Row>> {
         match self {
             #[cfg(feature = "ole")]
@@ -51,9 +55,36 @@ impl Table {
             },
         }
     }
+
+    /// Get a specific row by index without allocating a collection.
+    ///
+    /// This is more efficient than calling `rows()` and then indexing,
+    /// as it avoids cloning the entire row collection.
+    ///
+    /// Returns `None` if the index is out of bounds.
+    pub fn row_at(&self, index: usize) -> Result<Option<Row>> {
+        match self {
+            #[cfg(feature = "ole")]
+            Table::Doc(t) => {
+                let rows = t.rows().map_err(Error::from)?;
+                Ok(rows.get(index).cloned().map(Row::Doc))
+            },
+            #[cfg(feature = "ooxml")]
+            Table::Docx(t) => {
+                let rows = t.rows().map_err(Error::from)?;
+                Ok(rows.get(index).cloned().map(Row::Docx))
+            },
+            #[cfg(feature = "rtf")]
+            Table::Rtf(t) => {
+                let rows = t.rows();
+                Ok(rows.get(index).cloned().map(Row::Rtf))
+            },
+        }
+    }
 }
 
 /// A table row in a Word document.
+#[derive(Debug, Clone)]
 pub enum Row {
     #[cfg(feature = "ole")]
     Doc(ole::doc::Row),
@@ -64,7 +95,22 @@ pub enum Row {
 }
 
 impl Row {
+    /// Get the number of cells in this row.
+    pub fn cell_count(&self) -> Result<usize> {
+        match self {
+            #[cfg(feature = "ole")]
+            Row::Doc(r) => r.cell_count().map_err(Error::from),
+            #[cfg(feature = "ooxml")]
+            Row::Docx(r) => r.cell_count().map_err(Error::from),
+            #[cfg(feature = "rtf")]
+            Row::Rtf(r) => Ok(r.cell_count()),
+        }
+    }
+
     /// Get the cells in this row.
+    ///
+    /// **Performance Note**: This method allocates and clones the entire cell collection.
+    /// For better performance when iterating, consider using `cell_count()` and `cell_at(index)`.
     pub fn cells(&self) -> Result<Vec<Cell>> {
         match self {
             #[cfg(feature = "ole")]
@@ -84,9 +130,36 @@ impl Row {
             },
         }
     }
+
+    /// Get a specific cell by index without allocating a collection.
+    ///
+    /// This is more efficient than calling `cells()` and then indexing,
+    /// as it avoids cloning the entire cell collection.
+    ///
+    /// Returns `None` if the index is out of bounds.
+    pub fn cell_at(&self, index: usize) -> Result<Option<Cell>> {
+        match self {
+            #[cfg(feature = "ole")]
+            Row::Doc(r) => {
+                let cells = r.cells().map_err(Error::from)?;
+                Ok(cells.get(index).cloned().map(Cell::Doc))
+            },
+            #[cfg(feature = "ooxml")]
+            Row::Docx(r) => {
+                let cells = r.cells().map_err(Error::from)?;
+                Ok(cells.get(index).cloned().map(Cell::Docx))
+            },
+            #[cfg(feature = "rtf")]
+            Row::Rtf(r) => {
+                let cells = r.cells();
+                Ok(cells.get(index).cloned().map(Cell::Rtf))
+            },
+        }
+    }
 }
 
 /// A table cell in a Word document.
+#[derive(Debug, Clone)]
 pub enum Cell {
     #[cfg(feature = "ole")]
     Doc(ole::doc::Cell),

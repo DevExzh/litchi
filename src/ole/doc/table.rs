@@ -2,6 +2,7 @@
 use super::package::Result;
 use super::paragraph::Paragraph;
 use super::parts::tap::{CellProperties, TableJustification, TableProperties};
+use std::rc::Rc;
 
 /// A table in a Word document.
 ///
@@ -19,10 +20,14 @@ use super::parts::tap::{CellProperties, TableJustification, TableProperties};
 ///     }
 /// }
 /// ```
+///
+/// # Performance
+///
+/// Uses `Rc` for efficient cloning when passing around table data.
 #[derive(Debug, Clone)]
 pub struct Table {
-    /// Rows in the table
-    rows: Vec<Row>,
+    /// Rows in the table (shared via Rc for efficient cloning)
+    rows: Rc<Vec<Row>>,
     /// Table-level properties (if available)
     properties: Option<TableProperties>,
 }
@@ -32,7 +37,7 @@ impl Table {
     #[allow(dead_code)]
     pub(crate) fn new(rows: Vec<Row>) -> Self {
         Self {
-            rows,
+            rows: Rc::new(rows),
             properties: None,
         }
     }
@@ -41,7 +46,7 @@ impl Table {
     #[allow(dead_code)]
     pub(crate) fn with_properties(rows: Vec<Row>, properties: TableProperties) -> Self {
         Self {
-            rows,
+            rows: Rc::new(rows),
             properties: Some(properties),
         }
     }
@@ -63,8 +68,11 @@ impl Table {
     }
 
     /// Get all rows in this table.
+    ///
+    /// Returns a cloned vector. Due to Rc-based sharing in Row/Cell structures,
+    /// cloning is relatively cheap (only increments reference counts).
     pub fn rows(&self) -> Result<Vec<Row>> {
-        Ok(self.rows.clone())
+        Ok((*self.rows).clone())
     }
 
     /// Get a specific cell by row and column index.
@@ -100,10 +108,14 @@ impl Table {
 /// A row in a table.
 ///
 /// Represents a table row in the binary DOC format.
+///
+/// # Performance
+///
+/// Uses `Rc` for efficient cloning when passing around row data.
 #[derive(Debug, Clone)]
 pub struct Row {
-    /// Cells in the row
-    cells: Vec<Cell>,
+    /// Cells in the row (shared via Rc for efficient cloning)
+    cells: Rc<Vec<Cell>>,
     /// Row-level properties (if available)
     row_properties: Option<TableProperties>,
 }
@@ -113,7 +125,7 @@ impl Row {
     #[allow(unused)]
     pub(crate) fn new(cells: Vec<Cell>) -> Self {
         Self {
-            cells,
+            cells: Rc::new(cells),
             row_properties: None,
         }
     }
@@ -122,7 +134,7 @@ impl Row {
     #[allow(unused)]
     pub(crate) fn with_properties(cells: Vec<Cell>, properties: TableProperties) -> Self {
         Self {
-            cells,
+            cells: Rc::new(cells),
             row_properties: Some(properties),
         }
     }
@@ -133,8 +145,11 @@ impl Row {
     }
 
     /// Get all cells in this row.
+    ///
+    /// Returns a cloned vector. Due to Rc-based sharing in Cell structures,
+    /// cloning is relatively cheap (only increments reference counts).
     pub fn cells(&self) -> Result<Vec<Cell>> {
-        Ok(self.cells.clone())
+        Ok((*self.cells).clone())
     }
 
     /// Get the row properties.
@@ -158,12 +173,16 @@ impl Row {
 /// A cell in a table.
 ///
 /// Represents a table cell in the binary DOC format.
+///
+/// # Performance
+///
+/// Uses `Rc` for efficient cloning when passing around cell data.
 #[derive(Debug, Clone)]
 pub struct Cell {
-    /// Cell content (text)
-    text: String,
-    /// Cell content (paragraphs)
-    paragraphs: Vec<Paragraph>,
+    /// Cell content (text) - shared via Rc for efficient cloning
+    text: Rc<String>,
+    /// Cell content (paragraphs) - shared via Rc for efficient cloning
+    paragraphs: Rc<Vec<Paragraph>>,
     /// Cell properties (if available)
     properties: Option<CellProperties>,
 }
@@ -172,9 +191,10 @@ impl Cell {
     /// Create a new Cell.
     #[allow(unused)]
     pub(crate) fn new(text: String) -> Self {
+        let para = Paragraph::new(text.clone());
         Self {
-            text: text.clone(),
-            paragraphs: vec![Paragraph::new(text)],
+            text: Rc::new(text),
+            paragraphs: Rc::new(vec![para]),
             properties: None,
         }
     }
@@ -191,8 +211,8 @@ impl Cell {
             .collect::<Vec<&str>>()
             .join("\n");
         Self {
-            text,
-            paragraphs,
+            text: Rc::new(text),
+            paragraphs: Rc::new(paragraphs),
             properties,
         }
     }
@@ -205,8 +225,10 @@ impl Cell {
     }
 
     /// Get all paragraphs in this cell.
+    ///
+    /// Returns a cloned vector. Cloning is relatively cheap due to Rc-based sharing.
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
-        Ok(self.paragraphs.clone())
+        Ok((*self.paragraphs).clone())
     }
 
     /// Get the cell properties.

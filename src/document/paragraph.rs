@@ -10,6 +10,7 @@ use crate::ole;
 use crate::ooxml;
 
 /// A paragraph in a Word document.
+#[derive(Debug, Clone)]
 pub enum Paragraph {
     #[cfg(feature = "ole")]
     Doc(ole::doc::Paragraph),

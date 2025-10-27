@@ -521,6 +521,95 @@ impl Document {
         self.extract_tables_from_paragraphs(&self.paragraphs()?, 1)
     }
 
+    /// Get all document elements (paragraphs and tables) in document order.
+    ///
+    /// This method extracts paragraphs once and identifies which paragraphs belong to tables,
+    /// returning an ordered vector of `DocumentElement` objects that preserves the document structure.
+    /// This is more efficient than calling `paragraphs()` and `tables()` separately, and it
+    /// maintains the correct order of elements for sequential processing (e.g., Markdown conversion).
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::doc::Package;
+    /// use litchi::DocumentElement;
+    ///
+    /// let mut pkg = Package::open("document.doc")?;
+    /// let doc = pkg.document()?;
+    ///
+    /// for element in doc.elements()? {
+    ///     match element {
+    ///         DocumentElement::Paragraph(para) => {
+    ///             println!("Paragraph: {}", para.text()?);
+    ///         }
+    ///         DocumentElement::Table(table) => {
+    ///             println!("Table with {} rows", table.row_count()?);
+    ///         }
+    ///     }
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Performance
+    ///
+    /// This method is optimized to extract paragraphs only once and identify tables
+    /// by scanning paragraph properties, which is significantly faster than calling
+    /// `paragraphs()` and `tables()` separately.
+    pub fn elements(&self) -> Result<Vec<crate::document::DocumentElement>> {
+        use crate::document::DocumentElement;
+
+        // Extract all paragraphs once
+        let paragraphs = self.paragraphs()?;
+        let mut elements = Vec::new();
+        let mut i = 0;
+
+        while i < paragraphs.len() {
+            let para = &paragraphs[i];
+            let props = para.properties();
+
+            // Check if this paragraph starts a top-level table (level 1)
+            if props.in_table && props.table_nesting_level == 1 {
+                // Found the start of a table - collect all paragraphs in this table
+                let mut table_paras = Vec::new();
+
+                // Collect paragraphs until we exit the table
+                while i < paragraphs.len() {
+                    let current_para = &paragraphs[i];
+                    let current_props = current_para.properties();
+
+                    if !current_props.in_table || current_props.table_nesting_level < 1 {
+                        // Exited the table
+                        break;
+                    }
+
+                    table_paras.push(current_para.clone());
+                    i += 1;
+                }
+
+                // Extract rows from the collected table paragraphs
+                let rows = self.extract_rows_from_table_paragraphs(&table_paras, 1)?;
+
+                if !rows.is_empty() {
+                    elements.push(DocumentElement::Table(crate::document::Table::Doc(
+                        Table::new(rows),
+                    )));
+                }
+            } else if !props.in_table {
+                // This is a regular paragraph (not in a table)
+                elements.push(DocumentElement::Paragraph(crate::document::Paragraph::Doc(
+                    para.clone(),
+                )));
+                i += 1;
+            } else {
+                // This paragraph is in a nested table (level > 1), skip it
+                // as it will be processed as part of its parent table
+                i += 1;
+            }
+        }
+
+        Ok(elements)
+    }
+
     /// Extract tables from a list of paragraphs at a specific nesting level.
     ///
     /// This is based on Apache POI's table extraction algorithm that scans

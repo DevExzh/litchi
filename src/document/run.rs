@@ -9,6 +9,7 @@ use crate::ole;
 use crate::ooxml;
 
 /// A text run in a paragraph.
+#[derive(Debug, Clone)]
 pub enum Run {
     #[cfg(feature = "ole")]
     Doc(ole::doc::Run),

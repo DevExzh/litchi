@@ -12,39 +12,45 @@ use crate::document::{Document, Paragraph, Run, Table};
 
 impl ToMarkdown for Document {
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
-        let mut writer = MarkdownWriter::new(*options);
+        use crate::document::DocumentElement;
 
-        // Write metadata as YAML front matter if enabled
-        if options.include_metadata {
+        // Write metadata first (must be sequential)
+        let metadata_md = if options.include_metadata {
+            let mut metadata_writer = MarkdownWriter::new(*options);
             let metadata = self.metadata()?;
-            writer.write_metadata(&metadata)?;
-        }
+            metadata_writer.write_metadata(&metadata)?;
+            metadata_writer.finish()
+        } else {
+            String::new()
+        };
 
-        // Get all paragraphs once (avoid extracting twice)
-        // Following Apache POI's design: extract paragraphs, then identify tables from them
-        let paragraphs = self.paragraphs()?;
+        // Extract all document elements (paragraphs and tables) in document order
+        // This is more efficient than calling paragraphs() and tables() separately,
+        // and it maintains the correct order for Markdown conversion
+        let elements = self.elements()?;
 
-        // Extract tables from the already-extracted paragraphs
-        // Note: tables() internally calls paragraphs() again which causes duplication
-        // TODO: Refactor tables() to accept pre-extracted paragraphs to avoid double extraction
-        let tables = self.tables()?;
-
-        // For performance, pre-allocate based on estimated content size
-        let estimated_size = paragraphs.len() * 100 + tables.len() * 500; // Rough estimates
+        // Process elements sequentially to maintain document order
+        // Note: Parallel processing is not used here because we need to preserve
+        // the exact order of elements in the document for correct Markdown output
+        let mut writer = MarkdownWriter::new(*options);
+        // Estimate: 100 bytes per paragraph, 500 bytes per table
+        let estimated_size = elements.len() * 150; // Rough average
         writer.reserve(estimated_size);
 
-        // Write paragraphs (excluding those that are part of tables)
-        // For now, write all paragraphs - table filtering can be added later
-        for para in paragraphs {
-            writer.write_paragraph(&para)?;
+        for element in elements {
+            match element {
+                DocumentElement::Paragraph(para) => {
+                    writer.write_paragraph(&para)?;
+                },
+                DocumentElement::Table(table) => {
+                    writer.write_table(&table)?;
+                },
+            }
         }
+        let content_md = writer.finish();
 
-        // Write tables
-        for table in tables {
-            writer.write_table(&table)?;
-        }
-
-        Ok(writer.finish())
+        // Combine metadata and content
+        Ok(format!("{}{}", metadata_md, content_md))
     }
 }
 

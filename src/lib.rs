@@ -211,7 +211,7 @@ pub mod rtf;
 pub use common::{Error, Result};
 
 #[cfg(any(feature = "ole", feature = "ooxml"))]
-pub use document::Document;
+pub use document::{Document, DocumentElement};
 
 #[cfg(any(feature = "ole", feature = "ooxml"))]
 pub use presentation::Presentation;

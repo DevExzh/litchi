@@ -4,6 +4,8 @@ use crate::ooxml::error::{OoxmlError, Result};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use smallvec::SmallVec;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// A table in a Word document.
 ///
@@ -22,16 +24,26 @@ use smallvec::SmallVec;
 ///     }
 /// }
 /// ```
+///
+/// # Performance
+///
+/// Uses lazy parsing with caching - XML is parsed once on first access,
+/// then cached results are returned on subsequent calls.
 #[derive(Debug, Clone)]
 pub struct Table {
-    /// The raw XML bytes for this table
-    xml_bytes: Vec<u8>,
+    /// The raw XML bytes for this table (shared via Rc for efficient cloning)
+    xml_bytes: Rc<Vec<u8>>,
+    /// Cached parsed rows (lazy initialization)
+    cached_rows: Rc<RefCell<Option<SmallVec<[Row; 16]>>>>,
 }
 
 impl Table {
     /// Create a new Table from XML bytes.
     pub fn new(xml_bytes: Vec<u8>) -> Self {
-        Self { xml_bytes }
+        Self {
+            xml_bytes: Rc::new(xml_bytes),
+            cached_rows: Rc::new(RefCell::new(None)),
+        }
     }
 
     /// Get the number of rows in this table.
@@ -75,17 +87,37 @@ impl Table {
     ///
     /// # Performance
     ///
-    /// Uses SmallVec for efficient storage of typically small row collections.
+    /// Uses lazy parsing with caching - parses XML once on first call,
+    /// returns cached results on subsequent calls.
     pub fn rows(&self) -> Result<SmallVec<[Row; 16]>> {
+        // Check if we have cached rows
+        {
+            let cache = self.cached_rows.borrow();
+            if let Some(ref rows) = *cache {
+                return Ok(rows.clone());
+            }
+        }
+
+        // Parse rows from XML
+        let rows = self.parse_rows()?;
+
+        // Cache the result
+        *self.cached_rows.borrow_mut() = Some(rows.clone());
+
+        Ok(rows)
+    }
+
+    /// Parse rows from XML (internal method).
+    fn parse_rows(&self) -> Result<SmallVec<[Row; 16]>> {
         let mut reader = Reader::from_reader(&self.xml_bytes[..]);
         reader.config_mut().trim_text(true);
 
         // Use SmallVec for efficient storage of row collections
         let mut rows = SmallVec::new();
-        let mut current_row_xml = Vec::with_capacity(2048); // Pre-allocate for row XML
+        let mut current_row_xml = Vec::with_capacity(4096); // Pre-allocate for row XML (increased from 2048)
         let mut in_row = false;
         let mut depth = 0;
-        let mut buf = Vec::with_capacity(512); // Reusable buffer
+        let mut buf = Vec::with_capacity(1024); // Reusable buffer (increased from 512)
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -125,7 +157,11 @@ impl Table {
 
                         depth -= 1;
                         if depth == 0 && e.local_name().as_ref() == b"tr" {
-                            rows.push(Row::new(current_row_xml.clone()));
+                            // Move the XML bytes instead of cloning for the last item
+                            // For others, we must clone since we reuse the buffer
+                            let row_xml = std::mem::take(&mut current_row_xml);
+                            rows.push(Row::new(row_xml));
+                            current_row_xml = Vec::with_capacity(2048);
                             in_row = false;
                         }
                     }
@@ -172,16 +208,26 @@ impl Table {
 /// A row in a table.
 ///
 /// Represents a `<w:tr>` element.
+///
+/// # Performance
+///
+/// Uses lazy parsing with caching - XML is parsed once on first access,
+/// then cached results are returned on subsequent calls.
 #[derive(Debug, Clone)]
 pub struct Row {
-    /// The raw XML bytes for this row
-    xml_bytes: Vec<u8>,
+    /// The raw XML bytes for this row (shared via Rc for efficient cloning)
+    xml_bytes: Rc<Vec<u8>>,
+    /// Cached parsed cells (lazy initialization)
+    cached_cells: Rc<RefCell<Option<SmallVec<[Cell; 16]>>>>,
 }
 
 impl Row {
     /// Create a new Row from XML bytes.
     pub fn new(xml_bytes: Vec<u8>) -> Self {
-        Self { xml_bytes }
+        Self {
+            xml_bytes: Rc::new(xml_bytes),
+            cached_cells: Rc::new(RefCell::new(None)),
+        }
     }
 
     /// Get the number of cells in this row.
@@ -213,17 +259,37 @@ impl Row {
     ///
     /// # Performance
     ///
-    /// Uses SmallVec for efficient storage of typically small cell collections.
+    /// Uses lazy parsing with caching - parses XML once on first call,
+    /// returns cached results on subsequent calls.
     pub fn cells(&self) -> Result<SmallVec<[Cell; 16]>> {
+        // Check if we have cached cells
+        {
+            let cache = self.cached_cells.borrow();
+            if let Some(ref cells) = *cache {
+                return Ok(cells.clone());
+            }
+        }
+
+        // Parse cells from XML
+        let cells = self.parse_cells()?;
+
+        // Cache the result
+        *self.cached_cells.borrow_mut() = Some(cells.clone());
+
+        Ok(cells)
+    }
+
+    /// Parse cells from XML (internal method).
+    fn parse_cells(&self) -> Result<SmallVec<[Cell; 16]>> {
         let mut reader = Reader::from_reader(&self.xml_bytes[..]);
         reader.config_mut().trim_text(true);
 
         // Use SmallVec for efficient storage of cell collections
         let mut cells = SmallVec::new();
-        let mut current_cell_xml = Vec::with_capacity(2048); // Pre-allocate for cell XML
+        let mut current_cell_xml = Vec::with_capacity(4096); // Pre-allocate for cell XML (increased from 2048)
         let mut in_cell = false;
         let mut depth = 0;
-        let mut buf = Vec::with_capacity(512); // Reusable buffer
+        let mut buf = Vec::with_capacity(1024); // Reusable buffer (increased from 512)
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -263,7 +329,10 @@ impl Row {
 
                         depth -= 1;
                         if depth == 0 && e.local_name().as_ref() == b"tc" {
-                            cells.push(Cell::new(current_cell_xml.clone()));
+                            // Move the XML bytes instead of cloning
+                            let cell_xml = std::mem::take(&mut current_cell_xml);
+                            cells.push(Cell::new(cell_xml));
+                            current_cell_xml = Vec::with_capacity(2048);
                             in_cell = false;
                         }
                     }
@@ -297,22 +366,58 @@ impl Row {
 /// A cell in a table.
 ///
 /// Represents a `<w:tc>` element. Cells contain paragraphs.
+///
+/// # Performance
+///
+/// Uses lazy parsing with caching - text is extracted once on first access,
+/// then cached results are returned on subsequent calls.
 #[derive(Debug, Clone)]
 pub struct Cell {
-    /// The raw XML bytes for this cell
-    xml_bytes: Vec<u8>,
+    /// The raw XML bytes for this cell (shared via Rc for efficient cloning)
+    xml_bytes: Rc<Vec<u8>>,
+    /// Cached extracted text (lazy initialization)
+    cached_text: Rc<RefCell<Option<String>>>,
 }
 
 impl Cell {
     /// Create a new Cell from XML bytes.
     pub fn new(xml_bytes: Vec<u8>) -> Self {
-        Self { xml_bytes }
+        Self {
+            xml_bytes: Rc::new(xml_bytes),
+            cached_text: Rc::new(RefCell::new(None)),
+        }
     }
 
     /// Get the text content of this cell.
     ///
     /// Concatenates all text from all paragraphs in the cell.
+    ///
+    /// # Performance
+    ///
+    /// Uses lazy parsing with caching - parses XML once on first call,
+    /// returns cached results on subsequent calls.
     pub fn text(&self) -> Result<String> {
+        // Check if we have cached text
+        {
+            let cache = self.cached_text.borrow();
+            if let Some(ref text) = *cache {
+                return Ok(text.clone());
+            }
+        }
+
+        // Extract text from XML
+        let text = self.extract_text()?;
+
+        // Cache the result
+        *self.cached_text.borrow_mut() = Some(text.clone());
+
+        Ok(text)
+    }
+
+    /// Extract text from XML (internal method).
+    ///
+    /// Uses proper XML event parsing to correctly extract text nodes.
+    fn extract_text(&self) -> Result<String> {
         let mut reader = Reader::from_reader(&self.xml_bytes[..]);
         reader.config_mut().trim_text(true);
 
@@ -400,7 +505,10 @@ impl Cell {
 
                         depth -= 1;
                         if depth == 0 && e.local_name().as_ref() == b"p" {
-                            paragraphs.push(Paragraph::new(current_para_xml.clone()));
+                            // Move the XML bytes instead of cloning
+                            let para_xml = std::mem::take(&mut current_para_xml);
+                            paragraphs.push(Paragraph::new(para_xml));
+                            current_para_xml = Vec::with_capacity(1024);
                             in_para = false;
                         }
                     }

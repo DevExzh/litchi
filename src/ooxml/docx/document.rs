@@ -167,6 +167,43 @@ impl<'a> Document<'a> {
         Ok(self.part.tables()?.into_iter().collect())
     }
 
+    /// Get all document elements (paragraphs and tables) in document order.
+    ///
+    /// This method extracts both paragraphs and tables in a single pass,
+    /// returning an ordered vector that preserves the document structure.
+    /// This is more efficient than calling `paragraphs()` and `tables()` separately,
+    /// and it maintains the correct order of elements for sequential processing.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::docx::Package;
+    /// use litchi::DocumentElement;
+    ///
+    /// let pkg = Package::open("document.docx")?;
+    /// let doc = pkg.document()?;
+    ///
+    /// for element in doc.elements()? {
+    ///     match element {
+    ///         DocumentElement::Paragraph(para) => {
+    ///             println!("Paragraph: {}", para.text()?);
+    ///         }
+    ///         DocumentElement::Table(table) => {
+    ///             println!("Table with {} rows", table.row_count()?);
+    ///         }
+    ///     }
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Performance
+    ///
+    /// Uses a single-pass XML parser that is significantly faster than
+    /// calling `paragraphs()` and `tables()` separately.
+    pub fn elements(&self) -> Result<Vec<crate::document::DocumentElement>> {
+        self.part.elements()
+    }
+
     /// Get all sections in the document.
     ///
     /// Returns a `Sections` collection providing access to each section's
