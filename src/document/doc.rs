@@ -86,14 +86,11 @@ impl Document {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
 
-        // Try to detect the format by reading the file header
+        // Detect the format by reading the file header
         let mut file = File::open(path)?;
-        let initial_format = detect_document_format(&mut file)?;
+        let format = detect_document_format(&mut file)?;
 
-        // Refine ZIP-based format detection (distinguish DOCX from Pages)
-        let format = super::types::refine_document_format(&mut file, initial_format)?;
-
-        // Reopen the file for the appropriate parser
+        // Parse the file using the appropriate parser
         match format {
             #[cfg(feature = "ole")]
             DocumentFormat::Doc => {
@@ -169,6 +166,20 @@ impl Document {
             },
             #[cfg(not(feature = "iwa"))]
             DocumentFormat::Pages => Err(Error::FeatureDisabled("iwa".to_string())),
+            #[cfg(feature = "odf")]
+            DocumentFormat::Odt => {
+                let doc = crate::odf::Document::open(path).map_err(|e| {
+                    Error::ParseError(format!("Failed to open ODT document: {}", e))
+                })?;
+
+                Ok(Self {
+                    inner: DocumentImpl::Odt(doc),
+                    #[cfg(feature = "ooxml")]
+                    _package: None,
+                })
+            },
+            #[cfg(not(feature = "odf"))]
+            DocumentFormat::Odt => Err(Error::FeatureDisabled("odf".to_string())),
         }
     }
 
@@ -203,21 +214,7 @@ impl Document {
     /// - No temporary files created
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         // Detect format from byte signature
-        let initial_format = detect_document_format_from_bytes(&bytes)?;
-
-        // Refine ZIP-based format detection for bytes
-        let format = if initial_format == DocumentFormat::Docx {
-            // Check if it's a Pages document
-            #[cfg(feature = "iwa")]
-            {
-                let mut cursor = Cursor::new(&bytes);
-                super::types::refine_document_format(&mut cursor, initial_format)?
-            }
-            #[cfg(not(feature = "iwa"))]
-            initial_format
-        } else {
-            initial_format
-        };
+        let format = detect_document_format_from_bytes(&bytes)?;
 
         match format {
             #[cfg(feature = "ole")]
@@ -302,6 +299,20 @@ impl Document {
             },
             #[cfg(not(feature = "iwa"))]
             DocumentFormat::Pages => Err(Error::FeatureDisabled("iwa".to_string())),
+            #[cfg(feature = "odf")]
+            DocumentFormat::Odt => {
+                let doc = crate::odf::Document::from_bytes(bytes).map_err(|e| {
+                    Error::ParseError(format!("Failed to parse ODT document from bytes: {}", e))
+                })?;
+
+                Ok(Self {
+                    inner: DocumentImpl::Odt(doc),
+                    #[cfg(feature = "ooxml")]
+                    _package: None,
+                })
+            },
+            #[cfg(not(feature = "odf"))]
+            DocumentFormat::Odt => Err(Error::FeatureDisabled("odf".to_string())),
         }
     }
 
@@ -331,6 +342,10 @@ impl Document {
             }),
             #[cfg(feature = "rtf")]
             DocumentImpl::Rtf(doc) => Ok(doc.text()),
+            #[cfg(feature = "odf")]
+            DocumentImpl::Odt(doc) => doc
+                .text()
+                .map_err(|e| Error::ParseError(format!("Failed to extract text from ODT: {}", e))),
         }
     }
 
@@ -362,6 +377,10 @@ impl Document {
             },
             #[cfg(feature = "rtf")]
             DocumentImpl::Rtf(doc) => Ok(doc.paragraph_count()),
+            #[cfg(feature = "odf")]
+            DocumentImpl::Odt(doc) => doc
+                .paragraph_count()
+                .map_err(|e| Error::ParseError(format!("Failed to get paragraph count: {}", e))),
         }
     }
 
@@ -411,6 +430,13 @@ impl Document {
             DocumentImpl::Rtf(doc) => {
                 let paras = doc.paragraphs();
                 Ok(paras.into_iter().map(Paragraph::Rtf).collect())
+            },
+            #[cfg(feature = "odf")]
+            DocumentImpl::Odt(doc) => {
+                let paras = doc
+                    .paragraphs()
+                    .map_err(|e| Error::ParseError(format!("Failed to get paragraphs: {}", e)))?;
+                Ok(paras.into_iter().map(Paragraph::Odt).collect())
             },
         }
     }
@@ -467,6 +493,13 @@ impl Document {
                         Table::Rtf(owned_table)
                     })
                     .collect())
+            },
+            #[cfg(feature = "odf")]
+            DocumentImpl::Odt(doc) => {
+                let tables = doc
+                    .tables()
+                    .map_err(|e| Error::ParseError(format!("Failed to get tables: {}", e)))?;
+                Ok(tables.into_iter().map(Table::Odt).collect())
             },
         }
     }
@@ -564,6 +597,10 @@ impl Document {
 
                 Ok(elements)
             },
+            #[cfg(feature = "odf")]
+            DocumentImpl::Odt(doc) => doc
+                .elements()
+                .map_err(|e| Error::ParseError(format!("Failed to get elements: {}", e))),
         }
     }
 
@@ -620,6 +657,10 @@ impl Document {
                 // Metadata would need to be parsed from \info group
                 Ok(crate::common::Metadata::default())
             },
+            #[cfg(feature = "odf")]
+            DocumentImpl::Odt(doc) => doc
+                .metadata()
+                .map_err(|e| Error::ParseError(format!("Failed to get metadata: {}", e))),
         }
     }
 }

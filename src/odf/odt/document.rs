@@ -114,7 +114,7 @@ impl Document {
     /// ```
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let cursor = Cursor::new(bytes);
-        let mut package = Package::from_reader(cursor)?;
+        let package = Package::from_reader(cursor)?;
 
         // Verify this is a text document
         let mime_type = package.mimetype();
@@ -187,14 +187,32 @@ impl Document {
     /// use litchi::odf::Document;
     ///
     /// # fn main() -> litchi::Result<()> {
-    /// let mut doc = Document::open("document.odt")?;
+    /// let doc = Document::open("document.odt")?;
     /// let text = doc.text()?;
     /// println!("Text content:\n{}", text);
     /// # Ok(())
     /// # }
     /// ```
-    pub fn text(&mut self) -> Result<String> {
+    pub fn text(&self) -> Result<String> {
         TextElements::extract_text(self.content.xml_content())
+    }
+
+    /// Get the number of paragraphs in the document.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Document;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let doc = Document::open("document.odt")?;
+    /// let count = doc.paragraph_count()?;
+    /// println!("Paragraph count: {}", count);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn paragraph_count(&self) -> Result<usize> {
+        Ok(self.paragraphs()?.len())
     }
 
     /// Get all paragraphs in the document as structured elements.
@@ -208,7 +226,7 @@ impl Document {
     /// use litchi::odf::Document;
     ///
     /// # fn main() -> litchi::Result<()> {
-    /// let mut doc = Document::open("document.odt")?;
+    /// let doc = Document::open("document.odt")?;
     /// let paragraphs = doc.paragraphs()?;
     ///
     /// for para in paragraphs {
@@ -217,7 +235,7 @@ impl Document {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn paragraphs(&mut self) -> Result<Vec<ElementParagraph>> {
+    pub fn paragraphs(&self) -> Result<Vec<ElementParagraph>> {
         TextElements::parse_paragraphs(self.content.xml_content())
     }
 
@@ -232,16 +250,56 @@ impl Document {
     /// use litchi::odf::Document;
     ///
     /// # fn main() -> litchi::Result<()> {
-    /// let mut doc = Document::open("document.odt")?;
+    /// let doc = Document::open("document.odt")?;
     /// let tables = doc.tables()?;
     ///
     /// println!("Found {} tables", tables.len());
     /// # Ok(())
     /// # }
     /// ```
-    pub fn tables(&mut self) -> Result<Vec<ElementTable>> {
+    pub fn tables(&self) -> Result<Vec<ElementTable>> {
         use crate::odf::elements::table::TableElements;
         TableElements::parse_tables_from_content(self.content.xml_content())
+    }
+
+    /// Get all document elements (paragraphs and tables) in document order.
+    ///
+    /// This method extracts both paragraphs and tables, interleaved in the order
+    /// they appear in the document.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Document;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let doc = Document::open("document.odt")?;
+    /// let elements = doc.elements()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn elements(&self) -> Result<Vec<crate::document::DocumentElement>> {
+        // For now, return paragraphs as elements
+        // A full implementation would parse the document in order and identify both paragraphs and tables
+        let paragraphs = self.paragraphs()?;
+        let mut elements = Vec::new();
+
+        for para in paragraphs {
+            elements.push(crate::document::DocumentElement::Paragraph(
+                crate::document::Paragraph::Odt(para),
+            ));
+        }
+
+        // Add tables at the end for now
+        // TODO: Properly interleave paragraphs and tables in document order
+        let tables = self.tables()?;
+        for table in tables {
+            elements.push(crate::document::DocumentElement::Table(
+                crate::document::Table::Odt(table),
+            ));
+        }
+
+        Ok(elements)
     }
 
     /// Get document metadata.

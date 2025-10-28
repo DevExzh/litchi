@@ -5,7 +5,7 @@ use std::io::{Read, Seek};
 use std::path::Path;
 
 use super::types::FileFormat;
-use super::{iwork, ole2, ooxml, utils};
+use super::{iwork, ole2, ooxml, rtf, utils};
 
 #[cfg(feature = "odf")]
 use super::odf;
@@ -78,12 +78,33 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
         return ole2::detect_ole2_format(bytes);
     }
 
-    // Check for ZIP signature (OOXML and ODF formats)
+    // Check for ZIP signature (OOXML, ODF, and iWork formats)
     if &bytes[0..4] == utils::ZIP_SIGNATURE {
-        return ooxml::detect_zip_format(bytes);
+        // First try OOXML detection (most common)
+        if let Some(result) = ooxml::detect_zip_format(bytes) {
+            return Some(result);
+        }
+
+        // Then try ODF detection
+        #[cfg(feature = "odf")]
+        if let Some(result) = odf::detect_odf_format(bytes) {
+            return Some(result);
+        }
+
+        // Finally try iWork detection
+        if let Some(result) = iwork::detect_iwork_format(bytes) {
+            return Some(result);
+        }
+
+        return None;
     }
 
-    // Check for iWork bundle formats
+    // Check for RTF format (plain text with {\rtf signature)
+    if let Some(result) = rtf::detect_rtf_format(bytes) {
+        return Some(result);
+    }
+
+    // Check for iWork bundle formats (non-ZIP based)
     if let Some(result) = iwork::detect_iwork_format(bytes) {
         return Some(result);
     }
@@ -168,7 +189,12 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
         return None;
     }
 
-    // Check for iWork bundle formats
+    // Check for RTF format (plain text with {\rtf signature)
+    if let Some(result) = rtf::detect_rtf_format_from_reader(reader) {
+        return Some(result);
+    }
+
+    // Check for iWork bundle formats (non-ZIP based)
     if let Some(result) = iwork::detect_iwork_format_from_reader(reader) {
         return Some(result);
     }

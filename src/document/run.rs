@@ -19,6 +19,8 @@ pub enum Run {
     Pages(String),
     #[cfg(feature = "rtf")]
     Rtf(crate::rtf::Run<'static>),
+    #[cfg(feature = "odf")]
+    Odt(crate::odf::Run),
 }
 
 impl Run {
@@ -33,6 +35,10 @@ impl Run {
             Run::Pages(text) => Ok(text.clone()),
             #[cfg(feature = "rtf")]
             Run::Rtf(r) => Ok(r.text().to_string()),
+            #[cfg(feature = "odf")]
+            Run::Odt(r) => r
+                .text()
+                .map_err(|e| Error::ParseError(format!("Failed to get run text: {}", e))),
         }
     }
 
@@ -47,6 +53,8 @@ impl Run {
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
             #[cfg(feature = "rtf")]
             Run::Rtf(r) => Ok(Some(r.formatting.bold)),
+            #[cfg(feature = "odf")]
+            Run::Odt(r) => Ok(r.bold()),
         }
     }
 
@@ -61,6 +69,8 @@ impl Run {
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
             #[cfg(feature = "rtf")]
             Run::Rtf(r) => Ok(Some(r.formatting.italic)),
+            #[cfg(feature = "odf")]
+            Run::Odt(r) => Ok(r.italic()),
         }
     }
 
@@ -75,6 +85,8 @@ impl Run {
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
             #[cfg(feature = "rtf")]
             Run::Rtf(r) => Ok(Some(r.formatting.strike)),
+            #[cfg(feature = "odf")]
+            Run::Odt(r) => Ok(r.strikethrough()),
         }
     }
 
@@ -117,6 +129,8 @@ impl Run {
                     Ok(None)
                 }
             },
+            #[cfg(feature = "odf")]
+            Run::Odt(r) => Ok(r.vertical_position()),
         }
     }
 }

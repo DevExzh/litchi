@@ -91,7 +91,7 @@ impl Spreadsheet {
     /// ```
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let cursor = Cursor::new(bytes);
-        let mut package = Package::from_reader(cursor)?;
+        let package = Package::from_reader(cursor)?;
 
         // Verify this is a spreadsheet
         let mime_type = package.mimetype();

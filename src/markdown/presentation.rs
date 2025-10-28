@@ -130,6 +130,13 @@ fn extract_slide_title(slide: &Slide) -> Result<String> {
             // For Keynote slides, use the title if available
             Ok(keynote_slide.title.clone().unwrap_or_default())
         },
+        #[cfg(feature = "odf")]
+        Slide::Odp(_) => {
+            // For ODP slides, use the first line of text as title
+            let text = slide.text()?;
+            let first_line = text.lines().next().unwrap_or("");
+            Ok(first_line.to_string())
+        },
     }
 }
 
@@ -160,6 +167,15 @@ fn write_slide_content(
         #[cfg(feature = "iwa")]
         Slide::Keynote(_) => {
             // For Keynote slides, write the text content
+            let text = slide.text()?;
+            if !text.is_empty() {
+                writer.push_str(&text);
+                writer.push_str("\n\n");
+            }
+        },
+        #[cfg(feature = "odf")]
+        Slide::Odp(_) => {
+            // For ODP slides, write the text content
             let text = slide.text()?;
             if !text.is_empty() {
                 writer.push_str(&text);

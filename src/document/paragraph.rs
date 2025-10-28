@@ -20,6 +20,8 @@ pub enum Paragraph {
     Pages(String),
     #[cfg(feature = "rtf")]
     Rtf(crate::rtf::Paragraph),
+    #[cfg(feature = "odf")]
+    Odt(crate::odf::Paragraph),
 }
 
 impl Paragraph {
@@ -37,6 +39,10 @@ impl Paragraph {
                 // RTF paragraphs are just formatting info, text comes from runs
                 Ok(String::new())
             },
+            #[cfg(feature = "odf")]
+            Paragraph::Odt(p) => p
+                .text()
+                .map_err(|e| Error::ParseError(format!("Failed to get paragraph text: {}", e))),
         }
     }
 
@@ -63,6 +69,13 @@ impl Paragraph {
             Paragraph::Rtf(_p) => {
                 // RTF runs come from style blocks, not paragraphs
                 Ok(Vec::new())
+            },
+            #[cfg(feature = "odf")]
+            Paragraph::Odt(p) => {
+                let runs = p
+                    .runs()
+                    .map_err(|e| Error::ParseError(format!("Failed to get runs: {}", e)))?;
+                Ok(runs.into_iter().map(Run::Odt).collect())
             },
         }
     }

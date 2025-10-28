@@ -1,5 +1,6 @@
 //! Internal types for presentation format detection and implementation.
 
+use crate::common::detection::{self, FileFormat};
 use crate::common::{Error, Result};
 use std::io::{Read, Seek};
 
@@ -8,9 +9,6 @@ use crate::ole;
 
 #[cfg(feature = "ooxml")]
 use crate::ooxml;
-
-#[cfg(feature = "iwa")]
-use zip;
 
 /// Extracted data from a PPTX slide (to avoid lifetime issues).
 #[derive(Debug, Clone)]
@@ -27,7 +25,7 @@ pub struct PptSlideData {
     pub shape_count: usize,
 }
 
-/// A PowerPoint presentation implementation that can be .ppt, .pptx, or .key format.
+/// A PowerPoint presentation implementation that can be .ppt, .pptx, .key, or .odp format.
 ///
 /// This enum wraps the format-specific implementations and provides
 /// a unified API. Users typically don't interact with this enum directly,
@@ -43,9 +41,15 @@ pub(super) enum PresentationImpl {
     /// Apple Keynote format
     #[cfg(feature = "iwa")]
     Keynote(crate::iwa::keynote::KeynoteDocument),
+    /// OpenDocument Presentation format
+    #[cfg(feature = "odf")]
+    Odp(crate::odf::Presentation),
 }
 
 /// Presentation format detection.
+///
+/// This enum represents the supported presentation formats in the unified
+/// Presentation API. The format is automatically detected from file signatures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(unused)] // The corresponding enum would only be used when the feature is enabled
 pub(super) enum PresentationFormat {
@@ -55,30 +59,47 @@ pub(super) enum PresentationFormat {
     Pptx,
     /// Apple Keynote format (IWA/ZIP)
     Keynote,
+    /// OpenDocument Presentation format (.odp)
+    Odp,
 }
 
 /// Detect the presentation format by reading the file header.
 ///
-/// This function reads the first few bytes of the file to determine if it's
-/// an OLE2 file (.ppt) or a ZIP file (.pptx).
+/// This function leverages the common detection module for consistent
+/// format detection across the library. It reads the minimum necessary
+/// bytes to determine the format.
+///
+/// # Arguments
+///
+/// * `reader` - A reader that implements Read + Seek
+///
+/// # Returns
+///
+/// * `Ok(PresentationFormat)` if a supported presentation format is detected
+/// * `Err(Error)` if the format is not recognized or unsupported
 pub(super) fn detect_presentation_format<R: Read + Seek>(
     reader: &mut R,
 ) -> Result<PresentationFormat> {
-    use std::io::SeekFrom;
+    // Use the common detection module
+    let file_format = detection::detect_format_from_reader(reader).ok_or(Error::NotOfficeFile)?;
 
-    // Read the first 8 bytes
-    let mut header = [0u8; 8];
-    reader.read_exact(&mut header)?;
-
-    // Reset to the beginning
-    reader.seek(SeekFrom::Start(0))?;
-
-    detect_presentation_format_from_signature(&header)
+    // Map FileFormat to PresentationFormat
+    map_file_format_to_presentation_format(file_format)
 }
 
 /// Detect the presentation format from a byte buffer.
 ///
 /// This is optimized for in-memory detection without seeking.
+/// Leverages the common detection module for consistency.
+///
+/// # Arguments
+///
+/// * `bytes` - The file data as bytes
+///
+/// # Returns
+///
+/// * `Ok(PresentationFormat)` if a supported presentation format is detected
+/// * `Err(Error)` if the format is not recognized or unsupported
 #[inline]
 pub(super) fn detect_presentation_format_from_bytes(bytes: &[u8]) -> Result<PresentationFormat> {
     if bytes.len() < 4 {
@@ -87,77 +108,37 @@ pub(super) fn detect_presentation_format_from_bytes(bytes: &[u8]) -> Result<Pres
         ));
     }
 
-    detect_presentation_format_from_signature(&bytes[0..8.min(bytes.len())])
+    // Use the common detection module
+    let file_format =
+        detection::detect_file_format_from_bytes(bytes).ok_or(Error::NotOfficeFile)?;
+
+    // Map FileFormat to PresentationFormat
+    map_file_format_to_presentation_format(file_format)
 }
 
-/// Detect format from the signature bytes.
+/// Map common FileFormat to PresentationFormat.
+///
+/// This function converts the general FileFormat enum from the common
+/// detection module to the presentation-specific PresentationFormat enum.
+///
+/// # Arguments
+///
+/// * `file_format` - The detected file format
+///
+/// # Returns
+///
+/// * `Ok(PresentationFormat)` if the format is a supported presentation format
+/// * `Err(Error::InvalidFormat)` if the format is not a presentation format
 #[inline]
-fn detect_presentation_format_from_signature(header: &[u8]) -> Result<PresentationFormat> {
-    // Check for OLE2 signature (D0 CF 11 E0 A1 B1 1A E1)
-    if header.len() >= 4 && header[0..4] == [0xD0, 0xCF, 0x11, 0xE0] {
-        return Ok(PresentationFormat::Ppt);
+fn map_file_format_to_presentation_format(file_format: FileFormat) -> Result<PresentationFormat> {
+    match file_format {
+        FileFormat::Ppt => Ok(PresentationFormat::Ppt),
+        FileFormat::Pptx => Ok(PresentationFormat::Pptx),
+        FileFormat::Keynote => Ok(PresentationFormat::Keynote),
+        FileFormat::Odp => Ok(PresentationFormat::Odp),
+        _ => Err(Error::InvalidFormat(format!(
+            "Detected format {:?} is not a presentation format",
+            file_format
+        ))),
     }
-
-    // Check for ZIP signature (PK\x03\x04)
-    // Note: Both PPTX and Keynote are ZIP files, so we return Pptx here
-    // and will need to distinguish them by inspecting the ZIP contents
-    if header.len() >= 4 && header[0..4] == [0x50, 0x4B, 0x03, 0x04] {
-        return Ok(PresentationFormat::Pptx);
-    }
-
-    Err(Error::NotOfficeFile)
-}
-
-/// Detect if a ZIP file is a Keynote presentation by checking for iWork markers
-#[cfg(feature = "iwa")]
-fn is_keynote_presentation<R: Read + Seek>(reader: &mut R) -> bool {
-    use std::io::SeekFrom;
-
-    // Try to open as ZIP and look for iWork format indicators
-    reader.seek(SeekFrom::Start(0)).ok();
-
-    if let Ok(mut archive) = zip::ZipArchive::new(reader) {
-        // Check for Index.zip (older iWork format)
-        if archive.by_name("Index.zip").is_ok() {
-            return true;
-        }
-
-        // Check for Index/ directory with .iwa files (newer iWork format)
-        for i in 0..archive.len() {
-            if let Ok(file) = archive.by_index(i) {
-                let name = file.name();
-                if name.starts_with("Index/") && name.ends_with(".iwa") {
-                    return true;
-                }
-            }
-        }
-    }
-
-    false
-}
-
-/// Refine ZIP-based presentation format detection (PPTX vs Keynote)
-pub(super) fn refine_presentation_format<R: Read + Seek>(
-    reader: &mut R,
-    initial_format: PresentationFormat,
-) -> Result<PresentationFormat> {
-    use std::io::SeekFrom;
-
-    // Only refine if initial detection was Pptx (ZIP file)
-    if initial_format != PresentationFormat::Pptx {
-        return Ok(initial_format);
-    }
-
-    reader.seek(SeekFrom::Start(0))?;
-
-    // Check if it's a Keynote presentation
-    #[cfg(feature = "iwa")]
-    if is_keynote_presentation(reader) {
-        reader.seek(SeekFrom::Start(0))?;
-        return Ok(PresentationFormat::Keynote);
-    }
-
-    // Otherwise it's PPTX
-    reader.seek(SeekFrom::Start(0))?;
-    Ok(PresentationFormat::Pptx)
 }

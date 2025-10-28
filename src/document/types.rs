@@ -1,5 +1,6 @@
 //! Internal types for document format detection and implementation.
 
+use crate::common::detection::{self, FileFormat};
 use crate::common::{Error, Result};
 use std::io::{Read, Seek};
 
@@ -9,10 +10,7 @@ use crate::ole;
 #[cfg(feature = "ooxml")]
 use crate::ooxml;
 
-#[cfg(feature = "iwa")]
-use zip;
-
-/// A Word document implementation that can be .doc, .docx, .pages, or .rtf format.
+/// A Word document implementation that can be .doc, .docx, .pages, .rtf, or .odt format.
 ///
 /// This enum wraps the format-specific implementations and provides
 /// a unified API. Users typically don't interact with this enum directly,
@@ -31,9 +29,15 @@ pub(super) enum DocumentImpl {
     /// RTF format
     #[cfg(feature = "rtf")]
     Rtf(crate::rtf::RtfDocument<'static>),
+    /// OpenDocument Text format
+    #[cfg(feature = "odf")]
+    Odt(crate::odf::Document),
 }
 
 /// Document format detection.
+///
+/// This enum represents the supported document formats in the unified
+/// Document API. The format is automatically detected from file signatures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(unused)] // The corresponding enum would only be used when the feature is enabled
 pub(super) enum DocumentFormat {
@@ -45,28 +49,45 @@ pub(super) enum DocumentFormat {
     Pages,
     /// RTF format (plain text)
     Rtf,
+    /// OpenDocument Text format (.odt)
+    Odt,
 }
 
 /// Detect the document format by reading the file header.
 ///
-/// This function reads the first few bytes of the file to determine if it's
-/// an OLE2 file (.doc) or a ZIP file (.docx).
+/// This function leverages the common detection module for consistent
+/// format detection across the library. It reads the minimum necessary
+/// bytes to determine the format.
+///
+/// # Arguments
+///
+/// * `reader` - A reader that implements Read + Seek
+///
+/// # Returns
+///
+/// * `Ok(DocumentFormat)` if a supported document format is detected
+/// * `Err(Error)` if the format is not recognized or unsupported
 pub(super) fn detect_document_format<R: Read + Seek>(reader: &mut R) -> Result<DocumentFormat> {
-    use std::io::SeekFrom;
+    // Use the common detection module
+    let file_format = detection::detect_format_from_reader(reader).ok_or(Error::NotOfficeFile)?;
 
-    // Read the first 8 bytes
-    let mut header = [0u8; 8];
-    reader.read_exact(&mut header)?;
-
-    // Reset to the beginning
-    reader.seek(SeekFrom::Start(0))?;
-
-    detect_document_format_from_signature(&header)
+    // Map FileFormat to DocumentFormat
+    map_file_format_to_document_format(file_format)
 }
 
 /// Detect the document format from a byte buffer.
 ///
 /// This is optimized for in-memory detection without seeking.
+/// Leverages the common detection module for consistency.
+///
+/// # Arguments
+///
+/// * `bytes` - The file data as bytes
+///
+/// # Returns
+///
+/// * `Ok(DocumentFormat)` if a supported document format is detected
+/// * `Err(Error)` if the format is not recognized or unsupported
 #[inline]
 pub(super) fn detect_document_format_from_bytes(bytes: &[u8]) -> Result<DocumentFormat> {
     if bytes.len() < 4 {
@@ -75,85 +96,38 @@ pub(super) fn detect_document_format_from_bytes(bytes: &[u8]) -> Result<Document
         ));
     }
 
-    detect_document_format_from_signature(&bytes[0..8.min(bytes.len())])
+    // Use the common detection module
+    let file_format =
+        detection::detect_file_format_from_bytes(bytes).ok_or(Error::NotOfficeFile)?;
+
+    // Map FileFormat to DocumentFormat
+    map_file_format_to_document_format(file_format)
 }
 
-/// Detect format from the signature bytes.
+/// Map common FileFormat to DocumentFormat.
+///
+/// This function converts the general FileFormat enum from the common
+/// detection module to the document-specific DocumentFormat enum.
+///
+/// # Arguments
+///
+/// * `file_format` - The detected file format
+///
+/// # Returns
+///
+/// * `Ok(DocumentFormat)` if the format is a supported document format
+/// * `Err(Error::InvalidFormat)` if the format is not a document format
 #[inline]
-fn detect_document_format_from_signature(header: &[u8]) -> Result<DocumentFormat> {
-    // Check for OLE2 signature (D0 CF 11 E0 A1 B1 1A E1)
-    if header.len() >= 4 && header[0..4] == [0xD0, 0xCF, 0x11, 0xE0] {
-        return Ok(DocumentFormat::Doc);
+fn map_file_format_to_document_format(file_format: FileFormat) -> Result<DocumentFormat> {
+    match file_format {
+        FileFormat::Doc => Ok(DocumentFormat::Doc),
+        FileFormat::Docx => Ok(DocumentFormat::Docx),
+        FileFormat::Rtf => Ok(DocumentFormat::Rtf),
+        FileFormat::Pages => Ok(DocumentFormat::Pages),
+        FileFormat::Odt => Ok(DocumentFormat::Odt),
+        _ => Err(Error::InvalidFormat(format!(
+            "Detected format {:?} is not a document format",
+            file_format
+        ))),
     }
-
-    // Check for ZIP signature (PK\x03\x04)
-    // Note: Both DOCX and Pages are ZIP files, so we return Docx here
-    // and will need to distinguish them by inspecting the ZIP contents
-    if header.len() >= 4 && header[0..4] == [0x50, 0x4B, 0x03, 0x04] {
-        return Ok(DocumentFormat::Docx);
-    }
-
-    // Check for RTF signature ({\rtf or {\rtf1)
-    if header.len() >= 5 {
-        let text = std::str::from_utf8(&header[0..5.min(header.len())]).unwrap_or("");
-        if text.starts_with("{\\rtf") {
-            return Ok(DocumentFormat::Rtf);
-        }
-    }
-
-    Err(Error::NotOfficeFile)
-}
-
-/// Detect if a ZIP file is a Pages document by checking for iWork markers
-#[cfg(feature = "iwa")]
-fn is_pages_document<R: Read + Seek>(reader: &mut R) -> bool {
-    use std::io::SeekFrom;
-
-    // Try to open as ZIP and look for iWork format indicators
-    reader.seek(SeekFrom::Start(0)).ok();
-
-    if let Ok(mut archive) = zip::ZipArchive::new(reader) {
-        // Check for Index.zip (older iWork format)
-        if archive.by_name("Index.zip").is_ok() {
-            return true;
-        }
-
-        // Check for Index/ directory with .iwa files (newer iWork format)
-        for i in 0..archive.len() {
-            if let Ok(file) = archive.by_index(i) {
-                let name = file.name();
-                if name.starts_with("Index/") && name.ends_with(".iwa") {
-                    return true;
-                }
-            }
-        }
-    }
-
-    false
-}
-
-/// Refine ZIP-based document format detection (DOCX vs Pages)
-pub(super) fn refine_document_format<R: Read + Seek>(
-    reader: &mut R,
-    initial_format: DocumentFormat,
-) -> Result<DocumentFormat> {
-    use std::io::SeekFrom;
-
-    // Only refine if initial detection was Docx (ZIP file)
-    if initial_format != DocumentFormat::Docx {
-        return Ok(initial_format);
-    }
-
-    reader.seek(SeekFrom::Start(0))?;
-
-    // Check if it's a Pages document
-    #[cfg(feature = "iwa")]
-    if is_pages_document(reader) {
-        reader.seek(SeekFrom::Start(0))?;
-        return Ok(DocumentFormat::Pages);
-    }
-
-    // Otherwise it's DOCX
-    reader.seek(SeekFrom::Start(0))?;
-    Ok(DocumentFormat::Docx)
 }

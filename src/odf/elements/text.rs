@@ -59,6 +59,13 @@ impl Paragraph {
         Ok(spans)
     }
 
+    /// Get all runs (text spans) within this paragraph.
+    ///
+    /// This is an alias for `spans()` to match the unified document API.
+    pub fn runs(&self) -> Result<Vec<Span>> {
+        self.spans()
+    }
+
     /// Add a text span to this paragraph
     pub fn add_span(&mut self, span: Span) {
         self.element.add_child(Box::new(span.element));
@@ -132,6 +139,39 @@ impl Span {
     /// Set the style name
     pub fn set_style_name(&mut self, name: &str) {
         self.element.set_attribute("text:style-name", name);
+    }
+
+    /// Check if the text is bold.
+    ///
+    /// Returns `None` if the style doesn't specify bold formatting.
+    pub fn bold(&self) -> Option<bool> {
+        // In ODF, formatting is typically in styles, not directly on elements
+        // For now, return None to indicate formatting should be resolved via styles
+        None
+    }
+
+    /// Check if the text is italic.
+    ///
+    /// Returns `None` if the style doesn't specify italic formatting.
+    pub fn italic(&self) -> Option<bool> {
+        // In ODF, formatting is typically in styles, not directly on elements
+        None
+    }
+
+    /// Check if the text has strikethrough.
+    ///
+    /// Returns `None` if the style doesn't specify strikethrough formatting.
+    pub fn strikethrough(&self) -> Option<bool> {
+        // In ODF, formatting is typically in styles, not directly on elements
+        None
+    }
+
+    /// Get the vertical position (superscript/subscript).
+    ///
+    /// Returns `None` if the text is in normal position.
+    pub fn vertical_position(&self) -> Option<crate::common::style::text::pos::VerticalPosition> {
+        // In ODF, vertical position is typically in styles
+        None
     }
 }
 

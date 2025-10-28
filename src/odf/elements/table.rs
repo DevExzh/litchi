@@ -79,6 +79,11 @@ impl Table {
         Ok(rows.into_iter().nth(index))
     }
 
+    /// Get a row by index (alias for unified API)
+    pub fn row_at(&self, index: usize) -> Result<Option<TableRow>> {
+        self.row(index)
+    }
+
     /// Add a row to the table
     pub fn add_row(&mut self, row: TableRow) {
         self.element.add_child(Box::new(row.element));
@@ -145,10 +150,20 @@ impl TableRow {
         Ok(cells)
     }
 
+    /// Get the number of cells in the row
+    pub fn cell_count(&self) -> Result<usize> {
+        Ok(self.cells()?.len())
+    }
+
     /// Get a cell by column index
     pub fn cell(&self, index: usize) -> Result<Option<TableCell>> {
         let cells = self.cells()?;
         Ok(cells.into_iter().nth(index))
+    }
+
+    /// Get a cell by column index (alias for unified API)
+    pub fn cell_at(&self, index: usize) -> Result<Option<TableCell>> {
+        self.cell(index)
     }
 
     /// Add a cell to the row

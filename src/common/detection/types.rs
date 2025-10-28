@@ -17,6 +17,8 @@ pub enum FileFormat {
     Xlsx,
     /// Microsoft Excel Spreadsheet (Binary OOXML format, .xlsb)
     Xlsb,
+    /// Rich Text Format Document (.rtf)
+    Rtf,
     /// Apple Pages Document (.pages)
     Pages,
     /// Apple Keynote Presentation (.key)

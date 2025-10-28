@@ -88,7 +88,7 @@ impl Presentation {
     /// ```
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let cursor = Cursor::new(bytes);
-        let mut package = Package::from_reader(cursor)?;
+        let package = Package::from_reader(cursor)?;
 
         // Verify this is a presentation
         let mime_type = package.mimetype();
@@ -126,7 +126,7 @@ impl Presentation {
     }
 
     /// Get the number of slides in the presentation.
-    pub fn slide_count(&mut self) -> Result<usize> {
+    pub fn slide_count(&self) -> Result<usize> {
         let slides = self.slides()?;
         Ok(slides.len())
     }
@@ -134,7 +134,7 @@ impl Presentation {
     /// Get all slides in the presentation.
     ///
     /// Returns a vector of `Slide` objects representing all slides in the document.
-    pub fn slides(&mut self) -> Result<Vec<Slide>> {
+    pub fn slides(&self) -> Result<Vec<Slide>> {
         use super::parser::OdpParser;
 
         let content_bytes = self.package.get_file("content.xml")?;
@@ -150,7 +150,7 @@ impl Presentation {
     /// # Arguments
     ///
     /// * `index` - 0-based index of the slide
-    pub fn slide(&mut self, index: usize) -> Result<Option<Slide>> {
+    pub fn slide(&self, index: usize) -> Result<Option<Slide>> {
         let slides = self.slides()?;
         Ok(slides.into_iter().nth(index))
     }
@@ -158,7 +158,7 @@ impl Presentation {
     /// Extract all text content from the presentation.
     ///
     /// Returns text from all slides, separated by double newlines.
-    pub fn text(&mut self) -> Result<String> {
+    pub fn text(&self) -> Result<String> {
         let slides = self.slides()?;
         let mut all_text = Vec::new();
 

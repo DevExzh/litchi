@@ -92,12 +92,9 @@ impl Presentation {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
 
-        // Try to detect the format by reading the file header
+        // Detect the format by reading the file header
         let mut file = File::open(path)?;
-        let initial_format = detect_presentation_format(&mut file)?;
-
-        // Refine ZIP-based format detection (distinguish PPTX from Keynote)
-        let format = super::types::refine_presentation_format(&mut file, initial_format)?;
+        let format = detect_presentation_format(&mut file)?;
 
         // Open with the appropriate parser
         match format {
@@ -191,6 +188,21 @@ impl Presentation {
             },
             #[cfg(not(feature = "iwa"))]
             PresentationFormat::Keynote => Err(Error::FeatureDisabled("iwa".to_string())),
+            #[cfg(feature = "odf")]
+            PresentationFormat::Odp => {
+                let doc = crate::odf::Presentation::open(path).map_err(|e| {
+                    Error::ParseError(format!("Failed to open ODP presentation: {}", e))
+                })?;
+
+                Ok(Self {
+                    inner: PresentationImpl::Odp(doc),
+                    cached_metadata: Some(crate::common::Metadata::default()),
+                    #[cfg(feature = "ooxml")]
+                    _pptx_package: None,
+                })
+            },
+            #[cfg(not(feature = "odf"))]
+            PresentationFormat::Odp => Err(Error::FeatureDisabled("odf".to_string())),
         }
     }
 
@@ -225,21 +237,7 @@ impl Presentation {
     /// - No temporary files created
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         // Detect format from byte signature
-        let initial_format = detect_presentation_format_from_bytes(&bytes)?;
-
-        // Refine ZIP-based format detection for bytes
-        let format = if initial_format == PresentationFormat::Pptx {
-            // Check if it's a Keynote presentation
-            #[cfg(feature = "iwa")]
-            {
-                let mut cursor = Cursor::new(&bytes);
-                super::types::refine_presentation_format(&mut cursor, initial_format)?
-            }
-            #[cfg(not(feature = "iwa"))]
-            initial_format
-        } else {
-            initial_format
-        };
+        let format = detect_presentation_format_from_bytes(&bytes)?;
 
         match format {
             #[cfg(feature = "ole")]
@@ -339,6 +337,24 @@ impl Presentation {
             },
             #[cfg(not(feature = "iwa"))]
             PresentationFormat::Keynote => Err(Error::FeatureDisabled("iwa".to_string())),
+            #[cfg(feature = "odf")]
+            PresentationFormat::Odp => {
+                let doc = crate::odf::Presentation::from_bytes(bytes).map_err(|e| {
+                    Error::ParseError(format!(
+                        "Failed to parse ODP presentation from bytes: {}",
+                        e
+                    ))
+                })?;
+
+                Ok(Self {
+                    inner: PresentationImpl::Odp(doc),
+                    cached_metadata: Some(crate::common::Metadata::default()),
+                    #[cfg(feature = "ooxml")]
+                    _pptx_package: None,
+                })
+            },
+            #[cfg(not(feature = "odf"))]
+            PresentationFormat::Odp => Err(Error::FeatureDisabled("odf".to_string())),
         }
     }
 
@@ -378,6 +394,22 @@ impl Presentation {
             PresentationImpl::Keynote(doc) => doc.text().map_err(|e| {
                 Error::ParseError(format!("Failed to extract text from Keynote: {}", e))
             }),
+            #[cfg(feature = "odf")]
+            PresentationImpl::Odp(doc) => {
+                let mut text = String::new();
+                let slides = doc
+                    .slides()
+                    .map_err(|e| Error::ParseError(format!("Failed to get ODP slides: {}", e)))?;
+                for slide in slides {
+                    if let Ok(slide_text) = slide.text() {
+                        if !text.is_empty() {
+                            text.push_str("\n\n");
+                        }
+                        text.push_str(slide_text.as_ref());
+                    }
+                }
+                Ok(text)
+            },
         }
     }
 
@@ -406,6 +438,10 @@ impl Presentation {
                     .map_err(|e| Error::ParseError(format!("Failed to get slides: {}", e)))?;
                 Ok(slides.len())
             },
+            #[cfg(feature = "odf")]
+            PresentationImpl::Odp(doc) => doc
+                .slide_count()
+                .map_err(|e| Error::ParseError(format!("Failed to get ODP slide count: {}", e))),
         }
     }
 
@@ -462,6 +498,13 @@ impl Presentation {
                     .map_err(|e| Error::ParseError(format!("Failed to get slides: {}", e)))?;
                 Ok(keynote_slides.into_iter().map(Slide::Keynote).collect())
             },
+            #[cfg(feature = "odf")]
+            PresentationImpl::Odp(doc) => {
+                let odp_slides = doc
+                    .slides()
+                    .map_err(|e| Error::ParseError(format!("Failed to get ODP slides: {}", e)))?;
+                Ok(odp_slides.into_iter().map(Slide::Odp).collect())
+            },
         }
     }
 
@@ -488,6 +531,8 @@ impl Presentation {
             PresentationImpl::Pptx(pres) => pres.slide_width().map_err(Error::from),
             #[cfg(feature = "iwa")]
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
+            #[cfg(feature = "odf")]
+            PresentationImpl::Odp(_) => Ok(None), // ODP doesn't expose slide dimensions in unified API yet
         }
     }
 
@@ -514,6 +559,8 @@ impl Presentation {
             PresentationImpl::Pptx(pres) => pres.slide_height().map_err(Error::from),
             #[cfg(feature = "iwa")]
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
+            #[cfg(feature = "odf")]
+            PresentationImpl::Odp(_) => Ok(None), // ODP doesn't expose slide dimensions in unified API yet
         }
     }
 

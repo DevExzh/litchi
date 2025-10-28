@@ -4,11 +4,12 @@
 //! including reading files, checking existence, and basic package operations.
 
 use crate::common::{Error, Result};
+use std::cell::RefCell;
 use std::io::{Read, Seek};
 
 /// An ODF package (ZIP file containing XML documents)
 pub struct Package<R> {
-    archive: zip::ZipArchive<R>,
+    archive: RefCell<zip::ZipArchive<R>>,
     #[allow(dead_code)]
     manifest: super::manifest::Manifest,
     mimetype: String,
@@ -27,7 +28,7 @@ impl<R: Read + Seek> Package<R> {
         let manifest = super::manifest::Manifest::from_archive(&mut archive)?;
 
         Ok(Self {
-            archive,
+            archive: RefCell::new(archive),
             manifest,
             mimetype,
         })
@@ -50,9 +51,9 @@ impl<R: Read + Seek> Package<R> {
     }
 
     /// Get a file from the package by path
-    pub fn get_file(&mut self, path: &str) -> Result<Vec<u8>> {
-        let mut file = self
-            .archive
+    pub fn get_file(&self, path: &str) -> Result<Vec<u8>> {
+        let mut archive = self.archive.borrow_mut();
+        let mut file = archive
             .by_name(path)
             .map_err(|_| Error::InvalidFormat(format!("File not found: {}", path)))?;
 
@@ -62,8 +63,8 @@ impl<R: Read + Seek> Package<R> {
     }
 
     /// Check if a file exists in the package
-    pub fn has_file(&mut self, path: &str) -> bool {
-        self.archive.by_name(path).is_ok()
+    pub fn has_file(&self, path: &str) -> bool {
+        self.archive.borrow_mut().by_name(path).is_ok()
     }
 
     /// Get the manifest
@@ -74,10 +75,11 @@ impl<R: Read + Seek> Package<R> {
 
     /// List all files in the package
     #[allow(dead_code)]
-    pub fn files(&mut self) -> Result<Vec<String>> {
+    pub fn files(&self) -> Result<Vec<String>> {
         let mut files = Vec::new();
-        for i in 0..self.archive.len() {
-            let file = self.archive.by_index(i)?;
+        let mut archive = self.archive.borrow_mut();
+        for i in 0..archive.len() {
+            let file = archive.by_index(i)?;
             files.push(file.name().to_string());
         }
         Ok(files)

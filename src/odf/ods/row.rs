@@ -6,7 +6,7 @@ use crate::common::Result;
 /// A row in an ODS spreadsheet.
 ///
 /// Rows contain cells and maintain their position within a sheet.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Row {
     /// Cells in this row
     pub cells: Vec<Cell>,
@@ -18,6 +18,11 @@ impl Row {
     /// Get all cells in the row.
     pub fn cells(&self) -> Result<&[Cell]> {
         Ok(&self.cells)
+    }
+
+    /// Get the number of cells in the row.
+    pub fn cell_count(&self) -> Result<usize> {
+        Ok(self.cells.len())
     }
 
     /// Get a cell by column index.
@@ -34,6 +39,15 @@ impl Row {
         } else {
             Ok(None)
         }
+    }
+
+    /// Get a cell by column index (alias for unified API).
+    ///
+    /// # Arguments
+    ///
+    /// * `col` - Column index (0-based)
+    pub fn cell_at(&self, col: usize) -> Result<Option<&Cell>> {
+        self.cell(col)
     }
 
     /// Get the row index.

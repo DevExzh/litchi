@@ -45,11 +45,16 @@ mod odt;
 
 // Re-export main types for convenience
 pub use odp::Presentation;
-pub use ods::{Cell, CellValue, Row, Sheet, Spreadsheet};
+pub use ods::{Cell as SCell, CellValue, Row as SRow, Sheet, Spreadsheet};
 pub use odt::Document;
 
 // Re-export shapes for presentations
 pub use odp::{Shape, Slide};
+
+// Re-export document element types for unified API (for ODT tables)
+pub use elements::table::{Table, TableCell as Cell, TableRow as Row};
+pub use elements::text::Paragraph;
+pub use elements::text::Span as Run; // Span is equivalent to Run in ODF
 
 /// ODF format types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

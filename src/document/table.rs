@@ -17,6 +17,8 @@ pub enum Table {
     Docx(ooxml::docx::Table),
     #[cfg(feature = "rtf")]
     Rtf(crate::rtf::Table<'static>),
+    #[cfg(feature = "odf")]
+    Odt(crate::odf::Table),
 }
 
 impl Table {
@@ -29,6 +31,10 @@ impl Table {
             Table::Docx(t) => t.row_count().map_err(Error::from),
             #[cfg(feature = "rtf")]
             Table::Rtf(t) => Ok(t.row_count()),
+            #[cfg(feature = "odf")]
+            Table::Odt(t) => t
+                .row_count()
+                .map_err(|e| Error::ParseError(format!("Failed to get row count: {}", e))),
         }
     }
 
@@ -52,6 +58,13 @@ impl Table {
             Table::Rtf(t) => {
                 let rows = t.rows();
                 Ok(rows.iter().cloned().map(Row::Rtf).collect())
+            },
+            #[cfg(feature = "odf")]
+            Table::Odt(t) => {
+                let rows = t
+                    .rows()
+                    .map_err(|e| Error::ParseError(format!("Failed to get rows: {}", e)))?;
+                Ok(rows.into_iter().map(Row::Odt).collect())
             },
         }
     }
@@ -79,6 +92,13 @@ impl Table {
                 let rows = t.rows();
                 Ok(rows.get(index).cloned().map(Row::Rtf))
             },
+            #[cfg(feature = "odf")]
+            Table::Odt(t) => {
+                let rows = t
+                    .rows()
+                    .map_err(|e| Error::ParseError(format!("Failed to get rows: {}", e)))?;
+                Ok(rows.get(index).cloned().map(Row::Odt))
+            },
         }
     }
 }
@@ -92,6 +112,8 @@ pub enum Row {
     Docx(ooxml::docx::Row),
     #[cfg(feature = "rtf")]
     Rtf(crate::rtf::Row<'static>),
+    #[cfg(feature = "odf")]
+    Odt(crate::odf::Row),
 }
 
 impl Row {
@@ -104,6 +126,10 @@ impl Row {
             Row::Docx(r) => r.cell_count().map_err(Error::from),
             #[cfg(feature = "rtf")]
             Row::Rtf(r) => Ok(r.cell_count()),
+            #[cfg(feature = "odf")]
+            Row::Odt(r) => r
+                .cell_count()
+                .map_err(|e| Error::ParseError(format!("Failed to get cell count: {}", e))),
         }
     }
 
@@ -127,6 +153,13 @@ impl Row {
             Row::Rtf(r) => {
                 let cells = r.cells();
                 Ok(cells.iter().cloned().map(Cell::Rtf).collect())
+            },
+            #[cfg(feature = "odf")]
+            Row::Odt(r) => {
+                let cells = r
+                    .cells()
+                    .map_err(|e| Error::ParseError(format!("Failed to get cells: {}", e)))?;
+                Ok(cells.into_iter().map(Cell::Odt).collect())
             },
         }
     }
@@ -154,6 +187,13 @@ impl Row {
                 let cells = r.cells();
                 Ok(cells.get(index).cloned().map(Cell::Rtf))
             },
+            #[cfg(feature = "odf")]
+            Row::Odt(r) => {
+                let cells = r
+                    .cells()
+                    .map_err(|e| Error::ParseError(format!("Failed to get cells: {}", e)))?;
+                Ok(cells.get(index).cloned().map(Cell::Odt))
+            },
         }
     }
 }
@@ -167,6 +207,8 @@ pub enum Cell {
     Docx(ooxml::docx::Cell),
     #[cfg(feature = "rtf")]
     Rtf(crate::rtf::Cell<'static>),
+    #[cfg(feature = "odf")]
+    Odt(crate::odf::Cell),
 }
 
 impl Cell {
@@ -179,6 +221,10 @@ impl Cell {
             Cell::Docx(c) => c.text().map(|s| s.to_string()).map_err(Error::from),
             #[cfg(feature = "rtf")]
             Cell::Rtf(c) => Ok(c.text().to_string()),
+            #[cfg(feature = "odf")]
+            Cell::Odt(c) => c
+                .text()
+                .map_err(|e| Error::ParseError(format!("Failed to get cell text: {}", e))),
         }
     }
 }

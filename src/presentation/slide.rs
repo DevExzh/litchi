@@ -12,6 +12,9 @@ pub enum Slide {
     /// Apple Keynote slide
     #[cfg(feature = "iwa")]
     Keynote(crate::iwa::keynote::KeynoteSlide),
+    /// OpenDocument Presentation slide
+    #[cfg(feature = "odf")]
+    Odp(crate::odf::Slide),
 }
 
 impl Slide {
@@ -45,6 +48,10 @@ impl Slide {
                 text.push_str(&slide.text_content.join("\n"));
                 Ok(text)
             },
+            #[cfg(feature = "odf")]
+            Slide::Odp(slide) => slide.text().map(|s| s.to_string()).map_err(|e| {
+                crate::common::Error::ParseError(format!("Failed to get ODP slide text: {}", e))
+            }),
         }
     }
 
@@ -71,6 +78,8 @@ impl Slide {
             Slide::Pptx(_) => None,
             #[cfg(feature = "iwa")]
             Slide::Keynote(slide) => Some(slide.index + 1), // Convert 0-based to 1-based
+            #[cfg(feature = "odf")]
+            Slide::Odp(_) => None, // Slide numbers not currently exposed for ODP
         }
     }
 
@@ -97,6 +106,8 @@ impl Slide {
             Slide::Pptx(_) => None,
             #[cfg(feature = "iwa")]
             Slide::Keynote(_) => None, // Shape count not currently exposed for Keynote
+            #[cfg(feature = "odf")]
+            Slide::Odp(_) => None, // Shape count not currently exposed for ODP
         }
     }
 
@@ -123,6 +134,8 @@ impl Slide {
             Slide::Pptx(data) => Ok(data.name.clone()),
             #[cfg(feature = "iwa")]
             Slide::Keynote(slide) => Ok(slide.title.clone()),
+            #[cfg(feature = "odf")]
+            Slide::Odp(_slide) => Ok(None), // ODP slides don't have names in the current API
         }
     }
 }
