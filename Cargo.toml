@@ -57,7 +57,7 @@ iwa = [
 odf = ["dep:zip", "dep:quick-xml"]
 ole = ["dep:encoding_rs", "dep:bumpalo"]
 ooxml = ["dep:zip", "dep:quick-xml", "dep:encoding_rs"]
-rtf = ["dep:bumpalo", "dep:crc-fast"]
+rtf = ["dep:bumpalo", "dep:crc-fast", "dep:encoding_rs"]
 # Additional functionality features
 formula = ["dep:rowan", "dep:bumpalo", "dep:quick-xml"]
 imgconv = ["dep:image"]

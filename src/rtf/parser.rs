@@ -3,11 +3,38 @@
 use super::error::{RtfError, RtfResult};
 use super::lexer::{ControlWord, Token};
 use super::types::*;
+use crate::common::encoding::codepage_to_encoding;
 use bumpalo::Bump;
+use encoding_rs::Encoding;
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::num::NonZeroU16;
+
+/// RTF destination type - determines if we're in document body or header
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Destination {
+    /// Main document body - text should be extracted
+    DocumentBody,
+    /// Font table - should be skipped
+    FontTable,
+    /// Color table - should be skipped
+    ColorTable,
+    /// Stylesheet - should be skipped
+    StyleSheet,
+    /// Document info - should be skipped
+    Info,
+    /// Picture data - should be skipped
+    /// TODO: Future enhancement - extract and process embedded images
+    Picture,
+    /// Embedded object - should be skipped  
+    /// TODO: Future enhancement - extract OLE objects (e.g., MathType equations)
+    Object,
+    /// Result of embedded object rendering - should be skipped
+    Result,
+    /// Other destinations - should be skipped
+    Other,
+}
 
 /// Parser state for tracking formatting context.
 #[derive(Debug, Clone)]
@@ -22,6 +49,10 @@ struct State {
     in_table: bool,
     /// Cell boundaries for current row (in twips)
     cell_boundaries: SmallVec<[i32; 8]>,
+    /// Current destination (for skipping non-document content)
+    destination: Destination,
+    /// Current text encoding
+    encoding: &'static Encoding,
 }
 
 impl Default for State {
@@ -32,6 +63,8 @@ impl Default for State {
             unicode_skip: 1,
             in_table: false,
             cell_boundaries: SmallVec::new(),
+            destination: Destination::DocumentBody,
+            encoding: encoding_rs::WINDOWS_1252, // Default ANSI encoding
         }
     }
 }
@@ -125,25 +158,92 @@ impl<'a> Parser<'a> {
         if self.pos < self.tokens.len() {
             match &self.tokens[self.pos] {
                 Token::Control(ControlWord::FontTable) => {
+                    // Mark this as font table destination
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::FontTable;
+                    }
                     self.parse_font_table()?;
                     self.skip_until_close_brace()?;
                     self.states.pop();
                     return Ok(());
                 },
                 Token::Control(ControlWord::ColorTable) => {
+                    // Mark this as color table destination
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::ColorTable;
+                    }
                     self.parse_color_table()?;
                     self.skip_until_close_brace()?;
                     self.states.pop();
                     return Ok(());
                 },
                 Token::Control(ControlWord::IgnorableDestination) => {
-                    // Skip ignorable destinations
+                    // Mark as other destination and skip
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::Other;
+                    }
                     self.skip_until_close_brace()?;
                     self.states.pop();
                     return Ok(());
                 },
-                Token::Control(ControlWord::StyleSheet | ControlWord::Info) => {
-                    // Skip these for now
+                Token::Control(ControlWord::StyleSheet) => {
+                    // Mark as stylesheet destination and skip
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::StyleSheet;
+                    }
+                    self.skip_until_close_brace()?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::Info) => {
+                    // Mark as info destination and skip
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::Info;
+                    }
+                    self.skip_until_close_brace()?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::Picture) => {
+                    // Mark as picture destination and skip
+                    // TODO: Future enhancement - extract and process embedded images
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::Picture;
+                    }
+                    self.skip_until_close_brace()?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::Object) => {
+                    // Mark as object destination and skip
+                    // TODO: Future enhancement - extract OLE objects
+                    // Embedded objects in RTF files include:
+                    // - MathType/Equation Editor equations
+                    // - Excel charts and spreadsheets
+                    // - Visio diagrams
+                    // - Other OLE-embedded content
+                    //
+                    // To properly handle these, we would need to:
+                    // 1. Parse the OLE object structure from the hex-encoded binary data
+                    // 2. Identify the object type (CLSID/ProgID)
+                    // 3. Extract and decode the object's native format
+                    // 4. Convert to a suitable representation (e.g., LaTeX for equations, PNG for charts)
+                    //
+                    // For now, we skip these objects to avoid polluting the text output with
+                    // hex-encoded binary data.
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::Object;
+                    }
+                    self.skip_until_close_brace()?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::Result) => {
+                    // Mark as result destination and skip
+                    // This contains the rendered result of an embedded object
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::Result;
+                    }
                     self.skip_until_close_brace()?;
                     self.states.pop();
                     return Ok(());
@@ -246,15 +346,36 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
 
-        let text_str = std::str::from_utf8(buffer)?;
-        let text = self.arena.alloc_str(text_str);
-
         let state = self.current_state()?;
-        let block = StyleBlock::new(Cow::Borrowed(text), state.formatting, state.paragraph);
 
-        self.blocks.push(block);
+        // Only create blocks for text in the document body
+        // Skip text from font tables, color tables, stylesheets, etc.
+        if state.destination == Destination::DocumentBody {
+            // The bytes in the buffer came from a string that was decoded with Windows-1252.
+            // Each character in that string represents a byte value (0x00-0xFF).
+            // We need to recover the original bytes, then decode with the correct encoding.
+            //
+            // Since Windows-1252 characters U+0000-U+00FF map 1:1 to byte values 0x00-0xFF
+            // (with some exceptions in the 0x80-0x9F range), we can reconstruct the
+            // original bytes by taking the lower 8 bits of each character's code point.
+            //
+            // Note: buffer contains UTF-8 bytes of the string. We need to decode to chars first.
+            let original_bytes: SmallVec<[u8; 256]> = std::str::from_utf8(buffer)
+                .unwrap_or("")
+                .chars()
+                .map(|c| c as u8) // Take lower 8 bits
+                .collect();
+
+            // Now decode using the correct encoding
+            let (decoded_str, _, _) = state.encoding.decode(&original_bytes);
+
+            // Allocate in arena and create block
+            let text = self.arena.alloc_str(&decoded_str);
+            let block = StyleBlock::new(Cow::Borrowed(text), state.formatting, state.paragraph);
+            self.blocks.push(block);
+        }
+
         buffer.clear();
-
         Ok(())
     }
 
@@ -318,6 +439,14 @@ impl<'a> Parser<'a> {
                 // since they may span multiple tokens with fallback characters
                 // The control word itself doesn't add text here
                 let _ = code; // Suppress unused warning
+            },
+
+            // Character encoding
+            ControlWord::AnsiCodePage(cp) => {
+                // Set encoding based on Windows code page
+                if let Some(encoding) = codepage_to_encoding(*cp as u32) {
+                    state.encoding = encoding;
+                }
             },
 
             // Table control words
@@ -385,6 +514,10 @@ impl<'a> Parser<'a> {
                 Token::CloseBrace => {
                     self.pos += 1;
                     break;
+                },
+                Token::OpenBrace => {
+                    // Skip nested groups (e.g., {\*\panose ...})
+                    self.skip_group()?;
                 },
                 Token::Control(ControlWord::FontNumber(n)) => {
                     font_num = *n as FontRef;
@@ -483,6 +616,28 @@ impl<'a> Parser<'a> {
 
     /// Skip tokens until closing brace.
     fn skip_until_close_brace(&mut self) -> RtfResult<()> {
+        let mut depth = 1;
+
+        while self.pos < self.tokens.len() && depth > 0 {
+            match &self.tokens[self.pos] {
+                Token::OpenBrace => depth += 1,
+                Token::CloseBrace => depth -= 1,
+                _ => {},
+            }
+            self.pos += 1;
+        }
+
+        Ok(())
+    }
+
+    /// Skip an entire group starting from the OpenBrace token.
+    fn skip_group(&mut self) -> RtfResult<()> {
+        // Must be positioned at OpenBrace
+        if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace)) {
+            return Ok(());
+        }
+
+        self.pos += 1; // Skip the OpenBrace
         let mut depth = 1;
 
         while self.pos < self.tokens.len() && depth > 0 {

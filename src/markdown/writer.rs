@@ -52,6 +52,10 @@ pub(crate) struct MarkdownWriter {
     buffer: String,
     /// Current options
     options: MarkdownOptions,
+    /// Current formatting state to avoid duplicate markers
+    current_bold: bool,
+    current_italic: bool,
+    current_strikethrough: bool,
 }
 
 impl MarkdownWriter {
@@ -60,6 +64,9 @@ impl MarkdownWriter {
         Self {
             buffer: String::with_capacity(4096), // Pre-allocate reasonable size
             options,
+            current_bold: false,
+            current_italic: false,
+            current_strikethrough: false,
         }
     }
 
@@ -69,7 +76,13 @@ impl MarkdownWriter {
     ///
     /// **Performance**: Optimized to avoid redundant XML parsing by extracting runs
     /// once and deriving text from them when needed.
-    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    #[cfg(any(
+        feature = "ole",
+        feature = "ooxml",
+        feature = "odf",
+        feature = "rtf",
+        feature = "iwa"
+    ))]
     pub fn write_paragraph(&mut self, para: &Paragraph) -> Result<()> {
         // First check for paragraph-level formulas (display math)
         #[cfg(feature = "ooxml")]
@@ -95,16 +108,58 @@ impl MarkdownWriter {
             // Get runs once - this parses the paragraph XML
             let runs = para.runs()?;
 
-            // Derive text from runs for list detection (cheaper than parsing XML again)
-            let text = self.extract_text_from_runs(&runs)?;
-
-            // Check if this is a list item
-            if let Some(list_info) = self.detect_list_item(&text) {
-                self.write_list_item_from_runs(&runs, &list_info)?;
+            // FALLBACK: If no runs found (e.g., ODF paragraphs with direct text), use paragraph text
+            if runs.is_empty() {
+                let text = para.text()?;
+                if !text.is_empty() {
+                    // Check if this is a list item
+                    if let Some(list_info) = self.detect_list_item(&text) {
+                        // For plain text lists, write the content directly
+                        let indent = " ".repeat(list_info.level * self.options.list_indent);
+                        let marker = match list_info.list_type {
+                            ListType::Ordered => {
+                                if list_info.marker.contains('.') {
+                                    list_info.marker.clone()
+                                } else if list_info.marker.starts_with('(') {
+                                    format!(
+                                        "{}.",
+                                        list_info
+                                            .marker
+                                            .trim_start_matches('(')
+                                            .trim_end_matches(')')
+                                    )
+                                } else {
+                                    "1.".to_string()
+                                }
+                            },
+                            ListType::Unordered => "-".to_string(),
+                        };
+                        self.buffer.push_str(&indent);
+                        self.buffer.push_str(&marker);
+                        self.buffer.push(' ');
+                        self.buffer.push_str(
+                            text.trim_start()
+                                .trim_start_matches(&list_info.marker)
+                                .trim_start(),
+                        );
+                    } else {
+                        // Regular paragraph - just write the text
+                        self.buffer.push_str(&text);
+                    }
+                }
             } else {
-                // Write runs with style information
-                for run in runs {
-                    self.write_run(&run)?;
+                // Has runs - process them normally
+                // Derive text from runs for list detection (cheaper than parsing XML again)
+                let text = self.extract_text_from_runs(&runs)?;
+
+                // Check if this is a list item
+                if let Some(list_info) = self.detect_list_item(&text) {
+                    self.write_list_item_from_runs(&runs, &list_info)?;
+                } else {
+                    // Write runs with style information
+                    for run in runs {
+                        self.write_run(&run)?;
+                    }
                 }
             }
         } else {
@@ -138,6 +193,9 @@ impl MarkdownWriter {
                 self.buffer.push_str(&text);
             }
         }
+
+        // Close any open formatting at paragraph boundary
+        self.close_formatting();
 
         // Add paragraph break
         self.buffer.push_str("\n\n");
@@ -213,13 +271,79 @@ impl MarkdownWriter {
         Ok(())
     }
 
+    /// Close any currently open formatting.
+    /// This should be called at paragraph boundaries to ensure clean output.
+    fn close_formatting(&mut self) {
+        // Close in reverse order of opening (strikethrough -> italic -> bold)
+        if self.current_strikethrough {
+            self.buffer.push_str("~~");
+            self.current_strikethrough = false;
+        }
+        if self.current_italic {
+            self.buffer.push('*');
+            self.current_italic = false;
+        }
+        if self.current_bold {
+            self.buffer.push_str("**");
+            self.current_bold = false;
+        }
+    }
+
+    /// Apply formatting changes by closing/opening markers as needed.
+    /// Returns the text with appropriate formatting markers applied.
+    fn apply_formatting(&mut self, bold: bool, italic: bool, strikethrough: bool) {
+        // Determine what needs to change
+        let bold_changed = bold != self.current_bold;
+        let italic_changed = italic != self.current_italic;
+        let strike_changed = strikethrough != self.current_strikethrough;
+
+        // If nothing changed, we're done
+        if !bold_changed && !italic_changed && !strike_changed {
+            return;
+        }
+
+        // Close formatting that's being removed (in reverse order)
+        if strike_changed && self.current_strikethrough {
+            self.buffer.push_str("~~");
+            self.current_strikethrough = false;
+        }
+        if italic_changed && self.current_italic {
+            self.buffer.push('*');
+            self.current_italic = false;
+        }
+        if bold_changed && self.current_bold {
+            self.buffer.push_str("**");
+            self.current_bold = false;
+        }
+
+        // Open new formatting (in forward order)
+        if bold_changed && bold {
+            self.buffer.push_str("**");
+            self.current_bold = true;
+        }
+        if italic_changed && italic {
+            self.buffer.push('*');
+            self.current_italic = true;
+        }
+        if strike_changed && strikethrough {
+            self.buffer.push_str("~~");
+            self.current_strikethrough = true;
+        }
+    }
+
     /// Write a run with formatting.
     ///
     /// **Note**: This method requires the `ole` or `ooxml` feature to be enabled.
     ///
     /// **Performance**: For OOXML runs, this uses a single XML parse to extract both
     /// text and properties simultaneously, providing 2x speedup over separate calls.
-    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    #[cfg(any(
+        feature = "ole",
+        feature = "ooxml",
+        feature = "odf",
+        feature = "rtf",
+        feature = "iwa"
+    ))]
     pub fn write_run(&mut self, run: &Run) -> Result<()> {
         // First check if this run contains a formula
         if let Some(formula_markdown) = self.extract_formula_from_run(run)? {
@@ -367,58 +491,18 @@ impl MarkdownWriter {
             self.buffer.reserve(needed_capacity);
         }
 
-        // Apply strikethrough and bold/italic formatting
-        if strikethrough {
-            match self.options.strikethrough_style {
-                super::config::StrikethroughStyle::Markdown => match (bold, italic) {
-                    (true, true) => {
-                        self.buffer.push_str("~~***");
-                        self.buffer.push_str(&text);
-                        self.buffer.push_str("***~~");
-                    },
-                    (true, false) => {
-                        self.buffer.push_str("~~**");
-                        self.buffer.push_str(&text);
-                        self.buffer.push_str("**~~");
-                    },
-                    (false, true) => {
-                        self.buffer.push_str("~~*");
-                        self.buffer.push_str(&text);
-                        self.buffer.push_str("*~~");
-                    },
-                    (false, false) => {
-                        self.buffer.push_str("~~");
-                        self.buffer.push_str(&text);
-                        self.buffer.push_str("~~");
-                    },
-                },
-                super::config::StrikethroughStyle::Html => {
-                    self.buffer.push_str("<del>");
-                    match (bold, italic) {
-                        (true, true) => {
-                            self.buffer.push_str("***");
-                            self.buffer.push_str(&text);
-                            self.buffer.push_str("***");
-                        },
-                        (true, false) => {
-                            self.buffer.push_str("**");
-                            self.buffer.push_str(&text);
-                            self.buffer.push_str("**");
-                        },
-                        (false, true) => {
-                            self.buffer.push('*');
-                            self.buffer.push_str(&text);
-                            self.buffer.push('*');
-                        },
-                        (false, false) => {
-                            self.buffer.push_str(&text);
-                        },
-                    }
-                    self.buffer.push_str("</del>");
-                },
-            }
-        } else {
-            // Apply bold/italic only
+        // Apply formatting changes (only add/remove markers when formatting changes)
+        // Note: For HTML strikethrough style, we need special handling since HTML
+        // tags can't be left open across runs
+        if self.options.strikethrough_style == super::config::StrikethroughStyle::Html
+            && strikethrough
+        {
+            // HTML strikethrough: must be self-contained per run
+            // Close any open markdown formatting first
+            self.close_formatting();
+
+            // Apply HTML strikethrough with inline markdown formatting
+            self.buffer.push_str("<del>");
             match (bold, italic) {
                 (true, true) => {
                     self.buffer.push_str("***");
@@ -439,6 +523,11 @@ impl MarkdownWriter {
                     self.buffer.push_str(&text);
                 },
             }
+            self.buffer.push_str("</del>");
+        } else {
+            // Markdown-style formatting: can span across runs
+            self.apply_formatting(bold, italic, strikethrough);
+            self.buffer.push_str(&text);
         }
 
         Ok(())
@@ -447,7 +536,13 @@ impl MarkdownWriter {
     /// Write a table to the buffer.
     ///
     /// **Note**: This method requires the `ole` or `ooxml` feature to be enabled.
-    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    #[cfg(any(
+        feature = "ole",
+        feature = "ooxml",
+        feature = "odf",
+        feature = "rtf",
+        feature = "iwa"
+    ))]
     pub fn write_table(&mut self, table: &Table) -> Result<()> {
         // Check if table has merged cells
         let has_merged_cells = self.table_has_merged_cells(table)?;
@@ -475,7 +570,13 @@ impl MarkdownWriter {
     /// - Inconsistent cell counts across rows
     /// - Empty cells in positions where content is expected
     /// - Cell spans larger than 1 (when available)
-    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    #[cfg(any(
+        feature = "ole",
+        feature = "ooxml",
+        feature = "odf",
+        feature = "rtf",
+        feature = "iwa"
+    ))]
     fn table_has_merged_cells(&self, table: &Table) -> Result<bool> {
         let rows = table.rows()?;
         if rows.is_empty() {
@@ -534,7 +635,13 @@ impl MarkdownWriter {
     ///
     /// **Performance**: Uses efficient single-pass escaping and minimizes allocations.
     /// For large tables (20+ rows), uses parallel processing to render rows concurrently.
-    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    #[cfg(any(
+        feature = "ole",
+        feature = "ooxml",
+        feature = "odf",
+        feature = "rtf",
+        feature = "iwa"
+    ))]
     fn write_markdown_table(&mut self, table: &Table) -> Result<()> {
         let rows = table.rows()?;
         if rows.is_empty() {
@@ -620,7 +727,13 @@ impl MarkdownWriter {
     ///
     /// **Performance**: Single-pass escaping without intermediate allocations.
     /// Uses SIMD-accelerated memchr for fast searching.
-    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    #[cfg(any(
+        feature = "ole",
+        feature = "ooxml",
+        feature = "odf",
+        feature = "rtf",
+        feature = "iwa"
+    ))]
     fn write_markdown_escaped(&mut self, text: &str) {
         Self::escape_markdown_to_buffer(&mut self.buffer, text);
     }
@@ -631,7 +744,13 @@ impl MarkdownWriter {
     ///
     /// **Performance**: Single-pass escaping without intermediate allocations.
     /// Uses SIMD-accelerated memchr for fast searching.
-    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    #[cfg(any(
+        feature = "ole",
+        feature = "ooxml",
+        feature = "odf",
+        feature = "rtf",
+        feature = "iwa"
+    ))]
     fn escape_markdown_to_buffer(buffer: &mut String, text: &str) {
         let bytes = text.as_bytes();
         let mut pos = 0;
@@ -674,7 +793,13 @@ impl MarkdownWriter {
     ///
     /// **Performance**: Uses efficient single-pass HTML escaping and minimizes allocations.
     /// For large tables (20+ rows), uses parallel processing to render rows concurrently.
-    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    #[cfg(any(
+        feature = "ole",
+        feature = "ooxml",
+        feature = "odf",
+        feature = "rtf",
+        feature = "iwa"
+    ))]
     fn write_html_table(&mut self, table: &Table, styled: bool) -> Result<()> {
         let indent = " ".repeat(self.options.html_table_indent);
         let double_indent = format!("{}{}", indent, indent);
@@ -787,7 +912,13 @@ impl MarkdownWriter {
     /// **Performance**: Single-pass escaping that writes directly to the buffer,
     /// avoiding the 4 intermediate string allocations from chained `replace()` calls.
     /// Uses SIMD-accelerated memchr for fast searching.
-    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    #[cfg(any(
+        feature = "ole",
+        feature = "ooxml",
+        feature = "odf",
+        feature = "rtf",
+        feature = "iwa"
+    ))]
     fn write_html_escaped(&mut self, text: &str) {
         Self::escape_html_to_buffer(&mut self.buffer, text);
     }
@@ -799,7 +930,13 @@ impl MarkdownWriter {
     /// **Performance**: Single-pass escaping that writes directly to the buffer,
     /// avoiding the 4 intermediate string allocations from chained `replace()` calls.
     /// Uses SIMD-accelerated memchr for fast searching.
-    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    #[cfg(any(
+        feature = "ole",
+        feature = "ooxml",
+        feature = "odf",
+        feature = "rtf",
+        feature = "iwa"
+    ))]
     fn escape_html_to_buffer(buffer: &mut String, text: &str) {
         let bytes = text.as_bytes();
         let mut pos = 0;
@@ -979,7 +1116,13 @@ impl MarkdownWriter {
     /// Extract formula content from a run and convert to markdown.
     ///
     /// Returns the markdown representation of the formula if one is found, None otherwise.
-    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    #[cfg(any(
+        feature = "ole",
+        feature = "ooxml",
+        feature = "odf",
+        feature = "rtf",
+        feature = "iwa"
+    ))]
     fn extract_formula_from_run(&self, run: &Run) -> Result<Option<String>> {
         // Try OOXML OMML formulas first
         #[cfg(feature = "ooxml")]
@@ -1094,7 +1237,13 @@ impl MarkdownWriter {
 
     /// Write a list item with proper formatting.
     #[allow(dead_code)] // Used in fallback paths
-    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    #[cfg(any(
+        feature = "ole",
+        feature = "ooxml",
+        feature = "odf",
+        feature = "rtf",
+        feature = "iwa"
+    ))]
     fn write_list_item(&mut self, _para: &Paragraph, list_info: &ListItemInfo) -> Result<()> {
         // Add indentation for nested lists
         let indent = " ".repeat(list_info.level * self.options.list_indent);
@@ -1146,7 +1295,13 @@ impl MarkdownWriter {
     /// have the runs, as it avoids re-parsing the paragraph XML.
     ///
     /// For OOXML runs, this method is optimized to extract only text efficiently.
-    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    #[cfg(any(
+        feature = "ole",
+        feature = "ooxml",
+        feature = "odf",
+        feature = "rtf",
+        feature = "iwa"
+    ))]
     fn extract_text_from_runs(&self, runs: &[Run]) -> Result<String> {
         // Pre-allocate capacity based on number of runs
         let mut text = String::with_capacity(runs.len() * 32);
@@ -1164,7 +1319,13 @@ impl MarkdownWriter {
     /// Write a list item from runs with proper formatting.
     ///
     /// **Performance**: Takes pre-parsed runs to avoid re-parsing XML.
-    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    #[cfg(any(
+        feature = "ole",
+        feature = "ooxml",
+        feature = "odf",
+        feature = "rtf",
+        feature = "iwa"
+    ))]
     fn write_list_item_from_runs(&mut self, runs: &[Run], list_info: &ListItemInfo) -> Result<()> {
         // Add indentation for nested lists
         let indent = " ".repeat(list_info.level * self.options.list_indent);

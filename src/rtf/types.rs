@@ -269,6 +269,36 @@ impl<'a> Run<'a> {
     pub fn text(&self) -> &str {
         &self.text
     }
+
+    /// Check if this run is bold.
+    #[inline]
+    pub fn bold(&self) -> Option<bool> {
+        Some(self.formatting.bold)
+    }
+
+    /// Check if this run is italic.
+    #[inline]
+    pub fn italic(&self) -> Option<bool> {
+        Some(self.formatting.italic)
+    }
+
+    /// Check if this run has strikethrough.
+    #[inline]
+    pub fn strikethrough(&self) -> Option<bool> {
+        Some(self.formatting.strike)
+    }
+
+    /// Get the vertical position of this run (superscript/subscript).
+    #[inline]
+    pub fn vertical_position(&self) -> Option<crate::common::style::text::pos::VerticalPosition> {
+        if self.formatting.superscript {
+            Some(crate::common::style::text::pos::VerticalPosition::Superscript)
+        } else if self.formatting.subscript {
+            Some(crate::common::style::text::pos::VerticalPosition::Subscript)
+        } else {
+            None
+        }
+    }
 }
 
 /// A styled block of text with paragraph and character formatting.
@@ -297,5 +327,37 @@ impl<'a> StyleBlock<'a> {
     #[inline]
     pub fn text(&self) -> &str {
         &self.text
+    }
+}
+
+/// A paragraph with content (runs).
+///
+/// This represents a paragraph in the unified Document API, containing
+/// both paragraph properties and the runs that make up the paragraph content.
+#[derive(Debug, Clone)]
+pub struct ParagraphContent<'a> {
+    /// Paragraph properties (alignment, spacing, indentation)
+    pub properties: Paragraph,
+    /// Runs contained in this paragraph
+    pub runs: Vec<Run<'a>>,
+}
+
+impl<'a> ParagraphContent<'a> {
+    /// Create a new paragraph with content.
+    #[inline]
+    pub fn new(properties: Paragraph, runs: Vec<Run<'a>>) -> Self {
+        Self { properties, runs }
+    }
+
+    /// Get the text content of the paragraph.
+    #[inline]
+    pub fn text(&self) -> String {
+        self.runs.iter().map(|r| r.text.as_ref()).collect()
+    }
+
+    /// Get the runs in this paragraph.
+    #[inline]
+    pub fn runs(&self) -> &[Run<'a>] {
+        &self.runs
     }
 }

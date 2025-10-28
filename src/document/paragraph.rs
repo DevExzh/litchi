@@ -19,7 +19,7 @@ pub enum Paragraph {
     #[cfg(feature = "iwa")]
     Pages(String),
     #[cfg(feature = "rtf")]
-    Rtf(crate::rtf::Paragraph),
+    Rtf(crate::rtf::ParagraphContent<'static>),
     #[cfg(feature = "odf")]
     Odt(crate::odf::Paragraph),
 }
@@ -35,10 +35,7 @@ impl Paragraph {
             #[cfg(feature = "iwa")]
             Paragraph::Pages(text) => Ok(text.clone()),
             #[cfg(feature = "rtf")]
-            Paragraph::Rtf(_p) => {
-                // RTF paragraphs are just formatting info, text comes from runs
-                Ok(String::new())
-            },
+            Paragraph::Rtf(p) => Ok(p.text()),
             #[cfg(feature = "odf")]
             Paragraph::Odt(p) => p
                 .text()
@@ -66,10 +63,7 @@ impl Paragraph {
                 Ok(vec![Run::Pages(text.clone())])
             },
             #[cfg(feature = "rtf")]
-            Paragraph::Rtf(_p) => {
-                // RTF runs come from style blocks, not paragraphs
-                Ok(Vec::new())
-            },
+            Paragraph::Rtf(p) => Ok(p.runs().iter().map(|r| Run::Rtf(r.clone())).collect()),
             #[cfg(feature = "odf")]
             Paragraph::Odt(p) => {
                 let runs = p

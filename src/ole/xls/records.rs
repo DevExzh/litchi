@@ -318,11 +318,11 @@ impl XlsEncoding {
         match self {
             XlsEncoding::Utf16Le => {
                 // Use shared UTF-16 LE decoder
-                Ok(crate::ole::codepage::decode_utf16le(data))
+                Ok(crate::common::encoding::decode_utf16le(data))
             },
             XlsEncoding::Codepage(cp) => {
                 // Use shared codepage decoder
-                crate::ole::codepage::decode_bytes(data, Some(*cp as u32))
+                crate::common::encoding::decode_bytes(data, Some(*cp as u32))
                     .ok_or_else(|| XlsError::Encoding(format!("Unsupported codepage: {}", cp)))
             },
         }

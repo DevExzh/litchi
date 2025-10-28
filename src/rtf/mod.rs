@@ -38,5 +38,5 @@ pub use lexer::CharacterSet;
 pub use table::{Cell, Row, Table};
 pub use types::{
     Alignment, Color, ColorTable, Font, FontFamily, FontRef, FontTable, Formatting, Indentation,
-    Paragraph, Run, Spacing, StyleBlock,
+    Paragraph, ParagraphContent, Run, Spacing, StyleBlock,
 };

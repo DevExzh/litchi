@@ -47,20 +47,25 @@ impl<'a> RtfDocument<'a> {
     /// Parse RTF from bytes (handles both compressed and uncompressed)
     fn parse_internal(bytes: &[u8]) -> RtfResult<RtfDocument<'static>> {
         // Check if it's compressed RTF
-        let input = if super::compressed::is_compressed_rtf(bytes) {
+        let input_bytes = if super::compressed::is_compressed_rtf(bytes) {
             // Decompress first
-            let decompressed = super::compressed::decompress(bytes)?;
-            String::from_utf8(decompressed).map_err(|e| {
-                RtfError::InvalidUnicode(format!("Invalid UTF-8 after decompression: {}", e))
-            })?
+            super::compressed::decompress(bytes)?
         } else {
-            // Try to parse as UTF-8 string
-            std::str::from_utf8(bytes)
-                .map_err(|e| RtfError::InvalidUnicode(format!("Invalid UTF-8: {}", e)))?
-                .to_string()
+            bytes.to_vec()
         };
 
-        Self::parse_string(&input)
+        // RTF files are NOT UTF-8. They contain bytes in whatever code page is
+        // specified by \ansicpg (e.g., Windows-1252, GB2312, etc.).
+        //
+        // We use Latin-1 (ISO-8859-1) encoding for initial parsing because:
+        // 1. It provides 1:1 byte-to-character mapping (byte 0xNN -> U+00NN)
+        // 2. Control words (ASCII) parse correctly
+        // 3. We can recover original bytes and decode them with correct encoding later
+        //
+        // The parser will detect \ansicpg and use the proper encoding for text.
+        let (input_str, _, _) = encoding_rs::WINDOWS_1252.decode(&input_bytes);
+
+        Self::parse_string(&input_str)
     }
 
     /// Parse an RTF document from a UTF-8 string (internal)
@@ -218,6 +223,58 @@ impl<'a> RtfDocument<'a> {
         // Add final paragraph if it has content
         if has_content {
             paragraphs.push(current_para);
+        }
+
+        paragraphs
+    }
+
+    /// Get all paragraphs with their content (runs).
+    ///
+    /// This groups style blocks into paragraphs based on newline characters,
+    /// and returns each paragraph with its associated runs.
+    pub fn paragraphs_with_content(&self) -> Vec<super::types::ParagraphContent<'_>> {
+        use std::borrow::Cow;
+
+        let mut paragraphs = Vec::new();
+        let mut current_para_props = RtfParagraph::default();
+        let mut current_runs: Vec<Run<'_>> = Vec::new();
+        let mut has_content = false;
+
+        for block in &self.blocks {
+            let text = block.text.as_ref();
+
+            // Split on newlines to detect paragraph boundaries
+            let parts: Vec<&str> = text.split('\n').collect();
+
+            for (i, part) in parts.iter().enumerate() {
+                if !part.is_empty() {
+                    // Inherit paragraph properties from the style block
+                    current_para_props = block.paragraph;
+                    has_content = true;
+
+                    // Add run for this part
+                    current_runs.push(Run::new(Cow::Borrowed(part), block.formatting));
+                }
+
+                // If this is not the last part, we have a paragraph break
+                if i < parts.len() - 1 && has_content {
+                    paragraphs.push(super::types::ParagraphContent::new(
+                        current_para_props,
+                        current_runs.clone(),
+                    ));
+                    current_runs.clear();
+                    current_para_props = RtfParagraph::default();
+                    has_content = false;
+                }
+            }
+        }
+
+        // Add final paragraph if it has content
+        if has_content {
+            paragraphs.push(super::types::ParagraphContent::new(
+                current_para_props,
+                current_runs,
+            ));
         }
 
         paragraphs

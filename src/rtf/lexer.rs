@@ -14,6 +14,7 @@ pub enum ControlWord<'a> {
     // Document structure
     Rtf(i32),
     Ansi,
+    AnsiCodePage(i32),
     Mac,
     Pc,
     Pca,
@@ -23,6 +24,11 @@ pub enum ControlWord<'a> {
     ColorTable,
     StyleSheet,
     Info,
+
+    // Embedded content (to be skipped for now)
+    Picture,
+    Object,
+    Result,
 
     // Font properties
     FontNumber(i32),
@@ -320,6 +326,7 @@ impl<'a> Lexer<'a> {
             // Document
             "rtf" => ControlWord::Rtf(param_value),
             "ansi" => ControlWord::Ansi,
+            "ansicpg" => ControlWord::AnsiCodePage(param_value),
             "mac" => ControlWord::Mac,
             "pc" => ControlWord::Pc,
             "pca" => ControlWord::Pca,
@@ -329,6 +336,11 @@ impl<'a> Lexer<'a> {
             "colortbl" => ControlWord::ColorTable,
             "stylesheet" => ControlWord::StyleSheet,
             "info" => ControlWord::Info,
+
+            // Embedded content (skip for now)
+            "pict" => ControlWord::Picture,
+            "object" => ControlWord::Object,
+            "result" => ControlWord::Result,
 
             // Fonts
             "f" => ControlWord::FontNumber(param_value),

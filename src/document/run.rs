@@ -52,7 +52,7 @@ impl Run {
             #[cfg(feature = "iwa")]
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
             #[cfg(feature = "rtf")]
-            Run::Rtf(r) => Ok(Some(r.formatting.bold)),
+            Run::Rtf(r) => Ok(r.bold()),
             #[cfg(feature = "odf")]
             Run::Odt(r) => Ok(r.bold()),
         }
@@ -68,7 +68,7 @@ impl Run {
             #[cfg(feature = "iwa")]
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
             #[cfg(feature = "rtf")]
-            Run::Rtf(r) => Ok(Some(r.formatting.italic)),
+            Run::Rtf(r) => Ok(r.italic()),
             #[cfg(feature = "odf")]
             Run::Odt(r) => Ok(r.italic()),
         }
@@ -84,7 +84,7 @@ impl Run {
             #[cfg(feature = "iwa")]
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
             #[cfg(feature = "rtf")]
-            Run::Rtf(r) => Ok(Some(r.formatting.strike)),
+            Run::Rtf(r) => Ok(r.strikethrough()),
             #[cfg(feature = "odf")]
             Run::Odt(r) => Ok(r.strikethrough()),
         }
@@ -120,15 +120,7 @@ impl Run {
             #[cfg(feature = "iwa")]
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
             #[cfg(feature = "rtf")]
-            Run::Rtf(r) => {
-                if r.formatting.superscript {
-                    Ok(Some(VerticalPosition::Superscript))
-                } else if r.formatting.subscript {
-                    Ok(Some(VerticalPosition::Subscript))
-                } else {
-                    Ok(None)
-                }
-            },
+            Run::Rtf(r) => Ok(r.vertical_position()),
             #[cfg(feature = "odf")]
             Run::Odt(r) => Ok(r.vertical_position()),
         }

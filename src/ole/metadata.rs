@@ -450,7 +450,7 @@ fn extract_string(value: &PropertyValue, codepage: Option<u32>) -> Option<String
             if bytes.is_empty() {
                 None
             } else {
-                super::codepage::decode_bytes(bytes, codepage)
+                crate::common::encoding::decode_bytes(bytes, codepage)
             }
         },
         PropertyValue::Lpwstr(s) => {

@@ -6,6 +6,8 @@
 // Submodule declarations
 pub mod binary;
 pub mod detection;
+#[cfg(any(feature = "ole", feature = "rtf"))]
+pub mod encoding;
 pub mod error;
 pub mod metadata;
 pub mod shapes;

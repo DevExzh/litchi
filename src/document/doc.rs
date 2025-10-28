@@ -428,7 +428,25 @@ impl Document {
             },
             #[cfg(feature = "rtf")]
             DocumentImpl::Rtf(doc) => {
-                let paras = doc.paragraphs();
+                let paras = doc.paragraphs_with_content();
+                // Convert to static lifetime by cloning the text
+                let paras: Vec<_> = paras
+                    .into_iter()
+                    .map(|p| {
+                        crate::rtf::ParagraphContent::new(
+                            p.properties,
+                            p.runs
+                                .into_iter()
+                                .map(|r| {
+                                    crate::rtf::Run::new(
+                                        std::borrow::Cow::Owned(r.text.into_owned()),
+                                        r.formatting,
+                                    )
+                                })
+                                .collect(),
+                        )
+                    })
+                    .collect();
                 Ok(paras.into_iter().map(Paragraph::Rtf).collect())
             },
             #[cfg(feature = "odf")]
@@ -567,7 +585,7 @@ impl Document {
                 use super::DocumentElement;
                 // For RTF, we need to interleave paragraphs and tables in order
                 // First, get all paragraphs and tables
-                let paragraphs = doc.paragraphs();
+                let paragraphs = doc.paragraphs_with_content();
                 let tables = doc.tables();
 
                 // RTF documents store elements in order, so we need to identify
@@ -576,8 +594,21 @@ impl Document {
                 // TODO: Implement proper RTF element ordering based on RTF structure
                 let mut elements = Vec::new();
 
+                // Convert paragraphs to static lifetime
                 for para in paragraphs {
-                    elements.push(DocumentElement::Paragraph(Paragraph::Rtf(para)));
+                    let owned_para = crate::rtf::ParagraphContent::new(
+                        para.properties,
+                        para.runs
+                            .into_iter()
+                            .map(|r| {
+                                crate::rtf::Run::new(
+                                    std::borrow::Cow::Owned(r.text.into_owned()),
+                                    r.formatting,
+                                )
+                            })
+                            .collect(),
+                    );
+                    elements.push(DocumentElement::Paragraph(Paragraph::Rtf(owned_para)));
                 }
 
                 for table in tables {
