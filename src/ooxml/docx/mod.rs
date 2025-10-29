@@ -63,4 +63,4 @@ pub use package::Package;
 pub use paragraph::{Paragraph, Run, RunProperties};
 pub use section::{Emu, Margins, PageSize, Section, Sections};
 pub use styles::{Style, Styles};
-pub use table::{Cell, Row, Table};
+pub use table::{Cell, Row, Table, VMergeState};

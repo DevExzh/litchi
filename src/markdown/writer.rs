@@ -7,7 +7,7 @@ use super::config::{MarkdownOptions, TableStyle};
 /// **Note**: Some functionality requires the `ole` or `ooxml` feature to be enabled.
 use crate::common::{Error, Metadata, Result};
 #[cfg(any(feature = "ole", feature = "ooxml"))]
-use crate::document::{Paragraph, Run, Table};
+use crate::document::{Cell, Paragraph, Run, Table};
 use std::fmt::Write as FmtWrite;
 
 #[cfg(any(feature = "ole", feature = "ooxml"))]
@@ -43,6 +43,37 @@ enum ListType {
     Unordered,
 }
 
+/// Information about cell span (colspan and rowspan) for HTML rendering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CellSpan {
+    /// Number of columns this cell spans (horizontal merge)
+    colspan: usize,
+    /// Number of rows this cell spans (vertical merge)
+    rowspan: usize,
+    /// Whether this cell should be skipped in rendering (it's covered by a merge)
+    skip: bool,
+}
+
+impl CellSpan {
+    /// Create a new cell span with default values (no merge).
+    fn new() -> Self {
+        Self {
+            colspan: 1,
+            rowspan: 1,
+            skip: false,
+        }
+    }
+
+    /// Create a cell span that should be skipped.
+    fn skipped() -> Self {
+        Self {
+            colspan: 1,
+            rowspan: 1,
+            skip: true,
+        }
+    }
+}
+
 /// Low-level writer for efficient Markdown generation.
 ///
 /// This struct provides optimized methods for writing Markdown elements
@@ -56,6 +87,121 @@ pub(crate) struct MarkdownWriter {
     current_bold: bool,
     current_italic: bool,
     current_strikethrough: bool,
+}
+
+/// Analyze a table to compute cell spans (colspan/rowspan) for proper HTML rendering.
+///
+/// This function processes a table and computes the actual colspan and rowspan for each cell,
+/// taking into account:
+/// - `gridSpan` (horizontal merge/colspan)
+/// - `vMerge` (vertical merge/rowspan)
+///
+/// Returns a 2D vector where `result[row][col]` contains the span information for that cell.
+///
+/// **Performance**: Uses efficient single-pass analysis with minimal allocations.
+#[cfg(any(
+    feature = "ole",
+    feature = "ooxml",
+    feature = "odf",
+    feature = "rtf",
+    feature = "iwa"
+))]
+fn analyze_table_spans(table: &Table) -> Result<Vec<Vec<CellSpan>>> {
+    let rows = table.rows()?;
+    if rows.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // First pass: determine the maximum grid width (considering gridSpan)
+    let mut max_grid_cols = 0;
+    for row in &rows {
+        let cells = row.cells()?;
+        let mut row_grid_cols = 0;
+        for cell in &cells {
+            let grid_span = cell.grid_span().unwrap_or(1);
+            row_grid_cols += grid_span;
+        }
+        max_grid_cols = max_grid_cols.max(row_grid_cols);
+    }
+
+    // Initialize span info for all cells
+    let mut spans: Vec<Vec<CellSpan>> = Vec::with_capacity(rows.len());
+    for _ in 0..rows.len() {
+        spans.push(vec![CellSpan::new(); max_grid_cols]);
+    }
+
+    // Second pass: analyze gridSpan and vMerge for each cell
+    for (row_idx, row) in rows.iter().enumerate() {
+        let cells = row.cells()?;
+        let mut grid_col = 0; // Current grid column position
+
+        for cell in &cells {
+            // Skip grid columns that are covered by previous cells' colspan
+            while grid_col < max_grid_cols && spans[row_idx][grid_col].skip {
+                grid_col += 1;
+            }
+
+            if grid_col >= max_grid_cols {
+                break;
+            }
+
+            // Get horizontal span (gridSpan)
+            let colspan = cell.grid_span().unwrap_or(1);
+            spans[row_idx][grid_col].colspan = colspan;
+
+            // Mark columns covered by this cell's colspan as skipped
+            for offset in 1..colspan {
+                if grid_col + offset < max_grid_cols {
+                    spans[row_idx][grid_col + offset] = CellSpan::skipped();
+                }
+            }
+
+            // Get vertical merge state (vMerge)
+            #[cfg(feature = "ooxml")]
+            {
+                use crate::ooxml::docx::VMergeState;
+
+                if let Ok(Some(v_merge_state)) = cell.v_merge() {
+                    match v_merge_state {
+                        VMergeState::Restart => {
+                            // This cell starts a vertical merge
+                            // Count how many rows below continue this merge
+                            let mut rowspan = 1;
+                            for next_row_idx in (row_idx + 1)..rows.len() {
+                                if let Ok(Some(next_row)) = rows[next_row_idx].cell_at(grid_col) {
+                                    if let Ok(Some(VMergeState::Continue)) = next_row.v_merge() {
+                                        rowspan += 1;
+                                        // Mark this cell as skipped
+                                        spans[next_row_idx][grid_col] = CellSpan::skipped();
+                                        // Also mark colspan cells as skipped
+                                        for offset in 1..colspan {
+                                            if grid_col + offset < max_grid_cols {
+                                                spans[next_row_idx][grid_col + offset] =
+                                                    CellSpan::skipped();
+                                            }
+                                        }
+                                    } else {
+                                        break;
+                                    }
+                                } else {
+                                    break;
+                                }
+                            }
+                            spans[row_idx][grid_col].rowspan = rowspan;
+                        },
+                        VMergeState::Continue => {
+                            // This cell continues a merge from above, should be skipped
+                            // (already marked in the Restart case above)
+                        },
+                    }
+                }
+            }
+
+            grid_col += colspan;
+        }
+    }
+
+    Ok(spans)
 }
 
 impl MarkdownWriter {
@@ -566,10 +712,11 @@ impl MarkdownWriter {
 
     /// Check if a table has merged cells.
     ///
-    /// Uses multiple heuristics to detect merged cells:
-    /// - Inconsistent cell counts across rows
-    /// - Empty cells in positions where content is expected
-    /// - Cell spans larger than 1 (when available)
+    /// Uses proper span analysis to detect merged cells by checking for:
+    /// - Horizontal merges (gridSpan/colspan > 1)
+    /// - Vertical merges (vMerge/rowspan > 1)
+    ///
+    /// **Performance**: Efficient analysis that reuses existing span computation.
     #[cfg(any(
         feature = "ole",
         feature = "ooxml",
@@ -583,50 +730,24 @@ impl MarkdownWriter {
             return Ok(false);
         }
 
-        // Check for inconsistent cell counts - avoid allocating cell vectors
-        let mut max_cells = 0;
-        let mut min_cells = usize::MAX;
-
-        for row in &rows {
-            let cell_count = row.cell_count()?;
-            max_cells = max_cells.max(cell_count);
-            min_cells = min_cells.min(cell_count);
-        }
-
-        // If cell counts vary significantly, likely merged cells
-        if max_cells > min_cells {
-            return Ok(true);
-        }
-
-        // Check for empty cells in patterns that suggest merging
-        // This is a heuristic: if we have empty cells surrounded by content,
-        // it might indicate horizontal merging
+        // Quick check: Look for cells with gridSpan > 1 or vMerge attributes
         for row in &rows {
             let cells = row.cells()?;
-            if cells.len() < 2 {
-                continue;
-            }
-
-            let mut empty_streak = 0;
             for cell in &cells {
-                let cell_text = cell.text()?;
-                let text = cell_text.trim();
-                if text.is_empty() {
-                    empty_streak += 1;
-                    // Multiple consecutive empty cells suggest merging
-                    if empty_streak >= 2 {
+                // Check horizontal merge (gridSpan)
+                if cell.grid_span().unwrap_or(1) > 1 {
+                    return Ok(true);
+                }
+
+                // Check vertical merge (vMerge) - only available for OOXML
+                #[cfg(feature = "ooxml")]
+                {
+                    if cell.v_merge().ok().flatten().is_some() {
                         return Ok(true);
                     }
-                } else {
-                    empty_streak = 0;
                 }
             }
         }
-
-        // For more advanced detection, we could check:
-        // - Cell spans (gridSpan, rowspan attributes)
-        // - Vertical merging (vMerge attributes)
-        // But these require deeper parsing of the underlying formats
 
         Ok(false)
     }
@@ -789,10 +910,18 @@ impl MarkdownWriter {
         }
     }
 
-    /// Write a table in HTML format.
+    /// Write a table in HTML format with proper colspan and rowspan attributes.
     ///
     /// **Performance**: Uses efficient single-pass HTML escaping and minimizes allocations.
-    /// For large tables (20+ rows), uses parallel processing to render rows concurrently.
+    ///
+    /// **Merged Cells**: Properly handles merged cells by:
+    /// - Adding `colspan` attributes for horizontal merges (gridSpan)
+    /// - Adding `rowspan` attributes for vertical merges (vMerge)
+    /// - Skipping cells that are covered by a merge
+    ///
+    /// **Styling**:
+    /// - Styled tables (`styled = true`): Include indentation, line feeds, and CSS class
+    /// - Minimal tables (`styled = false`): No indentation, no line feeds for compact output
     #[cfg(any(
         feature = "ole",
         feature = "ooxml",
@@ -801,15 +930,6 @@ impl MarkdownWriter {
         feature = "iwa"
     ))]
     fn write_html_table(&mut self, table: &Table, styled: bool) -> Result<()> {
-        let indent = " ".repeat(self.options.html_table_indent);
-        let double_indent = format!("{}{}", indent, indent);
-
-        if styled {
-            self.buffer.push_str("<table class=\"doc-table\">\n");
-        } else {
-            self.buffer.push_str("<table>\n");
-        }
-
         let rows = table.rows()?;
 
         // Pre-allocate buffer capacity to reduce reallocations
@@ -817,93 +937,133 @@ impl MarkdownWriter {
         let total_cells: usize = rows.iter().map(|r| r.cell_count().unwrap_or(0)).sum();
         self.buffer.reserve(total_cells * 100);
 
-        // Decide whether to use parallel processing
-        if self.options.use_parallel && rows.len() > TABLE_PARALLEL_THRESHOLD {
-            // PARALLEL PATH: Process rows in parallel for large tables
-            // First, extract all cell texts sequentially (to avoid borrowing issues with Row enum)
-            let mut all_row_texts: Vec<Vec<String>> = Vec::with_capacity(rows.len());
-            for row in &rows {
-                let cells = row.cells()?;
-                let cell_texts: Result<Vec<String>> = cells.iter().map(|c| c.text()).collect();
-                all_row_texts.push(cell_texts?);
+        // Analyze table to get span information (colspan/rowspan)
+        let spans = analyze_table_spans(table)?;
+
+        // Helper closure to write cell opening tag with span attributes
+        let write_cell_open = |buffer: &mut String, tag: &str, span: &CellSpan| -> Result<()> {
+            buffer.push('<');
+            buffer.push_str(tag);
+
+            if span.colspan > 1 {
+                write!(buffer, " colspan=\"{}\"", span.colspan)
+                    .map_err(|e| Error::Other(e.to_string()))?;
             }
 
-            // Now process the texts in parallel
-            let row_strings: Vec<String> = all_row_texts
-                .par_iter()
-                .enumerate()
-                .map(|(i, cell_texts)| {
-                    // First row is typically header
-                    let tag = if i == 0 { "th" } else { "td" };
-
-                    // Estimate buffer size for this row
-                    let row_capacity = cell_texts.len() * 100 + indent.len() * 2 + 10;
-                    let mut row_buffer = String::with_capacity(row_capacity);
-
-                    row_buffer.push_str(&indent);
-                    row_buffer.push_str("<tr>\n");
-
-                    for text in cell_texts {
-                        // Write opening tag
-                        row_buffer.push_str(&double_indent);
-                        row_buffer.push('<');
-                        row_buffer.push_str(tag);
-                        row_buffer.push('>');
-
-                        // HTML escape and write text
-                        Self::escape_html_to_buffer(&mut row_buffer, text);
-
-                        // Write closing tag
-                        row_buffer.push_str("</");
-                        row_buffer.push_str(tag);
-                        row_buffer.push_str(">\n");
-                    }
-
-                    row_buffer.push_str(&indent);
-                    row_buffer.push_str("</tr>\n");
-
-                    row_buffer
-                })
-                .collect();
-
-            // Concatenate all row strings
-            for row_str in &row_strings {
-                self.buffer.push_str(row_str);
+            if span.rowspan > 1 {
+                write!(buffer, " rowspan=\"{}\"", span.rowspan)
+                    .map_err(|e| Error::Other(e.to_string()))?;
             }
-        } else {
-            // SEQUENTIAL PATH: Process rows sequentially for small tables
-            for (i, row) in rows.iter().enumerate() {
-                // First row is typically header
-                let tag = if i == 0 { "th" } else { "td" };
+
+            buffer.push('>');
+            Ok(())
+        };
+
+        // Helper closure to write cell closing tag
+        let write_cell_close = |buffer: &mut String, tag: &str| {
+            buffer.push_str("</");
+            buffer.push_str(tag);
+            buffer.push('>');
+        };
+
+        // Helper closure to process row cells with optional indentation
+        let process_row_cells = |writer: &mut Self,
+                                 cells: &[Cell],
+                                 row_idx: usize,
+                                 tag: &str,
+                                 spans: &[Vec<CellSpan>],
+                                 cell_indent: Option<&str>|
+         -> Result<()> {
+            let mut grid_col = 0;
+
+            for cell in cells {
+                // Skip grid columns covered by merges
+                while grid_col < spans.get(row_idx).map(|r| r.len()).unwrap_or(0)
+                    && spans[row_idx][grid_col].skip
+                {
+                    grid_col += 1;
+                }
+
+                // Get span information for this cell
+                let span_info = spans
+                    .get(row_idx)
+                    .and_then(|r| r.get(grid_col))
+                    .copied()
+                    .unwrap_or_else(CellSpan::new);
+
+                // Skip this cell if it's covered by a merge
+                if span_info.skip {
+                    grid_col += 1;
+                    continue;
+                }
+
+                let text = cell.text()?;
+
+                // Write cell indent if provided
+                if let Some(indent) = cell_indent {
+                    writer.buffer.push_str(indent);
+                }
+
+                // Write opening tag with colspan/rowspan attributes
+                write_cell_open(&mut writer.buffer, tag, &span_info)?;
+
+                // HTML escape and write text
+                writer.write_html_escaped(&text);
+
+                // Write closing tag
+                write_cell_close(&mut writer.buffer, tag);
+
+                // Add line feed if indented
+                if cell_indent.is_some() {
+                    writer.buffer.push('\n');
+                }
+
+                // Move to next grid column
+                grid_col += span_info.colspan;
+            }
+
+            Ok(())
+        };
+
+        if styled {
+            // STYLED TABLE: With indentation, line feeds, and CSS class
+            let indent = " ".repeat(self.options.html_table_indent);
+            let double_indent = format!("{}{}", indent, indent);
+
+            self.buffer.push_str("<table>\n");
+
+            for (row_idx, row) in rows.iter().enumerate() {
+                let tag = if row_idx == 0 { "th" } else { "td" };
 
                 self.buffer.push_str(&indent);
                 self.buffer.push_str("<tr>\n");
 
                 let cells = row.cells()?;
-                for cell in &cells {
-                    let text = cell.text()?;
-
-                    // Write opening tag
-                    self.buffer.push_str(&double_indent);
-                    self.buffer.push('<');
-                    self.buffer.push_str(tag);
-                    self.buffer.push('>');
-
-                    // HTML escape and write text in a single pass (no intermediate allocations)
-                    self.write_html_escaped(&text);
-
-                    // Write closing tag
-                    self.buffer.push_str("</");
-                    self.buffer.push_str(tag);
-                    self.buffer.push_str(">\n");
-                }
+                process_row_cells(self, &cells, row_idx, tag, &spans, Some(&double_indent))?;
 
                 self.buffer.push_str(&indent);
                 self.buffer.push_str("</tr>\n");
             }
+
+            self.buffer.push_str("</table>");
+        } else {
+            // MINIMAL TABLE: No indentation, no line feeds for compact output
+            self.buffer.push_str("<table>");
+
+            for (row_idx, row) in rows.iter().enumerate() {
+                let tag = if row_idx == 0 { "th" } else { "td" };
+
+                self.buffer.push_str("<tr>");
+
+                let cells = row.cells()?;
+                process_row_cells(self, &cells, row_idx, tag, &spans, None)?;
+
+                self.buffer.push_str("</tr>");
+            }
+
+            self.buffer.push_str("</table>");
         }
 
-        self.buffer.push_str("</table>");
         Ok(())
     }
 

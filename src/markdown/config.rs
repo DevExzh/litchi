@@ -244,6 +244,9 @@ impl MarkdownOptions {
 
 /// Table rendering styles for Markdown conversion.
 ///
+/// **Note**: If the `TableStyle` is either `MinimalHtml` or `StyledHtml`,
+/// the formatted text inside the cells will **always** be rendered as HTML styled text.
+///
 /// Determines how tables are rendered in the output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableStyle {
@@ -259,19 +262,29 @@ pub enum TableStyle {
     /// ```
     Markdown,
 
-    /// Use minimal HTML tables (no styling, just structure).
+    /// Use minimal HTML tables (no indentation, no line feeds).
+    ///
+    /// Note: If the TableStyle is set to MinimalHtml, the indentation config will be ignored.
     ///
     /// Example:
     /// ```html
-    /// <table>
-    ///   <tr><td>Cell 1</td><td>Cell 2</td></tr>
-    /// </table>
+    /// <table><tr><td>Cell 1</td><td>Cell 2</td></tr></table>
     /// ```
     MinimalHtml,
 
     /// Use styled HTML tables with customizable indentation.
     ///
-    /// Includes basic CSS classes for styling.
+    /// Includes indentation and line feeds.
+    ///
+    /// Example:
+    /// ```html
+    /// <table>
+    ///   <tr>
+    ///     <td>Cell 1</td>
+    ///     <td>Cell 2</td>
+    ///   </tr>
+    /// </table>
+    /// ```
     StyledHtml,
 }
 

@@ -7,6 +7,19 @@ use quick_xml::events::Event;
 use smallvec::SmallVec;
 use std::sync::Arc;
 
+/// Vertical merge state for table cells.
+///
+/// In OOXML, vertical merging uses the `<w:vMerge>` element:
+/// - `restart`: Starts a new vertical merge (first cell in the merge)
+/// - `continue`: Continues a vertical merge from the cell above (no `val` attribute or `val="continue"`)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VMergeState {
+    /// Starts a vertical merge (`<w:vMerge w:val="restart"/>`)
+    Restart,
+    /// Continues a vertical merge from above (`<w:vMerge/>` or `<w:vMerge w:val="continue"/>`)
+    Continue,
+}
+
 /// A table in a Word document.
 ///
 /// Represents a `<w:tbl>` element. Tables contain rows, which contain cells,
@@ -387,6 +400,135 @@ impl Cell {
             xml_bytes: Arc::new(xml_bytes),
             cached_text: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// Get the grid span (horizontal merge/colspan) of this cell.
+    ///
+    /// Returns the number of columns this cell spans. A value of 1 (default) means no merge.
+    /// This corresponds to the `<w:gridSpan>` element in OOXML.
+    ///
+    /// # Example
+    ///
+    /// ```xml
+    /// <w:tc>
+    ///   <w:tcPr>
+    ///     <w:gridSpan w:val="2"/>
+    ///   </w:tcPr>
+    ///   ...
+    /// </w:tc>
+    /// ```
+    pub fn grid_span(&self) -> Result<usize> {
+        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        reader.config_mut().trim_text(true);
+
+        let mut in_tc_pr = false;
+        let mut buf = Vec::new();
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                    let name = e.local_name();
+                    if name.as_ref() == b"tcPr" {
+                        in_tc_pr = true;
+                    } else if in_tc_pr && name.as_ref() == b"gridSpan" {
+                        // Extract the w:val attribute
+                        for attr in e.attributes().flatten() {
+                            if attr.key.local_name().as_ref() == b"val" {
+                                let val_str = std::str::from_utf8(&attr.value)
+                                    .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                                let span = val_str.parse::<usize>().unwrap_or(1);
+                                return Ok(span);
+                            }
+                        }
+                        // If no val attribute, default to 1
+                        return Ok(1);
+                    }
+                },
+                Ok(Event::End(e)) => {
+                    if e.local_name().as_ref() == b"tcPr" {
+                        in_tc_pr = false;
+                    }
+                },
+                Ok(Event::Eof) => break,
+                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+                _ => {},
+            }
+            buf.clear();
+        }
+
+        // Default: no horizontal merge
+        Ok(1)
+    }
+
+    /// Get the vertical merge (rowspan) state of this cell.
+    ///
+    /// Returns `Some(VMergeState)` if this cell participates in vertical merging,
+    /// or `None` if no vertical merge is present.
+    ///
+    /// This corresponds to the `<w:vMerge>` element in OOXML.
+    ///
+    /// # Example
+    ///
+    /// ```xml
+    /// <!-- Start of vertical merge -->
+    /// <w:tc>
+    ///   <w:tcPr>
+    ///     <w:vMerge w:val="restart"/>
+    ///   </w:tcPr>
+    ///   ...
+    /// </w:tc>
+    ///
+    /// <!-- Continuation of vertical merge -->
+    /// <w:tc>
+    ///   <w:tcPr>
+    ///     <w:vMerge/>
+    ///   </w:tcPr>
+    ///   ...
+    /// </w:tc>
+    /// ```
+    pub fn v_merge(&self) -> Result<Option<VMergeState>> {
+        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        reader.config_mut().trim_text(true);
+
+        let mut in_tc_pr = false;
+        let mut buf = Vec::new();
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                    let name = e.local_name();
+                    if name.as_ref() == b"tcPr" {
+                        in_tc_pr = true;
+                    } else if in_tc_pr && name.as_ref() == b"vMerge" {
+                        // Check for w:val attribute
+                        for attr in e.attributes().flatten() {
+                            if attr.key.local_name().as_ref() == b"val" {
+                                let val_str = std::str::from_utf8(&attr.value)
+                                    .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                                return match val_str {
+                                    "restart" => Ok(Some(VMergeState::Restart)),
+                                    _ => Ok(Some(VMergeState::Continue)),
+                                };
+                            }
+                        }
+                        // No val attribute means continue
+                        return Ok(Some(VMergeState::Continue));
+                    }
+                },
+                Ok(Event::End(e)) => {
+                    if e.local_name().as_ref() == b"tcPr" {
+                        in_tc_pr = false;
+                    }
+                },
+                Ok(Event::Eof) => break,
+                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+                _ => {},
+            }
+            buf.clear();
+        }
+
+        // Default: no vertical merge
+        Ok(None)
     }
 
     /// Get the text content of this cell.

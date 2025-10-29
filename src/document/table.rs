@@ -227,4 +227,43 @@ impl Cell {
                 .map_err(|e| Error::ParseError(format!("Failed to get cell text: {}", e))),
         }
     }
+
+    /// Get the grid span (colspan) of this cell.
+    ///
+    /// Returns the number of columns this cell spans. Default is 1 (no merge).
+    ///
+    /// **Note**: Currently only implemented for OOXML (.docx) format.
+    /// Other formats always return 1.
+    pub fn grid_span(&self) -> Result<usize> {
+        match self {
+            #[cfg(feature = "ole")]
+            Cell::Doc(_) => Ok(1), // Not implemented for OLE format
+            #[cfg(feature = "ooxml")]
+            Cell::Docx(c) => c.grid_span().map_err(Error::from),
+            #[cfg(feature = "rtf")]
+            Cell::Rtf(_) => Ok(1), // Not implemented for RTF format
+            #[cfg(feature = "odf")]
+            Cell::Odt(_) => Ok(1), // TODO: Implement for ODF format
+        }
+    }
+
+    /// Get the vertical merge state of this cell.
+    ///
+    /// Returns the vertical merge state if this cell participates in vertical merging,
+    /// or `None` if no vertical merge is present.
+    ///
+    /// **Note**: Currently only implemented for OOXML (.docx) format.
+    /// Other formats always return `None`.
+    #[cfg(feature = "ooxml")]
+    pub fn v_merge(&self) -> Result<Option<crate::ooxml::docx::VMergeState>> {
+        match self {
+            #[cfg(feature = "ole")]
+            Cell::Doc(_) => Ok(None), // Not implemented for OLE format
+            Cell::Docx(c) => c.v_merge().map_err(Error::from),
+            #[cfg(feature = "rtf")]
+            Cell::Rtf(_) => Ok(None), // Not implemented for RTF format
+            #[cfg(feature = "odf")]
+            Cell::Odt(_) => Ok(None), // TODO: Implement for ODF format
+        }
+    }
 }
