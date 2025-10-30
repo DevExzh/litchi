@@ -61,6 +61,7 @@ pub mod parts;
 pub mod presentation;
 pub mod shapes;
 pub mod slide;
+pub mod template;
 
 pub use package::Package;
 pub use presentation::Presentation;

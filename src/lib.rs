@@ -12,7 +12,7 @@
 //! - **Production Ready**: Clean API inspired by python-docx and python-pptx
 //! - **Type Safe**: Leverages Rust's type system for safety and correctness
 //!
-//! # Quick Start - Word Documents
+//! # Quick Start - Word Documents (Read)
 //!
 //! ```no_run
 //! use litchi::Document;
@@ -51,7 +51,27 @@
 //! # }
 //! ```
 //!
-//! # Quick Start - PowerPoint Presentations
+//! # Quick Start - Word Documents (Write)
+//!
+//! ```no_run
+//! use litchi::ooxml::docx::Package;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! // Create a new empty document
+//! let pkg = Package::new()?;
+//!
+//! // Save the document
+//! pkg.save("new_document.docx")?;
+//!
+//! // Open and verify
+//! let reopened = Package::open("new_document.docx")?;
+//! let doc = reopened.document()?;
+//! println!("Created document with {} paragraphs", doc.paragraph_count()?);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Quick Start - PowerPoint Presentations (Read)
 //!
 //! ```no_run
 //! use litchi::Presentation;
@@ -71,6 +91,46 @@
 //! for (i, slide) in pres.slides()?.iter().enumerate() {
 //!     println!("Slide {}: {}", i + 1, slide.text()?);
 //! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Quick Start - PowerPoint Presentations (Write)
+//!
+//! ```no_run
+//! use litchi::ooxml::pptx::Package;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! // Create a new empty presentation
+//! let pkg = Package::new()?;
+//!
+//! // Save the presentation
+//! pkg.save("new_presentation.pptx")?;
+//!
+//! // Open and verify
+//! let reopened = Package::open("new_presentation.pptx")?;
+//! let pres = reopened.presentation()?;
+//! println!("Created presentation with {} slides", pres.slide_count()?);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Quick Start - Excel Workbooks (Write)
+//!
+//! ```no_run
+//! use litchi::ooxml::xlsx::Workbook;
+//! use litchi::sheet::WorkbookTrait;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! // Create a new empty workbook
+//! let workbook = Workbook::create()?;
+//!
+//! // Save the workbook
+//! workbook.save("new_workbook.xlsx")?;
+//!
+//! // Open and verify
+//! let reopened = Workbook::open("new_workbook.xlsx")?;
+//! println!("Created workbook with {} worksheets", reopened.worksheet_count());
 //! # Ok(())
 //! # }
 //! ```

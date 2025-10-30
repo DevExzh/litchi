@@ -196,6 +196,10 @@ impl From<crate::ooxml::error::OoxmlError> for XlsbError {
                     expected, got
                 ))
             },
+            crate::ooxml::error::OoxmlError::IoError(e) => XlsbError::Io(e),
+            crate::ooxml::error::OoxmlError::InvalidUri(s) => {
+                XlsbError::Encoding(format!("Invalid URI: {}", s))
+            },
             crate::ooxml::error::OoxmlError::InvalidRelationship(msg) => {
                 XlsbError::Encoding(format!("Invalid relationship: {}", msg))
             },

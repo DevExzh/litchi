@@ -34,6 +34,7 @@ pub mod cell;
 pub mod parsers;
 pub mod shared_strings;
 pub mod styles;
+pub mod template;
 pub mod workbook;
 pub mod worksheet;
 

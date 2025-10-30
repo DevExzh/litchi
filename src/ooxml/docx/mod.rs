@@ -56,6 +56,7 @@ pub mod parts;
 pub mod section;
 pub mod styles;
 pub mod table;
+pub mod template;
 
 pub use document::Document;
 pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};

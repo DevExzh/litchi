@@ -35,6 +35,14 @@ pub enum OoxmlError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// IO error (alternative form for compatibility)
+    #[error("IO error: {0}")]
+    IoError(std::io::Error),
+
+    /// Invalid URI
+    #[error("Invalid URI: {0}")]
+    InvalidUri(String),
+
     /// Generic error
     #[error("{0}")]
     Other(String),

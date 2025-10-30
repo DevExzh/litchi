@@ -23,10 +23,12 @@ pub mod packuri;
 pub mod part;
 pub mod phys_pkg;
 pub mod pkgreader;
+pub mod pkgwriter;
 pub mod rel;
 
 // Re-export commonly used types
 pub use package::OpcPackage;
 pub use packuri::PackURI;
 pub use part::{BlobPart, Part, XmlPart};
+pub use pkgwriter::PackageWriter;
 pub use rel::{Relationship, Relationships};

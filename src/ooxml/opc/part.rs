@@ -28,6 +28,11 @@ pub trait Part {
     /// Returns a reference to the blob data for efficient access.
     fn blob(&self) -> &[u8];
 
+    /// Set the binary content of this part.
+    ///
+    /// This allows for modification of part content.
+    fn set_blob(&mut self, blob: Vec<u8>);
+
     /// Get the relationships for this part.
     fn rels(&self) -> &Relationships;
 
@@ -125,6 +130,10 @@ impl Part for BlobPart {
 
     fn blob(&self) -> &[u8] {
         &self.blob
+    }
+
+    fn set_blob(&mut self, blob: Vec<u8>) {
+        self.blob = Arc::new(blob);
     }
 
     fn rels(&self) -> &Relationships {
@@ -309,6 +318,12 @@ impl Part for XmlPart {
 
     fn blob(&self) -> &[u8] {
         &self.xml_bytes
+    }
+
+    fn set_blob(&mut self, blob: Vec<u8>) {
+        self.xml_bytes = Arc::new(blob);
+        // Clear cache when blob is updated
+        self.element_cache.clear();
     }
 
     fn rels(&self) -> &Relationships {

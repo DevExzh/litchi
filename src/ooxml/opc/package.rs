@@ -276,6 +276,27 @@ impl OpcPackage {
     pub fn contains_part(&self, partname: &PackURI) -> bool {
         self.parts.contains_key(partname)
     }
+
+    /// Save the package to a file.
+    ///
+    /// Writes the complete OPC package including all parts, relationships,
+    /// and content types to a ZIP file.
+    ///
+    /// # Arguments
+    /// * `path` - Path where the package should be written
+    ///
+    /// # Example
+    /// ```no_run
+    /// use litchi::ooxml::opc::package::OpcPackage;
+    ///
+    /// let mut pkg = OpcPackage::new();
+    /// // ... add parts to package ...
+    /// pkg.save("output.docx")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        crate::ooxml::opc::pkgwriter::PackageWriter::write(path, self)
+    }
 }
 
 impl Default for OpcPackage {

@@ -103,6 +103,12 @@ pub mod content_type {
         "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml";
     pub const PML_SLIDE_MASTER: &str =
         "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml";
+    pub const PML_TABLE_STYLES: &str =
+        "application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml";
+    pub const PML_VIEW_PROPS: &str =
+        "application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml";
+    pub const PML_PRES_PROPS: &str =
+        "application/vnd.openxmlformats-officedocument.presentationml.presProps+xml";
     pub const PML_NOTES_SLIDE: &str =
         "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml";
     pub const PML_NOTES_MASTER: &str =

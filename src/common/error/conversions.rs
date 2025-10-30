@@ -68,6 +68,8 @@ impl From<crate::ooxml::error::OoxmlError> for Error {
             crate::ooxml::error::OoxmlError::InvalidRelationship(s) => Error::Other(s),
             crate::ooxml::error::OoxmlError::InvalidFormat(s) => Error::InvalidFormat(s),
             crate::ooxml::error::OoxmlError::Opc(e) => Error::from_opc_error(e),
+            crate::ooxml::error::OoxmlError::IoError(e) => Error::Io(e),
+            crate::ooxml::error::OoxmlError::InvalidUri(s) => Error::Other(s),
             crate::ooxml::error::OoxmlError::Other(s) => Error::Other(s),
         }
     }

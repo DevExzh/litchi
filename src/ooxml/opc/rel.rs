@@ -284,6 +284,56 @@ impl Relationships {
     pub fn remove(&mut self, r_id: &str) -> Option<Relationship> {
         self.rels.remove(r_id)
     }
+
+    /// Serialize relationships to XML format.
+    ///
+    /// Generates the XML for a .rels file, with relationships sorted by rId
+    /// for consistent output.
+    pub fn to_xml(&self) -> String {
+        let mut xml = String::with_capacity(1024);
+
+        xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
+        xml.push('\n');
+        xml.push_str(
+            r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#,
+        );
+        xml.push('\n');
+
+        // Sort relationships by rId for consistent output
+        let mut rels: Vec<&Relationship> = self.rels.values().collect();
+        rels.sort_by_key(|rel| rel.r_id());
+
+        for rel in rels {
+            let target_mode = if rel.is_external() {
+                r#" TargetMode="External""#
+            } else {
+                ""
+            };
+
+            xml.push_str(&format!(
+                r#"  <Relationship Id="{}" Type="{}" Target="{}"{}/>"#,
+                Self::escape_xml(rel.r_id()),
+                Self::escape_xml(rel.reltype()),
+                Self::escape_xml(rel.target_ref()),
+                target_mode
+            ));
+            xml.push('\n');
+        }
+
+        xml.push_str("</Relationships>");
+
+        xml
+    }
+
+    /// Escape XML special characters.
+    #[inline]
+    fn escape_xml(s: &str) -> String {
+        s.replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;")
+            .replace('\'', "&apos;")
+    }
 }
 
 impl Default for Relationships {
