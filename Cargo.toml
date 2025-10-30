@@ -92,6 +92,7 @@ serde-saphyr = "0" # YAML serialization support
 smallvec = "1.15" # Stack-allocated vectors for small collections to avoid heap allocations
 snap = { version = "1", optional = true } # Snappy compression used in iWork file formats (.pages, .numbers, .key)
 thiserror = "2.0" # Convenient derive macros for error types
+xml-minifier = { path = "xml-minifier" }
 zerocopy = "0.8" # Safe zero-cost type conversions between bytes and structured data
 zerocopy-derive = "0.8" # Derive macros for zerocopy traits
 zip = { version = "6", optional = true } # ZIP archive handling for modern Office Open XML formats
