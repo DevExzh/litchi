@@ -66,6 +66,12 @@ impl ColorTable {
     pub fn get(&self, color_ref: ColorRef) -> Option<&Color> {
         self.colors.get(color_ref as usize)
     }
+
+    /// Get all colors in the table.
+    #[inline]
+    pub fn colors(&self) -> &[Color] {
+        &self.colors
+    }
 }
 
 impl Default for ColorTable {
@@ -147,6 +153,12 @@ impl<'a> FontTable<'a> {
     #[inline]
     pub fn get(&self, font_ref: FontRef) -> Option<&Font<'a>> {
         self.fonts.get(font_ref as usize)
+    }
+
+    /// Get all fonts in the table.
+    #[inline]
+    pub fn fonts(&self) -> &[Font<'a>] {
+        &self.fonts
     }
 }
 

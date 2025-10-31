@@ -25,8 +25,10 @@
 mod compressed;
 mod document;
 mod error;
+mod field;
 mod lexer;
 mod parser;
+mod picture;
 mod table;
 mod types;
 
@@ -34,7 +36,9 @@ mod types;
 pub use compressed::{compress, decompress, is_compressed_rtf};
 pub use document::RtfDocument;
 pub use error::{RtfError, RtfResult};
+pub use field::{Field, FieldType};
 pub use lexer::CharacterSet;
+pub use picture::{ImageType, Picture, detect_image_type};
 pub use table::{Cell, Row, Table};
 pub use types::{
     Alignment, Color, ColorTable, Font, FontFamily, FontRef, FontTable, Formatting, Indentation,

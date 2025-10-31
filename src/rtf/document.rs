@@ -21,6 +21,10 @@ pub struct RtfDocument<'a> {
     blocks: Vec<StyleBlock<'a>>,
     /// Extracted tables
     tables: Vec<super::table::Table<'a>>,
+    /// Extracted pictures
+    pictures: Vec<super::picture::Picture<'a>>,
+    /// Extracted fields
+    fields: Vec<super::field::Field<'a>>,
     /// Arena allocator (kept to maintain lifetime)
     _arena: Bump,
 }
@@ -126,11 +130,40 @@ impl<'a> RtfDocument<'a> {
             })
             .collect();
 
+        // Convert pictures to owned
+        let owned_pictures: Vec<super::picture::Picture<'static>> = parsed
+            .pictures
+            .into_iter()
+            .map(|pic| super::picture::Picture {
+                image_type: pic.image_type,
+                data: Cow::Owned(pic.data.into_owned()),
+                width: pic.width,
+                height: pic.height,
+                goal_width: pic.goal_width,
+                goal_height: pic.goal_height,
+                scale_x: pic.scale_x,
+                scale_y: pic.scale_y,
+            })
+            .collect();
+
+        // Convert fields to owned
+        let owned_fields: Vec<super::field::Field<'static>> = parsed
+            .fields
+            .into_iter()
+            .map(|field| super::field::Field {
+                field_type: field.field_type,
+                instruction: Cow::Owned(field.instruction.into_owned()),
+                result: Cow::Owned(field.result.into_owned()),
+            })
+            .collect();
+
         Ok(RtfDocument {
             font_table: owned_font_table,
             color_table: parsed.color_table,
             blocks: owned_blocks,
             tables: owned_tables,
+            pictures: owned_pictures,
+            fields: owned_fields,
             _arena: arena,
         })
     }
@@ -310,6 +343,48 @@ impl<'a> RtfDocument<'a> {
     /// Get all style blocks.
     pub fn blocks(&self) -> &[StyleBlock<'_>] {
         &self.blocks
+    }
+
+    /// Get all pictures in the document.
+    ///
+    /// Returns all embedded images extracted from the RTF document.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::rtf::RtfDocument;
+    ///
+    /// let doc = RtfDocument::open("document.rtf")?;
+    /// for (i, picture) in doc.pictures().iter().enumerate() {
+    ///     println!("Picture {}: {:?}, {} bytes", i, picture.image_type, picture.data().len());
+    /// }
+    /// # Ok::<(), litchi::rtf::RtfError>(())
+    /// ```
+    pub fn pictures(&self) -> &[super::picture::Picture<'_>] {
+        &self.pictures
+    }
+
+    /// Get all fields in the document.
+    ///
+    /// Returns all fields (hyperlinks, cross-references, etc.) from the RTF document.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::rtf::{RtfDocument, FieldType};
+    ///
+    /// let doc = RtfDocument::open("document.rtf")?;
+    /// for field in doc.fields() {
+    ///     if field.field_type == FieldType::Hyperlink {
+    ///         if let Some(url) = field.extract_url() {
+    ///             println!("Hyperlink: {}", url);
+    ///         }
+    ///     }
+    /// }
+    /// # Ok::<(), litchi::rtf::RtfError>(())
+    /// ```
+    pub fn fields(&self) -> &[super::field::Field<'_>] {
+        &self.fields
     }
 }
 

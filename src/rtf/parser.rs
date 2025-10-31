@@ -24,14 +24,16 @@ enum Destination {
     StyleSheet,
     /// Document info - should be skipped
     Info,
-    /// Picture data - should be skipped
-    /// TODO: Future enhancement - extract and process embedded images
+    /// Picture data - extract and process embedded images
     Picture,
-    /// Embedded object - should be skipped  
-    /// TODO: Future enhancement - extract OLE objects (e.g., MathType equations)
+    /// Embedded object - extract if possible
     Object,
     /// Result of embedded object rendering - should be skipped
     Result,
+    /// Field instruction
+    FieldInstruction,
+    /// Field result
+    FieldResult,
     /// Other destinations - should be skipped
     Other,
 }
@@ -93,6 +95,10 @@ pub struct Parser<'a> {
     current_row: Option<super::table::Row<'a>>,
     /// Current cell text buffer
     current_cell_text: SmallVec<[u8; 128]>,
+    /// Extracted pictures
+    pictures: Vec<super::picture::Picture<'a>>,
+    /// Extracted fields
+    fields: Vec<super::field::Field<'a>>,
 }
 
 impl<'a> Parser<'a> {
@@ -110,6 +116,8 @@ impl<'a> Parser<'a> {
             current_table: None,
             current_row: None,
             current_cell_text: SmallVec::new(),
+            pictures: Vec::new(),
+            fields: Vec::new(),
         }
     }
 
@@ -140,6 +148,8 @@ impl<'a> Parser<'a> {
             color_table: self.color_table.into_inner(),
             blocks: self.blocks,
             tables: self.tables,
+            pictures: self.pictures,
+            fields: self.fields,
         })
     }
 
@@ -205,32 +215,29 @@ impl<'a> Parser<'a> {
                     return Ok(());
                 },
                 Token::Control(ControlWord::Picture) => {
-                    // Mark as picture destination and skip
-                    // TODO: Future enhancement - extract and process embedded images
+                    // Mark as picture destination and extract
                     if let Some(state) = self.states.last_mut() {
                         state.destination = Destination::Picture;
                     }
+                    self.parse_picture()?;
                     self.skip_until_close_brace()?;
                     self.states.pop();
                     return Ok(());
                 },
                 Token::Control(ControlWord::Object) => {
-                    // Mark as object destination and skip
-                    // TODO: Future enhancement - extract OLE objects
+                    // Mark as object destination
                     // Embedded objects in RTF files include:
                     // - MathType/Equation Editor equations
                     // - Excel charts and spreadsheets
                     // - Visio diagrams
                     // - Other OLE-embedded content
                     //
-                    // To properly handle these, we would need to:
-                    // 1. Parse the OLE object structure from the hex-encoded binary data
+                    // For basic support, we extract object metadata and skip the binary data.
+                    // Full OLE parsing would require:
+                    // 1. Parse the OLE object structure from hex-encoded binary data
                     // 2. Identify the object type (CLSID/ProgID)
                     // 3. Extract and decode the object's native format
-                    // 4. Convert to a suitable representation (e.g., LaTeX for equations, PNG for charts)
-                    //
-                    // For now, we skip these objects to avoid polluting the text output with
-                    // hex-encoded binary data.
+                    // 4. Convert to suitable representation (e.g., LaTeX for equations)
                     if let Some(state) = self.states.last_mut() {
                         state.destination = Destination::Object;
                     }
@@ -244,6 +251,13 @@ impl<'a> Parser<'a> {
                     if let Some(state) = self.states.last_mut() {
                         state.destination = Destination::Result;
                     }
+                    self.skip_until_close_brace()?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::Field) => {
+                    // Parse field group
+                    self.parse_field()?;
                     self.skip_until_close_brace()?;
                     self.states.pop();
                     return Ok(());
@@ -811,6 +825,205 @@ impl<'a> Parser<'a> {
             self.tables.push(table);
         }
     }
+
+    /// Parse picture/image content.
+    ///
+    /// Pictures in RTF have the format:
+    /// {\pict\emfblip\picw<width>\pich<height>...<hex data>}
+    fn parse_picture(&mut self) -> RtfResult<()> {
+        self.pos += 1; // Skip \pict
+
+        let mut image_type = super::picture::ImageType::Unknown;
+        let mut width = None;
+        let mut height = None;
+        let mut goal_width = None;
+        let mut goal_height = None;
+        let mut scale_x = None;
+        let mut scale_y = None;
+        let mut hex_data = SmallVec::<[u8; 512]>::new();
+
+        // Parse picture properties and data
+        while self.pos < self.tokens.len() {
+            match &self.tokens[self.pos] {
+                Token::CloseBrace => {
+                    break;
+                },
+                Token::Control(control) => {
+                    self.pos += 1;
+                    match control {
+                        ControlWord::Emfblip => image_type = super::picture::ImageType::Emf,
+                        ControlWord::Pngblip => image_type = super::picture::ImageType::Png,
+                        ControlWord::Jpegblip => image_type = super::picture::ImageType::Jpeg,
+                        ControlWord::Macpict => image_type = super::picture::ImageType::Pict,
+                        ControlWord::Wmetafile(_) | ControlWord::Pmmetafile(_) => {
+                            image_type = super::picture::ImageType::Wmf
+                        },
+                        ControlWord::Dibitmap(_) | ControlWord::Wbitmap(_) => {
+                            image_type = super::picture::ImageType::Dib
+                        },
+                        ControlWord::PictureWidth(w) => width = Some(*w),
+                        ControlWord::PictureHeight(h) => height = Some(*h),
+                        ControlWord::PictureGoalWidth(w) => goal_width = Some(*w),
+                        ControlWord::PictureGoalHeight(h) => goal_height = Some(*h),
+                        ControlWord::PictureScaleX(s) => scale_x = Some(*s),
+                        ControlWord::PictureScaleY(s) => scale_y = Some(*s),
+                        _ => {},
+                    }
+                },
+                Token::Text(text) => {
+                    // Accumulate hex-encoded image data
+                    hex_data.extend_from_slice(text.as_bytes());
+                    self.pos += 1;
+                },
+                Token::Binary(_) => {
+                    // Skip binary data for now
+                    self.pos += 1;
+                },
+                Token::OpenBrace => {
+                    // Skip nested groups
+                    self.skip_group()?;
+                },
+            }
+        }
+
+        // Decode hex data to binary
+        if !hex_data.is_empty()
+            && let Ok(hex_str) = std::str::from_utf8(&hex_data)
+            && let Ok(decoded) = crate::common::encoding::decode_hex_data(hex_str)
+        {
+            // If type not specified, try to detect from data
+            if image_type == super::picture::ImageType::Unknown {
+                image_type = super::picture::detect_image_type(&decoded);
+            }
+
+            // Allocate in arena and create picture
+            let data_alloc = self.arena.alloc_slice_copy(&decoded);
+            let mut picture = super::picture::Picture::new(image_type, Cow::Borrowed(data_alloc));
+            picture.width = width;
+            picture.height = height;
+            picture.goal_width = goal_width;
+            picture.goal_height = goal_height;
+            picture.scale_x = scale_x;
+            picture.scale_y = scale_y;
+
+            self.pictures.push(picture);
+        }
+
+        Ok(())
+    }
+
+    /// Parse field content.
+    ///
+    /// Fields in RTF have the format:
+    /// {\field{\*\fldinst INSTRUCTION}{\fldrslt RESULT}}
+    fn parse_field(&mut self) -> RtfResult<()> {
+        self.pos += 1; // Skip \field
+
+        let mut instruction = SmallVec::<[u8; 128]>::new();
+        let mut result = SmallVec::<[u8; 128]>::new();
+        let mut in_instruction;
+        let mut in_result;
+
+        // Parse field groups
+        while self.pos < self.tokens.len() {
+            match &self.tokens[self.pos] {
+                Token::CloseBrace => {
+                    // End of outer field group
+                    break;
+                },
+                Token::OpenBrace => {
+                    self.pos += 1;
+                    // Check for fldinst or fldrslt
+                    if self.pos < self.tokens.len() {
+                        // Look for \*\fldinst or \fldrslt
+                        let is_ignorable = matches!(
+                            self.tokens.get(self.pos),
+                            Some(Token::Control(ControlWord::IgnorableDestination))
+                        );
+                        if is_ignorable {
+                            self.pos += 1;
+                        }
+
+                        if let Some(Token::Control(ControlWord::FieldInstruction)) =
+                            self.tokens.get(self.pos)
+                        {
+                            self.pos += 1;
+                            in_instruction = true;
+                            in_result = false;
+                            if let Some(state) = self.states.last_mut() {
+                                state.destination = Destination::FieldInstruction;
+                            }
+                        } else if let Some(Token::Control(ControlWord::FieldResult)) =
+                            self.tokens.get(self.pos)
+                        {
+                            self.pos += 1;
+                            in_instruction = false;
+                            in_result = true;
+                            if let Some(state) = self.states.last_mut() {
+                                state.destination = Destination::FieldResult;
+                            }
+                        } else {
+                            // Skip unknown nested groups
+                            self.skip_until_close_brace()?;
+                            continue;
+                        }
+
+                        // Collect text until closing brace
+                        while self.pos < self.tokens.len() {
+                            match &self.tokens[self.pos] {
+                                Token::CloseBrace => {
+                                    self.pos += 1;
+                                    break;
+                                },
+                                Token::Text(text) => {
+                                    if in_instruction {
+                                        instruction.extend_from_slice(text.as_bytes());
+                                    } else if in_result {
+                                        result.extend_from_slice(text.as_bytes());
+                                    }
+                                    self.pos += 1;
+                                },
+                                Token::OpenBrace => {
+                                    // Skip nested groups
+                                    self.skip_group()?;
+                                },
+                                _ => {
+                                    self.pos += 1;
+                                },
+                            }
+                        }
+                    }
+                },
+                _ => {
+                    self.pos += 1;
+                },
+            }
+        }
+
+        // Create field if we have instruction
+        if !instruction.is_empty()
+            && let Ok(inst_str) = std::str::from_utf8(&instruction)
+        {
+            // Allocate instruction in arena first
+            let inst_alloc = self.arena.alloc_str(inst_str);
+
+            // Parse field type from allocated instruction
+            let mut field = super::field::Field::parse_instruction(inst_alloc);
+            field.instruction = Cow::Borrowed(inst_alloc);
+
+            // Add result if available
+            if !result.is_empty()
+                && let Ok(res_str) = std::str::from_utf8(&result)
+            {
+                let res_alloc = self.arena.alloc_str(res_str);
+                field.result = Cow::Borrowed(res_alloc);
+            }
+
+            self.fields.push(field);
+        }
+
+        Ok(())
+    }
 }
 
 /// Parsed RTF document.
@@ -823,4 +1036,8 @@ pub struct ParsedDocument<'a> {
     pub blocks: Vec<StyleBlock<'a>>,
     /// Extracted tables
     pub tables: Vec<super::table::Table<'a>>,
+    /// Extracted pictures
+    pub pictures: Vec<super::picture::Picture<'a>>,
+    /// Extracted fields
+    pub fields: Vec<super::field::Field<'a>>,
 }

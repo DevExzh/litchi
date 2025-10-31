@@ -25,10 +25,35 @@ pub enum ControlWord<'a> {
     StyleSheet,
     Info,
 
-    // Embedded content (to be skipped for now)
+    // Embedded content
     Picture,
     Object,
     Result,
+
+    // Picture properties
+    PictureWidth(i32),
+    PictureHeight(i32),
+    PictureGoalWidth(i32),
+    PictureGoalHeight(i32),
+    PictureScaleX(i32),
+    PictureScaleY(i32),
+    Emfblip,
+    Pngblip,
+    Jpegblip,
+    Macpict,
+    Pmmetafile(i32),
+    Wmetafile(i32),
+    Dibitmap(i32),
+    Wbitmap(i32),
+
+    // Field support
+    Field,
+    FieldInstruction,
+    FieldResult,
+    FieldLock,
+    FieldDirty,
+    FieldEdit,
+    FieldPrivate,
 
     // Font properties
     FontNumber(i32),
@@ -337,10 +362,35 @@ impl<'a> Lexer<'a> {
             "stylesheet" => ControlWord::StyleSheet,
             "info" => ControlWord::Info,
 
-            // Embedded content (skip for now)
+            // Embedded content
             "pict" => ControlWord::Picture,
             "object" => ControlWord::Object,
             "result" => ControlWord::Result,
+
+            // Picture properties
+            "picw" => ControlWord::PictureWidth(param_value),
+            "pich" => ControlWord::PictureHeight(param_value),
+            "picwgoal" => ControlWord::PictureGoalWidth(param_value),
+            "pichgoal" => ControlWord::PictureGoalHeight(param_value),
+            "picscalex" => ControlWord::PictureScaleX(param_value),
+            "picscaley" => ControlWord::PictureScaleY(param_value),
+            "emfblip" => ControlWord::Emfblip,
+            "pngblip" => ControlWord::Pngblip,
+            "jpegblip" => ControlWord::Jpegblip,
+            "macpict" => ControlWord::Macpict,
+            "pmmetafile" => ControlWord::Pmmetafile(param_value),
+            "wmetafile" => ControlWord::Wmetafile(param_value),
+            "dibitmap" => ControlWord::Dibitmap(param_value),
+            "wbitmap" => ControlWord::Wbitmap(param_value),
+
+            // Field support
+            "field" => ControlWord::Field,
+            "fldinst" => ControlWord::FieldInstruction,
+            "fldrslt" => ControlWord::FieldResult,
+            "fldlock" => ControlWord::FieldLock,
+            "flddirty" => ControlWord::FieldDirty,
+            "fldedit" => ControlWord::FieldEdit,
+            "fldpriv" => ControlWord::FieldPrivate,
 
             // Fonts
             "f" => ControlWord::FontNumber(param_value),
