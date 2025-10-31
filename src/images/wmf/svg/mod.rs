@@ -88,6 +88,7 @@
 
 mod bounds;
 mod renderer;
+mod simd;
 mod state;
 mod style;
 mod transform;

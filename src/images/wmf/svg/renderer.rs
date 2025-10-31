@@ -245,17 +245,17 @@ impl SvgRenderer {
         let mut s = String::with_capacity(128 + count * 12);
         s.push_str(r#"<polygon points=""#);
 
+        // Extract x and y coordinates separately for SIMD processing
+        let mut xs = Vec::with_capacity(count);
+        let mut ys = Vec::with_capacity(count);
         for i in 0..count {
-            let x = read_i16_le(&rec.params, 2 + i * 4).unwrap_or(0);
-            let y = read_i16_le(&rec.params, 4 + i * 4).unwrap_or(0);
-            let (tx, ty) = self.transform.point(x, y);
-            if i > 0 {
-                s.push(' ');
-            }
-            write_num(&mut s, tx);
-            s.push(',');
-            write_num(&mut s, ty);
+            xs.push(read_i16_le(&rec.params, 2 + i * 4).unwrap_or(0));
+            ys.push(read_i16_le(&rec.params, 4 + i * 4).unwrap_or(0));
         }
+
+        // Use SIMD-accelerated batch transformation
+        self.transform
+            .transform_and_format_points(&xs, &ys, &mut s, ' ');
 
         s.push('"');
         if let Some(fill) = fill_attr(&self.state.brush, self.state.poly_fill_mode) {
@@ -280,17 +280,17 @@ impl SvgRenderer {
         let mut s = String::with_capacity(128 + count * 12);
         s.push_str(r#"<polyline points=""#);
 
+        // Extract x and y coordinates separately for SIMD processing
+        let mut xs = Vec::with_capacity(count);
+        let mut ys = Vec::with_capacity(count);
         for i in 0..count {
-            let x = read_i16_le(&rec.params, 2 + i * 4).unwrap_or(0);
-            let y = read_i16_le(&rec.params, 4 + i * 4).unwrap_or(0);
-            let (tx, ty) = self.transform.point(x, y);
-            if i > 0 {
-                s.push(' ');
-            }
-            write_num(&mut s, tx);
-            s.push(',');
-            write_num(&mut s, ty);
+            xs.push(read_i16_le(&rec.params, 2 + i * 4).unwrap_or(0));
+            ys.push(read_i16_le(&rec.params, 4 + i * 4).unwrap_or(0));
         }
+
+        // Use SIMD-accelerated batch transformation
+        self.transform
+            .transform_and_format_points(&xs, &ys, &mut s, ' ');
 
         s.push_str(r#"" fill="none""#);
         s.push_str(&stroke_attrs(&self.state.pen, &self.transform));
@@ -592,29 +592,36 @@ impl SvgRenderer {
                 break;
             }
 
+            // Extract all points for this polygon for SIMD processing
+            let mut xs = Vec::with_capacity(count);
+            let mut ys = Vec::with_capacity(count);
+            for i in 0..count {
+                xs.push(read_i16_le(&rec.params, offset + i * 4).unwrap_or(0));
+                ys.push(read_i16_le(&rec.params, offset + i * 4 + 2).unwrap_or(0));
+            }
+            offset += count * 4;
+
+            // Transform all points at once using SIMD
+            let mut out_x = vec![0.0; count];
+            let mut out_y = vec![0.0; count];
+            self.transform
+                .transform_points_batch(&xs, &ys, &mut out_x, &mut out_y);
+
             // First point - MoveTo
-            let x = read_i16_le(&rec.params, offset).unwrap_or(0);
-            let y = read_i16_le(&rec.params, offset + 2).unwrap_or(0);
-            let (tx, ty) = self.transform.point(x, y);
             path_data.push('M');
-            write_num(&mut path_data, tx);
+            write_num(&mut path_data, out_x[0]);
             path_data.push(',');
-            write_num(&mut path_data, ty);
+            write_num(&mut path_data, out_y[0]);
             path_data.push('L');
-            offset += 4;
 
             // Remaining points - LineTo
             for i in 1..count {
-                let x = read_i16_le(&rec.params, offset).unwrap_or(0);
-                let y = read_i16_le(&rec.params, offset + 2).unwrap_or(0);
-                let (tx, ty) = self.transform.point(x, y);
                 if i > 1 {
                     path_data.push(' ');
                 }
-                write_num(&mut path_data, tx);
+                write_num(&mut path_data, out_x[i]);
                 path_data.push(',');
-                write_num(&mut path_data, ty);
-                offset += 4;
+                write_num(&mut path_data, out_y[i]);
             }
 
             path_data.push('Z');
