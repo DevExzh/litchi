@@ -209,6 +209,8 @@ impl Shape for PictureShape {
 ///
 /// Searches for the BlipToDisplay property (0x0104) which contains
 /// the reference to the BLIP in the BStoreContainer.
+///
+/// Uses zero-copy parsing with `Cow` to avoid unnecessary allocations.
 #[cfg(feature = "imgconv")]
 pub fn extract_blip_id_from_escher(container: &EscherContainer) -> Option<u32> {
     use crate::ole::ppt::escher::EscherRecordType;
@@ -216,7 +218,7 @@ pub fn extract_blip_id_from_escher(container: &EscherContainer) -> Option<u32> {
     // Look for shape options (Opt record)
     for child in container.children().flatten() {
         if child.record_type == EscherRecordType::Opt {
-            // Parse properties from the Opt record
+            // Parse properties from the Opt record with zero-copy optimization
             let prop_count = child.instance;
             if let Ok(properties) =
                 crate::ole::ppt::shapes::escher::EscherProperty::parse_properties(

@@ -9,30 +9,36 @@ use crate::ole::ppt::package::Result;
 
 /// Represents any shape on a slide using an enum for zero-cost abstraction.
 ///
+/// Uses lifetime parameter `'a` for zero-copy parsing of shape data.
+///
 /// # Performance
 ///
 /// - Enum dispatch (no vtable overhead)
 /// - Stack-allocated (no heap allocation for shape variants)
 /// - Pattern matching compiles to efficient jump tables
+/// - Zero-copy parsing when possible
 #[derive(Debug, Clone)]
-pub enum ShapeEnum {
+pub enum ShapeEnum<'a> {
     /// Text box shape containing editable text
-    TextBox(TextBox),
+    TextBox(TextBox<'a>),
     /// Placeholder shape (title, body, footer, etc.)
-    Placeholder(Placeholder),
+    Placeholder(Placeholder<'a>),
     /// Auto shape (rectangle, ellipse, arrow, etc.)
-    AutoShape(AutoShape),
+    AutoShape(AutoShape<'a>),
     /// Picture/image shape (not yet implemented)
     Picture(PictureShape),
     /// Table shape (not yet implemented)
     Table(TableShape),
     /// Group shape containing other shapes (not yet implemented)
-    Group(GroupShape),
+    Group(GroupShape<'a>),
     /// Line/connector shape (not yet implemented)
     Line(LineShape),
 }
 
-impl ShapeEnum {
+impl<'a> ShapeEnum<'a>
+where
+    'a: 'static,
+{
     /// Get the shape type.
     pub fn shape_type(&self) -> ShapeType {
         match self {
@@ -90,7 +96,7 @@ impl ShapeEnum {
 
     /// Get shape as TextBox if it is one.
     #[inline]
-    pub fn as_textbox(&self) -> Option<&TextBox> {
+    pub fn as_textbox(&self) -> Option<&TextBox<'_>> {
         match self {
             ShapeEnum::TextBox(tb) => Some(tb),
             _ => None,
@@ -99,7 +105,7 @@ impl ShapeEnum {
 
     /// Get shape as Placeholder if it is one.
     #[inline]
-    pub fn as_placeholder(&self) -> Option<&Placeholder> {
+    pub fn as_placeholder(&self) -> Option<&Placeholder<'_>> {
         match self {
             ShapeEnum::Placeholder(ph) => Some(ph),
             _ => None,
@@ -108,7 +114,7 @@ impl ShapeEnum {
 
     /// Get shape as AutoShape if it is one.
     #[inline]
-    pub fn as_autoshape(&self) -> Option<&AutoShape> {
+    pub fn as_autoshape(&self) -> Option<&AutoShape<'_>> {
         match self {
             ShapeEnum::AutoShape(as_) => Some(as_),
             _ => None,
@@ -191,11 +197,11 @@ impl TableShape {
 ///
 /// Groups allow hierarchical organization of shapes.
 #[derive(Debug, Clone)]
-pub struct GroupShape {
+pub struct GroupShape<'a> {
     /// Shape ID
     id: u32,
     /// Child shapes
-    children: Vec<ShapeEnum>,
+    children: Vec<ShapeEnum<'a>>,
     /// Left coordinate
     left: i32,
     /// Top coordinate
@@ -206,7 +212,7 @@ pub struct GroupShape {
     height: i32,
 }
 
-impl GroupShape {
+impl<'a> GroupShape<'a> {
     /// Create a new group shape.
     pub fn new(id: u32) -> Self {
         Self {
@@ -220,12 +226,12 @@ impl GroupShape {
     }
 
     /// Add a child shape.
-    pub fn add_child(&mut self, shape: ShapeEnum) {
+    pub fn add_child(&mut self, shape: ShapeEnum<'a>) {
         self.children.push(shape);
     }
 
     /// Get child shapes.
-    pub fn children(&self) -> &[ShapeEnum] {
+    pub fn children(&self) -> &[ShapeEnum<'a>] {
         &self.children
     }
 

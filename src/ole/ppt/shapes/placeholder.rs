@@ -135,10 +135,13 @@ impl std::fmt::Display for PlaceholderType {
 }
 
 /// A placeholder shape in a PowerPoint presentation.
+///
+/// Uses lifetime parameter `'a` to enable zero-copy parsing when the shape
+/// data can be borrowed from a larger buffer.
 #[derive(Debug, Clone)]
-pub struct Placeholder {
+pub struct Placeholder<'a> {
     /// Shape container with properties and data
-    container: ShapeContainer,
+    container: ShapeContainer<'a>,
     /// The type of placeholder
     placeholder_type: PlaceholderType,
     /// Placeholder size (index in the layout)
@@ -149,8 +152,8 @@ pub struct Placeholder {
     raw_placeholder_data: Option<Vec<u8>>,
 }
 
-impl Placeholder {
-    /// Create a new placeholder shape.
+impl<'a> Placeholder<'a> {
+    /// Create a new placeholder shape with owned data.
     pub fn new(properties: ShapeProperties, raw_data: Vec<u8>) -> Self {
         Self {
             container: ShapeContainer::new(properties, raw_data),
@@ -161,9 +164,9 @@ impl Placeholder {
         }
     }
 
-    /// Create a placeholder from an Escher record with proper parsing.
+    /// Create a placeholder from an Escher record with zero-copy parsing.
     pub fn from_escher_record(
-        record: &super::escher::EscherRecord,
+        record: &'a super::escher::EscherRecord<'a>,
     ) -> super::super::package::Result<Self> {
         // Extract basic shape properties
         let properties = record.extract_shape_properties()?;
@@ -181,15 +184,15 @@ impl Placeholder {
                 (PlaceholderType::Body, None, None)
             };
 
-        // Extract additional placeholder properties from Escher data
-        let container = ShapeContainer::new(properties, record.data.clone());
+        // Extract additional placeholder properties from Escher data with zero-copy
+        let container = ShapeContainer::new_borrowed(properties, &record.data);
 
         Ok(Self {
             container,
             placeholder_type,
             size,
             index,
-            raw_placeholder_data: Some(record.data.clone()),
+            raw_placeholder_data: Some(record.data.to_vec()),
         })
     }
 
@@ -197,7 +200,7 @@ impl Placeholder {
     ///
     /// Based on POI's HSLFPlaceholder which extracts placeholder info from
     /// the shape's client data records (OEPlaceholderAtom).
-    pub fn from_container(container: ShapeContainer) -> Self {
+    pub fn from_container(container: ShapeContainer<'a>) -> Self {
         // Try to extract placeholder information from the raw data
         // The raw data may contain an OEPlaceholderAtom record
         let (placeholder_type, size, index) = if !container.raw_data.is_empty() {
@@ -363,7 +366,10 @@ impl Placeholder {
     }
 }
 
-impl Shape for Placeholder {
+impl<'a> Shape for Placeholder<'a>
+where
+    'a: 'static,
+{
     fn properties(&self) -> &ShapeProperties {
         &self.container.properties
     }

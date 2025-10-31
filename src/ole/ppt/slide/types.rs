@@ -22,8 +22,8 @@ pub struct Slide<'doc> {
     /// Reference to document data for lazy shape parsing (reserved for future use)
     #[allow(dead_code)]
     doc_data: &'doc [u8],
-    /// Lazily-loaded shapes
-    shapes: OnceCell<Vec<ShapeEnum>>,
+    /// Lazily-loaded shapes (use 'static since they store owned data)
+    shapes: OnceCell<Vec<ShapeEnum<'static>>>,
     /// Cached text content
     text_cache: OnceCell<String>,
 }
@@ -61,7 +61,7 @@ impl<'doc> Slide<'doc> {
     /// - Shapes are parsed only on first call
     /// - Subsequent calls return cached reference
     /// - Zero allocation after first parse
-    pub fn shapes(&self) -> Result<&[ShapeEnum]> {
+    pub fn shapes(&self) -> Result<&[ShapeEnum<'static>]> {
         self.shapes
             .get_or_try_init(|| self.parse_shapes())
             .map(|v| v.as_slice())
@@ -90,10 +90,13 @@ impl<'doc> Slide<'doc> {
     ///
     /// # Performance
     ///
-    /// - Zero-copy: Shapes borrow from slide's document data
+    /// - Shapes store owned data to allow caching
     /// - Lazy: Only called when shapes() is accessed
     /// - Uses Escher parser for efficient traversal
-    fn parse_shapes(&self) -> Result<Vec<ShapeEnum>> {
+    ///
+    /// Note: Shapes use 'static lifetime since they're stored in the Slide
+    /// and need to outlive the parsing function scope.
+    fn parse_shapes(&self) -> Result<Vec<ShapeEnum<'static>>> {
         // Find PPDrawing record
         let ppdrawing = match self
             .record
@@ -110,7 +113,7 @@ impl<'doc> Slide<'doc> {
             )?;
 
         // Convert Escher shapes to ShapeEnum with full property extraction
-        let shapes: Vec<ShapeEnum> = escher_shapes
+        let shapes: Vec<ShapeEnum<'static>> = escher_shapes
             .iter()
             .filter_map(|escher_shape| Self::convert_escher_to_shape_enum(escher_shape))
             .collect();
@@ -126,7 +129,7 @@ impl<'doc> Slide<'doc> {
     /// - Pattern matching for type dispatch
     fn convert_escher_to_shape_enum(
         escher_shape: &super::super::escher::EscherShape<'_>,
-    ) -> Option<ShapeEnum> {
+    ) -> Option<ShapeEnum<'static>> {
         use super::super::escher::EscherShapeType;
         use super::super::shapes::*;
 

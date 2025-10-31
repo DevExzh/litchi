@@ -8,10 +8,13 @@ use super::shape::{Shape, ShapeContainer, ShapeProperties};
 type TextFormattingResult = (Option<u16>, Option<u32>, bool, bool, bool);
 
 /// A text box shape in a PowerPoint presentation.
+///
+/// Uses lifetime parameter `'a` to enable zero-copy parsing when the shape
+/// data can be borrowed from a larger buffer.
 #[derive(Debug, Clone)]
-pub struct TextBox {
+pub struct TextBox<'a> {
     /// Shape container with properties and data
-    container: ShapeContainer,
+    container: ShapeContainer<'a>,
     /// Text content of the text box
     text: String,
     /// Font size in points
@@ -26,8 +29,8 @@ pub struct TextBox {
     underline: bool,
 }
 
-impl TextBox {
-    /// Create a new text box shape.
+impl<'a> TextBox<'a> {
+    /// Create a new text box shape with owned data.
     pub fn new(properties: ShapeProperties, raw_data: Vec<u8>) -> Self {
         Self {
             container: ShapeContainer::new(properties, raw_data),
@@ -40,9 +43,9 @@ impl TextBox {
         }
     }
 
-    /// Create a text box from an Escher record with proper parsing.
+    /// Create a text box from an Escher record with zero-copy parsing.
     pub fn from_escher_record(
-        record: &super::escher::EscherRecord,
+        record: &'a super::escher::EscherRecord<'a>,
     ) -> super::super::package::Result<Self> {
         // Extract basic shape properties
         let properties = record.extract_shape_properties()?;
@@ -54,8 +57,8 @@ impl TextBox {
         let (font_size, font_color, bold, italic, underline) =
             Self::extract_text_formatting(record)?;
 
-        // Extract additional properties from Escher records
-        let mut container = ShapeContainer::new(properties, record.data.clone());
+        // Extract additional properties from Escher records with zero-copy
+        let mut container = ShapeContainer::new_borrowed(properties, &record.data);
 
         // Look for text-related Escher properties in the record
         Self::extract_escher_text_properties(record, &mut container)?;
@@ -72,7 +75,7 @@ impl TextBox {
     }
 
     /// Create a text box from an existing container.
-    pub fn from_container(mut container: ShapeContainer) -> Self {
+    pub fn from_container(mut container: ShapeContainer<'a>) -> Self {
         // Extract text from container if available
         let text = container.text_content.take().unwrap_or_default();
 
@@ -259,7 +262,7 @@ impl TextBox {
     /// - Text anchor/alignment settings
     fn extract_escher_text_properties(
         record: &super::escher::EscherRecord,
-        container: &mut ShapeContainer,
+        container: &mut ShapeContainer<'a>,
     ) -> super::super::package::Result<()> {
         // Extract text-related properties from the record's properties
         // The record may contain Escher properties that define text margins,
@@ -552,7 +555,10 @@ impl TextBox {
     }
 }
 
-impl Shape for TextBox {
+impl<'a> Shape for TextBox<'a>
+where
+    'a: 'static,
+{
     fn properties(&self) -> &ShapeProperties {
         &self.container.properties
     }

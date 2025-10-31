@@ -108,18 +108,21 @@ impl std::fmt::Display for AutoShapeType {
 }
 
 /// An auto shape in a PowerPoint presentation.
+///
+/// Uses lifetime parameter `'a` to enable zero-copy parsing when the shape
+/// data can be borrowed from a larger buffer.
 #[derive(Debug, Clone)]
-pub struct AutoShape {
+pub struct AutoShape<'a> {
     /// Shape container with properties and data
-    container: ShapeContainer,
+    container: ShapeContainer<'a>,
     /// The type of auto shape
     auto_shape_type: AutoShapeType,
     /// Adjustment values for shape parameters (for complex shapes)
     adjustments: Vec<i32>,
 }
 
-impl AutoShape {
-    /// Create a new auto shape.
+impl<'a> AutoShape<'a> {
+    /// Create a new auto shape with owned data.
     pub fn new(properties: ShapeProperties, raw_data: Vec<u8>) -> Self {
         Self {
             container: ShapeContainer::new(properties, raw_data),
@@ -129,7 +132,7 @@ impl AutoShape {
     }
 
     /// Create an auto shape from an existing container.
-    pub fn from_container(container: ShapeContainer) -> Self {
+    pub fn from_container(container: ShapeContainer<'a>) -> Self {
         // Extract auto shape type from raw data
         let auto_shape_type = Self::extract_shape_type(&container.raw_data);
 
@@ -313,7 +316,10 @@ impl AutoShape {
     }
 }
 
-impl Shape for AutoShape {
+impl<'a> Shape for AutoShape<'a>
+where
+    'a: 'static,
+{
     fn properties(&self) -> &ShapeProperties {
         &self.container.properties
     }

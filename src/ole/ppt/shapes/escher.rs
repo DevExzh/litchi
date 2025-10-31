@@ -7,6 +7,7 @@ use super::super::package::{PptError, Result};
 /// Escher is Microsoft's binary format for storing graphics and shape data
 /// in Office documents, including PowerPoint presentations.
 use super::shape::{ShapeProperties, ShapeType};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use zerocopy::{
     FromBytes,
@@ -70,20 +71,21 @@ pub enum EscherPropertyHolder {
     Complex,
 }
 
-/// An Escher property containing binary data and metadata
+/// An Escher property containing binary data and metadata.
+/// Uses `Cow` for zero-copy parsing when possible.
 #[derive(Debug, Clone)]
-pub struct EscherProperty {
+pub struct EscherProperty<'a> {
     /// Property ID (includes type, complex flag, blip flag)
     pub id: u16,
     /// Property data value
     pub data: u32,
-    /// Complex data (for complex properties)
-    pub complex_data: Option<Vec<u8>>,
-    /// Array data (for array properties)
-    pub array_data: Option<Vec<u8>>,
+    /// Complex data (for complex properties) - uses Cow to avoid unnecessary clones
+    pub complex_data: Option<Cow<'a, [u8]>>,
+    /// Array data (for array properties) - uses Cow to avoid unnecessary clones
+    pub array_data: Option<Cow<'a, [u8]>>,
 }
 
-impl EscherProperty {
+impl<'a> EscherProperty<'a> {
     /// Create a new Escher property
     pub fn new(id: u16, data: u32) -> Self {
         Self {
@@ -94,23 +96,43 @@ impl EscherProperty {
         }
     }
 
-    /// Create a complex Escher property
-    pub fn new_complex(id: u16, data: u32, complex_data: Vec<u8>) -> Self {
+    /// Create a complex Escher property with borrowed data (zero-copy)
+    pub fn new_complex_borrowed(id: u16, data: u32, complex_data: &'a [u8]) -> Self {
         Self {
             id,
             data,
-            complex_data: Some(complex_data),
+            complex_data: Some(Cow::Borrowed(complex_data)),
             array_data: None,
         }
     }
 
-    /// Create an array Escher property
-    pub fn new_array(id: u16, data: u32, array_data: Vec<u8>) -> Self {
+    /// Create a complex Escher property with owned data
+    pub fn new_complex_owned(id: u16, data: u32, complex_data: Vec<u8>) -> Self {
+        Self {
+            id,
+            data,
+            complex_data: Some(Cow::Owned(complex_data)),
+            array_data: None,
+        }
+    }
+
+    /// Create an array Escher property with borrowed data (zero-copy)
+    pub fn new_array_borrowed(id: u16, data: u32, array_data: &'a [u8]) -> Self {
         Self {
             id,
             data,
             complex_data: None,
-            array_data: Some(array_data),
+            array_data: Some(Cow::Borrowed(array_data)),
+        }
+    }
+
+    /// Create an array Escher property with owned data
+    pub fn new_array_owned(id: u16, data: u32, array_data: Vec<u8>) -> Self {
+        Self {
+            id,
+            data,
+            complex_data: None,
+            array_data: Some(Cow::Owned(array_data)),
         }
     }
 
@@ -154,8 +176,8 @@ impl EscherProperty {
     }
 
     /// Parse properties from binary data (based on POI's EscherPropertyFactory).
-    /// Optimized for performance with pre-allocation and minimal copying.
-    pub fn parse_properties(data: &[u8], num_properties: u16) -> Result<Vec<Self>> {
+    /// Optimized for performance with pre-allocation and zero-copy when possible.
+    pub fn parse_properties(data: &'a [u8], num_properties: u16) -> Result<Vec<Self>> {
         if num_properties == 0 {
             return Ok(Vec::new());
         }
@@ -180,15 +202,15 @@ impl EscherProperty {
             let is_complex = (prop_id & 0x8000) != 0;
 
             let property = if is_complex {
-                // Parse complex property data
+                // Parse complex property data with zero-copy borrowing
                 let complex_size = (prop_data >> 16) as usize; // High 16 bits contain size
                 if offset + 6 + complex_size > data.len() {
                     break; // Not enough data for complex property
                 }
-                let complex_data = data[offset + 6..offset + 6 + complex_size].to_vec();
+                let complex_data = &data[offset + 6..offset + 6 + complex_size];
                 offset += 6 + complex_size;
 
-                Self::new_complex(prop_id, prop_data, complex_data)
+                Self::new_complex_borrowed(prop_id, prop_data, complex_data)
             } else {
                 // Simple property - advance offset without additional bounds check
                 offset += 6;
@@ -309,9 +331,9 @@ impl From<u16> for EscherRecordType {
 }
 
 /// An Escher record containing binary data and metadata.
-/// Optimized for performance with zero-copy parsing where possible.
+/// Optimized for performance with zero-copy parsing using `Cow`.
 #[derive(Debug, Clone)]
-pub struct EscherRecord {
+pub struct EscherRecord<'a> {
     /// Record type
     pub record_type: EscherRecordType,
     /// Record version
@@ -320,12 +342,12 @@ pub struct EscherRecord {
     pub instance: u16,
     /// Record data length
     pub data_length: u32,
-    /// Record data (owned for now, could be Cow in future)
-    pub data: Vec<u8>,
+    /// Record data - uses Cow to avoid unnecessary clones during parsing
+    pub data: Cow<'a, [u8]>,
     /// Child records (for container records)
-    pub children: Vec<EscherRecord>,
+    pub children: Vec<EscherRecord<'a>>,
     /// Parsed properties (for Options records)
-    pub properties: Vec<EscherProperty>,
+    pub properties: Vec<EscherProperty<'a>>,
 }
 
 /// Actions to take when processing text characters in UTF-16LE decoding.
@@ -368,9 +390,9 @@ impl CharacterAction {
     }
 }
 
-impl EscherRecord {
-    /// Parse an Escher record from binary data.
-    /// Optimized for performance with minimal allocations.
+impl<'a> EscherRecord<'a> {
+    /// Parse an Escher record from binary data with zero-copy optimization.
+    /// Uses `Cow` to borrow data when possible, avoiding unnecessary allocations.
     ///
     /// # Arguments
     ///
@@ -380,7 +402,7 @@ impl EscherRecord {
     /// # Returns
     ///
     /// Tuple of (parsed_record, bytes_consumed)
-    pub fn parse(data: &[u8], offset: usize) -> Result<(Self, usize)> {
+    pub fn parse(data: &'a [u8], offset: usize) -> Result<(Self, usize)> {
         if offset + 8 > data.len() {
             return Err(PptError::Corrupted(
                 "Not enough data for Escher record header".to_string(),
@@ -412,8 +434,8 @@ impl EscherRecord {
             ));
         }
 
-        // Use slice reference where possible to avoid allocation
-        let record_data = data[offset + 8..offset + total_size].to_vec();
+        // Use zero-copy borrowing for record data
+        let record_data = Cow::Borrowed(&data[offset + 8..offset + total_size]);
         let mut record = EscherRecord {
             record_type: record_type_enum,
             version,
@@ -436,18 +458,25 @@ impl EscherRecord {
         // Parse properties if this is an Options record
         if matches!(record_type_enum, EscherRecordType::Options) && data_length > 0 {
             // Options record format: number of properties (2 bytes) + property data
-            if record.data.len() >= 2 {
-                let num_properties = U16::<LittleEndian>::read_from_bytes(&record.data[0..2])
-                    .map(|v| v.get())
-                    .unwrap_or(0);
-                let property_data = &record.data[2..];
+            // Parse from original data slice to avoid borrowing from record.data
+            if data_length >= 2 && offset + 8 + 2 <= data.len() {
+                let num_properties =
+                    U16::<LittleEndian>::read_from_bytes(&data[offset + 8..offset + 10])
+                        .map(|v| v.get())
+                        .unwrap_or(0);
+                let property_data_start = offset + 10; // After header (8) + num_properties (2)
+                let property_data_end = (offset + total_size).min(data.len());
 
-                if let Ok(mut properties) =
-                    EscherProperty::parse_properties(property_data, num_properties)
-                {
-                    // Pre-allocate with exact size to avoid reallocations
-                    record.properties = Vec::with_capacity(properties.len());
-                    record.properties.append(&mut properties);
+                if property_data_start <= property_data_end {
+                    let property_data = &data[property_data_start..property_data_end];
+
+                    if let Ok(mut properties) =
+                        EscherProperty::parse_properties(property_data, num_properties)
+                    {
+                        // Pre-allocate with exact size to avoid reallocations
+                        record.properties = Vec::with_capacity(properties.len());
+                        record.properties.append(&mut properties);
+                    }
                 }
             }
         }
@@ -455,8 +484,8 @@ impl EscherRecord {
         Ok((record, total_size))
     }
 
-    /// Parse child records from a container record.
-    fn parse_container_children(data: &[u8]) -> Result<Vec<EscherRecord>> {
+    /// Parse child records from a container record with zero-copy optimization.
+    fn parse_container_children(data: &'a [u8]) -> Result<Vec<EscherRecord<'a>>> {
         let mut children = Vec::new();
         let mut offset = 0;
 
@@ -474,14 +503,14 @@ impl EscherRecord {
     }
 
     /// Find a child record of a specific type.
-    pub fn find_child(&self, record_type: EscherRecordType) -> Option<&EscherRecord> {
+    pub fn find_child(&self, record_type: EscherRecordType) -> Option<&EscherRecord<'a>> {
         self.children
             .iter()
             .find(|child| child.record_type == record_type)
     }
 
     /// Find all child records of a specific type.
-    pub fn find_children(&self, record_type: EscherRecordType) -> Vec<&EscherRecord> {
+    pub fn find_children(&self, record_type: EscherRecordType) -> Vec<&EscherRecord<'a>> {
         self.children
             .iter()
             .filter(|child| child.record_type == record_type)
@@ -489,14 +518,14 @@ impl EscherRecord {
     }
 
     /// Find a property by property number.
-    pub fn find_property(&self, property_number: u32) -> Option<&EscherProperty> {
+    pub fn find_property(&self, property_number: u32) -> Option<&EscherProperty<'a>> {
         self.properties
             .iter()
             .find(|prop| prop.property_number() as u32 == property_number)
     }
 
     /// Get all properties of this record.
-    pub fn properties(&self) -> &[EscherProperty] {
+    pub fn properties(&self) -> &[EscherProperty<'a>] {
         &self.properties
     }
 
@@ -789,7 +818,7 @@ impl EscherRecord {
     ///
     /// This properly parses child PPT records (TextCharsAtom, TextBytesAtom, etc.)
     /// from the Escher textbox data.
-    fn parse_text_record(text_record: &EscherRecord) -> Result<String> {
+    fn parse_text_record(text_record: &EscherRecord<'a>) -> Result<String> {
         let text_data = &text_record.data;
 
         if text_data.is_empty() {
@@ -799,6 +828,7 @@ impl EscherRecord {
         // Use EscherTextboxWrapper to properly parse the textbox data
         // This follows POI's approach of wrapping the Escher textbox and
         // extracting child PPT records
+        // Note: EscherTextboxWrapper requires owned data, so we clone when needed
         match super::super::escher_textbox::EscherTextboxWrapper::new(text_data.to_vec()) {
             Ok(wrapper) => Ok(wrapper.text().to_string()),
             Err(_) => {
@@ -838,8 +868,8 @@ impl EscherRecord {
         }
     }
 
-    /// Parse a complete shape from Escher data.
-    pub fn parse_shape(data: &[u8]) -> Result<ShapeProperties> {
+    /// Parse a complete shape from Escher data with zero-copy optimization.
+    pub fn parse_shape(data: &'a [u8]) -> Result<ShapeProperties> {
         if data.len() < 8 {
             return Err(PptError::Corrupted("Shape data too short".to_string()));
         }
@@ -849,17 +879,18 @@ impl EscherRecord {
     }
 }
 
-/// Parser for Escher-based shape data.
-pub struct EscherParser {
+/// Parser for Escher-based shape data with zero-copy optimization.
+/// Uses `Cow` to avoid unnecessary memory clones during parsing.
+pub struct EscherParser<'a> {
     /// Parsed records by key (type + instance)
-    records: HashMap<u32, EscherRecord>,
+    records: HashMap<u32, EscherRecord<'a>>,
     /// Records by shape ID (for placeholder lookup)
-    shape_records: HashMap<u32, EscherRecord>,
+    shape_records: HashMap<u32, EscherRecord<'a>>,
     /// Placeholder data records (OEPlaceholderAtom)
-    placeholder_records: Vec<EscherRecord>,
+    placeholder_records: Vec<EscherRecord<'a>>,
 }
 
-impl EscherParser {
+impl<'a> EscherParser<'a> {
     /// Create a new Escher parser.
     pub fn new() -> Self {
         Self {
@@ -869,8 +900,8 @@ impl EscherParser {
         }
     }
 
-    /// Parse Escher data and extract all records.
-    pub fn parse_data(&mut self, data: &[u8]) -> Result<()> {
+    /// Parse Escher data and extract all records with zero-copy optimization.
+    pub fn parse_data(&mut self, data: &'a [u8]) -> Result<()> {
         let mut offset = 0;
 
         while offset < data.len() {
@@ -910,18 +941,18 @@ impl EscherParser {
         &self,
         record_type: EscherRecordType,
         instance: u16,
-    ) -> Option<&EscherRecord> {
+    ) -> Option<&EscherRecord<'a>> {
         let key = (record_type.as_u16() as u32) << 16 | (instance as u32);
         self.records.get(&key)
     }
 
     /// Find a record by shape ID.
-    pub fn find_record_by_shape_id(&self, shape_id: u32) -> Option<&EscherRecord> {
+    pub fn find_record_by_shape_id(&self, shape_id: u32) -> Option<&EscherRecord<'a>> {
         self.shape_records.get(&shape_id)
     }
 
     /// Get all placeholder data records.
-    pub fn placeholder_records(&self) -> &[EscherRecord] {
+    pub fn placeholder_records(&self) -> &[EscherRecord<'a>] {
         &self.placeholder_records
     }
 
@@ -941,7 +972,7 @@ impl EscherParser {
     }
 }
 
-impl Default for EscherParser {
+impl<'a> Default for EscherParser<'a> {
     fn default() -> Self {
         Self::new()
     }
@@ -953,12 +984,13 @@ mod tests {
 
     #[test]
     fn test_escher_record_creation() {
+        let data_vec = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
         let record = EscherRecord {
             record_type: EscherRecordType::Transform,
             version: 1,
             instance: 0,
             data_length: 16,
-            data: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+            data: Cow::Owned(data_vec),
             children: Vec::new(),
             properties: Vec::new(),
         };
@@ -985,28 +1017,30 @@ mod tests {
     #[test]
     fn test_shape_properties_extraction() {
         // Create a mock transform record
+        let transform_data = vec![
+            0x10, 0x00, 0x00, 0x00, // x = 16
+            0x20, 0x00, 0x00, 0x00, // y = 32
+            0x64, 0x00, 0x00, 0x00, // width = 100
+            0x32, 0x00, 0x00, 0x00, // height = 50
+        ];
         let transform_record = EscherRecord {
             record_type: EscherRecordType::Transform,
             version: 1,
             instance: 0,
             data_length: 16,
-            data: vec![
-                0x10, 0x00, 0x00, 0x00, // x = 16
-                0x20, 0x00, 0x00, 0x00, // y = 32
-                0x64, 0x00, 0x00, 0x00, // width = 100
-                0x32, 0x00, 0x00, 0x00, // height = 50
-            ],
+            data: Cow::Owned(transform_data),
             children: Vec::new(),
             properties: Vec::new(),
         };
 
         // Create a mock shape properties record
+        let shape_props_data = vec![0x01, 0x00, 0x01, 0x00]; // shape_type = 1 (TextBox), id = 1
         let shape_props_record = EscherRecord {
             record_type: EscherRecordType::ShapeProperties,
             version: 1,
             instance: 0,
             data_length: 4,
-            data: vec![0x01, 0x00, 0x01, 0x00], // shape_type = 1 (TextBox), id = 1
+            data: Cow::Owned(shape_props_data),
             children: Vec::new(),
             properties: Vec::new(),
         };
@@ -1017,7 +1051,7 @@ mod tests {
             version: 1,
             instance: 0,
             data_length: 0,
-            data: Vec::new(),
+            data: Cow::Owned(Vec::new()),
             children: vec![transform_record, shape_props_record],
             properties: Vec::new(),
         };
@@ -1034,19 +1068,20 @@ mod tests {
     #[test]
     fn test_text_extraction() {
         // Create a container with a text record child
+        let text_data = vec![
+            0x48, 0x00, // 'H'
+            0x65, 0x00, // 'e'
+            0x6C, 0x00, // 'l'
+            0x6C, 0x00, // 'l'
+            0x6F, 0x00, // 'o'
+            0x00, 0x00, // null terminator
+        ];
         let text_record = EscherRecord {
             record_type: EscherRecordType::Text,
             version: 1,
             instance: 0,
             data_length: 10,
-            data: vec![
-                0x48, 0x00, // 'H'
-                0x65, 0x00, // 'e'
-                0x6C, 0x00, // 'l'
-                0x6C, 0x00, // 'l'
-                0x6F, 0x00, // 'o'
-                0x00, 0x00, // null terminator
-            ],
+            data: Cow::Owned(text_data),
             children: Vec::new(),
             properties: Vec::new(),
         };
@@ -1056,7 +1091,7 @@ mod tests {
             version: 1,
             instance: 0,
             data_length: 0,
-            data: Vec::new(),
+            data: Cow::Owned(Vec::new()),
             children: vec![text_record],
             properties: Vec::new(),
         };

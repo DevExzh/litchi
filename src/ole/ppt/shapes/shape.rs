@@ -3,6 +3,7 @@ use super::super::package::PptError;
 ///
 /// This module defines the core Shape trait that all shape types implement,
 /// along with common properties and methods for working with shapes.
+use std::borrow::Cow;
 use std::fmt;
 
 /// Types of shapes in PowerPoint presentations.
@@ -228,15 +229,21 @@ impl Clone for Box<dyn Shape> {
 ///
 /// This container includes Escher text properties extracted from the shape's
 /// OfficeArtFOPT records, following Apache POI's EscherProperties model.
+///
+/// Uses `Cow<'a, [u8]>` for zero-copy optimization when parsing shapes,
+/// allowing the raw data to be borrowed from the original source when possible.
+///
+/// Note: Child shapes use `'static` lifetime to maintain trait object safety,
+/// while raw_data can be borrowed with lifetime `'a`.
 #[derive(Clone)]
-pub struct ShapeContainer {
+pub struct ShapeContainer<'a> {
     /// Shape properties
     pub properties: ShapeProperties,
-    /// Raw shape data (for parsing)
-    pub raw_data: Vec<u8>,
+    /// Raw shape data (for parsing) - uses Cow to avoid unnecessary clones
+    pub raw_data: Cow<'a, [u8]>,
     /// Text content (if applicable)
     pub text_content: Option<String>,
-    /// Child shapes (for group shapes)
+    /// Child shapes (for group shapes) - must have 'static lifetime for trait object safety
     pub children: Vec<Box<dyn Shape>>,
 
     // Escher text properties (from OfficeArtFOPT records)
@@ -312,7 +319,7 @@ pub struct ShapeContainer {
     pub id_of_next_shape: Option<u32>,
 }
 
-impl std::fmt::Debug for ShapeContainer {
+impl<'a> std::fmt::Debug for ShapeContainer<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut debug = f.debug_struct("ShapeContainer");
         debug
@@ -349,15 +356,62 @@ impl std::fmt::Debug for ShapeContainer {
     }
 }
 
-impl ShapeContainer {
-    /// Create a new shape container.
+impl<'a> ShapeContainer<'a> {
+    /// Create a new shape container with owned data.
     ///
     /// All Escher text properties are initialized to `None` and can be
     /// populated later by parsing OfficeArtFOPT records.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let container = ShapeContainer::new(properties, data.to_vec());
+    /// ```
     pub fn new(properties: ShapeProperties, raw_data: Vec<u8>) -> Self {
         Self {
             properties,
-            raw_data,
+            raw_data: Cow::Owned(raw_data),
+            text_content: None,
+            children: Vec::new(),
+            // Initialize all Escher text properties to None
+            text_left: None,
+            text_top: None,
+            text_right: None,
+            text_bottom: None,
+            text_flow: None,
+            wrap_text: None,
+            anchor_text: None,
+            rotate_text: None,
+            text_id: None,
+            scale_text: None,
+            size_text_to_fit_shape: None,
+            size_shape_to_fit_text: None,
+            font_rotation: None,
+            bidi: None,
+            use_host_margins: None,
+            single_click_selects: None,
+            id_of_next_shape: None,
+        }
+    }
+
+    /// Create a new shape container with borrowed data (zero-copy).
+    ///
+    /// This constructor enables zero-copy parsing by borrowing the raw data
+    /// instead of copying it. Use this when the shape data lifetime is tied
+    /// to a larger buffer that will outlive the container.
+    ///
+    /// All Escher text properties are initialized to `None` and can be
+    /// populated later by parsing OfficeArtFOPT records.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let container = ShapeContainer::new_borrowed(properties, &data_slice);
+    /// ```
+    pub fn new_borrowed(properties: ShapeProperties, raw_data: &'a [u8]) -> Self {
+        Self {
+            properties,
+            raw_data: Cow::Borrowed(raw_data),
             text_content: None,
             children: Vec::new(),
             // Initialize all Escher text properties to None
@@ -486,7 +540,10 @@ impl ShapeContainer {
     }
 }
 
-impl Shape for ShapeContainer {
+impl<'a> Shape for ShapeContainer<'a>
+where
+    'a: 'static,
+{
     fn properties(&self) -> &ShapeProperties {
         &self.properties
     }
