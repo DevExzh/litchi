@@ -180,6 +180,39 @@ impl TableRow {
     pub fn set_style_name(&mut self, name: &str) {
         self.element.set_attribute("table:style-name", name);
     }
+
+    /// Get the number of times this row is repeated.
+    ///
+    /// In ODF, rows can have a `table:number-rows-repeated` attribute to indicate
+    /// that the row should be repeated multiple times. This method returns that count.
+    ///
+    /// # Returns
+    ///
+    /// The number of times this row appears (defaults to 1 if not specified).
+    pub fn repeat_count(&self) -> usize {
+        self.element
+            .get_int_attribute("table:number-rows-repeated")
+            .map(|n| n as usize)
+            .unwrap_or(1)
+    }
+
+    /// Set the number of times this row should be repeated.
+    pub fn set_repeat_count(&mut self, count: usize) {
+        if count > 1 {
+            self.element
+                .set_attribute("table:number-rows-repeated", &count.to_string());
+        } else {
+            self.element.remove_attribute("table:number-rows-repeated");
+        }
+    }
+
+    /// Get access to the underlying element for advanced operations.
+    ///
+    /// This is used internally by expansion utilities and other advanced features.
+    #[allow(dead_code)] // Used by table expansion utilities
+    pub(crate) fn element(&self) -> &Element {
+        &self.element
+    }
 }
 
 impl From<TableRow> for Element {
@@ -348,6 +381,40 @@ impl TableCell {
     /// Check if the cell is empty
     pub fn is_empty(&self) -> bool {
         matches!(self.value(), Ok(CellValue::Empty))
+    }
+
+    /// Get the number of times this cell is repeated.
+    ///
+    /// In ODF, cells can have a `table:number-columns-repeated` attribute to indicate
+    /// that the cell should be repeated multiple times horizontally. This method returns that count.
+    ///
+    /// # Returns
+    ///
+    /// The number of times this cell appears (defaults to 1 if not specified).
+    pub fn repeat_count(&self) -> usize {
+        self.element
+            .get_int_attribute("table:number-columns-repeated")
+            .map(|n| n as usize)
+            .unwrap_or(1)
+    }
+
+    /// Set the number of times this cell should be repeated.
+    pub fn set_repeat_count(&mut self, count: usize) {
+        if count > 1 {
+            self.element
+                .set_attribute("table:number-columns-repeated", &count.to_string());
+        } else {
+            self.element
+                .remove_attribute("table:number-columns-repeated");
+        }
+    }
+
+    /// Get access to the underlying element for advanced operations.
+    ///
+    /// This is used internally by expansion utilities and other advanced features.
+    #[allow(dead_code)] // Used by table expansion utilities
+    pub(crate) fn element(&self) -> &Element {
+        &self.element
     }
 }
 

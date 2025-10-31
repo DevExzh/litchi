@@ -133,11 +133,6 @@ pub struct NamespaceContext {
 }
 
 impl NamespaceContext {
-    /// Create a new namespace context
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Add a namespace declaration
     pub fn add_namespace(&mut self, prefix: &str, uri: &str) {
         if prefix == "xmlns" {

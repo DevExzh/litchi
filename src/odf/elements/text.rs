@@ -514,13 +514,33 @@ impl TextElements {
         Ok(headings)
     }
 
-    /// Extract all text content from XML with improved handling of nested elements
+    /// Extract all text content from XML with improved handling of nested elements.
+    ///
+    /// This method handles various text elements including:
+    /// - Paragraphs (text:p) and headings (text:h)
+    /// - Lists (text:list) with automatic bullet points
+    /// - Sections (text:section)
+    /// - Annotations/comments (office:annotation)
+    /// - Line breaks (text:line-break) and tabs (text:tab)
+    /// - Text boxes and frames (draw:text-box)
+    /// - Soft page breaks (text:soft-page-break)
+    /// - Spaces (text:s)
+    ///
+    /// # Arguments
+    ///
+    /// * `xml_content` - The XML content to extract text from
+    ///
+    /// # Returns
+    ///
+    /// Extracted plain text with paragraph breaks preserved
     pub fn extract_text(xml_content: &str) -> Result<String> {
         let mut reader = quick_xml::Reader::from_str(xml_content);
         let mut buf = Vec::new();
         let mut text = String::new();
-        let mut in_paragraph = false;
+        let mut in_text_context = false;
         let mut paragraph_text = String::new();
+        let mut depth_stack: Vec<String> = Vec::new();
+        let mut skip_depth = 0; // Depth to skip content (e.g., inside tracked-changes)
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -528,50 +548,173 @@ impl TextElements {
                     let tag_name =
                         String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
 
+                    depth_stack.push(tag_name.clone());
+
+                    // Skip certain elements that shouldn't contribute to text
+                    if skip_depth > 0 {
+                        skip_depth += 1;
+                        continue;
+                    }
+
                     match tag_name.as_str() {
-                        "text:p" | "text:h" => {
-                            if in_paragraph && !paragraph_text.is_empty() {
-                                if !text.is_empty() {
-                                    text.push('\n');
-                                }
-                                text.push_str(&paragraph_text);
-                                paragraph_text.clear();
-                            }
-                            in_paragraph = true;
+                        // Skip tracked changes and their content
+                        "text:tracked-changes" | "text:change-start" | "text:change-end" => {
+                            skip_depth = 1;
                         },
-                        "text:list" => {
-                            // Handle lists - add a newline before list if needed
-                            if in_paragraph && !paragraph_text.is_empty() {
+                        // Text containers
+                        "text:p" | "text:h" => {
+                            if in_text_context && !paragraph_text.is_empty() {
                                 if !text.is_empty() {
                                     text.push('\n');
                                 }
                                 text.push_str(&paragraph_text);
                                 paragraph_text.clear();
                             }
-                            in_paragraph = false;
+                            in_text_context = true;
+                        },
+                        // Lists - handle list items within paragraphs
+                        "text:list" => {
+                            if in_text_context && !paragraph_text.is_empty() {
+                                if !text.is_empty() {
+                                    text.push('\n');
+                                }
+                                text.push_str(&paragraph_text);
+                                paragraph_text.clear();
+                            }
+                            in_text_context = false;
                         },
                         "text:list-item" => {
-                            // Add bullet point
+                            // Start list item
                             if !paragraph_text.is_empty() {
-                                paragraph_text.push('\n');
+                                if !text.is_empty() {
+                                    text.push('\n');
+                                }
+                                text.push_str(&paragraph_text);
+                                paragraph_text.clear();
                             }
+                            in_text_context = true;
                             paragraph_text.push_str("• ");
                         },
-                        "text:line-break" | "text:tab" => {
-                            // Handle line breaks and tabs
-                            if in_paragraph {
-                                if tag_name == "text:line-break" {
-                                    paragraph_text.push('\n');
-                                } else {
-                                    paragraph_text.push('\t');
+                        // Sections
+                        "text:section" => {
+                            // Sections are transparent containers, just continue
+                        },
+                        // Text boxes and frames
+                        "draw:text-box" => {
+                            // Text boxes should contribute their text content
+                            if !paragraph_text.is_empty() {
+                                if !text.is_empty() {
+                                    text.push('\n');
                                 }
+                                text.push_str(&paragraph_text);
+                                paragraph_text.clear();
+                            }
+                        },
+                        // Annotations (comments)
+                        "office:annotation" => {
+                            // Optionally include annotations
+                            // For now, we'll skip them (set skip_depth if desired)
+                            // skip_depth = 1;
+                        },
+                        // Line breaks and formatting
+                        "text:line-break" => {
+                            if in_text_context {
+                                paragraph_text.push('\n');
+                            }
+                        },
+                        "text:tab" => {
+                            if in_text_context {
+                                paragraph_text.push('\t');
+                            }
+                        },
+                        "text:s" => {
+                            // Repeated space element
+                            if in_text_context {
+                                // Get the count attribute (defaults to 1)
+                                let count = e
+                                    .attributes()
+                                    .find_map(|attr| {
+                                        if let Ok(a) = attr {
+                                            let key = String::from_utf8(a.key.as_ref().to_vec())
+                                                .unwrap_or_default();
+                                            if key.ends_with(":c") || key == "text:c" {
+                                                let val = String::from_utf8(a.value.to_vec())
+                                                    .unwrap_or_default();
+                                                return val.parse::<usize>().ok();
+                                            }
+                                        }
+                                        None
+                                    })
+                                    .unwrap_or(1);
+                                for _ in 0..count {
+                                    paragraph_text.push(' ');
+                                }
+                            }
+                        },
+                        "text:soft-page-break" => {
+                            // Soft page breaks can be treated as paragraph breaks
+                            if in_text_context && !paragraph_text.is_empty() {
+                                if !text.is_empty() {
+                                    text.push('\n');
+                                }
+                                text.push_str(&paragraph_text);
+                                paragraph_text.clear();
                             }
                         },
                         _ => {}, // Ignore other elements
                     }
                 },
+                Ok(quick_xml::events::Event::Empty(ref e)) => {
+                    // Handle empty/self-closing elements
+                    let tag_name =
+                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
+
+                    if skip_depth > 0 {
+                        continue;
+                    }
+
+                    match tag_name.as_str() {
+                        "text:line-break" => {
+                            if in_text_context {
+                                paragraph_text.push('\n');
+                            }
+                        },
+                        "text:tab" => {
+                            if in_text_context {
+                                paragraph_text.push('\t');
+                            }
+                        },
+                        "text:s" => {
+                            // Repeated space element
+                            if in_text_context {
+                                let count = e
+                                    .attributes()
+                                    .find_map(|attr| {
+                                        if let Ok(a) = attr {
+                                            let key = String::from_utf8(a.key.as_ref().to_vec())
+                                                .unwrap_or_default();
+                                            if key.ends_with(":c") || key == "text:c" {
+                                                let val = String::from_utf8(a.value.to_vec())
+                                                    .unwrap_or_default();
+                                                return val.parse::<usize>().ok();
+                                            }
+                                        }
+                                        None
+                                    })
+                                    .unwrap_or(1);
+                                for _ in 0..count {
+                                    paragraph_text.push(' ');
+                                }
+                            }
+                        },
+                        _ => {},
+                    }
+                },
                 Ok(quick_xml::events::Event::Text(ref t)) => {
-                    if in_paragraph && let Ok(text_content) = String::from_utf8(t.to_vec()) {
+                    if skip_depth == 0
+                        && in_text_context
+                        && let Ok(text_content) = String::from_utf8(t.to_vec())
+                    {
                         paragraph_text.push_str(&text_content);
                     }
                 },
@@ -579,26 +722,42 @@ impl TextElements {
                     let tag_name =
                         String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
 
+                    // Pop from depth stack
+                    if let Some(last) = depth_stack.last()
+                        && last == &tag_name
+                    {
+                        depth_stack.pop();
+                    }
+
+                    // Handle skip depth
+                    if skip_depth > 0 {
+                        skip_depth -= 1;
+                        continue;
+                    }
+
                     match tag_name.as_str() {
-                        "text:p" | "text:h" => {
-                            if in_paragraph && !paragraph_text.is_empty() {
+                        "text:p" | "text:h" | "text:list-item" => {
+                            if in_text_context && !paragraph_text.is_empty() {
                                 if !text.is_empty() {
                                     text.push('\n');
                                 }
                                 text.push_str(&paragraph_text);
                                 paragraph_text.clear();
                             }
-                            in_paragraph = false;
+                            // Check if we're still in a text context by examining the stack
+                            in_text_context = depth_stack
+                                .iter()
+                                .any(|t| t == "text:p" || t == "text:h" || t == "text:list-item");
                         },
                         "text:list" => {
-                            in_paragraph = false;
+                            in_text_context = false;
                         },
                         _ => {},
                     }
                 },
                 Ok(quick_xml::events::Event::Eof) => {
                     // Handle any remaining paragraph text
-                    if in_paragraph && !paragraph_text.is_empty() {
+                    if in_text_context && !paragraph_text.is_empty() {
                         if !text.is_empty() {
                             text.push('\n');
                         }

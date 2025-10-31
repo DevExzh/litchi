@@ -323,11 +323,6 @@ pub struct StyleRegistry {
 }
 
 impl StyleRegistry {
-    /// Create a new style registry
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Add a style to the registry
     pub fn add_style(&mut self, style: Style) {
         if let Some(name) = style.name() {
@@ -417,7 +412,7 @@ impl StyleRegistry {
 
     /// Parse styles from XML content
     pub fn from_xml(xml_content: &str) -> Result<Self> {
-        let mut registry = Self::new();
+        let mut registry = Self::default();
 
         // For now, use a simple approach that just parses style attributes
         // Full property parsing can be added later

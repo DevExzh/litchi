@@ -144,7 +144,7 @@ impl Document {
         };
 
         // Initialize style registry
-        let mut style_registry = StyleRegistry::new();
+        let mut style_registry = StyleRegistry::default();
 
         // Parse styles from styles.xml if available
         if let Some(ref styles_part) = styles
@@ -279,24 +279,43 @@ impl Document {
     /// # }
     /// ```
     pub fn elements(&self) -> Result<Vec<crate::document::DocumentElement>> {
-        // For now, return paragraphs as elements
-        // A full implementation would parse the document in order and identify both paragraphs and tables
-        let paragraphs = self.paragraphs()?;
+        use crate::odf::elements::parser::{DocumentOrderElement, DocumentParser};
+
+        // Parse all elements in document order using the generic ODF parser
+        let ordered_elements = DocumentParser::parse_elements_in_order(self.content.xml_content())?;
         let mut elements = Vec::new();
 
-        for para in paragraphs {
-            elements.push(crate::document::DocumentElement::Paragraph(
-                crate::document::Paragraph::Odt(para),
-            ));
-        }
-
-        // Add tables at the end for now
-        // TODO: Properly interleave paragraphs and tables in document order
-        let tables = self.tables()?;
-        for table in tables {
-            elements.push(crate::document::DocumentElement::Table(
-                crate::document::Table::Odt(table),
-            ));
+        for element in ordered_elements {
+            match element {
+                DocumentOrderElement::Paragraph(para) => {
+                    elements.push(crate::document::DocumentElement::Paragraph(
+                        crate::document::Paragraph::Odt(para),
+                    ));
+                },
+                DocumentOrderElement::Heading(heading) => {
+                    // Convert heading to paragraph for unified API
+                    if let Ok(text) = heading.text() {
+                        let mut para = ElementParagraph::new();
+                        para.set_text(&text);
+                        if let Some(style) = heading.style_name() {
+                            para.set_style_name(style);
+                        }
+                        elements.push(crate::document::DocumentElement::Paragraph(
+                            crate::document::Paragraph::Odt(para),
+                        ));
+                    }
+                },
+                DocumentOrderElement::Table(table) => {
+                    elements.push(crate::document::DocumentElement::Table(
+                        crate::document::Table::Odt(table),
+                    ));
+                },
+                DocumentOrderElement::List(_list) => {
+                    // Lists could be converted to paragraphs or handled separately
+                    // For now, skip lists in the unified document element API
+                    // as they are typically expanded to paragraphs by text extraction
+                },
+            }
         }
 
         Ok(elements)
@@ -395,5 +414,174 @@ impl Document {
         style_name: &str,
     ) -> crate::odf::elements::style::StyleProperties<'_> {
         self.style_registry.get_resolved_properties(style_name)
+    }
+
+    /// Get all tracked changes in the document.
+    ///
+    /// Tracked changes include insertions, deletions, and format changes made
+    /// by document collaborators.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Document;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let doc = Document::open("document.odt")?;
+    /// let changes = doc.track_changes()?;
+    ///
+    /// for change in changes {
+    ///     println!("Change by {:?}: {:?}", change.author, change.change_type);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn track_changes(&self) -> Result<Vec<super::parser::TrackChange>> {
+        super::parser::OdtParser::parse_track_changes(self.content.xml_content())
+    }
+
+    /// Get all comments/annotations in the document.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Document;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let doc = Document::open("document.odt")?;
+    /// let comments = doc.comments()?;
+    ///
+    /// for comment in comments {
+    ///     println!("Comment by {:?}: {}", comment.author, comment.content);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn comments(&self) -> Result<Vec<super::parser::Comment>> {
+        super::parser::OdtParser::parse_comments(self.content.xml_content())
+    }
+
+    /// Get all sections in the document.
+    ///
+    /// Sections are document subdivisions that can have protected content,
+    /// different formatting, or special layout properties.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Document;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let doc = Document::open("document.odt")?;
+    /// let sections = doc.sections()?;
+    ///
+    /// for section in sections {
+    ///     println!("Section '{}': protected={}", section.name, section.protected);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn sections(&self) -> Result<Vec<super::parser::Section>> {
+        super::parser::OdtParser::parse_sections(self.content.xml_content())
+    }
+
+    /// Get all bookmarks in the document.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Document;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let doc = Document::open("document.odt")?;
+    /// let bookmarks = doc.bookmarks()?;
+    ///
+    /// for bookmark in bookmarks {
+    ///     if let Some(name) = bookmark.name() {
+    ///         println!("Bookmark: {}", name);
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn bookmarks(&self) -> Result<Vec<crate::odf::elements::bookmark::Bookmark>> {
+        use crate::odf::elements::bookmark::BookmarkParser;
+        BookmarkParser::parse_bookmarks(self.content.xml_content())
+    }
+
+    /// Get all bookmark ranges in the document.
+    ///
+    /// Bookmark ranges span multiple paragraphs or sections.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Document;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let doc = Document::open("document.odt")?;
+    /// let ranges = doc.bookmark_ranges()?;
+    ///
+    /// for range in ranges {
+    ///     if range.is_complete() {
+    ///         println!("Complete bookmark range: {}", range.name);
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn bookmark_ranges(&self) -> Result<Vec<crate::odf::elements::bookmark::BookmarkRange>> {
+        use crate::odf::elements::bookmark::BookmarkParser;
+        BookmarkParser::parse_bookmark_ranges(self.content.xml_content())
+    }
+
+    /// Get all fields in the document.
+    ///
+    /// Fields are dynamic content elements like page numbers, dates, and references.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Document;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let doc = Document::open("document.odt")?;
+    /// let fields = doc.fields()?;
+    ///
+    /// for field in fields {
+    ///     println!("Field type: {}, value: {}", field.field_type(), field.value());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn fields(&self) -> Result<Vec<crate::odf::elements::field::Field>> {
+        use crate::odf::elements::field::FieldParser;
+        FieldParser::parse_fields(self.content.xml_content())
+    }
+
+    /// Get all tables with repeated cells and rows expanded.
+    ///
+    /// ODF files can store repeated cells/rows compactly. This method expands
+    /// them into their full representation.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Document;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let doc = Document::open("document.odt")?;
+    /// let expanded_tables = doc.tables_expanded()?;
+    ///
+    /// for table in expanded_tables {
+    ///     println!("Expanded table has {} rows", table.row_count()?);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn tables_expanded(&self) -> Result<Vec<crate::odf::elements::table::Table>> {
+        use crate::odf::elements::table_expansion::TableExpander;
+        let tables = self.tables()?;
+        TableExpander::expand_tables(tables)
     }
 }

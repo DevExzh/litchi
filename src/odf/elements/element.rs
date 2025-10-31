@@ -160,7 +160,7 @@ impl Element {
             tag_name: tag_name.to_string(),
             qualified_name,
             attributes: HashMap::new(),
-            namespace_context: NamespaceContext::new(),
+            namespace_context: NamespaceContext::default(),
             text_content: String::new(),
             children: Vec::new(),
         }
@@ -251,7 +251,7 @@ impl Element {
                         Error::InvalidFormat("Invalid UTF-8 in tag name".to_string())
                     })?;
 
-                    let mut namespace_context = NamespaceContext::new();
+                    let mut namespace_context = NamespaceContext::default();
 
                     // First pass: collect namespace declarations
                     for attr_result in e.attributes() {

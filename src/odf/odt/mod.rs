@@ -8,3 +8,7 @@ mod document;
 mod parser;
 
 pub use document::Document;
+
+// Re-export ODT-specific types for external use
+#[allow(unused_imports)] // Library public API
+pub use parser::{ChangeType, Comment, Section, TrackChange};
