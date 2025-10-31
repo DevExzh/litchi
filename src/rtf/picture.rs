@@ -12,9 +12,11 @@
 use std::borrow::Cow;
 
 /// Image type in RTF documents.
+///
+/// Note: This enum is specific to RTF parsing. For general image processing,
+/// see the `images` module which has comprehensive format support.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImageType {
-    // TODO: Move the shared enum into the images module
     /// Enhanced Metafile
     Emf,
     /// Windows Metafile

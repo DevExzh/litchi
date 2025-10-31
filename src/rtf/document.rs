@@ -330,6 +330,46 @@ impl<'a> RtfDocument<'a> {
         &self.tables
     }
 
+    /// Get all document elements (paragraphs and tables) in approximate document order.
+    ///
+    /// Note: Due to RTF's structure, tables are extracted separately from paragraph flow.
+    /// This method returns paragraphs first, followed by tables. For most use cases this
+    /// is sufficient. If you need precise positional information, work with `blocks()` directly.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::rtf::RtfDocument;
+    ///
+    /// let doc = RtfDocument::open("document.rtf")?;
+    /// for element in doc.elements() {
+    ///     match element {
+    ///         litchi::rtf::DocumentElement::Paragraph(para) => {
+    ///             println!("Paragraph: {}", para.text());
+    ///         }
+    ///         litchi::rtf::DocumentElement::Table(table) => {
+    ///             println!("Table with {} rows", table.row_count());
+    ///         }
+    ///     }
+    /// }
+    /// # Ok::<(), litchi::rtf::RtfError>(())
+    /// ```
+    pub fn elements(&self) -> Vec<super::DocumentElement<'_>> {
+        let mut elements = Vec::new();
+
+        // Add all paragraphs first
+        for para in self.paragraphs_with_content() {
+            elements.push(super::DocumentElement::Paragraph(para));
+        }
+
+        // Add all tables
+        for table in &self.tables {
+            elements.push(super::DocumentElement::Table(table.clone()));
+        }
+
+        elements
+    }
+
     /// Get the font table.
     pub fn font_table(&self) -> &FontTable<'_> {
         &self.font_table

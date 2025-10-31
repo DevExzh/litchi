@@ -354,6 +354,18 @@ pub struct ParagraphContent<'a> {
     pub runs: Vec<Run<'a>>,
 }
 
+/// Document element - either a paragraph or a table.
+///
+/// This enum is used by the `elements()` method to represent
+/// the mixed content of an RTF document in sequential order.
+#[derive(Debug, Clone)]
+pub enum DocumentElement<'a> {
+    /// A paragraph with formatted runs
+    Paragraph(ParagraphContent<'a>),
+    /// A table with rows and cells
+    Table(super::table::Table<'a>),
+}
+
 impl<'a> ParagraphContent<'a> {
     /// Create a new paragraph with content.
     #[inline]

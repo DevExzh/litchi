@@ -41,6 +41,6 @@ pub use lexer::CharacterSet;
 pub use picture::{ImageType, Picture, detect_image_type};
 pub use table::{Cell, Row, Table};
 pub use types::{
-    Alignment, Color, ColorTable, Font, FontFamily, FontRef, FontTable, Formatting, Indentation,
-    Paragraph, ParagraphContent, Run, Spacing, StyleBlock,
+    Alignment, Color, ColorTable, DocumentElement, Font, FontFamily, FontRef, FontTable,
+    Formatting, Indentation, Paragraph, ParagraphContent, Run, Spacing, StyleBlock,
 };

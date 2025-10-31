@@ -583,47 +583,44 @@ impl Document {
             #[cfg(feature = "rtf")]
             DocumentImpl::Rtf(doc) => {
                 use super::DocumentElement;
-                // For RTF, we need to interleave paragraphs and tables in order
-                // First, get all paragraphs and tables
-                let paragraphs = doc.paragraphs_with_content();
-                let tables = doc.tables();
 
-                // RTF documents store elements in order, so we need to identify
-                // which paragraphs are part of tables and create the elements list
-                // For now, we'll use a simple approach: add all paragraphs first, then tables
-                // TODO: Implement proper RTF element ordering based on RTF structure
+                // Get elements from RTF document (paragraphs followed by tables)
+                let rtf_elements = doc.elements();
                 let mut elements = Vec::new();
 
-                // Convert paragraphs to static lifetime
-                for para in paragraphs {
-                    let owned_para = crate::rtf::ParagraphContent::new(
-                        para.properties,
-                        para.runs
-                            .into_iter()
-                            .map(|r| {
-                                crate::rtf::Run::new(
-                                    std::borrow::Cow::Owned(r.text.into_owned()),
-                                    r.formatting,
-                                )
-                            })
-                            .collect(),
-                    );
-                    elements.push(DocumentElement::Paragraph(Paragraph::Rtf(owned_para)));
-                }
-
-                for table in tables {
-                    let mut owned_table = crate::rtf::Table::new();
-                    for row in table.rows() {
-                        let mut owned_row = crate::rtf::Row::new();
-                        for cell in row.cells() {
-                            let owned_cell = crate::rtf::Cell::new(std::borrow::Cow::Owned(
-                                cell.text().to_string(),
-                            ));
-                            owned_row.add_cell(owned_cell);
-                        }
-                        owned_table.add_row(owned_row);
+                // Convert to owned elements with static lifetime
+                for element in rtf_elements {
+                    match element {
+                        crate::rtf::DocumentElement::Paragraph(para) => {
+                            let owned_para = crate::rtf::ParagraphContent::new(
+                                para.properties,
+                                para.runs
+                                    .into_iter()
+                                    .map(|r| {
+                                        crate::rtf::Run::new(
+                                            std::borrow::Cow::Owned(r.text.into_owned()),
+                                            r.formatting,
+                                        )
+                                    })
+                                    .collect(),
+                            );
+                            elements.push(DocumentElement::Paragraph(Paragraph::Rtf(owned_para)));
+                        },
+                        crate::rtf::DocumentElement::Table(table) => {
+                            let mut owned_table = crate::rtf::Table::new();
+                            for row in table.rows() {
+                                let mut owned_row = crate::rtf::Row::new();
+                                for cell in row.cells() {
+                                    let owned_cell = crate::rtf::Cell::new(
+                                        std::borrow::Cow::Owned(cell.text().to_string()),
+                                    );
+                                    owned_row.add_cell(owned_cell);
+                                }
+                                owned_table.add_row(owned_row);
+                            }
+                            elements.push(DocumentElement::Table(Table::Rtf(owned_table)));
+                        },
                     }
-                    elements.push(DocumentElement::Table(Table::Rtf(owned_table)));
                 }
 
                 Ok(elements)

@@ -243,7 +243,7 @@ impl Cell {
             #[cfg(feature = "rtf")]
             Cell::Rtf(_) => Ok(1), // Not implemented for RTF format
             #[cfg(feature = "odf")]
-            Cell::Odt(_) => Ok(1), // TODO: Implement for ODF format
+            Cell::Odt(_) => Ok(1), // Grid span not available in ODF format (always 1)
         }
     }
 
@@ -263,7 +263,7 @@ impl Cell {
             #[cfg(feature = "rtf")]
             Cell::Rtf(_) => Ok(None), // Not implemented for RTF format
             #[cfg(feature = "odf")]
-            Cell::Odt(_) => Ok(None), // TODO: Implement for ODF format
+            Cell::Odt(_) => Ok(None), // Vertical merge not available in ODF format
         }
     }
 }
