@@ -1,19 +1,26 @@
 //! OOXML format detection (modern Office documents).
 //!
 //! This module is only available when the `ooxml` feature is enabled.
+//!
+//! Uses SIMD-accelerated signature matching for improved performance.
 
 use crate::common::detection::FileFormat;
 use std::io::{Read, Seek};
 
+#[cfg(feature = "ooxml")]
+use crate::common::detection::simd_utils::signature_matches;
+
 /// Detect ZIP-based OOXML formats from byte content.
 /// Uses OpcPackage to properly validate and identify OOXML format.
+/// Uses SIMD-accelerated signature matching.
 ///
 /// # Note
 /// This function requires the `ooxml` feature to be enabled.
 #[cfg(feature = "ooxml")]
 pub fn detect_zip_format(bytes: &[u8]) -> Option<FileFormat> {
-    // Check if it starts with ZIP signature
-    if bytes.len() < 4 || &bytes[0..4] != crate::common::detection::utils::ZIP_SIGNATURE {
+    // Check if it starts with ZIP signature using SIMD
+    if bytes.len() < 4 || !signature_matches(bytes, crate::common::detection::utils::ZIP_SIGNATURE)
+    {
         return None;
     }
 

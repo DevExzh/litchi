@@ -2,8 +2,11 @@
 //!
 //! RTF files have a simple text-based signature that makes them easy to detect.
 //! The signature is `{\rtf` or `{\rtf1` at the start of the file.
+//!
+//! Uses SIMD-accelerated signature matching for improved performance.
 
 use crate::common::detection::FileFormat;
+use crate::common::detection::simd_utils::signature_matches;
 use std::io::{Read, Seek};
 
 /// RTF signature patterns.
@@ -14,7 +17,8 @@ const RTF_SIGNATURE_LEN: usize = 5;
 /// Detect RTF format from byte content.
 ///
 /// RTF files are plain text files that start with `{\rtf` or `{\rtf1`.
-/// This function checks the first few bytes for this signature.
+/// This function checks the first few bytes for this signature using
+/// SIMD-accelerated comparison when available.
 ///
 /// # Arguments
 ///
@@ -24,6 +28,11 @@ const RTF_SIGNATURE_LEN: usize = 5;
 ///
 /// * `Some(FileFormat::Rtf)` if the file is RTF format
 /// * `None` if not RTF format
+///
+/// # Performance
+///
+/// Uses SIMD-optimized signature matching for improved throughput when
+/// processing multiple files.
 ///
 /// # Examples
 ///
@@ -42,8 +51,8 @@ pub fn detect_rtf_format(bytes: &[u8]) -> Option<FileFormat> {
         return None;
     }
 
-    // Check for RTF signature
-    if &bytes[0..RTF_SIGNATURE_LEN] == RTF_SIGNATURE_MIN {
+    // Check for RTF signature using SIMD-accelerated matching
+    if signature_matches(bytes, RTF_SIGNATURE_MIN) {
         return Some(FileFormat::Rtf);
     }
 

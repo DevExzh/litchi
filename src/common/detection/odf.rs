@@ -5,10 +5,14 @@
 //!
 //! ODF files are ZIP archives containing a special "mimetype" file that
 //! must be stored uncompressed as the first file in the archive.
+//!
+//! Uses SIMD-accelerated signature matching for improved performance.
 
 use crate::common::detection::FileFormat;
 use std::io::{Read, Seek};
 
+#[cfg(feature = "odf")]
+use crate::common::detection::simd_utils::signature_matches;
 #[cfg(feature = "odf")]
 use std::io::Cursor;
 
@@ -74,13 +78,14 @@ pub fn detect_odf_format_from_mimetype(mimetype: &[u8]) -> Option<FileFormat> {
 /// # Performance
 ///
 /// This function performs minimal work:
-/// 1. Validates ZIP signature (4 bytes)
+/// 1. Validates ZIP signature (4 bytes) using SIMD acceleration
 /// 2. Opens ZIP archive in-memory
 /// 3. Reads only the mimetype file (typically < 100 bytes)
 #[cfg(feature = "odf")]
 pub fn detect_odf_format(bytes: &[u8]) -> Option<FileFormat> {
-    // Quick validation: check ZIP signature
-    if bytes.len() < 4 || &bytes[0..4] != crate::common::detection::utils::ZIP_SIGNATURE {
+    // Quick validation: check ZIP signature using SIMD
+    if bytes.len() < 4 || !signature_matches(bytes, crate::common::detection::utils::ZIP_SIGNATURE)
+    {
         return None;
     }
 

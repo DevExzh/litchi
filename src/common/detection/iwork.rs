@@ -3,8 +3,12 @@
 //! iWork files follow Apple's bundle format standard where each document
 //! is stored as a directory containing multiple files including Index.zip.
 //! Detection follows the iWork Archive (IWA) format specification.
+//!
+//! Uses SIMD-accelerated signature matching for improved performance.
 
 use crate::common::detection::FileFormat;
+#[cfg(feature = "iwa")]
+use crate::common::detection::simd_utils::signature_matches;
 #[cfg(feature = "iwa")]
 use std::io::Read;
 use std::path::Path;
@@ -12,10 +16,12 @@ use std::path::Path;
 /// Detect iWork formats from bytes.
 /// iWork files can be ZIP archives containing IWA files.
 /// Detection analyzes the ZIP structure and IWA message types.
+/// Uses SIMD-accelerated signature matching.
 #[cfg(feature = "iwa")]
 pub fn detect_iwork_format(bytes: &[u8]) -> Option<FileFormat> {
-    // Check if it starts with ZIP signature
-    if bytes.len() < 4 || &bytes[0..4] != crate::common::detection::utils::ZIP_SIGNATURE {
+    // Check if it starts with ZIP signature using SIMD
+    if bytes.len() < 4 || !signature_matches(bytes, crate::common::detection::utils::ZIP_SIGNATURE)
+    {
         return None;
     }
 
@@ -50,6 +56,7 @@ pub fn detect_iwork_format(_bytes: &[u8]) -> Option<FileFormat> {
 
 /// Detect iWork formats from reader.
 /// iWork files are ZIP archives that can be detected from stream data.
+/// Uses SIMD-accelerated signature matching.
 #[cfg(feature = "iwa")]
 pub fn detect_iwork_format_from_reader<R: std::io::Read + std::io::Seek>(
     reader: &mut R,
@@ -63,8 +70,11 @@ pub fn detect_iwork_format_from_reader<R: std::io::Read + std::io::Seek>(
     // Reset to beginning
     let _ = reader.seek(std::io::SeekFrom::Start(0));
 
-    // Check for ZIP signature
-    if &header[0..4] == crate::common::detection::utils::ZIP_SIGNATURE {
+    // Check for ZIP signature using SIMD
+    if signature_matches(
+        &header[0..4],
+        crate::common::detection::utils::ZIP_SIGNATURE,
+    ) {
         // Try to open as ZIP archive and check for IWA files
         if let Ok(mut archive) = zip::ZipArchive::new(reader) {
             // Check if archive contains IWA files

@@ -14,6 +14,7 @@ pub mod odf;
 pub mod ole2;
 pub mod ooxml;
 pub mod rtf;
+pub mod simd_utils;
 pub mod types;
 pub mod utils;
 

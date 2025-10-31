@@ -11,6 +11,7 @@ pub mod encoding;
 pub mod error;
 pub mod metadata;
 pub mod shapes;
+pub mod simd;
 pub mod style;
 
 // Re-exports for convenience
