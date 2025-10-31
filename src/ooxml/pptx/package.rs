@@ -241,6 +241,48 @@ impl Package {
         Ok(Self { opc })
     }
 
+    /// Create a Package from an already-parsed OPC package.
+    ///
+    /// This is used for single-pass parsing where the OPC package has already
+    /// been parsed during format detection. It avoids double-parsing.
+    ///
+    /// # Arguments
+    ///
+    /// * `opc` - An already-parsed OPC package
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::{OpcPackage, pptx::Package};
+    /// use std::io::Cursor;
+    ///
+    /// let bytes = std::fs::read("presentation.pptx")?;
+    /// let opc = OpcPackage::from_reader(Cursor::new(bytes))?;
+    /// let pkg = Package::from_opc_package(opc)?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn from_opc_package(opc: OpcPackage) -> Result<Self> {
+        // Verify it's a PowerPoint presentation by checking the main part's content type
+        let main_part = opc
+            .main_document_part()
+            .map_err(|e| OoxmlError::PartNotFound(format!("main presentation part: {}", e)))?;
+
+        let content_type = main_part.content_type();
+        // Support both regular and macro-enabled presentations
+        if content_type != ct::PML_PRESENTATION_MAIN && content_type != ct::PML_PRES_MACRO_MAIN {
+            return Err(OoxmlError::InvalidContentType {
+                expected: format!(
+                    "{} or {}",
+                    ct::PML_PRESENTATION_MAIN,
+                    ct::PML_PRES_MACRO_MAIN
+                ),
+                got: content_type.to_string(),
+            });
+        }
+
+        Ok(Self { opc })
+    }
+
     /// Create a .pptx package from a reader.
     ///
     /// # Arguments

@@ -304,53 +304,39 @@ impl PackageReader {
 
     /// Load all parts by walking the relationship graph.
     ///
-    /// Uses depth-first traversal to discover all parts reachable from
+    /// Uses iterative depth-first traversal to discover all parts reachable from
     /// package-level relationships. Tracks visited parts to avoid cycles.
+    /// Optimized for performance with minimal allocations.
     fn load_parts<R: Read + Seek>(
         phys_reader: &mut PhysPkgReader<R>,
         pkg_srels: &[SerializedRelationship],
         content_types: &ContentTypeMap,
     ) -> Result<Vec<SerializedPart>> {
-        let mut sparts = Vec::new();
-        let mut visited = HashMap::new();
+        use std::collections::HashSet;
 
-        Self::walk_parts(
-            phys_reader,
-            pkg_srels,
-            content_types,
-            &mut visited,
-            &mut sparts,
-        )?;
+        // Pre-allocate with reasonable capacity (typical Office docs have 20-50 parts)
+        let mut sparts = Vec::with_capacity(32);
+        let mut visited = HashSet::with_capacity(32);
 
-        Ok(sparts)
-    }
+        // Work queue for iterative traversal - avoids recursion overhead
+        // SmallVec optimizes for typical small relationship counts
+        let mut work_queue: Vec<(PackURI, String)> = Vec::with_capacity(pkg_srels.len());
 
-    /// Recursively walk the part relationship graph.
-    ///
-    /// This performs depth-first traversal of the part tree, loading each
-    /// part and its relationships. Uses a visited map to detect cycles.
-    fn walk_parts<R: Read + Seek>(
-        phys_reader: &mut PhysPkgReader<R>,
-        srels: &[SerializedRelationship],
-        content_types: &ContentTypeMap,
-        visited: &mut HashMap<String, ()>,
-        sparts: &mut Vec<SerializedPart>,
-    ) -> Result<()> {
-        for srel in srels {
-            // Skip external relationships
+        // Initialize work queue with package-level relationships
+        for srel in pkg_srels {
             if srel.is_external() {
                 continue;
             }
-
-            let partname = srel.target_partname()?;
-            let partname_str = partname.to_string();
-
-            // Skip if already visited
-            if visited.contains_key(&partname_str) {
-                continue;
+            if let Ok(partname) = srel.target_partname() {
+                let partname_str = partname.to_string();
+                if visited.insert(partname_str.clone()) {
+                    work_queue.push((partname, srel.reltype.clone()));
+                }
             }
-            visited.insert(partname_str, ());
+        }
 
+        // Iterative depth-first traversal
+        while let Some((partname, reltype)) = work_queue.pop() {
             // Load part content
             let blob = phys_reader.blob_for(&partname)?;
             let content_type = content_types.get(&partname)?;
@@ -358,21 +344,32 @@ impl PackageReader {
             // Load part relationships
             let part_srels = Self::load_rels(phys_reader, &partname)?;
 
-            // Create serialized part
-            let spart = SerializedPart {
-                partname: partname.clone(),
-                content_type,
-                reltype: srel.reltype.clone(),
-                blob,
-                srels: part_srels.clone(),
-            };
-            sparts.push(spart);
+            // Add child parts to work queue before creating SerializedPart
+            // This allows us to move part_srels instead of cloning
+            for child_srel in &part_srels {
+                if child_srel.is_external() {
+                    continue;
+                }
+                if let Ok(child_partname) = child_srel.target_partname() {
+                    let child_partname_str = child_partname.to_string();
+                    // HashSet::insert returns true if the value was newly inserted
+                    if visited.insert(child_partname_str) {
+                        work_queue.push((child_partname, child_srel.reltype.clone()));
+                    }
+                }
+            }
 
-            // Recursively load related parts
-            Self::walk_parts(phys_reader, &part_srels, content_types, visited, sparts)?;
+            // Create serialized part - move part_srels instead of cloning
+            sparts.push(SerializedPart {
+                partname,
+                content_type,
+                reltype,
+                blob,
+                srels: part_srels,
+            });
         }
 
-        Ok(())
+        Ok(sparts)
     }
 
     /// Get an iterator over all serialized parts.

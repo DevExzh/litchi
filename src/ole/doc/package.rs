@@ -126,6 +126,37 @@ impl<R: Read + Seek> Package<R> {
         Ok(Self { ole })
     }
 
+    /// Create a Package from an already-parsed OLE file.
+    ///
+    /// This is used for single-pass parsing where the OLE file has already
+    /// been parsed during format detection. It avoids double-parsing.
+    ///
+    /// # Arguments
+    ///
+    /// * `ole` - An already-parsed OLE file
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ole::{OleFile, doc::Package};
+    /// use std::io::Cursor;
+    ///
+    /// let bytes = std::fs::read("document.doc")?;
+    /// let ole = OleFile::open(Cursor::new(bytes))?;
+    /// let pkg = Package::from_ole_file(ole)?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn from_ole_file(ole: OleFile<R>) -> Result<Self> {
+        // Verify it's a Word document by checking for the WordDocument stream
+        if !ole.exists(&["WordDocument"]) {
+            return Err(DocError::InvalidFormat(
+                "Not a valid Word document: WordDocument stream not found".to_string(),
+            ));
+        }
+
+        Ok(Self { ole })
+    }
+
     /// Get the main document.
     ///
     /// Returns the `Document` object which provides access to the document's

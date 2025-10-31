@@ -91,6 +91,32 @@ impl Bundle {
         })
     }
 
+    /// Create a Bundle from an already-parsed ZIP archive.
+    ///
+    /// This is used for single-pass parsing where the ZIP archive has already
+    /// been parsed during format detection. It avoids double-parsing.
+    pub fn from_zip_archive(mut zip_archive: ZipArchive<std::io::Cursor<Vec<u8>>>) -> Result<Self> {
+        // Parse IWA files from the ZIP archive
+        let archives = parse_iwa_files_from_zip(&mut zip_archive)?;
+
+        // For single-file bundles, metadata is typically embedded
+        let metadata = BundleMetadata {
+            has_properties: true, // Assume it has properties
+            has_build_version_history: true,
+            has_document_identifier: true,
+            detected_application: None,
+            properties: HashMap::new(),
+            build_versions: Vec::new(),
+            document_id: None,
+        };
+
+        Ok(Bundle {
+            bundle_path: std::path::PathBuf::from("<zip_archive>"), // Placeholder path
+            archives,
+            metadata,
+        })
+    }
+
     /// Open a traditional directory-based bundle
     fn open_directory_bundle(bundle_path: &Path) -> Result<Self> {
         // Check for required bundle structure

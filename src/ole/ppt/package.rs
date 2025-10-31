@@ -126,6 +126,37 @@ impl<R: Read + Seek> Package<R> {
         Ok(Self { ole })
     }
 
+    /// Create a Package from an already-parsed OLE file.
+    ///
+    /// This is used for single-pass parsing where the OLE file has already
+    /// been parsed during format detection. It avoids double-parsing.
+    ///
+    /// # Arguments
+    ///
+    /// * `ole` - An already-parsed OLE file
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ole::{OleFile, ppt::Package};
+    /// use std::io::Cursor;
+    ///
+    /// let bytes = std::fs::read("presentation.ppt")?;
+    /// let ole = OleFile::open(Cursor::new(bytes))?;
+    /// let pkg = Package::from_ole_file(ole)?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn from_ole_file(ole: OleFile<R>) -> Result<Self> {
+        // Verify it's a PowerPoint document by checking for the PowerPoint Document stream
+        if !ole.exists(&["PowerPoint Document"]) {
+            return Err(PptError::InvalidFormat(
+                "Not a valid PowerPoint document: PowerPoint Document stream not found".to_string(),
+            ));
+        }
+
+        Ok(Self { ole })
+    }
+
     /// Get the main presentation.
     ///
     /// Returns the `Presentation` object which provides access to the presentation's

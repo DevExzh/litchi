@@ -34,6 +34,24 @@ impl<R: Read + Seek> Package<R> {
         })
     }
 
+    /// Create an ODF package from an already-parsed ZIP archive.
+    ///
+    /// This is used for single-pass parsing where the ZIP archive has already
+    /// been parsed during format detection. It avoids double-parsing.
+    pub fn from_zip_archive(mut archive: zip::ZipArchive<R>) -> Result<Self> {
+        // Read MIME type from mimetype file
+        let mimetype = Self::read_mimetype(&mut archive)?;
+
+        // Parse the manifest
+        let manifest = super::manifest::Manifest::from_archive(&mut archive)?;
+
+        Ok(Self {
+            archive: RefCell::new(archive),
+            manifest,
+            mimetype,
+        })
+    }
+
     /// Read MIME type from the mimetype file
     fn read_mimetype(archive: &mut zip::ZipArchive<R>) -> Result<String> {
         let mut mimetype_file = archive.by_name("mimetype").map_err(|_| {

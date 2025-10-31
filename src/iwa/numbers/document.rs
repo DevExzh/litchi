@@ -64,6 +64,22 @@ impl NumbersDocument {
         })
     }
 
+    /// Create a Numbers document from an already-parsed ZIP archive.
+    ///
+    /// This is used for single-pass parsing where the ZIP archive has already
+    /// been parsed during format detection. It avoids double-parsing.
+    pub fn from_zip_archive(
+        zip_archive: zip::ZipArchive<std::io::Cursor<Vec<u8>>>,
+    ) -> Result<Self> {
+        let bundle = Bundle::from_zip_archive(zip_archive)?;
+        let object_index = ObjectIndex::from_bundle(&bundle)?;
+
+        Ok(Self {
+            bundle,
+            object_index,
+        })
+    }
+
     /// Extract all text content from the document
     ///
     /// # Examples

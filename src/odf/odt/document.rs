@@ -170,6 +170,69 @@ impl Document {
         })
     }
 
+    /// Create an ODT document from an already-parsed ZIP archive.
+    ///
+    /// This is used for single-pass parsing where the ZIP archive has already
+    /// been parsed during format detection. It avoids double-parsing.
+    pub fn from_zip_archive(
+        zip_archive: zip::ZipArchive<std::io::Cursor<Vec<u8>>>,
+    ) -> Result<Self> {
+        let package = Package::from_zip_archive(zip_archive)?;
+
+        // Verify this is a text document
+        let mime_type = package.mimetype();
+        if !mime_type.contains("opendocument.text") {
+            return Err(Error::InvalidFormat(format!(
+                "Not an ODT file: MIME type is {}",
+                mime_type
+            )));
+        }
+
+        // Parse core components
+        let content_bytes = package.get_file("content.xml")?;
+        let content = Content::from_bytes(&content_bytes)?;
+
+        let styles = if package.has_file("styles.xml") {
+            let styles_bytes = package.get_file("styles.xml")?;
+            Some(Styles::from_bytes(&styles_bytes)?)
+        } else {
+            None
+        };
+
+        let meta = if package.has_file("meta.xml") {
+            let meta_bytes = package.get_file("meta.xml")?;
+            Some(Meta::from_bytes(&meta_bytes)?)
+        } else {
+            None
+        };
+
+        // Initialize style registry
+        let mut style_registry = StyleRegistry::default();
+
+        // Parse styles from styles.xml if available
+        if let Some(ref styles_part) = styles
+            && let Ok(registry) = StyleElements::parse_styles(styles_part.xml_content())
+        {
+            style_registry = registry;
+        }
+
+        // Also parse styles from content.xml (automatic styles)
+        if let Ok(content_registry) = StyleElements::parse_styles(content.xml_content()) {
+            // Merge content styles into main registry (content styles take precedence)
+            for (_name, style) in content_registry.styles {
+                style_registry.add_style(style);
+            }
+        }
+
+        Ok(Self {
+            package,
+            content,
+            styles,
+            meta,
+            style_registry,
+        })
+    }
+
     /// Extract all text content from the document.
     ///
     /// This method extracts plain text from all paragraphs, headings, and text elements

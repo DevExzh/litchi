@@ -45,6 +45,29 @@ impl XlsbWorkbook {
         Ok(workbook)
     }
 
+    /// Create an XLSB workbook from an already-parsed OPC package.
+    ///
+    /// This is used for single-pass parsing where the OPC package has already
+    /// been parsed during format detection. It avoids double-parsing.
+    ///
+    /// # Arguments
+    ///
+    /// * `package` - An already-parsed OPC package
+    pub fn from_opc_package(package: OpcPackage) -> XlsbResult<Self> {
+        let mut workbook = XlsbWorkbook {
+            package,
+            worksheets: Vec::new(),
+            worksheet_names: Vec::new(),
+            shared_strings: Vec::new(),
+            is_1904: false,
+        };
+
+        workbook.load_workbook_info()?;
+        workbook.load_shared_strings()?;
+
+        Ok(workbook)
+    }
+
     /// Load workbook information from workbook.bin
     fn load_workbook_info(&mut self) -> XlsbResult<()> {
         let workbook_uri = crate::ooxml::opc::PackURI::new("/xl/workbook.bin")?;

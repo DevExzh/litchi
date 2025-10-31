@@ -26,6 +26,7 @@ pub(super) enum WorkbookImpl {
 
     // Legacy OLE-based Excel
     #[cfg(feature = "ole")]
+    #[allow(dead_code)] // Kept for compatibility with old code
     XlsFile(crate::ole::xls::XlsWorkbook<std::io::BufReader<std::fs::File>>),
     #[cfg(feature = "ole")]
     XlsMem(crate::ole::xls::XlsWorkbook<std::io::Cursor<Vec<u8>>>),
@@ -57,7 +58,8 @@ pub(super) enum WorkbookFormat {
 }
 
 /// Detect workbook format from file signature.
-pub(super) fn detect_workbook_format_from_signature<R: Read + Seek>(
+#[allow(dead_code)] // For format detection, it is better to use the smart detection function, but the function is still useful for other purposes
+pub fn detect_workbook_format_from_signature<R: Read + Seek>(
     reader: &mut R,
 ) -> Result<WorkbookFormat> {
     let mut header = [0u8; 8];
@@ -80,7 +82,8 @@ pub(super) fn detect_workbook_format_from_signature<R: Read + Seek>(
 }
 
 /// Refine ZIP-based workbook format detection (XLSX vs XLSB vs Numbers)
-pub(super) fn refine_workbook_format<R: Read + Seek>(
+#[allow(dead_code)] // For format detection, it is better to use the smart detection function, but the function is still useful for other purposes
+pub fn refine_workbook_format<R: Read + Seek>(
     reader: &mut R,
     initial_format: WorkbookFormat,
 ) -> Result<WorkbookFormat> {

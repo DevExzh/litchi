@@ -198,6 +198,43 @@ impl Package {
         Ok(Self { opc })
     }
 
+    /// Create a Package from an already-parsed OPC package.
+    ///
+    /// This is used for single-pass parsing where the OPC package has already
+    /// been parsed during format detection. It avoids double-parsing.
+    ///
+    /// # Arguments
+    ///
+    /// * `opc` - An already-parsed OPC package
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::{OpcPackage, docx::Package};
+    /// use std::io::Cursor;
+    ///
+    /// let bytes = std::fs::read("document.docx")?;
+    /// let opc = OpcPackage::from_reader(Cursor::new(bytes))?;
+    /// let pkg = Package::from_opc_package(opc)?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn from_opc_package(opc: OpcPackage) -> Result<Self> {
+        // Verify it's a Word document by checking the main part's content type
+        let main_part = opc
+            .main_document_part()
+            .map_err(|e| OoxmlError::PartNotFound(format!("main document part: {}", e)))?;
+
+        let content_type = main_part.content_type();
+        if content_type != ct::WML_DOCUMENT_MAIN {
+            return Err(OoxmlError::InvalidContentType {
+                expected: ct::WML_DOCUMENT_MAIN.to_string(),
+                got: content_type.to_string(),
+            });
+        }
+
+        Ok(Self { opc })
+    }
+
     /// Create a .docx package from a reader.
     ///
     /// # Arguments

@@ -128,6 +128,50 @@ impl Spreadsheet {
         })
     }
 
+    /// Create an ODS spreadsheet from an already-parsed ZIP archive.
+    ///
+    /// This is used for single-pass parsing where the ZIP archive has already
+    /// been parsed during format detection. It avoids double-parsing.
+    pub fn from_zip_archive(
+        zip_archive: zip::ZipArchive<std::io::Cursor<Vec<u8>>>,
+    ) -> Result<Self> {
+        let package = Package::from_zip_archive(zip_archive)?;
+
+        // Verify this is a spreadsheet
+        let mime_type = package.mimetype();
+        if !mime_type.contains("opendocument.spreadsheet") {
+            return Err(Error::InvalidFormat(format!(
+                "Not an ODS file: MIME type is {}",
+                mime_type
+            )));
+        }
+
+        // Parse core components
+        let content_bytes = package.get_file("content.xml")?;
+        let content = Content::from_bytes(&content_bytes)?;
+
+        let styles = if package.has_file("styles.xml") {
+            let styles_bytes = package.get_file("styles.xml")?;
+            Some(Styles::from_bytes(&styles_bytes)?)
+        } else {
+            None
+        };
+
+        let meta = if package.has_file("meta.xml") {
+            let meta_bytes = package.get_file("meta.xml")?;
+            Some(Meta::from_bytes(&meta_bytes)?)
+        } else {
+            None
+        };
+
+        Ok(Self {
+            package,
+            content,
+            styles,
+            meta,
+        })
+    }
+
     /// Get the number of sheets in the spreadsheet.
     pub fn sheet_count(&mut self) -> Result<usize> {
         let sheets = self.sheets()?;

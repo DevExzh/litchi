@@ -67,7 +67,8 @@ pub(super) enum DocumentFormat {
 ///
 /// * `Ok(DocumentFormat)` if a supported document format is detected
 /// * `Err(Error)` if the format is not recognized or unsupported
-pub(super) fn detect_document_format<R: Read + Seek>(reader: &mut R) -> Result<DocumentFormat> {
+#[allow(dead_code)] // For format detection, it is better to use the smart detection function, but the function is still useful for other purposes
+pub fn detect_document_format<R: Read + Seek>(reader: &mut R) -> Result<DocumentFormat> {
     // Use the common detection module
     let file_format = detection::detect_format_from_reader(reader).ok_or(Error::NotOfficeFile)?;
 
@@ -89,7 +90,8 @@ pub(super) fn detect_document_format<R: Read + Seek>(reader: &mut R) -> Result<D
 /// * `Ok(DocumentFormat)` if a supported document format is detected
 /// * `Err(Error)` if the format is not recognized or unsupported
 #[inline]
-pub(super) fn detect_document_format_from_bytes(bytes: &[u8]) -> Result<DocumentFormat> {
+#[allow(dead_code)] // For format detection, it is better to use the smart detection function, but the function is still useful for other purposes
+pub fn detect_document_format_from_bytes(bytes: &[u8]) -> Result<DocumentFormat> {
     if bytes.len() < 4 {
         return Err(Error::InvalidFormat(
             "File too small to determine format".to_string(),

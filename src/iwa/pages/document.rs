@@ -71,6 +71,26 @@ impl PagesDocument {
         })
     }
 
+    /// Create a Pages document from an already-parsed ZIP archive.
+    ///
+    /// This is used for single-pass parsing where the ZIP archive has already
+    /// been parsed during format detection. It avoids double-parsing.
+    pub fn from_zip_archive(
+        zip_archive: zip::ZipArchive<std::io::Cursor<Vec<u8>>>,
+    ) -> Result<Self> {
+        let bundle = Bundle::from_zip_archive(zip_archive)?;
+
+        // Verify this is a Pages document
+        Self::verify_application(&bundle)?;
+
+        let object_index = ObjectIndex::from_bundle(&bundle)?;
+
+        Ok(Self {
+            bundle,
+            object_index,
+        })
+    }
+
     /// Verify that the bundle is a Pages document
     fn verify_application(bundle: &Bundle) -> Result<()> {
         // Check for Pages-specific message types (TP.* types in range 10000-10999)

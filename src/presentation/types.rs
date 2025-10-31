@@ -77,9 +77,8 @@ pub(super) enum PresentationFormat {
 ///
 /// * `Ok(PresentationFormat)` if a supported presentation format is detected
 /// * `Err(Error)` if the format is not recognized or unsupported
-pub(super) fn detect_presentation_format<R: Read + Seek>(
-    reader: &mut R,
-) -> Result<PresentationFormat> {
+#[allow(dead_code)] // For format detection, it is better to use the smart detection function, but the function is still useful for other purposes
+pub fn detect_presentation_format<R: Read + Seek>(reader: &mut R) -> Result<PresentationFormat> {
     // Use the common detection module
     let file_format = detection::detect_format_from_reader(reader).ok_or(Error::NotOfficeFile)?;
 
@@ -101,7 +100,8 @@ pub(super) fn detect_presentation_format<R: Read + Seek>(
 /// * `Ok(PresentationFormat)` if a supported presentation format is detected
 /// * `Err(Error)` if the format is not recognized or unsupported
 #[inline]
-pub(super) fn detect_presentation_format_from_bytes(bytes: &[u8]) -> Result<PresentationFormat> {
+#[allow(dead_code)] // For format detection, it is better to use the smart detection function, but the function is still useful for other purposes
+pub fn detect_presentation_format_from_bytes(bytes: &[u8]) -> Result<PresentationFormat> {
     if bytes.len() < 4 {
         return Err(Error::InvalidFormat(
             "File too small to determine format".to_string(),

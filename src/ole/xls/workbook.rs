@@ -42,6 +42,28 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         Ok(workbook)
     }
 
+    /// Create an XLS workbook from an already-parsed OLE file.
+    ///
+    /// This is used for single-pass parsing where the OLE file has already
+    /// been parsed during format detection. It avoids double-parsing.
+    ///
+    /// # Arguments
+    ///
+    /// * `ole_file` - An already-parsed OLE file
+    pub fn from_ole_file(ole_file: OleFile<R>) -> XlsResult<Self> {
+        let mut workbook = XlsWorkbook {
+            ole_file,
+            worksheets: Vec::new(),
+            worksheet_names: Vec::new(),
+            shared_strings: None,
+            biff_version: BiffVersion::Biff8,
+            is_1904_date_system: false,
+        };
+
+        workbook.parse_workbook()?;
+        Ok(workbook)
+    }
+
     /// Parse the workbook stream
     fn parse_workbook(&mut self) -> XlsResult<()> {
         // Find and read the Workbook stream

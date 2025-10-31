@@ -125,6 +125,50 @@ impl Presentation {
         })
     }
 
+    /// Create an ODP presentation from an already-parsed ZIP archive.
+    ///
+    /// This is used for single-pass parsing where the ZIP archive has already
+    /// been parsed during format detection. It avoids double-parsing.
+    pub fn from_zip_archive(
+        zip_archive: zip::ZipArchive<std::io::Cursor<Vec<u8>>>,
+    ) -> Result<Self> {
+        let package = Package::from_zip_archive(zip_archive)?;
+
+        // Verify this is a presentation
+        let mime_type = package.mimetype();
+        if !mime_type.contains("opendocument.presentation") {
+            return Err(Error::InvalidFormat(format!(
+                "Not an ODP file: MIME type is {}",
+                mime_type
+            )));
+        }
+
+        // Parse core components
+        let content_bytes = package.get_file("content.xml")?;
+        let content = Content::from_bytes(&content_bytes)?;
+
+        let styles = if package.has_file("styles.xml") {
+            let styles_bytes = package.get_file("styles.xml")?;
+            Some(Styles::from_bytes(&styles_bytes)?)
+        } else {
+            None
+        };
+
+        let meta = if package.has_file("meta.xml") {
+            let meta_bytes = package.get_file("meta.xml")?;
+            Some(Meta::from_bytes(&meta_bytes)?)
+        } else {
+            None
+        };
+
+        Ok(Self {
+            package,
+            content,
+            styles,
+            meta,
+        })
+    }
+
     /// Get the number of slides in the presentation.
     pub fn slide_count(&self) -> Result<usize> {
         let slides = self.slides()?;
