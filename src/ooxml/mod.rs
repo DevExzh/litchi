@@ -1,3 +1,4 @@
+pub mod common;
 pub mod docx;
 pub mod error;
 pub mod metadata;
@@ -48,6 +49,9 @@ pub use opc::{OpcPackage, PackURI};
 
 // Re-export shared utilities
 pub use shared::{Length, RGBColor};
+
+// Re-export common utilities
+pub use common::DocumentProperties;
 
 // Re-export error types
 pub use error::{OoxmlError, Result};

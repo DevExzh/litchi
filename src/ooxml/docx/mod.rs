@@ -50,6 +50,7 @@
 /// ```
 pub mod document;
 pub mod enums;
+pub mod format;
 pub mod package;
 pub mod paragraph;
 pub mod parts;
@@ -57,6 +58,7 @@ pub mod section;
 pub mod styles;
 pub mod table;
 pub mod template;
+pub mod writer;
 
 pub use document::Document;
 pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
@@ -65,3 +67,11 @@ pub use paragraph::{Paragraph, Run, RunProperties};
 pub use section::{Emu, Margins, PageSize, Section, Sections};
 pub use styles::{Style, Styles};
 pub use table::{Cell, Row, Table, VMergeState};
+// Re-export shared formatting types
+pub use format::{ImageFormat, LineSpacing, ParagraphAlignment, TableBorderStyle, UnderlineStyle};
+// Re-export writer types
+pub use writer::{
+    CellProperties, ListType, MutableDocument, MutableHyperlink, MutableInlineImage,
+    MutableParagraph, MutableRun, MutableTable, Note, PageNumberFormat, PageOrientation,
+    RunContent, SectionProperties, TableBorder, TableBorders,
+};

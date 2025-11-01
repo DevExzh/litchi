@@ -221,6 +221,25 @@ impl OpcPackage {
         rel.r_id().to_string()
     }
 
+    /// Add an external relationship (e.g., for hyperlinks).
+    ///
+    /// # Arguments
+    /// * `target_url` - External URL target
+    /// * `reltype` - Relationship type
+    ///
+    /// # Returns
+    /// The relationship ID (e.g., "rId1")
+    pub fn relate_to_external(&mut self, target_url: &str, reltype: &str) -> String {
+        self.rels.get_or_add_ext_rel(reltype, target_url)
+    }
+
+    /// Get mutable access to package-level relationships.
+    ///
+    /// Useful for advanced relationship management.
+    pub fn relationships_mut(&mut self) -> &mut Relationships {
+        &mut self.rels
+    }
+
     /// Find the next available partname for a part template.
     ///
     /// Useful for creating new parts with sequential numbering (e.g., image1.png, image2.png).

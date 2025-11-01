@@ -1,9 +1,12 @@
+use crate::ooxml::common::DocumentProperties;
 use crate::ooxml::docx::document::Document;
 use crate::ooxml::docx::parts::DocumentPart;
+use crate::ooxml::docx::writer::MutableDocument;
 /// Package implementation for Word documents.
 use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::opc::OpcPackage;
 use crate::ooxml::opc::constants::content_type as ct;
+use crate::ooxml::opc::packuri::PackURI;
 use std::io::{Read, Seek};
 use std::path::Path;
 
@@ -13,6 +16,8 @@ use std::path::Path;
 /// It wraps an OPC package and provides Word-specific functionality.
 ///
 /// # Examples
+///
+/// ## Reading an existing document
 ///
 /// ```rust,no_run
 /// use litchi::ooxml::docx::Package;
@@ -24,9 +29,31 @@ use std::path::Path;
 /// let doc = pkg.document()?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+///
+/// ## Creating a new document
+///
+/// ```rust,no_run
+/// use litchi::ooxml::docx::Package;
+///
+/// // Create a new document
+/// let mut pkg = Package::new()?;
+/// let mut doc = pkg.document_mut()?;
+///
+/// // Add content
+/// doc.add_paragraph_with_text("Hello, World!");
+/// doc.add_heading("Chapter 1", 1)?;
+///
+/// // Save the document
+/// pkg.save("output.docx")?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
 pub struct Package {
     /// The underlying OPC package
     opc: OpcPackage,
+    /// Mutable document for writing (cached)
+    mutable_doc: Option<MutableDocument>,
+    /// Document properties (metadata)
+    properties: DocumentProperties,
 }
 
 impl Package {
@@ -162,7 +189,17 @@ impl Package {
         }
         opc.add_part(Box::new(theme_part));
 
-        Ok(Self { opc })
+        // Create a mutable document for writing
+        let mutable_doc = Some(MutableDocument::new());
+
+        // Initialize document properties
+        let properties = DocumentProperties::new();
+
+        Ok(Self {
+            opc,
+            mutable_doc,
+            properties,
+        })
     }
 
     /// Open a .docx package from a file path.
@@ -195,7 +232,11 @@ impl Package {
             });
         }
 
-        Ok(Self { opc })
+        Ok(Self {
+            opc,
+            mutable_doc: None,
+            properties: DocumentProperties::new(),
+        })
     }
 
     /// Create a Package from an already-parsed OPC package.
@@ -232,7 +273,11 @@ impl Package {
             });
         }
 
-        Ok(Self { opc })
+        Ok(Self {
+            opc,
+            mutable_doc: None,
+            properties: DocumentProperties::new(),
+        })
     }
 
     /// Create a .docx package from a reader.
@@ -268,10 +313,14 @@ impl Package {
             });
         }
 
-        Ok(Self { opc })
+        Ok(Self {
+            opc,
+            mutable_doc: None,
+            properties: DocumentProperties::new(),
+        })
     }
 
-    /// Get the main document.
+    /// Get the main document for reading.
     ///
     /// Returns the `Document` object which provides access to the document's
     /// content, styles, and other features.
@@ -314,6 +363,51 @@ impl Package {
         &mut self.opc
     }
 
+    /// Get a mutable document for writing and modification.
+    ///
+    /// This returns a `MutableDocument` that allows you to add and modify
+    /// paragraphs, tables, and other document elements.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::docx::Package;
+    ///
+    /// let mut pkg = Package::new()?;
+    /// let mut doc = pkg.document_mut()?;
+    ///
+    /// // Add content
+    /// doc.add_paragraph_with_text("Hello, World!");
+    /// let para = doc.add_paragraph();
+    /// para.add_run_with_text("Bold text").bold(true);
+    ///
+    /// // Add a table
+    /// let table = doc.add_table(3, 2);
+    /// table.cell(0, 0).unwrap().set_text("Header 1");
+    ///
+    /// pkg.save("output.docx")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn document_mut(&mut self) -> Result<&mut MutableDocument> {
+        // If we don't have a mutable document, try to load it from the package
+        if self.mutable_doc.is_none() {
+            let doc_uri = PackURI::new("/word/document.xml")
+                .map_err(|e| OoxmlError::InvalidUri(format!("document URI: {}", e)))?;
+
+            // Try to get existing document content
+            if let Ok(part) = self.opc.get_part(&doc_uri) {
+                let xml = std::str::from_utf8(part.blob())
+                    .map_err(|e| OoxmlError::InvalidFormat(format!("Invalid UTF-8: {}", e)))?;
+                self.mutable_doc = Some(MutableDocument::from_xml(xml)?);
+            } else {
+                // Create a new empty document
+                self.mutable_doc = Some(MutableDocument::new());
+            }
+        }
+
+        Ok(self.mutable_doc.as_mut().unwrap())
+    }
+
     /// Save the package to a file.
     ///
     /// Writes the complete Word document including all parts, relationships,
@@ -332,13 +426,228 @@ impl Package {
     /// pkg.save("output.docx")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+    pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        use crate::ooxml::docx::writer::relmap::RelationshipMapper;
+        use crate::ooxml::opc::constants::relationship_type as rt;
+
+        // If we have a mutable document, update the document.xml part
+        if let Some(mutable_doc) = self.mutable_doc.take() {
+            if mutable_doc.is_modified() {
+                // Step 1: Collect all content that needs relationships
+                let hyperlink_urls = mutable_doc.collect_hyperlink_urls();
+                let images = mutable_doc.collect_images();
+                let has_header = mutable_doc.has_header();
+                let has_footer = mutable_doc.has_footer();
+
+                // Step 2: Create a relationship mapper and add relationships
+                let mut rel_mapper = RelationshipMapper::new();
+
+                // Create the document part first (we'll update it later)
+                let doc_uri = PackURI::new("/word/document.xml")
+                    .map_err(|e| OoxmlError::InvalidUri(format!("document URI: {}", e)))?;
+
+                // Get or create the document part to add relationships to
+                let content_type = self
+                    .opc
+                    .get_part(&doc_uri)
+                    .map(|p| p.content_type().to_string())
+                    .unwrap_or_else(|_| ct::WML_DOCUMENT_MAIN.to_string());
+
+                // Create new temporary part for relationships
+                use crate::ooxml::opc::part::{BlobPart, Part};
+                let mut temp_part =
+                    BlobPart::new(doc_uri.clone(), content_type.clone(), Vec::new());
+
+                // Add hyperlink relationships (external)
+                for (i, url) in hyperlink_urls.iter().enumerate() {
+                    let rid = temp_part.relate_to_ext(url, rt::HYPERLINK);
+                    rel_mapper.add_hyperlink(i, rid);
+                }
+
+                // Add image parts and relationships
+                for (i, (image_data, image_format)) in images.iter().enumerate() {
+                    let image_num = i + 1;
+                    let ext = image_format.extension();
+                    let image_partname = format!("/word/media/image{}.{}", image_num, ext);
+                    let image_uri = PackURI::new(&image_partname)
+                        .map_err(|e| OoxmlError::InvalidUri(format!("image URI: {}", e)))?;
+
+                    // Create and add image part
+                    let image_part = BlobPart::new(
+                        image_uri,
+                        image_format.mime_type().to_string(),
+                        image_data.to_vec(),
+                    );
+                    self.opc.add_part(Box::new(image_part));
+
+                    // Create relationship from document to image
+                    let rid = temp_part.relate_to(&image_partname, rt::IMAGE);
+                    rel_mapper.add_image(i, rid);
+                }
+
+                // Add header/footer parts and relationships
+                if has_header && let Some(header_xml) = mutable_doc.generate_header_xml()? {
+                    let header_uri = PackURI::new("/word/header1.xml")
+                        .map_err(|e| OoxmlError::InvalidUri(format!("header URI: {}", e)))?;
+                    let header_part = BlobPart::new(
+                        header_uri,
+                        ct::WML_HEADER.to_string(),
+                        header_xml.into_bytes(),
+                    );
+                    self.opc.add_part(Box::new(header_part));
+                    let rid = temp_part.relate_to("/word/header1.xml", rt::HEADER);
+                    rel_mapper.set_header_id(rid);
+                }
+
+                if has_footer && let Some(footer_xml) = mutable_doc.generate_footer_xml()? {
+                    let footer_uri = PackURI::new("/word/footer1.xml")
+                        .map_err(|e| OoxmlError::InvalidUri(format!("footer URI: {}", e)))?;
+                    let footer_part = BlobPart::new(
+                        footer_uri,
+                        ct::WML_FOOTER.to_string(),
+                        footer_xml.into_bytes(),
+                    );
+                    self.opc.add_part(Box::new(footer_part));
+                    let rid = temp_part.relate_to("/word/footer1.xml", rt::FOOTER);
+                    rel_mapper.set_footer_id(rid);
+                }
+
+                // Step 3: Generate XML with actual relationship IDs
+                let xml = mutable_doc.to_xml_with_rels(&rel_mapper)?;
+
+                // Step 4: Update the document part with final XML and relationships
+                temp_part.set_blob(xml.into_bytes());
+                self.opc.add_part(Box::new(temp_part));
+
+                // Update footnotes if present
+                if let Some(footnotes_xml) = mutable_doc.generate_footnotes_xml()? {
+                    self.update_footnotes_part(footnotes_xml)?;
+                }
+
+                // Update endnotes if present
+                if let Some(endnotes_xml) = mutable_doc.generate_endnotes_xml()? {
+                    self.update_endnotes_part(endnotes_xml)?;
+                }
+            }
+            // Put the document back
+            self.mutable_doc = Some(mutable_doc);
+        }
+
+        // Update core properties
+        self.update_core_properties()?;
+
         self.opc.save(path).map_err(|e| {
             OoxmlError::IoError(std::io::Error::other(format!(
                 "Failed to save package: {}",
                 e
             )))
         })
+    }
+
+    /// Get a reference to the document properties.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::docx::Package;
+    ///
+    /// let pkg = Package::open("document.docx")?;
+    /// let props = pkg.properties();
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn properties(&self) -> &DocumentProperties {
+        &self.properties
+    }
+
+    /// Get a mutable reference to the document properties.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::docx::Package;
+    ///
+    /// let mut pkg = Package::new()?;
+    /// pkg.properties_mut().title = Some("My Document".to_string());
+    /// pkg.properties_mut().creator = Some("John Doe".to_string());
+    /// pkg.save("document.docx")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn properties_mut(&mut self) -> &mut DocumentProperties {
+        &mut self.properties
+    }
+
+    /// Update the core.xml properties part.
+    fn update_core_properties(&mut self) -> Result<()> {
+        use crate::ooxml::opc::part::BlobPart;
+
+        let core_uri = PackURI::new("/docProps/core.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("core.xml URI: {}", e)))?;
+
+        // Generate XML from properties
+        let xml = self.properties.to_xml();
+
+        // Create or update the core properties part
+        let core_part = BlobPart::new(
+            core_uri,
+            ct::OPC_CORE_PROPERTIES.to_string(),
+            xml.into_bytes(),
+        );
+
+        self.opc.add_part(Box::new(core_part));
+
+        Ok(())
+    }
+
+    /// Update the footnotes.xml part with new content.
+    fn update_footnotes_part(&mut self, xml: String) -> Result<()> {
+        use crate::ooxml::opc::constants::content_type as ct;
+        use crate::ooxml::opc::constants::relationship_type as rt;
+        use crate::ooxml::opc::part::BlobPart;
+
+        let footnotes_uri = PackURI::new("/word/footnotes.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("footnotes URI: {}", e)))?;
+
+        let content_type = ct::WML_FOOTNOTES.to_string();
+        let footnotes_part = BlobPart::new(footnotes_uri.clone(), content_type, xml.into_bytes());
+
+        // Add the footnotes part
+        self.opc.add_part(Box::new(footnotes_part));
+
+        // Create relationship from document to footnotes
+        let doc_uri = PackURI::new("/word/document.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("document URI: {}", e)))?;
+
+        if let Ok(doc_part) = self.opc.get_part_mut(&doc_uri) {
+            let _ = doc_part.relate_to("/word/footnotes.xml", rt::FOOTNOTES);
+        }
+
+        Ok(())
+    }
+
+    /// Update the endnotes.xml part with new content.
+    fn update_endnotes_part(&mut self, xml: String) -> Result<()> {
+        use crate::ooxml::opc::constants::content_type as ct;
+        use crate::ooxml::opc::constants::relationship_type as rt;
+        use crate::ooxml::opc::part::BlobPart;
+
+        let endnotes_uri = PackURI::new("/word/endnotes.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("endnotes URI: {}", e)))?;
+
+        let content_type = ct::WML_ENDNOTES.to_string();
+        let endnotes_part = BlobPart::new(endnotes_uri.clone(), content_type, xml.into_bytes());
+
+        // Add the endnotes part
+        self.opc.add_part(Box::new(endnotes_part));
+
+        // Create relationship from document to endnotes
+        let doc_uri = PackURI::new("/word/document.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("document URI: {}", e)))?;
+
+        if let Ok(doc_part) = self.opc.get_part_mut(&doc_uri) {
+            let _ = doc_part.relate_to("/word/endnotes.xml", rt::ENDNOTES);
+        }
+
+        Ok(())
     }
 }
 

@@ -20,9 +20,78 @@ pub enum CellValue {
     DateTime(f64),
     /// Error value
     Error(String),
+    /// Formula with optional cached result
+    Formula {
+        /// Formula expression (without leading '=')
+        formula: String,
+        /// Optional cached result value
+        cached_value: Option<Box<CellValue>>,
+    },
 }
 
 impl CellValue {
     /// Static reference to an empty cell value for zero-copy returns.
     pub const EMPTY: &'static CellValue = &CellValue::Empty;
+}
+
+// Implement From for convenient cell value creation
+
+impl From<bool> for CellValue {
+    fn from(b: bool) -> Self {
+        CellValue::Bool(b)
+    }
+}
+
+impl From<i32> for CellValue {
+    fn from(i: i32) -> Self {
+        CellValue::Int(i as i64)
+    }
+}
+
+impl From<i64> for CellValue {
+    fn from(i: i64) -> Self {
+        CellValue::Int(i)
+    }
+}
+
+impl From<u32> for CellValue {
+    fn from(i: u32) -> Self {
+        CellValue::Int(i as i64)
+    }
+}
+
+impl From<usize> for CellValue {
+    fn from(i: usize) -> Self {
+        CellValue::Int(i as i64)
+    }
+}
+
+impl From<f32> for CellValue {
+    fn from(f: f32) -> Self {
+        CellValue::Float(f as f64)
+    }
+}
+
+impl From<f64> for CellValue {
+    fn from(f: f64) -> Self {
+        CellValue::Float(f)
+    }
+}
+
+impl From<String> for CellValue {
+    fn from(s: String) -> Self {
+        CellValue::String(s)
+    }
+}
+
+impl From<&str> for CellValue {
+    fn from(s: &str) -> Self {
+        CellValue::String(s.to_string())
+    }
+}
+
+impl From<&String> for CellValue {
+    fn from(s: &String) -> Self {
+        CellValue::String(s.clone())
+    }
 }

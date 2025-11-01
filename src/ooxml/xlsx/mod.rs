@@ -31,16 +31,28 @@
 //! ```
 
 pub mod cell;
+pub mod format;
 pub mod parsers;
 pub mod shared_strings;
 pub mod styles;
 pub mod template;
 pub mod workbook;
 pub mod worksheet;
+pub mod writer;
 
 // Re-export main types for convenience
 pub use cell::Cell;
+// Re-export shared formatting types
+pub use format::{
+    CellBorder, CellBorderLineStyle, CellBorderSide, CellFill, CellFillPatternType, CellFont,
+    CellFormat, Chart, ChartType, DataValidation, DataValidationOperator, DataValidationType,
+};
 pub use shared_strings::SharedStrings;
 pub use styles::{Alignment, Border, BorderStyle, CellStyle, Fill, Font, NumberFormat, Styles};
 pub use workbook::Workbook;
 pub use worksheet::Worksheet;
+// Re-export writer types
+pub use writer::{
+    FreezePanes, MutableSharedStrings, MutableWorkbookData, MutableWorksheet, NamedRange,
+    StylesBuilder,
+};

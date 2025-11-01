@@ -56,13 +56,17 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+pub mod format;
 pub mod package;
 pub mod parts;
 pub mod presentation;
 pub mod shapes;
 pub mod slide;
 pub mod template;
+pub mod writer;
 
+pub use format::{ImageFormat, TextFormat};
 pub use package::Package;
 pub use presentation::Presentation;
 pub use slide::{Slide, SlideLayout, SlideMaster};
+pub use writer::{MutablePresentation, MutableShape, MutableSlide};

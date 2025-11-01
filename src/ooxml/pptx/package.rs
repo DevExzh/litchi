@@ -1,10 +1,13 @@
 /// Package implementation for PowerPoint presentations.
+use crate::ooxml::common::DocumentProperties;
 use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::opc::OpcPackage;
 use crate::ooxml::opc::constants::content_type as ct;
+use crate::ooxml::opc::packuri::PackURI;
 use crate::ooxml::opc::part::Part;
 use crate::ooxml::pptx::parts::PresentationPart;
 use crate::ooxml::pptx::presentation::Presentation;
+use crate::ooxml::pptx::writer::MutablePresentation;
 use std::io::{Read, Seek};
 use std::path::Path;
 
@@ -31,6 +34,10 @@ use std::path::Path;
 pub struct Package {
     /// The underlying OPC package
     opc: OpcPackage,
+    /// Mutable presentation for writing (cached)
+    mutable_pres: Option<MutablePresentation>,
+    /// Document properties (metadata)
+    properties: DocumentProperties,
 }
 
 impl Package {
@@ -200,7 +207,17 @@ impl Package {
         opc.relate_to("docProps/app.xml", rt::EXTENDED_PROPERTIES);
         opc.add_part(Box::new(app_props_part));
 
-        Ok(Self { opc })
+        // Create a mutable presentation for writing
+        let mutable_pres = Some(MutablePresentation::new());
+
+        // Initialize document properties
+        let properties = DocumentProperties::new();
+
+        Ok(Self {
+            opc,
+            mutable_pres,
+            properties,
+        })
     }
 
     /// Open a .pptx package from a file path.
@@ -238,7 +255,11 @@ impl Package {
             });
         }
 
-        Ok(Self { opc })
+        Ok(Self {
+            opc,
+            mutable_pres: None,
+            properties: DocumentProperties::new(),
+        })
     }
 
     /// Create a Package from an already-parsed OPC package.
@@ -280,7 +301,11 @@ impl Package {
             });
         }
 
-        Ok(Self { opc })
+        Ok(Self {
+            opc,
+            mutable_pres: None,
+            properties: DocumentProperties::new(),
+        })
     }
 
     /// Create a .pptx package from a reader.
@@ -321,10 +346,14 @@ impl Package {
             });
         }
 
-        Ok(Self { opc })
+        Ok(Self {
+            opc,
+            mutable_pres: None,
+            properties: DocumentProperties::new(),
+        })
     }
 
-    /// Get the main presentation.
+    /// Get the main presentation for reading.
     ///
     /// Returns the `Presentation` object which provides access to the presentation's
     /// content, slides, and other features.
@@ -372,6 +401,68 @@ impl Package {
         &mut self.opc
     }
 
+    /// Get a mutable presentation for writing and modification.
+    ///
+    /// This returns a `MutablePresentation` that allows you to add and modify
+    /// slides, shapes, and other presentation elements.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::pptx::Package;
+    ///
+    /// let mut pkg = Package::new()?;
+    /// let mut pres = pkg.presentation_mut()?;
+    ///
+    /// // Add a slide
+    /// let slide = pres.add_slide()?;
+    /// slide.set_title("My Presentation");
+    /// slide.add_text_box("Hello, World!", 914400, 914400, 2743200, 914400);
+    ///
+    /// pkg.save("output.pptx")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn presentation_mut(&mut self) -> Result<&mut MutablePresentation> {
+        // If we don't have a mutable presentation, create one
+        if self.mutable_pres.is_none() {
+            self.mutable_pres = Some(MutablePresentation::new());
+        }
+
+        Ok(self.mutable_pres.as_mut().unwrap())
+    }
+
+    /// Get a reference to the presentation properties.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::pptx::Package;
+    ///
+    /// let pkg = Package::open("presentation.pptx")?;
+    /// let props = pkg.properties();
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn properties(&self) -> &DocumentProperties {
+        &self.properties
+    }
+
+    /// Get a mutable reference to the presentation properties.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::pptx::Package;
+    ///
+    /// let mut pkg = Package::new()?;
+    /// pkg.properties_mut().title = Some("My Presentation".to_string());
+    /// pkg.properties_mut().creator = Some("John Doe".to_string());
+    /// pkg.save("presentation.pptx")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn properties_mut(&mut self) -> &mut DocumentProperties {
+        &mut self.properties
+    }
+
     /// Save the package to a file.
     ///
     /// Writes the complete PowerPoint presentation including all parts, relationships,
@@ -390,13 +481,203 @@ impl Package {
     /// pkg.save("output.pptx")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+    pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        // If we have a mutable presentation, update the presentation parts
+        let should_update = self
+            .mutable_pres
+            .as_ref()
+            .map(|p| p.is_modified())
+            .unwrap_or(false);
+
+        if should_update {
+            // Take mutable_pres temporarily to avoid borrow issues
+            if let Some(mutable_pres) = self.mutable_pres.take() {
+                self.update_presentation_parts(&mutable_pres)?;
+                self.mutable_pres = Some(mutable_pres);
+            }
+        }
+
+        // Update core properties
+        self.update_core_properties()?;
+
         self.opc.save(path).map_err(|e| {
             OoxmlError::IoError(std::io::Error::other(format!(
                 "Failed to save package: {}",
                 e
             )))
         })
+    }
+
+    /// Update presentation parts with modified data.
+    fn update_presentation_parts(&mut self, pres: &MutablePresentation) -> Result<()> {
+        use crate::ooxml::opc::constants::content_type as ct;
+        use crate::ooxml::opc::constants::relationship_type as rt;
+        use crate::ooxml::opc::part::{BlobPart, Part};
+        use crate::ooxml::pptx::writer::relmap::RelationshipMapper;
+
+        // Initialize relationship mapper
+        let mut rel_mapper = RelationshipMapper::new();
+
+        // Collect all images from all slides
+        let all_images = pres.collect_all_images();
+
+        // Create image parts first and add to package
+        for (img_index, (_slide_index, image_data, image_format)) in all_images.iter().enumerate() {
+            let img_num = img_index + 1;
+            let ext = image_format.extension();
+
+            // Create image part URI
+            let image_partname = format!("/ppt/media/image{}.{}", img_num, ext);
+            let image_uri = PackURI::new(&image_partname)
+                .map_err(|e| OoxmlError::InvalidUri(format!("image URI: {}", e)))?;
+
+            // Create image part
+            let image_part = BlobPart::new(
+                image_uri,
+                image_format.mime_type().to_string(),
+                image_data.to_vec(),
+            );
+
+            // Add image part to package
+            self.opc.add_part(Box::new(image_part));
+        }
+
+        // Create presentation part and add relationships
+        let pres_uri = PackURI::new("/ppt/presentation.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("presentation URI: {}", e)))?;
+
+        // Create a temporary presentation part to manage relationships
+        let mut temp_pres_part = BlobPart::new(
+            pres_uri.clone(),
+            ct::PML_PRESENTATION_MAIN.to_string(),
+            Vec::new(),
+        );
+
+        // Add relationship to slideMaster (this should be rId1)
+        temp_pres_part.relate_to("slideMasters/slideMaster1.xml", rt::SLIDE_MASTER);
+
+        // Add other required relationships (in the order they were created in Package::new())
+        // These relationships should be added even if not modified, as they're required for a valid PPTX
+        temp_pres_part.relate_to("tableStyles.xml", rt::TABLE_STYLES);
+        temp_pres_part.relate_to("viewProps.xml", rt::VIEW_PROPS);
+        temp_pres_part.relate_to("presProps.xml", rt::PRES_PROPS);
+
+        // Track slide relationship IDs for presentation.xml generation
+        let mut slide_rel_ids: Vec<String> = Vec::new();
+
+        // Process each slide: create relationships first, then generate XML
+        for (slide_index, slide) in pres.slides.iter().enumerate() {
+            if slide.is_modified() {
+                let slide_num = slide_index + 1;
+                let slide_uri = PackURI::new(format!("/ppt/slides/slide{}.xml", slide_num))
+                    .map_err(|e| {
+                        OoxmlError::InvalidUri(format!("slide{} URI: {}", slide_num, e))
+                    })?;
+
+                // Create a temporary slide part to manage relationships
+                let mut temp_slide_part =
+                    BlobPart::new(slide_uri.clone(), ct::PML_SLIDE.to_string(), Vec::new());
+
+                // Add relationship from slide to slide layout (always first relationship)
+                temp_slide_part.relate_to("../slideLayouts/slideLayout1.xml", rt::SLIDE_LAYOUT);
+
+                // Collect images for this slide and create relationships
+                let slide_images = slide.collect_images();
+                for (img_index_in_slide, (_, image_format)) in slide_images.iter().enumerate() {
+                    // Find the global image index for this slide's image
+                    let mut global_img_idx = 0;
+                    for (global_idx, (s_idx, _, _)) in all_images.iter().enumerate() {
+                        if *s_idx == slide_index {
+                            if global_img_idx == img_index_in_slide {
+                                let img_num = global_idx + 1;
+                                let ext = image_format.extension();
+                                let image_rel_target = format!("../media/image{}.{}", img_num, ext);
+                                let rid = temp_slide_part.relate_to(&image_rel_target, rt::IMAGE);
+                                rel_mapper.add_image(slide_index, img_index_in_slide, rid);
+                                break;
+                            }
+                            global_img_idx += 1;
+                        }
+                    }
+                }
+
+                // Add relationship from slide to notes slide if notes exist
+                if slide.has_notes() {
+                    let notes_rel_target = format!("../notesSlides/notesSlide{}.xml", slide_num);
+                    let rid = temp_slide_part.relate_to(&notes_rel_target, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide");
+                    rel_mapper.add_notes(slide_index, rid);
+                }
+
+                // Now generate slide XML with actual relationship IDs
+                let slide_xml = slide.to_xml_with_rels(Some(slide_index), Some(&rel_mapper))?;
+
+                // Update the temp part with the actual XML content
+                temp_slide_part.set_blob(slide_xml.into_bytes());
+
+                // Add the slide part to the package
+                self.opc.add_part(Box::new(temp_slide_part));
+
+                // Create notes slide if notes exist
+                if let Some(notes_xml_result) = slide.generate_notes_xml() {
+                    let notes_xml = notes_xml_result?;
+                    let notes_uri =
+                        PackURI::new(format!("/ppt/notesSlides/notesSlide{}.xml", slide_num))
+                            .map_err(|e| {
+                                OoxmlError::InvalidUri(format!(
+                                    "notesSlide{} URI: {}",
+                                    slide_num, e
+                                ))
+                            })?;
+
+                    let mut notes_part = BlobPart::new(
+                        notes_uri,
+                        "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml".to_string(),
+                        notes_xml.into_bytes(),
+                    );
+
+                    // Add relationship from notes to slide
+                    notes_part.relate_to(&format!("../slides/slide{}.xml", slide_num), rt::SLIDE);
+
+                    self.opc.add_part(Box::new(notes_part));
+                }
+
+                // Add relationship from presentation to this slide and track the ID
+                let rel_target = format!("slides/slide{}.xml", slide_num);
+                let slide_rid = temp_pres_part.relate_to(&rel_target, rt::SLIDE);
+                slide_rel_ids.push(slide_rid);
+            }
+        }
+
+        // Now generate presentation XML with actual relationship IDs
+        let pres_xml = pres.generate_presentation_xml_with_rels(Some(&slide_rel_ids))?;
+        temp_pres_part.set_blob(pres_xml.into_bytes());
+
+        // Add the presentation part to the package
+        self.opc.add_part(Box::new(temp_pres_part));
+
+        Ok(())
+    }
+
+    /// Update the core.xml properties part.
+    fn update_core_properties(&mut self) -> Result<()> {
+        use crate::ooxml::opc::part::BlobPart;
+
+        let core_uri = PackURI::new("/docProps/core.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("core.xml URI: {}", e)))?;
+
+        // Generate XML from properties
+        let xml = self.properties.to_xml();
+
+        // Create or update the core properties part
+        let core_part = BlobPart::new(
+            core_uri,
+            ct::OPC_CORE_PROPERTIES.to_string(),
+            xml.into_bytes(),
+        );
+
+        self.opc.add_part(Box::new(core_part));
+
+        Ok(())
     }
 }
 

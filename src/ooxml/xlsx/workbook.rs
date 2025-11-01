@@ -3,7 +3,9 @@
 //! This module provides the concrete implementation of the Workbook trait
 //! for Excel (.xlsx) files using the Office Open XML format.
 
+use crate::ooxml::common::DocumentProperties;
 use crate::ooxml::opc::{OpcPackage, PackURI};
+use crate::ooxml::xlsx::writer::{MutableWorkbookData, MutableWorksheet};
 use crate::ooxml::xlsx::{SharedStrings, Styles};
 use crate::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator,
@@ -27,6 +29,10 @@ pub struct Workbook {
     shared_strings: SharedStrings,
     /// Styles information
     styles: Styles,
+    /// Mutable workbook data for writing (cached)
+    mutable_data: Option<MutableWorkbookData>,
+    /// Document properties (metadata)
+    properties: DocumentProperties,
 }
 
 impl Workbook {
@@ -149,6 +155,8 @@ impl Workbook {
             active_sheet_index: 0,
             shared_strings: SharedStrings::new(),
             styles: Styles::new(),
+            mutable_data: Some(MutableWorkbookData::new()),
+            properties: DocumentProperties::new(),
         };
 
         workbook.load_workbook_info()?;
@@ -271,6 +279,161 @@ impl Workbook {
         Self::new(package)
     }
 
+    /// Get a mutable worksheet for writing and modification.
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - Worksheet index (0-based)
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::xlsx::Workbook;
+    ///
+    /// let mut wb = Workbook::create()?;
+    /// let mut ws = wb.worksheet_mut(0)?;
+    ///
+    /// ws.set_cell_value(1, 1, "Hello");
+    /// ws.set_cell_value(1, 2, "World");
+    ///
+    /// wb.save("output.xlsx")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn worksheet_mut(&mut self, index: usize) -> SheetResult<&mut MutableWorksheet> {
+        if self.mutable_data.is_none() {
+            self.mutable_data = Some(MutableWorkbookData::new());
+        }
+
+        self.mutable_data.as_mut().unwrap().worksheet_mut(index)
+    }
+
+    /// Add a new worksheet to the workbook.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Name for the new worksheet
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::xlsx::Workbook;
+    ///
+    /// let mut wb = Workbook::create()?;
+    /// wb.add_worksheet("Data");
+    /// wb.add_worksheet("Summary");
+    ///
+    /// wb.save("output.xlsx")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn add_worksheet(&mut self, name: &str) -> &mut MutableWorksheet {
+        if self.mutable_data.is_none() {
+            self.mutable_data = Some(MutableWorkbookData::new());
+        }
+
+        self.mutable_data
+            .as_mut()
+            .unwrap()
+            .add_worksheet(name.to_string())
+    }
+
+    /// Define a named range.
+    ///
+    /// Named ranges allow you to refer to cells or ranges by meaningful names.
+    ///
+    /// # Arguments
+    /// * `name` - Name for the range (e.g., "TaxRate", "SalesData")
+    /// * `reference` - Reference formula (e.g., "Sheet1!$A$1:$B$10", "Sheet1!$C$5")
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::xlsx::Workbook;
+    ///
+    /// let mut wb = Workbook::create()?;
+    /// wb.define_name("TaxRate", "Sheet1!$A$1");
+    /// wb.define_name("SalesData", "Sheet1!$A$1:$D$100");
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn define_name(&mut self, name: &str, reference: &str) {
+        if self.mutable_data.is_none() {
+            self.mutable_data = Some(MutableWorkbookData::new());
+        }
+
+        self.mutable_data
+            .as_mut()
+            .unwrap()
+            .define_name(name, reference);
+    }
+
+    /// Define a sheet-scoped named range.
+    ///
+    /// # Arguments
+    /// * `name` - Name for the range
+    /// * `reference` - Reference formula
+    /// * `sheet_id` - 1-based sheet ID
+    pub fn define_name_local(&mut self, name: &str, reference: &str, sheet_id: u32) {
+        if self.mutable_data.is_none() {
+            self.mutable_data = Some(MutableWorkbookData::new());
+        }
+
+        self.mutable_data
+            .as_mut()
+            .unwrap()
+            .define_name_local(name, reference, sheet_id);
+    }
+
+    /// Define a named range with a comment.
+    pub fn define_name_with_comment(&mut self, name: &str, reference: &str, comment: &str) {
+        if self.mutable_data.is_none() {
+            self.mutable_data = Some(MutableWorkbookData::new());
+        }
+
+        self.mutable_data
+            .as_mut()
+            .unwrap()
+            .define_name_with_comment(name, reference, comment);
+    }
+
+    /// Remove a named range by name.
+    pub fn remove_name(&mut self, name: &str) -> bool {
+        self.mutable_data
+            .as_mut()
+            .map(|d| d.remove_name(name))
+            .unwrap_or(false)
+    }
+
+    /// Get a reference to the workbook properties.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::xlsx::Workbook;
+    ///
+    /// let wb = Workbook::create()?;
+    /// let props = wb.properties();
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn properties(&self) -> &DocumentProperties {
+        &self.properties
+    }
+
+    /// Get a mutable reference to the workbook properties.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::xlsx::Workbook;
+    ///
+    /// let mut wb = Workbook::create()?;
+    /// wb.properties_mut().title = Some("My Workbook".to_string());
+    /// wb.properties_mut().creator = Some("John Doe".to_string());
+    /// wb.save("workbook.xlsx")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn properties_mut(&mut self) -> &mut DocumentProperties {
+        &mut self.properties
+    }
+
     /// Save the workbook to a file.
     ///
     /// Writes the complete Excel workbook including all worksheets, styles,
@@ -289,8 +452,132 @@ impl Workbook {
     /// workbook.save("output.xlsx")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> SheetResult<()> {
+    pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> SheetResult<()> {
+        // If we have mutable data, update the workbook parts
+        let should_update = self
+            .mutable_data
+            .as_ref()
+            .map(|d| d.is_modified())
+            .unwrap_or(false);
+
+        if should_update {
+            // Take mutable_data temporarily to avoid borrow issues
+            if let Some(mut mutable_data) = self.mutable_data.take() {
+                self.update_workbook_parts(&mut mutable_data)?;
+                self.mutable_data = Some(mutable_data);
+            }
+        }
+
+        // Update core properties
+        self.update_core_properties()?;
+
         self.package.save(path)?;
+        Ok(())
+    }
+
+    /// Update workbook parts with modified data.
+    fn update_workbook_parts(&mut self, data: &mut MutableWorkbookData) -> SheetResult<()> {
+        use crate::ooxml::opc::constants::content_type as ct;
+        use crate::ooxml::opc::constants::relationship_type as rt;
+        use crate::ooxml::opc::part::{BlobPart, Part};
+
+        let workbook_uri = PackURI::new("/xl/workbook.xml")?;
+
+        // Create temporary workbook part to manage relationships
+        let mut temp_wb_part = BlobPart::new(
+            workbook_uri.clone(),
+            ct::SML_SHEET_MAIN.to_string(),
+            Vec::new(),
+        );
+
+        // Build styles from all worksheets FIRST
+        let (styles_builder, worksheet_style_indices) = data.build_styles()?;
+
+        // Generate and write styles.xml
+        let styles_xml = styles_builder.to_xml()?;
+        let styles_uri = PackURI::new("/xl/styles.xml")?;
+        let styles_part = BlobPart::new(
+            styles_uri,
+            ct::SML_STYLES.to_string(),
+            styles_xml.into_bytes(),
+        );
+        self.package.add_part(Box::new(styles_part));
+
+        // Create styles relationship
+        temp_wb_part.relate_to("styles.xml", rt::STYLES);
+
+        // Track worksheet relationship IDs for workbook.xml generation
+        let mut worksheet_rel_ids: Vec<String> = Vec::new();
+
+        // Update worksheet parts and create relationships
+        // IMPORTANT: Create relationships for ALL worksheets, not just modified ones
+        for (index, ws) in data.worksheets.iter().enumerate() {
+            // Get style indices for this worksheet
+            let style_indices = worksheet_style_indices
+                .get(index)
+                .cloned()
+                .unwrap_or_default();
+
+            // Generate XML with proper style indices
+            let ws_xml = ws.to_xml(&mut data.shared_strings, &style_indices)?;
+            let ws_uri = PackURI::new(format!("/xl/worksheets/sheet{}.xml", ws.sheet_id()))?;
+            let ws_part = BlobPart::new(ws_uri, ct::SML_WORKSHEET.to_string(), ws_xml.into_bytes());
+            self.package.add_part(Box::new(ws_part));
+
+            // Create relationship and track the ID (for ALL sheets)
+            let rel_target = format!("worksheets/sheet{}.xml", ws.sheet_id());
+            let rid = temp_wb_part.relate_to(
+                &rel_target,
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
+            );
+            worksheet_rel_ids.push(rid);
+        }
+
+        // Update shared strings
+        let ss_xml = data.shared_strings.to_xml()?;
+        let ss_uri = PackURI::new("/xl/sharedStrings.xml")?;
+        let ss_part = BlobPart::new(
+            ss_uri,
+            ct::SML_SHARED_STRINGS.to_string(),
+            ss_xml.into_bytes(),
+        );
+        self.package.add_part(Box::new(ss_part));
+
+        // Create shared strings relationship
+        temp_wb_part.relate_to(
+            "sharedStrings.xml",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings",
+        );
+
+        // Now generate workbook XML with actual relationship IDs
+        let workbook_xml = data.generate_workbook_xml_with_rels(&worksheet_rel_ids)?;
+        temp_wb_part.set_blob(workbook_xml.into_bytes());
+
+        // Add the workbook part to the package
+        self.package.add_part(Box::new(temp_wb_part));
+
+        Ok(())
+    }
+
+    /// Update the core.xml properties part.
+    fn update_core_properties(&mut self) -> SheetResult<()> {
+        use crate::ooxml::opc::constants::content_type as ct;
+        use crate::ooxml::opc::part::BlobPart;
+
+        let core_uri = PackURI::new("/docProps/core.xml")?;
+
+        // Generate XML from properties
+        let xml = self.properties.to_xml();
+
+        // Create or update the core properties part
+        let core_part = BlobPart::new(
+            core_uri,
+            ct::OPC_CORE_PROPERTIES.to_string(),
+            xml.into_bytes(),
+        );
+
+        self.package.add_part(Box::new(core_part));
+
         Ok(())
     }
 }
