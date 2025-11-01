@@ -1,0 +1,41 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "litchi-py"
+version = "0.0.1"
+description = "Python bindings for Litchi - High-performance Office file format parser"
+readme = "README.md"
+authors = [
+    { name = "Ryker Zhu" }
+]
+license = { text = "Apache-2.0" }
+keywords = ["office", "docx", "xlsx", "pptx", "parser"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Text Processing",
+]
+requires-python = ">=3.8"
+
+[project.urls]
+Homepage = "https://github.com/DevExzh/litchi"
+Repository = "https://github.com/DevExzh/litchi"
+Documentation = "https://docs.rs/litchi"
+
+[tool.maturin]
+# Use abi3 for Python 3.8+ compatibility
+# Include type stubs
+include = ["python/litchi_py/__init__.pyi", "python/litchi_py/py.typed"]
+
