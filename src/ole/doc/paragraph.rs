@@ -1,6 +1,7 @@
 /// Paragraph and Run structures for legacy Word documents.
 use super::package::Result;
 use super::parts::chp::{CharacterProperties, UnderlineStyle, VerticalPosition};
+use std::sync::Arc;
 
 /// A paragraph in a Word document.
 ///
@@ -166,11 +167,12 @@ pub struct Run {
     /// Character formatting properties
     properties: CharacterProperties,
     /// Parsed MTEF formula AST (if this run contains a formula)
+    /// Using Arc to share AST across multiple runs without cloning (thread-safe)
     #[cfg(feature = "formula")]
-    mtef_formula_ast: Option<Vec<crate::formula::MathNode<'static>>>,
+    mtef_formula_ast: Option<Arc<Vec<crate::formula::MathNode<'static>>>>,
     /// Parsed MTEF formula AST placeholder (when formula feature is disabled)
     #[cfg(not(feature = "formula"))]
-    mtef_formula_ast: Option<Vec<()>>,
+    mtef_formula_ast: Option<Arc<Vec<()>>>,
 }
 
 impl Run {
@@ -188,7 +190,7 @@ impl Run {
     pub(crate) fn with_mtef_formula(
         text: String,
         properties: CharacterProperties,
-        mtef_ast: Vec<crate::formula::MathNode<'static>>,
+        mtef_ast: Arc<Vec<crate::formula::MathNode<'static>>>,
     ) -> Self {
         Self {
             text,
@@ -202,7 +204,7 @@ impl Run {
     pub(crate) fn with_mtef_formula(
         text: String,
         properties: CharacterProperties,
-        _mtef_ast: Vec<()>,
+        _mtef_ast: Arc<Vec<()>>,
     ) -> Self {
         Self {
             text,
@@ -309,12 +311,12 @@ impl Run {
     /// Returns the parsed MTEF formula as AST nodes if this run contains a MathType equation,
     /// None otherwise.
     #[cfg(feature = "formula")]
-    pub fn mtef_formula_ast(&self) -> Option<&Vec<crate::formula::MathNode<'static>>> {
+    pub fn mtef_formula_ast(&self) -> Option<&Arc<Vec<crate::formula::MathNode<'static>>>> {
         self.mtef_formula_ast.as_ref()
     }
 
     #[cfg(not(feature = "formula"))]
-    pub fn mtef_formula_ast(&self) -> Option<&Vec<()>> {
+    pub fn mtef_formula_ast(&self) -> Option<&Arc<Vec<()>>> {
         self.mtef_formula_ast.as_ref()
     }
 
@@ -322,12 +324,14 @@ impl Run {
     ///
     /// This allows for modification of the formula AST if needed.
     #[cfg(feature = "formula")]
-    pub fn mtef_formula_ast_mut(&mut self) -> &mut Option<Vec<crate::formula::MathNode<'static>>> {
+    pub fn mtef_formula_ast_mut(
+        &mut self,
+    ) -> &mut Option<Arc<Vec<crate::formula::MathNode<'static>>>> {
         &mut self.mtef_formula_ast
     }
 
     #[cfg(not(feature = "formula"))]
-    pub fn mtef_formula_ast_mut(&mut self) -> &mut Option<Vec<()>> {
+    pub fn mtef_formula_ast_mut(&mut self) -> &mut Option<Arc<Vec<()>>> {
         &mut self.mtef_formula_ast
     }
 
@@ -349,7 +353,8 @@ impl Run {
         if let Some(ast) = &self.mtef_formula_ast {
             use crate::formula::LatexConverter;
             let mut converter = LatexConverter::new();
-            match converter.convert_nodes(ast) {
+            // Dereference Rc to access the Vec
+            match converter.convert_nodes(ast.as_ref()) {
                 Ok(latex) => Ok(Some(latex.to_string())),
                 Err(e) => {
                     // Return error message as placeholder

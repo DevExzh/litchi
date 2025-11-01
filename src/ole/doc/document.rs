@@ -2,6 +2,7 @@ use super::super::OleFile;
 /// Document - the main API for working with Word document content.
 use super::package::{DocError, Result};
 use super::paragraph::{Paragraph, Run};
+use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::FieldsTable;
 use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
@@ -11,13 +12,14 @@ use super::table::Table;
 use crate::ole::mtef_extractor::MtefExtractor;
 use std::collections::HashMap;
 use std::io::{Read, Seek};
+use std::sync::Arc;
 
 /// Type alias for parsed MTEF formula data with arena allocations
 #[cfg(feature = "formula")]
 type ParsedMtefData = (
     Vec<crate::formula::Formula<'static>>,
     Vec<Box<[u8]>>,
-    HashMap<String, Vec<crate::formula::MathNode<'static>>>,
+    HashMap<String, Arc<Vec<crate::formula::MathNode<'static>>>>,
 );
 
 /// A Word document (.doc).
@@ -46,11 +48,15 @@ pub struct Document {
     /// File Information Block from WordDocument stream
     fib: FileInformationBlock,
     /// The WordDocument stream - main document binary data
+    /// Used during initialization for TextExtractor and ChpBinTable parsing
+    #[allow(dead_code)] // False positive: used during initialization via parse_chp_bin_table
     word_document: Vec<u8>,
     /// The table stream (0Table or 1Table) - contains formatting and structure
     table_stream: Vec<u8>,
     /// Text extractor - holds the extracted document text
     text_extractor: TextExtractor,
+    /// Character property bin table - parsed once and shared across all paragraph extractors
+    chp_bin_table: Option<ChpBinTable>,
     /// Fields table - contains field information (embedded equations, hyperlinks, etc.)
     #[allow(dead_code)] // Stored for future field extraction features
     fields_table: Option<FieldsTable>,
@@ -68,11 +74,12 @@ pub struct Document {
     #[allow(dead_code)] // Stored for buffer lifetime management, not directly accessed
     data_buffers: Vec<Box<[u8]>>,
     /// Parsed MTEF formulas (stream_name -> parsed_ast)
+    /// Using Arc to share AST nodes across multiple runs without cloning (thread-safe)
     #[cfg(feature = "formula")]
-    parsed_mtef: std::collections::HashMap<String, Vec<crate::formula::MathNode<'static>>>,
+    parsed_mtef: std::collections::HashMap<String, Arc<Vec<crate::formula::MathNode<'static>>>>,
     /// Parsed MTEF formulas placeholder (when formula feature is disabled)
     #[cfg(not(feature = "formula"))]
-    parsed_mtef: std::collections::HashMap<String, Vec<()>>,
+    parsed_mtef: std::collections::HashMap<String, Arc<Vec<()>>>,
 }
 
 impl Document {
@@ -115,11 +122,16 @@ impl Document {
         #[cfg(not(feature = "formula"))]
         let parsed_mtef = Self::parse_all_mtef_data(&mtef_data)?;
 
+        // Parse ChpBinTable once here to avoid re-parsing for each subdocument
+        // This is a major performance optimization since ChpBinTable::parse is expensive
+        let chp_bin_table = Self::parse_chp_bin_table(&fib, &table_stream, &word_document)?;
+
         Ok(Self {
             fib,
             word_document,
             table_stream,
             text_extractor,
+            chp_bin_table,
             fields_table,
             mtef_data,
             #[cfg(feature = "formula")]
@@ -159,6 +171,57 @@ impl Document {
         _ole: &mut OleFile<R>,
     ) -> Result<HashMap<String, Vec<u8>>> {
         Ok(HashMap::new())
+    }
+
+    /// Parse ChpBinTable once during document initialization.
+    ///
+    /// This is a performance optimization - parsing ChpBinTable is expensive,
+    /// so we do it once and share the result across all paragraph extractors.
+    fn parse_chp_bin_table(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+        word_document: &[u8],
+    ) -> Result<Option<ChpBinTable>> {
+        use super::parts::piece_table::PieceTable;
+
+        // Parse piece table (required for FC-to-CP conversion in ChpBinTable)
+        // According to [MS-DOC], fcClx is at FIB offset 0x01A2
+        // In FibRgFcLcb97 (starting at FIB offset 154), this is index 33
+        let piece_table = if let Some((offset, length)) = fib.get_table_pointer(33) {
+            if length > 0 && (offset as usize) < table_stream.len() {
+                let clx_data = &table_stream[offset as usize..];
+                let clx_len = length.min((table_stream.len() - offset as usize) as u32) as usize;
+                PieceTable::parse(&clx_data[..clx_len])
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // Parse ChpBinTable if we have a piece table
+        // Index 12 in FibRgFcLcb97 is fcPlcfBteChpx/lcbPlcfBteChpx (PLCFBTECHPX)
+        let chp_bin_table = if let (Some((offset, length)), Some(pt)) =
+            (fib.get_table_pointer(12), &piece_table)
+        {
+            if length > 0 && (offset as usize) < table_stream.len() {
+                let chp_data = &table_stream[offset as usize..];
+                let chp_len = length.min((table_stream.len() - offset as usize) as u32) as usize;
+                if chp_len >= 8 {
+                    // Parse CHPBinTable (PlcfBteChpx with FKP pages)
+                    // FKP pages are in WordDocument stream, not table stream!
+                    ChpBinTable::parse(&chp_data[..chp_len], word_document, pt)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Ok(chp_bin_table)
     }
 
     /// Parse all extracted MTEF data into AST nodes using proper arena allocation.
@@ -203,8 +266,8 @@ impl Document {
             if parser.is_valid() {
                 match parser.parse() {
                     Ok(nodes) if !nodes.is_empty() => {
-                        // Successfully parsed - store the AST nodes, arena, and buffer
-                        parsed_mtef.insert(stream_name.clone(), nodes);
+                        // Successfully parsed - store the AST nodes in Arc for sharing, arena, and buffer
+                        parsed_mtef.insert(stream_name.clone(), Arc::new(nodes));
                         formula_arenas.push(formula);
                         data_buffers.push(data_box);
                     },
@@ -217,9 +280,9 @@ impl Document {
                             arena_ref.alloc_str(&format!("[Formula parsing error: {}]", e));
                         parsed_mtef.insert(
                             stream_name.clone(),
-                            vec![crate::formula::MathNode::Text(std::borrow::Cow::Borrowed(
-                                error_text,
-                            ))],
+                            Arc::new(vec![crate::formula::MathNode::Text(
+                                std::borrow::Cow::Borrowed(error_text),
+                            )]),
                         );
                         formula_arenas.push(formula);
                         data_buffers.push(data_box);
@@ -231,9 +294,9 @@ impl Document {
                     arena_ref.alloc_str(&format!("[Invalid MTEF format ({} bytes)]", data.len()));
                 parsed_mtef.insert(
                     stream_name.clone(),
-                    vec![crate::formula::MathNode::Text(std::borrow::Cow::Borrowed(
-                        error_text,
-                    ))],
+                    Arc::new(vec![crate::formula::MathNode::Text(
+                        std::borrow::Cow::Borrowed(error_text),
+                    )]),
                 );
                 formula_arenas.push(formula);
                 data_buffers.push(data_box);
@@ -247,7 +310,7 @@ impl Document {
     #[cfg(not(feature = "formula"))]
     fn parse_all_mtef_data(
         _mtef_data: &HashMap<String, Vec<u8>>,
-    ) -> Result<HashMap<String, Vec<()>>> {
+    ) -> Result<HashMap<String, Arc<Vec<()>>>> {
         Ok(HashMap::new())
     }
 
@@ -266,14 +329,17 @@ impl Document {
 
     /// Parse MTEF data for a given text pattern
     #[cfg(feature = "formula")]
-    fn parse_mtef_for_text(&self, _text: &str) -> Option<Vec<crate::formula::MathNode<'static>>> {
+    fn parse_mtef_for_text(
+        &self,
+        _text: &str,
+    ) -> Option<Arc<Vec<crate::formula::MathNode<'static>>>> {
         // For now, try to find any parsed MTEF data
         // In a more sophisticated implementation, we'd match specific text patterns
         // to specific MTEF streams
 
         for parsed_ast in self.parsed_mtef.values() {
             if !parsed_ast.is_empty() {
-                return Some(parsed_ast.clone());
+                return Some(Arc::clone(parsed_ast));
             }
         }
 
@@ -282,7 +348,7 @@ impl Document {
 
     /// Parse MTEF data for a given text pattern (fallback when formula feature is disabled)
     #[cfg(not(feature = "formula"))]
-    fn parse_mtef_for_text(&self, _text: &str) -> Option<Vec<()>> {
+    fn parse_mtef_for_text(&self, _text: &str) -> Option<Arc<Vec<()>>> {
         None
     }
 
@@ -418,10 +484,19 @@ impl Document {
     /// ```
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         let mut all_paragraphs = Vec::new();
-        let text = self.text()?;
+
+        // Wrap text in Arc to share across all extractors without cloning (thread-safe)
+        let text = Arc::new(self.text()?);
 
         // Get all subdocument ranges from FIB
         let subdoc_ranges = self.fib.get_all_subdoc_ranges();
+
+        // Pre-allocate if we know the approximate size
+        if let Some((_, _, last_end)) = subdoc_ranges.last() {
+            // Rough estimate: one paragraph per 100 characters
+            let estimate = (*last_end as usize) / 100;
+            all_paragraphs.reserve(estimate.max(16));
+        }
 
         // Parse each subdocument range
         for (_subdoc_name, start_cp, end_cp) in subdoc_ranges {
@@ -429,12 +504,13 @@ impl Document {
                 continue;
             }
 
-            // Create extractor for this CP range
+            // Create extractor for this CP range - text is shared via Arc::clone (cheap pointer copy)
+            // Pass ChpBinTable reference to avoid re-parsing
             let para_extractor = ParagraphExtractor::new_with_range(
                 &self.fib,
                 &self.table_stream,
-                &self.word_document,
-                text.clone(),
+                Arc::clone(&text),
+                self.chp_bin_table.as_ref(),
                 (start_cp, end_cp),
             )?;
 
@@ -456,35 +532,48 @@ impl Document {
         extracted_paras: Vec<ExtractedParagraph>,
         output: &mut Vec<Paragraph>,
     ) {
+        // Pre-allocate run vectors based on estimated size
+        let mut object_name_buffer = String::with_capacity(32);
+
         for (_para_text, para_props, runs) in extracted_paras {
+            // Pre-allocate run storage
+            let mut run_objects = Vec::with_capacity(runs.len());
+
             // Create runs for the paragraph, checking for MTEF formulas and OLE2 objects
-            let run_objects: Vec<Run> = runs
-                .into_iter()
-                .map(|(text, props)| {
-                    // Primary matching: Use pic_offset to find MTEF data (most reliable)
-                    if let Some(pic_offset) = props.pic_offset {
-                        // Skip zero offsets as they're likely invalid
-                        if pic_offset > 0 {
-                            let object_name = format!("_{}", pic_offset);
-                            if let Some(mtef_ast) = self.parsed_mtef.get(&object_name) {
-                                // Found matching formula - create run with MTEF AST
-                                return Run::with_mtef_formula(text, props, mtef_ast.clone());
-                            }
+            for (text, props) in runs {
+                // Primary matching: Use pic_offset to find MTEF data (most reliable)
+                if let Some(pic_offset) = props.pic_offset {
+                    // Skip zero offsets as they're likely invalid
+                    if pic_offset > 0 {
+                        // Reuse buffer to avoid repeated allocations
+                        object_name_buffer.clear();
+                        use std::fmt::Write;
+                        let _ = write!(object_name_buffer, "_{}", pic_offset);
+
+                        if let Some(mtef_ast) = self.parsed_mtef.get(object_name_buffer.as_str()) {
+                            // Found matching formula - create run with MTEF AST (Arc::clone is cheap)
+                            run_objects.push(Run::with_mtef_formula(
+                                text,
+                                props,
+                                Arc::clone(mtef_ast),
+                            ));
+                            continue;
                         }
                     }
+                }
 
-                    // Secondary matching: Check if this is an OLE2 object without pic_offset
-                    if props.is_ole2
-                        && Self::is_potential_mtef_formula(&text)
-                        && let Some(mtef_ast) = self.parse_mtef_for_text(&text)
-                    {
-                        return Run::with_mtef_formula(text, props, mtef_ast);
-                    }
+                // Secondary matching: Check if this is an OLE2 object without pic_offset
+                if props.is_ole2
+                    && Self::is_potential_mtef_formula(&text)
+                    && let Some(mtef_ast) = self.parse_mtef_for_text(&text)
+                {
+                    run_objects.push(Run::with_mtef_formula(text, props, mtef_ast));
+                    continue;
+                }
 
-                    // Regular run without formula
-                    Run::new(text, props)
-                })
-                .collect();
+                // Regular run without formula
+                run_objects.push(Run::new(text, props));
+            }
 
             // Create paragraph with runs and properties
             // Following Apache POI's design: text is stored in runs, not duplicated in paragraph

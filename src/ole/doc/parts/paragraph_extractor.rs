@@ -8,9 +8,9 @@ use super::chp::CharacterProperties;
 use super::chp_bin_table::ChpBinTable;
 use super::fib::FileInformationBlock;
 use super::pap::ParagraphProperties;
-use super::piece_table::PieceTable;
 use crate::ole::plcf::PlcfParser;
 use crate::ole::sprm::parse_sprms;
+use std::sync::Arc;
 
 /// Type alias for extracted paragraph data: (text, properties, runs).
 pub(crate) type ExtractedParagraph = (
@@ -23,33 +23,33 @@ pub(crate) type ExtractedParagraph = (
 ///
 /// Based on Apache POI's ParagraphPropertiesTable (PAPBinTable) and
 /// CharacterPropertiesTable (CHPBinTable).
-pub struct ParagraphExtractor {
+pub struct ParagraphExtractor<'a> {
     /// Paragraph property data (PLCF)
     pap_plcf: Option<PlcfParser>,
-    /// Character property bin table (properly parsed with FKP)
-    chp_bin_table: Option<ChpBinTable>,
-    /// The extracted text
-    text: String,
+    /// Character property bin table (shared reference to avoid re-parsing)
+    chp_bin_table: Option<&'a ChpBinTable>,
+    /// The extracted text (shared via Arc to avoid cloning, thread-safe)
+    text: Arc<String>,
     /// Text piece character positions
     text_ranges: Vec<(u32, u32, usize)>, // (cp_start, cp_end, text_offset)
     /// Character position range to extract (for subdocuments)
     cp_range: Option<(u32, u32)>,
 }
 
-impl ParagraphExtractor {
+impl<'a> ParagraphExtractor<'a> {
     /// Create a new paragraph extractor.
     ///
     /// # Arguments
     ///
     /// * `fib` - File Information Block
     /// * `table_stream` - Table stream (0Table or 1Table) data
-    /// * `word_document` - WordDocument stream data
-    /// * `text` - Extracted document text
+    /// * `text` - Extracted document text (shared via Arc, thread-safe)
+    /// * `chp_bin_table` - Pre-parsed character property bin table (avoids re-parsing)
     pub fn new(
         fib: &FileInformationBlock,
         table_stream: &[u8],
-        word_document: &[u8],
-        text: String,
+        text: Arc<String>,
+        chp_bin_table: Option<&'a ChpBinTable>,
     ) -> Result<Self> {
         // Get PAP bin table location from FIB
         // Index 13 in FibRgFcLcb97 is fcPlcfBtePapx/lcbPlcfBtePapx (PLCFBTEPAPX)
@@ -61,44 +61,6 @@ impl ParagraphExtractor {
                     // PAP PLCF uses 4-byte property descriptors initially
                     // Each entry points to a PAPX (paragraph properties) structure
                     PlcfParser::parse(&pap_data[..pap_len], 4)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        // Parse piece table from CLX (Complex file information)
-        // According to [MS-DOC], fcClx is at FIB offset 0x01A2
-        // In FibRgFcLcb97 (starting at FIB offset 154), this is index 33: (0x01A2 - 154) / 8 = 33
-        let piece_table = if let Some((offset, length)) = fib.get_table_pointer(33) {
-            if length > 0 && (offset as usize) < table_stream.len() {
-                let clx_data = &table_stream[offset as usize..];
-                let clx_len = length.min((table_stream.len() - offset as usize) as u32) as usize;
-                PieceTable::parse(&clx_data[..clx_len])
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        // Get CHP bin table location from FIB and parse it properly with FKP
-        // Index 12 in FibRgFcLcb97 is fcPlcfBteChpx/lcbPlcfBteChpx (PLCFBTECHPX)
-        // Requires piece table for FC-to-CP conversion
-        let chp_bin_table = if let (Some((offset, length)), Some(pt)) =
-            (fib.get_table_pointer(12), &piece_table)
-        {
-            if length > 0 && (offset as usize) < table_stream.len() {
-                let chp_data = &table_stream[offset as usize..];
-                let chp_len = length.min((table_stream.len() - offset as usize) as u32) as usize;
-                if chp_len >= 8 {
-                    // Parse CHPBinTable (PlcfBteChpx with FKP pages)
-                    // FKP pages are in WordDocument stream, not table stream!
-                    ChpBinTable::parse(&chp_data[..chp_len], word_document, pt)
                 } else {
                     None
                 }
@@ -129,17 +91,17 @@ impl ParagraphExtractor {
     ///
     /// * `fib` - File Information Block
     /// * `table_stream` - Table stream (0Table or 1Table) data
-    /// * `word_document` - WordDocument stream data
-    /// * `text` - Extracted document text
+    /// * `text` - Extracted document text (shared via Arc, thread-safe)
+    /// * `chp_bin_table` - Pre-parsed character property bin table (avoids re-parsing)
     /// * `cp_range` - Character position range (start_cp, end_cp)
     pub fn new_with_range(
         fib: &FileInformationBlock,
         table_stream: &[u8],
-        word_document: &[u8],
-        text: String,
+        text: Arc<String>,
+        chp_bin_table: Option<&'a ChpBinTable>,
         cp_range: (u32, u32),
     ) -> Result<Self> {
-        let mut extractor = Self::new(fib, table_stream, word_document, text)?;
+        let mut extractor = Self::new(fib, table_stream, text, chp_bin_table)?;
         extractor.cp_range = Some(cp_range);
         Ok(extractor)
     }
@@ -248,7 +210,11 @@ impl ParagraphExtractor {
         // Fallback if no paragraphs were found
         if paragraphs.is_empty() && !self.text.is_empty() {
             let runs = self.extract_runs(doc_start_cp, doc_end_cp)?;
-            paragraphs.push((self.text.clone(), ParagraphProperties::default(), runs));
+            paragraphs.push((
+                self.text.as_ref().clone(),
+                ParagraphProperties::default(),
+                runs,
+            ));
         }
 
         Ok(paragraphs)
@@ -294,7 +260,7 @@ impl ParagraphExtractor {
     ) -> Result<Vec<(String, CharacterProperties)>> {
         let mut runs = Vec::new();
 
-        if let Some(ref chp_bin_table) = self.chp_bin_table {
+        if let Some(chp_bin_table) = self.chp_bin_table {
             // Get runs that overlap with this paragraph
             let overlapping_runs = chp_bin_table.runs_in_range(para_start, para_end);
 

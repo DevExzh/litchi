@@ -73,8 +73,9 @@ impl ChpBinTable {
         let n = (plcf_bte_chpx_data.len() - 4) / 8;
 
         // Parsing PlcfBteChpx with n BTE entries
-
-        let mut all_runs = Vec::new();
+        // Pre-allocate: estimate ~10 runs per FKP page (conservative estimate)
+        let estimated_runs = n.saturating_mul(10);
+        let mut all_runs = Vec::with_capacity(estimated_runs);
 
         // Parse each BTE entry
         for i in 0..n {
@@ -112,20 +113,28 @@ impl ChpBinTable {
 
             // Parse CHPX FKP
             if let Some(fkp) = ChpxFkp::parse(fkp_page, word_document) {
-                // Process each entry in the FKP
-                for j in 0..fkp.count() {
+                let entry_count = fkp.count();
+
+                // Process entries in batch, caching next FC to avoid redundant lookups
+                for j in 0..entry_count {
                     if let Some(entry) = fkp.entry(j) {
-                        // Get the next entry to determine end position
-                        let end_fc = if j + 1 < fkp.count() {
+                        // Cache end_fc by looking ahead once
+                        let end_fc = if j + 1 < entry_count {
+                            // Get next entry's FC (more efficient than two entry() calls)
                             fkp.entry(j + 1).map(|e| e.fc).unwrap_or(entry.fc)
                         } else {
-                            // Last entry - use document end or next FKP's first FC
-                            entry.fc + 1000000 // Placeholder
+                            // Last entry - use large placeholder for document end
+                            entry.fc.saturating_add(1_000_000)
                         };
 
                         // Convert FC positions to CP using the piece table
                         let start_cp = piece_table.fc_to_cp(entry.fc).unwrap_or(entry.fc);
                         let end_cp = piece_table.fc_to_cp(end_fc).unwrap_or(end_fc);
+
+                        // Skip invalid ranges early
+                        if start_cp >= end_cp {
+                            continue;
+                        }
 
                         // Parse CHPX (grpprl) to get character properties
                         let properties = Self::parse_chpx(&entry.grpprl);
@@ -142,20 +151,20 @@ impl ChpBinTable {
 
         // Sort runs by start CP, then by end CP
         // This is essential for proper merging and overlap detection
-        all_runs.sort_by_key(|r| (r.start_cp, r.end_cp));
+        all_runs.sort_unstable_by_key(|r| (r.start_cp, r.end_cp));
 
         // Remove overlapping/duplicate runs and fix boundaries
         // Following Apache POI's approach: consecutive CHPXs should not overlap
-        let mut merged_runs = Vec::new();
+        // Use retain_mut for in-place filtering (Rust 1.61+)
         let mut last_end_cp = 0u32;
 
-        for mut run in all_runs {
+        all_runs.retain_mut(|run| {
             // Clamp run boundaries to avoid overlaps
             if run.start_cp < last_end_cp {
                 // This run overlaps with the previous one - skip or adjust
                 if run.end_cp <= last_end_cp {
                     // Completely contained in previous run - skip
-                    continue;
+                    return false;
                 }
                 // Partially overlaps - adjust start to avoid overlap
                 run.start_cp = last_end_cp;
@@ -163,17 +172,20 @@ impl ChpBinTable {
 
             // Skip invalid runs
             if run.start_cp >= run.end_cp {
-                continue;
+                return false;
             }
 
             last_end_cp = run.end_cp;
-            merged_runs.push(run);
-        }
+            true
+        });
 
-        Some(Self { runs: merged_runs })
+        Some(Self { runs: all_runs })
     }
 
     /// Parse CHPX data (grpprl) into CharacterProperties.
+    ///
+    /// Inlined for better performance in the hot loop.
+    #[inline]
     fn parse_chpx(grpprl: &[u8]) -> CharacterProperties {
         if grpprl.is_empty() {
             return CharacterProperties::default();
@@ -225,13 +237,13 @@ impl ChpBinTable {
     }
 
     /// Find runs that overlap with a character position range.
-    pub fn runs_in_range(&self, start_cp: u32, end_cp: u32) -> Vec<&CharacterRun> {
-        self.runs
-            .iter()
-            .filter(|run| {
-                // Check if run overlaps with [start_cp, end_cp)
-                run.end_cp > start_cp && run.start_cp < end_cp
-            })
-            .collect()
+    ///
+    /// Returns an iterator to avoid unnecessary allocations.
+    /// Use `.collect()` only if you need a Vec.
+    pub fn runs_in_range(&self, start_cp: u32, end_cp: u32) -> impl Iterator<Item = &CharacterRun> {
+        self.runs.iter().filter(move |run| {
+            // Check if run overlaps with [start_cp, end_cp)
+            run.end_cp > start_cp && run.start_cp < end_cp
+        })
     }
 }
