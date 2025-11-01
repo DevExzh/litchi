@@ -5,6 +5,7 @@
 /// based on Apache POI's SPRM handling.
 /// SPRM operation types based on size code (from POI's SprmOperation).
 use crate::common::binary::{read_i16_le, read_u16_le, read_u32_le};
+use smallvec::SmallVec;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SprmOperation {
     /// Size code 0 - toggle (no operand)
@@ -44,14 +45,17 @@ impl From<u8> for SprmOperation {
 /// An SPRM (Single Property Modifier).
 ///
 /// Based on Apache POI's SprmBuffer and related classes.
+///
+/// **Performance:** Uses `SmallVec` with 8-byte inline storage for operands
+/// to eliminate heap allocations for common cases (most operands are 1-4 bytes).
 #[derive(Debug, Clone)]
 pub struct Sprm {
     /// SPRM opcode
     pub opcode: u16,
     /// SPRM operation type
     pub operation: SprmOperation,
-    /// SPRM operand data
-    pub operand: Vec<u8>,
+    /// SPRM operand data (inline for operands ≤8 bytes to avoid heap allocation)
+    pub operand: SmallVec<[u8; 8]>,
     /// Offset in original grpprl array (for accessing raw data)
     pub offset: usize,
     /// Total size of this SPRM in bytes (opcode + size byte if any + operand)
@@ -109,8 +113,21 @@ pub fn parse_sprms(grpprl: &[u8]) -> Vec<Sprm> {
 }
 
 /// Parse SPRMs using 2-byte opcodes (Word 97+).
+///
+/// **Performance optimizations:**
+/// - Pre-allocates vector capacity based on input size estimate
+/// - Uses SmallVec for operands to avoid heap allocations (most are ≤8 bytes)
+/// - Extracts size code masking constant for better code generation
 fn parse_sprms_two_byte(grpprl: &[u8]) -> Vec<Sprm> {
-    let mut sprms = Vec::new();
+    // Pre-allocate: estimate ~4 bytes per SPRM on average (2 opcode + 1-2 operand)
+    // This significantly reduces reallocation overhead for large grpprl arrays
+    let estimated_capacity = (grpprl.len() / 4).max(8);
+    let mut sprms = Vec::with_capacity(estimated_capacity);
+
+    // Extract constant for better optimization
+    const SIZECODE_MASK: u16 = 0xe000;
+    const SIZECODE_SHIFT: u16 = 13;
+
     let mut offset = 0;
 
     while offset + 2 <= grpprl.len() {
@@ -118,11 +135,10 @@ fn parse_sprms_two_byte(grpprl: &[u8]) -> Vec<Sprm> {
 
         // Read SPRM opcode (2 bytes in Word 97+)
         let opcode = read_u16_le(grpprl, offset).unwrap_or(0);
-
         offset += 2;
 
         // Extract size code from opcode (bits 13-15, POI's BITFIELD_SIZECODE = 0xe000)
-        let size_code = ((opcode & 0xe000) >> 13) as u8;
+        let size_code = ((opcode & SIZECODE_MASK) >> SIZECODE_SHIFT) as u8;
         let operation = SprmOperation::from(size_code);
 
         // Determine operand size based on size code (matching POI's initSize method)
@@ -164,7 +180,8 @@ fn parse_sprms_two_byte(grpprl: &[u8]) -> Vec<Sprm> {
             break;
         }
 
-        let operand = grpprl[offset..offset + operand_size].to_vec();
+        // Use SmallVec::from_slice for efficient inline storage (no heap allocation for ≤8 bytes)
+        let operand = SmallVec::from_slice(&grpprl[offset..offset + operand_size]);
         offset += operand_size;
 
         let total_size = offset - sprm_start; // Total size including opcode
@@ -256,14 +273,14 @@ mod tests {
             Sprm {
                 opcode: 0x0835,
                 operation: SprmOperation::Byte,
-                operand: vec![1],
+                operand: SmallVec::from_slice(&[1]),
                 offset: 0,
                 size: 3,
             },
             Sprm {
                 opcode: 0x4A43,
                 operation: SprmOperation::Word,
-                operand: vec![24, 0],
+                operand: SmallVec::from_slice(&[24, 0]),
                 offset: 3,
                 size: 4,
             },
@@ -279,7 +296,7 @@ mod tests {
         let sprm = Sprm {
             opcode: 0x0835,
             operation: SprmOperation::Byte,
-            operand: vec![1],
+            operand: SmallVec::from_slice(&[1]),
             offset: 0,
             size: 3,
         };
@@ -288,7 +305,7 @@ mod tests {
         let sprm_false = Sprm {
             opcode: 0x0835,
             operation: SprmOperation::Byte,
-            operand: vec![0],
+            operand: SmallVec::from_slice(&[0]),
             offset: 0,
             size: 3,
         };
