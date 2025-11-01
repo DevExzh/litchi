@@ -794,33 +794,47 @@ impl<R: Read + Seek> OleFile<R> {
         Err(OleError::StreamNotFound)
     }
 
-    /// Find a child entry by name in a red-black tree
+    /// Find a child entry by name in a red-black tree (iterative, optimized)
+    ///
+    /// OLE directory entries are organized in a red-black tree, though not all
+    /// implementations guarantee perfect ordering. This uses an iterative traversal
+    /// with zero-allocation string comparison.
+    ///
+    /// Optimizations:
+    /// - Iterative instead of recursive (eliminates function call overhead)
+    /// - Zero-allocation case-insensitive comparison using eq_ignore_ascii_case
+    /// - Full tree traversal using work queue (handles all tree structures)
     fn find_child_by_name(&self, sid: u32, name: &str) -> Result<&DirectoryEntry, OleError> {
         if sid == NOSTREAM || sid as usize >= self.dir_entries.len() {
             return Err(OleError::StreamNotFound);
         }
 
-        let entry = self.dir_entries[sid as usize]
-            .as_ref()
-            .ok_or(OleError::StreamNotFound)?;
+        // Use iterative in-order traversal with a work queue (pre-allocated for efficiency)
+        // This handles all tree structures correctly, including improperly ordered trees
+        let mut queue = smallvec::SmallVec::<[u32; 32]>::new();
+        queue.push(sid);
 
-        // Case-insensitive comparison
-        if entry.name.to_lowercase() == name.to_lowercase() {
-            return Ok(entry);
-        }
+        while let Some(current_sid) = queue.pop() {
+            if current_sid == NOSTREAM || current_sid as usize >= self.dir_entries.len() {
+                continue;
+            }
 
-        // Search left subtree
-        if entry.sid_left != NOSTREAM
-            && let Ok(found) = self.find_child_by_name(entry.sid_left, name)
-        {
-            return Ok(found);
-        }
+            let entry = self.dir_entries[current_sid as usize]
+                .as_ref()
+                .ok_or(OleError::StreamNotFound)?;
 
-        // Search right subtree
-        if entry.sid_right != NOSTREAM
-            && let Ok(found) = self.find_child_by_name(entry.sid_right, name)
-        {
-            return Ok(found);
+            // Fast zero-allocation case-insensitive comparison (ASCII-optimized)
+            if entry.name.eq_ignore_ascii_case(name) {
+                return Ok(entry);
+            }
+
+            // Add children to queue (right first for depth-first-like order)
+            if entry.sid_right != NOSTREAM {
+                queue.push(entry.sid_right);
+            }
+            if entry.sid_left != NOSTREAM {
+                queue.push(entry.sid_left);
+            }
         }
 
         Err(OleError::StreamNotFound)
