@@ -12,8 +12,6 @@ pub struct PptRecordParser {
     records: Vec<PptRecord>,
     /// Slide text organized by SlideAtomsSets (following POI's architecture)
     slide_atoms_sets: Vec<Vec<u8>>,
-    /// Document record if found
-    document_record: Option<PptRecord>,
 }
 
 impl PptRecordParser {
@@ -22,7 +20,6 @@ impl PptRecordParser {
         Self {
             records: Vec::new(),
             slide_atoms_sets: Vec::new(),
-            document_record: None,
         }
     }
 
@@ -42,11 +39,6 @@ impl PptRecordParser {
         while offset + 8 <= data.len() {
             match PptRecord::parse(data, offset) {
                 Ok((record, consumed)) => {
-                    // Save Document record for later processing
-                    if record.record_type == PptRecordType::Document {
-                        self.document_record = Some(record.clone());
-                    }
-
                     self.records.push(record);
                     offset += consumed;
 
@@ -101,6 +93,14 @@ impl PptRecordParser {
     }
 
     /// Get all records recursively (for building persist mapping).
+    ///
+    /// # Deprecated
+    ///
+    /// This method clones all records including their data. Use `find_records_ref()` instead
+    /// for zero-copy access.
+    #[deprecated(note = "Use find_records_ref() instead to avoid expensive cloning")]
+    #[allow(dead_code)]
+    #[allow(deprecated)]
     pub fn find_records(&self, _record_type: PptRecordType) -> Vec<PptRecord> {
         // Collect all records recursively
         let mut all_records = Vec::new();
@@ -109,6 +109,12 @@ impl PptRecordParser {
     }
 
     /// Get all record references recursively (zero-copy version).
+    ///
+    /// # Performance
+    ///
+    /// - Zero-copy: returns references instead of cloning records
+    /// - Significantly faster than `find_records()` for large presentations
+    /// - Preferred method for building persist mappings and iterating records
     pub fn find_records_ref(&self) -> Vec<&PptRecord> {
         let mut all_records = Vec::new();
         Self::collect_records_recursive_ref(&self.records, &mut all_records);
@@ -117,8 +123,13 @@ impl PptRecordParser {
 
     /// Recursively collect all records including children (cloning version).
     ///
-    /// Note: This clones records. Consider using `collect_records_recursive_ref`
-    /// for zero-copy collection when ownership is not needed.
+    /// # Deprecated
+    ///
+    /// This clones all records including their Vec<u8> data, causing expensive memory copies.
+    /// Use `collect_records_recursive_ref` instead for zero-copy collection.
+    #[deprecated(note = "Use collect_records_recursive_ref instead to avoid expensive cloning")]
+    #[allow(dead_code)]
+    #[allow(deprecated)]
     fn collect_records_recursive(records: &[PptRecord], collector: &mut Vec<PptRecord>) {
         for record in records {
             collector.push(record.clone());

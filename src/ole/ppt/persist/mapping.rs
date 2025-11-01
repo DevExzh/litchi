@@ -53,6 +53,36 @@ impl PersistMapping {
         Self { mappings }
     }
 
+    /// Build mapping from record references (zero-copy version).
+    ///
+    /// # Performance
+    ///
+    /// - Zero-copy: works with references instead of owned records
+    /// - Avoids cloning large record data (Vec<u8>)
+    /// - Same logic as `build_from_records` but more efficient
+    pub fn build_from_records_ref(records: &[&PptRecord]) -> Self {
+        // Count PersistPtrHolder records for capacity estimation
+        let ptr_holder_count = records
+            .iter()
+            .filter(|r| r.record_type == PptRecordType::PersistPtrHolder)
+            .count();
+
+        // Pre-allocate with estimated capacity (assume ~10 slides per holder on average)
+        let mut mappings = HashMap::with_capacity(ptr_holder_count * 10);
+
+        // Process all PersistPtrHolder records in order
+        records
+            .iter()
+            .filter(|r| r.record_type == PptRecordType::PersistPtrHolder)
+            .filter_map(|r| PersistPtrHolder::parse(r).ok())
+            .for_each(|holder| {
+                // Extend mappings (later entries override earlier ones)
+                mappings.extend(holder.slide_locations().iter().map(|(&k, &v)| (k, v)));
+            });
+
+        Self { mappings }
+    }
+
     /// Get the byte offset for a given persist ID.
     #[inline]
     pub fn get_offset(&self, persist_id: u32) -> Option<u32> {

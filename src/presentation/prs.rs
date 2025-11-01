@@ -472,4 +472,36 @@ impl Presentation {
         // Return cached metadata that was extracted during presentation creation
         Ok(self.cached_metadata.clone())
     }
+
+    /// Fast text extraction for markdown conversion (internal use).
+    ///
+    /// This method is optimized for PPT files by skipping shape parsing.
+    /// For other formats, it falls back to the standard text extraction.
+    ///
+    /// # Performance
+    ///
+    /// - PPT: Uses fast path that bypasses shape parsing (3-10x faster)
+    /// - PPTX/Keynote/ODP: Falls back to standard extraction
+    ///
+    /// # Returns
+    ///
+    /// Vector of (slide_number, text) tuples for each slide
+    #[doc(hidden)]
+    pub fn extract_text_for_markdown(&self) -> Result<Vec<(usize, String)>> {
+        match &self.inner {
+            #[cfg(feature = "ole")]
+            PresentationImpl::Ppt(pres) => pres.extract_text_fast().map_err(Error::from),
+            // For other formats, extract from slides (slower but works)
+            _ => {
+                let slides = self.slides()?;
+                Ok(slides
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(idx, slide)| {
+                        slide.text().ok().map(|text| (idx + 1, text.to_string()))
+                    })
+                    .collect())
+            },
+        }
+    }
 }

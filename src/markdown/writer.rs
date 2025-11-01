@@ -1277,11 +1277,13 @@ impl MarkdownWriter {
     }
 
     /// Append a single character to the buffer.
+    #[allow(dead_code)]
     pub fn push(&mut self, ch: char) {
         self.buffer.push(ch);
     }
 
     /// Write a formatted string to the buffer.
+    #[allow(dead_code)]
     pub fn write_fmt(&mut self, args: std::fmt::Arguments) -> Result<()> {
         use std::fmt::Write as FmtWrite;
         self.buffer

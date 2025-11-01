@@ -1,9 +1,10 @@
+//! Provides a general interface to a physical OPC package (ZIP file).
+//!
+//! This module handles the low-level reading of OPC packages from ZIP archives,
+//! providing efficient access to package contents with minimal memory allocation.
+
 use crate::ooxml::opc::error::{OpcError, Result};
 use crate::ooxml::opc::packuri::PackURI;
-/// Provides a general interface to a physical OPC package (ZIP file).
-///
-/// This module handles the low-level reading of OPC packages from ZIP archives,
-/// providing efficient access to package contents with minimal memory allocation.
 use std::fs::File;
 use std::io::{BufReader, Read, Seek};
 use std::path::Path;

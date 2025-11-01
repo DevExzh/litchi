@@ -58,8 +58,9 @@ impl Presentation {
         parser.parse_document(&powerpoint_document)?;
 
         // Build persist mapping for slide lookup (collect all records recursively)
-        let all_records = parser.find_records(crate::ole::consts::PptRecordType::Unknown);
-        let persist_mapping = PersistMapping::build_from_records(&all_records);
+        // Use zero-copy reference collection to avoid cloning all record data
+        let all_records_ref = parser.find_records_ref();
+        let persist_mapping = PersistMapping::build_from_records_ref(&all_records_ref);
 
         // Try to read Pictures stream for image extraction
         #[cfg(feature = "imgconv")]
@@ -147,6 +148,61 @@ impl Presentation {
         } else {
             text_parts.join("\n\n")
         })
+    }
+
+    /// Fast text extraction that skips shape parsing.
+    ///
+    /// This is optimized for cases where only text is needed (e.g., markdown conversion)
+    /// and shape information is not required.
+    ///
+    /// # Performance
+    ///
+    /// - Directly extracts text from slide records without parsing shapes
+    /// - Significantly faster than `slides()` + `text()` for large presentations
+    /// - No shape object allocation or geometry calculations
+    /// - Pre-allocated string buffer
+    ///
+    /// # Returns
+    ///
+    /// Vector of (slide_number, text) tuples for each slide
+    pub(crate) fn extract_text_fast(&self) -> Result<Vec<(usize, String)>> {
+        let factory = SlideFactory::new(&self.powerpoint_document, &self.persist_mapping);
+
+        let mut results = Vec::with_capacity(factory.slide_ids().len());
+
+        for (idx, slide_result) in factory.slides().enumerate() {
+            let slide_data = slide_result?;
+
+            // Pre-allocate string buffer
+            let mut text = String::with_capacity(512);
+
+            // Extract text from slide records without parsing shapes
+            if let Ok(record_text) = slide_data.record.extract_text() {
+                let trimmed = record_text.trim();
+                if !trimmed.is_empty() {
+                    text.push_str(trimmed);
+                }
+            }
+
+            // Extract text from Escher/PPDrawing using the optimized path
+            if let Some(ppdrawing) = slide_data
+                .record
+                .find_child(crate::ole::consts::PptRecordType::PPDrawing)
+                && let Ok(escher_text) = super::escher::extract_text_from_escher(&ppdrawing.data)
+            {
+                let trimmed = escher_text.trim();
+                if !trimmed.is_empty() {
+                    if !text.is_empty() {
+                        text.push('\n');
+                    }
+                    text.push_str(trimmed);
+                }
+            }
+
+            results.push((idx + 1, text));
+        }
+
+        Ok(results)
     }
 
     /// Extract all images from the presentation
