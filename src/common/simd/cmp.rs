@@ -1,7 +1,21 @@
 //! SIMD vector comparison operations
 //!
 //! This module provides high-performance SIMD comparison operations for various
-//! architectures (x86_64, aarch64) and instruction sets (AVX, AVX2, AVX512, SSE, NEON, SVE).
+//! architectures (x86_64, aarch64) and instruction sets.
+//!
+//! # Supported Instruction Sets
+//!
+//! ## x86_64
+//! - **SSE2**: 128-bit integer operations
+//! - **SSE4.1**: Enhanced 128-bit operations
+//! - **SSE4.2**: 128-bit operations with string processing
+//! - **AVX2**: 256-bit integer operations
+//! - **AVX-512F/BW**: 512-bit operations
+//!
+//! ## aarch64 (ARM)
+//! - **NEON**: Fixed 128-bit SIMD operations (always available)
+//! - **SVE**: Scalable Vector Extension with 128-2048 bit vectors
+//! - **SVE2**: Enhanced SVE with additional DSP and multimedia instructions
 //!
 //! # Examples
 //!
@@ -15,6 +29,23 @@
 //! simd_eq_u8(&a, &b, &mut result);
 //! // result contains: [255, 255, 0, 255, 255, 0, 255, 255]
 //! ```
+//!
+//! # SVE/SVE2 Support
+//!
+//! SVE (Scalable Vector Extension) provides variable-length vectors from 128 to 2048 bits,
+//! determined at runtime based on the hardware. This allows the same code to automatically
+//! take advantage of larger vector registers when available.
+//!
+//! Key features of SVE:
+//! - **Scalable vectors**: Vector length is runtime-determined
+//! - **Predicate-based**: All operations use predicate masks for conditional execution
+//! - **Loop-friendly**: Built-in support for processing variable-length data
+//!
+//! SVE2 extends SVE with additional instructions for:
+//! - DSP and multimedia processing
+//! - Complex number arithmetic
+//! - Additional bit manipulation operations
+//! - Histogram and table lookup operations
 
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
@@ -1028,6 +1059,711 @@ mod aarch64_impl {
         // SAFETY: Caller ensures NEON support
         unsafe { vmaxq_f64(a, b) }
     }
+
+    // ============================================================================
+    // SVE (Scalable Vector Extension) Implementations
+    // ============================================================================
+    //
+    // SVE provides scalable vector lengths from 128 to 2048 bits, determined at runtime.
+    // Unlike fixed-width NEON, SVE operations use predicate masks for conditional execution.
+
+    #[cfg(target_feature = "sve")]
+    mod sve_impl {
+        use super::*;
+
+        /// Compare two SVE vectors of u8 for equality
+        ///
+        /// # Safety
+        ///
+        /// Requires SVE support. The vector length is determined at runtime.
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_eq_u8_sve(a: svuint8_t, b: svuint8_t) -> svbool_t {
+            // SAFETY: Caller ensures SVE support
+            unsafe {
+                let pg = svptrue_b8();
+                svcmpeq_u8(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of u16 for equality
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_eq_u16_sve(a: svuint16_t, b: svuint16_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b16();
+                svcmpeq_u16(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of u32 for equality
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_eq_u32_sve(a: svuint32_t, b: svuint32_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b32();
+                svcmpeq_u32(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of u64 for equality
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_eq_u64_sve(a: svuint64_t, b: svuint64_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b64();
+                svcmpeq_u64(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of i8 for equality
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_eq_i8_sve(a: svint8_t, b: svint8_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b8();
+                svcmpeq_s8(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of i16 for equality
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_eq_i16_sve(a: svint16_t, b: svint16_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b16();
+                svcmpeq_s16(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of i32 for equality
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_eq_i32_sve(a: svint32_t, b: svint32_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b32();
+                svcmpeq_s32(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of i64 for equality
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_eq_i64_sve(a: svint64_t, b: svint64_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b64();
+                svcmpeq_s64(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of f32 for equality
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_eq_f32_sve(a: svfloat32_t, b: svfloat32_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b32();
+                svcmpeq_f32(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of f64 for equality
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_eq_f64_sve(a: svfloat64_t, b: svfloat64_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b64();
+                svcmpeq_f64(pg, a, b)
+            }
+        }
+
+        // Greater than comparisons
+
+        /// Compare two SVE vectors of u8 for greater than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_gt_u8_sve(a: svuint8_t, b: svuint8_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b8();
+                svcmpgt_u8(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of u16 for greater than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_gt_u16_sve(a: svuint16_t, b: svuint16_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b16();
+                svcmpgt_u16(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of u32 for greater than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_gt_u32_sve(a: svuint32_t, b: svuint32_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b32();
+                svcmpgt_u32(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of u64 for greater than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_gt_u64_sve(a: svuint64_t, b: svuint64_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b64();
+                svcmpgt_u64(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of i8 for greater than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_gt_i8_sve(a: svint8_t, b: svint8_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b8();
+                svcmpgt_s8(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of i16 for greater than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_gt_i16_sve(a: svint16_t, b: svint16_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b16();
+                svcmpgt_s16(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of i32 for greater than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_gt_i32_sve(a: svint32_t, b: svint32_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b32();
+                svcmpgt_s32(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of i64 for greater than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_gt_i64_sve(a: svint64_t, b: svint64_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b64();
+                svcmpgt_s64(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of f32 for greater than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_gt_f32_sve(a: svfloat32_t, b: svfloat32_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b32();
+                svcmpgt_f32(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of f64 for greater than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_gt_f64_sve(a: svfloat64_t, b: svfloat64_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b64();
+                svcmpgt_f64(pg, a, b)
+            }
+        }
+
+        // Greater than or equal comparisons
+
+        /// Compare two SVE vectors of u8 for greater than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_ge_u8_sve(a: svuint8_t, b: svuint8_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b8();
+                svcmpge_u8(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of u16 for greater than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_ge_u16_sve(a: svuint16_t, b: svuint16_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b16();
+                svcmpge_u16(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of u32 for greater than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_ge_u32_sve(a: svuint32_t, b: svuint32_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b32();
+                svcmpge_u32(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of u64 for greater than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_ge_u64_sve(a: svuint64_t, b: svuint64_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b64();
+                svcmpge_u64(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of i8 for greater than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_ge_i8_sve(a: svint8_t, b: svint8_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b8();
+                svcmpge_s8(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of i16 for greater than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_ge_i16_sve(a: svint16_t, b: svint16_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b16();
+                svcmpge_s16(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of i32 for greater than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_ge_i32_sve(a: svint32_t, b: svint32_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b32();
+                svcmpge_s32(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of i64 for greater than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_ge_i64_sve(a: svint64_t, b: svint64_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b64();
+                svcmpge_s64(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of f32 for greater than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_ge_f32_sve(a: svfloat32_t, b: svfloat32_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b32();
+                svcmpge_f32(pg, a, b)
+            }
+        }
+
+        /// Compare two SVE vectors of f64 for greater than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_ge_f64_sve(a: svfloat64_t, b: svfloat64_t) -> svbool_t {
+            unsafe {
+                let pg = svptrue_b64();
+                svcmpge_f64(pg, a, b)
+            }
+        }
+
+        // Less than comparisons (implemented via greater than with swapped operands)
+
+        /// Compare two SVE vectors of u8 for less than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_lt_u8_sve(a: svuint8_t, b: svuint8_t) -> svbool_t {
+            unsafe { cmp_gt_u8_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of u16 for less than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_lt_u16_sve(a: svuint16_t, b: svuint16_t) -> svbool_t {
+            unsafe { cmp_gt_u16_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of u32 for less than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_lt_u32_sve(a: svuint32_t, b: svuint32_t) -> svbool_t {
+            unsafe { cmp_gt_u32_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of u64 for less than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_lt_u64_sve(a: svuint64_t, b: svuint64_t) -> svbool_t {
+            unsafe { cmp_gt_u64_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of i8 for less than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_lt_i8_sve(a: svint8_t, b: svint8_t) -> svbool_t {
+            unsafe { cmp_gt_i8_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of i16 for less than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_lt_i16_sve(a: svint16_t, b: svint16_t) -> svbool_t {
+            unsafe { cmp_gt_i16_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of i32 for less than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_lt_i32_sve(a: svint32_t, b: svint32_t) -> svbool_t {
+            unsafe { cmp_gt_i32_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of i64 for less than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_lt_i64_sve(a: svint64_t, b: svint64_t) -> svbool_t {
+            unsafe { cmp_gt_i64_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of f32 for less than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_lt_f32_sve(a: svfloat32_t, b: svfloat32_t) -> svbool_t {
+            unsafe { cmp_gt_f32_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of f64 for less than
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_lt_f64_sve(a: svfloat64_t, b: svfloat64_t) -> svbool_t {
+            unsafe { cmp_gt_f64_sve(b, a) }
+        }
+
+        // Less than or equal comparisons
+
+        /// Compare two SVE vectors of u8 for less than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_le_u8_sve(a: svuint8_t, b: svuint8_t) -> svbool_t {
+            unsafe { cmp_ge_u8_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of u16 for less than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_le_u16_sve(a: svuint16_t, b: svuint16_t) -> svbool_t {
+            unsafe { cmp_ge_u16_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of u32 for less than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_le_u32_sve(a: svuint32_t, b: svuint32_t) -> svbool_t {
+            unsafe { cmp_ge_u32_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of u64 for less than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_le_u64_sve(a: svuint64_t, b: svuint64_t) -> svbool_t {
+            unsafe { cmp_ge_u64_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of i8 for less than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_le_i8_sve(a: svint8_t, b: svint8_t) -> svbool_t {
+            unsafe { cmp_ge_i8_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of i16 for less than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_le_i16_sve(a: svint16_t, b: svint16_t) -> svbool_t {
+            unsafe { cmp_ge_i16_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of i32 for less than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_le_i32_sve(a: svint32_t, b: svint32_t) -> svbool_t {
+            unsafe { cmp_ge_i32_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of i64 for less than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_le_i64_sve(a: svint64_t, b: svint64_t) -> svbool_t {
+            unsafe { cmp_ge_i64_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of f32 for less than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_le_f32_sve(a: svfloat32_t, b: svfloat32_t) -> svbool_t {
+            unsafe { cmp_ge_f32_sve(b, a) }
+        }
+
+        /// Compare two SVE vectors of f64 for less than or equal
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn cmp_le_f64_sve(a: svfloat64_t, b: svfloat64_t) -> svbool_t {
+            unsafe { cmp_ge_f64_sve(b, a) }
+        }
+
+        // Minimum/Maximum operations
+
+        /// Get minimum of two SVE vectors of u8
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn min_u8_sve(a: svuint8_t, b: svuint8_t) -> svuint8_t {
+            unsafe {
+                let pg = svptrue_b8();
+                svmin_u8_z(pg, a, b)
+            }
+        }
+
+        /// Get maximum of two SVE vectors of u8
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn max_u8_sve(a: svuint8_t, b: svuint8_t) -> svuint8_t {
+            unsafe {
+                let pg = svptrue_b8();
+                svmax_u8_z(pg, a, b)
+            }
+        }
+
+        /// Get minimum of two SVE vectors of u16
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn min_u16_sve(a: svuint16_t, b: svuint16_t) -> svuint16_t {
+            unsafe {
+                let pg = svptrue_b16();
+                svmin_u16_z(pg, a, b)
+            }
+        }
+
+        /// Get maximum of two SVE vectors of u16
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn max_u16_sve(a: svuint16_t, b: svuint16_t) -> svuint16_t {
+            unsafe {
+                let pg = svptrue_b16();
+                svmax_u16_z(pg, a, b)
+            }
+        }
+
+        /// Get minimum of two SVE vectors of u32
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn min_u32_sve(a: svuint32_t, b: svuint32_t) -> svuint32_t {
+            unsafe {
+                let pg = svptrue_b32();
+                svmin_u32_z(pg, a, b)
+            }
+        }
+
+        /// Get maximum of two SVE vectors of u32
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn max_u32_sve(a: svuint32_t, b: svuint32_t) -> svuint32_t {
+            unsafe {
+                let pg = svptrue_b32();
+                svmax_u32_z(pg, a, b)
+            }
+        }
+
+        /// Get minimum of two SVE vectors of i8
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn min_i8_sve(a: svint8_t, b: svint8_t) -> svint8_t {
+            unsafe {
+                let pg = svptrue_b8();
+                svmin_s8_z(pg, a, b)
+            }
+        }
+
+        /// Get maximum of two SVE vectors of i8
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn max_i8_sve(a: svint8_t, b: svint8_t) -> svint8_t {
+            unsafe {
+                let pg = svptrue_b8();
+                svmax_s8_z(pg, a, b)
+            }
+        }
+
+        /// Get minimum of two SVE vectors of i16
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn min_i16_sve(a: svint16_t, b: svint16_t) -> svint16_t {
+            unsafe {
+                let pg = svptrue_b16();
+                svmin_s16_z(pg, a, b)
+            }
+        }
+
+        /// Get maximum of two SVE vectors of i16
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn max_i16_sve(a: svint16_t, b: svint16_t) -> svint16_t {
+            unsafe {
+                let pg = svptrue_b16();
+                svmax_s16_z(pg, a, b)
+            }
+        }
+
+        /// Get minimum of two SVE vectors of i32
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn min_i32_sve(a: svint32_t, b: svint32_t) -> svint32_t {
+            unsafe {
+                let pg = svptrue_b32();
+                svmin_s32_z(pg, a, b)
+            }
+        }
+
+        /// Get maximum of two SVE vectors of i32
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn max_i32_sve(a: svint32_t, b: svint32_t) -> svint32_t {
+            unsafe {
+                let pg = svptrue_b32();
+                svmax_s32_z(pg, a, b)
+            }
+        }
+
+        /// Get minimum of two SVE vectors of f32
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn min_f32_sve(a: svfloat32_t, b: svfloat32_t) -> svfloat32_t {
+            unsafe {
+                let pg = svptrue_b32();
+                svmin_f32_z(pg, a, b)
+            }
+        }
+
+        /// Get maximum of two SVE vectors of f32
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn max_f32_sve(a: svfloat32_t, b: svfloat32_t) -> svfloat32_t {
+            unsafe {
+                let pg = svptrue_b32();
+                svmax_f32_z(pg, a, b)
+            }
+        }
+
+        /// Get minimum of two SVE vectors of f64
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn min_f64_sve(a: svfloat64_t, b: svfloat64_t) -> svfloat64_t {
+            unsafe {
+                let pg = svptrue_b64();
+                svmin_f64_z(pg, a, b)
+            }
+        }
+
+        /// Get maximum of two SVE vectors of f64
+        #[target_feature(enable = "sve")]
+        #[inline]
+        pub unsafe fn max_f64_sve(a: svfloat64_t, b: svfloat64_t) -> svfloat64_t {
+            unsafe {
+                let pg = svptrue_b64();
+                svmax_f64_z(pg, a, b)
+            }
+        }
+    }
+
+    #[cfg(target_feature = "sve")]
+    pub use sve_impl::*;
+
+    // ============================================================================
+    // SVE2 (Scalable Vector Extension 2) Implementations
+    // ============================================================================
+    //
+    // SVE2 builds upon SVE with additional instructions for DSP, multimedia,
+    // and general-purpose processing.
+
+    #[cfg(target_feature = "sve2")]
+    mod sve2_impl {
+        use super::*;
+
+        // SVE2 adds more advanced operations like complex arithmetic, saturating operations,
+        // and additional integer operations. For basic comparisons, we can reuse SVE
+        // implementations, but SVE2 enables more optimizations for specific use cases.
+
+        /// Check if a byte array contains only ASCII characters using SVE2
+        ///
+        /// This leverages SVE2's enhanced bit manipulation capabilities.
+        #[target_feature(enable = "sve2")]
+        #[inline]
+        pub unsafe fn is_ascii_sve2(bytes: &[u8]) -> bool {
+            unsafe {
+                let pg = svptrue_b8();
+                let ascii_mask = svdup_u8(0x80);
+                let mut i = 0;
+
+                while i < bytes.len() {
+                    let remaining = bytes.len() - i;
+                    let pg_active = svwhilelt_b8_u64(i as u64, bytes.len() as u64);
+
+                    let data = svld1_u8(pg_active, bytes.as_ptr().add(i));
+                    let non_ascii = svtst_u8(pg_active, data, ascii_mask);
+
+                    if svptest_any(pg, non_ascii) {
+                        return false;
+                    }
+
+                    i += svcntb() as usize;
+                }
+
+                true
+            }
+        }
+
+        /// Count matching bytes using SVE2 histogram operations
+        ///
+        /// This can be more efficient than NEON for large inputs.
+        #[target_feature(enable = "sve2")]
+        #[inline]
+        pub unsafe fn count_byte_sve2(bytes: &[u8], target: u8) -> usize {
+            unsafe {
+                let pg = svptrue_b8();
+                let target_vec = svdup_u8(target);
+                let mut count = 0usize;
+                let mut i = 0;
+
+                while i < bytes.len() {
+                    let pg_active = svwhilelt_b8_u64(i as u64, bytes.len() as u64);
+                    let data = svld1_u8(pg_active, bytes.as_ptr().add(i));
+                    let matches = svcmpeq_u8(pg_active, data, target_vec);
+
+                    // Count the number of true predicates
+                    count += svcntp_b8(pg, matches) as usize;
+
+                    i += svcntb() as usize;
+                }
+
+                count
+            }
+        }
+    }
+
+    #[cfg(target_feature = "sve2")]
+    pub use sve2_impl::*;
 }
 
 // Re-export platform-specific implementations
@@ -1251,6 +1987,42 @@ unsafe fn is_all_zero_neon(bytes: &[u8]) -> bool {
     }
 
     true
+}
+
+/// Check if all bytes are zero using SVE (scalable vectors)
+///
+/// This version works with variable-length vectors, making it more efficient
+/// on hardware with larger vector registers.
+#[cfg(all(target_arch = "aarch64", target_feature = "sve"))]
+#[target_feature(enable = "sve")]
+unsafe fn is_all_zero_sve(bytes: &[u8]) -> bool {
+    unsafe {
+        let pg = svptrue_b8();
+        let zero_vec = svdup_u8(0);
+        let mut i = 0;
+
+        while i < bytes.len() {
+            // Create predicate for remaining elements
+            let pg_active = svwhilelt_b8_u64(i as u64, bytes.len() as u64);
+
+            // Load vector with predication
+            let data = svld1_u8(pg_active, bytes.as_ptr().add(i));
+
+            // Compare with zero
+            let eq = svcmpeq_u8(pg_active, data, zero_vec);
+
+            // Check if all active lanes are equal to zero
+            // If not all are true, then some byte is non-zero
+            if !svptest_last(pg, eq) {
+                return false;
+            }
+
+            // Advance by the number of bytes processed (vector length)
+            i += svcntb() as usize;
+        }
+
+        true
+    }
 }
 
 // Scalar fallback implementations

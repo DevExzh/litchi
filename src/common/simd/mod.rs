@@ -17,9 +17,9 @@
 //! - **AVX-512**: 512-bit operations (F, BW, DQ, VL extensions)
 //!
 //! ## aarch64 (ARM)
-//! - **NEON**: 128-bit SIMD operations
-//! - **SVE** (Scalable Vector Extension): Variable-length vectors (future support)
-//! - **SVE2**: Enhanced SVE operations (future support)
+//! - **NEON**: Fixed 128-bit SIMD operations (always available on aarch64)
+//! - **SVE** (Scalable Vector Extension): Variable-length vectors (128-2048 bits)
+//! - **SVE2**: Enhanced SVE with additional DSP and multimedia operations
 //!
 //! # Modules
 //!
@@ -50,6 +50,31 @@
 //! // result[i] is 0xFF where a[i] == b[i], 0x00 otherwise
 //! ```
 //!
+//! # SVE/SVE2 Features
+//!
+//! ARM's Scalable Vector Extension (SVE) and SVE2 provide unique capabilities:
+//!
+//! ## SVE Key Features
+//!
+//! - **Scalable**: Vector length determined at runtime (128-2048 bits in 128-bit increments)
+//! - **Predicated**: All operations use predicate masks for efficient conditional execution
+//! - **Loop-friendly**: `svwhilelt` and similar instructions simplify vectorized loops
+//! - **Future-proof**: Same code automatically leverages larger vectors on newer hardware
+//!
+//! ## SVE2 Additions
+//!
+//! SVE2 extends SVE with instructions for:
+//! - DSP operations (saturating arithmetic, complex numbers)
+//! - Multimedia processing (polynomial math, CRC)
+//! - Bit manipulation (population count, bit permutations)
+//! - Table operations and histogram processing
+//!
+//! ## Availability
+//!
+//! - **SVE**: Available on some ARMv8.2-A+ processors (e.g., Fujitsu A64FX, AWS Graviton3)
+//! - **SVE2**: Available on ARMv9-A processors (e.g., Apple M4, AWS Graviton4)
+//! - **Detection**: Compile with `+sve` or `+sve2` target features, or check HWCAP at runtime
+//!
 //! # Safety
 //!
 //! Functions using SIMD intrinsics are marked as `unsafe` when they require specific CPU features.
@@ -57,9 +82,19 @@
 //!
 //! When using low-level intrinsics directly, ensure the target CPU supports the required features
 //! either through:
-//! - Runtime detection with `is_x86_feature_detected!()` or similar
-//! - Compile-time target features: `#[target_feature(enable = "avx2")]`
-//! - Compiler flags: `RUSTFLAGS="-C target-feature=+avx2"`
+//! - Runtime detection with `is_x86_feature_detected!()` on x86_64
+//! - Compile-time target features: `#[target_feature(enable = "avx2")]` or `#[target_feature(enable = "sve")]`
+//! - Compiler flags: `RUSTFLAGS="-C target-feature=+avx2"` or `RUSTFLAGS="-C target-feature=+sve"`
+//!
+//! ## Example: Compiling with SVE Support
+//!
+//! ```bash
+//! # For SVE
+//! RUSTFLAGS="-C target-cpu=native -C target-feature=+sve" cargo build --release
+//!
+//! # For SVE2
+//! RUSTFLAGS="-C target-cpu=native -C target-feature=+sve2" cargo build --release
+//! ```
 
 pub mod cmp;
 pub mod fmt;
