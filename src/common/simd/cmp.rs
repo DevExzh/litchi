@@ -1099,6 +1099,160 @@ pub fn simd_ne_u8(a: &[u8], b: &[u8], result: &mut [u8]) {
     }
 }
 
+/// Check if all bytes in a slice are zero (SIMD-optimized)
+///
+/// Uses SIMD movemask instructions to avoid scalar iteration.
+///
+/// # Examples
+///
+/// ```rust
+/// use litchi::common::simd::cmp::is_all_zero;
+///
+/// let zeros = [0u8; 16];
+/// assert!(is_all_zero(&zeros));
+///
+/// let not_zeros = [0u8, 1, 0, 0, 0, 0, 0, 0];
+/// assert!(!is_all_zero(&not_zeros));
+/// ```
+#[inline]
+pub fn is_all_zero(bytes: &[u8]) -> bool {
+    #[cfg(target_arch = "x86_64")]
+    {
+        if is_x86_feature_detected!("avx2") {
+            unsafe { is_all_zero_avx2(bytes) }
+        } else if is_x86_feature_detected!("sse2") {
+            unsafe { is_all_zero_sse2(bytes) }
+        } else {
+            is_all_zero_scalar(bytes)
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        unsafe { is_all_zero_neon(bytes) }
+    }
+
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+    {
+        is_all_zero_scalar(bytes)
+    }
+}
+
+// Scalar fallback
+#[inline]
+#[allow(dead_code)]
+fn is_all_zero_scalar(bytes: &[u8]) -> bool {
+    bytes.iter().all(|&b| b == 0)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "sse2")]
+unsafe fn is_all_zero_sse2(bytes: &[u8]) -> bool {
+    let mut i = 0;
+    let len = bytes.len();
+
+    // Process 16 bytes at a time
+    while i + 16 <= len {
+        let vec = unsafe { _mm_loadu_si128(bytes.as_ptr().add(i) as *const __m128i) };
+        let zero = unsafe { _mm_setzero_si128() };
+        let eq = unsafe { _mm_cmpeq_epi8(vec, zero) };
+        let mask = unsafe { _mm_movemask_epi8(eq) };
+
+        // If not all bytes are zero, mask will not be 0xFFFF
+        if mask != 0xFFFF {
+            return false;
+        }
+        i += 16;
+    }
+
+    // Check remaining bytes
+    for &byte in &bytes[i..] {
+        if byte != 0 {
+            return false;
+        }
+    }
+
+    true
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn is_all_zero_avx2(bytes: &[u8]) -> bool {
+    let mut i = 0;
+    let len = bytes.len();
+
+    // Process 32 bytes at a time
+    while i + 32 <= len {
+        let vec = unsafe { _mm256_loadu_si256(bytes.as_ptr().add(i) as *const __m256i) };
+        let zero = unsafe { _mm256_setzero_si256() };
+        let eq = unsafe { _mm256_cmpeq_epi8(vec, zero) };
+        let mask = unsafe { _mm256_movemask_epi8(eq) };
+
+        // If not all bytes are zero, mask will not be 0xFFFFFFFF
+        if mask != -1 {
+            // -1 as i32 is 0xFFFFFFFF
+            return false;
+        }
+        i += 32;
+    }
+
+    // Handle remaining bytes with SSE2
+    if i + 16 <= len {
+        let vec = unsafe { _mm_loadu_si128(bytes.as_ptr().add(i) as *const __m128i) };
+        let zero = unsafe { _mm_setzero_si128() };
+        let eq = unsafe { _mm_cmpeq_epi8(vec, zero) };
+        let mask = unsafe { _mm_movemask_epi8(eq) };
+
+        if mask != 0xFFFF {
+            return false;
+        }
+        i += 16;
+    }
+
+    // Check remaining bytes
+    for &byte in &bytes[i..] {
+        if byte != 0 {
+            return false;
+        }
+    }
+
+    true
+}
+
+#[cfg(target_arch = "aarch64")]
+unsafe fn is_all_zero_neon(bytes: &[u8]) -> bool {
+    let mut i = 0;
+    let len = bytes.len();
+
+    // Process 16 bytes at a time
+    while i + 16 <= len {
+        // SAFETY: We've checked bounds
+        unsafe {
+            let vec = vld1q_u8(bytes.as_ptr().add(i));
+            let zero = vdupq_n_u8(0);
+            let eq = vceqq_u8(vec, zero);
+
+            // Check if all lanes are 0xFF (all bits set)
+            // Use vminvq_u8 to get the minimum value across all lanes
+            // If all are 0xFF, min will be 0xFF
+            let min = vminvq_u8(eq);
+            if min != 0xFF {
+                return false;
+            }
+        }
+        i += 16;
+    }
+
+    // Check remaining bytes
+    for &byte in &bytes[i..] {
+        if byte != 0 {
+            return false;
+        }
+    }
+
+    true
+}
+
 // Scalar fallback implementations
 
 #[inline]
@@ -1231,5 +1385,43 @@ mod tests {
         assert_eq!(result[1], 0x00);
         assert_eq!(result[2], 0xFF);
         assert_eq!(result[3], 0x00);
+    }
+
+    #[test]
+    fn test_is_all_zero() {
+        // Test all zeros
+        let zeros = [0u8; 16];
+        assert!(is_all_zero(&zeros));
+
+        // Test with one non-zero byte at different positions
+        let mut data = [0u8; 16];
+        data[0] = 1;
+        assert!(!is_all_zero(&data));
+
+        data[0] = 0;
+        data[8] = 1;
+        assert!(!is_all_zero(&data));
+
+        data[8] = 0;
+        data[15] = 1;
+        assert!(!is_all_zero(&data));
+
+        // Test with all non-zero
+        let all_ones = [0xFFu8; 16];
+        assert!(!is_all_zero(&all_ones));
+
+        // Test different sizes
+        assert!(is_all_zero(&[0u8; 8]));
+        assert!(is_all_zero(&[0u8; 32]));
+        assert!(is_all_zero(&[0u8; 64]));
+
+        assert!(!is_all_zero(&[1u8]));
+        assert!(is_all_zero(&[0u8]));
+
+        // Test edge case with size not aligned to SIMD width
+        let mut unaligned = vec![0u8; 17];
+        assert!(is_all_zero(&unaligned));
+        unaligned[16] = 1;
+        assert!(!is_all_zero(&unaligned));
     }
 }

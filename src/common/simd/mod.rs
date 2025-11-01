@@ -24,6 +24,7 @@
 //! # Modules
 //!
 //! - [`cmp`]: Vector comparison operations (equal, not equal, greater than, less than, etc.)
+//! - [`fmt`]: SIMD-optimized formatting operations (hex encoding, GUID/CLSID formatting)
 //!
 //! # Performance Considerations
 //!
@@ -61,3 +62,4 @@
 //! - Compiler flags: `RUSTFLAGS="-C target-feature=+avx2"`
 
 pub mod cmp;
+pub mod fmt;
