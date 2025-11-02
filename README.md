@@ -14,8 +14,9 @@ A high-performance Rust library for parsing Microsoft Office file formats (OLE2 
 
 ## Features
 
+- **Complete CRUD Operations** - Create, read, update, and save Office documents (.docx, .xlsx, .pptx)
 - **Unified API** - Same interface for legacy and modern formats with automatic format detection
-- **Microsoft Office** - Parse .doc, .docx, .xls, .xlsx, .xlsb, .ppt, .pptx files
+- **Microsoft Office** - Full support for .doc, .docx, .xls, .xlsx, .xlsb, .ppt, .pptx files
 - **OpenDocument** - Parse .odt, .ods, .odp files (ODF format)
 - **Apple iWork** - Parse .pages, .numbers, .key files (IWA format)
 - **Formula Conversion** - Parse MathType and Office MathML equations and convert to LaTeX
@@ -24,6 +25,8 @@ A high-performance Rust library for parsing Microsoft Office file formats (OLE2 
 - **High Performance** - SIMD optimizations, minimal allocations, efficient memory layout
 
 ## Quick Start
+
+### Reading Documents
 
 ```rust
 use litchi::{Document, Presentation};
@@ -39,7 +42,40 @@ let slide_count = pres.slide_count()?;
 use litchi::sheet::open_xls_workbook;
 let workbook = open_xls_workbook("spreadsheet.xls")?;
 let worksheet = workbook.worksheet_by_name("Sheet1")?;
+```
 
+### Creating and Writing Documents
+
+```rust
+use litchi::ooxml::docx::Package;
+use litchi::ooxml::xlsx::Workbook;
+use litchi::ooxml::pptx::Package as PptxPackage;
+
+// Create Word document
+let mut pkg = Package::new()?;
+let doc = pkg.document_mut()?;
+doc.add_heading("My Document", 1)?;
+doc.add_paragraph_with_text("Hello, World!");
+pkg.save("output.docx")?;
+
+// Create Excel workbook
+let mut wb = Workbook::create()?;
+let ws = wb.worksheet_mut(0)?;
+ws.set_cell_value(1, 1, "Hello");
+ws.set_cell_value(1, 2, "World");
+wb.save("output.xlsx")?;
+
+// Create PowerPoint presentation
+let mut pkg = PptxPackage::new()?;
+let pres = pkg.presentation_mut()?;
+let slide = pres.add_slide()?;
+slide.set_title("My Presentation");
+pkg.save("output.pptx")?;
+```
+
+### Additional Format Support
+
+```rust
 // OpenDocument formats (requires "odf" feature)
 #[cfg(feature = "odf")]
 {
@@ -71,6 +107,9 @@ Add to your `Cargo.toml`:
 ```toml
 [dependencies]
 litchi = "0.0.1"
+
+# Or use the development version
+litchi = { git = "https://github.com/DevExzh/litchi.git" }
 ```
 
 ### Optional Features
@@ -99,26 +138,31 @@ litchi = { version = "0.0.1", features = ["imgconv"] }  # Image conversion suppo
 
 ## Documentation
 
-For detailed documentation, API reference, and examples, visit [docs.rs/litchi](https://docs.rs/litchi).
+- **[API Reference](https://docs.rs/litchi)** - Complete API documentation
+- **[OFFICE_API_GUIDE.md](docs/OFFICE_API_GUIDE.md)** - Comprehensive guide with examples
+- **[FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md)** - Feature comparison with Apache POI
+- **[Examples](examples/)** - Working code examples:
+  - `office_crud_demo.rs` - Complete CRUD operations demo
 
 ## Current Status
 
-**Implemented:**
-- ✅ Microsoft Office formats (.doc, .docx, .xls, .xlsx, .xlsb, .ppt, .pptx)
-- ✅ OpenDocument formats (.odt, .ods, .odp)
-- ✅ Apple iWork formats (.pages, .numbers, .key)
-- ✅ Text extraction and basic formatting
-- ✅ Table and shape parsing
-- ✅ Formula parsing (MathType and MathML to LaTeX)
-- ✅ Markdown conversion
+**Fully Implemented:**
+- ✅ **CRUD Operations** - Create, read, and update .docx, .xlsx, .pptx files
+- ✅ **Reading** - Full support for .doc, .docx, .xls, .xlsx, .xlsb, .ppt, .pptx
+- ✅ **Writing** - Document creation and modification for OOXML formats
+- ✅ **Text & Formatting** - Paragraphs, runs, tables, cells, basic styling
+- ✅ **OpenDocument** - Read .odt, .ods, .odp files
+- ✅ **Apple iWork** - Read .pages, .numbers, .key files  
+- ✅ **Formula Parsing** - MathType and MathML to LaTeX conversion
+- ✅ **Markdown Export** - Convert documents and presentations to Markdown
 
-**Limitations:**
-- Read-only (no document creation or modification)
-- Basic formatting support only
-- No formula evaluation, charts, headers/footers, embedded objects
-- Missing advanced features like styles, themes, comments, revisions
+**In Progress:**
+- 🟡 Advanced formatting (cell styles, conditional formatting)
+- 🟡 Charts and embedded objects
+- 🟡 Headers, footers, comments
+- 🟡 Document protection and security features
 
-See [docs.rs/litchi](https://docs.rs/litchi) for the complete roadmap and planned features.
+See [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md) for a detailed feature comparison with Apache POI.
 
 ## License
 
