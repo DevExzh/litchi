@@ -201,6 +201,33 @@ impl<'a> Presentation<'a> {
     pub fn package(&self) -> &'a OpcPackage {
         self.package
     }
+
+    // TODO: Apache POI features not yet implemented:
+    // - Slide manipulation: delete_slide(), duplicate_slide(), move_slide()
+    // - Charts: add_chart(), get_charts(), update_chart()
+    // - Tables (reading/writing): get_tables(), add_table(), modify_table()
+    // - SmartArt: add_smartart(), get_smartart()
+    // - Audio/Video: add_audio(), add_video(), get_media()
+    // - Animations: add_animation(), get_animations(), set_animation_timing()
+    // - Transitions: set_slide_transition(), get_slide_transition()
+    // - Comments: add_comment(), get_comments(), delete_comment()
+    // - Notes (advanced): get_notes_master(), set_notes_master()
+    // - Handout master: get_handout_master(), set_handout_master()
+    // - Custom slide shows: add_custom_show(), get_custom_shows()
+    // - Slide layout manipulation: get_slide_layouts(), apply_layout()
+    // - Master slides manipulation: add_slide_master(), get_all_slide_masters()
+    // - Themes (advanced): apply_theme(), get_theme(), modify_theme()
+    // - Hyperlinks: add_hyperlink(), get_hyperlinks(), remove_hyperlink()
+    // - Group shapes: group_shapes(), ungroup_shapes(), get_grouped_shapes()
+    // - Shape formatting: set_shape_fill(), set_shape_line(), get_shape_effects()
+    // - Text formatting (rich): set_text_format(), get_text_format(), apply_style()
+    // - Placeholder management: get_placeholders(), fill_placeholder()
+    // - Slide backgrounds: set_background(), get_background(), remove_background()
+    // - Slide size: set_slide_size(), get_slide_size()
+    // - Presentation protection: protect_presentation(), unprotect_presentation()
+    // - Custom properties: set_custom_property(), get_custom_properties()
+    // - Sections: add_section(), get_sections(), rename_section(), delete_section()
+    // - Slide timings: set_slide_timing(), get_slide_timing()
 }
 
 #[cfg(test)]

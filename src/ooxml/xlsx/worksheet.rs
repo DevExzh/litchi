@@ -257,6 +257,212 @@ impl<'a> Worksheet<'a> {
             other => other,
         }
     }
+
+    /// Get all cells in a specific column.
+    ///
+    /// # Arguments
+    /// * `column` - Column number (1-based)
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::xlsx::Workbook;
+    ///
+    /// let wb = Workbook::open("workbook.xlsx")?;
+    /// let ws = wb.worksheet_by_index(0)?;
+    ///
+    /// // Get all values in column A (column 1)
+    /// let column_values = ws.column_values(1)?;
+    /// for value in column_values {
+    ///     println!("{:?}", value);
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn column_values(&self, column: u32) -> SheetResult<Vec<CellValue>> {
+        let mut values = Vec::new();
+
+        if let Some((min_row, _, max_row, _)) = self.dimensions {
+            for row in min_row..=max_row {
+                values.push(self.get_cell_value(row, column));
+            }
+        }
+
+        Ok(values)
+    }
+
+    /// Get all cells in a specific row.
+    ///
+    /// # Arguments
+    /// * `row` - Row number (1-based)
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::xlsx::Workbook;
+    ///
+    /// let wb = Workbook::open("workbook.xlsx")?;
+    /// let ws = wb.worksheet_by_index(0)?;
+    ///
+    /// // Get all values in row 1
+    /// let row_values = ws.row_values(1)?;
+    /// for value in row_values {
+    ///     println!("{:?}", value);
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn row_values(&self, row: u32) -> SheetResult<Vec<CellValue>> {
+        let mut values = Vec::new();
+
+        if let Some((_, min_col, _, max_col)) = self.dimensions {
+            for col in min_col..=max_col {
+                values.push(self.get_cell_value(row, col));
+            }
+        }
+
+        Ok(values)
+    }
+
+    /// Get a range of cells as a 2D vector.
+    ///
+    /// # Arguments
+    /// * `start_row` - Starting row (1-based, inclusive)
+    /// * `start_col` - Starting column (1-based, inclusive)
+    /// * `end_row` - Ending row (1-based, inclusive)
+    /// * `end_col` - Ending column (1-based, inclusive)
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::xlsx::Workbook;
+    ///
+    /// let wb = Workbook::open("workbook.xlsx")?;
+    /// let ws = wb.worksheet_by_index(0)?;
+    ///
+    /// // Get range A1:C3
+    /// let range = ws.range(1, 1, 3, 3)?;
+    /// for row in range {
+    ///     for cell in row {
+    ///         print!("{:?} ", cell);
+    ///     }
+    ///     println!();
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn range(
+        &self,
+        start_row: u32,
+        start_col: u32,
+        end_row: u32,
+        end_col: u32,
+    ) -> SheetResult<Vec<Vec<CellValue>>> {
+        let mut result = Vec::new();
+
+        for row in start_row..=end_row {
+            let mut row_data = Vec::new();
+            for col in start_col..=end_col {
+                row_data.push(self.get_cell_value(row, col));
+            }
+            result.push(row_data);
+        }
+
+        Ok(result)
+    }
+
+    /// Find cells containing specific text.
+    ///
+    /// # Arguments
+    /// * `query` - Text to search for
+    ///
+    /// # Returns
+    /// Vector of (row, column) tuples where the cell contains the query text
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::xlsx::Workbook;
+    ///
+    /// let wb = Workbook::open("workbook.xlsx")?;
+    /// let ws = wb.worksheet_by_index(0)?;
+    ///
+    /// // Find all cells containing "Total"
+    /// let matches = ws.find_text("Total")?;
+    /// for (row, col) in matches {
+    ///     println!("Found at row {}, column {}", row, col);
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn find_text(&self, query: &str) -> SheetResult<Vec<(u32, u32)>> {
+        let mut matches = Vec::new();
+
+        for (&row, row_data) in &self.cells {
+            for (&col, value) in row_data {
+                if let CellValue::String(s) = &value
+                    && (s.contains(query)
+                        || (s.starts_with("SHARED_STRING_") && {
+                            let resolved = self.resolve_shared_string(value.clone());
+                            matches!(resolved, CellValue::String(ref text) if text.contains(query))
+                        }))
+                {
+                    matches.push((row, col));
+                }
+            }
+        }
+
+        Ok(matches)
+    }
+
+    /// Get the used range dimensions (min row, min col, max row, max col).
+    ///
+    /// Returns None if the worksheet is empty.
+    pub fn used_range(&self) -> Option<(u32, u32, u32, u32)> {
+        self.dimensions
+    }
+
+    /// Check if a cell is empty.
+    ///
+    /// # Arguments
+    /// * `row` - Row number (1-based)
+    /// * `column` - Column number (1-based)
+    pub fn is_cell_empty(&self, row: u32, column: u32) -> bool {
+        matches!(self.get_cell_value(row, column), CellValue::Empty)
+    }
+
+    /// Count non-empty cells in the worksheet.
+    pub fn non_empty_cell_count(&self) -> usize {
+        self.cells
+            .values()
+            .map(|row| {
+                row.values()
+                    .filter(|v| !matches!(v, CellValue::Empty))
+                    .count()
+            })
+            .sum()
+    }
+
+    /// Get worksheet information.
+    pub fn info(&self) -> &WorksheetInfo {
+        &self.info
+    }
+
+    // TODO: Apache POI worksheet-level features not yet implemented:
+    // - Cell formatting (reading): get_cell_style(), get_cell_format()
+    // - Formula evaluation: evaluate_formula(), get_formula_evaluator()
+    // - Cell types (advanced): get_cell_type(), get_cached_formula_result_type()
+    // - Date cells: is_date_formatted(), get_date_cell_value()
+    // - Array formulas: set_array_formula(), get_array_formulas()
+    // - Rich text cells: get_rich_string_cell_value(), set_rich_text_string()
+    // - Cell hyperlinks: get_hyperlink(), set_hyperlink(), remove_hyperlink()
+    // - Cell comments: get_cell_comment(), set_cell_comment(), remove_cell_comment()
+    // - Merged regions: get_merged_regions(), is_merged_cell(), get_merge_region()
+    // - Column operations: auto_size_column(), set_column_hidden(), is_column_hidden()
+    // - Row operations: set_row_hidden(), is_row_hidden(), get_row_height(), set_row_height()
+    // - Sheet protection: protect_sheet(), is_protected(), get_protection_info()
+    // - Auto-filter: set_auto_filter(), get_auto_filter_range()
+    // - Data validation: add_validation_data(), get_data_validations()
+    // - Conditional formatting: get_sheet_conditional_formatting()
+    // - Page setup: get_print_setup(), set_fit_to_page()
+    // - Headers/Footers: get_header(), get_footer(), set_header(), set_footer()
+    // - Repeating rows/columns: set_repeating_rows(), set_repeating_columns()
 }
 
 impl<'a> WorksheetTrait for Worksheet<'a> {

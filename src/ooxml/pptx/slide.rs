@@ -128,6 +128,200 @@ impl<'a> Slide<'a> {
     pub fn shapes(&self) -> Result<Vec<BaseShape>> {
         self.part.shapes()
     }
+
+    /// Get the number of shapes on this slide.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::pptx::Package;
+    ///
+    /// let pkg = Package::open("presentation.pptx")?;
+    /// let pres = pkg.presentation()?;
+    /// let slides = pres.slides()?;
+    ///
+    /// if let Some(slide) = slides.first() {
+    ///     println!("Shape count: {}", slide.shape_count()?);
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn shape_count(&self) -> Result<usize> {
+        Ok(self.shapes()?.len())
+    }
+
+    /// Get a specific shape by index.
+    ///
+    /// # Arguments
+    /// * `index` - Zero-based index of the shape
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::pptx::Package;
+    ///
+    /// let pkg = Package::open("presentation.pptx")?;
+    /// let pres = pkg.presentation()?;
+    /// let slides = pres.slides()?;
+    ///
+    /// if let Some(slide) = slides.first() {
+    ///     if let Some(shape) = slide.shape(0)? {
+    ///         let mut shape_mut = shape;
+    ///         println!("First shape: {}", shape_mut.name()?);
+    ///     }
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn shape(&self, index: usize) -> Result<Option<BaseShape>> {
+        Ok(self.shapes()?.into_iter().nth(index))
+    }
+
+    /// Check if the slide has any tables.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::pptx::Package;
+    ///
+    /// let pkg = Package::open("presentation.pptx")?;
+    /// let pres = pkg.presentation()?;
+    /// let slides = pres.slides()?;
+    ///
+    /// if let Some(slide) = slides.first() {
+    ///     if slide.has_tables()? {
+    ///         println!("Slide contains tables");
+    ///     }
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn has_tables(&self) -> Result<bool> {
+        for shape in self.shapes()? {
+            if shape.has_table() {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    /// Check if the slide has any pictures.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::pptx::Package;
+    ///
+    /// let pkg = Package::open("presentation.pptx")?;
+    /// let pres = pkg.presentation()?;
+    /// let slides = pres.slides()?;
+    ///
+    /// if let Some(slide) = slides.first() {
+    ///     if slide.has_pictures()? {
+    ///         println!("Slide contains pictures");
+    ///     }
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn has_pictures(&self) -> Result<bool> {
+        use crate::ooxml::pptx::shapes::ShapeType;
+
+        for shape in self.shapes()? {
+            if matches!(shape.shape_type(), ShapeType::Picture) {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    /// Get all text shapes from this slide.
+    ///
+    /// Returns shapes that contain text (excluding pictures and other non-text shapes).
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::pptx::Package;
+    ///
+    /// let pkg = Package::open("presentation.pptx")?;
+    /// let pres = pkg.presentation()?;
+    /// let slides = pres.slides()?;
+    ///
+    /// if let Some(slide) = slides.first() {
+    ///     for mut shape in slide.text_shapes()? {
+    ///         if let Some(text) = shape.text()? {
+    ///             println!("Text: {}", text);
+    ///         }
+    ///     }
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn text_shapes(&self) -> Result<Vec<BaseShape>> {
+        let mut text_shapes = Vec::new();
+
+        for shape in self.shapes()? {
+            if shape.text()?.is_some() {
+                text_shapes.push(shape);
+            }
+        }
+
+        Ok(text_shapes)
+    }
+
+    /// Find text in the slide.
+    ///
+    /// Returns indices of shapes that contain the search text.
+    ///
+    /// # Arguments
+    /// * `query` - Text to search for (case-sensitive)
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::pptx::Package;
+    ///
+    /// let pkg = Package::open("presentation.pptx")?;
+    /// let pres = pkg.presentation()?;
+    /// let slides = pres.slides()?;
+    ///
+    /// if let Some(slide) = slides.first() {
+    ///     let matches = slide.find_text("important")?;
+    ///     println!("Found {} matching shapes", matches.len());
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn find_text(&self, query: &str) -> Result<Vec<usize>> {
+        let mut matches = Vec::new();
+
+        for (idx, shape) in self.shapes()?.into_iter().enumerate() {
+            if let Some(text) = shape.text()?
+                && text.contains(query)
+            {
+                matches.push(idx);
+            }
+        }
+
+        Ok(matches)
+    }
+
+    /// Check if the slide is empty (has no shapes).
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::pptx::Package;
+    ///
+    /// let pkg = Package::open("presentation.pptx")?;
+    /// let pres = pkg.presentation()?;
+    /// let slides = pres.slides()?;
+    ///
+    /// for slide in slides {
+    ///     if slide.is_empty()? {
+    ///         println!("Empty slide found");
+    ///     }
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn is_empty(&self) -> Result<bool> {
+        Ok(self.shape_count()? == 0)
+    }
 }
 
 /// A slide layout.

@@ -252,6 +252,22 @@ impl BaseShape {
     pub fn xml_bytes(&self) -> &[u8] {
         &self.xml_bytes
     }
+
+    /// Extract text content from this shape if it has any.
+    ///
+    /// Returns None if the shape doesn't contain text (e.g., pictures without text).
+    pub fn text(&self) -> Result<Option<String>> {
+        // Only text shapes have text frames
+        if !self.has_text_frame() {
+            return Ok(None);
+        }
+
+        // Parse text from the shape using TextFrame
+        match TextFrame::from_xml(&self.xml_bytes) {
+            Ok(tf) => Ok(Some(tf.text()?)),
+            Err(_) => Ok(None),
+        }
+    }
 }
 
 /// A shape containing text (p:sp).

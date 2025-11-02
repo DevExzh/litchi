@@ -366,10 +366,212 @@ impl<'a> Document<'a> {
         Ok(Sections::new(sections_xml))
     }
 
-    // TODO: Add more methods:
-    // - add_paragraph() -> Paragraph (writing support)
-    // - add_table() -> Table (writing support)
-    // - save() (writing support)
+    /// Get a specific paragraph by index.
+    ///
+    /// # Arguments
+    /// * `index` - Zero-based index of the paragraph
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::docx::Package;
+    ///
+    /// let pkg = Package::open("document.docx")?;
+    /// let doc = pkg.document()?;
+    ///
+    /// // Get first paragraph
+    /// if let Some(para) = doc.paragraph(0)? {
+    ///     println!("First paragraph: {}", para.text()?);
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn paragraph(&self, index: usize) -> Result<Option<Paragraph>> {
+        let paragraphs = self.paragraphs()?;
+        Ok(paragraphs.into_iter().nth(index))
+    }
+
+    /// Get a specific table by index.
+    ///
+    /// # Arguments
+    /// * `index` - Zero-based index of the table
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::docx::Package;
+    ///
+    /// let pkg = Package::open("document.docx")?;
+    /// let doc = pkg.document()?;
+    ///
+    /// // Get first table
+    /// if let Some(table) = doc.table(0)? {
+    ///     println!("Table has {} rows", table.row_count()?);
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn table(&self, index: usize) -> Result<Option<Table>> {
+        let tables = self.tables()?;
+        Ok(tables.into_iter().nth(index))
+    }
+
+    /// Extract all text from a specific range of paragraphs.
+    ///
+    /// # Arguments
+    /// * `start` - Starting paragraph index (inclusive)
+    /// * `end` - Ending paragraph index (exclusive)
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::docx::Package;
+    ///
+    /// let pkg = Package::open("document.docx")?;
+    /// let doc = pkg.document()?;
+    ///
+    /// // Get text from paragraphs 5-10
+    /// let text = doc.text_range(5, 10)?;
+    /// println!("{}", text);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn text_range(&self, start: usize, end: usize) -> Result<String> {
+        let paragraphs = self.paragraphs()?;
+        let mut result = String::new();
+
+        for (idx, para) in paragraphs.into_iter().enumerate() {
+            if idx >= end {
+                break;
+            }
+            if idx >= start {
+                if !result.is_empty() {
+                    result.push('\n');
+                }
+                result.push_str(&para.text()?);
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Check if the document contains any tables.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::docx::Package;
+    ///
+    /// let pkg = Package::open("document.docx")?;
+    /// let doc = pkg.document()?;
+    ///
+    /// if doc.has_tables()? {
+    ///     println!("Document contains tables");
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn has_tables(&self) -> Result<bool> {
+        Ok(self.table_count()? > 0)
+    }
+
+    /// Get the underlying OPC package reference.
+    ///
+    /// This provides access to low-level package operations.
+    #[inline]
+    pub fn opc_package(&self) -> &OpcPackage {
+        self.opc
+    }
+
+    /// Search for text in the document.
+    ///
+    /// Returns the indices of paragraphs that contain the search text.
+    ///
+    /// # Arguments
+    /// * `query` - Text to search for (case-sensitive)
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::docx::Package;
+    ///
+    /// let pkg = Package::open("document.docx")?;
+    /// let doc = pkg.document()?;
+    ///
+    /// // Find paragraphs containing "important"
+    /// let matches = doc.search("important")?;
+    /// println!("Found {} matching paragraphs", matches.len());
+    ///
+    /// for idx in matches {
+    ///     if let Some(para) = doc.paragraph(idx)? {
+    ///         println!("Match in paragraph {}: {}", idx, para.text()?);
+    ///     }
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn search(&self, query: &str) -> Result<Vec<usize>> {
+        let paragraphs = self.paragraphs()?;
+        let mut matches = Vec::new();
+
+        for (idx, para) in paragraphs.iter().enumerate() {
+            if para.text()?.contains(query) {
+                matches.push(idx);
+            }
+        }
+
+        Ok(matches)
+    }
+
+    /// Search for text in the document (case-insensitive).
+    ///
+    /// Returns the indices of paragraphs that contain the search text.
+    ///
+    /// # Arguments
+    /// * `query` - Text to search for (case-insensitive)
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::docx::Package;
+    ///
+    /// let pkg = Package::open("document.docx")?;
+    /// let doc = pkg.document()?;
+    ///
+    /// // Find paragraphs containing "important" (case-insensitive)
+    /// let matches = doc.search_ignore_case("IMPORTANT")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn search_ignore_case(&self, query: &str) -> Result<Vec<usize>> {
+        let paragraphs = self.paragraphs()?;
+        let query_lower = query.to_lowercase();
+        let mut matches = Vec::new();
+
+        for (idx, para) in paragraphs.iter().enumerate() {
+            if para.text()?.to_lowercase().contains(&query_lower) {
+                matches.push(idx);
+            }
+        }
+
+        Ok(matches)
+    }
+
+    // TODO: Apache POI features not yet implemented:
+    // - Headers and footers: add_header(), add_footer(), get_header(), get_footer()
+    // - Bookmarks: add_bookmark(), get_bookmarks(), goto_bookmark()
+    // - Comments: add_comment(), get_comments(), reply_to_comment()
+    // - Track changes: enable_track_changes(), get_revisions(), accept_revision(), reject_revision()
+    // - Fields: insert_field(), update_fields(), get_fields()
+    // - Hyperlinks (reading): get_hyperlinks(), follow_hyperlink()
+    // - Footnotes/Endnotes (reading): get_footnotes(), get_endnotes()
+    // - Table of contents: insert_toc(), update_toc()
+    // - Document protection: protect_document(), unprotect_document(), is_protected()
+    // - Custom XML parts: add_custom_xml(), get_custom_xml_parts()
+    // - Numbering (reading): get_numbering_definitions(), get_abstract_nums()
+    // - Drawing objects: get_drawings(), add_drawing()
+    // - Content controls: add_content_control(), get_content_controls()
+    // - Mail merge: execute_mail_merge(), get_merge_fields()
+    // - Document variables: set_variable(), get_variable()
+    // - Themes: get_theme(), apply_theme()
+    // - Page breaks: insert_page_break(), get_page_breaks()
+    // - Section breaks: insert_section_break(), get_section_breaks()
+    // - Watermarks: add_watermark(), remove_watermark()
+    // - Smart tags: get_smart_tags(), add_smart_tag()
 }
 
 // Note: Paragraph, Run, Table, Row, Cell, Section, Styles are now in separate modules:

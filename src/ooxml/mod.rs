@@ -1,3 +1,4 @@
+pub mod api;
 pub mod common;
 pub mod docx;
 pub mod error;

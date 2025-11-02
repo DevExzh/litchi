@@ -580,4 +580,33 @@ impl Workbook {
 
         Ok(())
     }
+
+    // TODO: Apache POI features not yet implemented:
+    // - Charts: add_chart(), get_charts(), create_chart(), update_chart()
+    // - Pivot tables: add_pivot_table(), get_pivot_tables(), refresh_pivot_table()
+    // - Data validation (reading): get_data_validation(), add_data_validation()
+    // - Conditional formatting: add_conditional_formatting(), get_conditional_formatting()
+    // - Comments: add_comment(), get_comments(), delete_comment()
+    // - Images/Pictures: add_picture(), get_pictures(), delete_picture()
+    // - Page setup: set_page_setup(), get_page_setup(), set_print_area()
+    // - Protection: protect_sheet(), unprotect_sheet(), protect_workbook(), unprotect_workbook()
+    // - Hidden sheets: hide_sheet(), unhide_sheet(), is_sheet_hidden()
+    // - Sheet ordering: move_sheet(), reorder_sheets()
+    // - Cell styles (advanced): create_cell_style(), clone_cell_style()
+    // - Hyperlinks: add_hyperlink(), get_hyperlinks(), remove_hyperlink()
+    // - Merged cells (reading): get_merged_regions(), merge_cells(), unmerge_cells()
+    // - Auto-filter: set_auto_filter(), get_auto_filter()
+    // - Column width/Row height: set_column_width(), get_column_width(), set_row_height()
+    // - Sheet visibility: set_sheet_visibility(), get_sheet_visibility()
+    // - Workbook calculation mode: set_force_formula_recalculation(), get_calculation_mode()
+    // - External links: get_external_links(), update_external_links()
+    // - Cell comments: get_cell_comment(), set_cell_comment()
+    // - Rich text in cells: set_rich_text_cell(), get_rich_text_cell()
+    // - Sheet tabs color: set_tab_color(), get_tab_color()
+    // - Group/Ungroup rows/columns: group_rows(), ungroup_rows(), group_columns(), ungroup_columns()
+    // - Subtotals: insert_subtotals(), remove_subtotals()
+    // - Sparklines: add_sparkline(), get_sparklines()
+    // - Slicers: add_slicer(), get_slicers()
+    // - Timeline: add_timeline(), get_timelines()
+    // - Power Query: get_power_query_connections()
 }
