@@ -56,61 +56,64 @@ unsafe fn transform_points_sse2(points: &mut [PointL], xform: &XForm) {
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::*;
 
-    // Load transform matrix into SSE registers
-    let m11 = _mm_set1_ps(xform.m11);
-    let m12 = _mm_set1_ps(xform.m12);
-    let m21 = _mm_set1_ps(xform.m21);
-    let m22 = _mm_set1_ps(xform.m22);
-    let dx = _mm_set1_ps(xform.dx);
-    let dy = _mm_set1_ps(xform.dy);
+    // SAFETY: All SSE2 intrinsic operations are safe within this target_feature context
+    unsafe {
+        // Load transform matrix into SSE registers
+        let m11 = _mm_set1_ps(xform.m11);
+        let m12 = _mm_set1_ps(xform.m12);
+        let m21 = _mm_set1_ps(xform.m21);
+        let m22 = _mm_set1_ps(xform.m22);
+        let dx = _mm_set1_ps(xform.dx);
+        let dy = _mm_set1_ps(xform.dy);
 
-    // Process 2 points at a time (4 floats: x1, y1, x2, y2)
-    let mut i = 0;
-    while i + 1 < points.len() {
-        // Load 2 points (4 i32s)
-        let p1 = &points[i];
-        let p2 = &points[i + 1];
+        // Process 2 points at a time (4 floats: x1, y1, x2, y2)
+        let mut i = 0;
+        while i + 1 < points.len() {
+            // Load 2 points (4 i32s)
+            let p1 = &points[i];
+            let p2 = &points[i + 1];
 
-        let x_vals = _mm_set_ps(0.0, 0.0, p2.x as f32, p1.x as f32);
-        let y_vals = _mm_set_ps(0.0, 0.0, p2.y as f32, p1.y as f32);
+            let x_vals = _mm_set_ps(0.0, 0.0, p2.x as f32, p1.x as f32);
+            let y_vals = _mm_set_ps(0.0, 0.0, p2.y as f32, p1.y as f32);
 
-        // Transform: x' = m11*x + m21*y + dx
-        let new_x = _mm_add_ps(
-            _mm_add_ps(_mm_mul_ps(m11, x_vals), _mm_mul_ps(m21, y_vals)),
-            dx,
-        );
+            // Transform: x' = m11*x + m21*y + dx
+            let new_x = _mm_add_ps(
+                _mm_add_ps(_mm_mul_ps(m11, x_vals), _mm_mul_ps(m21, y_vals)),
+                dx,
+            );
 
-        // Transform: y' = m12*x + m22*y + dy
-        let new_y = _mm_add_ps(
-            _mm_add_ps(_mm_mul_ps(m12, x_vals), _mm_mul_ps(m22, y_vals)),
-            dy,
-        );
+            // Transform: y' = m12*x + m22*y + dy
+            let new_y = _mm_add_ps(
+                _mm_add_ps(_mm_mul_ps(m12, x_vals), _mm_mul_ps(m22, y_vals)),
+                dy,
+            );
 
-        // Convert back to i32 and store
-        let result_x = _mm_cvtps_epi32(new_x);
-        let result_y = _mm_cvtps_epi32(new_y);
+            // Convert back to i32 and store
+            let result_x = _mm_cvtps_epi32(new_x);
+            let result_y = _mm_cvtps_epi32(new_y);
 
-        // Extract and store results
-        let mut temp_x = [0i32; 4];
-        let mut temp_y = [0i32; 4];
-        _mm_storeu_si128(temp_x.as_mut_ptr() as *mut __m128i, result_x);
-        _mm_storeu_si128(temp_y.as_mut_ptr() as *mut __m128i, result_y);
+            // Extract and store results
+            let mut temp_x = [0i32; 4];
+            let mut temp_y = [0i32; 4];
+            _mm_storeu_si128(temp_x.as_mut_ptr() as *mut __m128i, result_x);
+            _mm_storeu_si128(temp_y.as_mut_ptr() as *mut __m128i, result_y);
 
-        points[i].x = temp_x[0];
-        points[i].y = temp_y[0];
-        points[i + 1].x = temp_x[1];
-        points[i + 1].y = temp_y[1];
+            points[i].x = temp_x[0];
+            points[i].y = temp_y[0];
+            points[i + 1].x = temp_x[1];
+            points[i + 1].y = temp_y[1];
 
-        i += 2;
-    }
+            i += 2;
+        }
 
-    // Handle remaining point
-    if i < points.len() {
-        let point = &mut points[i];
-        let x = point.x as f32;
-        let y = point.y as f32;
-        point.x = (xform.m11 * x + xform.m21 * y + xform.dx) as i32;
-        point.y = (xform.m12 * x + xform.m22 * y + xform.dy) as i32;
+        // Handle remaining point
+        if i < points.len() {
+            let point = &mut points[i];
+            let x = point.x as f32;
+            let y = point.y as f32;
+            point.x = (xform.m11 * x + xform.m21 * y + xform.dx) as i32;
+            point.y = (xform.m12 * x + xform.m22 * y + xform.dy) as i32;
+        }
     }
 }
 
@@ -120,76 +123,79 @@ unsafe fn transform_points_avx2(points: &mut [PointL], xform: &XForm) {
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::*;
 
-    // Load transform matrix into AVX registers (8 floats at once)
-    let m11 = _mm256_set1_ps(xform.m11);
-    let m12 = _mm256_set1_ps(xform.m12);
-    let m21 = _mm256_set1_ps(xform.m21);
-    let m22 = _mm256_set1_ps(xform.m22);
-    let dx = _mm256_set1_ps(xform.dx);
-    let dy = _mm256_set1_ps(xform.dy);
+    // SAFETY: All AVX2 intrinsic operations are safe within this target_feature context
+    unsafe {
+        // Load transform matrix into AVX registers (8 floats at once)
+        let m11 = _mm256_set1_ps(xform.m11);
+        let m12 = _mm256_set1_ps(xform.m12);
+        let m21 = _mm256_set1_ps(xform.m21);
+        let m22 = _mm256_set1_ps(xform.m22);
+        let dx = _mm256_set1_ps(xform.dx);
+        let dy = _mm256_set1_ps(xform.dy);
 
-    // Process 4 points at a time (8 floats: x1,y1,x2,y2,x3,y3,x4,y4)
-    let mut i = 0;
-    while i + 3 < points.len() {
-        // Load 4 points
-        let x_vals = _mm256_set_ps(
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            points[i + 3].x as f32,
-            points[i + 2].x as f32,
-            points[i + 1].x as f32,
-            points[i].x as f32,
-        );
-        let y_vals = _mm256_set_ps(
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            points[i + 3].y as f32,
-            points[i + 2].y as f32,
-            points[i + 1].y as f32,
-            points[i].y as f32,
-        );
+        // Process 4 points at a time (8 floats: x1,y1,x2,y2,x3,y3,x4,y4)
+        let mut i = 0;
+        while i + 3 < points.len() {
+            // Load 4 points
+            let x_vals = _mm256_set_ps(
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                points[i + 3].x as f32,
+                points[i + 2].x as f32,
+                points[i + 1].x as f32,
+                points[i].x as f32,
+            );
+            let y_vals = _mm256_set_ps(
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                points[i + 3].y as f32,
+                points[i + 2].y as f32,
+                points[i + 1].y as f32,
+                points[i].y as f32,
+            );
 
-        // Transform: x' = m11*x + m21*y + dx
-        let new_x = _mm256_add_ps(
-            _mm256_add_ps(_mm256_mul_ps(m11, x_vals), _mm256_mul_ps(m21, y_vals)),
-            dx,
-        );
+            // Transform: x' = m11*x + m21*y + dx
+            let new_x = _mm256_add_ps(
+                _mm256_add_ps(_mm256_mul_ps(m11, x_vals), _mm256_mul_ps(m21, y_vals)),
+                dx,
+            );
 
-        // Transform: y' = m12*x + m22*y + dy
-        let new_y = _mm256_add_ps(
-            _mm256_add_ps(_mm256_mul_ps(m12, x_vals), _mm256_mul_ps(m22, y_vals)),
-            dy,
-        );
+            // Transform: y' = m12*x + m22*y + dy
+            let new_y = _mm256_add_ps(
+                _mm256_add_ps(_mm256_mul_ps(m12, x_vals), _mm256_mul_ps(m22, y_vals)),
+                dy,
+            );
 
-        // Convert and store
-        let result_x = _mm256_cvtps_epi32(new_x);
-        let result_y = _mm256_cvtps_epi32(new_y);
+            // Convert and store
+            let result_x = _mm256_cvtps_epi32(new_x);
+            let result_y = _mm256_cvtps_epi32(new_y);
 
-        let mut temp_x = [0i32; 8];
-        let mut temp_y = [0i32; 8];
-        _mm256_storeu_si256(temp_x.as_mut_ptr() as *mut __m256i, result_x);
-        _mm256_storeu_si256(temp_y.as_mut_ptr() as *mut __m256i, result_y);
+            let mut temp_x = [0i32; 8];
+            let mut temp_y = [0i32; 8];
+            _mm256_storeu_si256(temp_x.as_mut_ptr() as *mut __m256i, result_x);
+            _mm256_storeu_si256(temp_y.as_mut_ptr() as *mut __m256i, result_y);
 
-        for j in 0..4 {
-            points[i + j].x = temp_x[j];
-            points[i + j].y = temp_y[j];
+            for j in 0..4 {
+                points[i + j].x = temp_x[j];
+                points[i + j].y = temp_y[j];
+            }
+
+            i += 4;
         }
 
-        i += 4;
-    }
-
-    // Handle remaining points with scalar code
-    while i < points.len() {
-        let point = &mut points[i];
-        let x = point.x as f32;
-        let y = point.y as f32;
-        point.x = (xform.m11 * x + xform.m21 * y + xform.dx) as i32;
-        point.y = (xform.m12 * x + xform.m22 * y + xform.dy) as i32;
-        i += 1;
+        // Handle remaining points with scalar code
+        while i < points.len() {
+            let point = &mut points[i];
+            let x = point.x as f32;
+            let y = point.y as f32;
+            point.x = (xform.m11 * x + xform.m21 * y + xform.dx) as i32;
+            point.y = (xform.m12 * x + xform.m22 * y + xform.dy) as i32;
+            i += 1;
+        }
     }
 }
 
@@ -297,79 +303,83 @@ pub fn calculate_bounds_simd(points: &[PointL]) -> Option<(i32, i32, i32, i32)> 
     Some((min_x, min_y, max_x, max_y))
 }
 
+/// Calculate bounds using SSE4.1 (requires _mm_min_epi32/_mm_max_epi32)
 #[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "sse2")]
+#[target_feature(enable = "sse4.1")]
 unsafe fn calculate_bounds_sse2(points: &[PointL]) -> (i32, i32, i32, i32) {
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::*;
 
-    let mut min_x = _mm_set1_epi32(i32::MAX);
-    let mut min_y = _mm_set1_epi32(i32::MAX);
-    let mut max_x = _mm_set1_epi32(i32::MIN);
-    let mut max_y = _mm_set1_epi32(i32::MIN);
+    // SAFETY: All SSE4.1 intrinsic operations are safe within this target_feature context
+    unsafe {
+        let mut min_x = _mm_set1_epi32(i32::MAX);
+        let mut min_y = _mm_set1_epi32(i32::MAX);
+        let mut max_x = _mm_set1_epi32(i32::MIN);
+        let mut max_y = _mm_set1_epi32(i32::MIN);
 
-    // Process 4 points at a time
-    let mut i = 0;
-    while i + 3 < points.len() {
-        let x_vals = _mm_set_epi32(
-            points[i + 3].x,
-            points[i + 2].x,
-            points[i + 1].x,
-            points[i].x,
-        );
-        let y_vals = _mm_set_epi32(
-            points[i + 3].y,
-            points[i + 2].y,
-            points[i + 1].y,
-            points[i].y,
-        );
+        // Process 4 points at a time
+        let mut i = 0;
+        while i + 3 < points.len() {
+            let x_vals = _mm_set_epi32(
+                points[i + 3].x,
+                points[i + 2].x,
+                points[i + 1].x,
+                points[i].x,
+            );
+            let y_vals = _mm_set_epi32(
+                points[i + 3].y,
+                points[i + 2].y,
+                points[i + 1].y,
+                points[i].y,
+            );
 
-        min_x = _mm_min_epi32(min_x, x_vals);
-        min_y = _mm_min_epi32(min_y, y_vals);
-        max_x = _mm_max_epi32(max_x, x_vals);
-        max_y = _mm_max_epi32(max_y, y_vals);
+            min_x = _mm_min_epi32(min_x, x_vals);
+            min_y = _mm_min_epi32(min_y, y_vals);
+            max_x = _mm_max_epi32(max_x, x_vals);
+            max_y = _mm_max_epi32(max_y, y_vals);
 
-        i += 4;
+            i += 4;
+        }
+
+        // Reduce the SIMD registers to scalar values
+        let mut temp_min_x = [0i32; 4];
+        let mut temp_min_y = [0i32; 4];
+        let mut temp_max_x = [0i32; 4];
+        let mut temp_max_y = [0i32; 4];
+
+        _mm_storeu_si128(temp_min_x.as_mut_ptr() as *mut __m128i, min_x);
+        _mm_storeu_si128(temp_min_y.as_mut_ptr() as *mut __m128i, min_y);
+        _mm_storeu_si128(temp_max_x.as_mut_ptr() as *mut __m128i, max_x);
+        _mm_storeu_si128(temp_max_y.as_mut_ptr() as *mut __m128i, max_y);
+
+        let mut final_min_x = temp_min_x[0]
+            .min(temp_min_x[1])
+            .min(temp_min_x[2])
+            .min(temp_min_x[3]);
+        let mut final_min_y = temp_min_y[0]
+            .min(temp_min_y[1])
+            .min(temp_min_y[2])
+            .min(temp_min_y[3]);
+        let mut final_max_x = temp_max_x[0]
+            .max(temp_max_x[1])
+            .max(temp_max_x[2])
+            .max(temp_max_x[3]);
+        let mut final_max_y = temp_max_y[0]
+            .max(temp_max_y[1])
+            .max(temp_max_y[2])
+            .max(temp_max_y[3]);
+
+        // Handle remaining points
+        while i < points.len() {
+            final_min_x = final_min_x.min(points[i].x);
+            final_min_y = final_min_y.min(points[i].y);
+            final_max_x = final_max_x.max(points[i].x);
+            final_max_y = final_max_y.max(points[i].y);
+            i += 1;
+        }
+
+        (final_min_x, final_min_y, final_max_x, final_max_y)
     }
-
-    // Reduce the SIMD registers to scalar values
-    let mut temp_min_x = [0i32; 4];
-    let mut temp_min_y = [0i32; 4];
-    let mut temp_max_x = [0i32; 4];
-    let mut temp_max_y = [0i32; 4];
-
-    _mm_storeu_si128(temp_min_x.as_mut_ptr() as *mut __m128i, min_x);
-    _mm_storeu_si128(temp_min_y.as_mut_ptr() as *mut __m128i, min_y);
-    _mm_storeu_si128(temp_max_x.as_mut_ptr() as *mut __m128i, max_x);
-    _mm_storeu_si128(temp_max_y.as_mut_ptr() as *mut __m128i, max_y);
-
-    let mut final_min_x = temp_min_x[0]
-        .min(temp_min_x[1])
-        .min(temp_min_x[2])
-        .min(temp_min_x[3]);
-    let mut final_min_y = temp_min_y[0]
-        .min(temp_min_y[1])
-        .min(temp_min_y[2])
-        .min(temp_min_y[3]);
-    let mut final_max_x = temp_max_x[0]
-        .max(temp_max_x[1])
-        .max(temp_max_x[2])
-        .max(temp_max_x[3]);
-    let mut final_max_y = temp_max_y[0]
-        .max(temp_max_y[1])
-        .max(temp_max_y[2])
-        .max(temp_max_y[3]);
-
-    // Handle remaining points
-    while i < points.len() {
-        final_min_x = final_min_x.min(points[i].x);
-        final_min_y = final_min_y.min(points[i].y);
-        final_max_x = final_max_x.max(points[i].x);
-        final_max_y = final_max_y.max(points[i].y);
-        i += 1;
-    }
-
-    (final_min_x, final_min_y, final_max_x, final_max_y)
 }
 
 #[cfg(test)]

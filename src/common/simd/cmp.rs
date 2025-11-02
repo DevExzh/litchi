@@ -103,6 +103,10 @@ mod x86_impl {
     ///
     /// This function requires SSE2 support. Use runtime detection or compile
     /// with appropriate target features.
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn cmp_eq_u8_sse2(a: __m128i, b: __m128i) -> __m128i {
@@ -114,6 +118,10 @@ mod x86_impl {
     /// # Safety
     ///
     /// This function requires AVX2 support.
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn cmp_eq_u8_avx2(a: __m256i, b: __m256i) -> __m256i {
@@ -134,6 +142,14 @@ mod x86_impl {
     }
 
     /// Compare two vectors of u16 for equality (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn cmp_eq_u16_sse2(a: __m128i, b: __m128i) -> __m128i {
@@ -141,6 +157,14 @@ mod x86_impl {
     }
 
     /// Compare two vectors of u16 for equality (256-bit AVX2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn cmp_eq_u16_avx2(a: __m256i, b: __m256i) -> __m256i {
@@ -148,6 +172,14 @@ mod x86_impl {
     }
 
     /// Compare two vectors of u32 for equality (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn cmp_eq_u32_sse2(a: __m128i, b: __m128i) -> __m128i {
@@ -155,6 +187,14 @@ mod x86_impl {
     }
 
     /// Compare two vectors of u32 for equality (256-bit AVX2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn cmp_eq_u32_avx2(a: __m256i, b: __m256i) -> __m256i {
@@ -162,6 +202,14 @@ mod x86_impl {
     }
 
     /// Compare two vectors of u64 for equality (128-bit SSE4.1)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE4.1 instructions are available on the target CPU.
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE4.1 instructions are available on the target CPU.
     #[target_feature(enable = "sse4.1")]
     #[inline]
     pub unsafe fn cmp_eq_u64_sse41(a: __m128i, b: __m128i) -> __m128i {
@@ -169,6 +217,14 @@ mod x86_impl {
     }
 
     /// Compare two vectors of u64 for equality (256-bit AVX2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn cmp_eq_u64_avx2(a: __m256i, b: __m256i) -> __m256i {
@@ -178,6 +234,10 @@ mod x86_impl {
     // Greater than comparisons (signed)
 
     /// Compare two vectors of i8 for greater than (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn cmp_gt_i8_sse2(a: __m128i, b: __m128i) -> __m128i {
@@ -185,6 +245,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of i8 for greater than (256-bit AVX2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn cmp_gt_i8_avx2(a: __m256i, b: __m256i) -> __m256i {
@@ -192,6 +256,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of i16 for greater than (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn cmp_gt_i16_sse2(a: __m128i, b: __m128i) -> __m128i {
@@ -199,6 +267,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of i16 for greater than (256-bit AVX2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn cmp_gt_i16_avx2(a: __m256i, b: __m256i) -> __m256i {
@@ -206,6 +278,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of i32 for greater than (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn cmp_gt_i32_sse2(a: __m128i, b: __m128i) -> __m128i {
@@ -213,6 +289,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of i32 for greater than (256-bit AVX2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn cmp_gt_i32_avx2(a: __m256i, b: __m256i) -> __m256i {
@@ -220,6 +300,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of i64 for greater than (128-bit SSE4.2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE4.2 instructions are available on the target CPU.
     #[target_feature(enable = "sse4.2")]
     #[inline]
     pub unsafe fn cmp_gt_i64_sse42(a: __m128i, b: __m128i) -> __m128i {
@@ -227,6 +311,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of i64 for greater than (256-bit AVX2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn cmp_gt_i64_avx2(a: __m256i, b: __m256i) -> __m256i {
@@ -236,6 +324,10 @@ mod x86_impl {
     // Less than comparisons (implemented via greater than with swapped operands)
 
     /// Compare two vectors of i8 for less than (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn cmp_lt_i8_sse2(a: __m128i, b: __m128i) -> __m128i {
@@ -243,13 +335,21 @@ mod x86_impl {
     }
 
     /// Compare two vectors of i8 for less than (256-bit AVX2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn cmp_lt_i8_avx2(a: __m256i, b: __m256i) -> __m256i {
-        cmp_gt_i8_avx2(b, a)
+        unsafe { cmp_gt_i8_avx2(b, a) }
     }
 
     /// Compare two vectors of i16 for less than (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn cmp_lt_i16_sse2(a: __m128i, b: __m128i) -> __m128i {
@@ -257,13 +357,21 @@ mod x86_impl {
     }
 
     /// Compare two vectors of i16 for less than (256-bit AVX2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn cmp_lt_i16_avx2(a: __m256i, b: __m256i) -> __m256i {
-        cmp_gt_i16_avx2(b, a)
+        unsafe { cmp_gt_i16_avx2(b, a) }
     }
 
     /// Compare two vectors of i32 for less than (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn cmp_lt_i32_sse2(a: __m128i, b: __m128i) -> __m128i {
@@ -271,15 +379,23 @@ mod x86_impl {
     }
 
     /// Compare two vectors of i32 for less than (256-bit AVX2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn cmp_lt_i32_avx2(a: __m256i, b: __m256i) -> __m256i {
-        cmp_gt_i32_avx2(b, a)
+        unsafe { cmp_gt_i32_avx2(b, a) }
     }
 
     // Unsigned comparisons (requires XOR trick with sign bit)
 
     /// Compare two vectors of u8 for greater than (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn cmp_gt_u8_sse2(a: __m128i, b: __m128i) -> __m128i {
@@ -290,6 +406,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of u8 for greater than (256-bit AVX2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn cmp_gt_u8_avx2(a: __m256i, b: __m256i) -> __m256i {
@@ -300,6 +420,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of u16 for greater than (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn cmp_gt_u16_sse2(a: __m128i, b: __m128i) -> __m128i {
@@ -310,6 +434,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of u16 for greater than (256-bit AVX2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn cmp_gt_u16_avx2(a: __m256i, b: __m256i) -> __m256i {
@@ -320,6 +448,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of u32 for greater than (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn cmp_gt_u32_sse2(a: __m128i, b: __m128i) -> __m128i {
@@ -330,6 +462,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of u32 for greater than (256-bit AVX2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn cmp_gt_u32_avx2(a: __m256i, b: __m256i) -> __m256i {
@@ -342,6 +478,10 @@ mod x86_impl {
     // Floating-point comparisons
 
     /// Compare two vectors of f32 for equality (128-bit SSE)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE instructions are available on the target CPU.
     #[target_feature(enable = "sse")]
     #[inline]
     pub unsafe fn cmp_eq_f32_sse(a: __m128, b: __m128) -> __m128 {
@@ -349,6 +489,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f32 for equality (256-bit AVX)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX instructions are available on the target CPU.
     #[target_feature(enable = "avx")]
     #[inline]
     pub unsafe fn cmp_eq_f32_avx(a: __m256, b: __m256) -> __m256 {
@@ -356,6 +500,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f32 for not equal (128-bit SSE)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE instructions are available on the target CPU.
     #[target_feature(enable = "sse")]
     #[inline]
     pub unsafe fn cmp_ne_f32_sse(a: __m128, b: __m128) -> __m128 {
@@ -363,6 +511,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f32 for not equal (256-bit AVX)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX instructions are available on the target CPU.
     #[target_feature(enable = "avx")]
     #[inline]
     pub unsafe fn cmp_ne_f32_avx(a: __m256, b: __m256) -> __m256 {
@@ -370,6 +522,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f32 for greater than (128-bit SSE)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE instructions are available on the target CPU.
     #[target_feature(enable = "sse")]
     #[inline]
     pub unsafe fn cmp_gt_f32_sse(a: __m128, b: __m128) -> __m128 {
@@ -377,6 +533,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f32 for greater than (256-bit AVX)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX instructions are available on the target CPU.
     #[target_feature(enable = "avx")]
     #[inline]
     pub unsafe fn cmp_gt_f32_avx(a: __m256, b: __m256) -> __m256 {
@@ -384,6 +544,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f32 for greater than or equal (128-bit SSE)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE instructions are available on the target CPU.
     #[target_feature(enable = "sse")]
     #[inline]
     pub unsafe fn cmp_ge_f32_sse(a: __m128, b: __m128) -> __m128 {
@@ -391,6 +555,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f32 for greater than or equal (256-bit AVX)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX instructions are available on the target CPU.
     #[target_feature(enable = "avx")]
     #[inline]
     pub unsafe fn cmp_ge_f32_avx(a: __m256, b: __m256) -> __m256 {
@@ -398,6 +566,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f32 for less than (128-bit SSE)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE instructions are available on the target CPU.
     #[target_feature(enable = "sse")]
     #[inline]
     pub unsafe fn cmp_lt_f32_sse(a: __m128, b: __m128) -> __m128 {
@@ -405,6 +577,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f32 for less than (256-bit AVX)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX instructions are available on the target CPU.
     #[target_feature(enable = "avx")]
     #[inline]
     pub unsafe fn cmp_lt_f32_avx(a: __m256, b: __m256) -> __m256 {
@@ -412,6 +588,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f32 for less than or equal (128-bit SSE)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE instructions are available on the target CPU.
     #[target_feature(enable = "sse")]
     #[inline]
     pub unsafe fn cmp_le_f32_sse(a: __m128, b: __m128) -> __m128 {
@@ -419,6 +599,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f32 for less than or equal (256-bit AVX)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX instructions are available on the target CPU.
     #[target_feature(enable = "avx")]
     #[inline]
     pub unsafe fn cmp_le_f32_avx(a: __m256, b: __m256) -> __m256 {
@@ -426,6 +610,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f64 for equality (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn cmp_eq_f64_sse2(a: __m128d, b: __m128d) -> __m128d {
@@ -433,6 +621,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f64 for equality (256-bit AVX)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX instructions are available on the target CPU.
     #[target_feature(enable = "avx")]
     #[inline]
     pub unsafe fn cmp_eq_f64_avx(a: __m256d, b: __m256d) -> __m256d {
@@ -440,6 +632,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f64 for not equal (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn cmp_ne_f64_sse2(a: __m128d, b: __m128d) -> __m128d {
@@ -447,6 +643,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f64 for not equal (256-bit AVX)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX instructions are available on the target CPU.
     #[target_feature(enable = "avx")]
     #[inline]
     pub unsafe fn cmp_ne_f64_avx(a: __m256d, b: __m256d) -> __m256d {
@@ -454,6 +654,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f64 for greater than (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn cmp_gt_f64_sse2(a: __m128d, b: __m128d) -> __m128d {
@@ -461,6 +665,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f64 for greater than (256-bit AVX)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX instructions are available on the target CPU.
     #[target_feature(enable = "avx")]
     #[inline]
     pub unsafe fn cmp_gt_f64_avx(a: __m256d, b: __m256d) -> __m256d {
@@ -468,6 +676,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f64 for less than (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn cmp_lt_f64_sse2(a: __m128d, b: __m128d) -> __m128d {
@@ -475,6 +687,10 @@ mod x86_impl {
     }
 
     /// Compare two vectors of f64 for less than (256-bit AVX)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX instructions are available on the target CPU.
     #[target_feature(enable = "avx")]
     #[inline]
     pub unsafe fn cmp_lt_f64_avx(a: __m256d, b: __m256d) -> __m256d {
@@ -484,6 +700,10 @@ mod x86_impl {
     // Minimum/Maximum operations
 
     /// Get minimum of two vectors of u8 (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn min_u8_sse2(a: __m128i, b: __m128i) -> __m128i {
@@ -491,6 +711,10 @@ mod x86_impl {
     }
 
     /// Get minimum of two vectors of u8 (256-bit AVX2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn min_u8_avx2(a: __m256i, b: __m256i) -> __m256i {
@@ -498,6 +722,10 @@ mod x86_impl {
     }
 
     /// Get maximum of two vectors of u8 (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn max_u8_sse2(a: __m128i, b: __m128i) -> __m128i {
@@ -505,6 +733,10 @@ mod x86_impl {
     }
 
     /// Get maximum of two vectors of u8 (256-bit AVX2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn max_u8_avx2(a: __m256i, b: __m256i) -> __m256i {
@@ -512,6 +744,10 @@ mod x86_impl {
     }
 
     /// Get minimum of two vectors of i16 (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn min_i16_sse2(a: __m128i, b: __m128i) -> __m128i {
@@ -519,6 +755,10 @@ mod x86_impl {
     }
 
     /// Get minimum of two vectors of i16 (256-bit AVX2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn min_i16_avx2(a: __m256i, b: __m256i) -> __m256i {
@@ -526,6 +766,10 @@ mod x86_impl {
     }
 
     /// Get maximum of two vectors of i16 (128-bit SSE2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE2 instructions are available on the target CPU.
     #[target_feature(enable = "sse2")]
     #[inline]
     pub unsafe fn max_i16_sse2(a: __m128i, b: __m128i) -> __m128i {
@@ -533,6 +777,10 @@ mod x86_impl {
     }
 
     /// Get maximum of two vectors of i16 (256-bit AVX2)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX2 instructions are available on the target CPU.
     #[target_feature(enable = "avx2")]
     #[inline]
     pub unsafe fn max_i16_avx2(a: __m256i, b: __m256i) -> __m256i {
@@ -540,6 +788,10 @@ mod x86_impl {
     }
 
     /// Get minimum of two vectors of f32 (128-bit SSE)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE instructions are available on the target CPU.
     #[target_feature(enable = "sse")]
     #[inline]
     pub unsafe fn min_f32_sse(a: __m128, b: __m128) -> __m128 {
@@ -547,6 +799,10 @@ mod x86_impl {
     }
 
     /// Get minimum of two vectors of f32 (256-bit AVX)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX instructions are available on the target CPU.
     #[target_feature(enable = "avx")]
     #[inline]
     pub unsafe fn min_f32_avx(a: __m256, b: __m256) -> __m256 {
@@ -554,6 +810,10 @@ mod x86_impl {
     }
 
     /// Get maximum of two vectors of f32 (128-bit SSE)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that SSE instructions are available on the target CPU.
     #[target_feature(enable = "sse")]
     #[inline]
     pub unsafe fn max_f32_sse(a: __m128, b: __m128) -> __m128 {
@@ -561,6 +821,10 @@ mod x86_impl {
     }
 
     /// Get maximum of two vectors of f32 (256-bit AVX)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that AVX instructions are available on the target CPU.
     #[target_feature(enable = "avx")]
     #[inline]
     pub unsafe fn max_f32_avx(a: __m256, b: __m256) -> __m256 {
@@ -1890,9 +2154,9 @@ unsafe fn is_all_zero_sse2(bytes: &[u8]) -> bool {
     // Process 16 bytes at a time
     while i + 16 <= len {
         let vec = unsafe { _mm_loadu_si128(bytes.as_ptr().add(i) as *const __m128i) };
-        let zero = unsafe { _mm_setzero_si128() };
-        let eq = unsafe { _mm_cmpeq_epi8(vec, zero) };
-        let mask = unsafe { _mm_movemask_epi8(eq) };
+        let zero = _mm_setzero_si128();
+        let eq = _mm_cmpeq_epi8(vec, zero);
+        let mask = _mm_movemask_epi8(eq);
 
         // If not all bytes are zero, mask will not be 0xFFFF
         if mask != 0xFFFF {
@@ -1920,9 +2184,9 @@ unsafe fn is_all_zero_avx2(bytes: &[u8]) -> bool {
     // Process 32 bytes at a time
     while i + 32 <= len {
         let vec = unsafe { _mm256_loadu_si256(bytes.as_ptr().add(i) as *const __m256i) };
-        let zero = unsafe { _mm256_setzero_si256() };
-        let eq = unsafe { _mm256_cmpeq_epi8(vec, zero) };
-        let mask = unsafe { _mm256_movemask_epi8(eq) };
+        let zero = _mm256_setzero_si256();
+        let eq = _mm256_cmpeq_epi8(vec, zero);
+        let mask = _mm256_movemask_epi8(eq);
 
         // If not all bytes are zero, mask will not be 0xFFFFFFFF
         if mask != -1 {
@@ -1935,9 +2199,9 @@ unsafe fn is_all_zero_avx2(bytes: &[u8]) -> bool {
     // Handle remaining bytes with SSE2
     if i + 16 <= len {
         let vec = unsafe { _mm_loadu_si128(bytes.as_ptr().add(i) as *const __m128i) };
-        let zero = unsafe { _mm_setzero_si128() };
-        let eq = unsafe { _mm_cmpeq_epi8(vec, zero) };
-        let mask = unsafe { _mm_movemask_epi8(eq) };
+        let zero = _mm_setzero_si128();
+        let eq = _mm_cmpeq_epi8(vec, zero);
+        let mask = _mm_movemask_epi8(eq);
 
         if mask != 0xFFFF {
             return false;
@@ -2044,12 +2308,14 @@ unsafe fn simd_eq_u8_sse2_impl(a: &[u8], b: &[u8], result: &mut [u8]) {
     let mut i = 0;
 
     // Process 16 bytes at a time
-    while i + 16 <= len {
-        let va = _mm_loadu_si128(a.as_ptr().add(i) as *const __m128i);
-        let vb = _mm_loadu_si128(b.as_ptr().add(i) as *const __m128i);
-        let vcmp = cmp_eq_u8_sse2(va, vb);
-        _mm_storeu_si128(result.as_mut_ptr().add(i) as *mut __m128i, vcmp);
-        i += 16;
+    unsafe {
+        while i + 16 <= len {
+            let va = _mm_loadu_si128(a.as_ptr().add(i) as *const __m128i);
+            let vb = _mm_loadu_si128(b.as_ptr().add(i) as *const __m128i);
+            let vcmp = cmp_eq_u8_sse2(va, vb);
+            _mm_storeu_si128(result.as_mut_ptr().add(i) as *mut __m128i, vcmp);
+            i += 16;
+        }
     }
 
     // Handle remaining elements
@@ -2064,22 +2330,24 @@ unsafe fn simd_eq_u8_avx2_impl(a: &[u8], b: &[u8], result: &mut [u8]) {
     let len = a.len();
     let mut i = 0;
 
-    // Process 32 bytes at a time
-    while i + 32 <= len {
-        let va = _mm256_loadu_si256(a.as_ptr().add(i) as *const __m256i);
-        let vb = _mm256_loadu_si256(b.as_ptr().add(i) as *const __m256i);
-        let vcmp = cmp_eq_u8_avx2(va, vb);
-        _mm256_storeu_si256(result.as_mut_ptr().add(i) as *mut __m256i, vcmp);
-        i += 32;
-    }
+    unsafe {
+        // Process 32 bytes at a time
+        while i + 32 <= len {
+            let va = _mm256_loadu_si256(a.as_ptr().add(i) as *const __m256i);
+            let vb = _mm256_loadu_si256(b.as_ptr().add(i) as *const __m256i);
+            let vcmp = cmp_eq_u8_avx2(va, vb);
+            _mm256_storeu_si256(result.as_mut_ptr().add(i) as *mut __m256i, vcmp);
+            i += 32;
+        }
 
-    // Handle remaining elements with SSE2
-    if i + 16 <= len {
-        let va = _mm_loadu_si128(a.as_ptr().add(i) as *const __m128i);
-        let vb = _mm_loadu_si128(b.as_ptr().add(i) as *const __m128i);
-        let vcmp = cmp_eq_u8_sse2(va, vb);
-        _mm_storeu_si128(result.as_mut_ptr().add(i) as *mut __m128i, vcmp);
-        i += 16;
+        // Handle remaining elements with SSE2
+        if i + 16 <= len {
+            let va = _mm_loadu_si128(a.as_ptr().add(i) as *const __m128i);
+            let vb = _mm_loadu_si128(b.as_ptr().add(i) as *const __m128i);
+            let vcmp = cmp_eq_u8_sse2(va, vb);
+            _mm_storeu_si128(result.as_mut_ptr().add(i) as *mut __m128i, vcmp);
+            i += 16;
+        }
     }
 
     // Handle remaining elements
@@ -2195,5 +2463,286 @@ mod tests {
         assert!(is_all_zero(&unaligned));
         unaligned[16] = 1;
         assert!(!is_all_zero(&unaligned));
+    }
+
+    /// Test SIMD operations with various data sizes to trigger different code paths
+    #[test]
+    fn test_simd_various_sizes() {
+        // Test sizes that trigger different SIMD implementations:
+        // - Small (< 16): scalar or SSE
+        // - Medium (16-31): SSE2/SSSE3
+        // - Large (32+): AVX2
+        // - Very large (64+): AVX-512
+        let test_sizes = vec![1, 7, 8, 15, 16, 17, 31, 32, 33, 63, 64, 65, 127, 128, 256];
+
+        for size in test_sizes {
+            // Create test data
+            let a: Vec<u8> = (0..size).map(|i| (i % 256) as u8).collect();
+            let mut b = a.clone();
+
+            // Make some elements different
+            if size > 4 {
+                b[size / 4] = b[size / 4].wrapping_add(1);
+                b[size / 2] = b[size / 2].wrapping_add(1);
+                b[size * 3 / 4] = b[size * 3 / 4].wrapping_add(1);
+            }
+
+            let mut result = vec![0u8; size];
+
+            // Test equality
+            simd_eq_u8(&a, &b, &mut result);
+            for i in 0..size {
+                if a[i] == b[i] {
+                    assert_eq!(
+                        result[i], 0xFF,
+                        "Size {}, index {}: equality mismatch",
+                        size, i
+                    );
+                } else {
+                    assert_eq!(
+                        result[i], 0x00,
+                        "Size {}, index {}: equality mismatch",
+                        size, i
+                    );
+                }
+            }
+
+            // Test inequality
+            simd_ne_u8(&a, &b, &mut result);
+            for i in 0..size {
+                if a[i] != b[i] {
+                    assert_eq!(
+                        result[i], 0xFF,
+                        "Size {}, index {}: inequality mismatch",
+                        size, i
+                    );
+                } else {
+                    assert_eq!(
+                        result[i], 0x00,
+                        "Size {}, index {}: inequality mismatch",
+                        size, i
+                    );
+                }
+            }
+        }
+    }
+
+    /// Test edge cases: empty arrays, single elements
+    #[test]
+    fn test_simd_edge_cases() {
+        // Empty arrays
+        let empty_a: Vec<u8> = vec![];
+        let empty_b: Vec<u8> = vec![];
+        let mut empty_result: Vec<u8> = vec![];
+        simd_eq_u8(&empty_a, &empty_b, &mut empty_result);
+        assert_eq!(empty_result.len(), 0);
+
+        // Single element - equal
+        let a = vec![42u8];
+        let b = vec![42u8];
+        let mut result = vec![0u8];
+        simd_eq_u8(&a, &b, &mut result);
+        assert_eq!(result[0], 0xFF);
+
+        // Single element - not equal
+        let a = vec![42u8];
+        let b = vec![43u8];
+        let mut result = vec![0u8];
+        simd_eq_u8(&a, &b, &mut result);
+        assert_eq!(result[0], 0x00);
+    }
+
+    /// Test with all identical elements
+    #[test]
+    fn test_simd_identical_elements() {
+        let sizes = vec![8, 16, 32, 64, 100];
+
+        for size in sizes {
+            // All equal
+            let a = vec![0x55u8; size];
+            let b = vec![0x55u8; size];
+            let mut result = vec![0u8; size];
+
+            simd_eq_u8(&a, &b, &mut result);
+            for &val in &result {
+                assert_eq!(val, 0xFF, "All equal test failed for size {}", size);
+            }
+
+            // All different
+            let a = vec![0x55u8; size];
+            let b = vec![0xAAu8; size];
+            let mut result = vec![0u8; size];
+
+            simd_eq_u8(&a, &b, &mut result);
+            for &val in &result {
+                assert_eq!(val, 0x00, "All different test failed for size {}", size);
+            }
+        }
+    }
+
+    /// Test boundary values (0x00, 0xFF, etc.)
+    #[test]
+    fn test_simd_boundary_values() {
+        let test_values = vec![
+            (0x00u8, 0x00u8, true),
+            (0xFFu8, 0xFFu8, true),
+            (0x00u8, 0xFFu8, false),
+            (0xFFu8, 0x00u8, false),
+            (0x80u8, 0x80u8, true),
+            (0x7Fu8, 0x80u8, false),
+        ];
+
+        for (val_a, val_b, should_equal) in test_values {
+            let a = vec![val_a; 64];
+            let b = vec![val_b; 64];
+            let mut result = vec![0u8; 64];
+
+            simd_eq_u8(&a, &b, &mut result);
+
+            let expected = if should_equal { 0xFF } else { 0x00 };
+            for &val in &result {
+                assert_eq!(
+                    val, expected,
+                    "Boundary value test failed: 0x{:02X} vs 0x{:02X}",
+                    val_a, val_b
+                );
+            }
+        }
+    }
+
+    /// Test alternating patterns
+    #[test]
+    fn test_simd_alternating_patterns() {
+        let size = 128;
+        let mut a = vec![0u8; size];
+        let mut b = vec![0u8; size];
+
+        // Create alternating pattern: equal, not-equal, equal, not-equal, ...
+        for i in 0..size {
+            a[i] = (i % 2) as u8;
+            b[i] = if i % 4 < 2 {
+                (i % 2) as u8
+            } else {
+                ((i + 1) % 2) as u8
+            };
+        }
+
+        let mut result = vec![0u8; size];
+        simd_eq_u8(&a, &b, &mut result);
+
+        for i in 0..size {
+            let expected = if a[i] == b[i] { 0xFF } else { 0x00 };
+            assert_eq!(
+                result[i], expected,
+                "Alternating pattern failed at index {}",
+                i
+            );
+        }
+    }
+
+    /// Test that SIMD and scalar implementations produce the same results
+    #[test]
+    fn test_simd_vs_scalar_consistency() {
+        let test_data = vec![
+            (vec![1, 2, 3, 4, 5, 6, 7, 8], vec![1, 2, 3, 4, 5, 6, 7, 8]),
+            (vec![0; 64], vec![0; 64]),
+            (vec![0xFF; 64], vec![0xFF; 64]),
+            (
+                (0..100).map(|x| x as u8).collect(),
+                (0..100).map(|x| x as u8).collect(),
+            ),
+            (
+                (0..100).map(|x| x as u8).collect(),
+                (0..100).map(|x| (x + 1) as u8).collect(),
+            ),
+        ];
+
+        for (a, b) in test_data {
+            let mut simd_result = vec![0u8; a.len()];
+            let mut scalar_result = vec![0u8; a.len()];
+
+            simd_eq_u8(&a, &b, &mut simd_result);
+            simd_eq_u8_scalar(&a, &b, &mut scalar_result);
+
+            assert_eq!(simd_result, scalar_result, "SIMD and scalar results differ");
+        }
+    }
+
+    /// Test is_all_zero with various patterns
+    #[test]
+    fn test_is_all_zero_comprehensive() {
+        // Test various sizes
+        for size in [
+            0, 1, 7, 8, 15, 16, 17, 31, 32, 33, 63, 64, 65, 127, 128, 255, 256,
+        ] {
+            // All zeros
+            assert!(
+                is_all_zero(&vec![0u8; size]),
+                "is_all_zero failed for size {}",
+                size
+            );
+
+            // Single non-zero at start
+            if size > 0 {
+                let mut data = vec![0u8; size];
+                data[0] = 1;
+                assert!(
+                    !is_all_zero(&data),
+                    "is_all_zero false positive for size {}",
+                    size
+                );
+            }
+
+            // Single non-zero at end
+            if size > 0 {
+                let mut data = vec![0u8; size];
+                data[size - 1] = 1;
+                assert!(
+                    !is_all_zero(&data),
+                    "is_all_zero false positive for size {}",
+                    size
+                );
+            }
+
+            // Single non-zero in middle
+            if size > 1 {
+                let mut data = vec![0u8; size];
+                data[size / 2] = 1;
+                assert!(
+                    !is_all_zero(&data),
+                    "is_all_zero false positive for size {}",
+                    size
+                );
+            }
+
+            // All non-zero
+            if size > 0 {
+                assert!(
+                    !is_all_zero(&vec![1u8; size]),
+                    "is_all_zero false positive for all ones"
+                );
+            }
+        }
+    }
+
+    /// Stress test with large random-like data
+    #[test]
+    fn test_simd_large_data() {
+        let size = 1024;
+        let a: Vec<u8> = (0..size).map(|i| ((i * 137 + 42) % 256) as u8).collect();
+        let mut b = a.clone();
+
+        // Modify every 7th element
+        for i in (0..size).step_by(7) {
+            b[i] = b[i].wrapping_add(1);
+        }
+
+        let mut result = vec![0u8; size];
+        simd_eq_u8(&a, &b, &mut result);
+
+        for i in 0..size {
+            let expected = if a[i] == b[i] { 0xFF } else { 0x00 };
+            assert_eq!(result[i], expected, "Large data test failed at index {}", i);
+        }
     }
 }

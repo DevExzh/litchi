@@ -212,23 +212,17 @@ unsafe fn hex_encode_sse2(bytes: &[u8], output: &mut String, lowercase: bool) {
         HEX_CHARS
     };
 
-    let buf = output.as_mut_vec();
+    let buf = unsafe { output.as_mut_vec() };
     let mut i = 0;
 
     // Process 8 bytes at a time (produces 16 hex chars)
+    // Note: SSE2 doesn't have PSHUFB for table lookup, so we use scalar processing
+    // within the loop. This is still beneficial for cache locality.
     while i + 8 <= bytes.len() {
         let chunk = &bytes[i..i + 8];
 
-        // Load 8 bytes
-        let input = _mm_loadl_epi64(chunk.as_ptr() as *const __m128i);
-
-        // Split into high and low nibbles
-        let high = _mm_srli_epi64(input, 4);
-        let low = _mm_and_si128(input, _mm_set1_epi8(0x0F));
-
         // Process each byte individually (SSE2 doesn't have shuffle for byte indexing)
-        for j in 0..8 {
-            let byte = chunk[j];
+        for &byte in chunk {
             let h = (byte >> 4) as usize;
             let l = (byte & 0x0F) as usize;
             buf.push(hex_table[h]);
@@ -251,12 +245,12 @@ unsafe fn hex_encode_sse2(bytes: &[u8], output: &mut String, lowercase: bool) {
 #[target_feature(enable = "ssse3")]
 unsafe fn hex_encode_ssse3(bytes: &[u8], output: &mut String, lowercase: bool) {
     let hex_table_vec = if lowercase {
-        _mm_loadu_si128(HEX_CHARS_LOWER.as_ptr() as *const __m128i)
+        unsafe { _mm_loadu_si128(HEX_CHARS_LOWER.as_ptr() as *const __m128i) }
     } else {
-        _mm_loadu_si128(HEX_CHARS.as_ptr() as *const __m128i)
+        unsafe { _mm_loadu_si128(HEX_CHARS.as_ptr() as *const __m128i) }
     };
 
-    let buf = output.as_mut_vec();
+    let buf = unsafe { output.as_mut_vec() };
     let mut i = 0;
 
     let mask_0f = _mm_set1_epi8(0x0F);
@@ -264,13 +258,14 @@ unsafe fn hex_encode_ssse3(bytes: &[u8], output: &mut String, lowercase: bool) {
     // Process 8 bytes at a time (produces 16 hex chars)
     while i + 8 <= bytes.len() {
         // Load 8 bytes into lower 64 bits
-        let input = _mm_loadl_epi64(bytes[i..].as_ptr() as *const __m128i);
+        let input = unsafe { _mm_loadl_epi64(bytes[i..].as_ptr() as *const __m128i) };
 
         // Extract high and low nibbles
         let high = _mm_and_si128(_mm_srli_epi16(input, 4), mask_0f);
         let low = _mm_and_si128(input, mask_0f);
 
-        // Unpack to interleave high and low nibbles
+        // Interleave high and low nibbles: [h0, l0, h1, l1, h2, l2, h3, l3, ...]
+        // unpacklo operates on the lower 64 bits (8 bytes) which is what we need
         let nibbles = _mm_unpacklo_epi8(high, low);
 
         // Use PSHUFB to lookup hex characters
@@ -278,7 +273,7 @@ unsafe fn hex_encode_ssse3(bytes: &[u8], output: &mut String, lowercase: bool) {
 
         // Store result (16 bytes = 16 hex chars)
         let mut result: [u8; 16] = [0; 16];
-        _mm_storeu_si128(result.as_mut_ptr() as *mut __m128i, hex_chars);
+        unsafe { _mm_storeu_si128(result.as_mut_ptr() as *mut __m128i, hex_chars) };
 
         buf.extend_from_slice(&result);
         i += 8;
@@ -304,94 +299,120 @@ unsafe fn hex_encode_ssse3(bytes: &[u8], output: &mut String, lowercase: bool) {
 unsafe fn hex_encode_sse41(bytes: &[u8], output: &mut String, lowercase: bool) {
     // SSE4.1 adds some useful instructions but for hex encoding SSSE3 is sufficient
     // We'll use the SSSE3 implementation
-    hex_encode_ssse3(bytes, output, lowercase);
+    unsafe { hex_encode_ssse3(bytes, output, lowercase) };
 }
 
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
 unsafe fn hex_encode_avx2(bytes: &[u8], output: &mut String, lowercase: bool) {
-    let hex_table_vec = if lowercase {
-        _mm256_broadcastsi128_si256(_mm_loadu_si128(HEX_CHARS_LOWER.as_ptr() as *const __m128i))
-    } else {
-        _mm256_broadcastsi128_si256(_mm_loadu_si128(HEX_CHARS.as_ptr() as *const __m128i))
-    };
-
-    let buf = output.as_mut_vec();
+    // SAFETY: We're in an unsafe function with avx2 feature enabled
+    let buf = unsafe { output.as_mut_vec() };
     let mut i = 0;
-
-    let mask_0f = _mm256_set1_epi8(0x0F);
 
     // Process 16 bytes at a time (produces 32 hex chars)
     while i + 16 <= bytes.len() {
-        // Load 16 bytes into lower 128 bits of 256-bit register
-        let input_128 = _mm_loadu_si128(bytes[i..].as_ptr() as *const __m128i);
-        let input = _mm256_castsi128_si256(input_128);
+        // SAFETY: All intrinsic operations are safe within this target_feature context
+        unsafe {
+            // Load 16 bytes
+            let input = _mm_loadu_si128(bytes[i..].as_ptr() as *const __m128i);
 
-        // Extract high and low nibbles
-        let high = _mm256_and_si256(_mm256_srli_epi16(input, 4), mask_0f);
-        let low = _mm256_and_si256(input, mask_0f);
+            // Extract high and low nibbles
+            let high_128 = _mm_and_si128(_mm_srli_epi16(input, 4), _mm_set1_epi8(0x0F));
+            let low_128 = _mm_and_si128(input, _mm_set1_epi8(0x0F));
 
-        // Interleave high and low nibbles
-        let nibbles = _mm256_unpacklo_epi8(high, low);
+            // Interleave nibbles in the low 64 bits (first 8 bytes)
+            let nibbles_lo = _mm_unpacklo_epi8(high_128, low_128);
+            // Interleave nibbles in the high 64 bits (second 8 bytes)
+            let nibbles_hi = _mm_unpackhi_epi8(high_128, low_128);
 
-        // Use VPSHUFB to lookup hex characters
-        let hex_chars = _mm256_shuffle_epi8(hex_table_vec, nibbles);
+            // Load hex table and lookup
+            let hex_table_128 = _mm_loadu_si128(
+                if lowercase {
+                    HEX_CHARS_LOWER
+                } else {
+                    HEX_CHARS
+                }
+                .as_ptr() as *const __m128i,
+            );
+            let hex_lo = _mm_shuffle_epi8(hex_table_128, nibbles_lo);
+            let hex_hi = _mm_shuffle_epi8(hex_table_128, nibbles_hi);
 
-        // Store result (32 bytes but we only need 32 hex chars)
-        let mut result: [u8; 32] = [0; 32];
-        _mm256_storeu_si256(result.as_mut_ptr() as *mut __m256i, hex_chars);
+            // Store results (16 + 16 = 32 hex chars)
+            let mut result: [u8; 32] = [0; 32];
+            _mm_storeu_si128(result.as_mut_ptr() as *mut __m128i, hex_lo);
+            _mm_storeu_si128(result[16..].as_mut_ptr() as *mut __m128i, hex_hi);
 
-        buf.extend_from_slice(&result);
+            buf.extend_from_slice(&result);
+        }
         i += 16;
     }
 
     // Handle remaining bytes with SSSE3
     if i < bytes.len() {
-        hex_encode_ssse3(&bytes[i..], output, lowercase);
+        unsafe { hex_encode_ssse3(&bytes[i..], output, lowercase) };
     }
 }
 
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f,avx512bw,avx512vl")]
 unsafe fn hex_encode_avx512(bytes: &[u8], output: &mut String, lowercase: bool) {
-    let hex_table_vec = if lowercase {
-        _mm512_broadcast_i32x4(_mm_loadu_si128(HEX_CHARS_LOWER.as_ptr() as *const __m128i))
-    } else {
-        _mm512_broadcast_i32x4(_mm_loadu_si128(HEX_CHARS.as_ptr() as *const __m128i))
-    };
-
-    let buf = output.as_mut_vec();
+    // SAFETY: We're in an unsafe function with avx512 features enabled
+    let buf = unsafe { output.as_mut_vec() };
     let mut i = 0;
-
-    let mask_0f = _mm512_set1_epi8(0x0F);
 
     // Process 32 bytes at a time (produces 64 hex chars)
     while i + 32 <= bytes.len() {
-        // Load 32 bytes into lower 256 bits of 512-bit register
-        let input_256 = _mm256_loadu_si256(bytes[i..].as_ptr() as *const __m256i);
-        let input = _mm512_castsi256_si512(input_256);
+        // SAFETY: All intrinsic operations are safe within this target_feature context
+        unsafe {
+            // Load 32 bytes
+            let input = _mm256_loadu_si256(bytes[i..].as_ptr() as *const __m256i);
 
-        // Extract high and low nibbles
-        let high = _mm512_and_si512(_mm512_srli_epi16(input, 4), mask_0f);
-        let low = _mm512_and_si512(input, mask_0f);
+            // Split into two 128-bit lanes
+            let input_lo = _mm256_castsi256_si128(input);
+            let input_hi = _mm256_extracti128_si256(input, 1);
 
-        // Interleave high and low nibbles
-        let nibbles = _mm512_unpacklo_epi8(high, low);
+            // Process each 128-bit lane
+            let hex_table_128 = _mm_loadu_si128(
+                if lowercase {
+                    HEX_CHARS_LOWER
+                } else {
+                    HEX_CHARS
+                }
+                .as_ptr() as *const __m128i,
+            );
+            let mask_0f = _mm_set1_epi8(0x0F);
 
-        // Use VPSHUFB to lookup hex characters
-        let hex_chars = _mm512_shuffle_epi8(hex_table_vec, nibbles);
+            // First 16 bytes
+            let high_lo = _mm_and_si128(_mm_srli_epi16(input_lo, 4), mask_0f);
+            let low_lo = _mm_and_si128(input_lo, mask_0f);
+            let nibbles_lo_lo = _mm_unpacklo_epi8(high_lo, low_lo);
+            let nibbles_lo_hi = _mm_unpackhi_epi8(high_lo, low_lo);
+            let hex_lo_lo = _mm_shuffle_epi8(hex_table_128, nibbles_lo_lo);
+            let hex_lo_hi = _mm_shuffle_epi8(hex_table_128, nibbles_lo_hi);
 
-        // Store result
-        let mut result: [u8; 64] = [0; 64];
-        _mm512_storeu_si512(result.as_mut_ptr() as *mut __m512i, hex_chars);
+            // Second 16 bytes
+            let high_hi = _mm_and_si128(_mm_srli_epi16(input_hi, 4), mask_0f);
+            let low_hi = _mm_and_si128(input_hi, mask_0f);
+            let nibbles_hi_lo = _mm_unpacklo_epi8(high_hi, low_hi);
+            let nibbles_hi_hi = _mm_unpackhi_epi8(high_hi, low_hi);
+            let hex_hi_lo = _mm_shuffle_epi8(hex_table_128, nibbles_hi_lo);
+            let hex_hi_hi = _mm_shuffle_epi8(hex_table_128, nibbles_hi_hi);
 
-        buf.extend_from_slice(&result);
+            // Store results (64 hex chars total)
+            let mut result: [u8; 64] = [0; 64];
+            _mm_storeu_si128(result.as_mut_ptr() as *mut __m128i, hex_lo_lo);
+            _mm_storeu_si128(result[16..].as_mut_ptr() as *mut __m128i, hex_lo_hi);
+            _mm_storeu_si128(result[32..].as_mut_ptr() as *mut __m128i, hex_hi_lo);
+            _mm_storeu_si128(result[48..].as_mut_ptr() as *mut __m128i, hex_hi_hi);
+
+            buf.extend_from_slice(&result);
+        }
         i += 32;
     }
 
     // Handle remaining bytes with AVX2
     if i < bytes.len() {
-        hex_encode_avx2(&bytes[i..], output, lowercase);
+        unsafe { hex_encode_avx2(&bytes[i..], output, lowercase) };
     }
 }
 
@@ -658,5 +679,281 @@ mod tests {
 
         // Both should produce the same result
         assert_eq!(scalar_result, simd_result);
+    }
+
+    /// Test all SIMD variants with different data sizes
+    /// This ensures each implementation path is tested
+    #[test]
+    fn test_simd_variants_comprehensive() {
+        // Test data of various sizes to trigger different code paths
+        let test_cases = vec![
+            vec![],                                       // Empty
+            vec![0x42],                                   // 1 byte (scalar fallback)
+            vec![0x01, 0x23, 0x45, 0x67],                 // 4 bytes
+            (0..8).collect::<Vec<u8>>(),                  // 8 bytes (SSE/SSSE3 boundary)
+            (0..16).collect::<Vec<u8>>(),                 // 16 bytes (AVX2 boundary)
+            (0..32).collect::<Vec<u8>>(),                 // 32 bytes (AVX512 boundary)
+            (0..=255).collect::<Vec<u8>>(),               // Full byte range
+            (0..1000).map(|i| (i % 256) as u8).collect(), // Large data
+        ];
+
+        for data in test_cases {
+            // Generate expected result using scalar implementation
+            let mut expected = String::new();
+            hex_encode_scalar(&data, &mut expected, false);
+
+            let mut expected_lower = String::new();
+            hex_encode_scalar(&data, &mut expected_lower, true);
+
+            // Test uppercase
+            let result = hex_encode(&data);
+            assert_eq!(
+                result,
+                expected,
+                "Uppercase encoding failed for {} bytes",
+                data.len()
+            );
+
+            // Test lowercase
+            let result_lower = hex_encode_lower(&data);
+            assert_eq!(
+                result_lower,
+                expected_lower,
+                "Lowercase encoding failed for {} bytes",
+                data.len()
+            );
+        }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn test_x86_sse2_directly() {
+        let data: Vec<u8> = (0..32).collect();
+
+        let mut result = String::new();
+        unsafe {
+            hex_encode_sse2(&data, &mut result, false);
+        }
+
+        let mut expected = String::new();
+        hex_encode_scalar(&data, &mut expected, false);
+
+        assert_eq!(result, expected, "SSE2 implementation mismatch");
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn test_x86_ssse3_directly() {
+        if !is_x86_feature_detected!("ssse3") {
+            eprintln!("SSSE3 not available, skipping test");
+            return;
+        }
+
+        let data: Vec<u8> = (0..64).collect();
+
+        let mut result = String::new();
+        unsafe {
+            hex_encode_ssse3(&data, &mut result, false);
+        }
+
+        let mut expected = String::new();
+        hex_encode_scalar(&data, &mut expected, false);
+
+        assert_eq!(result, expected, "SSSE3 implementation mismatch");
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn test_x86_sse41_directly() {
+        if !is_x86_feature_detected!("sse4.1") {
+            eprintln!("SSE4.1 not available, skipping test");
+            return;
+        }
+
+        let data: Vec<u8> = (0..64).collect();
+
+        let mut result = String::new();
+        unsafe {
+            hex_encode_sse41(&data, &mut result, false);
+        }
+
+        let mut expected = String::new();
+        hex_encode_scalar(&data, &mut expected, false);
+
+        assert_eq!(result, expected, "SSE4.1 implementation mismatch");
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn test_x86_avx2_directly() {
+        if !is_x86_feature_detected!("avx2") {
+            eprintln!("AVX2 not available, skipping test");
+            return;
+        }
+
+        let data: Vec<u8> = (0..=255).collect();
+
+        let mut result = String::new();
+        unsafe {
+            hex_encode_avx2(&data, &mut result, false);
+        }
+
+        let mut expected = String::new();
+        hex_encode_scalar(&data, &mut expected, false);
+
+        assert_eq!(result, expected, "AVX2 implementation mismatch");
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn test_x86_avx512_directly() {
+        if !is_x86_feature_detected!("avx512f")
+            || !is_x86_feature_detected!("avx512bw")
+            || !is_x86_feature_detected!("avx512vl")
+        {
+            eprintln!("AVX-512 not available, skipping test");
+            return;
+        }
+
+        let data: Vec<u8> = (0..=255).collect();
+
+        let mut result = String::new();
+        unsafe {
+            hex_encode_avx512(&data, &mut result, false);
+        }
+
+        let mut expected = String::new();
+        hex_encode_scalar(&data, &mut expected, false);
+
+        assert_eq!(result, expected, "AVX-512 implementation mismatch");
+    }
+
+    /// Test with edge cases and special patterns
+    #[test]
+    fn test_edge_cases() {
+        // All zeros
+        let zeros = vec![0u8; 100];
+        let result = hex_encode(&zeros);
+        assert_eq!(result.len(), 200);
+        assert!(result.chars().all(|c| c == '0'));
+
+        // All ones (0xFF)
+        let ones = vec![0xFFu8; 100];
+        let result = hex_encode(&ones);
+        assert_eq!(result.len(), 200);
+        assert!(result.chars().all(|c| c == 'F'));
+
+        // Alternating pattern
+        let alternating: Vec<u8> = (0..128)
+            .map(|i| if i % 2 == 0 { 0xAA } else { 0x55 })
+            .collect();
+        let result = hex_encode(&alternating);
+        assert_eq!(result.len(), 256);
+
+        // Test boundary values
+        let boundary = vec![0x00, 0x0F, 0x10, 0x7F, 0x80, 0xF0, 0xFF];
+        let result = hex_encode(&boundary);
+        assert_eq!(result, "000F107F80F0FF");
+    }
+
+    /// Test lowercase vs uppercase consistency
+    #[test]
+    fn test_case_consistency() {
+        let data: Vec<u8> = (0..=255).collect();
+
+        let upper = hex_encode(&data);
+        let lower = hex_encode_lower(&data);
+
+        // Same length
+        assert_eq!(upper.len(), lower.len());
+
+        // Only differ in case for hex letters (A-F vs a-f)
+        for (u, l) in upper.chars().zip(lower.chars()) {
+            if u.is_ascii_digit() {
+                assert_eq!(u, l, "Digits should be the same");
+            } else {
+                assert_eq!(
+                    u.to_ascii_lowercase(),
+                    l,
+                    "Letters should differ only in case"
+                );
+            }
+        }
+    }
+
+    /// Test that different SIMD paths produce identical results
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn test_all_x86_implementations_match() {
+        let data: Vec<u8> = (0..=255).collect();
+
+        let mut scalar_result = String::new();
+        hex_encode_scalar(&data, &mut scalar_result, false);
+
+        // Test SSE2
+        let mut sse2_result = String::new();
+        unsafe {
+            hex_encode_sse2(&data, &mut sse2_result, false);
+        }
+        assert_eq!(sse2_result, scalar_result, "SSE2 mismatch");
+
+        // Test SSSE3 if available
+        if is_x86_feature_detected!("ssse3") {
+            let mut ssse3_result = String::new();
+            unsafe {
+                hex_encode_ssse3(&data, &mut ssse3_result, false);
+            }
+            assert_eq!(ssse3_result, scalar_result, "SSSE3 mismatch");
+        }
+
+        // Test SSE4.1 if available
+        if is_x86_feature_detected!("sse4.1") {
+            let mut sse41_result = String::new();
+            unsafe {
+                hex_encode_sse41(&data, &mut sse41_result, false);
+            }
+            assert_eq!(sse41_result, scalar_result, "SSE4.1 mismatch");
+        }
+
+        // Test AVX2 if available
+        if is_x86_feature_detected!("avx2") {
+            let mut avx2_result = String::new();
+            unsafe {
+                hex_encode_avx2(&data, &mut avx2_result, false);
+            }
+            assert_eq!(avx2_result, scalar_result, "AVX2 mismatch");
+        }
+
+        // Test AVX-512 if available
+        if is_x86_feature_detected!("avx512f")
+            && is_x86_feature_detected!("avx512bw")
+            && is_x86_feature_detected!("avx512vl")
+        {
+            let mut avx512_result = String::new();
+            unsafe {
+                hex_encode_avx512(&data, &mut avx512_result, false);
+            }
+            assert_eq!(avx512_result, scalar_result, "AVX-512 mismatch");
+        }
+    }
+
+    /// Benchmark-style test with varying sizes
+    #[test]
+    fn test_various_sizes() {
+        for size in [
+            1, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65, 127, 128, 129, 255, 256, 257, 1000,
+        ] {
+            let data: Vec<u8> = (0..size).map(|i| (i % 256) as u8).collect();
+
+            let mut expected = String::new();
+            hex_encode_scalar(&data, &mut expected, false);
+
+            let result = hex_encode(&data);
+            assert_eq!(
+                result, expected,
+                "Size {} failed: expected {}, got {}",
+                size, expected, result
+            );
+        }
     }
 }

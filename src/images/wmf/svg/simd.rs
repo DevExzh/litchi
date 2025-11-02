@@ -122,45 +122,48 @@ impl SimdTransform {
         out_y: &mut [f64],
         len: usize,
     ) {
-        let chunks = len / 8;
-        let remainder = len % 8;
+        // SAFETY: All AVX-512 intrinsic operations are safe within this target_feature context
+        unsafe {
+            let chunks = len / 8;
+            let remainder = len % 8;
 
-        let bbox_left_vec = _mm512_set1_pd(self.bbox_left);
-        let bbox_top_vec = _mm512_set1_pd(self.bbox_top);
-        let scale_x_vec = _mm512_set1_pd(self.scale_x);
-        let scale_y_vec = _mm512_set1_pd(self.scale_y);
+            let bbox_left_vec = _mm512_set1_pd(self.bbox_left);
+            let bbox_top_vec = _mm512_set1_pd(self.bbox_top);
+            let scale_x_vec = _mm512_set1_pd(self.scale_x);
+            let scale_y_vec = _mm512_set1_pd(self.scale_y);
 
-        for i in 0..chunks {
-            let idx = i * 8;
+            for i in 0..chunks {
+                let idx = i * 8;
 
-            // Load 8 x i16 values and convert to f64
-            let x_i32 =
-                _mm256_cvtepi16_epi32(_mm_loadu_si128(xs.as_ptr().add(idx) as *const __m128i));
-            let x_f64 = _mm512_cvtepi32_pd(x_i32);
+                // Load 8 x i16 values and convert to f64
+                let x_i32 =
+                    _mm256_cvtepi16_epi32(_mm_loadu_si128(xs.as_ptr().add(idx) as *const __m128i));
+                let x_f64 = _mm512_cvtepi32_pd(x_i32);
 
-            // Load 8 y i16 values and convert to f64
-            let y_i32 =
-                _mm256_cvtepi16_epi32(_mm_loadu_si128(ys.as_ptr().add(idx) as *const __m128i));
-            let y_f64 = _mm512_cvtepi32_pd(y_i32);
+                // Load 8 y i16 values and convert to f64
+                let y_i32 =
+                    _mm256_cvtepi16_epi32(_mm_loadu_si128(ys.as_ptr().add(idx) as *const __m128i));
+                let y_f64 = _mm512_cvtepi32_pd(y_i32);
 
-            // Transform: (coord - bbox_offset) * scale
-            let tx = _mm512_mul_pd(_mm512_sub_pd(x_f64, bbox_left_vec), scale_x_vec);
-            let ty = _mm512_mul_pd(_mm512_sub_pd(y_f64, bbox_top_vec), scale_y_vec);
+                // Transform: (coord - bbox_offset) * scale
+                let tx = _mm512_mul_pd(_mm512_sub_pd(x_f64, bbox_left_vec), scale_x_vec);
+                let ty = _mm512_mul_pd(_mm512_sub_pd(y_f64, bbox_top_vec), scale_y_vec);
 
-            // Store results
-            _mm512_storeu_pd(out_x.as_mut_ptr().add(idx), tx);
-            _mm512_storeu_pd(out_y.as_mut_ptr().add(idx), ty);
+                // Store results
+                _mm512_storeu_pd(out_x.as_mut_ptr().add(idx), tx);
+                _mm512_storeu_pd(out_y.as_mut_ptr().add(idx), ty);
+            }
+
+            // Handle remainder with scalar
+            let start = chunks * 8;
+            self.transform_batch_scalar(
+                &xs[start..],
+                &ys[start..],
+                &mut out_x[start..],
+                &mut out_y[start..],
+                remainder,
+            );
         }
-
-        // Handle remainder with scalar
-        let start = chunks * 8;
-        self.transform_batch_scalar(
-            &xs[start..],
-            &ys[start..],
-            &mut out_x[start..],
-            &mut out_y[start..],
-            remainder,
-        );
     }
 
     /// AVX/AVX2 implementation (4 points per iteration)
@@ -175,45 +178,48 @@ impl SimdTransform {
         out_y: &mut [f64],
         len: usize,
     ) {
-        let chunks = len / 4;
-        let remainder = len % 4;
+        // SAFETY: All AVX intrinsic operations are safe within this target_feature context
+        unsafe {
+            let chunks = len / 4;
+            let remainder = len % 4;
 
-        let bbox_left_vec = _mm256_set1_pd(self.bbox_left);
-        let bbox_top_vec = _mm256_set1_pd(self.bbox_top);
-        let scale_x_vec = _mm256_set1_pd(self.scale_x);
-        let scale_y_vec = _mm256_set1_pd(self.scale_y);
+            let bbox_left_vec = _mm256_set1_pd(self.bbox_left);
+            let bbox_top_vec = _mm256_set1_pd(self.bbox_top);
+            let scale_x_vec = _mm256_set1_pd(self.scale_x);
+            let scale_y_vec = _mm256_set1_pd(self.scale_y);
 
-        for i in 0..chunks {
-            let idx = i * 4;
+            for i in 0..chunks {
+                let idx = i * 4;
 
-            // Load 4 i16 values, convert to i32, then to f64
-            // Read 8 bytes (4 x i16) into lower half of xmm register
-            let x_i16 = _mm_loadl_epi64(xs.as_ptr().add(idx) as *const __m128i);
-            let x_i32 = _mm_cvtepi16_epi32(x_i16);
-            let x_f64 = _mm256_cvtepi32_pd(x_i32);
+                // Load 4 i16 values, convert to i32, then to f64
+                // Read 8 bytes (4 x i16) into lower half of xmm register
+                let x_i16 = _mm_loadl_epi64(xs.as_ptr().add(idx) as *const __m128i);
+                let x_i32 = _mm_cvtepi16_epi32(x_i16);
+                let x_f64 = _mm256_cvtepi32_pd(x_i32);
 
-            let y_i16 = _mm_loadl_epi64(ys.as_ptr().add(idx) as *const __m128i);
-            let y_i32 = _mm_cvtepi16_epi32(y_i16);
-            let y_f64 = _mm256_cvtepi32_pd(y_i32);
+                let y_i16 = _mm_loadl_epi64(ys.as_ptr().add(idx) as *const __m128i);
+                let y_i32 = _mm_cvtepi16_epi32(y_i16);
+                let y_f64 = _mm256_cvtepi32_pd(y_i32);
 
-            // Transform: (coord - bbox_offset) * scale
-            let tx = _mm256_mul_pd(_mm256_sub_pd(x_f64, bbox_left_vec), scale_x_vec);
-            let ty = _mm256_mul_pd(_mm256_sub_pd(y_f64, bbox_top_vec), scale_y_vec);
+                // Transform: (coord - bbox_offset) * scale
+                let tx = _mm256_mul_pd(_mm256_sub_pd(x_f64, bbox_left_vec), scale_x_vec);
+                let ty = _mm256_mul_pd(_mm256_sub_pd(y_f64, bbox_top_vec), scale_y_vec);
 
-            // Store results
-            _mm256_storeu_pd(out_x.as_mut_ptr().add(idx), tx);
-            _mm256_storeu_pd(out_y.as_mut_ptr().add(idx), ty);
+                // Store results
+                _mm256_storeu_pd(out_x.as_mut_ptr().add(idx), tx);
+                _mm256_storeu_pd(out_y.as_mut_ptr().add(idx), ty);
+            }
+
+            // Handle remainder with scalar
+            let start = chunks * 4;
+            self.transform_batch_scalar(
+                &xs[start..],
+                &ys[start..],
+                &mut out_x[start..],
+                &mut out_y[start..],
+                remainder,
+            );
         }
-
-        // Handle remainder with scalar
-        let start = chunks * 4;
-        self.transform_batch_scalar(
-            &xs[start..],
-            &ys[start..],
-            &mut out_x[start..],
-            &mut out_y[start..],
-            remainder,
-        );
     }
 
     /// SSE2 implementation (2 points per iteration)
@@ -228,45 +234,47 @@ impl SimdTransform {
         out_y: &mut [f64],
         len: usize,
     ) {
-        let chunks = len / 2;
-        let remainder = len % 2;
+        // SAFETY: All SSE2 intrinsic operations are safe within this target_feature context
+        unsafe {
+            let chunks = len / 2;
+            let remainder = len % 2;
 
-        let bbox_left_vec = _mm_set1_pd(self.bbox_left);
-        let bbox_top_vec = _mm_set1_pd(self.bbox_top);
-        let scale_x_vec = _mm_set1_pd(self.scale_x);
-        let scale_y_vec = _mm_set1_pd(self.scale_y);
+            let bbox_left_vec = _mm_set1_pd(self.bbox_left);
+            let bbox_top_vec = _mm_set1_pd(self.bbox_top);
+            let scale_x_vec = _mm_set1_pd(self.scale_x);
+            let scale_y_vec = _mm_set1_pd(self.scale_y);
 
-        for i in 0..chunks {
-            let idx = i * 2;
+            for i in 0..chunks {
+                let idx = i * 2;
 
-            // Load 2 i16 values and convert to f64
-            let x_i32 = _mm_cvtsi32_si128(xs[idx] as i32);
-            let x_f64_1 = _mm_cvtsi32_sd(_mm_setzero_pd(), xs[idx] as i32);
-            let x_f64_2 = _mm_cvtsi32_sd(_mm_setzero_pd(), xs[idx + 1] as i32);
-            let x_f64 = _mm_unpacklo_pd(x_f64_1, x_f64_2);
+                // Load 2 i16 values and convert to f64
+                let x_f64_1 = _mm_cvtsi32_sd(_mm_setzero_pd(), xs[idx] as i32);
+                let x_f64_2 = _mm_cvtsi32_sd(_mm_setzero_pd(), xs[idx + 1] as i32);
+                let x_f64 = _mm_unpacklo_pd(x_f64_1, x_f64_2);
 
-            let y_f64_1 = _mm_cvtsi32_sd(_mm_setzero_pd(), ys[idx] as i32);
-            let y_f64_2 = _mm_cvtsi32_sd(_mm_setzero_pd(), ys[idx + 1] as i32);
-            let y_f64 = _mm_unpacklo_pd(y_f64_1, y_f64_2);
+                let y_f64_1 = _mm_cvtsi32_sd(_mm_setzero_pd(), ys[idx] as i32);
+                let y_f64_2 = _mm_cvtsi32_sd(_mm_setzero_pd(), ys[idx + 1] as i32);
+                let y_f64 = _mm_unpacklo_pd(y_f64_1, y_f64_2);
 
-            // Transform: (coord - bbox_offset) * scale
-            let tx = _mm_mul_pd(_mm_sub_pd(x_f64, bbox_left_vec), scale_x_vec);
-            let ty = _mm_mul_pd(_mm_sub_pd(y_f64, bbox_top_vec), scale_y_vec);
+                // Transform: (coord - bbox_offset) * scale
+                let tx = _mm_mul_pd(_mm_sub_pd(x_f64, bbox_left_vec), scale_x_vec);
+                let ty = _mm_mul_pd(_mm_sub_pd(y_f64, bbox_top_vec), scale_y_vec);
 
-            // Store results
-            _mm_storeu_pd(out_x.as_mut_ptr().add(idx), tx);
-            _mm_storeu_pd(out_y.as_mut_ptr().add(idx), ty);
+                // Store results
+                _mm_storeu_pd(out_x.as_mut_ptr().add(idx), tx);
+                _mm_storeu_pd(out_y.as_mut_ptr().add(idx), ty);
+            }
+
+            // Handle remainder with scalar
+            let start = chunks * 2;
+            self.transform_batch_scalar(
+                &xs[start..],
+                &ys[start..],
+                &mut out_x[start..],
+                &mut out_y[start..],
+                remainder,
+            );
         }
-
-        // Handle remainder with scalar
-        let start = chunks * 2;
-        self.transform_batch_scalar(
-            &xs[start..],
-            &ys[start..],
-            &mut out_x[start..],
-            &mut out_y[start..],
-            remainder,
-        );
     }
 
     /// NEON implementation for aarch64 (2 points per iteration)
