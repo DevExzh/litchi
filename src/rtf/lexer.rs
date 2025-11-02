@@ -141,9 +141,10 @@ pub enum Token<'a> {
 }
 
 /// Character set encoding for RTF.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CharacterSet {
     /// ANSI (Windows-1252 / CP1252)
+    #[default]
     Ansi,
     /// Mac (Mac Roman)
     Mac,
@@ -151,12 +152,6 @@ pub enum CharacterSet {
     Pc,
     /// PC (DOS / CP850)
     Pca,
-}
-
-impl Default for CharacterSet {
-    fn default() -> Self {
-        Self::Ansi
-    }
 }
 
 /// RTF Lexer using arena allocation.
