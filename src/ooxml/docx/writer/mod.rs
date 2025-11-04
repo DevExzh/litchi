@@ -2,7 +2,10 @@
 //!
 //! This module provides the writer API for creating and modifying Word documents.
 
+pub mod bookmark;
+pub mod comment;
 pub mod doc;
+pub mod field;
 pub mod hyperlink;
 pub mod image;
 pub mod note;
@@ -35,3 +38,12 @@ pub use run::{MutableRun, RunContent};
 
 // Re-export table types
 pub use table::{CellProperties, MutableCell, MutableRow, MutableTable, TableBorder, TableBorders};
+
+// Re-export comment types
+pub use comment::MutableComment;
+
+// Re-export bookmark types
+pub use bookmark::MutableBookmark;
+
+// Re-export field types
+pub use field::MutableField;

@@ -1,6 +1,8 @@
 /// Paragraph and Run structures for Word documents.
 use crate::common::VerticalPosition;
+use crate::ooxml::docx::hyperlink::Hyperlink;
 use crate::ooxml::error::{OoxmlError, Result};
+use crate::ooxml::opc::rel::Relationships;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use smallvec::SmallVec;
@@ -381,6 +383,28 @@ impl Paragraph {
         }
 
         Ok(formulas)
+    }
+
+    /// Get all hyperlinks in this paragraph.
+    ///
+    /// Returns a vector of `Hyperlink` objects representing all hyperlinks
+    /// found in this paragraph. Requires relationships to resolve external URLs.
+    ///
+    /// # Arguments
+    ///
+    /// * `rels` - Relationships for resolving relationship IDs to URLs
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// let para = doc.paragraph(0)?.unwrap();
+    /// let hyperlinks = para.hyperlinks(&main_part.rels())?;
+    /// for link in hyperlinks {
+    ///     println!("Link: {} -> {:?}", link.text(), link.url());
+    /// }
+    /// ```
+    pub fn hyperlinks(&self, rels: &Relationships) -> Result<Vec<Hyperlink>> {
+        Hyperlink::extract_from_paragraph(&self.xml_bytes, rels)
     }
 }
 

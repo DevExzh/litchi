@@ -1,5 +1,6 @@
 pub mod api;
 pub mod common;
+pub mod custom_properties;
 pub mod docx;
 pub mod error;
 pub mod metadata;
@@ -53,6 +54,9 @@ pub use shared::{Length, RGBColor};
 
 // Re-export common utilities
 pub use common::DocumentProperties;
+
+// Re-export custom properties
+pub use custom_properties::{CustomProperties, PropertyValue};
 
 // Re-export error types
 pub use error::{OoxmlError, Result};

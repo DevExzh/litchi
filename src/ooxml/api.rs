@@ -112,6 +112,38 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
+//! ### Working with Custom Properties
+//!
+//! ```rust,no_run
+//! use litchi::ooxml::docx::Package;
+//! use litchi::ooxml::custom_properties::PropertyValue;
+//!
+//! let mut pkg = Package::new()?;
+//!
+//! // Add custom properties
+//! let custom_props = pkg.custom_properties_mut();
+//! custom_props.add_property("ProjectName", PropertyValue::String("MyProject".to_string()));
+//! custom_props.add_property("Version", PropertyValue::Integer(1));
+//! custom_props.add_property("Budget", PropertyValue::Double(50000.0));
+//! custom_props.add_property("IsApproved", PropertyValue::Boolean(true));
+//!
+//! // Read custom properties
+//! let pkg = Package::open("document.docx")?;
+//! for (name, value) in pkg.custom_properties().iter() {
+//!     println!("{}: {:?}", name, value);
+//! }
+//!
+//! // Modify custom property
+//! let mut pkg = Package::open("document.docx")?;
+//! pkg.custom_properties_mut().set_property("Version", PropertyValue::Integer(2));
+//!
+//! // Remove custom property
+//! pkg.custom_properties_mut().remove_property("Budget");
+//!
+//! pkg.save("document.docx")?;
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
 //! ## Excel Workbooks (XLSX)
 //!
 //! ### Creating a new workbook
@@ -472,7 +504,7 @@ mod tests {
 
         // Create
         let mut pkg = DocxPackage::new().unwrap();
-        let mut doc = pkg.document_mut().unwrap();
+        let doc = pkg.document_mut().unwrap();
         doc.add_paragraph_with_text("Test paragraph");
 
         // Note: In real tests, you'd save and re-open

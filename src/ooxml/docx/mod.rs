@@ -48,30 +48,56 @@
 /// }
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+pub mod bookmark;
+pub mod comment;
+pub mod content_control;
+pub mod custom_xml;
 pub mod document;
 pub mod enums;
+pub mod field;
+pub mod footnote;
 pub mod format;
+pub mod header_footer;
+pub mod hyperlink;
+pub mod numbering;
 pub mod package;
 pub mod paragraph;
 pub mod parts;
 pub mod section;
+pub mod settings;
 pub mod styles;
 pub mod table;
 pub mod template;
+pub mod theme;
+pub mod variables;
 pub mod writer;
 
+pub use bookmark::Bookmark;
+pub use comment::Comment;
+pub use content_control::ContentControl;
+pub use custom_xml::CustomXmlPart;
 pub use document::Document;
 pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
+pub use field::Field;
+pub use footnote::{Note, NoteType};
+pub use header_footer::HeaderFooter;
+pub use hyperlink::Hyperlink;
+pub use numbering::{AbstractNum, Num, Numbering};
 pub use package::Package;
 pub use paragraph::{Paragraph, Run, RunProperties};
 pub use section::{Emu, Margins, PageSize, Section, Sections};
+pub use settings::{DocumentSettings, ProtectionType};
 pub use styles::{Style, Styles};
 pub use table::{Cell, Row, Table, VMergeState};
+pub use theme::Theme;
+pub use variables::DocumentVariables;
 // Re-export shared formatting types
 pub use format::{ImageFormat, LineSpacing, ParagraphAlignment, TableBorderStyle, UnderlineStyle};
 // Re-export writer types
 pub use writer::{
-    CellProperties, ListType, MutableDocument, MutableHyperlink, MutableInlineImage,
-    MutableParagraph, MutableRun, MutableTable, Note, PageNumberFormat, PageOrientation,
-    RunContent, SectionProperties, TableBorder, TableBorders,
+    CellProperties, ListType, MutableBookmark, MutableComment, MutableDocument, MutableField,
+    MutableHyperlink, MutableInlineImage, MutableParagraph, MutableRun, MutableTable,
+    PageNumberFormat, PageOrientation, RunContent, SectionProperties, TableBorder, TableBorders,
 };
+// Note: writer::Note is not re-exported to avoid naming conflict with footnote::Note
+// Use writer::Note explicitly if needed

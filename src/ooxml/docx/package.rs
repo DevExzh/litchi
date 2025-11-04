@@ -1,4 +1,5 @@
 use crate::ooxml::common::DocumentProperties;
+use crate::ooxml::custom_properties::CustomProperties;
 use crate::ooxml::docx::document::Document;
 use crate::ooxml::docx::parts::DocumentPart;
 use crate::ooxml::docx::writer::MutableDocument;
@@ -54,6 +55,8 @@ pub struct Package {
     mutable_doc: Option<MutableDocument>,
     /// Document properties (metadata)
     properties: DocumentProperties,
+    /// Custom document properties
+    custom_properties: CustomProperties,
 }
 
 impl Package {
@@ -189,16 +192,35 @@ impl Package {
         }
         opc.add_part(Box::new(theme_part));
 
+        // Create numbering.xml part
+        let numbering_partname = PackURI::new("/word/numbering.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("numbering partname: {}", e)))?;
+        let numbering_part = BlobPart::new(
+            numbering_partname,
+            ct::WML_NUMBERING.to_string(),
+            template::default_numbering_xml().as_bytes().to_vec(),
+        );
+
+        // Add relationship from document to numbering (use relative path)
+        if let Ok(doc_part) = opc.get_part_mut(&doc_partname) {
+            doc_part.relate_to("numbering.xml", rt::NUMBERING);
+        }
+        opc.add_part(Box::new(numbering_part));
+
         // Create a mutable document for writing
         let mutable_doc = Some(MutableDocument::new());
 
         // Initialize document properties
         let properties = DocumentProperties::new();
 
+        // Initialize custom properties
+        let custom_properties = CustomProperties::new();
+
         Ok(Self {
             opc,
             mutable_doc,
             properties,
+            custom_properties,
         })
     }
 
@@ -232,10 +254,15 @@ impl Package {
             });
         }
 
+        // Try to extract custom properties
+        let custom_properties = crate::ooxml::custom_properties::extract_custom_properties(&opc)
+            .unwrap_or_else(|_| CustomProperties::new());
+
         Ok(Self {
             opc,
             mutable_doc: None,
             properties: DocumentProperties::new(),
+            custom_properties,
         })
     }
 
@@ -273,10 +300,15 @@ impl Package {
             });
         }
 
+        // Try to extract custom properties
+        let custom_properties = crate::ooxml::custom_properties::extract_custom_properties(&opc)
+            .unwrap_or_else(|_| CustomProperties::new());
+
         Ok(Self {
             opc,
             mutable_doc: None,
             properties: DocumentProperties::new(),
+            custom_properties,
         })
     }
 
@@ -313,10 +345,15 @@ impl Package {
             });
         }
 
+        // Try to extract custom properties
+        let custom_properties = crate::ooxml::custom_properties::extract_custom_properties(&opc)
+            .unwrap_or_else(|_| CustomProperties::new());
+
         Ok(Self {
             opc,
             mutable_doc: None,
             properties: DocumentProperties::new(),
+            custom_properties,
         })
     }
 
@@ -458,6 +495,28 @@ impl Package {
                 let mut temp_part =
                     BlobPart::new(doc_uri.clone(), content_type.clone(), Vec::new());
 
+                // Copy existing relationships from the original document part (styles, settings, etc.)
+                if let Ok(existing_part) = self.opc.get_part(&doc_uri) {
+                    for rel in existing_part.rels().iter() {
+                        // Skip relationships we're going to recreate dynamically
+                        if !matches!(
+                            rel.reltype(),
+                            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
+                                | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+                                | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header"
+                                | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer"
+                                | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes"
+                                | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes"
+                        ) {
+                            if rel.is_external() {
+                                temp_part.relate_to_ext(rel.target_ref(), rel.reltype());
+                            } else {
+                                temp_part.relate_to(rel.target_ref(), rel.reltype());
+                            }
+                        }
+                    }
+                }
+
                 // Add hyperlink relationships (external)
                 for (i, url) in hyperlink_urls.iter().enumerate() {
                     let rid = temp_part.relate_to_ext(url, rt::HYPERLINK);
@@ -536,6 +595,9 @@ impl Package {
         // Update core properties
         self.update_core_properties()?;
 
+        // Update custom properties
+        self.update_custom_properties()?;
+
         self.opc.save(path).map_err(|e| {
             OoxmlError::IoError(std::io::Error::other(format!(
                 "Failed to save package: {}",
@@ -576,6 +638,49 @@ impl Package {
         &mut self.properties
     }
 
+    /// Get a reference to the custom document properties.
+    ///
+    /// Custom properties allow you to attach arbitrary typed metadata to documents.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::docx::Package;
+    ///
+    /// let pkg = Package::open("document.docx")?;
+    /// let custom_props = pkg.custom_properties();
+    ///
+    /// if let Some(value) = custom_props.get_property("ProjectName") {
+    ///     println!("Project: {:?}", value);
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn custom_properties(&self) -> &CustomProperties {
+        &self.custom_properties
+    }
+
+    /// Get a mutable reference to the custom document properties.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::docx::Package;
+    /// use litchi::ooxml::custom_properties::PropertyValue;
+    ///
+    /// let mut pkg = Package::new()?;
+    /// let custom_props = pkg.custom_properties_mut();
+    ///
+    /// custom_props.add_property("ProjectName", PropertyValue::String("MyProject".to_string()));
+    /// custom_props.add_property("Version", PropertyValue::Integer(1));
+    /// custom_props.add_property("Budget", PropertyValue::Double(50000.0));
+    ///
+    /// pkg.save("document.docx")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn custom_properties_mut(&mut self) -> &mut CustomProperties {
+        &mut self.custom_properties
+    }
+
     /// Update the core.xml properties part.
     fn update_core_properties(&mut self) -> Result<()> {
         use crate::ooxml::opc::part::BlobPart;
@@ -594,6 +699,38 @@ impl Package {
         );
 
         self.opc.add_part(Box::new(core_part));
+
+        Ok(())
+    }
+
+    /// Update the custom.xml properties part.
+    fn update_custom_properties(&mut self) -> Result<()> {
+        use crate::ooxml::opc::constants::relationship_type as rt;
+        use crate::ooxml::opc::part::BlobPart;
+
+        // Only create custom properties part if there are custom properties
+        if self.custom_properties.is_empty() {
+            return Ok(());
+        }
+
+        let custom_uri = PackURI::new("/docProps/custom.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("custom.xml URI: {}", e)))?;
+
+        // Generate XML from custom properties
+        let xml = self.custom_properties.to_xml()?;
+
+        // Create or update the custom properties part
+        let custom_part = BlobPart::new(
+            custom_uri.clone(),
+            ct::OFC_CUSTOM_PROPERTIES.to_string(),
+            xml.into_bytes(),
+        );
+
+        self.opc.add_part(Box::new(custom_part));
+
+        // Ensure relationship exists
+        self.opc
+            .relate_to("docProps/custom.xml", rt::CUSTOM_PROPERTIES);
 
         Ok(())
     }

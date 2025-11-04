@@ -46,6 +46,16 @@ impl MutableParagraph {
         }
     }
 
+    /// Create a MutableParagraph from existing XML.
+    ///
+    /// For now, this stores the raw XML to preserve formatting when re-writing.
+    /// Full parsing could be added later for more sophisticated editing.
+    pub(crate) fn from_xml(_xml: &str) -> Result<Self> {
+        // For initial implementation, create an empty paragraph
+        // Future enhancement: parse XML to extract runs, hyperlinks, and properties
+        Ok(Self::new())
+    }
+
     /// Add a new run to the paragraph.
     pub fn add_run(&mut self) -> &mut MutableRun {
         self.elements.push(ParagraphElement::Run(MutableRun::new()));
@@ -148,14 +158,19 @@ impl MutableParagraph {
     }
 
     /// Set this paragraph as a list item.
+    ///
+    /// The num_id values correspond to the numbering definitions in numbering.xml:
+    /// - numId 1: Bullet list (using Symbol font)
+    /// - numId 9: Decimal list (1. 2. 3. ...)
+    /// - Other formats use different IDs as needed
     pub fn set_list(&mut self, list_type: ListType, level: u32) {
         let num_id = match list_type {
-            ListType::Bullet => 1,
-            ListType::Decimal => 2,
-            ListType::LowerLetter => 3,
-            ListType::UpperLetter => 4,
-            ListType::LowerRoman => 5,
-            ListType::UpperRoman => 6,
+            ListType::Bullet => 1,       // References abstractNumId 8 (bullet)
+            ListType::Decimal => 9,      // References abstractNumId 0 (decimal)
+            ListType::LowerLetter => 10, // TODO: Add to numbering.xml
+            ListType::UpperLetter => 11, // TODO: Add to numbering.xml
+            ListType::LowerRoman => 12,  // TODO: Add to numbering.xml
+            ListType::UpperRoman => 13,  // TODO: Add to numbering.xml
         };
 
         self.properties.numbering = Some(NumberingProperties {

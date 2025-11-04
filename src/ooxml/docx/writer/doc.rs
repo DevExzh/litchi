@@ -477,9 +477,145 @@ impl DocumentBody {
         }
     }
 
-    fn from_xml(_xml: &str) -> Result<Self> {
-        // TODO: Implement XML parsing for reading existing documents
-        Ok(Self::new())
+    fn from_xml(xml: &str) -> Result<Self> {
+        use quick_xml::Reader;
+        use quick_xml::events::Event;
+
+        let mut reader = Reader::from_str(xml);
+        reader.config_mut().trim_text(true);
+
+        let mut body = Self::new();
+        let mut current_para_xml = Vec::new();
+        let mut current_table_xml = Vec::new();
+        let mut in_paragraph = false;
+        let mut in_table = false;
+        let mut depth = 0;
+        let mut buf = Vec::with_capacity(2048);
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(Event::Start(e)) => {
+                    let tag = e.local_name();
+                    if tag.as_ref() == b"p" && !in_paragraph && !in_table {
+                        in_paragraph = true;
+                        depth = 1;
+                        current_para_xml.clear();
+                        current_para_xml.extend_from_slice(b"<w:p");
+                        for attr in e.attributes().flatten() {
+                            current_para_xml.push(b' ');
+                            current_para_xml.extend_from_slice(attr.key.as_ref());
+                            current_para_xml.extend_from_slice(b"=\"");
+                            current_para_xml.extend_from_slice(&attr.value);
+                            current_para_xml.push(b'"');
+                        }
+                        current_para_xml.push(b'>');
+                    } else if tag.as_ref() == b"tbl" && !in_table && !in_paragraph {
+                        in_table = true;
+                        depth = 1;
+                        current_table_xml.clear();
+                        current_table_xml.extend_from_slice(b"<w:tbl");
+                        for attr in e.attributes().flatten() {
+                            current_table_xml.push(b' ');
+                            current_table_xml.extend_from_slice(attr.key.as_ref());
+                            current_table_xml.extend_from_slice(b"=\"");
+                            current_table_xml.extend_from_slice(&attr.value);
+                            current_table_xml.push(b'"');
+                        }
+                        current_table_xml.push(b'>');
+                    } else if in_paragraph {
+                        depth += 1;
+                        current_para_xml.push(b'<');
+                        current_para_xml.extend_from_slice(e.name().as_ref());
+                        for attr in e.attributes().flatten() {
+                            current_para_xml.push(b' ');
+                            current_para_xml.extend_from_slice(attr.key.as_ref());
+                            current_para_xml.extend_from_slice(b"=\"");
+                            current_para_xml.extend_from_slice(&attr.value);
+                            current_para_xml.push(b'"');
+                        }
+                        current_para_xml.push(b'>');
+                    } else if in_table {
+                        depth += 1;
+                        current_table_xml.push(b'<');
+                        current_table_xml.extend_from_slice(e.name().as_ref());
+                        for attr in e.attributes().flatten() {
+                            current_table_xml.push(b' ');
+                            current_table_xml.extend_from_slice(attr.key.as_ref());
+                            current_table_xml.extend_from_slice(b"=\"");
+                            current_table_xml.extend_from_slice(&attr.value);
+                            current_table_xml.push(b'"');
+                        }
+                        current_table_xml.push(b'>');
+                    }
+                },
+                Ok(Event::End(e)) => {
+                    let tag = e.local_name();
+                    if in_paragraph {
+                        current_para_xml.extend_from_slice(b"</");
+                        current_para_xml.extend_from_slice(e.name().as_ref());
+                        current_para_xml.push(b'>');
+                        depth -= 1;
+                        if depth == 0 && tag.as_ref() == b"p" {
+                            // Parse paragraph from XML
+                            let xml_str = String::from_utf8_lossy(&current_para_xml).into_owned();
+                            body.elements
+                                .push(BodyElement::Paragraph(MutableParagraph::from_xml(
+                                    &xml_str,
+                                )?));
+                            in_paragraph = false;
+                        }
+                    } else if in_table {
+                        current_table_xml.extend_from_slice(b"</");
+                        current_table_xml.extend_from_slice(e.name().as_ref());
+                        current_table_xml.push(b'>');
+                        depth -= 1;
+                        if depth == 0 && tag.as_ref() == b"tbl" {
+                            // Parse table from XML
+                            let xml_str = String::from_utf8_lossy(&current_table_xml).into_owned();
+                            body.elements
+                                .push(BodyElement::Table(MutableTable::from_xml(&xml_str)?));
+                            in_table = false;
+                        }
+                    }
+                },
+                Ok(Event::Text(e)) if in_paragraph => {
+                    current_para_xml.extend_from_slice(e.as_ref());
+                },
+                Ok(Event::Text(e)) if in_table => {
+                    current_table_xml.extend_from_slice(e.as_ref());
+                },
+                Ok(Event::Empty(e)) if in_paragraph => {
+                    current_para_xml.push(b'<');
+                    current_para_xml.extend_from_slice(e.name().as_ref());
+                    for attr in e.attributes().flatten() {
+                        current_para_xml.push(b' ');
+                        current_para_xml.extend_from_slice(attr.key.as_ref());
+                        current_para_xml.extend_from_slice(b"=\"");
+                        current_para_xml.extend_from_slice(&attr.value);
+                        current_para_xml.push(b'"');
+                    }
+                    current_para_xml.extend_from_slice(b"/>");
+                },
+                Ok(Event::Empty(e)) if in_table => {
+                    current_table_xml.push(b'<');
+                    current_table_xml.extend_from_slice(e.name().as_ref());
+                    for attr in e.attributes().flatten() {
+                        current_table_xml.push(b' ');
+                        current_table_xml.extend_from_slice(attr.key.as_ref());
+                        current_table_xml.extend_from_slice(b"=\"");
+                        current_table_xml.extend_from_slice(&attr.value);
+                        current_table_xml.push(b'"');
+                    }
+                    current_table_xml.extend_from_slice(b"/>");
+                },
+                Ok(Event::Eof) => break,
+                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+                _ => {},
+            }
+            buf.clear();
+        }
+
+        Ok(body)
     }
 
     fn add_paragraph(&mut self) -> &mut MutableParagraph {

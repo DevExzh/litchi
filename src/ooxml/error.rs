@@ -53,3 +53,9 @@ impl From<quick_xml::Error> for OoxmlError {
         OoxmlError::Xml(err.to_string())
     }
 }
+
+impl From<std::fmt::Error> for OoxmlError {
+    fn from(err: std::fmt::Error) -> Self {
+        OoxmlError::Other(err.to_string())
+    }
+}

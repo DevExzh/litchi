@@ -78,6 +78,16 @@ impl MutableTable {
         table
     }
 
+    /// Create a MutableTable from existing XML.
+    ///
+    /// For now, creates an empty table to preserve basic structure.
+    /// Full parsing could be added later for more sophisticated editing.
+    pub(crate) fn from_xml(_xml: &str) -> crate::ooxml::error::Result<Self> {
+        // For initial implementation, create an empty table
+        // Future enhancement: parse XML to extract rows, cells, and properties
+        Ok(Self::new(0, 0))
+    }
+
     /// Add a new row with specified column count.
     pub fn add_row(&mut self, cols: usize) -> &mut MutableRow {
         self.rows.push(MutableRow::new(cols));

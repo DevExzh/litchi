@@ -49,3 +49,10 @@ pub fn default_app_props_xml() -> &'static str {
 pub fn default_theme_xml() -> &'static str {
     minified_xml!("resources/theme/theme1.xml")
 }
+
+/// Generate a default numbering.xml content.
+///
+/// Defines numbering formats for lists (bullets, decimals, etc.).
+pub fn default_numbering_xml() -> &'static str {
+    minified_xml!("resources/numbering.xml")
+}

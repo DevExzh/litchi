@@ -211,6 +211,10 @@ pub mod relationship_type {
     pub const THEME_OVERRIDE: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/themeOverride";
 
+    // Custom XML
+    pub const CUSTOM_XML: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml";
+
     // External links
     pub const HYPERLINK: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
