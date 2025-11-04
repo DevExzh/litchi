@@ -15,7 +15,7 @@ fn escape_xml(s: &str) -> String {
 }
 
 /// A shape on a slide (text box, image, etc.).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MutableShape {
     /// Shape ID
     pub(crate) shape_id: u32,
@@ -23,7 +23,7 @@ pub struct MutableShape {
     pub(crate) shape_type: ShapeType,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum ShapeType {
     TextBox {
         text: String,

@@ -18,6 +18,8 @@ pub struct RelationshipMapper {
     image_ids: HashMap<(usize, usize), String>,
     /// Maps slide_index to notes slide relationship ID
     notes_ids: HashMap<usize, String>,
+    /// Maps slide_index to background image relationship ID
+    background_ids: HashMap<usize, String>,
 }
 
 impl RelationshipMapper {
@@ -64,5 +66,22 @@ impl RelationshipMapper {
     #[allow(dead_code)] // Public API but not used in the current implementation
     pub fn get_notes_id(&self, slide_index: usize) -> Option<&str> {
         self.notes_ids.get(&slide_index).map(|s| s.as_str())
+    }
+
+    /// Add a background image relationship mapping for a specific slide.
+    ///
+    /// # Arguments
+    /// * `slide_index` - The index of the slide (0-based)
+    /// * `rel_id` - The relationship ID (e.g., "rId4")
+    pub fn add_background(&mut self, slide_index: usize, rel_id: String) {
+        self.background_ids.insert(slide_index, rel_id);
+    }
+
+    /// Get the background image relationship ID for a specific slide.
+    ///
+    /// # Arguments
+    /// * `slide_index` - The index of the slide (0-based)
+    pub fn get_background_id(&self, slide_index: usize) -> Option<&str> {
+        self.background_ids.get(&slide_index).map(|s| s.as_str())
     }
 }

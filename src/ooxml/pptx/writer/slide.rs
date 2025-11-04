@@ -16,7 +16,7 @@ fn escape_xml(s: &str) -> String {
 }
 
 /// A mutable slide in a presentation.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MutableSlide {
     /// Slide ID (unique identifier)
     pub(crate) slide_id: u32,
@@ -26,6 +26,10 @@ pub struct MutableSlide {
     pub(crate) shapes: Vec<MutableShape>,
     /// Speaker notes for the slide
     pub(crate) notes: Option<String>,
+    /// Slide transition effect
+    pub(crate) transition: Option<crate::ooxml::pptx::transitions::SlideTransition>,
+    /// Slide background
+    pub(crate) background: Option<crate::ooxml::pptx::backgrounds::SlideBackground>,
     /// Whether the slide has been modified
     pub(crate) modified: bool,
 }
@@ -38,6 +42,8 @@ impl MutableSlide {
             title: None,
             shapes: Vec::new(),
             notes: None,
+            transition: None,
+            background: None,
             modified: false,
         }
     }
@@ -45,6 +51,14 @@ impl MutableSlide {
     /// Get the slide ID.
     pub fn slide_id(&self) -> u32 {
         self.slide_id
+    }
+
+    /// Set the slide ID.
+    ///
+    /// This is used internally when duplicating slides to assign new IDs.
+    pub(crate) fn set_slide_id(&mut self, slide_id: u32) {
+        self.slide_id = slide_id;
+        self.modified = true;
     }
 
     /// Set the slide title.
@@ -72,6 +86,77 @@ impl MutableSlide {
     /// Check if the slide has speaker notes.
     pub fn has_notes(&self) -> bool {
         self.notes.is_some()
+    }
+
+    /// Set a transition effect for the slide.
+    ///
+    /// # Arguments
+    /// * `transition` - The transition configuration
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use litchi::ooxml::pptx::{MutablePresentation, TransitionType, TransitionSpeed, SlideTransition};
+    ///
+    /// let mut pres = MutablePresentation::new();
+    /// let slide = pres.add_slide().unwrap();
+    ///
+    /// // Add a fade transition
+    /// let transition = SlideTransition::new(TransitionType::Fade)
+    ///     .with_speed(TransitionSpeed::Fast)
+    ///     .with_advance_after_ms(3000);
+    /// slide.set_transition(transition);
+    /// ```
+    pub fn set_transition(&mut self, transition: crate::ooxml::pptx::transitions::SlideTransition) {
+        self.transition = Some(transition);
+        self.modified = true;
+    }
+
+    /// Get the transition effect for the slide.
+    ///
+    /// Returns `None` if no transition is set.
+    pub fn transition(&self) -> Option<&crate::ooxml::pptx::transitions::SlideTransition> {
+        self.transition.as_ref()
+    }
+
+    /// Remove the transition effect from the slide.
+    pub fn remove_transition(&mut self) {
+        self.transition = None;
+        self.modified = true;
+    }
+
+    /// Set a background for the slide.
+    ///
+    /// # Arguments
+    /// * `background` - The background configuration
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use litchi::ooxml::pptx::{MutablePresentation, SlideBackground};
+    ///
+    /// let mut pres = MutablePresentation::new();
+    /// let slide = pres.add_slide().unwrap();
+    ///
+    /// // Set a solid blue background
+    /// slide.set_background(SlideBackground::solid("4472C4"));
+    /// ```
+    pub fn set_background(&mut self, background: crate::ooxml::pptx::backgrounds::SlideBackground) {
+        self.background = Some(background);
+        self.modified = true;
+    }
+
+    /// Get the background for the slide.
+    ///
+    /// Returns `None` if no background is set.
+    pub fn background(&self) -> Option<&crate::ooxml::pptx::backgrounds::SlideBackground> {
+        self.background.as_ref()
+    }
+
+    /// Remove the background from the slide (use master background).
+    pub fn remove_background(&mut self) {
+        self.background = None;
+        self.modified = true;
     }
 
     /// Add a text box to the slide.
@@ -170,7 +255,7 @@ impl MutableSlide {
         self.modified
     }
 
-    /// Collect all images from this slide.
+    /// Collect all images from this slide (from shapes only, not background).
     pub(crate) fn collect_images(&self) -> Vec<(&[u8], ImageFormat)> {
         let mut images = Vec::new();
 
@@ -181,6 +266,17 @@ impl MutableSlide {
         }
 
         images
+    }
+
+    /// Get the background image if this slide has a picture background.
+    ///
+    /// Returns `Some((image_data, format))` if the background is a picture,
+    /// otherwise returns `None`.
+    pub(crate) fn get_background_image(&self) -> Option<(&[u8], ImageFormat)> {
+        self.background
+            .as_ref()
+            .and_then(|bg| bg.get_image_data())
+            .map(|(data, &format)| (data, format))
     }
 
     /// Generate slide XML content.
@@ -212,6 +308,19 @@ impl MutableSlide {
         );
 
         xml.push_str("<p:cSld>");
+
+        // Add background if present (must come BEFORE spTree per OOXML spec)
+        if let Some(ref background) = self.background {
+            // For picture backgrounds, we need to get the relationship ID
+            let bg_rel_id = if background.get_image_data().is_some() {
+                // Get actual relationship ID from mapper
+                slide_index.and_then(|si| rel_mapper.and_then(|rm| rm.get_background_id(si)))
+            } else {
+                None
+            };
+            xml.push_str(&background.to_xml(bg_rel_id)?);
+        }
+
         xml.push_str("<p:spTree>");
 
         // Write group shape properties (required)
@@ -253,6 +362,12 @@ impl MutableSlide {
         xml.push_str("</p:cSld>");
 
         xml.push_str(r#"<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>"#);
+
+        // Add transition if present
+        if let Some(ref transition) = self.transition {
+            xml.push_str(&transition.to_xml()?);
+        }
+
         xml.push_str("</p:sld>");
 
         Ok(xml)

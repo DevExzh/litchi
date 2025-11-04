@@ -162,6 +162,52 @@ impl BaseShape {
         false
     }
 
+    /// Get the placeholder type if this shape is a placeholder.
+    ///
+    /// Returns the type attribute value from the `<p:ph>` element,
+    /// such as "title", "body", "ctrTitle", "subTitle", "dt", "ftr", "sldNum", etc.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// if shape.is_placeholder() {
+    ///     if let Ok(ph_type) = shape.placeholder_type() {
+    ///         println!("Placeholder type: {}", ph_type);
+    ///     }
+    /// }
+    /// ```
+    pub fn placeholder_type(&self) -> Result<String> {
+        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let mut buf = Vec::new();
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
+                    if e.local_name().as_ref() == b"ph" {
+                        // Look for the type attribute
+                        for attr in e.attributes().flatten() {
+                            if attr.key.as_ref() == b"type" {
+                                return std::str::from_utf8(&attr.value)
+                                    .map(|s| s.to_string())
+                                    .map_err(|e| {
+                                        crate::ooxml::error::OoxmlError::Xml(e.to_string())
+                                    });
+                            }
+                        }
+                        // If no type attribute, it's usually a body placeholder
+                        return Ok("body".to_string());
+                    }
+                },
+                Ok(Event::Eof) => break,
+                Err(e) => return Err(crate::ooxml::error::OoxmlError::Xml(e.to_string())),
+                _ => {},
+            }
+            buf.clear();
+        }
+
+        Ok(String::new())
+    }
+
     /// Check if this shape has a text frame.
     pub fn has_text_frame(&self) -> bool {
         self.shape_type == ShapeType::Shape

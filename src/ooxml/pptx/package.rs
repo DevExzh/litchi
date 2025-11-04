@@ -183,6 +183,25 @@ impl Package {
         }
         opc.add_part(Box::new(pres_props_part));
 
+        // Create notesMaster.xml
+        let notes_master_partname = PackURI::new("/ppt/notesMasters/notesMaster1.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("notesMaster partname: {}", e)))?;
+        let mut notes_master_part = BlobPart::new(
+            notes_master_partname.clone(),
+            "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml"
+                .to_string(),
+            template::default_notes_master_xml().as_bytes().to_vec(),
+        );
+
+        // Add relationship from notesMaster to theme
+        notes_master_part.relate_to("../theme/theme1.xml", rt::THEME);
+
+        // Add relationship from presentation to notesMaster
+        if let Ok(pres_part) = opc.get_part_mut(&pres_partname) {
+            pres_part.relate_to("notesMasters/notesMaster1.xml", rt::NOTES_MASTER);
+        }
+        opc.add_part(Box::new(notes_master_part));
+
         // Create core.xml (core properties)
         let core_props_partname = PackURI::new("/docProps/core.xml")
             .map_err(|e| OoxmlError::InvalidUri(format!("core.xml partname: {}", e)))?;
@@ -518,16 +537,43 @@ impl Package {
         // Initialize relationship mapper
         let mut rel_mapper = RelationshipMapper::new();
 
-        // Collect all images from all slides
+        // Collect all images from all slides (shapes)
         let all_images = pres.collect_all_images();
 
-        // Create image parts first and add to package
-        for (img_index, (_slide_index, image_data, image_format)) in all_images.iter().enumerate() {
-            let img_num = img_index + 1;
+        // Collect all background images
+        let all_bg_images = pres.collect_all_background_images();
+
+        // Track the total number of images for unique numbering
+        let mut total_image_count = 0;
+
+        // Create image parts for shape images first and add to package
+        for (_slide_index, image_data, image_format) in &all_images {
+            total_image_count += 1;
             let ext = image_format.extension();
 
             // Create image part URI
-            let image_partname = format!("/ppt/media/image{}.{}", img_num, ext);
+            let image_partname = format!("/ppt/media/image{}.{}", total_image_count, ext);
+            let image_uri = PackURI::new(&image_partname)
+                .map_err(|e| OoxmlError::InvalidUri(format!("image URI: {}", e)))?;
+
+            // Create image part
+            let image_part = BlobPart::new(
+                image_uri,
+                image_format.mime_type().to_string(),
+                image_data.to_vec(),
+            );
+
+            // Add image part to package
+            self.opc.add_part(Box::new(image_part));
+        }
+
+        // Create image parts for background images
+        for (_slide_index, image_data, image_format) in &all_bg_images {
+            total_image_count += 1;
+            let ext = image_format.extension();
+
+            // Create image part URI
+            let image_partname = format!("/ppt/media/image{}.{}", total_image_count, ext);
             let image_uri = PackURI::new(&image_partname)
                 .map_err(|e| OoxmlError::InvalidUri(format!("image URI: {}", e)))?;
 
@@ -562,90 +608,107 @@ impl Package {
         temp_pres_part.relate_to("viewProps.xml", rt::VIEW_PROPS);
         temp_pres_part.relate_to("presProps.xml", rt::PRES_PROPS);
 
+        // Add relationship to notesMaster (required when we have notesSlides)
+        temp_pres_part.relate_to("notesMasters/notesMaster1.xml", rt::NOTES_MASTER);
+
         // Track slide relationship IDs for presentation.xml generation
         let mut slide_rel_ids: Vec<String> = Vec::new();
 
         // Process each slide: create relationships first, then generate XML
+        // Note: We process ALL slides, not just modified ones, because when creating a new
+        // presentation or when slides have been reordered, we need to regenerate everything
         for (slide_index, slide) in pres.slides.iter().enumerate() {
-            if slide.is_modified() {
-                let slide_num = slide_index + 1;
-                let slide_uri = PackURI::new(format!("/ppt/slides/slide{}.xml", slide_num))
-                    .map_err(|e| {
-                        OoxmlError::InvalidUri(format!("slide{} URI: {}", slide_num, e))
-                    })?;
+            let slide_num = slide_index + 1;
+            let slide_uri = PackURI::new(format!("/ppt/slides/slide{}.xml", slide_num))
+                .map_err(|e| OoxmlError::InvalidUri(format!("slide{} URI: {}", slide_num, e)))?;
 
-                // Create a temporary slide part to manage relationships
-                let mut temp_slide_part =
-                    BlobPart::new(slide_uri.clone(), ct::PML_SLIDE.to_string(), Vec::new());
+            // Create a temporary slide part to manage relationships
+            let mut temp_slide_part =
+                BlobPart::new(slide_uri.clone(), ct::PML_SLIDE.to_string(), Vec::new());
 
-                // Add relationship from slide to slide layout (always first relationship)
-                temp_slide_part.relate_to("../slideLayouts/slideLayout1.xml", rt::SLIDE_LAYOUT);
+            // Add relationship from slide to slide layout (always first relationship)
+            temp_slide_part.relate_to("../slideLayouts/slideLayout1.xml", rt::SLIDE_LAYOUT);
 
-                // Collect images for this slide and create relationships
-                let slide_images = slide.collect_images();
-                for (img_index_in_slide, (_, image_format)) in slide_images.iter().enumerate() {
-                    // Find the global image index for this slide's image
-                    let mut global_img_idx = 0;
-                    for (global_idx, (s_idx, _, _)) in all_images.iter().enumerate() {
-                        if *s_idx == slide_index {
-                            if global_img_idx == img_index_in_slide {
-                                let img_num = global_idx + 1;
-                                let ext = image_format.extension();
-                                let image_rel_target = format!("../media/image{}.{}", img_num, ext);
-                                let rid = temp_slide_part.relate_to(&image_rel_target, rt::IMAGE);
-                                rel_mapper.add_image(slide_index, img_index_in_slide, rid);
-                                break;
-                            }
-                            global_img_idx += 1;
+            // Collect images for this slide and create relationships
+            let slide_images = slide.collect_images();
+            for (img_index_in_slide, (_, image_format)) in slide_images.iter().enumerate() {
+                // Find the global image index for this slide's image
+                let mut global_img_idx = 0;
+                for (global_idx, (s_idx, _, _)) in all_images.iter().enumerate() {
+                    if *s_idx == slide_index {
+                        if global_img_idx == img_index_in_slide {
+                            let img_num = global_idx + 1;
+                            let ext = image_format.extension();
+                            let image_rel_target = format!("../media/image{}.{}", img_num, ext);
+                            let rid = temp_slide_part.relate_to(&image_rel_target, rt::IMAGE);
+                            rel_mapper.add_image(slide_index, img_index_in_slide, rid);
+                            break;
                         }
+                        global_img_idx += 1;
                     }
                 }
-
-                // Add relationship from slide to notes slide if notes exist
-                if slide.has_notes() {
-                    let notes_rel_target = format!("../notesSlides/notesSlide{}.xml", slide_num);
-                    let rid = temp_slide_part.relate_to(&notes_rel_target, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide");
-                    rel_mapper.add_notes(slide_index, rid);
-                }
-
-                // Now generate slide XML with actual relationship IDs
-                let slide_xml = slide.to_xml_with_rels(Some(slide_index), Some(&rel_mapper))?;
-
-                // Update the temp part with the actual XML content
-                temp_slide_part.set_blob(slide_xml.into_bytes());
-
-                // Add the slide part to the package
-                self.opc.add_part(Box::new(temp_slide_part));
-
-                // Create notes slide if notes exist
-                if let Some(notes_xml_result) = slide.generate_notes_xml() {
-                    let notes_xml = notes_xml_result?;
-                    let notes_uri =
-                        PackURI::new(format!("/ppt/notesSlides/notesSlide{}.xml", slide_num))
-                            .map_err(|e| {
-                                OoxmlError::InvalidUri(format!(
-                                    "notesSlide{} URI: {}",
-                                    slide_num, e
-                                ))
-                            })?;
-
-                    let mut notes_part = BlobPart::new(
-                        notes_uri,
-                        "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml".to_string(),
-                        notes_xml.into_bytes(),
-                    );
-
-                    // Add relationship from notes to slide
-                    notes_part.relate_to(&format!("../slides/slide{}.xml", slide_num), rt::SLIDE);
-
-                    self.opc.add_part(Box::new(notes_part));
-                }
-
-                // Add relationship from presentation to this slide and track the ID
-                let rel_target = format!("slides/slide{}.xml", slide_num);
-                let slide_rid = temp_pres_part.relate_to(&rel_target, rt::SLIDE);
-                slide_rel_ids.push(slide_rid);
             }
+
+            // Add relationship for background image if present
+            if slide.get_background_image().is_some() {
+                // Find the background image for this slide in all_bg_images
+                for (bg_idx, (bg_slide_idx, _, bg_format)) in all_bg_images.iter().enumerate() {
+                    if *bg_slide_idx == slide_index {
+                        // Calculate the image number (after all shape images)
+                        let bg_img_num = all_images.len() + bg_idx + 1;
+                        let ext = bg_format.extension();
+                        let bg_rel_target = format!("../media/image{}.{}", bg_img_num, ext);
+                        let rid = temp_slide_part.relate_to(&bg_rel_target, rt::IMAGE);
+                        rel_mapper.add_background(slide_index, rid);
+                        break;
+                    }
+                }
+            }
+
+            // Add relationship from slide to notes slide if notes exist
+            if slide.has_notes() {
+                let notes_rel_target = format!("../notesSlides/notesSlide{}.xml", slide_num);
+                let rid = temp_slide_part.relate_to(&notes_rel_target, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide");
+                rel_mapper.add_notes(slide_index, rid);
+            }
+
+            // Now generate slide XML with actual relationship IDs
+            let slide_xml = slide.to_xml_with_rels(Some(slide_index), Some(&rel_mapper))?;
+
+            // Update the temp part with the actual XML content
+            temp_slide_part.set_blob(slide_xml.into_bytes());
+
+            // Add the slide part to the package
+            self.opc.add_part(Box::new(temp_slide_part));
+
+            // Create notes slide if notes exist
+            if let Some(notes_xml_result) = slide.generate_notes_xml() {
+                let notes_xml = notes_xml_result?;
+                let notes_uri =
+                    PackURI::new(format!("/ppt/notesSlides/notesSlide{}.xml", slide_num)).map_err(
+                        |e| OoxmlError::InvalidUri(format!("notesSlide{} URI: {}", slide_num, e)),
+                    )?;
+
+                let mut notes_part = BlobPart::new(
+                    notes_uri,
+                    "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"
+                        .to_string(),
+                    notes_xml.into_bytes(),
+                );
+
+                // Add relationship from notes to slide
+                notes_part.relate_to(&format!("../slides/slide{}.xml", slide_num), rt::SLIDE);
+
+                // Add relationship from notes to notesMaster (REQUIRED by PowerPoint!)
+                notes_part.relate_to("../notesMasters/notesMaster1.xml", rt::NOTES_MASTER);
+
+                self.opc.add_part(Box::new(notes_part));
+            }
+
+            // Add relationship from presentation to this slide and track the ID
+            let rel_target = format!("slides/slide{}.xml", slide_num);
+            let slide_rid = temp_pres_part.relate_to(&rel_target, rt::SLIDE);
+            slide_rel_ids.push(slide_rid);
         }
 
         // Now generate presentation XML with actual relationship IDs

@@ -1,5 +1,6 @@
 /// Slide-related objects, including Slide, SlideLayout, and SlideMaster.
 use crate::ooxml::error::Result;
+use crate::ooxml::opc::packuri::PackURI;
 use crate::ooxml::pptx::parts::{SlideLayoutPart, SlideMasterPart, SlidePart};
 use crate::ooxml::pptx::shapes::base::BaseShape;
 
@@ -25,15 +26,35 @@ use crate::ooxml::pptx::shapes::base::BaseShape;
 pub struct Slide<'a> {
     /// The underlying slide part
     part: SlidePart<'a>,
+    /// Reference to the OPC package (for accessing notes)
+    package: Option<&'a crate::ooxml::opc::OpcPackage>,
 }
 
+#[allow(dead_code)] // Part of the public API for future use
 impl<'a> Slide<'a> {
     /// Create a new Slide from a SlidePart.
     ///
     /// This is typically called internally.
     #[inline]
     pub(crate) fn new(part: SlidePart<'a>) -> Self {
-        Self { part }
+        Self {
+            part,
+            package: None,
+        }
+    }
+
+    /// Create a new Slide with a reference to the package.
+    ///
+    /// This allows accessing related parts like notes.
+    #[inline]
+    pub(crate) fn with_package(
+        part: SlidePart<'a>,
+        package: &'a crate::ooxml::opc::OpcPackage,
+    ) -> Self {
+        Self {
+            part,
+            package: Some(package),
+        }
     }
 
     /// Get the slide name.
@@ -321,6 +342,157 @@ impl<'a> Slide<'a> {
     /// ```
     pub fn is_empty(&self) -> Result<bool> {
         Ok(self.shape_count()? == 0)
+    }
+
+    /// Get the transition effect for this slide.
+    ///
+    /// Returns `None` if no transition is defined for this slide.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::pptx::Package;
+    ///
+    /// let pkg = Package::open("presentation.pptx")?;
+    /// let pres = pkg.presentation()?;
+    /// let slides = pres.slides()?;
+    ///
+    /// if let Some(slide) = slides.first() {
+    ///     if let Some(transition) = slide.transition()? {
+    ///         println!("Transition type: {:?}", transition.transition_type);
+    ///         println!("Speed: {:?}", transition.speed);
+    ///     } else {
+    ///         println!("No transition");
+    ///     }
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn transition(&self) -> Result<Option<crate::ooxml::pptx::transitions::SlideTransition>> {
+        self.part.transition()
+    }
+
+    /// Get the background for this slide.
+    ///
+    /// Returns `None` if no background is defined (uses master background).
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::pptx::Package;
+    ///
+    /// let pkg = Package::open("presentation.pptx")?;
+    /// let pres = pkg.presentation()?;
+    /// let slides = pres.slides()?;
+    ///
+    /// if let Some(slide) = slides.first() {
+    ///     if let Some(bg) = slide.background()? {
+    ///         println!("Slide has custom background: {:?}", bg);
+    ///     } else {
+    ///         println!("Using master background");
+    ///     }
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn background(&self) -> Result<Option<crate::ooxml::pptx::backgrounds::SlideBackground>> {
+        self.part.background()
+    }
+
+    /// Get the speaker notes for this slide.
+    ///
+    /// Returns `None` if no notes are defined or if the package reference is not available.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::pptx::Package;
+    ///
+    /// let pkg = Package::open("presentation.pptx")?;
+    /// let pres = pkg.presentation()?;
+    /// let slides = pres.slides()?;
+    ///
+    /// for slide in slides {
+    ///     if let Some(notes) = slide.notes()? {
+    ///         println!("Notes: {}", notes);
+    ///     }
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn notes(&self) -> Result<Option<String>> {
+        // Check if we have package reference
+        let package = match self.package {
+            Some(pkg) => pkg,
+            None => return Ok(None),
+        };
+
+        // Look for notes relationship
+        let slide_part = self.part.part();
+        let rels = slide_part.rels();
+
+        // Find the notes relationship (type is notesSlide)
+        let notes_rel = rels.iter().find(|rel| {
+            rel.reltype()
+                == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide"
+        });
+
+        if let Some(rel) = notes_rel {
+            // Get the notes part
+            let base_uri = slide_part.partname().base_uri();
+            let notes_partname = PackURI::from_rel_ref(base_uri, rel.target_ref())
+                .map_err(crate::ooxml::error::OoxmlError::InvalidFormat)?;
+
+            if let Ok(notes_part) = package.get_part(&notes_partname) {
+                // Extract text from notes
+                return Self::extract_notes_text(notes_part.blob());
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Extract text from notes XML.
+    fn extract_notes_text(xml: &[u8]) -> Result<Option<String>> {
+        use quick_xml::Reader;
+        use quick_xml::events::Event;
+
+        let mut reader = Reader::from_reader(xml);
+        reader.config_mut().trim_text(true);
+
+        let mut text = String::new();
+        let mut in_text_element = false;
+        let mut buf = Vec::new();
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(Event::Start(e)) => {
+                    if e.local_name().as_ref() == b"t" {
+                        in_text_element = true;
+                    }
+                },
+                Ok(Event::Text(e)) if in_text_element => {
+                    let t = std::str::from_utf8(e.as_ref())
+                        .map_err(|e| crate::ooxml::error::OoxmlError::Xml(e.to_string()))?;
+                    if !text.is_empty() && !text.ends_with('\n') {
+                        text.push('\n');
+                    }
+                    text.push_str(t);
+                },
+                Ok(Event::End(e)) => {
+                    if e.local_name().as_ref() == b"t" {
+                        in_text_element = false;
+                    }
+                },
+                Ok(Event::Eof) => break,
+                Err(e) => return Err(crate::ooxml::error::OoxmlError::Xml(e.to_string())),
+                _ => {},
+            }
+            buf.clear();
+        }
+
+        if text.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(text))
+        }
     }
 }
 

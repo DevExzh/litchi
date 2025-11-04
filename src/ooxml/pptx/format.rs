@@ -1,7 +1,7 @@
 //! Format types for PPTX presentations.
 
 /// Image format types supported by PPTX.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImageFormat {
     Png,
     Jpeg,

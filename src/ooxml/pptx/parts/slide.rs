@@ -219,6 +219,22 @@ impl<'a> SlidePart<'a> {
 
         Err(OoxmlError::Xml("Unexpected end of shape XML".to_string()))
     }
+
+    /// Get the transition effect for this slide.
+    ///
+    /// Parses the `<p:transition>` element from the slide XML.
+    /// Returns `None` if no transition is defined.
+    pub fn transition(&self) -> Result<Option<crate::ooxml::pptx::transitions::SlideTransition>> {
+        crate::ooxml::pptx::transitions::SlideTransition::from_xml(self.xml_bytes())
+    }
+
+    /// Get the background for this slide.
+    ///
+    /// Parses the `<p:bg>` element from the slide XML.
+    /// Returns `None` if no background is defined.
+    pub fn background(&self) -> Result<Option<crate::ooxml::pptx::backgrounds::SlideBackground>> {
+        crate::ooxml::pptx::backgrounds::SlideBackground::from_xml(self.xml_bytes())
+    }
 }
 
 /// A slide layout part.

@@ -56,17 +56,23 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+pub mod backgrounds;
 pub mod format;
+pub mod hyperlinks;
 pub mod package;
 pub mod parts;
 pub mod presentation;
 pub mod shapes;
 pub mod slide;
 pub mod template;
+pub mod transitions;
 pub mod writer;
 
+pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
 pub use format::{ImageFormat, TextFormat};
+pub use hyperlinks::Hyperlink;
 pub use package::Package;
 pub use presentation::Presentation;
 pub use slide::{Slide, SlideLayout, SlideMaster};
+pub use transitions::{SlideTransition, TransitionDirection, TransitionSpeed, TransitionType};
 pub use writer::{MutablePresentation, MutableShape, MutableSlide};
