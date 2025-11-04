@@ -290,6 +290,84 @@ impl MutableWorksheet {
         self.modified
     }
 
+    // TODO: Implement hyperlink support
+    /// Set a hyperlink for a cell.
+    ///
+    /// # Arguments
+    /// * `row` - Row index (0-based)
+    /// * `col` - Column index (0-based)
+    /// * `url` - The URL or internal reference
+    ///
+    /// # TODO
+    /// This method is not yet implemented. Hyperlinks need to be stored and written to:
+    /// - The worksheet XML (`<hyperlink>` elements)
+    /// - The worksheet relationships file (`_rels/sheet.xml.rels`)
+    #[allow(unused_variables)]
+    pub fn set_hyperlink(&mut self, row: u32, col: u32, url: &str) {
+        // TODO: Implement hyperlink storage and XML generation
+        todo!("Hyperlink support is not yet implemented")
+    }
+
+    // TODO: Implement cell comment support
+    /// Add a comment to a cell.
+    ///
+    /// # Arguments
+    /// * `row` - Row index (0-based)
+    /// * `col` - Column index (0-based)
+    /// * `text` - The comment text
+    ///
+    /// # TODO
+    /// This method is not yet implemented. Comments need to be written to:
+    /// - A separate comments.xml part
+    /// - The worksheet relationships file
+    /// - VML drawing parts for comment rendering
+    #[allow(unused_variables)]
+    pub fn set_cell_comment(&mut self, row: u32, col: u32, text: &str) {
+        // TODO: Implement comment storage and XML generation
+        todo!("Cell comment support is not yet implemented")
+    }
+
+    // TODO: Implement conditional formatting support
+    /// Add conditional formatting to a range.
+    ///
+    /// # TODO
+    /// This method is not yet implemented. Conditional formatting requires:
+    /// - Storage of formatting rules
+    /// - XML generation for `<conditionalFormatting>` elements
+    /// - Support for various rule types (cellIs, colorScale, dataBar, iconSet, etc.)
+    #[allow(unused_variables)]
+    pub fn add_conditional_formatting(&mut self, range: &str, rule_type: &str) {
+        // TODO: Implement conditional formatting storage and XML generation
+        todo!("Conditional formatting support is not yet implemented")
+    }
+
+    // TODO: Implement page setup support
+    /// Configure page setup for printing.
+    ///
+    /// # TODO
+    /// This method is not yet implemented. Page setup requires:
+    /// - Storage of page properties (orientation, paper size, margins)
+    /// - XML generation for `<pageSetup>`, `<pageMargins>`, `<printOptions>` elements
+    /// - Header/footer support
+    #[allow(unused_variables)]
+    pub fn set_page_setup(&mut self, orientation: &str, paper_size: u32) {
+        // TODO: Implement page setup storage and XML generation
+        todo!("Page setup support is not yet implemented")
+    }
+
+    // TODO: Implement auto-filter support
+    /// Add an auto-filter to a range.
+    ///
+    /// # TODO
+    /// This method is not yet implemented. Auto-filters require:
+    /// - XML generation for `<autoFilter>` elements
+    /// - Support for filter criteria
+    #[allow(unused_variables)]
+    pub fn set_auto_filter(&mut self, range: &str) {
+        // TODO: Implement auto-filter storage and XML generation
+        todo!("Auto-filter support is not yet implemented")
+    }
+
     /// Get the used range dimensions (min_row, min_col, max_row, max_col).
     pub fn used_range(&self) -> Option<(u32, u32, u32, u32)> {
         if self.cells.is_empty() {
@@ -326,9 +404,10 @@ impl MutableWorksheet {
         xml.push_str(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">"#);
 
         // Write sheet dimensions
+        // NOTE: Excel uses 1-based row/column numbering in XML
         if let Some((min_row, min_col, max_row, max_col)) = self.used_range() {
-            let min_ref = format!("{}{}", Self::column_to_letters(min_col), min_row);
-            let max_ref = format!("{}{}", Self::column_to_letters(max_col), max_row);
+            let min_ref = format!("{}{}", Self::column_to_letters(min_col + 1), min_row + 1);
+            let max_ref = format!("{}{}", Self::column_to_letters(max_col + 1), max_row + 1);
             write!(
                 xml,
                 r#"<dimension ref="{}:{}"/>"#,
@@ -355,6 +434,7 @@ impl MutableWorksheet {
                 (false, false) => "",
             };
 
+            // NOTE: Excel uses 1-based numbering for topLeftCell
             let top_left_cell = format!("{}{}", Self::column_to_letters(x_split + 1), y_split + 1);
 
             write!(
@@ -379,7 +459,10 @@ impl MutableWorksheet {
         }
 
         xml.push_str("</sheetViews>");
-        xml.push_str("<sheetFormatPr defaultRowHeight=\"15\"/>\n");
+        xml.push_str("<sheetFormatPr defaultRowHeight=\"15\"/>");
+
+        // Write column information (widths and hidden columns)
+        self.write_cols(&mut xml)?;
 
         // Write sheet data
         xml.push_str("<sheetData>");
@@ -392,13 +475,23 @@ impl MutableWorksheet {
                 .map_err(|e| format!("XML write error: {}", e))?;
 
             for (start_row, start_col, end_row, end_col) in &self.merged_cells {
-                let start_ref = format!("{}{}", Self::column_to_letters(*start_col), start_row);
-                let end_ref = format!("{}{}", Self::column_to_letters(*end_col), end_row);
+                // NOTE: Excel uses 1-based numbering for cell references
+                let start_ref = format!(
+                    "{}{}",
+                    Self::column_to_letters(start_col + 1),
+                    start_row + 1
+                );
+                let end_ref = format!("{}{}", Self::column_to_letters(end_col + 1), end_row + 1);
                 write!(xml, r#"<mergeCell ref="{}:{}"/>"#, start_ref, end_ref)
                     .map_err(|e| format!("XML write error: {}", e))?;
             }
 
             xml.push_str("</mergeCells>");
+        }
+
+        // Write data validations
+        if !self.validations.is_empty() {
+            self.write_data_validations(&mut xml)?;
         }
 
         xml.push_str("</worksheet>");
@@ -436,11 +529,26 @@ impl MutableWorksheet {
             let mut cells = rows[&row_num].clone();
             cells.sort_unstable_by_key(|(col, _)| *col);
 
-            write!(xml, r#"<row r="{}">"#, row_num)
+            // NOTE: Excel uses 1-based row numbering
+            write!(xml, r#"<row r="{}""#, row_num + 1)
                 .map_err(|e| format!("XML write error: {}", e))?;
 
+            // Add custom row height if specified
+            if let Some(&height) = self.row_heights.get(&row_num) {
+                write!(xml, r#" ht="{}" customHeight="1""#, height)
+                    .map_err(|e| format!("XML write error: {}", e))?;
+            }
+
+            // Add hidden attribute if row is hidden
+            if self.hidden_rows.contains(&row_num) {
+                xml.push_str(r#" hidden="1""#);
+            }
+
+            xml.push('>');
+
             for (col_num, value) in cells {
-                let cell_ref = format!("{}{}", Self::column_to_letters(col_num), row_num);
+                // NOTE: Excel uses 1-based numbering for cell references
+                let cell_ref = format!("{}{}", Self::column_to_letters(col_num + 1), row_num + 1);
                 // Get the style index for this cell (if any)
                 let style_index = style_indices.get(&(row_num, col_num)).copied();
                 self.write_cell(xml, &cell_ref, value, shared_strings, style_index)?;
@@ -527,7 +635,7 @@ impl MutableWorksheet {
                 formula,
                 cached_value,
             } => {
-                xml.push_str(&format!(r#"<c r="{}"{}">"#, cell_ref, style_attr));
+                xml.push_str(&format!(r#"<c r="{}"{}>"#, cell_ref, style_attr));
                 write!(xml, "<f>{}</f>", escape_xml(formula))
                     .map_err(|e| format!("XML write error: {}", e))?;
 
@@ -555,6 +663,267 @@ impl MutableWorksheet {
                 }
                 xml.push_str("</c>");
             },
+        }
+
+        Ok(())
+    }
+
+    /// Write column information (widths and hidden state).
+    fn write_cols(&self, xml: &mut String) -> SheetResult<()> {
+        if self.column_widths.is_empty() && self.hidden_columns.is_empty() {
+            return Ok(());
+        }
+
+        // Collect all columns that have custom width or are hidden
+        let mut cols_to_write: std::collections::BTreeSet<u32> = std::collections::BTreeSet::new();
+        cols_to_write.extend(self.column_widths.keys());
+        cols_to_write.extend(&self.hidden_columns);
+
+        if cols_to_write.is_empty() {
+            return Ok(());
+        }
+
+        xml.push_str("<cols>");
+
+        for &col in &cols_to_write {
+            // NOTE: Excel uses 1-based column numbering for min/max attributes
+            write!(xml, r#"<col min="{}" max="{}""#, col + 1, col + 1)
+                .map_err(|e| format!("XML write error: {}", e))?;
+
+            // Add width if specified
+            if let Some(&width) = self.column_widths.get(&col) {
+                write!(xml, r#" width="{}" customWidth="1""#, width)
+                    .map_err(|e| format!("XML write error: {}", e))?;
+            } else {
+                // Default Excel column width is 8.43
+                xml.push_str(r#" width="8.43""#);
+            }
+
+            // Add hidden attribute if column is hidden
+            if self.hidden_columns.contains(&col) {
+                xml.push_str(r#" hidden="1""#);
+            }
+
+            xml.push_str("/>");
+        }
+
+        xml.push_str("</cols>");
+        Ok(())
+    }
+
+    /// Write data validations.
+    fn write_data_validations(&self, xml: &mut String) -> SheetResult<()> {
+        if self.validations.is_empty() {
+            return Ok(());
+        }
+
+        write!(
+            xml,
+            r#"<dataValidations count="{}">"#,
+            self.validations.len()
+        )
+        .map_err(|e| format!("XML write error: {}", e))?;
+
+        for validation in &self.validations {
+            xml.push_str(r#"<dataValidation"#);
+
+            // Write type and operator
+            match &validation.validation_type {
+                DataValidationType::List { values } => {
+                    xml.push_str(r#" type="list""#);
+                    write!(xml, r#" sqref="{}""#, escape_xml(&validation.range))
+                        .map_err(|e| format!("XML write error: {}", e))?;
+
+                    if validation.show_input_message {
+                        xml.push_str(r#" showInputMessage="1""#);
+                    }
+                    if validation.show_error_alert {
+                        xml.push_str(r#" showErrorMessage="1""#);
+                    }
+
+                    if let Some(ref title) = validation.input_title {
+                        write!(xml, r#" promptTitle="{}""#, escape_xml(title))
+                            .map_err(|e| format!("XML write error: {}", e))?;
+                    }
+                    if let Some(ref msg) = validation.input_message {
+                        write!(xml, r#" prompt="{}""#, escape_xml(msg))
+                            .map_err(|e| format!("XML write error: {}", e))?;
+                    }
+                    if let Some(ref title) = validation.error_title {
+                        write!(xml, r#" errorTitle="{}""#, escape_xml(title))
+                            .map_err(|e| format!("XML write error: {}", e))?;
+                    }
+                    if let Some(ref msg) = validation.error_message {
+                        write!(xml, r#" error="{}""#, escape_xml(msg))
+                            .map_err(|e| format!("XML write error: {}", e))?;
+                    }
+
+                    xml.push('>');
+
+                    // Write list values as a comma-separated string in formula1
+                    let list_str = values.join(",");
+                    write!(xml, "<formula1>\"{}\"</formula1>", escape_xml(&list_str))
+                        .map_err(|e| format!("XML write error: {}", e))?;
+
+                    xml.push_str("</dataValidation>");
+                },
+                DataValidationType::Whole {
+                    operator,
+                    value1,
+                    value2,
+                } => {
+                    xml.push_str(r#" type="whole""#);
+                    write!(
+                        xml,
+                        r#" operator="{}" sqref="{}""#,
+                        operator.as_str(),
+                        escape_xml(&validation.range)
+                    )
+                    .map_err(|e| format!("XML write error: {}", e))?;
+
+                    self.write_validation_attributes(xml, validation)?;
+
+                    xml.push('>');
+
+                    write!(xml, "<formula1>{}</formula1>", value1)
+                        .map_err(|e| format!("XML write error: {}", e))?;
+                    if let Some(v2) = value2 {
+                        write!(xml, "<formula2>{}</formula2>", v2)
+                            .map_err(|e| format!("XML write error: {}", e))?;
+                    }
+
+                    xml.push_str("</dataValidation>");
+                },
+                DataValidationType::Decimal {
+                    operator,
+                    value1,
+                    value2,
+                } => {
+                    xml.push_str(r#" type="decimal""#);
+                    write!(
+                        xml,
+                        r#" operator="{}" sqref="{}""#,
+                        operator.as_str(),
+                        escape_xml(&validation.range)
+                    )
+                    .map_err(|e| format!("XML write error: {}", e))?;
+
+                    self.write_validation_attributes(xml, validation)?;
+
+                    xml.push('>');
+
+                    write!(xml, "<formula1>{}</formula1>", value1)
+                        .map_err(|e| format!("XML write error: {}", e))?;
+                    if let Some(v2) = value2 {
+                        write!(xml, "<formula2>{}</formula2>", v2)
+                            .map_err(|e| format!("XML write error: {}", e))?;
+                    }
+
+                    xml.push_str("</dataValidation>");
+                },
+                DataValidationType::TextLength {
+                    operator,
+                    value1,
+                    value2,
+                } => {
+                    xml.push_str(r#" type="textLength""#);
+                    write!(
+                        xml,
+                        r#" operator="{}" sqref="{}""#,
+                        operator.as_str(),
+                        escape_xml(&validation.range)
+                    )
+                    .map_err(|e| format!("XML write error: {}", e))?;
+
+                    self.write_validation_attributes(xml, validation)?;
+
+                    xml.push('>');
+
+                    write!(xml, "<formula1>{}</formula1>", value1)
+                        .map_err(|e| format!("XML write error: {}", e))?;
+                    if let Some(v2) = value2 {
+                        write!(xml, "<formula2>{}</formula2>", v2)
+                            .map_err(|e| format!("XML write error: {}", e))?;
+                    }
+
+                    xml.push_str("</dataValidation>");
+                },
+                DataValidationType::Date {
+                    operator,
+                    value1,
+                    value2,
+                } => {
+                    xml.push_str(r#" type="date""#);
+                    write!(
+                        xml,
+                        r#" operator="{}" sqref="{}""#,
+                        operator.as_str(),
+                        escape_xml(&validation.range)
+                    )
+                    .map_err(|e| format!("XML write error: {}", e))?;
+
+                    self.write_validation_attributes(xml, validation)?;
+
+                    xml.push('>');
+
+                    write!(xml, "<formula1>{}</formula1>", escape_xml(value1))
+                        .map_err(|e| format!("XML write error: {}", e))?;
+                    if let Some(v2) = value2 {
+                        write!(xml, "<formula2>{}</formula2>", escape_xml(v2))
+                            .map_err(|e| format!("XML write error: {}", e))?;
+                    }
+
+                    xml.push_str("</dataValidation>");
+                },
+                DataValidationType::Custom { formula } => {
+                    xml.push_str(r#" type="custom""#);
+                    write!(xml, r#" sqref="{}""#, escape_xml(&validation.range))
+                        .map_err(|e| format!("XML write error: {}", e))?;
+
+                    self.write_validation_attributes(xml, validation)?;
+
+                    xml.push('>');
+
+                    write!(xml, "<formula1>{}</formula1>", escape_xml(formula))
+                        .map_err(|e| format!("XML write error: {}", e))?;
+
+                    xml.push_str("</dataValidation>");
+                },
+            }
+        }
+
+        xml.push_str("</dataValidations>");
+        Ok(())
+    }
+
+    /// Write common validation attributes.
+    fn write_validation_attributes(
+        &self,
+        xml: &mut String,
+        validation: &DataValidation,
+    ) -> SheetResult<()> {
+        if validation.show_input_message {
+            xml.push_str(r#" showInputMessage="1""#);
+        }
+        if validation.show_error_alert {
+            xml.push_str(r#" showErrorMessage="1""#);
+        }
+
+        if let Some(ref title) = validation.input_title {
+            write!(xml, r#" promptTitle="{}""#, escape_xml(title))
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(ref msg) = validation.input_message {
+            write!(xml, r#" prompt="{}""#, escape_xml(msg))
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(ref title) = validation.error_title {
+            write!(xml, r#" errorTitle="{}""#, escape_xml(title))
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(ref msg) = validation.error_message {
+            write!(xml, r#" error="{}""#, escape_xml(msg))
+                .map_err(|e| format!("XML write error: {}", e))?;
         }
 
         Ok(())

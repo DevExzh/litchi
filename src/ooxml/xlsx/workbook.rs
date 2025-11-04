@@ -231,6 +231,11 @@ impl Workbook {
     pub(crate) fn shared_strings(&self) -> &SharedStrings {
         &self.shared_strings
     }
+
+    /// Get the styles collection (for internal use by worksheet)
+    pub(crate) fn styles(&self) -> &Styles {
+        &self.styles
+    }
 }
 
 impl WorkbookTrait for Workbook {
@@ -505,6 +510,9 @@ impl Workbook {
 
         // Create styles relationship
         temp_wb_part.relate_to("styles.xml", rt::STYLES);
+
+        // Create theme relationship (required by Excel)
+        temp_wb_part.relate_to("theme/theme1.xml", rt::THEME);
 
         // Track worksheet relationship IDs for workbook.xml generation
         let mut worksheet_rel_ids: Vec<String> = Vec::new();

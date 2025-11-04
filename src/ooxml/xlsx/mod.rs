@@ -50,7 +50,10 @@ pub use format::{
 pub use shared_strings::SharedStrings;
 pub use styles::{Alignment, Border, BorderStyle, CellStyle, Fill, Font, NumberFormat, Styles};
 pub use workbook::Workbook;
-pub use worksheet::Worksheet;
+pub use worksheet::{
+    AutoFilter, ColumnInfo, Comment, ConditionalFormatRule, DataValidationRule, Hyperlink,
+    PageSetup, RowInfo, Worksheet, WorksheetInfo,
+};
 // Re-export writer types
 pub use writer::{
     FreezePanes, MutableSharedStrings, MutableWorkbookData, MutableWorksheet, NamedRange,
