@@ -4,6 +4,7 @@
 
 pub mod bookmark;
 pub mod comment;
+pub mod content_control;
 pub mod doc;
 pub mod field;
 pub mod hyperlink;
@@ -13,10 +14,14 @@ pub mod paragraph;
 pub(crate) mod relmap;
 pub mod run;
 pub mod section;
+pub mod style;
 pub mod table;
+pub mod theme;
+pub mod toc;
+pub mod watermark;
 
 // Re-export main document type
-pub use doc::MutableDocument;
+pub use doc::{DocumentProtection, MutableDocument};
 
 // Re-export note types
 pub use note::Note;
@@ -47,3 +52,18 @@ pub use bookmark::MutableBookmark;
 
 // Re-export field types
 pub use field::MutableField;
+
+// Re-export style types
+pub use style::{MutableStyle, generate_styles_xml};
+
+// Re-export content control types
+pub use content_control::{ContentControlType, MutableContentControl};
+
+// Re-export theme types
+pub use theme::{ColorScheme, MutableTheme};
+
+// Re-export watermark types
+pub use watermark::Watermark;
+
+// Re-export TOC types
+pub use toc::TableOfContents;

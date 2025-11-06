@@ -20,6 +20,10 @@ pub struct RelationshipMapper {
     header_id: Option<String>,
     /// Footer relationship ID (if any)
     footer_id: Option<String>,
+    /// Footnotes relationship ID (if any)
+    footnotes_id: Option<String>,
+    /// Endnotes relationship ID (if any)
+    endnotes_id: Option<String>,
 }
 
 impl RelationshipMapper {
@@ -66,5 +70,25 @@ impl RelationshipMapper {
     /// Get the footer relationship ID.
     pub fn get_footer_id(&self) -> Option<&str> {
         self.footer_id.as_deref()
+    }
+
+    /// Set the footnotes relationship ID.
+    pub fn set_footnotes_id(&mut self, rel_id: String) {
+        self.footnotes_id = Some(rel_id);
+    }
+
+    /// Get the footnotes relationship ID.
+    pub fn get_footnotes_id(&self) -> Option<&str> {
+        self.footnotes_id.as_deref()
+    }
+
+    /// Set the endnotes relationship ID.
+    pub fn set_endnotes_id(&mut self, rel_id: String) {
+        self.endnotes_id = Some(rel_id);
+    }
+
+    /// Get the endnotes relationship ID.
+    pub fn get_endnotes_id(&self) -> Option<&str> {
+        self.endnotes_id.as_deref()
     }
 }

@@ -1,6 +1,9 @@
 /// Paragraph and Run structures for Word documents.
 use crate::common::VerticalPosition;
+use crate::ooxml::docx::drawing::{DrawingObject, parse_drawing_objects};
 use crate::ooxml::docx::hyperlink::Hyperlink;
+use crate::ooxml::docx::image::{InlineImage, parse_inline_images};
+use crate::ooxml::docx::revision::{Revision, parse_revisions};
 use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::opc::rel::Relationships;
 use quick_xml::Reader;
@@ -194,6 +197,77 @@ impl Paragraph {
             }
         }
         Ok(formulas)
+    }
+
+    /// Extract all inline images from this paragraph.
+    ///
+    /// Returns a vector of `InlineImage` objects found in `<w:drawing>` elements
+    /// within this paragraph.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// for para in document.paragraphs()? {
+    ///     for image in para.images()? {
+    ///         println!("Image: {} ({}x{} pixels)",
+    ///             image.name(),
+    ///             image.width_px(),
+    ///             image.height_px()
+    ///         );
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    pub fn images(&self) -> Result<SmallVec<[InlineImage; 4]>> {
+        parse_inline_images(&self.xml_bytes)
+    }
+
+    /// Extract all drawing objects (shapes, text boxes) from this paragraph.
+    ///
+    /// Returns a vector of `DrawingObject` objects found in `<w:drawing>` elements
+    /// within this paragraph. This includes shapes, text boxes, and other DrawingML objects.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// for para in document.paragraphs()? {
+    ///     for drawing in para.drawing_objects()? {
+    ///         println!("Shape: {} (type: {:?})",
+    ///             drawing.name(),
+    ///             drawing.shape_type()
+    ///         );
+    ///         if !drawing.text().is_empty() {
+    ///             println!("  Text: {}", drawing.text());
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    pub fn drawing_objects(&self) -> Result<SmallVec<[DrawingObject; 4]>> {
+        parse_drawing_objects(&self.xml_bytes)
+    }
+
+    /// Extract all tracked changes (revisions) from this paragraph.
+    ///
+    /// Returns a vector of `Revision` objects representing all tracked changes
+    /// (insertions, deletions, moves) within this paragraph.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// for para in document.paragraphs()? {
+    ///     for revision in para.revisions()? {
+    ///         println!("Revision by {}: {} - {}",
+    ///             revision.author(),
+    ///             revision.revision_type(),
+    ///             revision.text()
+    ///         );
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    pub fn revisions(&self) -> Result<SmallVec<[Revision; 4]>> {
+        parse_revisions(&self.xml_bytes)
     }
 
     /// Extract paragraph-level OMML formulas.

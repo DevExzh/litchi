@@ -5,24 +5,40 @@ use std::fmt::Write as FmtWrite;
 /// A mutable field in a Word document.
 ///
 /// Fields are dynamic content placeholders such as page numbers, dates, cross-references, etc.
+///
+/// This enum supports both complete fields and individual field characters for complex field structures.
 #[derive(Debug, Clone)]
-pub struct MutableField {
-    /// Field instruction (e.g., "PAGE", "DATE", "REF MyBookmark")
-    instruction: String,
-    /// Field result (optional, the displayed value)
-    result: Option<String>,
-    /// Whether the field is dirty (needs update)
-    dirty: bool,
+pub enum MutableField {
+    /// A complete field with instruction and optional result
+    Complete {
+        /// Field instruction (e.g., "PAGE", "DATE", "REF MyBookmark")
+        instruction: String,
+        /// Field result (optional, the displayed value)
+        result: Option<String>,
+        /// Whether the field is dirty (needs update)
+        dirty: bool,
+    },
+    /// Field begin character
+    Begin,
+    /// Field instruction text
+    Instruction(String),
+    /// Field separate character
+    Separate {
+        /// Whether the field is dirty
+        dirty: bool,
+    },
+    /// Field end character
+    End,
 }
 
 impl MutableField {
-    /// Create a new field.
+    /// Create a new complete field.
     ///
     /// # Arguments
     ///
     /// * `instruction` - The field instruction (e.g., "PAGE", "DATE \\@ \"MMMM d, yyyy\"")
     pub fn new(instruction: String) -> Self {
-        Self {
+        Self::Complete {
             instruction,
             result: None,
             dirty: true,
@@ -36,46 +52,88 @@ impl MutableField {
     /// * `instruction` - The field instruction
     /// * `result` - The current result value
     pub fn with_result(instruction: String, result: String) -> Self {
-        Self {
+        Self::Complete {
             instruction,
             result: Some(result),
             dirty: false,
         }
     }
 
-    /// Get the field instruction.
-    #[inline]
-    pub fn instruction(&self) -> &str {
-        &self.instruction
+    /// Create a field begin character.
+    pub fn begin() -> Self {
+        Self::Begin
     }
 
-    /// Set the field instruction.
-    pub fn set_instruction(&mut self, instruction: String) {
-        self.instruction = instruction;
-        self.dirty = true;
+    /// Create a field instruction.
+    pub fn instruction(text: String) -> Self {
+        Self::Instruction(text)
     }
 
-    /// Get the field result.
-    #[inline]
-    pub fn result(&self) -> Option<&str> {
-        self.result.as_deref()
+    /// Create a field separate character.
+    pub fn separate() -> Self {
+        Self::Separate { dirty: false }
     }
 
-    /// Set the field result.
-    pub fn set_result(&mut self, result: Option<String>) {
-        self.result = result;
-        self.dirty = false;
+    /// Create a field separate character marked as dirty.
+    pub fn separate_dirty() -> Self {
+        Self::Separate { dirty: true }
+    }
+
+    /// Create a field end character.
+    pub fn end() -> Self {
+        Self::End
+    }
+
+    /// Get the field instruction (for Complete fields only).
+    pub fn get_instruction(&self) -> Option<&str> {
+        match self {
+            Self::Complete { instruction, .. } => Some(instruction),
+            Self::Instruction(text) => Some(text),
+            _ => None,
+        }
+    }
+
+    /// Set the field instruction (for Complete fields only).
+    pub fn set_instruction(&mut self, new_instruction: String) {
+        if let Self::Complete {
+            instruction, dirty, ..
+        } = self
+        {
+            *instruction = new_instruction;
+            *dirty = true;
+        }
+    }
+
+    /// Get the field result (for Complete fields only).
+    pub fn get_result(&self) -> Option<&str> {
+        match self {
+            Self::Complete { result, .. } => result.as_deref(),
+            _ => None,
+        }
+    }
+
+    /// Set the field result (for Complete fields only).
+    pub fn set_result(&mut self, new_result: Option<String>) {
+        if let Self::Complete { result, dirty, .. } = self {
+            *result = new_result;
+            *dirty = false;
+        }
     }
 
     /// Check if the field is dirty (needs update).
-    #[inline]
     pub fn is_dirty(&self) -> bool {
-        self.dirty
+        match self {
+            Self::Complete { dirty, .. } | Self::Separate { dirty } => *dirty,
+            _ => false,
+        }
     }
 
-    /// Mark the field as dirty.
+    /// Mark the field as dirty (for Complete fields only).
     pub fn mark_dirty(&mut self) {
-        self.dirty = true;
+        match self {
+            Self::Complete { dirty, .. } | Self::Separate { dirty } => *dirty = true,
+            _ => {},
+        }
     }
 
     /// Generate XML for this field.
@@ -83,30 +141,60 @@ impl MutableField {
     pub(crate) fn to_xml(&self) -> Result<String> {
         let mut xml = String::with_capacity(256);
 
-        // Field begin
-        xml.push_str(r#"<w:fldChar w:fldCharType="begin"/>"#);
+        match self {
+            Self::Complete {
+                instruction,
+                result,
+                dirty,
+            } => {
+                // Field begin
+                xml.push_str(r#"<w:fldChar w:fldCharType="begin"/>"#);
 
-        // Field instruction
-        write!(
-            &mut xml,
-            "</w:r><w:r><w:instrText>{}</w:instrText>",
-            escape_xml(&self.instruction)
-        )?;
+                // Field instruction
+                write!(
+                    &mut xml,
+                    "</w:r><w:r><w:instrText>{}</w:instrText>",
+                    escape_xml(instruction)
+                )?;
 
-        // Separate run
-        if self.dirty {
-            xml.push_str(r#"</w:r><w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/>"#);
-        } else {
-            xml.push_str(r#"</w:r><w:r><w:fldChar w:fldCharType="separate"/>"#);
+                // Separate run
+                if *dirty {
+                    xml.push_str(
+                        r#"</w:r><w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/>"#,
+                    );
+                } else {
+                    xml.push_str(r#"</w:r><w:r><w:fldChar w:fldCharType="separate"/>"#);
+                }
+
+                // Field result
+                if let Some(res) = result {
+                    write!(&mut xml, "</w:r><w:r><w:t>{}</w:t>", escape_xml(res))?;
+                }
+
+                // Field end
+                xml.push_str(r#"</w:r><w:r><w:fldChar w:fldCharType="end"/>"#);
+            },
+            Self::Begin => {
+                xml.push_str(r#"<w:fldChar w:fldCharType="begin"/>"#);
+            },
+            Self::Instruction(text) => {
+                write!(
+                    &mut xml,
+                    r#"<w:instrText xml:space="preserve">{}</w:instrText>"#,
+                    escape_xml(text)
+                )?;
+            },
+            Self::Separate { dirty } => {
+                if *dirty {
+                    xml.push_str(r#"<w:fldChar w:fldCharType="separate" w:dirty="true"/>"#);
+                } else {
+                    xml.push_str(r#"<w:fldChar w:fldCharType="separate"/>"#);
+                }
+            },
+            Self::End => {
+                xml.push_str(r#"<w:fldChar w:fldCharType="end"/>"#);
+            },
         }
-
-        // Field result
-        if let Some(result) = &self.result {
-            write!(&mut xml, "</w:r><w:r><w:t>{}</w:t>", escape_xml(result))?;
-        }
-
-        // Field end
-        xml.push_str(r#"</w:r><w:r><w:fldChar w:fldCharType="end"/>"#);
 
         Ok(xml)
     }
@@ -162,6 +250,20 @@ impl MutableField {
     /// * `url` - The URL to link to
     pub fn hyperlink(url: &str) -> Self {
         Self::new(format!(r#"HYPERLINK "{}""#, url))
+    }
+
+    /// Create a TOC (Table of Contents) field.
+    ///
+    /// # Arguments
+    ///
+    /// * `instruction` - The complete TOC field instruction (e.g., `TOC \o "1-3" \h \z`)
+    /// * `placeholder_text` - Optional placeholder text to display before field update
+    pub fn toc(instruction: String, placeholder_text: Option<String>) -> Self {
+        Self::Complete {
+            instruction,
+            result: placeholder_text,
+            dirty: true,
+        }
     }
 }
 

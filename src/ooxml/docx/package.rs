@@ -96,13 +96,35 @@ impl Package {
         opc.relate_to("word/document.xml", rt::OFFICE_DOCUMENT);
         opc.add_part(Box::new(doc_part));
 
-        // Create styles.xml part
+        // Create styles.xml part with dynamic style generation
         let styles_partname = PackURI::new("/word/styles.xml")
             .map_err(|e| OoxmlError::InvalidUri(format!("styles partname: {}", e)))?;
+
+        // Generate default styles dynamically
+        use crate::ooxml::docx::writer::style::{MutableStyle, generate_styles_xml};
+        let default_styles = vec![
+            MutableStyle::normal(),
+            MutableStyle::heading_1(),
+            MutableStyle::heading_2(),
+            MutableStyle::heading_3(),
+            MutableStyle::title(),
+            MutableStyle::default_paragraph_font(),
+            MutableStyle::toc_heading(),
+            MutableStyle::toc1(),
+            MutableStyle::toc2(),
+            MutableStyle::toc3(),
+            MutableStyle::hyperlink(),
+            MutableStyle::header(),
+            MutableStyle::footer(),
+            MutableStyle::footnote_text(),
+            MutableStyle::endnote_text(),
+        ];
+        let styles_xml = generate_styles_xml(&default_styles)?;
+
         let styles_part = BlobPart::new(
             styles_partname.clone(),
             ct::WML_STYLES.to_string(),
-            template::default_styles_xml().as_bytes().to_vec(),
+            styles_xml.as_bytes().to_vec(),
         );
 
         // Add relationship from document to styles (use relative path)
@@ -468,8 +490,11 @@ impl Package {
         use crate::ooxml::opc::constants::relationship_type as rt;
 
         // If we have a mutable document, update the document.xml part
-        if let Some(mutable_doc) = self.mutable_doc.take() {
+        if let Some(mut mutable_doc) = self.mutable_doc.take() {
             if mutable_doc.is_modified() {
+                // Generate TOC if configured (must happen before serialization)
+                mutable_doc.generate_toc_if_needed()?;
+
                 // Step 1: Collect all content that needs relationships
                 let hyperlink_urls = mutable_doc.collect_hyperlink_urls();
                 let images = mutable_doc.collect_images();
@@ -545,7 +570,12 @@ impl Package {
                 }
 
                 // Add header/footer parts and relationships
-                if has_header && let Some(header_xml) = mutable_doc.generate_header_xml()? {
+                // Note: If watermark exists, headers will be handled by update_watermark_headers
+                // which merges user content with watermark
+                if has_header
+                    && !mutable_doc.has_watermark()
+                    && let Some(header_xml) = mutable_doc.generate_header_xml()?
+                {
                     let header_uri = PackURI::new("/word/header1.xml")
                         .map_err(|e| OoxmlError::InvalidUri(format!("header URI: {}", e)))?;
                     let header_part = BlobPart::new(
@@ -554,7 +584,8 @@ impl Package {
                         header_xml.into_bytes(),
                     );
                     self.opc.add_part(Box::new(header_part));
-                    let rid = temp_part.relate_to("/word/header1.xml", rt::HEADER);
+                    // Use relative path for relationship (relative to document.xml location)
+                    let rid = temp_part.relate_to("header1.xml", rt::HEADER);
                     rel_mapper.set_header_id(rid);
                 }
 
@@ -567,8 +598,112 @@ impl Package {
                         footer_xml.into_bytes(),
                     );
                     self.opc.add_part(Box::new(footer_part));
-                    let rid = temp_part.relate_to("/word/footer1.xml", rt::FOOTER);
+                    // Use relative path for relationship (relative to document.xml location)
+                    let rid = temp_part.relate_to("footer1.xml", rt::FOOTER);
                     rel_mapper.set_footer_id(rid);
+                }
+
+                // Add footnotes parts and relationships BEFORE document XML generation
+                if let Some(footnotes_xml) = mutable_doc.generate_footnotes_xml()? {
+                    let footnotes_uri = PackURI::new("/word/footnotes.xml")
+                        .map_err(|e| OoxmlError::InvalidUri(format!("footnotes URI: {}", e)))?;
+                    let footnotes_part = BlobPart::new(
+                        footnotes_uri,
+                        ct::WML_FOOTNOTES.to_string(),
+                        footnotes_xml.into_bytes(),
+                    );
+                    self.opc.add_part(Box::new(footnotes_part));
+                    let rid = temp_part.relate_to("footnotes.xml", rt::FOOTNOTES);
+                    rel_mapper.set_footnotes_id(rid);
+                }
+
+                // Add endnotes parts and relationships BEFORE document XML generation
+                if let Some(endnotes_xml) = mutable_doc.generate_endnotes_xml()? {
+                    let endnotes_uri = PackURI::new("/word/endnotes.xml")
+                        .map_err(|e| OoxmlError::InvalidUri(format!("endnotes URI: {}", e)))?;
+                    let endnotes_part = BlobPart::new(
+                        endnotes_uri,
+                        ct::WML_ENDNOTES.to_string(),
+                        endnotes_xml.into_bytes(),
+                    );
+                    self.opc.add_part(Box::new(endnotes_part));
+                    let rid = temp_part.relate_to("endnotes.xml", rt::ENDNOTES);
+                    rel_mapper.set_endnotes_id(rid);
+                }
+
+                // Handle watermark headers before generating document XML
+                // This ensures header relationships are properly set up
+                if mutable_doc.has_watermark() {
+                    // Generate user header content if exists (will be merged with watermark)
+                    let user_header_content = if mutable_doc.has_header() {
+                        mutable_doc.generate_header_xml()?
+                    } else {
+                        None
+                    };
+
+                    // Create three headers (default, first, even) with watermark
+                    let header_types = [
+                        ("/word/header1.xml", "header1.xml"),
+                        ("/word/header2.xml", "header2.xml"),
+                        ("/word/header3.xml", "header3.xml"),
+                    ];
+
+                    for (idx, (header_uri_path, header_filename)) in header_types.iter().enumerate()
+                    {
+                        if let Some(wm) = mutable_doc.watermark.as_ref() {
+                            let watermark_xml = wm.to_header_xml((idx + 1) as u32)?;
+
+                            // Merge user header content with watermark for the default header
+                            let header_xml = if idx == 0
+                                && let Some(ref user_content) = user_header_content
+                            {
+                                // Extract user paragraphs from the <w:hdr>...</w:hdr> wrapper
+                                let user_paragraphs = if let Some(start) = user_content.find("<w:p")
+                                {
+                                    if let Some(end) = user_content.rfind("</w:hdr>") {
+                                        &user_content[start..end]
+                                    } else {
+                                        ""
+                                    }
+                                } else {
+                                    ""
+                                };
+
+                                // Combine watermark and user content
+                                format!(
+                                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">{}{}</w:hdr>"#,
+                                    watermark_xml, user_paragraphs
+                                )
+                            } else {
+                                // Just watermark for first and even headers
+                                format!(
+                                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">{}</w:hdr>"#,
+                                    watermark_xml
+                                )
+                            };
+
+                            let header_uri = PackURI::new(*header_uri_path).map_err(|e| {
+                                OoxmlError::InvalidUri(format!("header URI: {}", e))
+                            })?;
+
+                            let header_part = BlobPart::new(
+                                header_uri,
+                                ct::WML_HEADER.to_string(),
+                                header_xml.into_bytes(),
+                            );
+
+                            self.opc.add_part(Box::new(header_part));
+
+                            // Add relationship for the default header
+                            if idx == 0 {
+                                let rid = temp_part.relate_to(header_filename, rt::HEADER);
+                                rel_mapper.set_header_id(rid);
+                            } else {
+                                // Other headers are added but not set in rel_mapper (they're referenced in sectPr)
+                                temp_part.relate_to(header_filename, rt::HEADER);
+                            }
+                        }
+                    }
                 }
 
                 // Step 3: Generate XML with actual relationship IDs
@@ -578,14 +713,21 @@ impl Package {
                 temp_part.set_blob(xml.into_bytes());
                 self.opc.add_part(Box::new(temp_part));
 
-                // Update footnotes if present
-                if let Some(footnotes_xml) = mutable_doc.generate_footnotes_xml()? {
-                    self.update_footnotes_part(footnotes_xml)?;
+                // Note: Footnotes and endnotes are already handled above (before document XML generation)
+                // so they appear in sectPr with proper relationship IDs
+
+                // Update comments if present
+                if let Some(comments_xml) = mutable_doc.generate_comments_xml()? {
+                    self.update_comments_part(comments_xml)?;
                 }
 
-                // Update endnotes if present
-                if let Some(endnotes_xml) = mutable_doc.generate_endnotes_xml()? {
-                    self.update_endnotes_part(endnotes_xml)?;
+                // Update settings.xml with protection if modified
+                let settings_xml = mutable_doc.generate_settings_xml()?;
+                self.update_settings_part(settings_xml)?;
+
+                // Update theme if present
+                if let Some(theme_xml) = mutable_doc.generate_theme_xml()? {
+                    self.update_theme_part(theme_xml)?;
                 }
             }
             // Put the document back
@@ -736,6 +878,7 @@ impl Package {
     }
 
     /// Update the footnotes.xml part with new content.
+    #[allow(unused)] // Kept for future use
     fn update_footnotes_part(&mut self, xml: String) -> Result<()> {
         use crate::ooxml::opc::constants::content_type as ct;
         use crate::ooxml::opc::constants::relationship_type as rt;
@@ -750,18 +893,19 @@ impl Package {
         // Add the footnotes part
         self.opc.add_part(Box::new(footnotes_part));
 
-        // Create relationship from document to footnotes
+        // Create relationship from document to footnotes (use relative path)
         let doc_uri = PackURI::new("/word/document.xml")
             .map_err(|e| OoxmlError::InvalidUri(format!("document URI: {}", e)))?;
 
         if let Ok(doc_part) = self.opc.get_part_mut(&doc_uri) {
-            let _ = doc_part.relate_to("/word/footnotes.xml", rt::FOOTNOTES);
+            let _ = doc_part.relate_to("footnotes.xml", rt::FOOTNOTES);
         }
 
         Ok(())
     }
 
     /// Update the endnotes.xml part with new content.
+    #[allow(unused)] // Kept for future use
     fn update_endnotes_part(&mut self, xml: String) -> Result<()> {
         use crate::ooxml::opc::constants::content_type as ct;
         use crate::ooxml::opc::constants::relationship_type as rt;
@@ -776,12 +920,180 @@ impl Package {
         // Add the endnotes part
         self.opc.add_part(Box::new(endnotes_part));
 
-        // Create relationship from document to endnotes
+        // Create relationship from document to endnotes (use relative path)
         let doc_uri = PackURI::new("/word/document.xml")
             .map_err(|e| OoxmlError::InvalidUri(format!("document URI: {}", e)))?;
 
         if let Ok(doc_part) = self.opc.get_part_mut(&doc_uri) {
-            let _ = doc_part.relate_to("/word/endnotes.xml", rt::ENDNOTES);
+            let _ = doc_part.relate_to("endnotes.xml", rt::ENDNOTES);
+        }
+
+        Ok(())
+    }
+
+    /// Update or create the comments part with the given XML content.
+    fn update_comments_part(&mut self, xml: String) -> Result<()> {
+        use crate::ooxml::opc::constants::content_type as ct;
+        use crate::ooxml::opc::constants::relationship_type as rt;
+        use crate::ooxml::opc::part::BlobPart;
+
+        let comments_uri = PackURI::new("/word/comments.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("comments URI: {}", e)))?;
+
+        let content_type = ct::WML_COMMENTS.to_string();
+        let comments_part = BlobPart::new(comments_uri.clone(), content_type, xml.into_bytes());
+
+        // Add the comments part
+        self.opc.add_part(Box::new(comments_part));
+
+        // Create relationship from document to comments
+        let doc_uri = PackURI::new("/word/document.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("document URI: {}", e)))?;
+
+        if let Ok(doc_part) = self.opc.get_part_mut(&doc_uri) {
+            let _ = doc_part.relate_to("/word/comments.xml", rt::COMMENTS);
+        }
+
+        Ok(())
+    }
+
+    /// Update the settings.xml part with new content.
+    fn update_settings_part(&mut self, xml: String) -> Result<()> {
+        use crate::ooxml::opc::constants::content_type as ct;
+        use crate::ooxml::opc::part::BlobPart;
+
+        let settings_uri = PackURI::new("/word/settings.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("settings URI: {}", e)))?;
+
+        let content_type = ct::WML_SETTINGS.to_string();
+        let settings_part = BlobPart::new(settings_uri, content_type, xml.into_bytes());
+
+        // Add/replace the settings part
+        self.opc.add_part(Box::new(settings_part));
+
+        Ok(())
+    }
+
+    fn update_theme_part(&mut self, xml: String) -> Result<()> {
+        use crate::ooxml::opc::part::BlobPart;
+
+        let theme_uri = PackURI::new("/word/theme/theme1.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("theme URI: {}", e)))?;
+
+        let content_type = "application/vnd.openxmlformats-officedocument.theme+xml".to_string();
+        let theme_part = BlobPart::new(theme_uri.clone(), content_type, xml.into_bytes());
+
+        // Add/replace the theme part
+        self.opc.add_part(Box::new(theme_part));
+
+        // Add relationship from document to theme if not exists
+        let doc_uri = PackURI::new("/word/document.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("document URI: {}", e)))?;
+
+        if let Ok(doc_part) = self.opc.get_part_mut(&doc_uri) {
+            // Check if theme relationship already exists
+            let has_theme_rel = doc_part.rels().iter().any(|rel| {
+                rel.reltype()
+                    == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme"
+            });
+
+            if !has_theme_rel {
+                doc_part.relate_to(
+                    "theme/theme1.xml",
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    #[allow(unused)] // Kept for future use
+    fn update_watermark_headers(
+        &mut self,
+        mutable_doc: &crate::ooxml::docx::writer::MutableDocument,
+    ) -> Result<()> {
+        use crate::ooxml::opc::constants::content_type as ct;
+        use crate::ooxml::opc::constants::relationship_type as rt;
+        use crate::ooxml::opc::part::BlobPart;
+
+        // Get watermark if present
+        // Access watermark through a temporary reference
+        let has_watermark = mutable_doc.has_watermark();
+        if !has_watermark {
+            return Ok(());
+        }
+
+        // Get user header content if it exists
+        let user_header_content = if mutable_doc.has_header() {
+            mutable_doc.generate_header_xml()?
+        } else {
+            None
+        };
+
+        // Create three headers (default, first, even) with watermark
+        let header_types = [
+            ("/word/header1.xml", "default"),
+            ("/word/header2.xml", "first"),
+            ("/word/header3.xml", "even"),
+        ];
+
+        let doc_uri = PackURI::new("/word/document.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("document URI: {}", e)))?;
+
+        for (idx, (header_path, _header_type)) in header_types.iter().enumerate() {
+            // Generate watermark XML for this header - need to get watermark again each iteration
+            let watermark_xml = if let Some(wm) = mutable_doc.watermark.as_ref() {
+                wm.to_header_xml((idx + 1) as u32)?
+            } else {
+                continue;
+            };
+
+            // Merge user header content with watermark for the default header
+            let header_xml = if idx == 0
+                && let Some(ref user_content) = user_header_content
+            {
+                // Extract user paragraphs from the <w:hdr>...</w:hdr> wrapper
+                let user_paragraphs = if let Some(start) = user_content.find("<w:p") {
+                    if let Some(end) = user_content.rfind("</w:hdr>") {
+                        &user_content[start..end]
+                    } else {
+                        ""
+                    }
+                } else {
+                    ""
+                };
+
+                // Combine watermark and user content
+                format!(
+                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">{}{}</w:hdr>"#,
+                    watermark_xml, user_paragraphs
+                )
+            } else {
+                // Just watermark for first and even headers
+                format!(
+                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">{}</w:hdr>"#,
+                    watermark_xml
+                )
+            };
+
+            let header_uri = PackURI::new(*header_path)
+                .map_err(|e| OoxmlError::InvalidUri(format!("header URI: {}", e)))?;
+
+            let header_part = BlobPart::new(
+                header_uri,
+                ct::WML_HEADER.to_string(),
+                header_xml.into_bytes(),
+            );
+
+            self.opc.add_part(Box::new(header_part));
+
+            // Add relationship from document to header (use relative path)
+            // Extract filename from the absolute path (e.g., "/word/header1.xml" -> "header1.xml")
+            let header_filename = header_path.rsplit('/').next().unwrap_or(header_path);
+            if let Ok(doc_part) = self.opc.get_part_mut(&doc_uri) {
+                doc_part.relate_to(header_filename, rt::HEADER);
+            }
         }
 
         Ok(())

@@ -13,6 +13,10 @@ use crate::ooxml::docx::paragraph::Paragraph;
 use crate::ooxml::docx::parts::DocumentPart;
 use crate::ooxml::docx::section::{Section, Sections};
 use crate::ooxml::docx::settings::DocumentSettings;
+use crate::ooxml::docx::statistics::{
+    DocumentStatistics, count_characters, count_characters_no_spaces, count_words,
+    estimate_line_count, estimate_page_count,
+};
 use crate::ooxml::docx::styles::Styles;
 use crate::ooxml::docx::table::Table;
 use crate::ooxml::docx::theme::Theme;
@@ -1254,6 +1258,67 @@ impl<'a> Document<'a> {
         Ok(custom_parts)
     }
 
+    /// Get document statistics.
+    ///
+    /// Calculates comprehensive statistics about the document including
+    /// word count, character count, paragraph count, and other metrics.
+    ///
+    /// # Performance
+    ///
+    /// Statistics are calculated on-demand by parsing the entire document.
+    /// For large documents, consider caching the result if you need to
+    /// access statistics multiple times.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::docx::Package;
+    ///
+    /// let pkg = Package::open("document.docx")?;
+    /// let doc = pkg.document()?;
+    ///
+    /// let stats = doc.statistics()?;
+    /// println!("Words: {}", stats.word_count());
+    /// println!("Characters: {}", stats.character_count());
+    /// println!("Paragraphs: {}", stats.paragraph_count());
+    /// println!("Pages (estimate): {}", stats.page_count());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn statistics(&self) -> Result<DocumentStatistics> {
+        let mut stats = DocumentStatistics::new();
+
+        // Get all text content
+        let text = self.text()?;
+
+        // Calculate text statistics
+        stats.set_word_count(count_words(&text));
+        stats.set_character_count(count_characters(&text));
+        stats.set_character_count_no_spaces(count_characters_no_spaces(&text));
+
+        // Get paragraph and table counts
+        stats.set_paragraph_count(self.paragraph_count()?);
+        stats.set_table_count(self.table_count()?);
+
+        // Estimate lines and pages (80 chars/line, 45 lines/page)
+        let line_count = estimate_line_count(&text, 80);
+        stats.set_line_count(line_count);
+        stats.set_page_count(estimate_page_count(line_count, 45));
+
+        // Count images and drawings across all paragraphs
+        let mut image_count = 0;
+        let mut drawing_count = 0;
+
+        for para in self.paragraphs()? {
+            image_count += para.images()?.len();
+            drawing_count += para.drawing_objects()?.len();
+        }
+
+        stats.set_image_count(image_count);
+        stats.set_drawing_count(drawing_count);
+
+        Ok(stats)
+    }
+
     // ========================================
     // READING FEATURES - ALL IMPLEMENTED ✅
     // ========================================
@@ -1271,16 +1336,17 @@ impl<'a> Document<'a> {
     // ✅ Numbering: numbering() with abstract numbering and instances
     // ✅ Document Settings: settings(), is_protected()
     // ✅ Document Variables: document_variables()
+    // ✅ Statistics: statistics() with word/character/page counts
     // ✅ Theme: theme() with color and font schemes
     // ✅ Content Controls: content_controls()
     // ✅ Custom XML: custom_xml_parts()
     // ✅ Search: search(), search_ignore_case()
     //
     // ========================================
-    // WRITE OPERATIONS - TODO
+    // WRITE OPERATIONS
     // ========================================
-    // These are complex write operations that modify the document structure.
-    // They require careful XML manipulation and relationship management.
+    // Note: Write operations are primarily handled by the MutableDocument API
+    // in the writer module. See src/ooxml/docx/writer/doc.rs for full API.
     //
     // TODO: Modification operations
     // - Add/remove paragraphs: add_paragraph(), remove_paragraph()
@@ -1288,37 +1354,38 @@ impl<'a> Document<'a> {
     // - Modify runs: set_bold(), set_italic(), set_font(), set_color()
     // - Insert elements: insert_paragraph(), insert_table()
     //
-    // TODO: Track changes
-    // - enable_track_changes(), disable_track_changes()
-    // - get_revisions(), accept_revision(), reject_revision()
-    // - get_revision_info(), get_revision_author()
+    // ✅ COMPLETED: Track changes reading (November 2024)
+    // - See revision.rs module and Paragraph::revisions() method
+    // - Full support for insert, delete, move, and format revisions
+    // - Includes author, date, and revision ID tracking
     //
-    // TODO: Table of contents
+    // TODO: Table of contents (MS-DOCX Section 17.16.5)
+    // - Requires parsing w:sdt elements with w:docPartGallery="Table of Contents"
     // - insert_toc(), update_toc(), remove_toc()
-    // - set_toc_styles(), get_toc_entries()
     //
-    // TODO: Mail merge
+    // TODO: Mail merge fields (MS-DOCX Section 17.16.5.35)
+    // - Requires parsing w:fldSimple and w:fldChar elements with MERGEFIELD
     // - execute_mail_merge(), get_merge_fields()
-    // - add_merge_field(), set_merge_data()
     //
-    // TODO: Page/Section breaks
-    // - insert_page_break(), get_page_breaks()
-    // - insert_section_break(), get_section_breaks()
-    // - remove_break()
+    // TODO: Page/Section breaks (MS-DOCX Section 17.3.3.3)
+    // - Partially supported via Section API, advanced break types pending
+    // - insert_page_break(), insert_section_break()
     //
-    // TODO: Watermarks
+    // TODO: Watermarks (MS-DOCX Section 17.10.2)
+    // - Requires parsing VML shapes in headers with watermark styling
     // - add_watermark(), remove_watermark()
-    // - set_watermark_text(), set_watermark_image()
     //
-    // TODO: Images (reading)
-    // - get_images(), image_count()
-    // - extract_image(), get_image_properties()
+    // ✅ COMPLETED: Images reading (November 2024)
+    // - See image.rs module and Paragraph::images() method
+    // - Full support for inline images with lazy loading
     //
-    // TODO: Drawing objects (reading)
-    // - get_shapes(), shape_count()
-    // - get_text_boxes(), get_diagrams()
+    // ✅ COMPLETED: Drawing objects - shapes, text boxes (November 2024)
+    // - See drawing.rs module and Paragraph::drawing_objects() method
+    // - Full support for shapes, text boxes, inline/anchored positions
+    // - 20+ standard shape types (rectangle, ellipse, arrows, etc.)
     //
-    // TODO: Smart tags
+    // TODO: Smart tags (MS-DOCX Section 17.5.1)
+    // - Requires parsing w:smartTag elements with namespace URIs
     // - get_smart_tags(), add_smart_tag(), remove_smart_tag()
 }
 

@@ -5,6 +5,8 @@ use std::fmt::Write as FmtWrite;
 // Import shared format types
 pub use super::super::format::{LineSpacing, ParagraphAlignment};
 // Import other writer types
+use super::bookmark::MutableBookmark;
+use super::field::MutableField;
 use super::hyperlink::MutableHyperlink;
 use super::image::MutableInlineImage;
 use super::run::MutableRun;
@@ -24,6 +26,12 @@ pub(crate) enum ParagraphElement {
     Run(MutableRun),
     Hyperlink(MutableHyperlink),
     InlineImage(MutableInlineImage),
+    /// Bookmark start marker
+    BookmarkStart(MutableBookmark),
+    /// Bookmark end marker (ID only)
+    BookmarkEnd(u32),
+    /// Field
+    Field(MutableField),
 }
 
 /// A mutable paragraph in a document.
@@ -73,7 +81,12 @@ impl MutableParagraph {
     }
 
     /// Add a hyperlink to the paragraph.
-    pub fn add_hyperlink(&mut self, text: &str, url: &str) -> &mut MutableHyperlink {
+    ///
+    /// # Arguments
+    ///
+    /// * `url` - The URL to link to
+    /// * `text` - The display text for the hyperlink
+    pub fn add_hyperlink(&mut self, url: &str, text: &str) -> &mut MutableHyperlink {
         self.elements
             .push(ParagraphElement::Hyperlink(MutableHyperlink::new(
                 url.to_string(),  // URL first (matches MutableHyperlink::new signature)
@@ -117,6 +130,60 @@ impl MutableParagraph {
         }
     }
 
+    /// Add a bookmark start marker.
+    ///
+    /// Bookmarks mark named locations in the document. You must call `add_bookmark_end`
+    /// with the same ID after adding content to close the bookmark.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique bookmark ID (must be unique within the document)
+    /// * `name` - Bookmark name (for cross-referencing)
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// para.add_bookmark_start(1, "MyBookmark");
+    /// para.add_run_with_text("Bookmarked text");
+    /// para.add_bookmark_end(1);
+    /// ```
+    pub fn add_bookmark_start(&mut self, id: u32, name: &str) {
+        let bookmark = MutableBookmark::new(id, name.to_string());
+        self.elements
+            .push(ParagraphElement::BookmarkStart(bookmark));
+    }
+
+    /// Add a bookmark end marker.
+    ///
+    /// This closes a bookmark started with `add_bookmark_start`.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - ID of the bookmark to close (must match a previous bookmark start)
+    pub fn add_bookmark_end(&mut self, id: u32) {
+        self.elements.push(ParagraphElement::BookmarkEnd(id));
+    }
+
+    /// Add a field to the paragraph.
+    ///
+    /// Fields are dynamic content like page numbers, dates, cross-references, etc.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// // Add a page number field
+    /// para.add_field(MutableField::page());
+    ///
+    /// // Add a date field
+    /// para.add_field(MutableField::date(Some("MMMM d, yyyy")));
+    ///
+    /// // Add a cross-reference field
+    /// para.add_field(MutableField::reference("MyBookmark"));
+    /// ```
+    pub fn add_field(&mut self, field: MutableField) {
+        self.elements.push(ParagraphElement::Field(field));
+    }
+
     /// Set the paragraph style.
     pub fn set_style(&mut self, style_id: &str) {
         self.style = Some(style_id.to_string());
@@ -144,7 +211,7 @@ impl MutableParagraph {
 
     /// Set left indentation (in inches).
     pub fn set_indent_left(&mut self, inches: f64) {
-        self.properties.indent_left = Some((inches * 1440.0) as u32);
+        self.properties.indent_left = Some((inches * 1440.0) as i32);
     }
 
     /// Set right indentation (in inches).
@@ -167,10 +234,10 @@ impl MutableParagraph {
         let num_id = match list_type {
             ListType::Bullet => 1,       // References abstractNumId 8 (bullet)
             ListType::Decimal => 9,      // References abstractNumId 0 (decimal)
-            ListType::LowerLetter => 10, // TODO: Add to numbering.xml
-            ListType::UpperLetter => 11, // TODO: Add to numbering.xml
-            ListType::LowerRoman => 12,  // TODO: Add to numbering.xml
-            ListType::UpperRoman => 13,  // TODO: Add to numbering.xml
+            ListType::LowerLetter => 10, // References abstractNumId 9 (lower letter a, b, c)
+            ListType::UpperLetter => 11, // References abstractNumId 10 (upper letter A, B, C)
+            ListType::LowerRoman => 12,  // References abstractNumId 11 (lower roman i, ii, iii)
+            ListType::UpperRoman => 13,  // References abstractNumId 12 (upper roman I, II, III)
         };
 
         self.properties.numbering = Some(NumberingProperties {
@@ -290,10 +357,28 @@ impl MutableParagraph {
                 xml.push_str("/>");
             }
 
+            // Write tab stops
+            if !self.properties.tab_stops.is_empty() {
+                xml.push_str("<w:tabs>");
+                for tab_stop in &self.properties.tab_stops {
+                    xml.push_str("<w:tab");
+                    write!(xml, " w:val=\"{}\"", escape_xml(&tab_stop.alignment))
+                        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                    write!(xml, " w:pos=\"{}\"", tab_stop.position)
+                        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                    if let Some(ref leader) = tab_stop.leader {
+                        write!(xml, " w:leader=\"{}\"", escape_xml(leader))
+                            .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                    }
+                    xml.push_str("/>");
+                }
+                xml.push_str("</w:tabs>");
+            }
+
             xml.push_str("</w:pPr>");
         }
 
-        // Write elements (runs and hyperlinks)
+        // Write elements (runs, hyperlinks, bookmarks, fields)
         // Use placeholders for relationship IDs that will be replaced after relationships are created
         let mut hyperlink_idx = 0;
         let mut image_idx = 0;
@@ -302,7 +387,7 @@ impl MutableParagraph {
                 ParagraphElement::Run(run) => run.to_xml(xml)?,
                 ParagraphElement::Hyperlink(hyperlink) => {
                     let placeholder = format!("{{{{HYPERLINK_{}}}}}", hyperlink_idx);
-                    hyperlink.to_xml(xml, &placeholder)?;
+                    hyperlink.to_xml(xml, Some(&placeholder))?;
                     hyperlink_idx += 1;
                 },
                 ParagraphElement::InlineImage(image) => {
@@ -311,6 +396,20 @@ impl MutableParagraph {
                     image.to_xml(xml, &placeholder)?;
                     xml.push_str("</w:r>");
                     image_idx += 1;
+                },
+                ParagraphElement::BookmarkStart(bookmark) => {
+                    let start_xml = bookmark.to_xml_start()?;
+                    xml.push_str(&start_xml);
+                },
+                ParagraphElement::BookmarkEnd(id) => {
+                    write!(xml, r#"<w:bookmarkEnd w:id="{}"/>"#, id)
+                        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                },
+                ParagraphElement::Field(field) => {
+                    xml.push_str("<w:r>");
+                    let field_xml = field.to_xml()?;
+                    xml.push_str(&field_xml);
+                    xml.push_str("</w:r>");
                 },
             }
         }
@@ -430,6 +529,24 @@ impl MutableParagraph {
                 xml.push_str("/>");
             }
 
+            // Write tab stops
+            if !self.properties.tab_stops.is_empty() {
+                xml.push_str("<w:tabs>");
+                for tab_stop in &self.properties.tab_stops {
+                    xml.push_str("<w:tab");
+                    write!(xml, " w:val=\"{}\"", escape_xml(&tab_stop.alignment))
+                        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                    write!(xml, " w:pos=\"{}\"", tab_stop.position)
+                        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                    if let Some(ref leader) = tab_stop.leader {
+                        write!(xml, " w:leader=\"{}\"", escape_xml(leader))
+                            .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                    }
+                    xml.push_str("/>");
+                }
+                xml.push_str("</w:tabs>");
+            }
+
             xml.push_str("</w:pPr>");
         }
 
@@ -439,14 +556,35 @@ impl MutableParagraph {
             match element {
                 ParagraphElement::Run(run) => run.to_xml(xml)?,
                 ParagraphElement::Hyperlink(hyperlink) => {
-                    if let Some(rel_id) = rel_mapper.get_hyperlink_id(*hyperlink_counter) {
-                        hyperlink.to_xml(xml, rel_id)?;
+                    // Only external hyperlinks (with URLs) need relationship IDs and counter increment
+                    // Internal anchor hyperlinks (TOC) don't have URLs and don't need r:id
+                    if hyperlink.url.is_some() {
+                        if let Some(rel_id) = rel_mapper.get_hyperlink_id(*hyperlink_counter) {
+                            hyperlink.to_xml(xml, Some(rel_id))?;
+                        } else {
+                            // Fallback to placeholder if ID not found (shouldn't happen)
+                            let placeholder = format!("{{{{HYPERLINK_{}}}}}", *hyperlink_counter);
+                            hyperlink.to_xml(xml, Some(&placeholder))?;
+                        }
+                        *hyperlink_counter += 1; // Only increment for external hyperlinks
                     } else {
-                        // Fallback to placeholder if ID not found (shouldn't happen)
-                        let placeholder = format!("{{{{HYPERLINK_{}}}}}", *hyperlink_counter);
-                        hyperlink.to_xml(xml, &placeholder)?;
+                        // Internal anchor hyperlink (no URL, only anchor)
+                        hyperlink.to_xml(xml, None)?;
                     }
-                    *hyperlink_counter += 1;
+                },
+                ParagraphElement::BookmarkStart(bookmark) => {
+                    let start_xml = bookmark.to_xml_start()?;
+                    xml.push_str(&start_xml);
+                },
+                ParagraphElement::BookmarkEnd(id) => {
+                    write!(xml, r#"<w:bookmarkEnd w:id="{}"/>"#, id)
+                        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                },
+                ParagraphElement::Field(field) => {
+                    xml.push_str("<w:r>");
+                    let field_xml = field.to_xml()?;
+                    xml.push_str(&field_xml);
+                    xml.push_str("</w:r>");
                 },
                 ParagraphElement::InlineImage(image) => {
                     xml.push_str("<w:r>");
@@ -468,6 +606,14 @@ impl MutableParagraph {
     }
 }
 
+/// Tab stop definition for paragraphs.
+#[derive(Debug, Clone)]
+pub(crate) struct TabStop {
+    pub(crate) position: u32,
+    pub(crate) alignment: String,
+    pub(crate) leader: Option<String>,
+}
+
 /// Paragraph properties.
 #[derive(Debug, Default)]
 pub(crate) struct ParagraphProperties {
@@ -476,9 +622,10 @@ pub(crate) struct ParagraphProperties {
     pub(crate) space_before: Option<u32>,
     pub(crate) space_after: Option<u32>,
     pub(crate) line_spacing: Option<LineSpacing>,
-    pub(crate) indent_left: Option<u32>,
+    pub(crate) indent_left: Option<i32>,
     pub(crate) indent_right: Option<u32>,
     pub(crate) indent_first_line: Option<i32>,
+    pub(crate) tab_stops: Vec<TabStop>,
 }
 
 impl ParagraphProperties {
@@ -491,6 +638,7 @@ impl ParagraphProperties {
             || self.indent_left.is_some()
             || self.indent_right.is_some()
             || self.indent_first_line.is_some()
+            || !self.tab_stops.is_empty()
     }
 }
 

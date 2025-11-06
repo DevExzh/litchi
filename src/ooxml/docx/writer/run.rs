@@ -59,6 +59,14 @@ impl MutableRun {
         self.content = RunContent::Text(text.to_string());
     }
 
+    /// Get the text content.
+    pub fn get_text(&self) -> String {
+        match &self.content {
+            RunContent::Text(s) => s.clone(),
+            _ => String::new(),
+        }
+    }
+
     /// Make the text bold.
     pub fn bold(&mut self, bold: bool) -> &mut Self {
         self.properties.bold = Some(bold);
@@ -192,6 +200,14 @@ impl MutableRun {
                     .map_err(|e| OoxmlError::Xml(e.to_string()))?;
             }
 
+            if self.properties.no_proof {
+                xml.push_str("<w:noProof/>");
+            }
+
+            if self.properties.web_hidden {
+                xml.push_str("<w:webHidden/>");
+            }
+
             xml.push_str("</w:rPr>");
         }
 
@@ -306,6 +322,8 @@ pub(crate) struct RunProperties {
     pub(crate) color: Option<String>,
     pub(crate) highlight: Option<String>,
     pub(crate) has_break: bool,
+    pub(crate) no_proof: bool,
+    pub(crate) web_hidden: bool,
 }
 
 impl RunProperties {
@@ -317,5 +335,7 @@ impl RunProperties {
             || self.font_name.is_some()
             || self.color.is_some()
             || self.highlight.is_some()
+            || self.no_proof
+            || self.web_hidden
     }
 }

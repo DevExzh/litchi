@@ -5,10 +5,16 @@ use std::fmt::Write as FmtWrite;
 // Import shared format types
 pub use super::super::format::ImageFormat;
 // Import from other writer modules
+use super::comment::MutableComment;
 use super::note::Note;
 use super::paragraph::{MutableParagraph, ParagraphElement};
 use super::section::SectionProperties;
 use super::table::MutableTable;
+use super::theme::MutableTheme;
+use super::toc::TableOfContents;
+use super::watermark::Watermark;
+// Import settings types
+use super::super::settings::ProtectionType;
 
 /// A mutable Word document for writing and modification.
 ///
@@ -25,10 +31,31 @@ pub struct MutableDocument {
     footnotes: Vec<Note>,
     /// Endnotes (ID -> Note)
     endnotes: Vec<Note>,
+    /// Comments (ID -> Comment)
+    comments: Vec<MutableComment>,
+    /// Document protection settings
+    protection: Option<DocumentProtection>,
     /// Section properties (page setup, margins, orientation)
     section: SectionProperties,
+    /// Theme (optional)
+    theme: Option<MutableTheme>,
+    /// Watermark (optional)
+    pub(crate) watermark: Option<Watermark>,
+    /// Table of Contents configuration (optional)
+    toc_config: Option<(usize, TableOfContents)>, // (insertion index, config)
     /// Whether the document has been modified
     modified: bool,
+}
+
+/// Document protection settings.
+#[derive(Debug, Clone)]
+pub struct DocumentProtection {
+    /// Type of protection
+    pub protection_type: ProtectionType,
+    /// Password hash (optional, for actual enforcement)
+    pub password_hash: Option<String>,
+    /// Salt for password hash (optional)
+    pub salt: Option<String>,
 }
 
 impl MutableDocument {
@@ -40,7 +67,12 @@ impl MutableDocument {
             footer: None,
             footnotes: Vec::new(),
             endnotes: Vec::new(),
+            comments: Vec::new(),
+            protection: None,
+            toc_config: None,
             section: SectionProperties::default(),
+            theme: None,
+            watermark: None,
             modified: false,
         }
     }
@@ -50,11 +82,16 @@ impl MutableDocument {
         let body = DocumentBody::from_xml(xml)?;
         Ok(Self {
             body,
+            toc_config: None,
             header: None,
             footer: None,
             footnotes: Vec::new(),
             endnotes: Vec::new(),
+            comments: Vec::new(),
+            protection: None,
             section: SectionProperties::default(),
+            theme: None,
+            watermark: None,
             modified: false,
         })
     }
@@ -207,6 +244,393 @@ impl MutableDocument {
         !self.endnotes.is_empty()
     }
 
+    /// Add a comment and return its ID and mutable reference.
+    ///
+    /// # Arguments
+    ///
+    /// * `author` - Comment author name
+    /// * `text` - Comment text content
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// let (comment_id, comment) = doc.add_comment("John Doe", "This needs revision");
+    /// comment.set_initials(Some("JD".to_string()));
+    /// ```
+    pub fn add_comment(&mut self, author: &str, text: &str) -> (u32, &mut MutableComment) {
+        let id = self.comments.len() as u32 + 1;
+        let comment = MutableComment::new(id, author.to_string(), text.to_string());
+        self.comments.push(comment);
+        self.modified = true;
+        (id, self.comments.last_mut().unwrap())
+    }
+
+    /// Check if the document has comments.
+    pub fn has_comments(&self) -> bool {
+        !self.comments.is_empty()
+    }
+
+    /// Get the number of comments in the document.
+    pub fn comment_count(&self) -> usize {
+        self.comments.len()
+    }
+
+    /// Set document protection.
+    ///
+    /// # Arguments
+    ///
+    /// * `protection_type` - Type of protection to apply
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use litchi::ooxml::docx::settings::ProtectionType;
+    ///
+    /// // Protect document as read-only
+    /// doc.set_protection(ProtectionType::ReadOnly);
+    ///
+    /// // Allow only comments
+    /// doc.set_protection(ProtectionType::Comments);
+    /// ```
+    pub fn set_protection(&mut self, protection_type: ProtectionType) {
+        self.protection = Some(DocumentProtection {
+            protection_type,
+            password_hash: None,
+            salt: None,
+        });
+        self.modified = true;
+    }
+
+    /// Set document protection with password.
+    ///
+    /// Note: For simplicity, this implementation stores the hash directly.
+    /// In a production system, you would use proper password hashing (SHA-256, etc.).
+    ///
+    /// # Arguments
+    ///
+    /// * `protection_type` - Type of protection to apply
+    /// * `password_hash` - Password hash (from proper hashing algorithm)
+    /// * `salt` - Salt used for password hashing
+    pub fn set_protection_with_password(
+        &mut self,
+        protection_type: ProtectionType,
+        password_hash: String,
+        salt: String,
+    ) {
+        self.protection = Some(DocumentProtection {
+            protection_type,
+            password_hash: Some(password_hash),
+            salt: Some(salt),
+        });
+        self.modified = true;
+    }
+
+    /// Remove document protection.
+    pub fn remove_protection(&mut self) {
+        self.protection = None;
+        self.modified = true;
+    }
+
+    /// Check if the document has protection set.
+    pub fn is_protected(&self) -> bool {
+        self.protection.is_some()
+    }
+
+    /// Get the protection type if set.
+    pub fn protection_type(&self) -> Option<ProtectionType> {
+        self.protection.as_ref().map(|p| p.protection_type)
+    }
+
+    /// Set the document theme.
+    ///
+    /// # Arguments
+    ///
+    /// * `theme` - Theme to apply to the document
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use litchi::ooxml::docx::writer::MutableTheme;
+    ///
+    /// let theme = MutableTheme::office_theme();
+    /// doc.set_theme(theme);
+    /// ```
+    pub fn set_theme(&mut self, theme: MutableTheme) {
+        self.theme = Some(theme);
+        self.modified = true;
+    }
+
+    /// Get a reference to the document theme.
+    pub fn theme(&self) -> Option<&MutableTheme> {
+        self.theme.as_ref()
+    }
+
+    /// Get a mutable reference to the document theme.
+    pub fn theme_mut(&mut self) -> Option<&mut MutableTheme> {
+        self.modified = true;
+        self.theme.as_mut()
+    }
+
+    /// Set a watermark for the document.
+    ///
+    /// # Arguments
+    ///
+    /// * `watermark` - Watermark to apply
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use litchi::ooxml::docx::writer::Watermark;
+    ///
+    /// let watermark = Watermark::text("CONFIDENTIAL");
+    /// doc.set_watermark(watermark);
+    /// ```
+    pub fn set_watermark(&mut self, watermark: Watermark) {
+        self.watermark = Some(watermark);
+        self.modified = true;
+    }
+
+    /// Remove the watermark from the document.
+    pub fn remove_watermark(&mut self) {
+        if self.watermark.is_some() {
+            self.watermark = None;
+            self.modified = true;
+        }
+    }
+
+    /// Check if the document has a watermark.
+    pub fn has_watermark(&self) -> bool {
+        self.watermark.is_some()
+    }
+
+    /// Add a table of contents at the current position in the document.
+    ///
+    /// # Arguments
+    ///
+    /// * `toc` - Table of contents configuration
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use litchi::ooxml::docx::writer::TableOfContents;
+    ///
+    /// let toc = TableOfContents::new()
+    ///     .heading_levels(1, 3)
+    ///     .title("Contents");
+    /// doc.add_toc(toc);
+    /// ```
+    pub fn add_toc(&mut self, toc: TableOfContents) -> Result<()> {
+        // Add optional title paragraph with TOCHeading style
+        if let Some(title) = toc.get_title() {
+            let title_para = self.add_paragraph();
+            title_para.set_style("TOCHeading");
+            let title_run = title_para.add_run();
+            title_run.set_text(title);
+        }
+
+        // Record the insertion point (after the title if present)
+        let insertion_index = self.body.elements.len();
+
+        // Store the TOC configuration for later generation (at save time)
+        self.toc_config = Some((insertion_index, toc));
+
+        self.modified = true;
+        Ok(())
+    }
+
+    /// Generate and insert TOC entries.
+    /// This is called automatically before serialization.
+    pub(crate) fn generate_toc_if_needed(&mut self) -> Result<()> {
+        use super::field::MutableField;
+        use std::fmt::Write as FmtWrite;
+
+        // Check if we have a TOC to generate
+        let Some((insertion_index, toc)) = self.toc_config.take() else {
+            return Ok(());
+        };
+
+        // Step 1: Scan document for headings and add bookmarks
+        let mut heading_info = Vec::new();
+        let mut bookmark_counter = 0u32;
+        let start_level = toc.start_level();
+        let end_level = toc.end_level();
+
+        // Iterate through all body elements to find headings
+        for element in &mut self.body.elements {
+            if let BodyElement::Paragraph(para) = element
+                && let Some(style) = &para.style
+            {
+                // Check if this is a heading within our TOC range
+                let heading_level = match style.as_str() {
+                    "Heading1" => Some(1),
+                    "Heading2" => Some(2),
+                    "Heading3" => Some(3),
+                    "Heading4" => Some(4),
+                    "Heading5" => Some(5),
+                    "Heading6" => Some(6),
+                    "Heading7" => Some(7),
+                    "Heading8" => Some(8),
+                    "Heading9" => Some(9),
+                    _ => None,
+                };
+
+                if let Some(level) = heading_level
+                    && level >= start_level
+                    && level <= end_level
+                {
+                    // Extract heading text
+                    let mut heading_text = String::new();
+                    for elem in &para.elements {
+                        if let super::paragraph::ParagraphElement::Run(run) = elem {
+                            heading_text.push_str(&run.get_text());
+                        }
+                    }
+
+                    // Generate unique bookmark name
+                    let bookmark_name = format!("_Toc{}", 213359267 + bookmark_counter);
+                    let bookmark_id = bookmark_counter;
+                    bookmark_counter += 1;
+
+                    // Add bookmark to the heading paragraph
+                    para.add_bookmark_start(bookmark_id, &bookmark_name);
+                    para.add_bookmark_end(bookmark_id);
+
+                    // Store heading info for TOC generation
+                    heading_info.push((level, heading_text, bookmark_name));
+                }
+            }
+        }
+
+        // Step 2: Build TOC paragraphs
+        let mut toc_paragraphs = Vec::new();
+
+        // First paragraph: TOC field wrapper
+        let mut toc_field_para = MutableParagraph::new();
+        let instruction = toc.build_field_instruction();
+        toc_field_para
+            .elements
+            .push(super::paragraph::ParagraphElement::Field(
+                MutableField::begin(),
+            ));
+        toc_field_para
+            .elements
+            .push(super::paragraph::ParagraphElement::Field(
+                MutableField::instruction(instruction),
+            ));
+        toc_field_para
+            .elements
+            .push(super::paragraph::ParagraphElement::Field(
+                MutableField::separate(),
+            ));
+
+        toc_paragraphs.push(toc_field_para);
+
+        // Generate TOC entry paragraphs
+        for (level, heading_text, bookmark_name) in heading_info {
+            let mut toc_entry = MutableParagraph::new();
+
+            // Set TOC style
+            toc_entry.style = Some(format!("TOC{}", level));
+
+            // Set paragraph properties (tab and indent)
+            toc_entry
+                .properties
+                .tab_stops
+                .push(super::paragraph::TabStop {
+                    position: 9350,
+                    alignment: "right".to_string(),
+                    leader: Some("dot".to_string()),
+                });
+
+            let indent = match level {
+                1 => 0,
+                2 => 440,
+                3 => 880,
+                _ => (level as i32 - 1) * 440,
+            };
+            toc_entry.properties.indent_left = Some(indent);
+
+            // Add hyperlink with runs and PAGEREF field
+            let mut hyperlink =
+                super::hyperlink::MutableHyperlink::new_anchor(bookmark_name.clone());
+
+            let mut text_run = super::run::MutableRun::new();
+            text_run.set_text(&heading_text);
+            text_run.properties.no_proof = true;
+            hyperlink.add_run(text_run);
+
+            let mut tab_run = super::run::MutableRun::new();
+            tab_run.add_tab();
+            tab_run.properties.no_proof = true;
+            tab_run.properties.web_hidden = true;
+            hyperlink.add_run(tab_run);
+
+            hyperlink
+                .elements
+                .push(super::hyperlink::HyperlinkElement::Field(
+                    MutableField::begin(),
+                ));
+
+            let mut pageref_instr = String::new();
+            write!(&mut pageref_instr, " PAGEREF {} \\h ", bookmark_name).unwrap();
+            hyperlink
+                .elements
+                .push(super::hyperlink::HyperlinkElement::Field(
+                    MutableField::instruction(pageref_instr),
+                ));
+
+            hyperlink
+                .elements
+                .push(super::hyperlink::HyperlinkElement::Field(
+                    MutableField::separate(),
+                ));
+
+            let mut page_run = super::run::MutableRun::new();
+            page_run.set_text("1");
+            page_run.properties.no_proof = true;
+            page_run.properties.web_hidden = true;
+            hyperlink.add_run(page_run);
+
+            hyperlink
+                .elements
+                .push(super::hyperlink::HyperlinkElement::Field(
+                    MutableField::end(),
+                ));
+
+            toc_entry
+                .elements
+                .push(super::paragraph::ParagraphElement::Hyperlink(hyperlink));
+            toc_paragraphs.push(toc_entry);
+        }
+
+        // Add field end to the first TOC paragraph
+        if let Some(first_para) = toc_paragraphs.first_mut() {
+            first_para
+                .elements
+                .push(super::paragraph::ParagraphElement::Field(
+                    MutableField::end(),
+                ));
+        }
+
+        // Step 3: Insert TOC paragraphs at the recorded position
+        for (i, para) in toc_paragraphs.into_iter().enumerate() {
+            self.body
+                .elements
+                .insert(insertion_index + i, BodyElement::Paragraph(para));
+        }
+
+        Ok(())
+    }
+
+    /// Generate theme XML for theme1.xml part.
+    pub(crate) fn generate_theme_xml(&self) -> Result<Option<String>> {
+        if let Some(theme) = &self.theme {
+            Ok(Some(theme.to_xml()?))
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Collect all hyperlink URLs from the document in order.
     ///
     /// Note: This collects ALL hyperlinks, not just unique URLs. Each hyperlink
@@ -218,8 +642,10 @@ impl MutableDocument {
         for element in &self.body.elements {
             if let BodyElement::Paragraph(para) = element {
                 for para_element in &para.elements {
-                    if let ParagraphElement::Hyperlink(link) = para_element {
-                        urls.push(link.url.clone());
+                    if let ParagraphElement::Hyperlink(link) = para_element
+                        && let Some(url) = &link.url
+                    {
+                        urls.push(url.clone());
                     }
                 }
             }
@@ -359,6 +785,58 @@ impl MutableDocument {
         Ok(Some(xml))
     }
 
+    /// Generate comments XML content.
+    pub(crate) fn generate_comments_xml(&self) -> Result<Option<String>> {
+        if self.comments.is_empty() {
+            return Ok(None);
+        }
+
+        let mut xml = String::with_capacity(2048);
+        xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
+        xml.push_str(r#"<w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#);
+
+        for comment in &self.comments {
+            let comment_xml = comment.to_xml()?;
+            xml.push_str(&comment_xml);
+        }
+
+        xml.push_str("</w:comments>");
+        Ok(Some(xml))
+    }
+
+    /// Generate settings XML content with protection if set.
+    ///
+    /// This generates a complete settings.xml file including document protection
+    /// if protection is enabled.
+    pub(crate) fn generate_settings_xml(&self) -> Result<String> {
+        let mut xml = String::with_capacity(1024);
+        xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
+        xml.push_str(r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#);
+
+        // Add document protection if set
+        if let Some(ref protection) = self.protection {
+            xml.push_str(r#"<w:documentProtection w:edit=""#);
+            xml.push_str(protection.protection_type.to_xml());
+            xml.push_str(r#"" w:enforcement="1""#);
+
+            if let Some(ref hash) = protection.password_hash {
+                write!(xml, r#" w:hash="{}""#, hash).map_err(|e| OoxmlError::Xml(e.to_string()))?;
+            }
+
+            if let Some(ref salt) = protection.salt {
+                write!(xml, r#" w:salt="{}""#, salt).map_err(|e| OoxmlError::Xml(e.to_string()))?;
+            }
+
+            xml.push_str("/>");
+        }
+
+        // Add default zoom
+        xml.push_str(r#"<w:zoom w:percent="100"/>"#);
+
+        xml.push_str("</w:settings>");
+        Ok(xml)
+    }
+
     /// Get a reference to a paragraph by index.
     pub fn paragraph(&mut self, index: usize) -> Option<&mut MutableParagraph> {
         self.body.paragraph(index)
@@ -403,7 +881,7 @@ impl MutableDocument {
         Ok(xml)
     }
 
-    /// Generate section properties XML including header/footer references.
+    /// Generate section properties XML including header/footer/footnote/endnote references.
     fn generate_section_properties(
         &self,
         xml: &mut String,
@@ -411,7 +889,10 @@ impl MutableDocument {
     ) -> Result<()> {
         xml.push_str("<w:sectPr>");
 
-        // Add header reference if present
+        // IMPORTANT: Element order MUST follow OOXML spec (ISO/IEC 29500)
+        // Microsoft Word strictly enforces this ordering!
+
+        // 1. Add header reference if present (must come before footnotePr)
         if let Some(header_id) = rel_mapper.get_header_id() {
             write!(
                 xml,
@@ -421,12 +902,30 @@ impl MutableDocument {
             .map_err(|e| OoxmlError::Xml(e.to_string()))?;
         }
 
-        // Add footer reference if present
+        // 2. Add footer reference if present (must come before footnotePr)
         if let Some(footer_id) = rel_mapper.get_footer_id() {
             write!(
                 xml,
                 r#"<w:footerReference w:type="default" r:id="{}"/>"#,
                 footer_id
+            )
+            .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+        }
+
+        // 3. Add footnote properties if present
+        if rel_mapper.get_footnotes_id().is_some() {
+            write!(
+                xml,
+                r#"<w:footnotePr><w:numFmt w:val="decimal"/></w:footnotePr>"#
+            )
+            .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+        }
+
+        // 4. Add endnote properties if present
+        if rel_mapper.get_endnotes_id().is_some() {
+            write!(
+                xml,
+                r#"<w:endnotePr><w:numFmt w:val="decimal"/></w:endnotePr>"#
             )
             .map_err(|e| OoxmlError::Xml(e.to_string()))?;
         }
