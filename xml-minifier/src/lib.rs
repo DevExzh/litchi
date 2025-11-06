@@ -543,7 +543,17 @@ fn minify_xml(xml: &str) -> Result<String, Box<dyn std::error::Error>> {
 
     loop {
         match reader.read_event_into(&mut buf)? {
-            Event::Eof => break,
+            Event::Eof => {
+                // Flush any remaining buffered start tags before EOF
+                // (this can happen if the root element never closes in the stream)
+                for start_tag in tag_stack.drain(..) {
+                    output.push(b'<');
+                    output.extend_from_slice(start_tag.name().as_ref());
+                    write_attributes(&mut output, &start_tag)?;
+                    output.push(b'>');
+                }
+                break;
+            },
 
             // Preserve XML declaration - write it as-is
             Event::Decl(e) => {
@@ -573,8 +583,18 @@ fn minify_xml(xml: &str) -> Result<String, Box<dyn std::error::Error>> {
                 tag_stack.push(owned);
             },
 
-            // Handle empty tags - write directly
+            // Handle empty tags - flush buffered tags first, then write
             Event::Empty(e) => {
+                // Flush all buffered start tags since we have an empty element
+                let tags_to_flush = std::mem::take(&mut tag_stack);
+                for start_tag in tags_to_flush {
+                    output.push(b'<');
+                    output.extend_from_slice(start_tag.name().as_ref());
+                    write_attributes(&mut output, &start_tag)?;
+                    output.push(b'>');
+                }
+                
+                // Now write the empty tag
                 output.push(b'<');
                 output.extend_from_slice(e.name().as_ref());
                 write_attributes(&mut output, &e)?;
