@@ -99,6 +99,24 @@ pub struct Parser<'a> {
     pictures: Vec<super::picture::Picture<'a>>,
     /// Extracted fields
     fields: Vec<super::field::Field<'a>>,
+    /// List table
+    list_table: super::list::ListTable<'a>,
+    /// List override table
+    list_override_table: super::list::ListOverrideTable,
+    /// Sections
+    sections: Vec<super::section::Section<'a>>,
+    /// Bookmarks
+    bookmarks: super::bookmark::BookmarkTable<'a>,
+    /// Shapes
+    shapes: Vec<super::shape::Shape<'a>>,
+    /// Shape groups
+    shape_groups: Vec<super::shape::ShapeGroup<'a>>,
+    /// Stylesheet
+    stylesheet: super::stylesheet::StyleSheet<'a>,
+    /// Document information
+    info: super::info::DocumentInfo<'a>,
+    /// Annotations
+    annotations: Vec<super::annotation::Annotation<'a>>,
 }
 
 impl<'a> Parser<'a> {
@@ -118,6 +136,15 @@ impl<'a> Parser<'a> {
             current_cell_text: SmallVec::new(),
             pictures: Vec::new(),
             fields: Vec::new(),
+            list_table: super::list::ListTable::new(),
+            list_override_table: super::list::ListOverrideTable::new(),
+            sections: Vec::new(),
+            bookmarks: super::bookmark::BookmarkTable::new(),
+            shapes: Vec::new(),
+            shape_groups: Vec::new(),
+            stylesheet: super::stylesheet::StyleSheet::new(),
+            info: super::info::DocumentInfo::new(),
+            annotations: Vec::new(),
         }
     }
 
@@ -150,6 +177,15 @@ impl<'a> Parser<'a> {
             tables: self.tables,
             pictures: self.pictures,
             fields: self.fields,
+            list_table: self.list_table,
+            list_override_table: self.list_override_table,
+            sections: self.sections,
+            bookmarks: self.bookmarks,
+            shapes: self.shapes,
+            shape_groups: self.shape_groups,
+            stylesheet: self.stylesheet,
+            info: self.info,
+            annotations: self.annotations,
         })
     }
 
@@ -414,12 +450,55 @@ impl<'a> Parser<'a> {
             // Character formatting
             ControlWord::Bold(b) => state.formatting.bold = *b,
             ControlWord::Italic(b) => state.formatting.italic = *b,
-            ControlWord::Underline(b) => state.formatting.underline = *b,
-            ControlWord::UnderlineNone => state.formatting.underline = false,
+            ControlWord::Underline(b) => {
+                state.formatting.underline = if *b {
+                    super::types::UnderlineStyle::Single
+                } else {
+                    super::types::UnderlineStyle::None
+                }
+            },
+            ControlWord::UnderlineNone => {
+                state.formatting.underline = super::types::UnderlineStyle::None
+            },
+            ControlWord::UnderlineDouble => {
+                state.formatting.underline = super::types::UnderlineStyle::Double
+            },
+            ControlWord::UnderlineDotted => {
+                state.formatting.underline = super::types::UnderlineStyle::Dotted
+            },
+            ControlWord::UnderlineDashed => {
+                state.formatting.underline = super::types::UnderlineStyle::Dashed
+            },
+            ControlWord::UnderlineDashDot => {
+                state.formatting.underline = super::types::UnderlineStyle::DashDot
+            },
+            ControlWord::UnderlineDashDotDot => {
+                state.formatting.underline = super::types::UnderlineStyle::DashDotDot
+            },
+            ControlWord::UnderlineWords => {
+                state.formatting.underline = super::types::UnderlineStyle::Words
+            },
+            ControlWord::UnderlineThick => {
+                state.formatting.underline = super::types::UnderlineStyle::Thick
+            },
+            ControlWord::UnderlineWave => {
+                state.formatting.underline = super::types::UnderlineStyle::Wave
+            },
             ControlWord::Strike(b) => state.formatting.strike = *b,
+            ControlWord::DoubleStrike(b) => state.formatting.double_strike = *b,
             ControlWord::Superscript(b) => state.formatting.superscript = *b,
             ControlWord::Subscript(b) => state.formatting.subscript = *b,
             ControlWord::SmallCaps(b) => state.formatting.smallcaps = *b,
+            ControlWord::AllCaps(b) => state.formatting.all_caps = *b,
+            ControlWord::Hidden(b) => state.formatting.hidden = *b,
+            ControlWord::Outline(b) => state.formatting.outline = *b,
+            ControlWord::Shadow(b) => state.formatting.shadow = *b,
+            ControlWord::Emboss(b) => state.formatting.emboss = *b,
+            ControlWord::Imprint(b) => state.formatting.imprint = *b,
+            ControlWord::CharSpacing(n) => state.formatting.char_spacing = *n,
+            ControlWord::CharScale(n) => state.formatting.char_scale = *n,
+            ControlWord::Kerning(n) => state.formatting.kerning = *n,
+            ControlWord::Highlight(c) => state.formatting.highlight_color = Some(*c as ColorRef),
             ControlWord::Plain => {
                 // Reset to default formatting
                 state.formatting = Formatting::default();
@@ -445,6 +524,12 @@ impl<'a> Parser<'a> {
             ControlWord::LeftIndent(n) => state.paragraph.indentation.left = *n,
             ControlWord::RightIndent(n) => state.paragraph.indentation.right = *n,
             ControlWord::FirstLineIndent(n) => state.paragraph.indentation.first_line = *n,
+
+            // Paragraph additional properties
+            ControlWord::KeepTogether => state.paragraph.keep_together = true,
+            ControlWord::KeepNext => state.paragraph.keep_next = true,
+            ControlWord::PageBreakBefore => state.paragraph.page_break_before = true,
+            ControlWord::WidowControl => state.paragraph.widow_control = true,
 
             // Unicode
             ControlWord::UnicodeSkip(n) => state.unicode_skip = *n,
@@ -1040,4 +1125,22 @@ pub struct ParsedDocument<'a> {
     pub pictures: Vec<super::picture::Picture<'a>>,
     /// Extracted fields
     pub fields: Vec<super::field::Field<'a>>,
+    /// List table
+    pub list_table: super::list::ListTable<'a>,
+    /// List override table
+    pub list_override_table: super::list::ListOverrideTable,
+    /// Sections
+    pub sections: Vec<super::section::Section<'a>>,
+    /// Bookmarks
+    pub bookmarks: super::bookmark::BookmarkTable<'a>,
+    /// Shapes
+    pub shapes: Vec<super::shape::Shape<'a>>,
+    /// Shape groups
+    pub shape_groups: Vec<super::shape::ShapeGroup<'a>>,
+    /// Stylesheet
+    pub stylesheet: super::stylesheet::StyleSheet<'a>,
+    /// Document information
+    pub info: super::info::DocumentInfo<'a>,
+    /// Annotations
+    pub annotations: Vec<super::annotation::Annotation<'a>>,
 }

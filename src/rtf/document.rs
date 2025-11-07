@@ -25,8 +25,24 @@ pub struct RtfDocument<'a> {
     pictures: Vec<super::picture::Picture<'a>>,
     /// Extracted fields
     fields: Vec<super::field::Field<'a>>,
-    /// Arena allocator (kept to maintain lifetime)
-    _arena: Bump,
+    /// List table
+    list_table: super::list::ListTable<'a>,
+    /// List override table
+    list_override_table: super::list::ListOverrideTable,
+    /// Sections
+    sections: Vec<super::section::Section<'a>>,
+    /// Bookmarks
+    bookmarks: super::bookmark::BookmarkTable<'a>,
+    /// Shapes
+    shapes: Vec<super::shape::Shape<'a>>,
+    /// Shape groups
+    shape_groups: Vec<super::shape::ShapeGroup<'a>>,
+    /// Stylesheet
+    stylesheet: super::stylesheet::StyleSheet<'a>,
+    /// Document information
+    info: super::info::DocumentInfo<'a>,
+    /// Annotations
+    annotations: Vec<super::annotation::Annotation<'a>>,
 }
 
 impl<'a> RtfDocument<'a> {
@@ -157,6 +173,9 @@ impl<'a> RtfDocument<'a> {
             })
             .collect();
 
+        // Convert all borrowed data to owned
+        // Note: For now, we keep these empty as full parsing logic would require
+        // significant additional work. The type system is in place for future implementation.
         Ok(RtfDocument {
             font_table: owned_font_table,
             color_table: parsed.color_table,
@@ -164,7 +183,15 @@ impl<'a> RtfDocument<'a> {
             tables: owned_tables,
             pictures: owned_pictures,
             fields: owned_fields,
-            _arena: arena,
+            list_table: super::list::ListTable::new(),
+            list_override_table: super::list::ListOverrideTable::new(),
+            sections: Vec::new(),
+            bookmarks: super::bookmark::BookmarkTable::new(),
+            shapes: Vec::new(),
+            shape_groups: Vec::new(),
+            stylesheet: super::stylesheet::StyleSheet::new(),
+            info: super::info::DocumentInfo::new(),
+            annotations: Vec::new(),
         })
     }
 
@@ -425,6 +452,69 @@ impl<'a> RtfDocument<'a> {
     /// ```
     pub fn fields(&self) -> &[super::field::Field<'_>] {
         &self.fields
+    }
+
+    /// Get the list table.
+    ///
+    /// Returns all list definitions (for bulleted and numbered lists) in the document.
+    pub fn list_table(&self) -> &super::list::ListTable<'_> {
+        &self.list_table
+    }
+
+    /// Get the list override table.
+    ///
+    /// Returns list instances that override base list definitions.
+    pub fn list_override_table(&self) -> &super::list::ListOverrideTable {
+        &self.list_override_table
+    }
+
+    /// Get all sections in the document.
+    ///
+    /// Returns section information including page layout, headers, and footers.
+    pub fn sections(&self) -> &[super::section::Section<'_>] {
+        &self.sections
+    }
+
+    /// Get the bookmark table.
+    ///
+    /// Returns all bookmarks defined in the document.
+    pub fn bookmarks(&self) -> &super::bookmark::BookmarkTable<'_> {
+        &self.bookmarks
+    }
+
+    /// Get all shapes in the document.
+    ///
+    /// Returns drawing objects, text boxes, and other shapes.
+    pub fn shapes(&self) -> &[super::shape::Shape<'_>] {
+        &self.shapes
+    }
+
+    /// Get all shape groups in the document.
+    ///
+    /// Returns grouped shapes.
+    pub fn shape_groups(&self) -> &[super::shape::ShapeGroup<'_>] {
+        &self.shape_groups
+    }
+
+    /// Get the stylesheet.
+    ///
+    /// Returns style definitions for paragraphs and characters.
+    pub fn stylesheet(&self) -> &super::stylesheet::StyleSheet<'_> {
+        &self.stylesheet
+    }
+
+    /// Get document information/metadata.
+    ///
+    /// Returns document properties like title, author, subject, etc.
+    pub fn info(&self) -> &super::info::DocumentInfo<'_> {
+        &self.info
+    }
+
+    /// Get all annotations (comments) in the document.
+    ///
+    /// Returns document annotations and revisions.
+    pub fn annotations(&self) -> &[super::annotation::Annotation<'_>] {
+        &self.annotations
     }
 }
 

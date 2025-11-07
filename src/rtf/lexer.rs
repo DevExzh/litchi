@@ -73,10 +73,29 @@ pub enum ControlWord<'a> {
     Italic(bool),
     Underline(bool),
     UnderlineNone,
+    UnderlineDouble,
+    UnderlineDotted,
+    UnderlineDashed,
+    UnderlineDashDot,
+    UnderlineDashDotDot,
+    UnderlineWords,
+    UnderlineThick,
+    UnderlineWave,
     Strike(bool),
+    DoubleStrike(bool),
     Superscript(bool),
     Subscript(bool),
     SmallCaps(bool),
+    AllCaps(bool),
+    Hidden(bool),
+    Outline(bool),
+    Shadow(bool),
+    Emboss(bool),
+    Imprint(bool),
+    CharSpacing(i32),
+    CharScale(i32),
+    Kerning(i32),
+    Highlight(i32),
     Plain,
 
     // Paragraph formatting
@@ -96,12 +115,123 @@ pub enum ControlWord<'a> {
     RightIndent(i32),
     FirstLineIndent(i32),
 
+    // Paragraph additional properties
+    KeepTogether,
+    KeepNext,
+    PageBreakBefore,
+    WidowControl,
+
     // Tables
     TableRowDefaults,
     TableRow,
     TableCell,
     CellX(i32),
     InTable,
+
+    // Borders
+    BorderTop,
+    BorderBottom,
+    BorderLeft,
+    BorderRight,
+    BorderSingle,
+    BorderDotted,
+    BorderDashed,
+    BorderDouble,
+    BorderTriple,
+    BorderWave,
+    BorderWidth(i32),
+    BorderColor(i32),
+    BorderSpace(i32),
+
+    // Shading
+    Shading(i32),
+    ForegroundPattern(i32),
+    BackgroundPattern(i32),
+
+    // Tab stops
+    TabLeft,
+    TabRight,
+    TabCenter,
+    TabDecimal,
+    TabBar,
+    TabPosition(i32),
+    TabLeaderDot,
+    TabLeaderHyphen,
+    TabLeaderUnderscore,
+    TabLeaderThick,
+
+    // Lists
+    ListTable,
+    List(i32),
+    ListId(i32),
+    ListOverrideTable,
+    ListOverride(i32),
+    ListLevel(i32),
+    ListLevelType(i32),
+    ListNumberText(&'a str),
+    ListLevelStartAt(i32),
+    ListLevelNumber(i32),
+
+    // Sections
+    SectionBreak,
+    SectionContinuous,
+    SectionColumn,
+    SectionPage,
+    SectionEvenPage,
+    SectionOddPage,
+    PageWidth(i32),
+    PageHeight(i32),
+    MarginLeft(i32),
+    MarginRight(i32),
+    MarginTop(i32),
+    MarginBottom(i32),
+    HeaderDistance(i32),
+    FooterDistance(i32),
+    Landscape,
+    Columns(i32),
+    Header,
+    HeaderFirst,
+    HeaderLeft,
+    HeaderRight,
+    Footer,
+    FooterFirst,
+    FooterLeft,
+    FooterRight,
+
+    // Footnotes and endnotes
+    Footnote,
+    Endnote,
+    FootnoteNumber(i32),
+    EndnoteNumber(i32),
+
+    // Bookmarks
+    BookmarkStart(&'a str),
+    BookmarkEnd,
+
+    // Annotations/comments
+    Annotation,
+    AnnotationDate(&'a str),
+    AnnotationAuthor(&'a str),
+    AnnotationRef(i32),
+
+    // Shapes
+    Shape,
+    ShapeType(i32),
+    ShapeLeft(i32),
+    ShapeTop(i32),
+    ShapeWidth(i32),
+    ShapeHeight(i32),
+    ShapeRotation(i32),
+    ShapeZOrder(i32),
+    ShapeGroup,
+
+    // Document info
+    Title(&'a str),
+    Subject(&'a str),
+    Author(&'a str),
+    Keywords(&'a str),
+    Comment(&'a str),
+    DocComment(&'a str),
 
     // Unicode
     Unicode(i32),
@@ -411,10 +541,29 @@ impl<'a> Lexer<'a> {
             "i" => ControlWord::Italic(param_bool),
             "ul" => ControlWord::Underline(param_bool),
             "ulnone" => ControlWord::UnderlineNone,
+            "uldb" => ControlWord::UnderlineDouble,
+            "uld" => ControlWord::UnderlineDotted,
+            "uldash" => ControlWord::UnderlineDashed,
+            "uldashd" => ControlWord::UnderlineDashDot,
+            "uldashdd" => ControlWord::UnderlineDashDotDot,
+            "ulw" => ControlWord::UnderlineWords,
+            "ulth" => ControlWord::UnderlineThick,
+            "ulwave" => ControlWord::UnderlineWave,
             "strike" => ControlWord::Strike(param_bool),
+            "striked" => ControlWord::DoubleStrike(param_bool),
             "super" => ControlWord::Superscript(param_bool),
             "sub" => ControlWord::Subscript(param_bool),
             "scaps" => ControlWord::SmallCaps(param_bool),
+            "caps" => ControlWord::AllCaps(param_bool),
+            "v" => ControlWord::Hidden(param_bool),
+            "outl" => ControlWord::Outline(param_bool),
+            "shad" => ControlWord::Shadow(param_bool),
+            "embo" => ControlWord::Emboss(param_bool),
+            "impr" => ControlWord::Imprint(param_bool),
+            "expnd" => ControlWord::CharSpacing(param_value),
+            "charscalex" => ControlWord::CharScale(param_value),
+            "kerning" => ControlWord::Kerning(param_value),
+            "highlight" => ControlWord::Highlight(param_value),
             "plain" => ControlWord::Plain,
 
             // Paragraph
@@ -434,12 +583,106 @@ impl<'a> Lexer<'a> {
             "ri" => ControlWord::RightIndent(param_value),
             "fi" => ControlWord::FirstLineIndent(param_value),
 
+            // Paragraph additional properties
+            "keep" => ControlWord::KeepTogether,
+            "keepn" => ControlWord::KeepNext,
+            "pagebb" => ControlWord::PageBreakBefore,
+            "widctlpar" => ControlWord::WidowControl,
+
             // Tables
             "trowd" => ControlWord::TableRowDefaults,
             "row" => ControlWord::TableRow,
             "cell" => ControlWord::TableCell,
             "cellx" => ControlWord::CellX(param_value),
             "intbl" => ControlWord::InTable,
+
+            // Borders
+            "brdrt" => ControlWord::BorderTop,
+            "brdrb" => ControlWord::BorderBottom,
+            "brdrl" => ControlWord::BorderLeft,
+            "brdrr" => ControlWord::BorderRight,
+            "brdrs" => ControlWord::BorderSingle,
+            "brdrdot" => ControlWord::BorderDotted,
+            "brdrdash" => ControlWord::BorderDashed,
+            "brdrdb" => ControlWord::BorderDouble,
+            "brdrtriple" => ControlWord::BorderTriple,
+            "brdrwavy" => ControlWord::BorderWave,
+            "brdrw" => ControlWord::BorderWidth(param_value),
+            "brdrcf" => ControlWord::BorderColor(param_value),
+            "brsp" => ControlWord::BorderSpace(param_value),
+
+            // Shading
+            "shading" => ControlWord::Shading(param_value),
+            "cfpat" => ControlWord::ForegroundPattern(param_value),
+            "cbpat" => ControlWord::BackgroundPattern(param_value),
+
+            // Tab stops
+            "tql" => ControlWord::TabLeft,
+            "tqr" => ControlWord::TabRight,
+            "tqc" => ControlWord::TabCenter,
+            "tqdec" => ControlWord::TabDecimal,
+            "tb" => ControlWord::TabBar,
+            "tx" => ControlWord::TabPosition(param_value),
+            "tldot" => ControlWord::TabLeaderDot,
+            "tlhyph" => ControlWord::TabLeaderHyphen,
+            "tlul" => ControlWord::TabLeaderUnderscore,
+            "tlth" => ControlWord::TabLeaderThick,
+
+            // Lists
+            "listtable" => ControlWord::ListTable,
+            "list" => ControlWord::List(param_value),
+            "listid" => ControlWord::ListId(param_value),
+            "listoverridetable" => ControlWord::ListOverrideTable,
+            "listoverride" => ControlWord::ListOverride(param_value),
+            "listlevel" => ControlWord::ListLevel(param_value),
+            "levelnfc" => ControlWord::ListLevelType(param_value),
+            "levelstartat" => ControlWord::ListLevelStartAt(param_value),
+            "levelnumbers" => ControlWord::ListLevelNumber(param_value),
+
+            // Sections
+            "sbknone" => ControlWord::SectionContinuous,
+            "sbkcol" => ControlWord::SectionColumn,
+            "sbkpage" => ControlWord::SectionPage,
+            "sbkeven" => ControlWord::SectionEvenPage,
+            "sbkodd" => ControlWord::SectionOddPage,
+            "paperw" => ControlWord::PageWidth(param_value),
+            "paperh" => ControlWord::PageHeight(param_value),
+            "margl" => ControlWord::MarginLeft(param_value),
+            "margr" => ControlWord::MarginRight(param_value),
+            "margt" => ControlWord::MarginTop(param_value),
+            "margb" => ControlWord::MarginBottom(param_value),
+            "headery" => ControlWord::HeaderDistance(param_value),
+            "footery" => ControlWord::FooterDistance(param_value),
+            "landscape" => ControlWord::Landscape,
+            "cols" => ControlWord::Columns(param_value),
+            "header" => ControlWord::Header,
+            "headerf" => ControlWord::HeaderFirst,
+            "headerl" => ControlWord::HeaderLeft,
+            "headerr" => ControlWord::HeaderRight,
+            "footer" => ControlWord::Footer,
+            "footerf" => ControlWord::FooterFirst,
+            "footerl" => ControlWord::FooterLeft,
+            "footerr" => ControlWord::FooterRight,
+
+            // Footnotes and endnotes
+            "footnote" => ControlWord::Footnote,
+            "endnote" => ControlWord::Endnote,
+
+            // Bookmarks
+            "bkmkend" => ControlWord::BookmarkEnd,
+
+            // Annotations
+            "atnid" => ControlWord::AnnotationRef(param_value),
+
+            // Shapes
+            "shp" => ControlWord::Shape,
+            "shpgrp" => ControlWord::ShapeGroup,
+
+            // Document info
+            "title" => ControlWord::Title(word),
+            "subject" => ControlWord::Subject(word),
+            "author" => ControlWord::Author(word),
+            "keywords" => ControlWord::Keywords(word),
 
             // Unicode
             "u" => ControlWord::Unicode(param_value),

@@ -1,5 +1,6 @@
 //! RTF document type definitions.
 
+use super::border::{Borders, Shading};
 use std::borrow::Cow;
 use std::num::NonZeroU16;
 
@@ -215,6 +216,44 @@ pub struct Paragraph {
     pub spacing: Spacing,
     /// Indentation
     pub indentation: Indentation,
+    /// Borders
+    pub borders: Borders,
+    /// Shading/background
+    pub shading: Shading,
+    /// Keep paragraph on one page
+    pub keep_together: bool,
+    /// Keep with next paragraph
+    pub keep_next: bool,
+    /// Page break before
+    pub page_break_before: bool,
+    /// Widow/orphan control
+    pub widow_control: bool,
+}
+
+/// Underline style
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum UnderlineStyle {
+    /// No underline
+    #[default]
+    None,
+    /// Single underline
+    Single,
+    /// Double underline
+    Double,
+    /// Dotted underline
+    Dotted,
+    /// Dashed underline
+    Dashed,
+    /// Dash-dot underline
+    DashDot,
+    /// Dash-dot-dot underline
+    DashDotDot,
+    /// Word-only underline
+    Words,
+    /// Thick underline
+    Thick,
+    /// Wave underline
+    Wave,
 }
 
 /// Character formatting properties.
@@ -226,20 +265,42 @@ pub struct Formatting {
     pub font_size: NonZeroU16,
     /// Color reference
     pub color_ref: ColorRef,
+    /// Background/highlight color reference
+    pub highlight_color: Option<ColorRef>,
     /// Bold
     pub bold: bool,
     /// Italic
     pub italic: bool,
-    /// Underline
-    pub underline: bool,
+    /// Underline style
+    pub underline: UnderlineStyle,
     /// Strikethrough
     pub strike: bool,
+    /// Double strikethrough
+    pub double_strike: bool,
     /// Superscript
     pub superscript: bool,
     /// Subscript
     pub subscript: bool,
     /// Small caps
     pub smallcaps: bool,
+    /// All caps
+    pub all_caps: bool,
+    /// Hidden text
+    pub hidden: bool,
+    /// Outline
+    pub outline: bool,
+    /// Shadow
+    pub shadow: bool,
+    /// Emboss
+    pub emboss: bool,
+    /// Engrave (imprint)
+    pub imprint: bool,
+    /// Character spacing (in twips)
+    pub char_spacing: i32,
+    /// Horizontal scaling (percentage)
+    pub char_scale: i32,
+    /// Kerning (in half-points)
+    pub kerning: i32,
 }
 
 impl Default for Formatting {
@@ -249,13 +310,24 @@ impl Default for Formatting {
             // SAFETY: 24 (12pt) is non-zero
             font_size: unsafe { NonZeroU16::new_unchecked(24) },
             color_ref: 0,
+            highlight_color: None,
             bold: false,
             italic: false,
-            underline: false,
+            underline: UnderlineStyle::default(),
             strike: false,
+            double_strike: false,
             superscript: false,
             subscript: false,
             smallcaps: false,
+            all_caps: false,
+            hidden: false,
+            outline: false,
+            shadow: false,
+            emboss: false,
+            imprint: false,
+            char_spacing: 0,
+            char_scale: 100,
+            kerning: 0,
         }
     }
 }
@@ -297,7 +369,13 @@ impl<'a> Run<'a> {
     /// Check if this run has strikethrough.
     #[inline]
     pub fn strikethrough(&self) -> Option<bool> {
-        Some(self.formatting.strike)
+        Some(self.formatting.strike || self.formatting.double_strike)
+    }
+
+    /// Check if this run has underline.
+    #[inline]
+    pub fn underline(&self) -> bool {
+        !matches!(self.formatting.underline, UnderlineStyle::None)
     }
 
     /// Get the vertical position of this run (superscript/subscript).

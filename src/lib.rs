@@ -169,9 +169,7 @@ pub mod common;
 ///
 /// Provides format-agnostic interface for both .doc and .docx files.
 /// Use [`Document::open()`] to get started.
-///
-/// **Note**: This requires at least one of the `ole` or `ooxml` features to be enabled.
-#[cfg(any(feature = "ole", feature = "ooxml"))]
+#[cfg(any(feature = "ole", feature = "ooxml", feature = "rtf"))]
 pub mod document;
 
 /// Image processing and conversion module

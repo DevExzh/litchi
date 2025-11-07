@@ -92,6 +92,7 @@ pub enum DetectedFormat {
 /// * `Some(DetectedFormat)` - Format detected with pre-parsed structure
 /// * `None` - Format not recognized
 pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
+    #[cfg(any(feature = "ooxml", feature = "iwa", feature = "odf"))]
     use crate::common::detection::FileFormat;
     use crate::common::detection::simd_utils::check_office_signatures;
 

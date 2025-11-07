@@ -22,25 +22,52 @@
 //! # Ok::<(), litchi::common::Error>(())
 //! ```
 
+mod annotation;
+mod bookmark;
+mod border;
 mod compressed;
 mod document;
 mod error;
 mod field;
+mod info;
 mod lexer;
+mod list;
 mod parser;
 mod picture;
+mod section;
+mod shape;
+mod stylesheet;
 mod table;
 mod types;
+mod writer;
 
 // Re-exports
+pub use annotation::{Annotation, AnnotationType, Revision, RevisionType};
+pub use bookmark::{Bookmark, BookmarkTable};
+pub use border::{
+    Border, BorderStyle, Borders, Shading, ShadingPattern, TabAlignment, TabLeader, TabStop,
+};
 pub use compressed::{compress, decompress, is_compressed_rtf};
 pub use document::RtfDocument;
 pub use error::{RtfError, RtfResult};
 pub use field::{Field, FieldType};
+pub use info::{DocumentInfo, DocumentProtection, ProtectionType};
 pub use lexer::CharacterSet;
+pub use list::{
+    List, ListJustification, ListLevel, ListLevelType, ListOverride, ListOverrideTable, ListTable,
+};
 pub use picture::{ImageType, Picture, detect_image_type};
+pub use section::{
+    HeaderFooter, HeaderFooterParagraph, HeaderFooterType, Note, PageNumberFormat, PageOrientation,
+    Section, SectionBreakType, SectionProperties, VerticalAlignment,
+};
+pub use shape::{
+    Fill, FillType, GradientDirection, Shape, ShapeGeometry, ShapeGroup, ShapeType, WrapMode,
+};
+pub use stylesheet::{Style, StyleSheet, StyleType};
 pub use table::{Cell, Row, Table};
 pub use types::{
-    Alignment, Color, ColorTable, DocumentElement, Font, FontFamily, FontRef, FontTable,
-    Formatting, Indentation, Paragraph, ParagraphContent, Run, Spacing, StyleBlock,
+    Alignment, Color, ColorRef, ColorTable, DocumentElement, Font, FontFamily, FontRef, FontTable,
+    Formatting, Indentation, Paragraph, ParagraphContent, Run, Spacing, StyleBlock, UnderlineStyle,
 };
+pub use writer::{RtfWriter, WriterOptions};
