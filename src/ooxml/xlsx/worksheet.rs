@@ -965,30 +965,40 @@ impl<'a> Worksheet<'a> {
                 _ => None,
             });
 
+        // Helper function to map border style string to enum
+        let map_border_style = |s: &super::styles::BorderStyle| {
+            let style = match s.style.as_str() {
+                "thin" => super::format::CellBorderLineStyle::Thin,
+                "medium" => super::format::CellBorderLineStyle::Medium,
+                "dashed" => super::format::CellBorderLineStyle::Dashed,
+                "dotted" => super::format::CellBorderLineStyle::Dotted,
+                "thick" => super::format::CellBorderLineStyle::Thick,
+                "double" => super::format::CellBorderLineStyle::Double,
+                "hair" => super::format::CellBorderLineStyle::Hair,
+                "mediumDashed" => super::format::CellBorderLineStyle::MediumDashed,
+                "dashDot" => super::format::CellBorderLineStyle::DashDot,
+                "mediumDashDot" => super::format::CellBorderLineStyle::MediumDashDot,
+                "dashDotDot" => super::format::CellBorderLineStyle::DashDotDot,
+                "mediumDashDotDot" => super::format::CellBorderLineStyle::MediumDashDotDot,
+                "slantDashDot" => super::format::CellBorderLineStyle::SlantDashDot,
+                "none" => super::format::CellBorderLineStyle::None,
+                _ => super::format::CellBorderLineStyle::Thin, // Default fallback
+            };
+            super::format::CellBorderSide {
+                style,
+                color: s.color.clone(),
+            }
+        };
+
         let border = style
             .border_id
             .and_then(|id| styles.get_border(id as usize))
             .map(|b| CellBorder {
-                left: b.left.as_ref().map(|s| super::format::CellBorderSide {
-                    style: super::format::CellBorderLineStyle::Thin, // TODO: Map properly
-                    color: s.color.clone(),
-                }),
-                right: b.right.as_ref().map(|s| super::format::CellBorderSide {
-                    style: super::format::CellBorderLineStyle::Thin,
-                    color: s.color.clone(),
-                }),
-                top: b.top.as_ref().map(|s| super::format::CellBorderSide {
-                    style: super::format::CellBorderLineStyle::Thin,
-                    color: s.color.clone(),
-                }),
-                bottom: b.bottom.as_ref().map(|s| super::format::CellBorderSide {
-                    style: super::format::CellBorderLineStyle::Thin,
-                    color: s.color.clone(),
-                }),
-                diagonal: b.diagonal.as_ref().map(|s| super::format::CellBorderSide {
-                    style: super::format::CellBorderLineStyle::Thin,
-                    color: s.color.clone(),
-                }),
+                left: b.left.as_ref().map(&map_border_style),
+                right: b.right.as_ref().map(&map_border_style),
+                top: b.top.as_ref().map(&map_border_style),
+                bottom: b.bottom.as_ref().map(&map_border_style),
+                diagonal: b.diagonal.as_ref().map(&map_border_style),
             });
 
         let number_format = style

@@ -6,7 +6,10 @@ pub mod styles;
 pub mod workbook;
 
 // Re-export main types
-pub use sheet::{FreezePanes, MutableWorksheet, NamedRange};
+pub use sheet::{
+    AutoFilter, CellComment, ConditionalFormat, ConditionalFormatType, FreezePanes, HeaderFooter,
+    Hyperlink, Image, MutableWorksheet, NamedRange, PageSetup, SheetProtection,
+};
 pub use strings::MutableSharedStrings;
 pub use styles::StylesBuilder;
-pub use workbook::MutableWorkbookData;
+pub use workbook::{MutableWorkbookData, WorkbookProtection};

@@ -308,6 +308,10 @@ impl StylesBuilder {
         // Write cell styles (required, even if minimal)
         xml.push_str(r#"<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>"#);
 
+        // Write dxfs (differential formats) - must come AFTER cellStyles per OOXML spec
+        // These are used by conditional formatting
+        xml.push_str(r#"<dxfs count="0"/>"#);
+
         xml.push_str("</styleSheet>");
 
         Ok(xml)

@@ -19,6 +19,17 @@ fn escape_xml(s: &str) -> String {
         .replace('\'', "&apos;")
 }
 
+/// Workbook protection configuration.
+#[derive(Debug, Clone)]
+pub struct WorkbookProtection {
+    /// Password hash (optional)
+    pub password_hash: Option<String>,
+    /// Lock structure (prevent adding/deleting sheets)
+    pub lock_structure: bool,
+    /// Lock windows (prevent resizing/moving workbook window)
+    pub lock_windows: bool,
+}
+
 /// Mutable workbook for writing.
 ///
 /// This is managed internally by the Workbook struct.
@@ -30,6 +41,12 @@ pub struct MutableWorkbookData {
     pub shared_strings: MutableSharedStrings,
     /// Named ranges
     pub named_ranges: Vec<NamedRange>,
+    /// Workbook protection
+    pub protection: Option<WorkbookProtection>,
+    /// Force formula recalculation on open
+    pub force_formula_recalculation: bool,
+    /// Calculation mode: "auto", "manual", or "autoNoTable"
+    pub calculation_mode: String,
     /// Whether the workbook has been modified
     pub modified: bool,
 }
@@ -41,6 +58,9 @@ impl MutableWorkbookData {
             worksheets: Vec::new(),
             shared_strings: MutableSharedStrings::new(),
             named_ranges: Vec::new(),
+            protection: None,
+            force_formula_recalculation: false,
+            calculation_mode: "auto".to_string(),
             modified: false,
         };
 
@@ -181,6 +201,37 @@ impl MutableWorkbookData {
             r#"xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">"#,
         );
 
+        // Add fileVersion (recommended by Excel for compatibility)
+        xml.push_str(
+            r#"<fileVersion appName="xl" lastEdited="7" lowestEdited="7" rupBuild="16925"/>"#,
+        );
+
+        // Add workbookPr (required by Excel)
+        xml.push_str(r#"<workbookPr defaultThemeVersion="166925"/>"#);
+
+        // Write workbook protection if configured (must come after workbookPr per OOXML spec)
+        if let Some(ref protection) = self.protection {
+            xml.push_str("<workbookProtection");
+            if let Some(ref hash) = protection.password_hash {
+                write!(xml, r#" workbookPassword="{}""#, hash)
+                    .map_err(|e| format!("XML write error: {}", e))?;
+            }
+            if protection.lock_structure {
+                xml.push_str(r#" lockStructure="1""#);
+            }
+            if protection.lock_windows {
+                xml.push_str(r#" lockWindows="1""#);
+            }
+            xml.push_str("/>");
+        }
+
+        // Add bookViews (required by Excel)
+        xml.push_str("<bookViews>");
+        xml.push_str(
+            r#"<workbookView xWindow="0" yWindow="0" windowWidth="20000" windowHeight="10000"/>"#,
+        );
+        xml.push_str("</bookViews>");
+
         xml.push_str("<sheets>");
         for (index, ws) in self.worksheets.iter().enumerate() {
             let sheet_id = ws.sheet_id();
@@ -188,6 +239,8 @@ impl MutableWorkbookData {
                 .get(index)
                 .map(|s| s.as_str())
                 .unwrap_or("rId1"); // Fallback, shouldn't happen
+
+            // Sheet elements are always self-closing (tab colors are in worksheet XML, not here)
             write!(
                 xml,
                 r#"<sheet name="{}" sheetId="{}" r:id="{}"/>"#,
@@ -226,9 +279,145 @@ impl MutableWorkbookData {
             xml.push_str("</definedNames>");
         }
 
+        // Add calculation properties (recommended for Excel compatibility)
+        xml.push_str(r#"<calcPr calcId="171027"/>"#);
+
         xml.push_str("</workbook>");
 
         Ok(xml)
+    }
+
+    // ===== Workbook-level Features =====
+
+    /// Hide a worksheet by index.
+    pub fn hide_sheet(&mut self, index: usize) -> SheetResult<()> {
+        if let Some(ws) = self.worksheets.get_mut(index) {
+            ws.set_hidden(true);
+            self.modified = true;
+            Ok(())
+        } else {
+            Err("Worksheet index out of bounds".into())
+        }
+    }
+
+    /// Unhide a worksheet by index.
+    pub fn unhide_sheet(&mut self, index: usize) -> SheetResult<()> {
+        if let Some(ws) = self.worksheets.get_mut(index) {
+            ws.set_hidden(false);
+            self.modified = true;
+            Ok(())
+        } else {
+            Err("Worksheet index out of bounds".into())
+        }
+    }
+
+    /// Check if a worksheet is hidden.
+    pub fn is_sheet_hidden(&self, index: usize) -> Option<bool> {
+        self.worksheets.get(index).map(|ws| ws.is_hidden())
+    }
+
+    /// Move a worksheet to a new position.
+    pub fn move_sheet(&mut self, from_index: usize, to_index: usize) -> SheetResult<()> {
+        if from_index >= self.worksheets.len() || to_index >= self.worksheets.len() {
+            return Err("Worksheet index out of bounds".into());
+        }
+
+        let worksheet = self.worksheets.remove(from_index);
+        self.worksheets.insert(to_index, worksheet);
+        self.modified = true;
+        Ok(())
+    }
+
+    /// Set sheet visibility state.
+    pub fn set_sheet_visibility(&mut self, index: usize, visibility: &str) -> SheetResult<()> {
+        if let Some(ws) = self.worksheets.get_mut(index) {
+            ws.set_visibility(visibility);
+            self.modified = true;
+            Ok(())
+        } else {
+            Err("Worksheet index out of bounds".into())
+        }
+    }
+
+    /// Get sheet visibility state.
+    pub fn get_sheet_visibility(&self, index: usize) -> Option<&str> {
+        self.worksheets.get(index).map(|ws| ws.visibility())
+    }
+
+    /// Set the active worksheet index.
+    pub fn set_active_sheet(&mut self, index: usize) {
+        // Mark all worksheets as not active
+        for ws in &mut self.worksheets {
+            ws.set_active(false);
+        }
+
+        // Set the specified worksheet as active
+        if let Some(ws) = self.worksheets.get_mut(index) {
+            ws.set_active(true);
+            self.modified = true;
+        }
+    }
+
+    /// Force formula recalculation when the workbook is opened.
+    pub fn set_force_formula_recalculation(&mut self, force: bool) {
+        self.force_formula_recalculation = force;
+        self.modified = true;
+    }
+
+    /// Get whether formula recalculation is forced.
+    pub fn get_force_formula_recalculation(&self) -> bool {
+        self.force_formula_recalculation
+    }
+
+    /// Set the calculation mode for the workbook.
+    pub fn set_calculation_mode(&mut self, mode: &str) {
+        self.calculation_mode = mode.to_string();
+        self.modified = true;
+    }
+
+    /// Get the calculation mode for the workbook.
+    pub fn get_calculation_mode(&self) -> Option<&str> {
+        Some(&self.calculation_mode)
+    }
+
+    /// Protect the workbook with optional password.
+    ///
+    /// # Arguments
+    /// * `password` - Optional password (will be hashed)
+    /// * `lock_structure` - Prevent adding/deleting sheets
+    /// * `lock_windows` - Prevent resizing/moving workbook window
+    pub fn protect_workbook(
+        &mut self,
+        password: Option<&str>,
+        lock_structure: bool,
+        lock_windows: bool,
+    ) {
+        use super::sheet::MutableWorksheet;
+
+        let password_hash = password.map(MutableWorksheet::hash_password);
+
+        self.protection = Some(WorkbookProtection {
+            password_hash,
+            lock_structure,
+            lock_windows,
+        });
+        self.modified = true;
+    }
+
+    /// Unprotect the workbook.
+    pub fn unprotect_workbook(&mut self) {
+        self.protection = None;
+        self.modified = true;
+    }
+
+    /// Check if the workbook is protected.
+    pub fn is_protected(&self) -> bool {
+        self.protection.is_some()
+    }
+
+    /// Get the workbook protection configuration.
+    pub fn get_protection(&self) -> Option<&WorkbookProtection> {
+        self.protection.as_ref()
     }
 }
 

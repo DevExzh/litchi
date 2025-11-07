@@ -56,6 +56,8 @@ pub use worksheet::{
 };
 // Re-export writer types
 pub use writer::{
-    FreezePanes, MutableSharedStrings, MutableWorkbookData, MutableWorksheet, NamedRange,
-    StylesBuilder,
+    AutoFilter as WriterAutoFilter, CellComment as WriterCellComment, ConditionalFormat,
+    ConditionalFormatType, FreezePanes, HeaderFooter, Hyperlink as WriterHyperlink, Image,
+    MutableSharedStrings, MutableWorkbookData, MutableWorksheet, NamedRange,
+    PageSetup as WriterPageSetup, SheetProtection, StylesBuilder, WorkbookProtection,
 };
