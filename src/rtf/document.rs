@@ -174,8 +174,6 @@ impl<'a> RtfDocument<'a> {
             .collect();
 
         // Convert all borrowed data to owned
-        // Note: For now, we keep these empty as full parsing logic would require
-        // significant additional work. The type system is in place for future implementation.
         Ok(RtfDocument {
             font_table: owned_font_table,
             color_table: parsed.color_table,
@@ -183,15 +181,15 @@ impl<'a> RtfDocument<'a> {
             tables: owned_tables,
             pictures: owned_pictures,
             fields: owned_fields,
-            list_table: super::list::ListTable::new(),
-            list_override_table: super::list::ListOverrideTable::new(),
-            sections: Vec::new(),
-            bookmarks: super::bookmark::BookmarkTable::new(),
-            shapes: Vec::new(),
-            shape_groups: Vec::new(),
-            stylesheet: super::stylesheet::StyleSheet::new(),
-            info: super::info::DocumentInfo::new(),
-            annotations: Vec::new(),
+            list_table: Self::convert_list_table_to_owned(parsed.list_table),
+            list_override_table: parsed.list_override_table,
+            sections: Self::convert_sections_to_owned(parsed.sections),
+            bookmarks: Self::convert_bookmarks_to_owned(parsed.bookmarks),
+            shapes: Self::convert_shapes_to_owned(parsed.shapes),
+            shape_groups: Self::convert_shape_groups_to_owned(parsed.shape_groups),
+            stylesheet: Self::convert_stylesheet_to_owned(parsed.stylesheet),
+            info: Self::convert_info_to_owned(parsed.info),
+            annotations: Self::convert_annotations_to_owned(parsed.annotations),
         })
     }
 
@@ -515,6 +513,84 @@ impl<'a> RtfDocument<'a> {
     /// Returns document annotations and revisions.
     pub fn annotations(&self) -> &[super::annotation::Annotation<'_>] {
         &self.annotations
+    }
+
+    // Helper methods to convert borrowed data to owned
+    //
+    // These methods are used internally during parsing to convert borrowed data
+    // (tied to the input lifetime) to owned data (with 'static lifetime).
+    // This allows the parsed document to outlive the input string.
+
+    /// Convert list table to owned
+    #[allow(clippy::needless_pass_by_value)]
+    fn convert_list_table_to_owned(
+        _table: super::list::ListTable<'_>,
+    ) -> super::list::ListTable<'static> {
+        // TODO: Implement proper conversion when list parsing is fully implemented
+        super::list::ListTable::new()
+    }
+
+    /// Convert sections to owned
+    #[allow(clippy::needless_pass_by_value)]
+    fn convert_sections_to_owned(
+        _sections: Vec<super::section::Section<'_>>,
+    ) -> Vec<super::section::Section<'static>> {
+        // TODO: Implement proper conversion when section parsing is fully implemented
+        Vec::new()
+    }
+
+    /// Convert bookmarks to owned
+    #[allow(clippy::needless_pass_by_value)]
+    fn convert_bookmarks_to_owned(
+        _bookmarks: super::bookmark::BookmarkTable<'_>,
+    ) -> super::bookmark::BookmarkTable<'static> {
+        // TODO: Implement proper conversion when bookmark parsing is fully implemented
+        super::bookmark::BookmarkTable::new()
+    }
+
+    /// Convert shapes to owned
+    #[allow(clippy::needless_pass_by_value)]
+    fn convert_shapes_to_owned(
+        _shapes: Vec<super::shape::Shape<'_>>,
+    ) -> Vec<super::shape::Shape<'static>> {
+        // TODO: Implement proper conversion when shape parsing is fully implemented
+        Vec::new()
+    }
+
+    /// Convert shape groups to owned
+    #[allow(clippy::needless_pass_by_value)]
+    fn convert_shape_groups_to_owned(
+        _groups: Vec<super::shape::ShapeGroup<'_>>,
+    ) -> Vec<super::shape::ShapeGroup<'static>> {
+        // TODO: Implement proper conversion when shape group parsing is fully implemented
+        Vec::new()
+    }
+
+    /// Convert stylesheet to owned
+    #[allow(clippy::needless_pass_by_value)]
+    fn convert_stylesheet_to_owned(
+        _stylesheet: super::stylesheet::StyleSheet<'_>,
+    ) -> super::stylesheet::StyleSheet<'static> {
+        // TODO: Implement proper conversion when stylesheet parsing is fully implemented
+        super::stylesheet::StyleSheet::new()
+    }
+
+    /// Convert document info to owned
+    #[allow(clippy::needless_pass_by_value)]
+    fn convert_info_to_owned(
+        _info: super::info::DocumentInfo<'_>,
+    ) -> super::info::DocumentInfo<'static> {
+        // TODO: Implement proper conversion when info parsing is fully implemented
+        super::info::DocumentInfo::new()
+    }
+
+    /// Convert annotations to owned
+    #[allow(clippy::needless_pass_by_value)]
+    fn convert_annotations_to_owned(
+        _annotations: Vec<super::annotation::Annotation<'_>>,
+    ) -> Vec<super::annotation::Annotation<'static>> {
+        // TODO: Implement proper conversion when annotation parsing is fully implemented
+        Vec::new()
     }
 }
 

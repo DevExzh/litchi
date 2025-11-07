@@ -9,6 +9,10 @@ use smallvec::SmallVec;
 use std::borrow::Cow;
 
 /// Control word with optional parameter.
+///
+/// This enum represents all control words defined in the RTF 1.9.1 specification.
+/// Some variants may not be actively used by the parser yet but are included
+/// for completeness and future extensibility.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ControlWord<'a> {
     // Document structure
@@ -636,10 +640,12 @@ impl<'a> Lexer<'a> {
             "listoverride" => ControlWord::ListOverride(param_value),
             "listlevel" => ControlWord::ListLevel(param_value),
             "levelnfc" => ControlWord::ListLevelType(param_value),
+            "leveltext" => ControlWord::ListNumberText(word),
             "levelstartat" => ControlWord::ListLevelStartAt(param_value),
             "levelnumbers" => ControlWord::ListLevelNumber(param_value),
 
             // Sections
+            "sbk" => ControlWord::SectionBreak,
             "sbknone" => ControlWord::SectionContinuous,
             "sbkcol" => ControlWord::SectionColumn,
             "sbkpage" => ControlWord::SectionPage,
@@ -667,22 +673,37 @@ impl<'a> Lexer<'a> {
             // Footnotes and endnotes
             "footnote" => ControlWord::Footnote,
             "endnote" => ControlWord::Endnote,
+            "chftn" => ControlWord::FootnoteNumber(param_value),
+            "chftnsepc" => ControlWord::EndnoteNumber(param_value),
 
             // Bookmarks
+            "bkmkstart" => ControlWord::BookmarkStart(word),
             "bkmkend" => ControlWord::BookmarkEnd,
 
             // Annotations
+            "atn" => ControlWord::Annotation,
+            "atndate" => ControlWord::AnnotationDate(word),
+            "atnauthor" => ControlWord::AnnotationAuthor(word),
             "atnid" => ControlWord::AnnotationRef(param_value),
 
             // Shapes
             "shp" => ControlWord::Shape,
             "shpgrp" => ControlWord::ShapeGroup,
+            "shpinst" => ControlWord::ShapeType(param_value),
+            "shpleft" => ControlWord::ShapeLeft(param_value),
+            "shptop" => ControlWord::ShapeTop(param_value),
+            "shpwidth" => ControlWord::ShapeWidth(param_value),
+            "shpheight" => ControlWord::ShapeHeight(param_value),
+            "shprotation" => ControlWord::ShapeRotation(param_value),
+            "shpz" => ControlWord::ShapeZOrder(param_value),
 
             // Document info
             "title" => ControlWord::Title(word),
             "subject" => ControlWord::Subject(word),
             "author" => ControlWord::Author(word),
             "keywords" => ControlWord::Keywords(word),
+            "comment" => ControlWord::Comment(word),
+            "doccomm" => ControlWord::DocComment(word),
 
             // Unicode
             "u" => ControlWord::Unicode(param_value),

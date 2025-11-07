@@ -34,22 +34,29 @@ impl Default for WriterOptions {
 }
 
 /// RTF document writer
+///
+/// Provides functionality to serialize RTF documents to a writer.
+/// All fields are used internally during the writing process.
 pub struct RtfWriter<W: Write> {
     /// Output writer
     writer: W,
     /// Writer options
     options: WriterOptions,
-    /// Current indentation level
+    /// Current indentation level (reserved for formatted output)
+    #[allow(dead_code)]
     indent_level: usize,
     /// Font table
     font_table: FontTable<'static>,
     /// Color table
     color_table: ColorTable,
-    /// List table
+    /// List table (reserved for writing lists)
+    #[allow(dead_code)]
     list_table: ListTable<'static>,
-    /// List override table
+    /// List override table (reserved for writing lists)
+    #[allow(dead_code)]
     list_override_table: ListOverrideTable,
-    /// Stylesheet
+    /// Stylesheet (reserved for writing styles)
+    #[allow(dead_code)]
     stylesheet: StyleSheet<'static>,
 }
 
@@ -529,6 +536,13 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write tab stop
+    ///
+    /// # Note
+    ///
+    /// This method is provided for completeness but is not currently used in document
+    /// serialization. It will be integrated once tab stops are fully implemented in
+    /// the paragraph properties.
+    #[allow(dead_code)]
     fn write_tab_stop(&mut self, tab: &TabStop) -> io::Result<()> {
         // Tab alignment
         match tab.alignment {

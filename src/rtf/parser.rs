@@ -1112,6 +1112,10 @@ impl<'a> Parser<'a> {
 }
 
 /// Parsed RTF document.
+///
+/// This is an intermediate representation produced by the parser
+/// before being converted into the final `RtfDocument` structure.
+/// All fields are public to allow direct access during document construction.
 pub struct ParsedDocument<'a> {
     /// Font table
     pub font_table: FontTable<'a>,
