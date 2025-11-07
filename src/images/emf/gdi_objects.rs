@@ -5,6 +5,7 @@
 
 use crate::images::svg::color::colorref_to_hex;
 use std::collections::HashMap;
+use xml_minifier::minified_xml_format;
 
 /// Pen styles from GDI
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -87,6 +88,152 @@ impl BrushStyle {
     }
 }
 
+/// Hatch styles from GDI (for BS_HATCHED brushes)
+/// Reference: [MS-EMF] Section 2.1.25 HatchStyle Enumeration
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum HatchStyle {
+    Horizontal = 0, // -----
+    Vertical = 1,   // |||||
+    FDiagonal = 2,  // \\\\\
+    BDiagonal = 3,  // /////
+    Cross = 4,      // +++++
+    DiagCross = 5,  // xxxxx
+}
+
+impl HatchStyle {
+    pub fn from_u32(value: u32) -> Option<Self> {
+        match value {
+            0 => Some(Self::Horizontal),
+            1 => Some(Self::Vertical),
+            2 => Some(Self::FDiagonal),
+            3 => Some(Self::BDiagonal),
+            4 => Some(Self::Cross),
+            5 => Some(Self::DiagCross),
+            _ => None,
+        }
+    }
+
+    /// Generate SVG pattern definition for this hatch style
+    /// Returns (pattern_id, pattern_svg) tuple
+    pub fn to_svg_pattern(&self, pattern_id: &str, color: &str, bg_color: &str) -> String {
+        let pattern_size = 8.0; // Standard hatch pattern size
+
+        match self {
+            Self::Horizontal => {
+                minified_xml_format!(
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
+  <rect width="{}" height="{}" fill="{}"/>
+  <line x1="0" y1="4" x2="8" y2="4" stroke="{}" stroke-width="1"/>
+</pattern>"#,
+                    pattern_id,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    bg_color,
+                    color
+                )
+            },
+            Self::Vertical => {
+                minified_xml_format!(
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
+  <rect width="{}" height="{}" fill="{}"/>
+  <line x1="4" y1="0" x2="4" y2="8" stroke="{}" stroke-width="1"/>
+</pattern>"#,
+                    pattern_id,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    bg_color,
+                    color
+                )
+            },
+            Self::FDiagonal => {
+                minified_xml_format!(
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
+  <rect width="{}" height="{}" fill="{}"/>
+  <line x1="0" y1="0" x2="8" y2="8" stroke="{}" stroke-width="1"/>
+  <line x1="-2" y1="6" x2="2" y2="10" stroke="{}" stroke-width="1"/>
+  <line x1="6" y1="-2" x2="10" y2="2" stroke="{}" stroke-width="1"/>
+</pattern>"#,
+                    pattern_id,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    bg_color,
+                    color,
+                    color,
+                    color
+                )
+            },
+            Self::BDiagonal => {
+                minified_xml_format!(
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
+  <rect width="{}" height="{}" fill="{}"/>
+  <line x1="0" y1="8" x2="8" y2="0" stroke="{}" stroke-width="1"/>
+  <line x1="-2" y1="2" x2="2" y2="-2" stroke="{}" stroke-width="1"/>
+  <line x1="6" y1="10" x2="10" y2="6" stroke="{}" stroke-width="1"/>
+</pattern>"#,
+                    pattern_id,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    bg_color,
+                    color,
+                    color,
+                    color
+                )
+            },
+            Self::Cross => {
+                minified_xml_format!(
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
+  <rect width="{}" height="{}" fill="{}"/>
+  <line x1="0" y1="4" x2="8" y2="4" stroke="{}" stroke-width="1"/>
+  <line x1="4" y1="0" x2="4" y2="8" stroke="{}" stroke-width="1"/>
+</pattern>"#,
+                    pattern_id,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    bg_color,
+                    color,
+                    color
+                )
+            },
+            Self::DiagCross => {
+                minified_xml_format!(
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
+  <rect width="{}" height="{}" fill="{}"/>
+  <line x1="0" y1="0" x2="8" y2="8" stroke="{}" stroke-width="1"/>
+  <line x1="0" y1="8" x2="8" y2="0" stroke="{}" stroke-width="1"/>
+  <line x1="-2" y1="6" x2="2" y2="10" stroke="{}" stroke-width="1"/>
+  <line x1="6" y1="-2" x2="10" y2="2" stroke="{}" stroke-width="1"/>
+  <line x1="-2" y1="2" x2="2" y2="-2" stroke="{}" stroke-width="1"/>
+  <line x1="6" y1="10" x2="10" y2="6" stroke="{}" stroke-width="1"/>
+</pattern>"#,
+                    pattern_id,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    bg_color,
+                    color,
+                    color,
+                    color,
+                    color,
+                    color,
+                    color
+                )
+            },
+        }
+    }
+}
+
 /// Pen object for drawing
 #[derive(Debug, Clone)]
 pub struct Pen {
@@ -134,8 +281,9 @@ impl Pen {
 #[derive(Debug, Clone)]
 pub struct Brush {
     pub style: BrushStyle,
-    pub color: String, // RGB hex color
-    pub hatch: u32,    // Hatch pattern if hatched
+    pub color: String,                   // RGB hex color (foreground for hatched)
+    pub hatch_style: Option<HatchStyle>, // Hatch pattern style if BS_HATCHED
+    pub pattern_id: Option<String>,      // Pattern reference ID for SVG
 }
 
 impl Default for Brush {
@@ -143,28 +291,96 @@ impl Default for Brush {
         Self {
             style: BrushStyle::Solid,
             color: "#FFFFFF".to_string(),
-            hatch: 0,
+            hatch_style: None,
+            pattern_id: None,
         }
     }
 }
 
 impl Brush {
     /// Create brush from EMR_CREATEBRUSHINDIRECT data
+    ///
+    /// # Arguments
+    /// * `style` - Brush style (BS_SOLID, BS_HATCHED, etc.)
+    /// * `colorref` - COLORREF value (RGB color)
+    /// * `hatch` - Hatch style value (only used if style is BS_HATCHED)
     pub fn from_emr_data(style: u32, colorref: u32, hatch: u32) -> Self {
+        let brush_style = BrushStyle::from_u32(style).unwrap_or(BrushStyle::Solid);
+        let hatch_style = if brush_style == BrushStyle::Hatched {
+            HatchStyle::from_u32(hatch)
+        } else {
+            None
+        };
+
         Self {
-            style: BrushStyle::from_u32(style).unwrap_or(BrushStyle::Solid),
+            style: brush_style,
             color: colorref_to_hex(colorref),
-            hatch,
+            hatch_style,
+            pattern_id: None,
         }
     }
 
     /// Convert to SVG fill attribute
+    ///
+    /// Returns either a color value, "none", or a pattern reference.
+    /// For hatched brushes, returns a pattern reference that must be
+    /// defined in the SVG <defs> section.
     pub fn to_svg_fill(&self) -> String {
         match self.style {
             BrushStyle::Null => "none".to_string(),
             BrushStyle::Solid => self.color.clone(),
-            _ => self.color.clone(), // Simplified for now
+            BrushStyle::Hatched => {
+                // For hatched brushes, return pattern reference if available
+                if let Some(ref pattern_id) = self.pattern_id {
+                    format!("url(#{})", pattern_id)
+                } else {
+                    // Fallback to solid color if pattern not generated
+                    self.color.clone()
+                }
+            },
+            // For other pattern types, use solid color as fallback
+            // Full pattern support would require bitmap handling
+            BrushStyle::Pattern
+            | BrushStyle::Indexed
+            | BrushStyle::DibPattern
+            | BrushStyle::DibPatternPt
+            | BrushStyle::Pattern8x8
+            | BrushStyle::DibPattern8x8
+            | BrushStyle::MonoPattern => {
+                // TODO: Full pattern/bitmap brush support
+                // For now, use the brush color as a reasonable fallback
+                self.color.clone()
+            },
         }
+    }
+
+    /// Generate SVG pattern definition for hatched brush
+    ///
+    /// This should be called to generate the pattern definition that goes
+    /// in the <defs> section of the SVG document.
+    ///
+    /// # Arguments
+    /// * `pattern_id` - Unique ID for this pattern
+    /// * `bg_color` - Background color for the pattern
+    ///
+    /// # Returns
+    /// SVG pattern definition string, or None if not a hatched brush
+    pub fn generate_svg_pattern(&mut self, pattern_id: String, bg_color: &str) -> Option<String> {
+        if self.style == BrushStyle::Hatched {
+            if let Some(hatch_style) = self.hatch_style {
+                self.pattern_id = Some(pattern_id.clone());
+                Some(hatch_style.to_svg_pattern(&pattern_id, &self.color, bg_color))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Check if this brush requires a pattern definition
+    pub fn needs_pattern(&self) -> bool {
+        matches!(self.style, BrushStyle::Hatched) && self.hatch_style.is_some()
     }
 }
 
@@ -323,9 +539,50 @@ mod tests {
 
     #[test]
     fn test_brush_creation() {
-        let brush = Brush::from_emr_data(0, 0x00FF00, 0); // Green
+        let brush = Brush::from_emr_data(0, 0x00FF00, 0); // Green solid brush
         assert_eq!(brush.style, BrushStyle::Solid);
         assert_eq!(brush.color, "#00FF00");
+        assert!(brush.hatch_style.is_none());
+    }
+
+    #[test]
+    fn test_hatched_brush_creation() {
+        let brush = Brush::from_emr_data(2, 0xFF0000, 4); // Red cross-hatched brush
+        assert_eq!(brush.style, BrushStyle::Hatched);
+        assert_eq!(brush.color, "#FF0000");
+        assert_eq!(brush.hatch_style, Some(HatchStyle::Cross));
+        assert!(brush.needs_pattern());
+    }
+
+    #[test]
+    fn test_brush_svg_fill() {
+        // Solid brush
+        let solid = Brush::from_emr_data(0, 0x00FF00, 0);
+        assert_eq!(solid.to_svg_fill(), "#00FF00");
+
+        // Null brush
+        let null = Brush::from_emr_data(1, 0x000000, 0);
+        assert_eq!(null.to_svg_fill(), "none");
+
+        // Hatched brush without pattern ID (fallback)
+        let hatched = Brush::from_emr_data(2, 0xFF0000, 0);
+        assert_eq!(hatched.to_svg_fill(), "#FF0000");
+    }
+
+    #[test]
+    fn test_hatch_pattern_generation() {
+        let mut brush = Brush::from_emr_data(2, 0xFF0000, 0); // Horizontal hatch
+        let pattern = brush.generate_svg_pattern("pattern-1".to_string(), "#FFFFFF");
+        assert!(pattern.is_some());
+
+        let pattern_svg = pattern.unwrap();
+        assert!(pattern_svg.contains("pattern-1"));
+        assert!(pattern_svg.contains("#FF0000")); // Foreground color
+        assert!(pattern_svg.contains("#FFFFFF")); // Background color
+
+        // Now the brush should have pattern_id set
+        assert_eq!(brush.pattern_id, Some("pattern-1".to_string()));
+        assert_eq!(brush.to_svg_fill(), "url(#pattern-1)");
     }
 
     #[test]

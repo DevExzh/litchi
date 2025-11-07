@@ -20,6 +20,7 @@ pub mod simd_ops;
 pub mod svg;
 
 pub use converter::{EmfConverter, EmfToRasterOptions};
+pub use gdi_objects::{Brush, BrushStyle, Font, HatchStyle, Pen, PenStyle};
 pub use parser::{EmfParser, EmfRecord, EmfRecordRef, RecordRefIterator};
 pub use record_parser::*;
 pub use svg::EmfSvgConverter;

@@ -5,6 +5,11 @@ use super::path::PathBuilder;
 use crate::images::emf::records::*;
 use crate::images::svg_utils::write_num;
 
+// Import hatch style constants
+use crate::images::emf::records::hatch_style;
+
+use xml_minifier::minified_xml_format;
+
 /// Complete rendering state
 pub struct RenderState {
     /// Device context stack
@@ -220,6 +225,18 @@ impl DeviceContext {
     pub fn get_fill_attr(&self) -> String {
         if self.brush.style == brush_style::NULL {
             "fill=\"none\"".to_string()
+        } else if self.brush.style == brush_style::HATCHED {
+            // For hatched brushes, use pattern reference if available
+            if let Some(ref pattern_id) = self.brush.pattern_id {
+                format!("fill=\"url(#{})\"", pattern_id)
+            } else {
+                // Fallback to solid color if pattern not generated
+                let mut s = String::with_capacity(32);
+                s.push_str("fill=\"");
+                s.push_str(&self.brush.color.to_svg_color());
+                s.push('"');
+                s
+            }
         } else {
             let mut s = String::with_capacity(32);
             s.push_str("fill=\"");
@@ -297,6 +314,7 @@ pub struct Brush {
     pub style: u32,
     pub color: ColorRef,
     pub hatch: Option<u32>,
+    pub pattern_id: Option<String>, // SVG pattern reference for hatched brushes
 }
 
 impl Default for Brush {
@@ -305,7 +323,193 @@ impl Default for Brush {
             style: brush_style::SOLID,
             color: ColorRef::from_rgb(255, 255, 255), // White
             hatch: None,
+            pattern_id: None,
         }
+    }
+}
+
+impl Brush {
+    /// Create brush from EMR_CREATEBRUSHINDIRECT record
+    pub fn from_create_brush(style: u32, color: ColorRef, hatch: u32) -> Self {
+        let hatch_opt = if style == brush_style::HATCHED {
+            Some(hatch)
+        } else {
+            None
+        };
+
+        Self {
+            style,
+            color,
+            hatch: hatch_opt,
+            pattern_id: None,
+        }
+    }
+
+    /// Generate SVG pattern definition for hatched brush
+    ///
+    /// # Arguments
+    /// * `pattern_id` - Unique ID for the pattern
+    /// * `bg_color` - Background color for the pattern
+    ///
+    /// # Returns
+    /// SVG pattern definition string, or None if not a hatched brush
+    pub fn generate_svg_pattern(
+        &mut self,
+        pattern_id: String,
+        bg_color: &ColorRef,
+    ) -> Option<String> {
+        if self.style == brush_style::HATCHED {
+            if let Some(hatch) = self.hatch {
+                self.pattern_id = Some(pattern_id.clone());
+                Some(Self::hatch_to_svg_pattern(
+                    &pattern_id,
+                    &self.color.to_svg_color(),
+                    &bg_color.to_svg_color(),
+                    hatch,
+                ))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Convert hatch style to SVG pattern definition
+    fn hatch_to_svg_pattern(pattern_id: &str, color: &str, bg_color: &str, hatch: u32) -> String {
+        let pattern_size = 8.0;
+
+        match hatch {
+            hatch_style::HORIZONTAL => {
+                minified_xml_format!(
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
+  <rect width="{}" height="{}" fill="{}"/>
+  <line x1="0" y1="4" x2="8" y2="4" stroke="{}" stroke-width="1"/>
+</pattern>"#,
+                    pattern_id,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    bg_color,
+                    color
+                )
+            },
+            hatch_style::VERTICAL => {
+                minified_xml_format!(
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
+  <rect width="{}" height="{}" fill="{}"/>
+  <line x1="4" y1="0" x2="4" y2="8" stroke="{}" stroke-width="1"/>
+</pattern>"#,
+                    pattern_id,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    bg_color,
+                    color
+                )
+            },
+            hatch_style::FDIAGONAL => {
+                minified_xml_format!(
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
+  <rect width="{}" height="{}" fill="{}"/>
+  <line x1="0" y1="0" x2="8" y2="8" stroke="{}" stroke-width="1"/>
+  <line x1="-2" y1="6" x2="2" y2="10" stroke="{}" stroke-width="1"/>
+  <line x1="6" y1="-2" x2="10" y2="2" stroke="{}" stroke-width="1"/>
+</pattern>"#,
+                    pattern_id,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    bg_color,
+                    color,
+                    color,
+                    color
+                )
+            },
+            hatch_style::BDIAGONAL => {
+                minified_xml_format!(
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
+  <rect width="{}" height="{}" fill="{}"/>
+  <line x1="0" y1="8" x2="8" y2="0" stroke="{}" stroke-width="1"/>
+  <line x1="-2" y1="2" x2="2" y2="-2" stroke="{}" stroke-width="1"/>
+  <line x1="6" y1="10" x2="10" y2="6" stroke="{}" stroke-width="1"/>
+</pattern>"#,
+                    pattern_id,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    bg_color,
+                    color,
+                    color,
+                    color
+                )
+            },
+            hatch_style::CROSS => {
+                minified_xml_format!(
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
+  <rect width="{}" height="{}" fill="{}"/>
+  <line x1="0" y1="4" x2="8" y2="4" stroke="{}" stroke-width="1"/>
+  <line x1="4" y1="0" x2="4" y2="8" stroke="{}" stroke-width="1"/>
+</pattern>"#,
+                    pattern_id,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    bg_color,
+                    color,
+                    color
+                )
+            },
+            hatch_style::DIAGCROSS => {
+                minified_xml_format!(
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
+  <rect width="{}" height="{}" fill="{}"/>
+  <line x1="0" y1="0" x2="8" y2="8" stroke="{}" stroke-width="1"/>
+  <line x1="0" y1="8" x2="8" y2="0" stroke="{}" stroke-width="1"/>
+  <line x1="-2" y1="6" x2="2" y2="10" stroke="{}" stroke-width="1"/>
+  <line x1="6" y1="-2" x2="10" y2="2" stroke="{}" stroke-width="1"/>
+  <line x1="-2" y1="2" x2="2" y2="-2" stroke="{}" stroke-width="1"/>
+  <line x1="6" y1="10" x2="10" y2="6" stroke="{}" stroke-width="1"/>
+</pattern>"#,
+                    pattern_id,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    bg_color,
+                    color,
+                    color,
+                    color,
+                    color,
+                    color,
+                    color
+                )
+            },
+            _ => {
+                // Unknown hatch style, use solid color
+                minified_xml_format!(
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
+  <rect width="{}" height="{}" fill="{}"/>
+</pattern>"#,
+                    pattern_id,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    pattern_size,
+                    color
+                )
+            },
+        }
+    }
+
+    /// Check if this brush needs a pattern definition
+    pub fn needs_pattern(&self) -> bool {
+        self.style == brush_style::HATCHED && self.hatch.is_some()
     }
 }
 
