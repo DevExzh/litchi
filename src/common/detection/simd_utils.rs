@@ -573,7 +573,7 @@ mod tests {
         let matches = parallel_signature_check(data, &many_signatures);
         assert_eq!(matches.as_slice(), &[0, 2]);
         // Verify SmallVec didn't spill to heap (capacity check)
-        assert!(matches.spilled() == false);
+        assert!(!matches.spilled());
     }
 
     #[test]

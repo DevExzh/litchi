@@ -239,7 +239,6 @@ pub fn detect_iwork_format_from_path<P: AsRef<Path>>(path: P) -> Option<FileForm
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
 
     #[test]
     #[cfg(feature = "ooxml")]

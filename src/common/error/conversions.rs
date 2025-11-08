@@ -3,6 +3,13 @@
 //! This module contains From trait implementations to convert from internal
 //! error types to the unified Error type.
 
+#[cfg(any(
+    feature = "ole",
+    feature = "ooxml",
+    feature = "odf",
+    feature = "iwa",
+    feature = "formula"
+))]
 use super::types::Error;
 
 // Conversions from internal error types

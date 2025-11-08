@@ -13,6 +13,8 @@ pub mod metadata;
 pub mod shapes;
 pub mod simd;
 pub mod style;
+/// Common unit conversion utilities (length units used across all formats)
+pub mod unit;
 
 // Re-exports for convenience
 pub use detection::{FileFormat, detect_file_format, detect_file_format_from_bytes};
@@ -20,3 +22,5 @@ pub use error::{Error, Result};
 pub use metadata::Metadata;
 pub use shapes::{PlaceholderType, ShapeType};
 pub use style::{Length, RGBColor, VerticalPosition};
+// Unit conversions
+pub use unit::{Length as MeasuredLength, LengthUnit};
