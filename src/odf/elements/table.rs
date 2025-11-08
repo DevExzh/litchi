@@ -86,7 +86,43 @@ impl Table {
 
     /// Add a row to the table
     pub fn add_row(&mut self, row: TableRow) {
-        self.element.add_child(Box::new(row.element));
+        self.element.add_child(row.element);
+    }
+
+    /// Add a column definition to the table
+    ///
+    /// This must be called before adding rows. Columns are defined at the beginning
+    /// of the table in ODF format.
+    ///
+    /// # Arguments
+    ///
+    /// * `column` - Table column definition
+    pub fn add_column(&mut self, column: TableColumn) {
+        // Columns must be inserted before rows
+        // Find the first row index
+        let first_row_idx = self
+            .element
+            .children
+            .iter()
+            .position(|child| child.tag_name() == "table:table-row");
+
+        let col_element: Element = column.into();
+        if let Some(idx) = first_row_idx {
+            self.element.children.insert(idx, col_element);
+        } else {
+            self.element.add_child(col_element);
+        }
+    }
+
+    /// Set the number of columns and create default column definitions
+    ///
+    /// # Arguments
+    ///
+    /// * `count` - Number of columns
+    pub fn set_column_count(&mut self, count: usize) {
+        for _ in 0..count {
+            self.add_column(TableColumn::new());
+        }
     }
 
     /// Get the number of columns (based on the widest row)
@@ -168,15 +204,18 @@ impl TableRow {
 
     /// Add a cell to the row
     pub fn add_cell(&mut self, cell: TableCell) {
-        self.element.add_child(Box::new(cell.element));
+        self.element.add_child(cell.element);
     }
 
-    /// Get the style name
+    /// Get the style name (for row height)
     pub fn style_name(&self) -> Option<&str> {
         self.element.get_attribute("table:style-name")
     }
 
-    /// Set the style name
+    /// Set the style name (for row height)
+    ///
+    /// To set a specific height, you need to create a row style in the
+    /// document's automatic styles section.
     pub fn set_style_name(&mut self, name: &str) {
         self.element.set_attribute("table:style-name", name);
     }
@@ -574,7 +613,7 @@ impl TableElements {
                     } else if !stack.is_empty() {
                         let element = stack.pop().unwrap();
                         if let Some(parent) = stack.last_mut() {
-                            parent.add_child(Box::new(element));
+                            parent.add_child(element);
                         }
                     }
                 },

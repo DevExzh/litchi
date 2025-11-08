@@ -31,3 +31,9 @@ impl Meta {
         self.element.get_attribute("dc:creator")
     }
 }
+
+impl Default for Meta {
+    fn default() -> Self {
+        Self::new()
+    }
+}

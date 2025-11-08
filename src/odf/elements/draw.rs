@@ -41,6 +41,12 @@ impl DrawPage {
     }
 }
 
+impl Default for DrawPage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A text box element
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -63,6 +69,12 @@ impl TextBox {
     }
 }
 
+impl Default for TextBox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// An image element
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -82,5 +94,11 @@ impl Image {
     /// Get the image href
     pub fn href(&self) -> Option<&str> {
         self.element.get_attribute("xlink:href")
+    }
+}
+
+impl Default for Image {
+    fn default() -> Self {
+        Self::new()
     }
 }

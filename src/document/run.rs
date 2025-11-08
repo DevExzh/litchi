@@ -1,6 +1,8 @@
 //! Text run implementation for Word documents.
 
-use crate::common::{Error, Result};
+#[cfg(any(feature = "ole", feature = "ooxml", feature = "odf"))]
+use crate::common::Error;
+use crate::common::Result;
 
 #[cfg(feature = "ole")]
 use crate::ole;

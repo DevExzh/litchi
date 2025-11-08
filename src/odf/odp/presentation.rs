@@ -225,4 +225,111 @@ impl Presentation {
             Ok(Metadata::default())
         }
     }
+
+    // Note: For presentation modification operations, see `MutablePresentation` which provides
+    // full CRUD operations on slides and shapes including add/remove/update slides, add/remove
+    // shapes, and clear operations.
+
+    /// Save the presentation to a new file.
+    ///
+    /// This method saves the current presentation state to a new file.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path where the ODP file should be saved
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Presentation;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let presentation = Presentation::open("input.odp")?;
+    /// presentation.save("output.odp")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Note
+    ///
+    /// Full presentation modification support is planned for future releases. For now,
+    /// to modify a presentation, use `PresentationBuilder` to create a new one with
+    /// the desired content.
+    pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result<()> {
+        let bytes = self.to_bytes()?;
+        std::fs::write(path, bytes)?;
+        Ok(())
+    }
+
+    /// Convert the presentation to bytes.
+    ///
+    /// This method serializes the presentation to an ODF-compliant ZIP archive.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Presentation;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let presentation = Presentation::open("slides.odp")?;
+    /// let bytes = presentation.to_bytes()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        use crate::odf::core::PackageWriter;
+
+        let mut writer = PackageWriter::new();
+
+        // Set MIME type
+        writer.set_mimetype(self.package.mimetype())?;
+
+        // Add content.xml
+        let content_xml = self.content.xml_content();
+        writer.add_file("content.xml", content_xml.as_bytes())?;
+
+        // Add styles.xml if present
+        if let Some(ref styles) = self.styles {
+            let styles_xml = styles.xml_content();
+            writer.add_file("styles.xml", styles_xml.as_bytes())?;
+        }
+
+        // Add meta.xml if present
+        if let Some(ref meta) = self.meta {
+            let meta_xml = meta.xml_content();
+            writer.add_file("meta.xml", meta_xml.as_bytes())?;
+        }
+
+        // Copy settings.xml if present
+        if self.package.has_file("settings.xml") {
+            let settings_bytes = self.package.get_file("settings.xml")?;
+            writer.add_file("settings.xml", &settings_bytes)?;
+        }
+
+        // Copy all media files (images, videos, etc.) from the original package
+        let media_files = self.package.media_files()?;
+        for media_path in media_files {
+            if let Ok(media_bytes) = self.package.get_file(&media_path) {
+                writer.add_file(&media_path, &media_bytes)?;
+            }
+        }
+
+        // Copy other common ODF files if they exist
+        let other_files = vec!["Thumbnails/thumbnail.png", "Configurations2/"];
+        for file_path in other_files {
+            if self.package.has_file(file_path)
+                && let Ok(file_bytes) = self.package.get_file(file_path)
+            {
+                writer.add_file(file_path, &file_bytes)?;
+            }
+        }
+
+        writer.finish_to_bytes()
+    }
+
+    // Note: DELETE operations are available via `MutablePresentation`. To modify this presentation:
+    //   1. Convert: `let mut mutable = MutablePresentation::from_presentation(presentation)?`
+    //   2. Modify: `mutable.remove_slide(0)?`, `mutable.add_shape(0, shape)?`, etc.
+    //   3. Save: `mutable.save("output.odp")?`
+    // Available methods: remove_slide, remove_shape, update_slide, clear_slide, clear_slides, etc.
 }

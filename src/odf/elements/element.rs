@@ -54,12 +54,6 @@ pub trait ElementBase {
     /// Set the text content of this element
     fn set_text(&mut self, text: &str);
 
-    /// Get child elements
-    fn children(&self) -> &[Box<dyn ElementBase>];
-
-    /// Get mutable child elements
-    fn children_mut(&mut self) -> &mut Vec<Box<dyn ElementBase>>;
-
     /// Get attribute value by name
     fn get_attribute(&self, name: &str) -> Option<&str> {
         self.attributes().get(name).map(|s| s.as_str())
@@ -99,46 +93,6 @@ pub trait ElementBase {
     fn get_int_attribute(&self, name: &str) -> Option<i64> {
         self.get_attribute(name).and_then(|s| s.parse().ok())
     }
-
-    /// Find child elements by tag name
-    fn get_elements_by_tag(&self, tag_name: &str) -> Vec<&dyn ElementBase> {
-        self.children()
-            .iter()
-            .filter(|child| child.tag_name() == tag_name)
-            .map(|child| child.as_ref())
-            .collect()
-    }
-
-    /// Find first child element by tag name
-    fn get_element_by_tag(&self, tag_name: &str) -> Option<&dyn ElementBase> {
-        self.children()
-            .iter()
-            .find(|child| child.tag_name() == tag_name)
-            .map(|child| child.as_ref())
-    }
-
-    /// Add child element
-    fn add_child(&mut self, child: Box<dyn ElementBase>) {
-        self.children_mut().push(child);
-    }
-
-    /// Remove child element at index
-    fn remove_child(&mut self, index: usize) -> Option<Box<dyn ElementBase>> {
-        if index < self.children().len() {
-            Some(self.children_mut().remove(index))
-        } else {
-            None
-        }
-    }
-
-    /// Get all text content recursively
-    fn get_text_recursive(&self) -> String {
-        let mut text = self.text().to_string();
-        for child in self.children() {
-            text.push_str(&child.get_text_recursive());
-        }
-        text
-    }
 }
 
 /// Concrete Element implementation with namespace support
@@ -150,6 +104,32 @@ pub struct Element {
     namespace_context: NamespaceContext,
     text_content: String,
     pub(crate) children: Vec<Element>,
+}
+
+impl Element {
+    /// Add a child element (concrete Element type)
+    pub fn add_child(&mut self, child: Element) {
+        self.children.push(child);
+    }
+
+    /// Get children as concrete Elements
+    pub fn get_children(&self) -> &[Element] {
+        &self.children
+    }
+
+    /// Get mutable children as concrete Elements  
+    pub fn get_children_mut(&mut self) -> &mut Vec<Element> {
+        &mut self.children
+    }
+
+    /// Get text recursively from this element and all children
+    pub fn get_text_recursive(&self) -> String {
+        let mut text = self.text_content.clone();
+        for child in &self.children {
+            text.push_str(&child.get_text_recursive());
+        }
+        text
+    }
 }
 
 impl Element {
@@ -413,17 +393,6 @@ impl ElementBase for Element {
 
     fn set_text(&mut self, text: &str) {
         self.text_content = text.to_string();
-    }
-
-    fn children(&self) -> &[Box<dyn ElementBase>] {
-        // This is a workaround since we can't return &[Box<dyn ElementBase>]
-        // from a concrete type. In practice, you'd implement this differently
-        // with proper trait objects.
-        unsafe { std::mem::transmute(&self.children[..]) }
-    }
-
-    fn children_mut(&mut self) -> &mut Vec<Box<dyn ElementBase>> {
-        unsafe { std::mem::transmute(&mut self.children) }
     }
 }
 

@@ -1,7 +1,7 @@
 //! PowerPoint presentation implementation.
 
 use super::Slide;
-use super::types::{PptSlideData, PptxSlideData, PresentationImpl};
+use super::types::PresentationImpl;
 use crate::common::{Error, Result};
 
 #[cfg(feature = "ole")]
@@ -344,6 +344,7 @@ impl Presentation {
         match &self.inner {
             #[cfg(feature = "ole")]
             PresentationImpl::Ppt(pres) => {
+                use super::types::PptSlideData;
                 // Extract slide data to avoid lifetime issues
                 let ppt_slides = pres.slides().map_err(Error::from)?;
                 ppt_slides
@@ -362,6 +363,7 @@ impl Presentation {
             },
             #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(pres) => {
+                use super::types::PptxSlideData;
                 let slides = pres.slides().map_err(Error::from)?;
                 // Extract slide data immediately to avoid lifetime issues
                 slides
@@ -488,20 +490,19 @@ impl Presentation {
     /// Vector of (slide_number, text) tuples for each slide
     #[doc(hidden)]
     pub fn extract_text_for_markdown(&self) -> Result<Vec<(usize, String)>> {
-        match &self.inner {
-            #[cfg(feature = "ole")]
-            PresentationImpl::Ppt(pres) => pres.extract_text_fast().map_err(Error::from),
-            // For other formats, extract from slides (slower but works)
-            _ => {
-                let slides = self.slides()?;
-                Ok(slides
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(idx, slide)| {
-                        slide.text().ok().map(|text| (idx + 1, text.to_string()))
-                    })
-                    .collect())
-            },
+        #[cfg(feature = "ole")]
+        {
+            if let PresentationImpl::Ppt(pres) = &self.inner {
+                return pres.extract_text_fast().map_err(Error::from);
+            }
         }
+
+        // For other formats, extract from slides (slower but works)
+        let slides = self.slides()?;
+        Ok(slides
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, slide)| slide.text().ok().map(|text| (idx + 1, text.to_string())))
+            .collect())
     }
 }

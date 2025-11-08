@@ -31,23 +31,25 @@ pub enum StyleFamily {
     Graphic,
 }
 
-impl StyleFamily {
-    /// Parse style family from string
-    pub fn from_str(s: &str) -> Option<Self> {
+impl std::str::FromStr for StyleFamily {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "paragraph" => Some(Self::Paragraph),
-            "text" => Some(Self::Text),
-            "table" => Some(Self::Table),
-            "table-column" => Some(Self::TableColumn),
-            "table-row" => Some(Self::TableRow),
-            "table-cell" => Some(Self::TableCell),
-            "page-layout" => Some(Self::PageLayout),
-            "master-page" => Some(Self::MasterPage),
-            "graphic" => Some(Self::Graphic),
-            _ => None,
+            "paragraph" => Ok(Self::Paragraph),
+            "text" => Ok(Self::Text),
+            "table" => Ok(Self::Table),
+            "table-column" => Ok(Self::TableColumn),
+            "table-row" => Ok(Self::TableRow),
+            "table-cell" => Ok(Self::TableCell),
+            "page-layout" => Ok(Self::PageLayout),
+            "master-page" => Ok(Self::MasterPage),
+            "graphic" => Ok(Self::Graphic),
+            _ => Err(format!("Invalid style family: {}", s)),
         }
     }
+}
 
+impl StyleFamily {
     /// Convert to string
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -140,6 +142,93 @@ impl Style {
         Self {
             element: Element::new("style:style"),
             properties: StyleProperties::default(),
+        }
+    }
+
+    /// Create a new style with name and family
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Name of the style
+    /// * `family` - Style family (e.g., "text", "paragraph", "table")
+    pub fn with_name_and_family(name: &str, family: &str) -> Self {
+        let mut element = Element::new("style:style");
+        element.set_attribute("style:name", name);
+        element.set_attribute("style:family", family);
+        Self {
+            element,
+            properties: StyleProperties::default(),
+        }
+    }
+
+    /// Set a text property
+    ///
+    /// # Arguments
+    ///
+    /// * `property` - Property name (e.g., "fo:font-size", "fo:font-weight")
+    /// * `value` - Property value
+    pub fn set_text_property(&mut self, property: &str, value: &str) {
+        // Create or update text-properties element
+        let mut found = false;
+        for child in &mut self.element.children {
+            if child.tag_name() == "style:text-properties" {
+                child.set_attribute(property, value);
+                found = true;
+                break;
+            }
+        }
+
+        if !found {
+            let mut text_props = Element::new("style:text-properties");
+            text_props.set_attribute(property, value);
+            self.element.children.push(text_props);
+        }
+    }
+
+    /// Set a paragraph property
+    ///
+    /// # Arguments
+    ///
+    /// * `property` - Property name (e.g., "fo:text-align", "fo:margin-top")
+    /// * `value` - Property value
+    pub fn set_paragraph_property(&mut self, property: &str, value: &str) {
+        // Create or update paragraph-properties element
+        let mut found = false;
+        for child in &mut self.element.children {
+            if child.tag_name() == "style:paragraph-properties" {
+                child.set_attribute(property, value);
+                found = true;
+                break;
+            }
+        }
+
+        if !found {
+            let mut para_props = Element::new("style:paragraph-properties");
+            para_props.set_attribute(property, value);
+            self.element.children.push(para_props);
+        }
+    }
+
+    /// Set a table property
+    ///
+    /// # Arguments
+    ///
+    /// * `property` - Property name
+    /// * `value` - Property value
+    pub fn set_table_property(&mut self, property: &str, value: &str) {
+        let mut found = false;
+        for child in &mut self.element.children {
+            if child.tag_name() == "style:table-properties" {
+                child.set_attribute(property, value);
+                found = true;
+                break;
+            }
+        }
+
+        if !found {
+            let mut table_props = Element::new("style:table-properties");
+            table_props.set_attribute(property, value);
+            self.element.children.push(table_props);
         }
     }
 
@@ -291,7 +380,7 @@ impl Style {
     pub fn family(&self) -> Option<StyleFamily> {
         self.element
             .get_attribute("style:family")
-            .and_then(StyleFamily::from_str)
+            .and_then(|s| s.parse::<StyleFamily>().ok())
     }
 
     /// Get the parent style name

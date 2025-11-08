@@ -3,6 +3,8 @@
 //! This module provides a comprehensive set of classes for parsing and manipulating
 //! OpenDocument XML elements, inspired by odfdo/odfpy libraries.
 
+/// Efficient attribute parsing with SIMD acceleration
+pub mod attr_parser;
 /// Bookmark elements for marking locations in documents
 pub mod bookmark;
 /// Drawing elements (shapes, frames, images)
@@ -21,9 +23,13 @@ pub mod office;
 pub mod parser;
 /// Style elements
 pub mod style;
+/// Style builder for creating styles programmatically
+pub mod style_builder;
 /// Table-related elements (tables, rows, cells)
 pub mod table;
 /// Table expansion utilities for repeated cells/rows
 pub mod table_expansion;
+/// Efficient tag matching with SIMD and perfect hashing
+pub mod tag_matcher;
 /// Text-related elements (paragraphs, spans, headings)
 pub mod text;

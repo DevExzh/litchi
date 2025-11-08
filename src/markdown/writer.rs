@@ -6,19 +6,13 @@ use super::config::{MarkdownOptions, TableStyle};
 ///
 /// **Note**: Some functionality requires the `ole` or `ooxml` feature to be enabled.
 use crate::common::{Error, Metadata, Result};
-#[cfg(any(feature = "ole", feature = "ooxml"))]
 use crate::document::{Cell, Paragraph, Run, Table};
-use std::fmt::Write as FmtWrite;
-
-#[cfg(any(feature = "ole", feature = "ooxml"))]
 use memchr::memchr;
-
-#[cfg(any(feature = "ole", feature = "ooxml"))]
-use rayon::prelude::*;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use std::fmt::Write as FmtWrite;
 
 /// Minimum number of table rows to justify parallel processing overhead.
 /// Tables are typically smaller than documents, so we use a lower threshold.
-#[cfg(any(feature = "ole", feature = "ooxml"))]
 const TABLE_PARALLEL_THRESHOLD: usize = 20;
 
 /// Information about a detected list item.
@@ -630,6 +624,24 @@ impl MarkdownWriter {
                 run.italic()?.unwrap_or(false),
                 run.strikethrough()?.unwrap_or(false),
                 run.vertical_position()?,
+            )
+        };
+
+        // For rtf, odf features (without ole/ooxml)
+        #[cfg(all(
+            not(any(feature = "ole", feature = "ooxml")),
+            any(feature = "rtf", feature = "odf", feature = "iwa")
+        ))]
+        let (text, bold, italic, strikethrough) = {
+            let text = run.text()?;
+            if text.is_empty() {
+                return Ok(());
+            }
+            (
+                text,
+                run.bold()?.unwrap_or(false),
+                run.italic()?.unwrap_or(false),
+                run.strikethrough()?.unwrap_or(false),
             )
         };
 
@@ -1417,10 +1429,10 @@ impl MarkdownWriter {
         feature = "rtf",
         feature = "iwa"
     ))]
-    fn extract_formula_from_run(&self, run: &Run) -> Result<Option<String>> {
+    fn extract_formula_from_run(&self, _run: &Run) -> Result<Option<String>> {
         // Try OOXML OMML formulas first
         #[cfg(feature = "ooxml")]
-        if let crate::document::Run::Docx(docx_run) = run
+        if let crate::document::Run::Docx(docx_run) = _run
             && let Some(omml_xml) = docx_run.omml_formula()?
         {
             // Parse OMML and convert to LaTeX
@@ -1444,7 +1456,7 @@ impl MarkdownWriter {
         #[cfg(feature = "ole")]
         {
             // When only ole feature is enabled, Run can only be Doc variant
-            let ole_run = match run {
+            let ole_run = match _run {
                 crate::document::Run::Doc(r) => r,
                 #[cfg(feature = "ooxml")]
                 _ => return Ok(None),

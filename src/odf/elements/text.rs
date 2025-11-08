@@ -68,7 +68,7 @@ impl Paragraph {
 
     /// Add a text span to this paragraph
     pub fn add_span(&mut self, span: Span) {
-        self.element.add_child(Box::new(span.element));
+        self.element.add_child(span.element);
     }
 
     /// Check if this paragraph is a heading
@@ -178,6 +178,125 @@ impl Span {
 impl From<Span> for Element {
     fn from(span: Span) -> Element {
         span.element
+    }
+}
+
+/// A hyperlink element (text:a)
+#[derive(Debug, Clone)]
+pub struct Hyperlink {
+    element: Element,
+}
+
+impl Default for Hyperlink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Hyperlink {
+    /// Create a new hyperlink
+    pub fn new() -> Self {
+        Self {
+            element: Element::new("text:a"),
+        }
+    }
+
+    /// Create hyperlink from element
+    pub fn from_element(element: Element) -> Result<Self> {
+        if element.tag_name() != "text:a" {
+            return Err(Error::InvalidFormat(
+                "Element is not a hyperlink".to_string(),
+            ));
+        }
+        Ok(Self { element })
+    }
+
+    /// Get the hyperlink URL
+    pub fn href(&self) -> Option<&str> {
+        self.element.get_attribute("xlink:href")
+    }
+
+    /// Set the hyperlink URL
+    pub fn set_href(&mut self, href: &str) {
+        self.element.set_attribute("xlink:href", href);
+    }
+
+    /// Get the link text content
+    pub fn text(&self) -> Result<String> {
+        Ok(self.element.get_text_recursive())
+    }
+
+    /// Set the link text content
+    pub fn set_text(&mut self, text: &str) {
+        self.element.set_text(text);
+    }
+
+    /// Get the link type (simple, locator, etc.)
+    pub fn link_type(&self) -> Option<&str> {
+        self.element.get_attribute("xlink:type")
+    }
+
+    /// Get the visited style name
+    pub fn visited_style_name(&self) -> Option<&str> {
+        self.element.get_attribute("text:visited-style-name")
+    }
+}
+
+impl From<Hyperlink> for Element {
+    fn from(link: Hyperlink) -> Element {
+        link.element
+    }
+}
+
+/// A bookmark element (text:bookmark)
+#[derive(Debug, Clone)]
+pub struct Bookmark {
+    element: Element,
+}
+
+impl Bookmark {
+    /// Create a new bookmark
+    pub fn new(name: &str) -> Self {
+        let mut element = Element::new("text:bookmark");
+        element.set_attribute("text:name", name);
+        Self { element }
+    }
+
+    /// Create bookmark from element
+    pub fn from_element(element: Element) -> Result<Self> {
+        let tag = element.tag_name();
+        if tag != "text:bookmark" && tag != "text:bookmark-start" && tag != "text:bookmark-end" {
+            return Err(Error::InvalidFormat(
+                "Element is not a bookmark".to_string(),
+            ));
+        }
+        Ok(Self { element })
+    }
+
+    /// Get the bookmark name
+    pub fn name(&self) -> Option<&str> {
+        self.element.get_attribute("text:name")
+    }
+
+    /// Set the bookmark name
+    pub fn set_name(&mut self, name: &str) {
+        self.element.set_attribute("text:name", name);
+    }
+
+    /// Check if this is a bookmark-start element
+    pub fn is_start(&self) -> bool {
+        self.element.tag_name() == "text:bookmark-start"
+    }
+
+    /// Check if this is a bookmark-end element
+    pub fn is_end(&self) -> bool {
+        self.element.tag_name() == "text:bookmark-end"
+    }
+}
+
+impl From<Bookmark> for Element {
+    fn from(bookmark: Bookmark) -> Element {
+        bookmark.element
     }
 }
 
@@ -291,7 +410,7 @@ impl List {
 
     /// Add a list item
     pub fn add_item(&mut self, item: ListItem) {
-        self.element.add_child(Box::new(item.element));
+        self.element.add_child(item.element);
     }
 
     /// Get the style name
@@ -366,7 +485,7 @@ impl ListItem {
 
     /// Add a paragraph to this list item
     pub fn add_paragraph(&mut self, paragraph: Paragraph) {
-        self.element.add_child(Box::new(paragraph.element));
+        self.element.add_child(paragraph.element);
     }
 }
 

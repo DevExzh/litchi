@@ -530,9 +530,45 @@ impl Document {
                 Ok(elements)
             },
             #[cfg(feature = "odf")]
-            DocumentImpl::Odt(doc) => doc
-                .elements()
-                .map_err(|e| Error::ParseError(format!("Failed to get elements: {}", e))),
+            DocumentImpl::Odt(doc) => {
+                use super::DocumentElement;
+                use crate::odf::elements::parser::DocumentOrderElement;
+                use crate::odf::elements::text::Paragraph as ElementParagraph;
+
+                // Get ODF-specific elements and convert to unified API types
+                let odf_elements = doc
+                    .elements()
+                    .map_err(|e| Error::ParseError(format!("Failed to get elements: {}", e)))?;
+
+                let mut elements = Vec::new();
+                for element in odf_elements {
+                    match element {
+                        DocumentOrderElement::Paragraph(para) => {
+                            elements.push(DocumentElement::Paragraph(Paragraph::Odt(para)));
+                        },
+                        DocumentOrderElement::Heading(heading) => {
+                            // Convert heading to paragraph for unified API
+                            if let Ok(text) = heading.text() {
+                                let mut para = ElementParagraph::new();
+                                para.set_text(&text);
+                                if let Some(style) = heading.style_name() {
+                                    para.set_style_name(style);
+                                }
+                                elements.push(DocumentElement::Paragraph(Paragraph::Odt(para)));
+                            }
+                        },
+                        DocumentOrderElement::Table(table) => {
+                            elements.push(DocumentElement::Table(Table::Odt(table)));
+                        },
+                        DocumentOrderElement::List(_list) => {
+                            // Lists are typically expanded to paragraphs in text extraction
+                            // Skip in the unified document element API for now
+                        },
+                    }
+                }
+
+                Ok(elements)
+            },
         }
     }
 

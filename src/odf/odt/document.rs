@@ -325,63 +325,52 @@ impl Document {
         TableElements::parse_tables_from_content(self.content.xml_content())
     }
 
-    /// Get all document elements (paragraphs and tables) in document order.
+    /// Get all document elements (paragraphs, headings, and tables) in document order.
     ///
-    /// This method extracts both paragraphs and tables, interleaved in the order
-    /// they appear in the document.
+    /// This method extracts both paragraphs (including headings) and tables, interleaved
+    /// in the order they appear in the document. This provides a more efficient way to
+    /// iterate through document content than calling `paragraphs()` and `tables()` separately,
+    /// and preserves the exact document order.
+    ///
+    /// # Returns
+    ///
+    /// A vector of `DocumentOrderElement` containing all paragraphs, headings, tables, and
+    /// lists in the order they appear in the document.
     ///
     /// # Examples
     ///
     /// ```no_run
     /// use litchi::odf::Document;
+    /// use litchi::odf::elements::parser::DocumentOrderElement;
     ///
     /// # fn main() -> litchi::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let elements = doc.elements()?;
+    ///
+    /// for element in elements {
+    ///     match element {
+    ///         DocumentOrderElement::Paragraph(para) => {
+    ///             println!("Paragraph: {}", para.text()?);
+    ///         },
+    ///         DocumentOrderElement::Heading(heading) => {
+    ///             println!("Heading: {}", heading.text()?);
+    ///         },
+    ///         DocumentOrderElement::Table(table) => {
+    ///             println!("Table with {} rows", table.row_count()?);
+    ///         },
+    ///         DocumentOrderElement::List(_) => {
+    ///             println!("List element");
+    ///         },
+    ///     }
+    /// }
     /// # Ok(())
     /// # }
     /// ```
-    pub fn elements(&self) -> Result<Vec<crate::document::DocumentElement>> {
-        use crate::odf::elements::parser::{DocumentOrderElement, DocumentParser};
+    pub fn elements(&self) -> Result<Vec<crate::odf::elements::parser::DocumentOrderElement>> {
+        use crate::odf::elements::parser::DocumentParser;
 
         // Parse all elements in document order using the generic ODF parser
-        let ordered_elements = DocumentParser::parse_elements_in_order(self.content.xml_content())?;
-        let mut elements = Vec::new();
-
-        for element in ordered_elements {
-            match element {
-                DocumentOrderElement::Paragraph(para) => {
-                    elements.push(crate::document::DocumentElement::Paragraph(
-                        crate::document::Paragraph::Odt(para),
-                    ));
-                },
-                DocumentOrderElement::Heading(heading) => {
-                    // Convert heading to paragraph for unified API
-                    if let Ok(text) = heading.text() {
-                        let mut para = ElementParagraph::new();
-                        para.set_text(&text);
-                        if let Some(style) = heading.style_name() {
-                            para.set_style_name(style);
-                        }
-                        elements.push(crate::document::DocumentElement::Paragraph(
-                            crate::document::Paragraph::Odt(para),
-                        ));
-                    }
-                },
-                DocumentOrderElement::Table(table) => {
-                    elements.push(crate::document::DocumentElement::Table(
-                        crate::document::Table::Odt(table),
-                    ));
-                },
-                DocumentOrderElement::List(_list) => {
-                    // Lists could be converted to paragraphs or handled separately
-                    // For now, skip lists in the unified document element API
-                    // as they are typically expanded to paragraphs by text extraction
-                },
-            }
-        }
-
-        Ok(elements)
+        DocumentParser::parse_elements_in_order(self.content.xml_content())
     }
 
     /// Get document metadata.
@@ -647,4 +636,325 @@ impl Document {
         let tables = self.tables()?;
         TableExpander::expand_tables(tables)
     }
+
+    // Note: For document modification operations, see `MutableDocument` which provides
+    // full CRUD operations (Create, Read, Update, Delete) on document content including
+    // adding, updating, and removing paragraphs and tables while preserving insertion order.
+
+    /// Save the document to a new file.
+    ///
+    /// This method saves the current document state to a new file. Note that this
+    /// creates a copy of the original document; modifications are not yet supported.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path where the ODT file should be saved
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Document;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let doc = Document::open("input.odt")?;
+    /// doc.save("output.odt")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Note
+    ///
+    /// Full document modification support is planned for future releases. For now,
+    /// to modify a document, use `DocumentBuilder` to create a new document with
+    /// the desired content.
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let bytes = self.to_bytes()?;
+        std::fs::write(path, bytes)?;
+        Ok(())
+    }
+
+    /// Convert the document to bytes.
+    ///
+    /// This method serializes the document to an ODF-compliant ZIP archive.
+    /// All embedded media files (images, etc.) are automatically copied.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Document;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let doc = Document::open("document.odt")?;
+    /// let bytes = doc.to_bytes()?;
+    /// // Use bytes for network transfer, etc.
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        use crate::odf::core::PackageWriter;
+
+        let mut writer = PackageWriter::new();
+
+        // Set MIME type
+        writer.set_mimetype(self.package.mimetype())?;
+
+        // Add content.xml
+        let content_xml = self.content.xml_content();
+        writer.add_file("content.xml", content_xml.as_bytes())?;
+
+        // Add styles.xml if present
+        if let Some(ref styles) = self.styles {
+            let styles_xml = styles.xml_content();
+            writer.add_file("styles.xml", styles_xml.as_bytes())?;
+        }
+
+        // Add meta.xml if present
+        if let Some(ref meta) = self.meta {
+            let meta_xml = meta.xml_content();
+            writer.add_file("meta.xml", meta_xml.as_bytes())?;
+        }
+
+        // Copy settings.xml if present
+        if self.package.has_file("settings.xml") {
+            let settings_bytes = self.package.get_file("settings.xml")?;
+            writer.add_file("settings.xml", &settings_bytes)?;
+        }
+
+        // Copy all media files (images, etc.) from the original package
+        let media_files = self.package.media_files()?;
+        for media_path in media_files {
+            if let Ok(media_bytes) = self.package.get_file(&media_path) {
+                writer.add_file(&media_path, &media_bytes)?;
+            }
+        }
+
+        // Copy other common ODF files if they exist
+        let other_files = vec!["Thumbnails/thumbnail.png", "Configurations2/"];
+        for file_path in other_files {
+            if self.package.has_file(file_path)
+                && let Ok(file_bytes) = self.package.get_file(file_path)
+            {
+                writer.add_file(file_path, &file_bytes)?;
+            }
+        }
+
+        writer.finish_to_bytes()
+    }
+
+    /// Extract all hyperlinks from the document
+    ///
+    /// Returns a vector of tuples containing (link text, URL).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Document;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let doc = Document::open("document.odt")?;
+    /// let hyperlinks = doc.hyperlinks()?;
+    /// for (text, url) in hyperlinks {
+    ///     println!("{}: {}", text, url);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn hyperlinks(&self) -> Result<Vec<(String, String)>> {
+        use quick_xml::Reader;
+        use quick_xml::events::Event;
+
+        let content_xml = self.content.xml_content();
+        let mut reader = Reader::from_str(content_xml);
+        let mut buf = Vec::new();
+        let mut links = Vec::new();
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(Event::Start(ref e)) if e.name().as_ref() == b"text:a" => {
+                    // Extract href attribute
+                    let href = e
+                        .attributes()
+                        .filter_map(|a| a.ok())
+                        .find(|attr| attr.key.as_ref() == b"xlink:href")
+                        .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
+
+                    // Extract link text
+                    let mut text = String::new();
+                    let mut depth = 1;
+                    buf.clear();
+                    loop {
+                        match reader.read_event_into(&mut buf) {
+                            Ok(Event::Text(ref e)) => {
+                                if let Ok(t) = String::from_utf8(e.to_vec()) {
+                                    text.push_str(&t);
+                                }
+                            },
+                            Ok(Event::Start(_)) => depth += 1,
+                            Ok(Event::End(_)) => {
+                                depth -= 1;
+                                if depth == 0 {
+                                    break;
+                                }
+                            },
+                            Ok(Event::Eof) => break,
+                            _ => {},
+                        }
+                        buf.clear();
+                    }
+
+                    if let Some(url) = href {
+                        links.push((text, url));
+                    }
+                },
+                Ok(Event::Eof) => break,
+                Err(e) => return Err(Error::Other(format!("XML parse error: {}", e))),
+                _ => {},
+            }
+            buf.clear();
+        }
+
+        Ok(links)
+    }
+
+    /// Extract all bookmark names from the document
+    ///
+    /// Returns a vector of bookmark names.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Document;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let doc = Document::open("document.odt")?;
+    /// let bookmark_names = doc.bookmark_names()?;
+    /// for bookmark in bookmark_names {
+    ///     println!("Bookmark: {}", bookmark);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn bookmark_names(&self) -> Result<Vec<String>> {
+        use quick_xml::Reader;
+        use quick_xml::events::Event;
+
+        let content_xml = self.content.xml_content();
+        let mut reader = Reader::from_str(content_xml);
+        let mut buf = Vec::new();
+        let mut bookmarks = Vec::new();
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e)) => {
+                    if e.name().as_ref() == b"text:bookmark"
+                        || e.name().as_ref() == b"text:bookmark-start"
+                        || e.name().as_ref() == b"text:bookmark-end"
+                    {
+                        // Extract name attribute
+                        for attr in e.attributes().filter_map(|a| a.ok()) {
+                            if attr.key.as_ref() == b"text:name" {
+                                if let Ok(name) = String::from_utf8(attr.value.to_vec())
+                                    && !bookmarks.contains(&name)
+                                {
+                                    bookmarks.push(name);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                },
+                Ok(Event::Eof) => break,
+                Err(e) => return Err(Error::Other(format!("XML parse error: {}", e))),
+                _ => {},
+            }
+            buf.clear();
+        }
+
+        Ok(bookmarks)
+    }
+
+    /// Extract all image paths from the document
+    ///
+    /// Returns a vector of image file paths within the ODF package.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Document;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let doc = Document::open("document.odt")?;
+    /// let images = doc.image_paths()?;
+    /// for img_path in images {
+    ///     println!("Image: {}", img_path);
+    ///     // You can extract the image bytes with:
+    ///     // let bytes = doc.get_file(&img_path)?;
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn image_paths(&self) -> Result<Vec<String>> {
+        use quick_xml::Reader;
+        use quick_xml::events::Event;
+
+        let content_xml = self.content.xml_content();
+        let mut reader = Reader::from_str(content_xml);
+        let mut buf = Vec::new();
+        let mut images = Vec::new();
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e)) => {
+                    if e.name().as_ref() == b"draw:image" {
+                        // Extract href attribute
+                        if let Some(href) = e
+                            .attributes()
+                            .filter_map(|a| a.ok())
+                            .find(|attr| attr.key.as_ref() == b"xlink:href")
+                            .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok())
+                        {
+                            images.push(href);
+                        }
+                    }
+                },
+                Ok(Event::Eof) => break,
+                Err(e) => return Err(Error::Other(format!("XML parse error: {}", e))),
+                _ => {},
+            }
+            buf.clear();
+        }
+
+        Ok(images)
+    }
+
+    /// Get a file from the ODF package (useful for extracting images)
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the file within the package (e.g., "Pictures/image1.png")
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Document;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let doc = Document::open("document.odt")?;
+    /// let images = doc.image_paths()?;
+    /// if let Some(first_image) = images.first() {
+    ///     let image_bytes = doc.get_file(first_image)?;
+    ///     std::fs::write("extracted_image.png", image_bytes)?;
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_file(&self, path: &str) -> Result<Vec<u8>> {
+        self.package.get_file(path)
+    }
+
+    // Note: DELETE operations are available via `MutableDocument`. To modify this document:
+    //   1. Convert to MutableDocument:  `let mut mutable = MutableDocument::from_document(doc)?`
+    //   2. Perform modifications: `mutable.remove_paragraph(0)?`, `mutable.remove_table(1)?`, etc.
+    //   3. Save: `mutable.save("output.odt")?`
+    // Available methods: remove_paragraph, remove_table, update_paragraph, clear_content, etc.
 }

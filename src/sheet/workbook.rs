@@ -3,6 +3,7 @@
 use super::types::Result;
 use super::workbook_types::WorkbookImpl;
 use crate::common::{Error, Metadata};
+#[allow(unused_imports)] // Used by sheet implementations
 use crate::sheet::WorkbookTrait;
 use std::path::Path;
 

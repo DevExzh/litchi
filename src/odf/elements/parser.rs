@@ -23,7 +23,8 @@ pub enum DocumentOrderElement {
     Heading(Heading),
     /// A table element
     Table(Table),
-    /// A list element
+    /// A list element (currently parsed but not exposed in unified API)
+    #[allow(dead_code)] // Parsed but not yet exposed in all APIs
     List(List),
 }
 
@@ -223,7 +224,7 @@ impl DocumentParser {
                             if element_stack.len() > 1 {
                                 let (_, child_element) = element_stack.pop().unwrap();
                                 if let Some((_, parent_element)) = element_stack.last_mut() {
-                                    parent_element.add_child(Box::new(child_element));
+                                    parent_element.add_child(child_element);
                                 }
                             } else {
                                 // Single element on stack, check if it should be completed

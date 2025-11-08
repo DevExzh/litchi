@@ -300,4 +300,111 @@ impl Spreadsheet {
             Ok(Metadata::default())
         }
     }
+
+    // Note: For spreadsheet modification operations, see `MutableSpreadsheet` which provides
+    // full CRUD operations on sheets, rows, and cells including set_cell, clear_cell, add/remove
+    // rows and sheets.
+
+    /// Save the spreadsheet to a new file.
+    ///
+    /// This method saves the current spreadsheet state to a new file.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path where the ODS file should be saved
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Spreadsheet;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let spreadsheet = Spreadsheet::open("input.ods")?;
+    /// spreadsheet.save("output.ods")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Note
+    ///
+    /// Full spreadsheet modification support is planned for future releases. For now,
+    /// to modify a spreadsheet, use `SpreadsheetBuilder` to create a new one with
+    /// the desired content.
+    pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result<()> {
+        let bytes = self.to_bytes()?;
+        std::fs::write(path, bytes)?;
+        Ok(())
+    }
+
+    /// Convert the spreadsheet to bytes.
+    ///
+    /// This method serializes the spreadsheet to an ODF-compliant ZIP archive.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Spreadsheet;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let spreadsheet = Spreadsheet::open("data.ods")?;
+    /// let bytes = spreadsheet.to_bytes()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        use crate::odf::core::PackageWriter;
+
+        let mut writer = PackageWriter::new();
+
+        // Set MIME type
+        writer.set_mimetype(self.package.mimetype())?;
+
+        // Add content.xml
+        let content_xml = self.content.xml_content();
+        writer.add_file("content.xml", content_xml.as_bytes())?;
+
+        // Add styles.xml if present
+        if let Some(ref styles) = self.styles {
+            let styles_xml = styles.xml_content();
+            writer.add_file("styles.xml", styles_xml.as_bytes())?;
+        }
+
+        // Add meta.xml if present
+        if let Some(ref meta) = self.meta {
+            let meta_xml = meta.xml_content();
+            writer.add_file("meta.xml", meta_xml.as_bytes())?;
+        }
+
+        // Copy settings.xml if present
+        if self.package.has_file("settings.xml") {
+            let settings_bytes = self.package.get_file("settings.xml")?;
+            writer.add_file("settings.xml", &settings_bytes)?;
+        }
+
+        // Copy all media files (images, charts, etc.) from the original package
+        let media_files = self.package.media_files()?;
+        for media_path in media_files {
+            if let Ok(media_bytes) = self.package.get_file(&media_path) {
+                writer.add_file(&media_path, &media_bytes)?;
+            }
+        }
+
+        // Copy other common ODF files if they exist
+        let other_files = vec!["Thumbnails/thumbnail.png", "Configurations2/"];
+        for file_path in other_files {
+            if self.package.has_file(file_path)
+                && let Ok(file_bytes) = self.package.get_file(file_path)
+            {
+                writer.add_file(file_path, &file_bytes)?;
+            }
+        }
+
+        writer.finish_to_bytes()
+    }
+
+    // Note: DELETE operations are available via `MutableSpreadsheet`. To modify this spreadsheet:
+    //   1. Convert: `let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet)?`
+    //   2. Modify: `mutable.remove_sheet(0)?`, `mutable.set_cell(0, 0, 0, value)?`, etc.
+    //   3. Save: `mutable.save("output.ods")?`
+    // Available methods: remove_sheet, remove_row, set_cell, clear_cell, clear_sheet, etc.
 }

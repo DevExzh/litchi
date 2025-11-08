@@ -27,6 +27,12 @@ impl Document {
     }
 }
 
+impl Default for Document {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// An office body element
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -46,7 +52,7 @@ impl Body {
     /// Get the body type
     pub fn body_type(&self) -> Option<&str> {
         // Check child elements to determine body type
-        for child in self.element.children() {
+        for child in self.element.get_children() {
             let tag = child.tag_name();
             if tag == "office:text" {
                 return Some("text");
@@ -57,5 +63,11 @@ impl Body {
             }
         }
         None
+    }
+}
+
+impl Default for Body {
+    fn default() -> Self {
+        Self::new()
     }
 }

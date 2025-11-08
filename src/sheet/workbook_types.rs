@@ -82,7 +82,9 @@ pub fn detect_workbook_format_from_signature<R: Read + Seek>(
 }
 
 /// Refine ZIP-based workbook format detection (XLSX vs XLSB vs Numbers)
-#[allow(dead_code)] // For format detection, it is better to use the smart detection function, but the function is still useful for other purposes
+#[allow(dead_code)]
+// For format detection, it is better to use the smart detection function, but the function is still useful for other purposes
+#[cfg(any(feature = "iwa", feature = "ooxml", feature = "odf"))]
 pub fn refine_workbook_format<R: Read + Seek>(
     reader: &mut R,
     initial_format: WorkbookFormat,

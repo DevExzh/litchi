@@ -167,9 +167,15 @@ pub mod common;
 
 /// Unified Word document API
 ///
-/// Provides format-agnostic interface for both .doc and .docx files.
+/// Provides format-agnostic interface for .doc, .docx, .rtf, and .odt files.
 /// Use [`Document::open()`] to get started.
-#[cfg(any(feature = "ole", feature = "ooxml", feature = "rtf"))]
+#[cfg(any(
+    feature = "ole",
+    feature = "ooxml",
+    feature = "rtf",
+    feature = "odf",
+    feature = "iwa"
+))]
 pub mod document;
 
 /// Image processing and conversion module
@@ -187,7 +193,7 @@ pub mod images;
 /// Use [`Presentation::open()`] to get started.
 ///
 /// **Note**: This requires at least one of the `ole` or `ooxml` features to be enabled.
-#[cfg(any(feature = "ole", feature = "ooxml"))]
+#[cfg(any(feature = "ole", feature = "ooxml", feature = "odf", feature = "iwa"))]
 pub mod presentation;
 
 /// Unified Excel/Spreadsheet API (.xls, .xlsx, .xlsb, .ods, .numbers)
@@ -268,10 +274,16 @@ pub mod rtf;
 // Re-export high-level APIs
 pub use common::{Error, Result};
 
-#[cfg(any(feature = "ole", feature = "ooxml"))]
+#[cfg(any(
+    feature = "ole",
+    feature = "ooxml",
+    feature = "rtf",
+    feature = "odf",
+    feature = "iwa"
+))]
 pub use document::{Document, DocumentElement};
 
-#[cfg(any(feature = "ole", feature = "ooxml"))]
+#[cfg(any(feature = "ole", feature = "ooxml", feature = "odf", feature = "iwa"))]
 pub use presentation::Presentation;
 
 // Re-export commonly used types

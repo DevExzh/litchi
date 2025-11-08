@@ -92,7 +92,6 @@ impl<R: Read + Seek> Package<R> {
     }
 
     /// List all files in the package
-    #[allow(dead_code)]
     pub fn files(&self) -> Result<Vec<String>> {
         let mut files = Vec::new();
         let mut archive = self.archive.borrow_mut();
@@ -101,5 +100,31 @@ impl<R: Read + Seek> Package<R> {
             files.push(file.name().to_string());
         }
         Ok(files)
+    }
+
+    /// Get all embedded media files (images, etc.) from the package.
+    ///
+    /// This returns paths to all files in the Pictures/ directory and other media directories.
+    pub fn media_files(&self) -> Result<Vec<String>> {
+        let all_files = self.files()?;
+        Ok(all_files
+            .into_iter()
+            .filter(|path| {
+                path.starts_with("Pictures/")
+                    || path.starts_with("media/")
+                    || path.starts_with("Object/")
+                    || path.ends_with(".png")
+                    || path.ends_with(".jpg")
+                    || path.ends_with(".jpeg")
+                    || path.ends_with(".gif")
+                    || path.ends_with(".svg")
+            })
+            .collect())
+    }
+
+    /// Check if the package contains any media files.
+    #[allow(dead_code)] // Reserved for future use
+    pub fn has_media(&self) -> bool {
+        self.media_files().map(|m| !m.is_empty()).unwrap_or(false)
     }
 }

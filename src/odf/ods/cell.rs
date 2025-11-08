@@ -80,6 +80,132 @@ impl Cell {
         Ok(self.formula.as_deref())
     }
 
+    /// Parse and get the formula structure.
+    ///
+    /// Returns the parsed formula if the cell contains a formula,
+    /// None otherwise. This provides access to the formula's tokens
+    /// and structure for analysis.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Spreadsheet;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let sheet = Spreadsheet::open("data.ods")?;
+    /// if let Some(sheets) = sheet.sheets().ok() {
+    ///     if let Some(first_sheet) = sheets.first() {
+    ///         let cell = first_sheet.cell("A1")?;
+    ///         if let Some(parsed_formula) = cell.parsed_formula()? {
+    ///             println!("Formula tokens: {:?}", parsed_formula.tokens);
+    ///         }
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn parsed_formula(&self) -> Result<Option<super::formula::Formula>> {
+        if let Some(formula_str) = &self.formula {
+            let parser = super::formula::FormulaParser::new(formula_str);
+            Ok(Some(parser.parse()?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Check if the cell has a formula.
+    ///
+    /// Returns true if the cell contains a formula.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Spreadsheet;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let sheet = Spreadsheet::open("data.ods")?;
+    /// if let Some(sheets) = sheet.sheets().ok() {
+    ///     if let Some(first_sheet) = sheets.first() {
+    ///         let cell = first_sheet.cell("A1")?;
+    ///         if cell.has_formula() {
+    ///             println!("Cell A1 contains a formula");
+    ///         }
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn has_formula(&self) -> bool {
+        self.formula.is_some()
+    }
+
+    /// Extract cell references from the formula.
+    ///
+    /// Returns a list of cell references used in the formula.
+    /// Returns an empty vector if the cell has no formula.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Spreadsheet;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let sheet = Spreadsheet::open("data.ods")?;
+    /// if let Some(sheets) = sheet.sheets().ok() {
+    ///     if let Some(first_sheet) = sheets.first() {
+    ///         let cell = first_sheet.cell("A1")?;
+    ///         let refs = cell.formula_cell_refs()?;
+    ///         println!("Cell references: {:?}", refs);
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn formula_cell_refs(&self) -> Result<Vec<super::formula::CellRef>> {
+        if let Some(formula) = self.parsed_formula()? {
+            Ok(super::formula::extract_cell_refs(&formula)
+                .into_iter()
+                .cloned()
+                .collect())
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    /// Extract function names used in the formula.
+    ///
+    /// Returns a list of function names used in the formula.
+    /// Returns an empty vector if the cell has no formula.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi::odf::Spreadsheet;
+    ///
+    /// # fn main() -> litchi::Result<()> {
+    /// let sheet = Spreadsheet::open("data.ods")?;
+    /// if let Some(sheets) = sheet.sheets().ok() {
+    ///     if let Some(first_sheet) = sheets.first() {
+    ///         let cell = first_sheet.cell("A1")?;
+    ///         let funcs = cell.formula_functions()?;
+    ///         println!("Functions used: {:?}", funcs);
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn formula_functions(&self) -> Result<Vec<String>> {
+        if let Some(formula) = self.parsed_formula()? {
+            Ok(super::formula::extract_functions(&formula)
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect())
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
     /// Get the cell coordinates (row, column).
     ///
     /// Returns a tuple of (row_index, column_index), both 0-based.
