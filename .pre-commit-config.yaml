@@ -1,12 +1,12 @@
 repos:
   - repo: local
     hooks:
-      - id: cargo-fmt
-        name: Run cargo fmt
-        entry: cargo fmt
+      - id: rustfmt
+        name: Run rustfmt
+        entry: rustfmt
         language: system
         types: [rust]
-        pass_filenames: false
+        pass_filenames: true
       - id: cargo-sort
         name: Run cargo sort
         entry: cargo sort
