@@ -316,6 +316,29 @@ impl OpcPackage {
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         crate::ooxml::opc::pkgwriter::PackageWriter::write(path, self)
     }
+
+    /// Save the package to a stream.
+    ///
+    /// Writes the complete OPC package including all parts, relationships,
+    /// and content types to a writer stream.
+    ///
+    /// # Arguments
+    /// * `writer` - A writer that implements Write + Seek
+    ///
+    /// # Example
+    /// ```no_run
+    /// use litchi::ooxml::opc::package::OpcPackage;
+    /// use std::fs::File;
+    ///
+    /// let mut pkg = OpcPackage::new();
+    /// // ... add parts to package ...
+    /// let file = File::create("output.docx")?;
+    /// pkg.to_stream(file)?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn to_stream<W: std::io::Write + std::io::Seek>(&self, writer: W) -> Result<()> {
+        crate::ooxml::opc::pkgwriter::PackageWriter::write_to_stream(writer, self)
+    }
 }
 
 impl Default for OpcPackage {

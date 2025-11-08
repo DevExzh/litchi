@@ -154,12 +154,12 @@ impl<R: Read + Seek> PhysPkgReader<R> {
 /// Physical package writer for creating OPC packages.
 ///
 /// Handles the low-level writing of parts to a ZIP archive with optimal compression.
-pub struct PhysPkgWriter {
+pub struct PhysPkgWriter<W: std::io::Write + std::io::Seek> {
     /// The underlying ZIP archive writer
-    archive: zip::ZipWriter<File>,
+    archive: zip::ZipWriter<W>,
 }
 
-impl PhysPkgWriter {
+impl PhysPkgWriter<File> {
     /// Create a new package writer for a file path.
     ///
     /// # Arguments
@@ -168,6 +168,18 @@ impl PhysPkgWriter {
         let file = File::create(path)?;
         let archive = zip::ZipWriter::new(file);
         Ok(Self { archive })
+    }
+}
+
+impl<W: std::io::Write + std::io::Seek> PhysPkgWriter<W> {
+    /// Create a new package writer from a writer stream.
+    ///
+    /// # Arguments
+    /// * `writer` - A writer that implements Write + Seek
+    pub fn new(writer: W) -> Self {
+        Self {
+            archive: zip::ZipWriter::new(writer),
+        }
     }
 
     /// Write a part to the package.
