@@ -340,6 +340,15 @@ pub const SPRM_P_NEST: u16 = 0x4610;
 /// sprmPDxaLeft1 - First line indent (operation 0x11)
 pub const SPRM_P_DXA_LEFT1: u16 = 0x8411;
 
+/// sprmPDxaRight (Word 2000+) - modern encoding used by newer nFib
+pub const SPRM_P_DXA_RIGHT_2000: u16 = 0x845D;
+
+/// sprmPDxaLeft (Word 2000+) - modern encoding used by newer nFib
+pub const SPRM_P_DXA_LEFT_2000: u16 = 0x845E;
+
+/// sprmPDxaLeft1 (Word 2000+) - modern encoding used by newer nFib
+pub const SPRM_P_DXA_LEFT1_2000: u16 = 0x8460;
+
 /// sprmPDyaLine - Line spacing (operation 0x12)
 pub const SPRM_P_DYA_LINE: u16 = 0x6412;
 
@@ -351,6 +360,12 @@ pub const SPRM_P_DYA_AFTER: u16 = 0xA414;
 
 /// sprmPChgTabs - Change tabs (operation 0x15)
 pub const SPRM_P_CHG_TABS: u16 = 0xC615;
+
+/// sprmPFDyaBeforeAuto - Auto space before (operation 0x5B)
+pub const SPRM_P_F_DYA_BEFORE_AUTO: u16 = 0x245B;
+
+/// sprmPFDyaAfterAuto - Auto space after (operation 0x5C)
+pub const SPRM_P_F_DYA_AFTER_AUTO: u16 = 0x245C;
 
 /// sprmPFInTable - In table flag (operation 0x16)
 pub const SPRM_P_F_IN_TABLE: u16 = 0x2416;
@@ -474,6 +489,9 @@ pub const SPRM_P_OUT_LVL: u16 = 0x2640;
 
 /// sprmPFBiDi - Bi-directional paragraph (operation 0x41)
 pub const SPRM_P_F_BI_DI: u16 = 0x2441;
+
+/// sprmPJc (Word 2000+) - logical justification (modern)
+pub const SPRM_P_JC_LOGICAL: u16 = 0x2461;
 
 /// sprmPFNumRMIns - Numbering revision insert (operation 0x43)
 pub const SPRM_P_F_NUM_RM_INS: u16 = 0x2443;
@@ -767,19 +785,24 @@ pub const SPRM_T_C_VERT_BANDS: u16 = 0x3441;
 pub const SPRM_T_JC90: u16 = 0x5442;
 
 // SEP (Section Properties) SPRM opcodes (partial list for completeness)
-// Based on Apache POI's SectionProperties
+// Based on Apache POI's SectionProperties and LibreOffice sprmids.hxx
 
 /// sprmSBkc - Break code (operation 0x00)
 pub const SPRM_S_BKC: u16 = 0x3000;
 
-/// sprmSFTitlePage - Title page (operation 0x01)
-pub const SPRM_S_F_TITLE_PAGE: u16 = 0x3001;
+/// sprmSFTitlePage - Title page (operation 0x0A)
+/// Note: Some older tables list 0x3001; MS-DOC/LibreOffice indicate 0x300A (operation 0x0A)
+pub const SPRM_S_F_TITLE_PAGE: u16 = 0x300A;
 
 /// sprmSCcolumns - Number of columns (operation 0x02)
 pub const SPRM_S_C_COLUMNS: u16 = 0x3002;
 
 /// sprmSDxaColumns - Column width (operation 0x03)
 pub const SPRM_S_DXA_COLUMNS: u16 = 0x9003;
+
+/// sprmSGprfIhdt - Header/Footer presence mask in section (operation 0x14)
+/// Bits specify which header/footer stories exist for this section.
+pub const SPRM_S_GPRF_IHDT: u16 = 0x3014;
 
 /// Extract SPRM type from opcode (bits 10-12).
 ///

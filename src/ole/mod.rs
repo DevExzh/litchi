@@ -4,6 +4,9 @@ pub mod consts;
 /// Main OLE file parsing implementation
 mod file;
 
+/// OLE file writing and modification
+pub mod writer;
+
 /// Metadata extraction from OLE property streams
 mod metadata;
 
@@ -49,4 +52,5 @@ pub mod xls;
 // Re-export public types for convenient access
 pub use file::{DirectoryEntry, OleError, OleFile, is_ole_file};
 pub use metadata::{OleMetadata, PropertyValue};
+pub use writer::OleWriter;
 pub use xls::{XlsError, XlsWorkbook};
