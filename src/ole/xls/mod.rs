@@ -9,7 +9,7 @@
 mod error;
 
 /// BIFF record parsing utilities
-mod records;
+pub mod records;
 
 /// Workbook parsing implementation
 mod workbook;
@@ -23,7 +23,11 @@ mod cell;
 /// Shared parsing utilities
 mod utils;
 
+/// XLS file writing
+pub mod writer;
+
 pub use cell::XlsCell;
 pub use error::{XlsError, XlsResult};
 pub use workbook::XlsWorkbook;
 pub use worksheet::XlsWorksheet;
+pub use writer::XlsWriter;

@@ -667,27 +667,15 @@ mod tests {
     #[test]
     fn test_toggle_value() {
         // Test basic values
-        assert_eq!(CharacterProperties::get_toggle_value(0, None), false);
-        assert_eq!(CharacterProperties::get_toggle_value(1, None), true);
+        assert!(!CharacterProperties::get_toggle_value(0, None));
+        assert!(CharacterProperties::get_toggle_value(1, None));
 
         // Test preserve old value
-        assert_eq!(
-            CharacterProperties::get_toggle_value(0x80, Some(true)),
-            true
-        );
-        assert_eq!(
-            CharacterProperties::get_toggle_value(0x80, Some(false)),
-            false
-        );
+        assert!(CharacterProperties::get_toggle_value(0x80, Some(true)));
+        assert!(!CharacterProperties::get_toggle_value(0x80, Some(false)));
 
         // Test toggle old value
-        assert_eq!(
-            CharacterProperties::get_toggle_value(0x81, Some(true)),
-            false
-        );
-        assert_eq!(
-            CharacterProperties::get_toggle_value(0x81, Some(false)),
-            true
-        );
+        assert!(!CharacterProperties::get_toggle_value(0x81, Some(true)));
+        assert!(CharacterProperties::get_toggle_value(0x81, Some(false)));
     }
 }
