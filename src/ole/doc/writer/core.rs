@@ -372,17 +372,23 @@ impl DocWriter {
         let instr = format!("HYPERLINK \"{}\"", escaped);
 
         // Default hyperlink visual style (blue + single underline)
-        let mut link_fmt = CharacterFormatting::default();
-        link_fmt.underline = Some(true);
-        link_fmt.color = Some((0x00, 0x00, 0xFF));
+        let link_fmt = CharacterFormatting {
+            underline: Some(true),
+            color: Some((0x00, 0x00, 0xFF)),
+            ..CharacterFormatting::default()
+        };
 
         // Field begin/separator/end special chars
-        let mut spec_fmt = CharacterFormatting::default();
-        spec_fmt.special = Some(true);
+        let spec_fmt = CharacterFormatting {
+            special: Some(true),
+            ..CharacterFormatting::default()
+        };
 
         // Field instruction should be hidden (vanished) but not special
-        let mut instr_fmt = CharacterFormatting::default();
-        instr_fmt.field_vanish = Some(true);
+        let instr_fmt = CharacterFormatting {
+            field_vanish: Some(true),
+            ..CharacterFormatting::default()
+        };
 
         let runs = vec![
             ("\u{0013}".to_string(), spec_fmt.clone()), // fldBegin
@@ -489,7 +495,7 @@ impl DocWriter {
                 // Add a single paragraph for this header/footer part
                 let fc_para_start = text_fc_start + text_stream.len() as u32;
                 let mut para_chars: u32 = 0;
-                let mut last_run_index_for_para: Option<usize> = None;
+                let last_run_index_for_para = chpx_entries.len() - 1;
 
                 // Character formatting default
                 let char_fmt = CharacterFormatting::default();
@@ -503,13 +509,11 @@ impl DocWriter {
                 // chpx range for run (without paragraph mark yet)
                 let run_fc_end = run_fc_start + para_chars * 2;
                 chpx_entries.push((run_fc_start, run_fc_end, grpprl));
-                last_run_index_for_para = Some(chpx_entries.len() - 1);
 
                 // Paragraph mark for the content paragraph
                 text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
-                if let Some(last_idx) = last_run_index_for_para {
-                    chpx_entries[last_idx].1 += 2; // include content paragraph mark
-                }
+                // include content paragraph mark in the last run
+                chpx_entries[last_run_index_for_para].1 += 2;
                 let fc_para_end = text_fc_start + text_stream.len() as u32;
 
                 // PAPX for content paragraph
@@ -520,9 +524,7 @@ impl DocWriter {
                 let fc_guard_start = fc_para_end;
                 text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
                 // Extend last run to cover the guard mark as well (default formatting)
-                if let Some(last_idx) = last_run_index_for_para {
-                    chpx_entries[last_idx].1 += 2;
-                }
+                chpx_entries[last_run_index_for_para].1 += 2;
                 let fc_guard_end = fc_guard_start + 2;
                 // PAPX for guard empty paragraph (default formatting)
                 let guard_pap_grpprl = build_papx_grpprl(&ParagraphFormatting::default());
