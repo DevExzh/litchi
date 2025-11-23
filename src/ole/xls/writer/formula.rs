@@ -36,6 +36,12 @@ pub enum Ptg {
     PtgRef(u16, u16, bool, bool),
     /// Area reference (r1, c1, r2, c2)
     PtgArea(u16, u16, u16, u16),
+    /// 3D area reference (ixti, r1, r2, c1, c2)
+    ///
+    /// Used by defined names and other structures that require
+    /// NameParsedFormula, which MUST use 3D references instead of
+    /// plain 2D PtgArea in BIFF8.
+    PtgArea3d(u16, u16, u16, u16, u16),
     /// Addition operator
     PtgAdd,
     /// Subtraction operator
@@ -80,8 +86,12 @@ fn get_precedence(op: &str) -> u8 {
     }
 }
 
-/// Parse a cell reference like "A1" or "$B$2"
-fn parse_cell_ref(s: &str) -> Result<Ptg, XlsError> {
+/// Parse a cell reference like "A1" or "$B$2" into a `PtgRef` token.
+///
+/// This is exposed as `pub(crate)` so that other writer components
+/// (for example, named range handling) can reuse the same parsing
+/// logic and stay consistent with formula tokenization.
+pub(crate) fn parse_cell_ref(s: &str) -> Result<Ptg, XlsError> {
     let s = s.trim();
     let mut col_abs = false;
     let mut row_abs = false;
@@ -432,6 +442,33 @@ pub fn encode_ptg_tokens(tokens: &[Ptg]) -> Vec<u8> {
                     col_flags |= 0x8000;
                 }
                 bytes.extend_from_slice(&col_flags.to_le_bytes());
+            },
+            Ptg::PtgArea(r1, r2, c1, c2) => {
+                // BIFF8 PtgArea (2D area reference)
+                // Rows are stored as 0-based indices; columns are stored
+                // with relative/absolute flags in the upper bits. For the
+                // initial implementation we always emit absolute area
+                // references, so the flag bits remain clear.
+                bytes.push(0x25); // PtgArea
+                bytes.extend_from_slice(&r1.to_le_bytes());
+                bytes.extend_from_slice(&r2.to_le_bytes());
+                bytes.extend_from_slice(&c1.to_le_bytes());
+                bytes.extend_from_slice(&c2.to_le_bytes());
+            },
+            Ptg::PtgArea3d(ixti, r1, r2, c1, c2) => {
+                // BIFF8 PtgArea3d (3D area reference)
+                //
+                // Layout: opcode (1 byte) + ixti (2 bytes) + r1 (2) +
+                // r2 (2) + c1 (2) + c2 (2).
+                //
+                // For now we always emit absolute references, so the
+                // relative bits in the column fields remain clear.
+                bytes.push(0x3B); // PtgArea3d
+                bytes.extend_from_slice(&ixti.to_le_bytes());
+                bytes.extend_from_slice(&r1.to_le_bytes());
+                bytes.extend_from_slice(&r2.to_le_bytes());
+                bytes.extend_from_slice(&c1.to_le_bytes());
+                bytes.extend_from_slice(&c2.to_le_bytes());
             },
             Ptg::PtgAdd => bytes.push(0x03),
             Ptg::PtgSub => bytes.push(0x04),

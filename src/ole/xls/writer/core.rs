@@ -37,6 +37,7 @@ use std::collections::HashMap;
 
 mod conditional_format;
 mod data_validation;
+mod named_range;
 mod worksheet;
 
 pub use self::conditional_format::{
@@ -45,6 +46,8 @@ pub use self::conditional_format::{
 pub use self::data_validation::{
     XlsDataValidation, XlsDataValidationOperator, XlsDataValidationType,
 };
+pub use self::named_range::XlsDefinedName;
+use self::named_range::XlsDefinedName as InternalDefinedName;
 use self::worksheet::{MergedRange, WritableCell, WritableWorksheet};
 
 /// Cell value type for writing
@@ -71,11 +74,13 @@ pub struct XlsWriter {
     shared_strings: Vec<String>,
     /// String to index mapping for deduplication
     string_map: HashMap<String, u32>,
-    /// Use 1904 date system (Mac) instead of 1900 (Windows)
-    use_1904_dates: bool,
+    /// Workbook-level defined names (named ranges).
+    defined_names: Vec<InternalDefinedName>,
+    fmt: FormattingManager,
     /// Total number of string occurrences (including duplicates) for SST.cstTotal
     sst_total: u32,
-    fmt: FormattingManager,
+    /// Use 1904 date system (Mac) instead of 1900 (Windows)
+    use_1904_dates: bool,
 }
 
 impl XlsWriter {
@@ -85,9 +90,10 @@ impl XlsWriter {
             worksheets: Vec::new(),
             shared_strings: Vec::new(),
             string_map: HashMap::new(),
-            use_1904_dates: false,
+            defined_names: Vec::new(),
             sst_total: 0,
             fmt: FormattingManager::new(),
+            use_1904_dates: false,
         }
     }
 
@@ -263,6 +269,146 @@ impl XlsWriter {
 
     pub fn add_cell_format(&mut self, format: ExtendedFormat) -> u16 {
         self.fmt.add_format(format)
+    }
+
+    /// Validate a defined name according to basic Excel constraints.
+    ///
+    /// This helper enforces only well-defined structural rules from the
+    /// specification:
+    /// - Name MUST NOT be empty.
+    /// - Name length MUST be at most 255 characters (Lbl.cch is a byte).
+    fn validate_defined_name(name: &str) -> XlsResult<()> {
+        if name.is_empty() {
+            return Err(XlsError::InvalidData(
+                "Defined name must not be empty".to_string(),
+            ));
+        }
+
+        let char_count = name.chars().count();
+        if char_count > u8::MAX as usize {
+            return Err(XlsError::InvalidData(
+                "Defined name must be at most 255 characters".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Define a workbook-scoped named range.
+    ///
+    /// The reference must currently be a simple A1 or A1:B10 style range
+    /// without sheet qualifiers. More complex formulas will be rejected
+    /// at serialization time to avoid emitting invalid BIFF payloads.
+    pub fn define_name(&mut self, name: &str, reference: &str) -> XlsResult<()> {
+        Self::validate_defined_name(name)?;
+
+        if self.worksheets.is_empty() {
+            return Err(XlsError::InvalidData(
+                "define_name: workbook must have at least one worksheet".to_string(),
+            ));
+        }
+
+        // For now, workbook-scoped names that refer to cell ranges are
+        // anchored to the first worksheet. Users who need explicit
+        // sheet scoping can use `define_name_local`.
+        let target_sheet = 0u16;
+
+        self.defined_names.push(InternalDefinedName {
+            name: name.to_string(),
+            reference: reference.to_string(),
+            comment: None,
+            local_sheet: None,
+            target_sheet: Some(target_sheet),
+            hidden: false,
+            is_function: false,
+            is_built_in: false,
+            built_in_code: None,
+        });
+
+        Ok(())
+    }
+
+    /// Define a sheet-scoped named range.
+    ///
+    /// `sheet` is a 0-based worksheet index.
+    pub fn define_name_local(
+        &mut self,
+        name: &str,
+        reference: &str,
+        sheet: usize,
+    ) -> XlsResult<()> {
+        Self::validate_defined_name(name)?;
+
+        let _ = self
+            .worksheets
+            .get(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+
+        let itab = u16::try_from(sheet + 1).map_err(|_| {
+            XlsError::InvalidData(
+                "define_name_local: sheet index exceeds BIFF8 itab limit".to_string(),
+            )
+        })?;
+
+        self.defined_names.push(InternalDefinedName {
+            name: name.to_string(),
+            reference: reference.to_string(),
+            comment: None,
+            local_sheet: Some(itab),
+            target_sheet: Some(sheet as u16),
+            hidden: false,
+            is_function: false,
+            is_built_in: false,
+            built_in_code: None,
+        });
+
+        Ok(())
+    }
+
+    /// Define a workbook-scoped named range with a user-visible comment.
+    pub fn define_name_with_comment(
+        &mut self,
+        name: &str,
+        reference: &str,
+        comment: &str,
+    ) -> XlsResult<()> {
+        Self::validate_defined_name(name)?;
+
+        if self.worksheets.is_empty() {
+            return Err(XlsError::InvalidData(
+                "define_name_with_comment: workbook must have at least one worksheet".to_string(),
+            ));
+        }
+
+        let target_sheet = 0u16;
+
+        self.defined_names.push(InternalDefinedName {
+            name: name.to_string(),
+            reference: reference.to_string(),
+            comment: Some(comment.to_string()),
+            local_sheet: None,
+            target_sheet: Some(target_sheet),
+            hidden: false,
+            is_function: false,
+            is_built_in: false,
+            built_in_code: None,
+        });
+
+        Ok(())
+    }
+
+    /// Remove all defined names with the given name.
+    ///
+    /// Returns `true` if at least one name was removed.
+    pub fn remove_name(&mut self, name: &str) -> bool {
+        let initial_len = self.defined_names.len();
+        self.defined_names.retain(|n| n.name != name);
+        self.defined_names.len() < initial_len
+    }
+
+    /// Get all defined names in this workbook.
+    pub fn named_ranges(&self) -> &[XlsDefinedName] {
+        &self.defined_names
     }
 
     /// Set the width of a column in character units.
@@ -714,6 +860,24 @@ impl XlsWriter {
             biff::write_boundsheet(&mut stream, 0, &worksheet.name)?;
         }
 
+        // Internal SUPBOOK / EXTERNSHEET records are required for 3D
+        // references used by defined names (NameParsedFormula). We keep
+        // the model minimal by generating a single internal SUPBOOK and
+        // one XTI entry per worksheet.
+        if !self.defined_names.is_empty() && !self.worksheets.is_empty() {
+            let sheet_count = u16::try_from(self.worksheets.len()).unwrap_or(u16::MAX);
+            biff::write_supbook_internal(&mut stream, sheet_count)?;
+            biff::write_externsheet_internal(&mut stream, sheet_count)?;
+        }
+
+        // NAME (Lbl) records for workbook- and sheet-scoped defined names.
+        // These are stored in the globals substream and reference cell
+        // areas using BIFF8 formula tokens.
+        for defined_name in &self.defined_names {
+            let rgce = defined_name.to_biff_formula()?;
+            biff::write_name(&mut stream, defined_name, &rgce)?;
+        }
+
         // SST record (shared string table)
         if !self.shared_strings.is_empty() {
             biff::write_sst(&mut stream, &self.shared_strings, self.sst_total)?;
@@ -939,7 +1103,7 @@ impl XlsWriter {
     // ❌ Cell formatting (fonts, colors, borders, number formats) - Future enhancement
     // ❌ Column widths and row heights - Future enhancement
     // ❌ Merged cells - Future enhancement
-    // ❌ Named ranges - Future enhancement
+    // ✅ Named ranges (simple A1-style, workbook and sheet scoped) - IMPLEMENTED
     // ❌ Formulas (parsing and tokenization) - Future enhancement
 }
 

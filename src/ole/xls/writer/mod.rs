@@ -18,7 +18,7 @@ pub mod formula;
 // Re-export public types
 pub use core::{
     XlsCellValue, XlsConditionalFormat, XlsConditionalFormatType, XlsConditionalPattern,
-    XlsDataValidation, XlsDataValidationOperator, XlsDataValidationType, XlsWriter,
+    XlsDataValidation, XlsDataValidationOperator, XlsDataValidationType, XlsDefinedName, XlsWriter,
 };
 pub use formatting::{
     BorderStyle, Borders, CellStyle, ExtendedFormat, Fill, FillPattern, Font, FormattingManager,

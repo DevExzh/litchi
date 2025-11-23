@@ -16,10 +16,12 @@
 //! and Apache POI's BIFF record generation.
 
 use super::super::XlsResult;
+use crate::ole::xls::writer::XlsDefinedName;
 use std::io::Write;
 
 mod cells;
 mod conditional_format;
+mod named_range;
 mod sst;
 mod validation;
 mod workbook;
@@ -45,6 +47,13 @@ pub(crate) fn write_record_header<W: Write>(
     Ok(())
 }
 
+/// Write NAME (Lbl) record for a defined name.
+///
+/// Record type: 0x0018
+pub fn write_name<W: Write>(writer: &mut W, name: &XlsDefinedName, rgce: &[u8]) -> XlsResult<()> {
+    named_range::write_name(writer, name, rgce)
+}
+
 /// Write FORMAT record (number format string)
 ///
 /// Record type: 0x041E
@@ -56,7 +65,7 @@ pub fn write_format_record<W: Write>(
     workbook::write_format_record(writer, index_code, format_str)
 }
 
-fn has_multibyte_char(s: &str) -> bool {
+pub(crate) fn has_multibyte_char(s: &str) -> bool {
     s.chars().any(|c| c as u32 > 0xFF)
 }
 
@@ -200,6 +209,17 @@ pub fn write_date1904<W: Write>(writer: &mut W, is_1904: bool) -> XlsResult<()> 
 /// Record type: 0x003D
 pub fn write_window1<W: Write>(writer: &mut W) -> XlsResult<()> {
     workbook::write_window1(writer)
+}
+
+/// Write internal SUPBOOK record used for 3D references within this
+/// workbook.
+pub fn write_supbook_internal<W: Write>(writer: &mut W, sheet_count: u16) -> XlsResult<()> {
+    workbook::write_supbook_internal(writer, sheet_count)
+}
+
+/// Write EXTERNSHEET record for internal workbook references.
+pub fn write_externsheet_internal<W: Write>(writer: &mut W, sheet_count: u16) -> XlsResult<()> {
+    workbook::write_externsheet_internal(writer, sheet_count)
 }
 
 /// Write BOUNDSHEET8 record (worksheet metadata)

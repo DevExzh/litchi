@@ -209,6 +209,57 @@ pub fn write_window1<W: Write>(writer: &mut W) -> XlsResult<()> {
     Ok(())
 }
 
+/// Write SUPBOOK record for the internal workbook.
+///
+/// Record type: 0x01AE
+///
+/// This minimal variant declares that all 3D references refer to the
+/// current workbook. The layout for an internal SUPBOOK in BIFF8 is:
+///
+/// - cTab (2 bytes): number of sheets in the workbook
+/// - reserved (2 bytes): MUST be 0x0401
+pub fn write_supbook_internal<W: Write>(writer: &mut W, sheet_count: u16) -> XlsResult<()> {
+    write_record_header(writer, 0x01AE, 4)?;
+    writer.write_all(&sheet_count.to_le_bytes())?;
+    writer.write_all(&0x0401u16.to_le_bytes())?;
+    Ok(())
+}
+
+/// Write EXTERNSHEET record for internal workbook references.
+///
+/// Record type: 0x0017
+///
+/// For internal references we generate one XTI entry per worksheet,
+/// each mapping to a single sheet in the first (and only) SUPBOOK
+/// record. PtgArea3d tokens then use `ixti` to index into this XTI
+/// array.
+pub fn write_externsheet_internal<W: Write>(writer: &mut W, sheet_count: u16) -> XlsResult<()> {
+    if sheet_count == 0 {
+        return Ok(());
+    }
+
+    let cxti = sheet_count;
+    // cXTI (2 bytes) + cXTI * sizeof(XTI)
+    let data_len = 2u16.saturating_add(cxti.saturating_mul(6));
+    write_record_header(writer, 0x0017, data_len)?;
+
+    // cXTI
+    writer.write_all(&cxti.to_le_bytes())?;
+
+    // XTI entries: (ixSupBook, itabFirst, itabLast)
+    // ixSupBook is 0 for the first SUPBOOK; sheet indices are 1-based
+    // BoundSheet8 indices.
+    for i in 0..sheet_count {
+        let ix_supbook: u16 = 0;
+        let itab: u16 = i.saturating_add(1);
+        writer.write_all(&ix_supbook.to_le_bytes())?;
+        writer.write_all(&itab.to_le_bytes())?;
+        writer.write_all(&itab.to_le_bytes())?;
+    }
+
+    Ok(())
+}
+
 /// Write BOUNDSHEET8 record (worksheet metadata)
 ///
 /// Record type: 0x0085
