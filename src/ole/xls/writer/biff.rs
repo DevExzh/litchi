@@ -165,6 +165,20 @@ pub fn write_autofilterinfo<W: Write>(writer: &mut W, c_entries: u16) -> XlsResu
     worksheet::write_autofilterinfo(writer, c_entries)
 }
 
+/// Write HLINK (hyperlink) record for a cell or cell range.
+///
+/// Record type: 0x01B8
+pub fn write_hyperlink<W: Write>(
+    writer: &mut W,
+    row1: u32,
+    row2: u32,
+    col1: u16,
+    col2: u16,
+    url: &str,
+) -> XlsResult<()> {
+    worksheet::write_hyperlink(writer, row1, row2, col1, col2, url)
+}
+
 /// Write BOF (Beginning of File) record
 ///
 /// Record type: 0x0809

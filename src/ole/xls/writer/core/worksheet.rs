@@ -38,6 +38,21 @@ pub(super) struct AutoFilterRange {
     pub last_col: u16,
 }
 
+/// Hyperlink target within a worksheet.
+#[derive(Debug, Clone)]
+pub(super) struct XlsHyperlink {
+    /// First row (0-based) of the hyperlink range.
+    pub first_row: u32,
+    /// Last row (0-based) of the hyperlink range.
+    pub last_row: u32,
+    /// First column (0-based) of the hyperlink range.
+    pub first_col: u16,
+    /// Last column (0-based) of the hyperlink range.
+    pub last_col: u16,
+    /// Raw hyperlink target string.
+    pub url: String,
+}
+
 /// Represents a worksheet in the writer
 #[derive(Debug)]
 pub(super) struct WritableWorksheet {
@@ -67,6 +82,8 @@ pub(super) struct WritableWorksheet {
     /// Optional freeze panes configuration.
     pub freeze_panes: Option<FreezePanes>,
     pub auto_filter: Option<AutoFilterRange>,
+    /// Cell or range hyperlinks stored for this worksheet.
+    pub hyperlinks: Vec<XlsHyperlink>,
 }
 
 impl WritableWorksheet {
@@ -87,6 +104,7 @@ impl WritableWorksheet {
             conditional_formats: Vec::new(),
             freeze_panes: None,
             auto_filter: None,
+            hyperlinks: Vec::new(),
         }
     }
 
@@ -136,6 +154,10 @@ impl WritableWorksheet {
 
     pub(super) fn hide_column(&mut self, col: u16) {
         self.hidden_columns.insert(col);
+    }
+
+    pub(super) fn add_hyperlink(&mut self, hyperlink: XlsHyperlink) {
+        self.hyperlinks.push(hyperlink);
     }
 
     pub(super) fn show_column(&mut self, col: u16) {

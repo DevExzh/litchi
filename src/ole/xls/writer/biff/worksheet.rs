@@ -113,6 +113,183 @@ pub fn write_autofilterinfo<W: Write>(writer: &mut W, c_entries: u16) -> XlsResu
     Ok(())
 }
 
+fn encode_web_url_bytes(url: &str) -> Vec<u8> {
+    // For URL hyperlinks we follow Apache POI's HyperlinkRecord layout:
+    // the address is stored as a UTF-16LE string with a single trailing
+    // NUL character and the length field contains the size in bytes
+    // (2 bytes per character).
+    let mut terminated = String::with_capacity(url.len().saturating_add(1));
+    terminated.push_str(url);
+    terminated.push('\0');
+
+    let mut out = Vec::with_capacity(terminated.len().saturating_mul(2));
+    for unit in terminated.encode_utf16() {
+        out.extend_from_slice(&unit.to_le_bytes());
+    }
+    out
+}
+
+fn write_hyperlink_web<W: Write>(
+    writer: &mut W,
+    row1: u16,
+    row2: u16,
+    col1: u16,
+    col2: u16,
+    url: &str,
+) -> XlsResult<()> {
+    if url.is_empty() {
+        return Ok(());
+    }
+
+    // Constants taken from PhpSpreadsheet's writeUrlWeb implementation.
+    const UNKNOWN1: [u8; 20] = [
+        0xD0, 0xC9, 0xEA, 0x79, 0xF9, 0xBA, 0xCE, 0x11, 0x8C, 0x82, 0x00, 0xAA, 0x00, 0x4B, 0xA9,
+        0x0B, 0x02, 0x00, 0x00, 0x00,
+    ];
+    const UNKNOWN2: [u8; 16] = [
+        0xE0, 0xC9, 0xEA, 0x79, 0xF9, 0xBA, 0xCE, 0x11, 0x8C, 0x82, 0x00, 0xAA, 0x00, 0x4B, 0xA9,
+        0x0B,
+    ];
+
+    let url_bytes = encode_web_url_bytes(url);
+    let url_len = u32::try_from(url_bytes.len()).map_err(|_| {
+        XlsError::InvalidData("Hyperlink URL exceeds BIFF8 length limit".to_string())
+    })?;
+
+    // Base size (0x34) matches POI's HyperlinkRecord.getDataSize():
+    //  - 8 bytes Ref8U (rwFirst, rwLast, colFirst, colLast)
+    //  - 16 bytes GUID
+    //  - 4 bytes streamVersion
+    //  - 4 bytes linkOpts
+    //  - 16 bytes URL moniker CLSID
+    //  - 4 bytes address length (byte count)
+    let data_len = 0x34u32.saturating_add(url_len);
+    if data_len > u16::MAX as u32 {
+        return Err(XlsError::InvalidData(
+            "Hyperlink record exceeds BIFF8 length limit".to_string(),
+        ));
+    }
+
+    write_record_header(writer, 0x01B8, data_len as u16)?;
+
+    writer.write_all(&row1.to_le_bytes())?;
+    writer.write_all(&row2.to_le_bytes())?;
+    writer.write_all(&col1.to_le_bytes())?;
+    writer.write_all(&col2.to_le_bytes())?;
+
+    writer.write_all(&UNKNOWN1)?;
+
+    // Option flags: 0x00000003 for standard URL/UNC hyperlink.
+    writer.write_all(&0x0000_0003u32.to_le_bytes())?;
+
+    writer.write_all(&UNKNOWN2)?;
+    writer.write_all(&url_len.to_le_bytes())?;
+    writer.write_all(&url_bytes)?;
+
+    Ok(())
+}
+
+fn write_hyperlink_internal<W: Write>(
+    writer: &mut W,
+    row1: u16,
+    row2: u16,
+    col1: u16,
+    col2: u16,
+    url: &str,
+) -> XlsResult<()> {
+    if url.is_empty() {
+        return Ok(());
+    }
+
+    const UNKNOWN1: [u8; 20] = [
+        0xD0, 0xC9, 0xEA, 0x79, 0xF9, 0xBA, 0xCE, 0x11, 0x8C, 0x82, 0x00, 0xAA, 0x00, 0x4B, 0xA9,
+        0x0B, 0x02, 0x00, 0x00, 0x00,
+    ];
+
+    // Strip explicit internal: prefix if present.
+    let target = url.strip_prefix("internal:").unwrap_or(url);
+
+    // Append a single NUL terminator, then encode as UTF-16LE.
+    let mut terminated = String::with_capacity(target.len().saturating_add(1));
+    terminated.push_str(target);
+    terminated.push('\0');
+
+    let char_count = terminated.chars().count();
+    let mut wide = Vec::with_capacity(char_count.saturating_mul(2));
+    for unit in terminated.encode_utf16() {
+        wide.extend_from_slice(&unit.to_le_bytes());
+    }
+
+    let url_len = u32::try_from(char_count)
+        .map_err(|_| XlsError::InvalidData("Internal hyperlink target is too long".to_string()))?;
+
+    let data_len = 0x24u32.saturating_add(u32::from(wide.len() as u16));
+    if data_len > u16::MAX as u32 {
+        return Err(XlsError::InvalidData(
+            "Internal hyperlink record exceeds BIFF8 length limit".to_string(),
+        ));
+    }
+
+    write_record_header(writer, 0x01B8, data_len as u16)?;
+
+    writer.write_all(&row1.to_le_bytes())?;
+    writer.write_all(&row2.to_le_bytes())?;
+    writer.write_all(&col1.to_le_bytes())?;
+    writer.write_all(&col2.to_le_bytes())?;
+
+    writer.write_all(&UNKNOWN1)?;
+
+    // Option flags: 0x00000008 for internal document reference.
+    writer.write_all(&0x0000_0008u32.to_le_bytes())?;
+
+    writer.write_all(&url_len.to_le_bytes())?;
+    writer.write_all(&wide)?;
+
+    Ok(())
+}
+
+/// Write HLINK (hyperlink) record for a single cell or cell range.
+///
+/// For now we support standard web/mail/ftp URLs and internal workbook
+/// references. External file hyperlinks can be added later using the
+/// more complex BIFF8 layout if required.
+pub fn write_hyperlink<W: Write>(
+    writer: &mut W,
+    row1: u32,
+    row2: u32,
+    col1: u16,
+    col2: u16,
+    url: &str,
+) -> XlsResult<()> {
+    if row1 > u16::MAX as u32 || row2 > u16::MAX as u32 {
+        return Err(XlsError::InvalidData(
+            "Hyperlink row index must be <= 65535 for BIFF8".to_string(),
+        ));
+    }
+
+    let r1 = row1 as u16;
+    let r2 = row2 as u16;
+
+    let trimmed = url.trim();
+    if trimmed.is_empty() {
+        return Ok(());
+    }
+
+    let is_web_like = trimmed.starts_with("http://")
+        || trimmed.starts_with("https://")
+        || trimmed.starts_with("ftp://")
+        || trimmed.starts_with("mailto:");
+
+    let is_internal = trimmed.starts_with("internal:")
+        || (!is_web_like && trimmed.contains('!') && !trimmed.contains("://"));
+
+    if is_internal {
+        write_hyperlink_internal(writer, r1, r2, col1, col2, trimmed)
+    } else {
+        write_hyperlink_web(writer, r1, r2, col1, col2, trimmed)
+    }
+}
+
 /// Write WINDOW2 record (Worksheet view settings)
 ///
 /// Record type: 0x023E, Length: 18 (worksheet and macro sheet)

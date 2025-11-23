@@ -48,9 +48,11 @@ pub use self::data_validation::{
 };
 pub use self::named_range::XlsDefinedName;
 use self::named_range::XlsDefinedName as InternalDefinedName;
-use self::worksheet::{AutoFilterRange, MergedRange, WritableCell, WritableWorksheet};
+use self::worksheet::{
+    AutoFilterRange, MergedRange, WritableCell, WritableWorksheet, XlsHyperlink,
+};
 
-fn column_to_letters(mut col: u16) -> String {
+fn column_to_letters(col: u16) -> String {
     let mut col_index = col as u32;
     let mut buf = Vec::new();
 
@@ -313,6 +315,47 @@ impl XlsWriter {
                 "Defined name must be at most 255 characters".to_string(),
             ));
         }
+
+        Ok(())
+    }
+
+    /// Set a hyperlink for a single cell.
+    ///
+    /// Row and column indices are 0-based, matching the rest of the XLS
+    /// writer APIs. The hyperlink target can be a standard URL (http, https,
+    /// ftp, mailto) or an internal reference such as `Sheet1!A1` or
+    /// `internal:Sheet1!A1`.
+    pub fn set_hyperlink(&mut self, sheet: usize, row: u32, col: u16, url: &str) -> XlsResult<()> {
+        if row > u16::MAX as u32 {
+            return Err(XlsError::InvalidData(
+                "set_hyperlink: row index must be <= 65535 for BIFF8".to_string(),
+            ));
+        }
+
+        if col >= 256 {
+            return Err(XlsError::InvalidData(
+                "set_hyperlink: column index must be < 256 for BIFF8".to_string(),
+            ));
+        }
+
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+
+        // Replace any existing hyperlink on this exact cell to match
+        // XLSX writer semantics.
+        worksheet.hyperlinks.retain(|h| {
+            !(h.first_row == row && h.last_row == row && h.first_col == col && h.last_col == col)
+        });
+
+        worksheet.add_hyperlink(XlsHyperlink {
+            first_row: row,
+            last_row: row,
+            first_col: col,
+            last_col: col,
+            url: url.to_string(),
+        });
 
         Ok(())
     }
@@ -1104,6 +1147,18 @@ impl XlsWriter {
                         // Skip blank cells
                     },
                 }
+            }
+
+            // Hyperlink records for cells or ranges.
+            for hyperlink in &worksheet.hyperlinks {
+                biff::write_hyperlink(
+                    &mut stream,
+                    hyperlink.first_row,
+                    hyperlink.last_row,
+                    hyperlink.first_col,
+                    hyperlink.last_col,
+                    &hyperlink.url,
+                )?;
             }
 
             if !worksheet.merged_ranges.is_empty() {
