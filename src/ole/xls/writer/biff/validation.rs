@@ -3,6 +3,25 @@ use std::io::Write;
 
 use super::{unicode_string_size, write_record_header, write_unicode_string_biff8};
 
+/// Configuration for a single DV (data validation) record.
+#[derive(Debug, Clone)]
+pub(crate) struct DvConfig<'a> {
+    pub data_type: u8,
+    pub operator: u8,
+    pub error_style: u8,
+    pub empty_cell_allowed: bool,
+    pub suppress_dropdown_arrow: bool,
+    pub is_explicit_list_formula: bool,
+    pub show_prompt_on_cell_selected: bool,
+    pub prompt_title: Option<&'a str>,
+    pub prompt_text: Option<&'a str>,
+    pub show_error_on_invalid_value: bool,
+    pub error_title: Option<&'a str>,
+    pub error_text: Option<&'a str>,
+    pub formula1: Option<&'a [u8]>,
+    pub formula2: Option<&'a [u8]>,
+}
+
 pub fn write_dval<W: Write>(writer: &mut W, dv_count: u32) -> XlsResult<()> {
     // DVAL: options(2) + horiz_pos(4) + vert_pos(4) + cbo_id(4) + dv_no(4) = 18 bytes
     write_record_header(writer, 0x01B2, 18)?;
@@ -23,20 +42,7 @@ pub fn write_dval<W: Write>(writer: &mut W, dv_count: u32) -> XlsResult<()> {
 
 pub fn write_dv<W: Write>(
     writer: &mut W,
-    data_type: u8,
-    operator: u8,
-    error_style: u8,
-    empty_cell_allowed: bool,
-    suppress_dropdown_arrow: bool,
-    is_explicit_list_formula: bool,
-    show_prompt_on_cell_selected: bool,
-    prompt_title: Option<&str>,
-    prompt_text: Option<&str>,
-    show_error_on_invalid_value: bool,
-    error_title: Option<&str>,
-    error_text: Option<&str>,
-    formula1: Option<&[u8]>,
-    formula2: Option<&[u8]>,
+    cfg: &DvConfig<'_>,
     ranges: &[(u32, u32, u16, u16)],
 ) -> XlsResult<()> {
     if ranges.is_empty() {
@@ -50,24 +56,25 @@ pub fn write_dv<W: Write>(
     })?;
 
     // Normalise titles/text: Excel encodes "not present" as a single NUL character.
-    let prompt_title_val: &str = match prompt_title {
+    let prompt_title_val: &str = match cfg.prompt_title {
         Some(s) if !s.is_empty() => s,
         _ => "\u{0000}",
     };
-    let error_title_val: &str = match error_title {
+    let error_title_val: &str = match cfg.error_title {
         Some(s) if !s.is_empty() => s,
         _ => "\u{0000}",
     };
-    let prompt_text_val: &str = match prompt_text {
+    let prompt_text_val: &str = match cfg.prompt_text {
         Some(s) if !s.is_empty() => s,
         _ => "\u{0000}",
     };
-    let error_text_val: &str = match error_text {
+    let error_text_val: &str = match cfg.error_text {
         Some(s) if !s.is_empty() => s,
         _ => "\u{0000}",
     };
 
-    let f1_len: u16 = formula1
+    let f1_len: u16 = cfg
+        .formula1
         .map(|f| {
             u16::try_from(f.len()).map_err(|_| {
                 XlsError::InvalidData(
@@ -78,7 +85,8 @@ pub fn write_dv<W: Write>(
         .transpose()?
         .unwrap_or(0);
 
-    let f2_len: u16 = formula2
+    let f2_len: u16 = cfg
+        .formula2
         .map(|f| {
             u16::try_from(f.len()).map_err(|_| {
                 XlsError::InvalidData(
@@ -109,24 +117,24 @@ pub fn write_dv<W: Write>(
 
     // Option flags bitfield
     let mut option_flags: u32 = 0;
-    option_flags |= (u32::from(data_type)) & 0x0000_000F;
-    option_flags |= ((u32::from(error_style)) & 0x0000_0007) << 4;
-    if is_explicit_list_formula {
+    option_flags |= (u32::from(cfg.data_type)) & 0x0000_000F;
+    option_flags |= ((u32::from(cfg.error_style)) & 0x0000_0007) << 4;
+    if cfg.is_explicit_list_formula {
         option_flags |= 0x0000_0080;
     }
-    if empty_cell_allowed {
+    if cfg.empty_cell_allowed {
         option_flags |= 0x0000_0100;
     }
-    if suppress_dropdown_arrow {
+    if cfg.suppress_dropdown_arrow {
         option_flags |= 0x0000_0200;
     }
-    if show_prompt_on_cell_selected {
+    if cfg.show_prompt_on_cell_selected {
         option_flags |= 0x0004_0000;
     }
-    if show_error_on_invalid_value {
+    if cfg.show_error_on_invalid_value {
         option_flags |= 0x0008_0000;
     }
-    option_flags |= ((u32::from(operator)) & 0x0000_0007) << 20;
+    option_flags |= ((u32::from(cfg.operator)) & 0x0000_0007) << 20;
 
     writer.write_all(&option_flags.to_le_bytes())?;
 
@@ -139,14 +147,14 @@ pub fn write_dv<W: Write>(
     // First formula
     writer.write_all(&f1_len.to_le_bytes())?;
     writer.write_all(&0x3FE0u16.to_le_bytes())?; // not_used_1
-    if let Some(bytes) = formula1 {
+    if let Some(bytes) = cfg.formula1 {
         writer.write_all(bytes)?;
     }
 
     // Second formula
     writer.write_all(&f2_len.to_le_bytes())?;
     writer.write_all(&0u16.to_le_bytes())?; // not_used_2
-    if let Some(bytes) = formula2 {
+    if let Some(bytes) = cfg.formula2 {
         writer.write_all(bytes)?;
     }
 

@@ -347,33 +347,33 @@ impl XlsWriter {
             ));
         }
 
-        if let Some(title) = validation.input_title.as_ref() {
-            if title.len() > 32 {
-                return Err(XlsError::InvalidData(
-                    "Input message title must be at most 32 characters".to_string(),
-                ));
-            }
+        if let Some(title) = validation.input_title.as_ref()
+            && title.len() > 32
+        {
+            return Err(XlsError::InvalidData(
+                "Input message title must be at most 32 characters".to_string(),
+            ));
         }
-        if let Some(text) = validation.input_message.as_ref() {
-            if text.len() > 255 {
-                return Err(XlsError::InvalidData(
-                    "Input message text must be at most 255 characters".to_string(),
-                ));
-            }
+        if let Some(text) = validation.input_message.as_ref()
+            && text.len() > 255
+        {
+            return Err(XlsError::InvalidData(
+                "Input message text must be at most 255 characters".to_string(),
+            ));
         }
-        if let Some(title) = validation.error_title.as_ref() {
-            if title.len() > 32 {
-                return Err(XlsError::InvalidData(
-                    "Error message title must be at most 32 characters".to_string(),
-                ));
-            }
+        if let Some(title) = validation.error_title.as_ref()
+            && title.len() > 32
+        {
+            return Err(XlsError::InvalidData(
+                "Error message title must be at most 32 characters".to_string(),
+            ));
         }
-        if let Some(text) = validation.error_message.as_ref() {
-            if text.len() > 255 {
-                return Err(XlsError::InvalidData(
-                    "Error message text must be at most 255 characters".to_string(),
-                ));
-            }
+        if let Some(text) = validation.error_message.as_ref()
+            && text.len() > 255
+        {
+            return Err(XlsError::InvalidData(
+                "Error message text must be at most 255 characters".to_string(),
+            ));
         }
 
         let worksheet = self
@@ -664,29 +664,31 @@ impl XlsWriter {
                 biff::write_dval(&mut stream, dv_count)?;
 
                 for dv in &worksheet.data_validations {
-                    let (data_type, operator, is_explicit_list, formula1, formula2) =
-                        dv.validation_type.to_biff_payload()?;
+                    let payload = dv.validation_type.to_biff_payload()?;
 
                     let ranges = [(dv.first_row, dv.last_row, dv.first_col, dv.last_col)];
 
-                    biff::write_dv(
-                        &mut stream,
-                        data_type,
-                        operator,
-                        0,     // errorStyle: STOP
-                        true,  // emptyCellAllowed
-                        false, // suppressDropdownArrow
-                        is_explicit_list,
-                        dv.show_input_message,
-                        dv.input_title.as_deref(),
-                        dv.input_message.as_deref(),
-                        dv.show_error_alert,
-                        dv.error_title.as_deref(),
-                        dv.error_message.as_deref(),
-                        formula1.as_deref(),
-                        formula2.as_deref(),
-                        &ranges,
-                    )?;
+                    let formula1 = payload.formula1.as_deref();
+                    let formula2 = payload.formula2.as_deref();
+
+                    let dv_config = biff::DvConfig {
+                        data_type: payload.data_type,
+                        operator: payload.operator,
+                        error_style: 0, // errorStyle: STOP
+                        empty_cell_allowed: true,
+                        suppress_dropdown_arrow: false,
+                        is_explicit_list_formula: payload.is_explicit_list,
+                        show_prompt_on_cell_selected: dv.show_input_message,
+                        prompt_title: dv.input_title.as_deref(),
+                        prompt_text: dv.input_message.as_deref(),
+                        show_error_on_invalid_value: dv.show_error_alert,
+                        error_title: dv.error_title.as_deref(),
+                        error_text: dv.error_message.as_deref(),
+                        formula1,
+                        formula2,
+                    };
+
+                    biff::write_dv(&mut stream, &dv_config, &ranges)?;
                 }
             }
 

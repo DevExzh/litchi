@@ -48,13 +48,19 @@ pub enum XlsDataValidationType {
     List { values: Vec<String> },
 }
 
+/// BIFF8-encoded components of a single data validation rule.
+#[derive(Debug, Clone)]
+pub(crate) struct XlsDataValidationBiffPayload {
+    pub data_type: u8,
+    pub operator: u8,
+    pub is_explicit_list: bool,
+    pub formula1: Option<Vec<u8>>,
+    pub formula2: Option<Vec<u8>>,
+}
+
 impl XlsDataValidationType {
     /// Convert this validation type into BIFF8 DV payload components.
-    ///
-    /// Returns `(data_type, operator, is_explicit_list, formula1_bytes, formula2_bytes)`.
-    pub(crate) fn to_biff_payload(
-        &self,
-    ) -> XlsResult<(u8, u8, bool, Option<Vec<u8>>, Option<Vec<u8>>)> {
+    pub(crate) fn to_biff_payload(&self) -> XlsResult<XlsDataValidationBiffPayload> {
         match self {
             XlsDataValidationType::Whole {
                 operator,
@@ -84,8 +90,13 @@ impl XlsDataValidationType {
                         _ => None,
                     }
                 };
-
-                Ok((data_type, op, false, formula1, formula2))
+                Ok(XlsDataValidationBiffPayload {
+                    data_type,
+                    operator: op,
+                    is_explicit_list: false,
+                    formula1,
+                    formula2,
+                })
             },
             XlsDataValidationType::List { values } => {
                 if values.is_empty() {
@@ -113,7 +124,13 @@ impl XlsDataValidationType {
                 let formula1 = Some(encode_ptg_tokens(&tokens));
 
                 // LIST uses operator IGNORED (0) and marks explicit list formula.
-                Ok((0x03, 0, true, formula1, None))
+                Ok(XlsDataValidationBiffPayload {
+                    data_type: 0x03,
+                    operator: 0,
+                    is_explicit_list: true,
+                    formula1,
+                    formula2: None,
+                })
             },
         }
     }

@@ -25,6 +25,8 @@ mod validation;
 mod workbook;
 mod worksheet;
 
+pub(crate) use validation::DvConfig;
+
 /// Write a BIFF record header
 ///
 /// # Arguments
@@ -111,40 +113,10 @@ pub fn write_dval<W: Write>(writer: &mut W, dv_count: u32) -> XlsResult<()> {
 
 pub fn write_dv<W: Write>(
     writer: &mut W,
-    data_type: u8,
-    operator: u8,
-    error_style: u8,
-    empty_cell_allowed: bool,
-    suppress_dropdown_arrow: bool,
-    is_explicit_list_formula: bool,
-    show_prompt_on_cell_selected: bool,
-    prompt_title: Option<&str>,
-    prompt_text: Option<&str>,
-    show_error_on_invalid_value: bool,
-    error_title: Option<&str>,
-    error_text: Option<&str>,
-    formula1: Option<&[u8]>,
-    formula2: Option<&[u8]>,
+    cfg: &DvConfig<'_>,
     ranges: &[(u32, u32, u16, u16)],
 ) -> XlsResult<()> {
-    validation::write_dv(
-        writer,
-        data_type,
-        operator,
-        error_style,
-        empty_cell_allowed,
-        suppress_dropdown_arrow,
-        is_explicit_list_formula,
-        show_prompt_on_cell_selected,
-        prompt_title,
-        prompt_text,
-        show_error_on_invalid_value,
-        error_title,
-        error_text,
-        formula1,
-        formula2,
-        ranges,
-    )
+    validation::write_dv(writer, cfg, ranges)
 }
 
 /// Write UseSelFS (Use Natural Language Formulas) record.
