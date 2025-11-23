@@ -21,6 +21,15 @@ pub(super) struct MergedRange {
     pub last_col: u16,
 }
 
+/// Freeze panes configuration for a worksheet.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct FreezePanes {
+    /// Number of frozen rows from the top (0-based, inclusive index of last frozen row).
+    pub freeze_rows: u32,
+    /// Number of frozen columns from the left (0-based, inclusive index of last frozen column).
+    pub freeze_cols: u16,
+}
+
 /// Represents a worksheet in the writer
 #[derive(Debug)]
 pub(super) struct WritableWorksheet {
@@ -39,6 +48,8 @@ pub(super) struct WritableWorksheet {
     pub merged_ranges: Vec<MergedRange>,
     pub data_validations: Vec<XlsDataValidation>,
     pub conditional_formats: Vec<XlsConditionalFormat>,
+    /// Optional freeze panes configuration.
+    pub freeze_panes: Option<FreezePanes>,
 }
 
 impl WritableWorksheet {
@@ -53,6 +64,7 @@ impl WritableWorksheet {
             merged_ranges: Vec::new(),
             data_validations: Vec::new(),
             conditional_formats: Vec::new(),
+            freeze_panes: None,
         }
     }
 
@@ -83,5 +95,16 @@ impl WritableWorksheet {
 
     pub(super) fn add_conditional_format(&mut self, cf: XlsConditionalFormat) {
         self.conditional_formats.push(cf);
+    }
+
+    pub(super) fn set_freeze_panes(&mut self, freeze_rows: u32, freeze_cols: u16) {
+        self.freeze_panes = Some(FreezePanes {
+            freeze_rows,
+            freeze_cols,
+        });
+    }
+
+    pub(super) fn clear_freeze_panes(&mut self) {
+        self.freeze_panes = None;
     }
 }

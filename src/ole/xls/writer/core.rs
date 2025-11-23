@@ -294,6 +294,46 @@ impl XlsWriter {
         Ok(())
     }
 
+    /// Configure freeze panes for the specified worksheet.
+    ///
+    /// Row and column indices are 0-based and represent the number of
+    /// rows/columns at the top/left that remain frozen.
+    pub fn freeze_panes(
+        &mut self,
+        sheet: usize,
+        freeze_rows: u32,
+        freeze_cols: u16,
+    ) -> XlsResult<()> {
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+
+        if freeze_rows == 0 && freeze_cols == 0 {
+            worksheet.clear_freeze_panes();
+            return Ok(());
+        }
+
+        if freeze_rows > u16::MAX as u32 {
+            return Err(XlsError::InvalidData(
+                "freeze_panes: freeze_rows must be <= 65535".to_string(),
+            ));
+        }
+
+        worksheet.set_freeze_panes(freeze_rows, freeze_cols);
+        Ok(())
+    }
+
+    /// Remove any freeze panes from the specified worksheet.
+    pub fn unfreeze_panes(&mut self, sheet: usize) -> XlsResult<()> {
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.clear_freeze_panes();
+        Ok(())
+    }
+
     /// Add a data validation rule to the specified worksheet.
     pub fn add_data_validation(
         &mut self,
@@ -567,9 +607,19 @@ impl XlsWriter {
                 worksheet.last_col,
             )?;
 
-            // Required sheet records for worksheet substream per MS-XLS
+            // Required sheet records for worksheet substream per MS-XLS.
+            //
+            // Apache POI writes WINDOW2 first and then (optionally) PANE
+            // immediately afterwards when freeze panes are configured. We
+            // mirror that ordering here to avoid Excel interpreting the
+            // pane as a generic split window.
             biff::write_wsbool(&mut stream)?;
-            biff::write_window2(&mut stream)?;
+            let has_freeze_panes = worksheet.freeze_panes.is_some();
+            biff::write_window2(&mut stream, has_freeze_panes)?;
+
+            if let Some(panes) = worksheet.freeze_panes {
+                biff::write_pane(&mut stream, panes.freeze_rows, panes.freeze_cols)?;
+            }
 
             // Cell records (sorted by row, then column)
             let mut sorted_cells: Vec<_> = worksheet.cells.iter().collect();

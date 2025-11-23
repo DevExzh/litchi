@@ -166,9 +166,18 @@ pub fn write_wsbool<W: Write>(writer: &mut W) -> XlsResult<()> {
 /// Write WINDOW2 record (Worksheet view settings)
 ///
 /// Record type: 0x023E, Length: 18 (worksheet and macro sheet)
-/// Writes conservative defaults that are accepted by Excel.
-pub fn write_window2<W: Write>(writer: &mut W) -> XlsResult<()> {
-    worksheet::write_window2(writer)
+///
+/// The `has_freeze_panes` flag controls whether the FREEZE_PANES and
+/// FREEZE_PANES_NO_SPLIT bits are set in the options field.
+pub fn write_window2<W: Write>(writer: &mut W, has_freeze_panes: bool) -> XlsResult<()> {
+    worksheet::write_window2(writer, has_freeze_panes)
+}
+
+/// Write PANE record (freeze panes configuration)
+///
+/// Record type: 0x0041, Length: 10
+pub fn write_pane<W: Write>(writer: &mut W, freeze_rows: u32, freeze_cols: u16) -> XlsResult<()> {
+    worksheet::write_pane(writer, freeze_rows, freeze_cols)
 }
 
 /// Write BOF (Beginning of File) record
