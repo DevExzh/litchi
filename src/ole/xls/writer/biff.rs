@@ -161,6 +161,10 @@ pub fn write_pane<W: Write>(writer: &mut W, freeze_rows: u32, freeze_cols: u16) 
     worksheet::write_pane(writer, freeze_rows, freeze_cols)
 }
 
+pub fn write_autofilterinfo<W: Write>(writer: &mut W, c_entries: u16) -> XlsResult<()> {
+    worksheet::write_autofilterinfo(writer, c_entries)
+}
+
 /// Write BOF (Beginning of File) record
 ///
 /// Record type: 0x0809

@@ -30,6 +30,14 @@ pub(super) struct FreezePanes {
     pub freeze_cols: u16,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(super) struct AutoFilterRange {
+    pub first_row: u32,
+    pub last_row: u32,
+    pub first_col: u16,
+    pub last_col: u16,
+}
+
 /// Represents a worksheet in the writer
 #[derive(Debug)]
 pub(super) struct WritableWorksheet {
@@ -58,6 +66,7 @@ pub(super) struct WritableWorksheet {
     pub conditional_formats: Vec<XlsConditionalFormat>,
     /// Optional freeze panes configuration.
     pub freeze_panes: Option<FreezePanes>,
+    pub auto_filter: Option<AutoFilterRange>,
 }
 
 impl WritableWorksheet {
@@ -77,6 +86,7 @@ impl WritableWorksheet {
             data_validations: Vec::new(),
             conditional_formats: Vec::new(),
             freeze_panes: None,
+            auto_filter: None,
         }
     }
 

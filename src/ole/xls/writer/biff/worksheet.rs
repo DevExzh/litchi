@@ -103,6 +103,16 @@ pub fn write_pane<W: Write>(writer: &mut W, freeze_rows: u32, freeze_cols: u16) 
     Ok(())
 }
 
+pub fn write_autofilterinfo<W: Write>(writer: &mut W, c_entries: u16) -> XlsResult<()> {
+    if c_entries == 0 {
+        return Ok(());
+    }
+
+    write_record_header(writer, 0x009D, 2)?;
+    writer.write_all(&c_entries.to_le_bytes())?;
+    Ok(())
+}
+
 /// Write WINDOW2 record (Worksheet view settings)
 ///
 /// Record type: 0x023E, Length: 18 (worksheet and macro sheet)

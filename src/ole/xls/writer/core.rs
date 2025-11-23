@@ -48,7 +48,30 @@ pub use self::data_validation::{
 };
 pub use self::named_range::XlsDefinedName;
 use self::named_range::XlsDefinedName as InternalDefinedName;
-use self::worksheet::{MergedRange, WritableCell, WritableWorksheet};
+use self::worksheet::{AutoFilterRange, MergedRange, WritableCell, WritableWorksheet};
+
+fn column_to_letters(mut col: u16) -> String {
+    let mut col_index = col as u32;
+    let mut buf = Vec::new();
+
+    loop {
+        let rem = (col_index % 26) as u8;
+        buf.push((b'A' + rem) as char);
+        col_index /= 26;
+        if col_index == 0 {
+            break;
+        }
+        col_index -= 1;
+    }
+
+    buf.iter().rev().collect()
+}
+
+fn a1_cell(row: u32, col: u16) -> String {
+    let col_str = column_to_letters(col);
+    let row_idx = row + 1;
+    format!("{col_str}{row_idx}")
+}
 
 /// Cell value type for writing
 #[derive(Debug, Clone)]
@@ -290,6 +313,73 @@ impl XlsWriter {
                 "Defined name must be at most 255 characters".to_string(),
             ));
         }
+
+        Ok(())
+    }
+
+    pub fn set_auto_filter(
+        &mut self,
+        sheet: usize,
+        first_row: u32,
+        last_row: u32,
+        first_col: u16,
+        last_col: u16,
+    ) -> XlsResult<()> {
+        if first_row > last_row || first_col > last_col {
+            return Err(XlsError::InvalidData(
+                "set_auto_filter: first row/col must be <= last row/col".to_string(),
+            ));
+        }
+
+        if last_row > u16::MAX as u32 {
+            return Err(XlsError::InvalidData(
+                "set_auto_filter: row index must be <= 65535 for BIFF8".to_string(),
+            ));
+        }
+
+        if last_col >= 256 {
+            return Err(XlsError::InvalidData(
+                "set_auto_filter: column index must be < 256 for BIFF8".to_string(),
+            ));
+        }
+
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+
+        worksheet.auto_filter = Some(AutoFilterRange {
+            first_row,
+            last_row,
+            first_col,
+            last_col,
+        });
+
+        let itab = u16::try_from(sheet + 1).map_err(|_| {
+            XlsError::InvalidData(
+                "set_auto_filter: sheet index exceeds BIFF8 itab limit".to_string(),
+            )
+        })?;
+
+        self.defined_names.retain(|n| {
+            !(n.is_built_in && n.built_in_code == Some(0x0D) && n.local_sheet == Some(itab))
+        });
+
+        let start_ref = a1_cell(first_row, first_col);
+        let end_ref = a1_cell(last_row, last_col);
+        let reference = format!("{start_ref}:{end_ref}");
+
+        self.defined_names.push(InternalDefinedName {
+            name: "_FilterDatabase".to_string(),
+            reference,
+            comment: None,
+            local_sheet: Some(itab),
+            target_sheet: Some(sheet as u16),
+            hidden: true,
+            is_function: false,
+            is_built_in: true,
+            built_in_code: Some(0x0D),
+        });
 
         Ok(())
     }
@@ -920,6 +1010,16 @@ impl XlsWriter {
 
             if let Some(panes) = worksheet.freeze_panes {
                 biff::write_pane(&mut stream, panes.freeze_rows, panes.freeze_cols)?;
+            }
+
+            if let Some(af) = worksheet.auto_filter {
+                let width = u32::from(af.last_col).saturating_sub(u32::from(af.first_col)) + 1;
+                let c_entries = u16::try_from(width).map_err(|_| {
+                    XlsError::InvalidData(
+                        "set_auto_filter: auto-filter column span exceeds BIFF8 limit".to_string(),
+                    )
+                })?;
+                biff::write_autofilterinfo(&mut stream, c_entries)?;
             }
 
             // Column width / hidden state via COLINFO records.
