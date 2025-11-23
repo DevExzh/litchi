@@ -16,9 +16,12 @@ pub mod formatting;
 pub mod formula;
 
 // Re-export public types
-pub use core::{XlsCellValue, XlsWriter};
+pub use core::{
+    XlsCellValue, XlsConditionalFormat, XlsConditionalFormatType, XlsConditionalPattern,
+    XlsDataValidation, XlsDataValidationOperator, XlsDataValidationType, XlsWriter,
+};
 pub use formatting::{
-    BorderStyle, Borders, ExtendedFormat, Fill, FillPattern, Font, FormattingManager,
+    BorderStyle, Borders, CellStyle, ExtendedFormat, Fill, FillPattern, Font, FormattingManager,
     HorizontalAlignment, VerticalAlignment,
 };
 pub use formula::{FormulaTokenizer, Ptg};

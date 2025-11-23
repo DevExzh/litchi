@@ -11,6 +11,7 @@
 //! - **PALETTE**: Color palette
 
 use super::super::XlsResult;
+use std::collections::HashMap;
 use std::io::Write;
 
 /// Font weight constants
@@ -33,6 +34,80 @@ pub enum HorizontalAlignment {
     Fill = 4,
     Justify = 5,
     CenterAcrossSelection = 6,
+}
+
+/// Built-in number format strings as defined by BIFF8 / Excel.
+///
+/// These are taken from Apache POI's `BuiltinFormats` table so that
+/// format indices used in `ExtendedFormat.format_index` match POI and
+/// Excel expectations.
+const BUILTIN_NUMBER_FORMATS: [&str; 50] = [
+    "General",                              // 0x00
+    "0",                                    // 0x01
+    "0.00",                                 // 0x02
+    "#,##0",                                // 0x03
+    "#,##0.00",                             // 0x04
+    "\"$\"#,##0_);(\"$\"#,##0)",            // 0x05
+    "\"$\"#,##0_);[Red](\"$\"#,##0)",       // 0x06
+    "\"$\"#,##0.00_);(\"$\"#,##0.00)",      // 0x07
+    "\"$\"#,##0.00_);[Red](\"$\"#,##0.00)", // 0x08
+    "0%",                                   // 0x09
+    "0.00%",                                // 0x0A
+    "0.00E+00",                             // 0x0B
+    "# ?/?",                                // 0x0C
+    "# ??/??",                              // 0x0D
+    "m/d/yy",                               // 0x0E
+    "d-mmm-yy",                             // 0x0F
+    "d-mmm",                                // 0x10
+    "mmm-yy",                               // 0x11
+    "h:mm AM/PM",                           // 0x12
+    "h:mm:ss AM/PM",                        // 0x13
+    "h:mm",                                 // 0x14
+    "h:mm:ss",                              // 0x15
+    "m/d/yy h:mm",                          // 0x16
+    // 0x17 - 0x24 reserved for international and undocumented
+    "reserved-0x17",              // 0x17
+    "reserved-0x18",              // 0x18
+    "reserved-0x19",              // 0x19
+    "reserved-0x1A",              // 0x1A
+    "reserved-0x1B",              // 0x1B
+    "reserved-0x1C",              // 0x1C
+    "reserved-0x1D",              // 0x1D
+    "reserved-0x1E",              // 0x1E
+    "reserved-0x1F",              // 0x1F
+    "reserved-0x20",              // 0x20
+    "reserved-0x21",              // 0x21
+    "reserved-0x22",              // 0x22
+    "reserved-0x23",              // 0x23
+    "reserved-0x24",              // 0x24
+    "#,##0_);(#,##0)",            // 0x25
+    "#,##0_);[Red](#,##0)",       // 0x26
+    "#,##0.00_);(#,##0.00)",      // 0x27
+    "#,##0.00_);[Red](#,##0.00)", // 0x28
+    "_(* #,##0_);_(* (#,##0);_(* \"-\"_);_(@_)",
+    "_(\"$\"* #,##0_);_(\"$\"* (#,##0);_(\"$\"* \"-\"_);_(@_)",
+    "_(* #,##0.00_);_(* (#,##0.00);_(* \"-\"??_);_(@_)",
+    "_(\"$\"* #,##0.00_);_(\"$\"* (#,##0.00);_(\"$\"* \"-\"??_);_(@_)",
+    "mm:ss",     // 0x2D
+    "[h]:mm:ss", // 0x2E
+    "mm:ss.0",   // 0x2F
+    "##0.0E+0",  // 0x30
+    "@",         // 0x31 (text)
+];
+
+/// First user-defined number format index in BIFF8 / Excel.
+const FIRST_USER_DEFINED_NUMBER_FORMAT_INDEX: u16 = 164;
+
+/// Look up the BIFF built-in number format index for a given pattern.
+///
+/// This mirrors Apache POI's `BuiltinFormats.getBuiltinFormat(String)`
+/// in a simplified form and is used by the formatting manager to avoid
+/// creating duplicate custom FORMAT records for built-in patterns.
+fn builtin_number_format_index(pattern: &str) -> Option<u16> {
+    BUILTIN_NUMBER_FORMATS
+        .iter()
+        .position(|&p| p == pattern)
+        .map(|idx| idx as u16)
 }
 
 /// Vertical alignment
@@ -168,6 +243,44 @@ impl Default for ExtendedFormat {
     }
 }
 
+/// High-level cell style descriptor used to build reusable styles.
+///
+/// This is a value-based counterpart to POI's `HSSFCellStyle`: it
+/// groups together font, borders, fill, alignment, and an optional
+/// number format string. `FormattingManager` converts a `CellStyle`
+/// into an `ExtendedFormat` plus FONT and FORMAT records.
+#[derive(Debug, Clone)]
+pub struct CellStyle {
+    /// Font definition used by this style.
+    pub font: Font,
+    /// Cell borders (styles and colors).
+    pub borders: Borders,
+    /// Cell fill (background pattern and colors).
+    pub fill: Fill,
+    /// Horizontal alignment.
+    pub h_align: HorizontalAlignment,
+    /// Vertical alignment.
+    pub v_align: VerticalAlignment,
+    /// Whether text is wrapped within the cell.
+    pub text_wrap: bool,
+    /// Optional number format pattern (e.g. "0.00", "yyyy-mm-dd").
+    pub number_format: Option<String>,
+}
+
+impl Default for CellStyle {
+    fn default() -> Self {
+        Self {
+            font: Font::default(),
+            borders: Borders::default(),
+            fill: Fill::default(),
+            h_align: HorizontalAlignment::General,
+            v_align: VerticalAlignment::Bottom,
+            text_wrap: false,
+            number_format: None,
+        }
+    }
+}
+
 /// Write FONT record (0x0031)
 ///
 /// # Arguments
@@ -265,22 +378,37 @@ pub fn write_xf<W: Write>(writer: &mut W, xf: &ExtendedFormat, is_style_xf: bool
     // Used attributes flags
     writer.write_all(&[0])?;
 
-    // Border styles and colors (simplified)
-    let border_left = (xf.borders.left_style as u8) & 0x0F;
-    let border_right = (xf.borders.right_style as u8) & 0x0F;
-    let border_top = (xf.borders.top_style as u8) & 0x0F;
-    let border_bottom = (xf.borders.bottom_style as u8) & 0x0F;
+    // Border styles bitfield (field_6_border_options).
+    // Matches POI's ExtendedFormatRecord: 4-bit nibbles per side.
+    let border_left = (xf.borders.left_style as u16) & 0x000F;
+    let border_right = ((xf.borders.right_style as u16) & 0x000F) << 4;
+    let border_top = ((xf.borders.top_style as u16) & 0x000F) << 8;
+    let border_bottom = ((xf.borders.bottom_style as u16) & 0x000F) << 12;
+    let border_options = border_left | border_right | border_top | border_bottom;
+    writer.write_all(&border_options.to_le_bytes())?;
 
-    writer.write_all(&[border_left | (border_right << 4)])?;
-    writer.write_all(&[border_top | (border_bottom << 4)])?;
+    // Border palette indices and diagonal flags (field_7_palette_options).
+    let left_idx = xf.borders.left_color & 0x007F;
+    let right_idx = xf.borders.right_color & 0x007F;
+    let palette_options: u16 = (left_idx & 0x007F) | ((right_idx & 0x007F) << 7);
+    writer.write_all(&palette_options.to_le_bytes())?;
 
-    // Border colors (2 bytes each, we'll use default black)
-    writer.write_all(&xf.borders.left_color.to_le_bytes())?;
-    writer.write_all(&xf.borders.right_color.to_le_bytes())?;
+    // Additional palette options and fill pattern (field_8_adtl_palette_options).
+    let top_idx = xf.borders.top_color & 0x007F;
+    let bottom_idx = xf.borders.bottom_color & 0x007F;
+    let mut adtl_palette_options: u32 = 0;
+    adtl_palette_options |= (top_idx as u32) & 0x0000_007F;
+    adtl_palette_options |= ((bottom_idx as u32) & 0x0000_007F) << 7;
+    // Diagonal and diagonal line style are left at 0 (not used).
+    let fill_pattern_bits = (xf.fill.pattern as u32) & 0x3F;
+    adtl_palette_options |= fill_pattern_bits << 26;
+    writer.write_all(&adtl_palette_options.to_le_bytes())?;
 
-    // Fill pattern and colors (simplified - full implementation would need more fields)
-    writer.write_all(&[((xf.fill.pattern as u8) & 0x3F), 0])?;
-    writer.write_all(&xf.fill.foreground_color.to_le_bytes())?;
+    // Fill foreground and background palette indices (field_9_fill_palette_options).
+    let fg_idx = xf.fill.foreground_color & 0x007F;
+    let bg_idx = xf.fill.background_color & 0x007F;
+    let fill_palette_options: u16 = (fg_idx & 0x007F) | ((bg_idx & 0x007F) << 7);
+    writer.write_all(&fill_palette_options.to_le_bytes())?;
 
     Ok(())
 }
@@ -290,6 +418,10 @@ pub fn write_xf<W: Write>(writer: &mut W, xf: &ExtendedFormat, is_style_xf: bool
 pub struct FormattingManager {
     fonts: Vec<Font>,
     formats: Vec<ExtendedFormat>,
+    // Custom number formats (FORMAT records) keyed by index code.
+    // Built-in formats (0x00..0x31) come from BUILTIN_NUMBER_FORMATS.
+    number_formats: Vec<(u16, String)>,
+    number_format_map: HashMap<String, u16>,
 }
 
 impl FormattingManager {
@@ -298,6 +430,8 @@ impl FormattingManager {
         let mut manager = Self {
             fonts: Vec::new(),
             formats: Vec::new(),
+            number_formats: Vec::new(),
+            number_format_map: HashMap::new(),
         };
 
         // Add default fonts (indices 0..3) to approximate Excel/POI defaults.
@@ -340,6 +474,80 @@ impl FormattingManager {
         index
     }
 
+    /// Register a number format pattern and return its BIFF format index.
+    ///
+    /// This mirrors POI's `HSSFDataFormat.getFormat` behavior:
+    /// - Built-in formats (see `BUILTIN_NUMBER_FORMATS`) return their
+    ///   predefined indices.
+    /// - The "TEXT" alias normalizes to "@".
+    /// - Custom patterns are assigned indices starting at 164 and
+    ///   written as FORMAT (0x041E) records.
+    pub fn register_number_format(&mut self, pattern: &str) -> u16 {
+        // Normalize "TEXT" alias used by POI to "@".
+        let normalized = if pattern.eq_ignore_ascii_case("TEXT") {
+            "@"
+        } else {
+            pattern
+        };
+
+        // Built-in lookup
+        if let Some(idx) = builtin_number_format_index(normalized) {
+            return idx;
+        }
+
+        // Existing custom format
+        if let Some(&idx) = self.number_format_map.get(normalized) {
+            return idx;
+        }
+
+        // Allocate new user-defined format index starting at 164, as in BIFF8.
+        let next_index = self.next_custom_format_index();
+        self.number_formats
+            .push((next_index, normalized.to_string()));
+        self.number_format_map
+            .insert(normalized.to_string(), next_index);
+        next_index
+    }
+
+    /// Register a high-level `CellStyle` and return its internal style index.
+    ///
+    /// This helper wires fonts, number formats, and XF properties together:
+    /// - The provided font is appended to the FONT table and its index stored
+    ///   in the resulting `ExtendedFormat`.
+    /// - If a number format pattern is specified, it is registered via
+    ///   `register_number_format` and the resulting index is stored in
+    ///   `ExtendedFormat.format_index`.
+    /// - Borders, fills, and alignment settings are copied into the XF.
+    pub fn register_cell_style(&mut self, style: CellStyle) -> u16 {
+        let CellStyle {
+            font,
+            borders,
+            fill,
+            h_align,
+            v_align,
+            text_wrap,
+            number_format,
+        } = style;
+
+        let font_index = self.add_font(font);
+        let format_index = number_format
+            .as_deref()
+            .map(|pattern| self.register_number_format(pattern))
+            .unwrap_or(0);
+
+        let xf = ExtendedFormat {
+            font_index,
+            format_index,
+            h_align,
+            v_align,
+            text_wrap,
+            borders,
+            fill,
+        };
+
+        self.add_format(xf)
+    }
+
     /// Get font by index
     pub fn get_font(&self, index: u16) -> Option<&Font> {
         self.fonts.get(index as usize)
@@ -355,6 +563,24 @@ impl FormattingManager {
         for font in &self.fonts {
             write_font(writer, font)?;
         }
+        Ok(())
+    }
+
+    /// Write all FORMAT records (0x041E): built-in indices 0..7 and any
+    /// registered user-defined formats.
+    pub fn write_number_formats<W: Write>(&self, writer: &mut W) -> XlsResult<()> {
+        // POI's InternalWorkbook.createWorkbook emits FORMAT records for
+        // built-in indices 0..7. We mirror that behavior here to keep
+        // record streams comparable, even though Excel does not strictly
+        // require FORMAT records for built-ins.
+        for (index, format_str) in BUILTIN_NUMBER_FORMATS.iter().enumerate().take(8) {
+            super::biff::write_format_record(writer, index as u16, format_str)?;
+        }
+
+        for (code, pattern) in &self.number_formats {
+            super::biff::write_format_record(writer, *code, pattern)?;
+        }
+
         Ok(())
     }
 
@@ -408,6 +634,33 @@ impl FormattingManager {
         }
 
         Ok(())
+    }
+
+    /// Compute the next available user-defined number format index.
+    ///
+    /// BIFF8 reserves built-in indices below 164; custom formats start
+    /// at `FIRST_USER_DEFINED_NUMBER_FORMAT_INDEX`. We allocate indices
+    /// monotonically increasing from that base, mirroring POI's
+    /// `InternalWorkbook.getFormat` behavior.
+    fn next_custom_format_index(&self) -> u16 {
+        self.number_formats
+            .iter()
+            .map(|(code, _)| *code)
+            .max()
+            .map(|max_code| max_code.saturating_add(1))
+            .unwrap_or(FIRST_USER_DEFINED_NUMBER_FORMAT_INDEX)
+    }
+    pub(crate) fn cell_xf_index_for(&self, format_index: u16) -> u16 {
+        const STYLE_XF_COUNT: u16 = 15;
+        const BUILTIN_STYLE_XF_COUNT: u16 = 5;
+        const DEFAULT_CELL_XF_INDEX: u16 = STYLE_XF_COUNT;
+        const USER_CELL_XF_START_INDEX: u16 = DEFAULT_CELL_XF_INDEX + 1 + BUILTIN_STYLE_XF_COUNT;
+
+        if format_index == 0 {
+            DEFAULT_CELL_XF_INDEX
+        } else {
+            USER_CELL_XF_START_INDEX + (format_index - 1)
+        }
     }
 }
 

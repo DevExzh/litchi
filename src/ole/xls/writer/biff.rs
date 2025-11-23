@@ -15,8 +15,15 @@
 //! Based on Microsoft's "[MS-XLS]: Excel Binary File Format (.xls) Structure" specification
 //! and Apache POI's BIFF record generation.
 
-use super::super::{XlsError, XlsResult};
+use super::super::XlsResult;
 use std::io::Write;
+
+mod cells;
+mod conditional_format;
+mod sst;
+mod validation;
+mod workbook;
+mod worksheet;
 
 /// Write a BIFF record header
 ///
@@ -36,28 +43,45 @@ pub(crate) fn write_record_header<W: Write>(
     Ok(())
 }
 
-/// Write STYLE record (built-in style)
+/// Write FORMAT record (number format string)
 ///
-/// Record type: 0x0293
-///
-/// This helper writes only built-in styles, which use the compact 4-byte
-/// payload:
-///  - field_1_xf_index (2 bytes): low 12 bits = XF index, bit 15 = isBuiltIn
-///  - builtinStyle (1 byte): built-in style identifier (e.g., 0 = Normal)
-///  - outlineLevel (1 byte): usually 0xFF for non-outline styles
-fn write_style_builtin<W: Write>(
+/// Record type: 0x041E
+pub fn write_format_record<W: Write>(
     writer: &mut W,
-    xf_index: u16,
-    builtin_style_id: u8,
+    index_code: u16,
+    format_str: &str,
 ) -> XlsResult<()> {
-    // Mask to 12 bits, then set the built-in flag in bit 15.
-    let xf_field: u16 = (xf_index & 0x0FFF) | 0x8000;
+    workbook::write_format_record(writer, index_code, format_str)
+}
 
-    write_record_header(writer, 0x0293, 4)?;
-    writer.write_all(&xf_field.to_le_bytes())?;
-    writer.write_all(&[builtin_style_id])?;
-    // Match POI's use of 0xFF ("no outline level").
-    writer.write_all(&[0xFF])?;
+fn has_multibyte_char(s: &str) -> bool {
+    s.chars().any(|c| c as u32 > 0xFF)
+}
+
+pub(crate) fn unicode_string_size(value: &str) -> u16 {
+    let char_count = value.chars().count() as u16;
+    if has_multibyte_char(value) {
+        2u16 + 1u16 + char_count.saturating_mul(2)
+    } else {
+        2u16 + 1u16 + char_count
+    }
+}
+
+pub(crate) fn write_unicode_string_biff8<W: Write>(writer: &mut W, value: &str) -> XlsResult<()> {
+    let char_count: u16 = value.chars().count() as u16;
+    writer.write_all(&char_count.to_le_bytes())?;
+
+    let is_16bit = has_multibyte_char(value);
+    writer.write_all(&[if is_16bit { 0x01 } else { 0x00 }])?;
+
+    if is_16bit {
+        for code_unit in value.encode_utf16() {
+            writer.write_all(&code_unit.to_le_bytes())?;
+        }
+    } else {
+        writer.write_all(value.as_bytes())?;
+    }
+
     Ok(())
 }
 
@@ -78,22 +102,49 @@ fn write_style_builtin<W: Write>(
 /// - (0x0000, 0)  => Normal
 /// - (0x0014, 5)  => Percent
 pub fn write_builtin_styles<W: Write>(writer: &mut W) -> XlsResult<()> {
-    // Order follows POI for easier comparison, but Excel only cares about
-    // the XF indices and builtin IDs, not the sequence.
-    const MAPPINGS: &[(u16, u8)] = &[
-        (0x0010, 3),
-        (0x0011, 6),
-        (0x0012, 4),
-        (0x0013, 7),
-        (0x0000, 0),
-        (0x0014, 5),
-    ];
+    workbook::write_builtin_styles(writer)
+}
 
-    for &(xf_index, builtin_id) in MAPPINGS {
-        write_style_builtin(writer, xf_index, builtin_id)?;
-    }
+pub fn write_dval<W: Write>(writer: &mut W, dv_count: u32) -> XlsResult<()> {
+    validation::write_dval(writer, dv_count)
+}
 
-    Ok(())
+pub fn write_dv<W: Write>(
+    writer: &mut W,
+    data_type: u8,
+    operator: u8,
+    error_style: u8,
+    empty_cell_allowed: bool,
+    suppress_dropdown_arrow: bool,
+    is_explicit_list_formula: bool,
+    show_prompt_on_cell_selected: bool,
+    prompt_title: Option<&str>,
+    prompt_text: Option<&str>,
+    show_error_on_invalid_value: bool,
+    error_title: Option<&str>,
+    error_text: Option<&str>,
+    formula1: Option<&[u8]>,
+    formula2: Option<&[u8]>,
+    ranges: &[(u32, u32, u16, u16)],
+) -> XlsResult<()> {
+    validation::write_dv(
+        writer,
+        data_type,
+        operator,
+        error_style,
+        empty_cell_allowed,
+        suppress_dropdown_arrow,
+        is_explicit_list_formula,
+        show_prompt_on_cell_selected,
+        prompt_title,
+        prompt_text,
+        show_error_on_invalid_value,
+        error_title,
+        error_text,
+        formula1,
+        formula2,
+        ranges,
+    )
 }
 
 /// Write UseSelFS (Use Natural Language Formulas) record.
@@ -101,9 +152,7 @@ pub fn write_builtin_styles<W: Write>(writer: &mut W) -> XlsResult<()> {
 /// Record type: 0x0160, Length: 2
 /// A value of 0 disables natural language formulas (modern Excel default).
 pub fn write_usesel_fs<W: Write>(writer: &mut W) -> XlsResult<()> {
-    write_record_header(writer, 0x0160, 2)?;
-    writer.write_all(&0u16.to_le_bytes())?;
-    Ok(())
+    workbook::write_usesel_fs(writer)
 }
 
 /// Write WSBOOL record (Additional Workspace Information)
@@ -111,13 +160,7 @@ pub fn write_usesel_fs<W: Write>(writer: &mut W) -> XlsResult<()> {
 /// Record type: 0x0081, Length: 2
 /// Writes default flags indicating a normal worksheet (not dialog sheet).
 pub fn write_wsbool<W: Write>(writer: &mut W) -> XlsResult<()> {
-    write_record_header(writer, 0x0081, 2)?;
-    // Match Apache POI's InternalSheet.createWSBool():
-    //   WSBool1 = 0x04, WSBool2 = 0xC1
-    // POI serializes as [WSBool2, WSBool1], so the on-disk u16 (little-endian)
-    // is 0x04C1.
-    writer.write_all(&0x04C1u16.to_le_bytes())?;
-    Ok(())
+    worksheet::write_wsbool(writer)
 }
 
 /// Write WINDOW2 record (Worksheet view settings)
@@ -125,40 +168,7 @@ pub fn write_wsbool<W: Write>(writer: &mut W) -> XlsResult<()> {
 /// Record type: 0x023E, Length: 18 (worksheet and macro sheet)
 /// Writes conservative defaults that are accepted by Excel.
 pub fn write_window2<W: Write>(writer: &mut W) -> XlsResult<()> {
-    write_record_header(writer, 0x023E, 18)?;
-
-    // grbit flags: match Apache POI's InternalSheet.createWindowTwo():
-    // options = 0x06B6, which turns on:
-    //  - DISPLAY_GRIDLINES
-    //  - DISPLAY_ROW_COL_HEADINGS
-    //  - DISPLAY_ZEROS
-    //  - DEFAULT_HEADER
-    //  - DISPLAY_GUTS
-    //  - FREEZE_PANES_NO_SPLIT
-    //  - ACTIVE
-    writer.write_all(&0x06B6u16.to_le_bytes())?;
-
-    // rwTop, colLeft
-    writer.write_all(&0u16.to_le_bytes())?; // rwTop = 0
-    writer.write_all(&0u16.to_le_bytes())?; // colLeft = 0
-
-    // icvHdr (header color). POI uses 0x40; we mirror that here. The header
-    // color is stored as a 32-bit value in POI, but we split it across two
-    // u16 fields here; little-endian bytes are identical on disk.
-    writer.write_all(&0x0040u16.to_le_bytes())?;
-
-    // reserved2
-    writer.write_all(&0u16.to_le_bytes())?;
-
-    // wScaleSLV, wScaleNormal, unused, reserved3
-    // POI sets both zooms to 0 and reserved to 0; our split-u16 layout yields
-    // the same byte pattern on disk (all zeros) for these trailing fields.
-    writer.write_all(&0u16.to_le_bytes())?; // wScaleSLV (page break zoom)
-    writer.write_all(&0u16.to_le_bytes())?; // wScaleNormal (normal zoom)
-    writer.write_all(&0u16.to_le_bytes())?; // unused
-    writer.write_all(&0u16.to_le_bytes())?; // reserved3
-
-    Ok(())
+    worksheet::write_window2(writer)
 }
 
 /// Write BOF (Beginning of File) record
@@ -170,35 +180,14 @@ pub fn write_window2<W: Write>(writer: &mut W) -> XlsResult<()> {
 /// * `writer` - Output writer
 /// * `substream_type` - Type of substream (0x0005 = Workbook, 0x0010 = Worksheet)
 pub fn write_bof<W: Write>(writer: &mut W, substream_type: u16) -> XlsResult<()> {
-    write_record_header(writer, 0x0809, 16)?;
-
-    // BIFF version (0x0600 = BIFF8)
-    writer.write_all(&0x0600u16.to_le_bytes())?;
-
-    // Substream type
-    writer.write_all(&substream_type.to_le_bytes())?;
-
-    // Build identifier (arbitrary)
-    writer.write_all(&0x0DBBu16.to_le_bytes())?;
-
-    // Build year (e.g., 1996)
-    writer.write_all(&0x07CCu16.to_le_bytes())?;
-
-    // File history flags (0x00000000)
-    writer.write_all(&0x00000000u32.to_le_bytes())?;
-
-    // Lowest BIFF version (0x06 = BIFF8)
-    writer.write_all(&0x00000006u32.to_le_bytes())?;
-
-    Ok(())
+    workbook::write_bof(writer, substream_type)
 }
 
 /// Write EOF (End of File) record
 ///
 /// Record type: 0x000A
 pub fn write_eof<W: Write>(writer: &mut W) -> XlsResult<()> {
-    write_record_header(writer, 0x000A, 0)?;
-    Ok(())
+    workbook::write_eof(writer)
 }
 
 /// Write CODEPAGE record
@@ -207,12 +196,10 @@ pub fn write_eof<W: Write>(writer: &mut W) -> XlsResult<()> {
 ///
 /// # Arguments
 ///
-/// * `writer` - Output writer  
+/// * `writer` - Output writer
 /// * `codepage` - Code page identifier (default: 1252 for Windows Latin 1)
 pub fn write_codepage<W: Write>(writer: &mut W, codepage: u16) -> XlsResult<()> {
-    write_record_header(writer, 0x0042, 2)?;
-    writer.write_all(&codepage.to_le_bytes())?;
-    Ok(())
+    workbook::write_codepage(writer, codepage)
 }
 
 /// Write DATE1904 record
@@ -224,40 +211,14 @@ pub fn write_codepage<W: Write>(writer: &mut W, codepage: u16) -> XlsResult<()> 
 /// * `writer` - Output writer
 /// * `is_1904` - True for 1904 date system (Mac), false for 1900 (Windows)
 pub fn write_date1904<W: Write>(writer: &mut W, is_1904: bool) -> XlsResult<()> {
-    write_record_header(writer, 0x0022, 2)?;
-    let flag = if is_1904 { 1u16 } else { 0u16 };
-    writer.write_all(&flag.to_le_bytes())?;
-    Ok(())
+    workbook::write_date1904(writer, is_1904)
 }
 
 /// Write WINDOW1 record (workbook window properties)
 ///
 /// Record type: 0x003D
 pub fn write_window1<W: Write>(writer: &mut W) -> XlsResult<()> {
-    write_record_header(writer, 0x003D, 18)?;
-
-    // Window position and size (default values)
-    writer.write_all(&0u16.to_le_bytes())?; // xWn: horizontal position
-    writer.write_all(&0u16.to_le_bytes())?; // yWn: vertical position
-    writer.write_all(&0x3000u16.to_le_bytes())?; // dxWn: width
-    writer.write_all(&0x1E00u16.to_le_bytes())?; // dyWn: height
-
-    // Options flags
-    writer.write_all(&0x0038u16.to_le_bytes())?; // grbit: various flags
-
-    // Active sheet index
-    writer.write_all(&0u16.to_le_bytes())?; // itabCur
-
-    // First displayed sheet tab
-    writer.write_all(&0u16.to_le_bytes())?; // itabFirst
-
-    // Number of selected sheets
-    writer.write_all(&1u16.to_le_bytes())?; // ctabSel
-
-    // Ratio of width of tab to width of horizontal scroll bar
-    writer.write_all(&0x0258u16.to_le_bytes())?; // wTabRatio
-
-    Ok(())
+    workbook::write_window1(writer)
 }
 
 /// Write BOUNDSHEET8 record (worksheet metadata)
@@ -273,44 +234,7 @@ pub fn write_window1<W: Write>(writer: &mut W) -> XlsResult<()> {
 /// The sheet name is encoded as ShortXLUnicodeString per BIFF8: 1-byte character count,
 /// 1-byte flags (0x00 = compressed 8-bit, 0x01 = uncompressed UTF-16LE), followed by characters.
 pub fn write_boundsheet<W: Write>(writer: &mut W, position: u32, name: &str) -> XlsResult<()> {
-    let truncated = if name.len() > 31 { &name[..31] } else { name };
-
-    // Determine encoding: use compressed 8-bit if all ASCII; otherwise UTF-16LE
-    let is_ascii = truncated.is_ascii();
-    let (cch, flags, name_bytes_vec): (u8, u8, Vec<u8>) = if is_ascii {
-        let bytes = truncated.as_bytes();
-        (bytes.len() as u8, 0x00, bytes.to_vec())
-    } else {
-        // UTF-16LE encoding
-        let utf16: Vec<u16> = truncated.encode_utf16().collect();
-        let mut buf = Vec::with_capacity(utf16.len() * 2);
-        for ch in &utf16 {
-            buf.extend_from_slice(&ch.to_le_bytes());
-        }
-        (utf16.len() as u8, 0x01, buf)
-    };
-
-    // position(4) + options(2) + cch(1) + flags(1) + name bytes
-    let name_bytes_len: u16 = if is_ascii {
-        cch as u16
-    } else {
-        (cch as u16) * 2
-    };
-    let data_len = 4u16 + 2u16 + 1u16 + 1u16 + name_bytes_len; // 8 + name length
-    write_record_header(writer, 0x0085, data_len)?;
-
-    // Absolute stream position
-    writer.write_all(&position.to_le_bytes())?;
-
-    // Sheet state and type (0x0000 = visible worksheet, type = worksheet)
-    writer.write_all(&0x0000u16.to_le_bytes())?;
-
-    // ShortXLUnicodeString: cch, flags, chars
-    writer.write_all(&[cch])?;
-    writer.write_all(&[flags])?;
-    writer.write_all(&name_bytes_vec[..(cch as usize) * if is_ascii { 1 } else { 2 }])?;
-
-    Ok(())
+    workbook::write_boundsheet(writer, position, name)
 }
 
 /// Write DIMENSIONS record (worksheet dimensions)
@@ -331,17 +255,15 @@ pub fn write_dimensions<W: Write>(
     first_col: u16,
     last_col: u16,
 ) -> XlsResult<()> {
-    write_record_header(writer, 0x0200, 14)?;
+    worksheet::write_dimensions(writer, first_row, last_row, first_col, last_col)
+}
 
-    writer.write_all(&first_row.to_le_bytes())?;
-    writer.write_all(&last_row.to_le_bytes())?;
-    writer.write_all(&first_col.to_le_bytes())?;
-    writer.write_all(&last_col.to_le_bytes())?;
-
-    // Reserved (must be 0)
-    writer.write_all(&0u16.to_le_bytes())?;
-
-    Ok(())
+pub fn write_mergedcells<W, I>(writer: &mut W, ranges: I) -> XlsResult<()>
+where
+    W: Write,
+    I: IntoIterator<Item = (u32, u32, u16, u16)>,
+{
+    worksheet::write_mergedcells(writer, ranges)
 }
 
 /// Write NUMBER record (floating point cell)
@@ -361,26 +283,7 @@ pub fn write_number<W: Write>(
     xf_index: u16,
     value: f64,
 ) -> XlsResult<()> {
-    // BIFF8 stores row as a 16-bit index (0..65535)
-    let row_u16 = u16::try_from(row).map_err(|_| {
-        XlsError::InvalidData(format!(
-            "Row index {} exceeds BIFF8 limit 65535 for NUMBER record",
-            row
-        ))
-    })?;
-
-    write_record_header(writer, 0x0203, 14)?;
-
-    writer.write_all(&row_u16.to_le_bytes())?;
-    writer.write_all(&col.to_le_bytes())?;
-
-    // XF record index
-    writer.write_all(&xf_index.to_le_bytes())?;
-
-    // IEEE 754 floating point value
-    writer.write_all(&value.to_le_bytes())?;
-
-    Ok(())
+    cells::write_number(writer, row, col, xf_index, value)
 }
 
 /// Write LABELSST record (string cell with reference to SST)
@@ -400,27 +303,7 @@ pub fn write_labelsst<W: Write>(
     xf_index: u16,
     sst_index: u32,
 ) -> XlsResult<()> {
-    // BIFF8 stores row as a 16-bit index (0..65535)
-    let row_u16 = u16::try_from(row).map_err(|_| {
-        XlsError::InvalidData(format!(
-            "Row index {} exceeds BIFF8 limit 65535 for LABELSST record",
-            row
-        ))
-    })?;
-
-    // 2 (row) + 2 (col) + 2 (xf) + 4 (sst index) = 10 bytes
-    write_record_header(writer, 0x00FD, 10)?;
-
-    writer.write_all(&row_u16.to_le_bytes())?;
-    writer.write_all(&col.to_le_bytes())?;
-
-    // XF record index
-    writer.write_all(&xf_index.to_le_bytes())?;
-
-    // SST index
-    writer.write_all(&sst_index.to_le_bytes())?;
-
-    Ok(())
+    cells::write_labelsst(writer, row, col, xf_index, sst_index)
 }
 
 /// Write BOOLERR record (boolean or error cell)
@@ -440,42 +323,7 @@ pub fn write_boolerr<W: Write>(
     xf_index: u16,
     value: bool,
 ) -> XlsResult<()> {
-    // BIFF8 stores row as a 16-bit index (0..65535)
-    let row_u16 = u16::try_from(row).map_err(|_| {
-        XlsError::InvalidData(format!(
-            "Row index {} exceeds BIFF8 limit 65535 for BOOLERR record",
-            row
-        ))
-    })?;
-
-    // 2 (row) + 2 (col) + 2 (xf) + 1 (value) + 1 (is-error flag) = 8 bytes
-    write_record_header(writer, 0x0205, 8)?;
-
-    writer.write_all(&row_u16.to_le_bytes())?;
-    writer.write_all(&col.to_le_bytes())?;
-
-    // XF record index
-    writer.write_all(&xf_index.to_le_bytes())?;
-
-    // Boolean value (0 = false, 1 = true) + error flag (0 = boolean)
-    writer.write_all(&[if value { 1 } else { 0 }, 0])?;
-
-    Ok(())
-}
-
-/// Write CONTINUE record
-///
-/// Record type: 0x003C
-///
-/// # Arguments
-///
-/// * `writer` - Output writer
-/// * `data` - Continuation data
-fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> XlsResult<()> {
-    let len = data.len().min(8224) as u16; // Max record size
-    write_record_header(writer, 0x003C, len)?;
-    writer.write_all(&data[..len as usize])?;
-    Ok(())
+    cells::write_boolerr(writer, row, col, xf_index, value)
 }
 
 /// Write SST (Shared String Table) record with CONTINUE support
@@ -495,129 +343,33 @@ fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> XlsResult<()> {
 /// This implementation properly handles string splitting across CONTINUE boundaries,
 /// based on Apache POI's SSTSerializer.
 pub fn write_sst<W: Write>(writer: &mut W, strings: &[String], cst_total: u32) -> XlsResult<()> {
-    const MAX_RECORD_DATA: usize = 8224; // max data payload per record
+    sst::write_sst(writer, strings, cst_total)
+}
 
-    // We'll build each record's payload into a local buffer, then flush with the header
-    let mut first_record = true;
-    let mut buffer: Vec<u8> = Vec::with_capacity(MAX_RECORD_DATA);
+pub fn write_cfheader<W: Write>(
+    writer: &mut W,
+    ranges: &[(u32, u32, u16, u16)],
+    num_rules: u16,
+) -> XlsResult<()> {
+    conditional_format::write_cfheader(writer, ranges, num_rules)
+}
 
-    // Helper to flush current buffer as either SST or CONTINUE
-    let flush = |writer: &mut W, buf: &mut Vec<u8>, first: bool| -> XlsResult<()> {
-        if buf.is_empty() {
-            return Ok(());
-        }
-        if first {
-            write_record_header(writer, 0x00FC, buf.len() as u16)?;
-            writer.write_all(buf)?;
-        } else {
-            // Delegate CONTINUE records to the helper so we keep the
-            // record-writing logic in one place.
-            write_continue(writer, buf)?;
-        }
-        buf.clear();
-        Ok(())
-    };
-
-    // Initialize first SST record with cstTotal and cstUnique
-    buffer.extend_from_slice(&cst_total.to_le_bytes());
-    buffer.extend_from_slice(&(strings.len() as u32).to_le_bytes());
-
-    // Available payload for this record
-    let mut available = MAX_RECORD_DATA - buffer.len();
-
-    for s in strings {
-        let is_ascii = s.is_ascii();
-        let cch: usize;
-        let mut data8: &[u8] = &[];
-        let mut data16: Vec<u8> = Vec::new();
-        let high_byte_flag: u8;
-
-        if is_ascii {
-            let bytes = s.as_bytes();
-            cch = bytes.len().min(0xFFFF);
-            data8 = &bytes[..cch];
-            high_byte_flag = 0x00;
-        } else {
-            let utf16: Vec<u16> = s.encode_utf16().collect();
-            cch = utf16.len().min(0xFFFF);
-            data16.reserve_exact(cch * 2);
-            for ch in utf16.iter().take(cch) {
-                data16.extend_from_slice(&ch.to_le_bytes());
-            }
-            high_byte_flag = 0x01;
-        }
-
-        // String header is 3 bytes (cch u16 + flags u8). Ensure it fits fully in current record.
-        if available < 3 {
-            // Flush current record
-            flush(writer, &mut buffer, first_record)?;
-            first_record = false;
-            // Start CONTINUE record; for a new string we do not need leading high-byte flag
-            available = MAX_RECORD_DATA;
-        }
-
-        // Write header
-        buffer.extend_from_slice(&(cch as u16).to_le_bytes());
-        buffer.push(high_byte_flag);
-        available -= 3;
-
-        // Now write character data, possibly across CONTINUE records
-        if high_byte_flag == 0x00 {
-            // Compressed 8-bit
-            let mut offset = 0;
-            while offset < cch {
-                let can_write = available.min(cch - offset);
-                if can_write == 0 {
-                    // Flush and start CONTINUE; for continued strings, first byte is compression flag
-                    flush(writer, &mut buffer, first_record)?;
-                    first_record = false;
-                    buffer.push(high_byte_flag); // continuation header for string
-                    available = MAX_RECORD_DATA - 1;
-                    continue;
-                }
-                buffer.extend_from_slice(&data8[offset..offset + can_write]);
-                offset += can_write;
-                available -= can_write;
-            }
-        } else {
-            // UTF-16LE (2 bytes per char), do not split a character
-            let total_bytes = cch * 2;
-            let mut written = 0;
-            while written < total_bytes {
-                // space available in bytes, but keep even number to not split a char
-                let mut can_write = available.min(total_bytes - written);
-                if can_write == 0 {
-                    // Flush and start CONTINUE; for continued strings, first byte is compression flag
-                    flush(writer, &mut buffer, first_record)?;
-                    first_record = false;
-                    buffer.push(high_byte_flag); // continuation header for string
-                    available = MAX_RECORD_DATA - 1;
-                    continue;
-                }
-                // ensure even number of bytes
-                if !can_write.is_multiple_of(2) {
-                    if can_write == 1 {
-                        // no space for a full char
-                        flush(writer, &mut buffer, first_record)?;
-                        first_record = false;
-                        buffer.push(high_byte_flag);
-                        available = MAX_RECORD_DATA - 1;
-                        continue;
-                    } else {
-                        can_write -= 1;
-                    }
-                }
-                buffer.extend_from_slice(&data16[written..written + can_write]);
-                written += can_write;
-                available -= can_write;
-            }
-        }
-    }
-
-    // Flush any remaining data
-    flush(writer, &mut buffer, first_record)?;
-
-    Ok(())
+pub fn write_cfrule<W: Write>(
+    writer: &mut W,
+    condition_type: u8,
+    comparison_op: u8,
+    formula1: &[u8],
+    formula2: &[u8],
+    pattern: Option<(u16, u16, u16)>,
+) -> XlsResult<()> {
+    conditional_format::write_cfrule(
+        writer,
+        condition_type,
+        comparison_op,
+        formula1,
+        formula2,
+        pattern,
+    )
 }
 
 #[cfg(test)]

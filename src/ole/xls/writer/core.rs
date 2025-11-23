@@ -31,9 +31,21 @@
 
 use super::super::error::{XlsError, XlsResult};
 use super::biff;
-use super::formatting::FormattingManager;
+use super::formatting::{CellStyle, ExtendedFormat, FormattingManager};
 use crate::ole::writer::OleWriter;
 use std::collections::HashMap;
+
+mod conditional_format;
+mod data_validation;
+mod worksheet;
+
+pub use self::conditional_format::{
+    XlsConditionalFormat, XlsConditionalFormatType, XlsConditionalPattern,
+};
+pub use self::data_validation::{
+    XlsDataValidation, XlsDataValidationOperator, XlsDataValidationType,
+};
+use self::worksheet::{MergedRange, WritableCell, WritableWorksheet};
 
 /// Cell value type for writing
 #[derive(Debug, Clone)]
@@ -49,65 +61,6 @@ pub enum XlsCellValue {
     /// Blank/empty cell
     Blank,
 }
-
-/// Represents a cell to be written
-#[derive(Debug, Clone)]
-struct WritableCell {
-    /// Row index (0-based)
-    row: u32,
-    /// Column index (0-based)
-    col: u16,
-    /// Cell value
-    value: XlsCellValue,
-}
-
-/// Represents a worksheet in the writer
-#[derive(Debug)]
-pub(crate) struct WritableWorksheet {
-    /// Worksheet name
-    name: String,
-    /// Cells to write (indexed by (row, col))
-    cells: HashMap<(u32, u16), WritableCell>,
-    /// First used row
-    first_row: u32,
-    /// Last used row (exclusive)
-    last_row: u32,
-    /// First used column
-    first_col: u16,
-    /// Last used column (exclusive)
-    last_col: u16,
-}
-
-impl WritableWorksheet {
-    fn new(name: String) -> Self {
-        Self {
-            name,
-            cells: HashMap::new(),
-            first_row: 0,
-            last_row: 0,
-            first_col: 0,
-            last_col: 0,
-        }
-    }
-
-    fn add_cell(&mut self, cell: WritableCell) {
-        // Update dimensions
-        if self.cells.is_empty() {
-            self.first_row = cell.row;
-            self.last_row = cell.row + 1;
-            self.first_col = cell.col;
-            self.last_col = cell.col + 1;
-        } else {
-            self.first_row = self.first_row.min(cell.row);
-            self.last_row = self.last_row.max(cell.row + 1);
-            self.first_col = self.first_col.min(cell.col);
-            self.last_col = self.last_col.max(cell.col + 1);
-        }
-
-        self.cells.insert((cell.row, cell.col), cell);
-    }
-}
-
 /// XLS file writer
 ///
 /// Provides methods to create and modify XLS (BIFF8) files.
@@ -122,6 +75,7 @@ pub struct XlsWriter {
     use_1904_dates: bool,
     /// Total number of string occurrences (including duplicates) for SST.cstTotal
     sst_total: u32,
+    fmt: FormattingManager,
 }
 
 impl XlsWriter {
@@ -133,6 +87,7 @@ impl XlsWriter {
             string_map: HashMap::new(),
             use_1904_dates: false,
             sst_total: 0,
+            fmt: FormattingManager::new(),
         }
     }
 
@@ -176,18 +131,24 @@ impl XlsWriter {
     /// * `col` - Column index (0-based)
     /// * `value` - String value
     pub fn write_string(&mut self, sheet: usize, row: u32, col: u16, value: &str) -> XlsResult<()> {
-        let worksheet = self
-            .worksheets
-            .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        self.write_string_with_format(sheet, row, col, value, 0)
+    }
 
-        worksheet.add_cell(WritableCell {
+    pub fn write_string_with_format(
+        &mut self,
+        sheet: usize,
+        row: u32,
+        col: u16,
+        value: &str,
+        format_id: u16,
+    ) -> XlsResult<()> {
+        self.write_cell(
+            sheet,
             row,
             col,
-            value: XlsCellValue::String(value.to_string()),
-        });
-
-        Ok(())
+            XlsCellValue::String(value.to_string()),
+            format_id,
+        )
     }
 
     /// Write a number value to a cell
@@ -199,18 +160,18 @@ impl XlsWriter {
     /// * `col` - Column index (0-based)
     /// * `value` - Numeric value
     pub fn write_number(&mut self, sheet: usize, row: u32, col: u16, value: f64) -> XlsResult<()> {
-        let worksheet = self
-            .worksheets
-            .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        self.write_number_with_format(sheet, row, col, value, 0)
+    }
 
-        worksheet.add_cell(WritableCell {
-            row,
-            col,
-            value: XlsCellValue::Number(value),
-        });
-
-        Ok(())
+    pub fn write_number_with_format(
+        &mut self,
+        sheet: usize,
+        row: u32,
+        col: u16,
+        value: f64,
+        format_id: u16,
+    ) -> XlsResult<()> {
+        self.write_cell(sheet, row, col, XlsCellValue::Number(value), format_id)
     }
 
     /// Write a boolean value to a cell
@@ -228,18 +189,18 @@ impl XlsWriter {
         col: u16,
         value: bool,
     ) -> XlsResult<()> {
-        let worksheet = self
-            .worksheets
-            .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        self.write_boolean_with_format(sheet, row, col, value, 0)
+    }
 
-        worksheet.add_cell(WritableCell {
-            row,
-            col,
-            value: XlsCellValue::Boolean(value),
-        });
-
-        Ok(())
+    pub fn write_boolean_with_format(
+        &mut self,
+        sheet: usize,
+        row: u32,
+        col: u16,
+        value: bool,
+        format_id: u16,
+    ) -> XlsResult<()> {
+        self.write_cell(sheet, row, col, XlsCellValue::Boolean(value), format_id)
     }
 
     /// Write a formula to a cell
@@ -262,6 +223,162 @@ impl XlsWriter {
         col: u16,
         formula: &str,
     ) -> XlsResult<()> {
+        self.write_formula_with_format(sheet, row, col, formula, 0)
+    }
+
+    pub fn write_formula_with_format(
+        &mut self,
+        sheet: usize,
+        row: u32,
+        col: u16,
+        formula: &str,
+        format_id: u16,
+    ) -> XlsResult<()> {
+        self.write_cell(
+            sheet,
+            row,
+            col,
+            XlsCellValue::Formula(formula.to_string()),
+            format_id,
+        )
+    }
+
+    /// Register a number format pattern and return its BIFF format index.
+    ///
+    /// This is a thin wrapper around the internal `FormattingManager`
+    /// and mirrors Apache POI's `HSSFDataFormat.getFormat` API. The
+    /// returned index can be stored in `ExtendedFormat.format_index`
+    /// to apply number formats to cells.
+    pub fn register_number_format(&mut self, pattern: &str) -> u16 {
+        self.fmt.register_number_format(pattern)
+    }
+
+    /// Register a reusable cell style defined by `CellStyle`.
+    ///
+    /// The returned identifier can be passed to the `write_*_with_format`
+    /// methods to apply this style to individual cells.
+    pub fn add_cell_style(&mut self, style: CellStyle) -> u16 {
+        self.fmt.register_cell_style(style)
+    }
+
+    pub fn add_cell_format(&mut self, format: ExtendedFormat) -> u16 {
+        self.fmt.add_format(format)
+    }
+
+    pub fn merge_cells(
+        &mut self,
+        sheet: usize,
+        first_row: u32,
+        last_row: u32,
+        first_col: u16,
+        last_col: u16,
+    ) -> XlsResult<()> {
+        if first_row > last_row || first_col > last_col {
+            return Err(XlsError::InvalidData(
+                "merge_cells: first row/col must be <= last row/col".to_string(),
+            ));
+        }
+
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+
+        worksheet.add_merged_range(MergedRange {
+            first_row,
+            last_row,
+            first_col,
+            last_col,
+        });
+
+        Ok(())
+    }
+
+    /// Add a data validation rule to the specified worksheet.
+    pub fn add_data_validation(
+        &mut self,
+        sheet: usize,
+        validation: XlsDataValidation,
+    ) -> XlsResult<()> {
+        if validation.first_row > validation.last_row || validation.first_col > validation.last_col
+        {
+            return Err(XlsError::InvalidData(
+                "add_data_validation: first row/col must be <= last row/col".to_string(),
+            ));
+        }
+
+        if let Some(title) = validation.input_title.as_ref() {
+            if title.len() > 32 {
+                return Err(XlsError::InvalidData(
+                    "Input message title must be at most 32 characters".to_string(),
+                ));
+            }
+        }
+        if let Some(text) = validation.input_message.as_ref() {
+            if text.len() > 255 {
+                return Err(XlsError::InvalidData(
+                    "Input message text must be at most 255 characters".to_string(),
+                ));
+            }
+        }
+        if let Some(title) = validation.error_title.as_ref() {
+            if title.len() > 32 {
+                return Err(XlsError::InvalidData(
+                    "Error message title must be at most 32 characters".to_string(),
+                ));
+            }
+        }
+        if let Some(text) = validation.error_message.as_ref() {
+            if text.len() > 255 {
+                return Err(XlsError::InvalidData(
+                    "Error message text must be at most 255 characters".to_string(),
+                ));
+            }
+        }
+
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+
+        worksheet.add_data_validation(validation);
+
+        Ok(())
+    }
+
+    pub fn add_conditional_format(
+        &mut self,
+        sheet: usize,
+        cf: XlsConditionalFormat,
+    ) -> XlsResult<()> {
+        if cf.first_row > cf.last_row || cf.first_col > cf.last_col {
+            return Err(XlsError::InvalidData(
+                "add_conditional_format: first row/col must be <= last row/col".to_string(),
+            ));
+        }
+
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+
+        worksheet.add_conditional_format(cf);
+
+        Ok(())
+    }
+
+    fn write_cell(
+        &mut self,
+        sheet: usize,
+        row: u32,
+        col: u16,
+        value: XlsCellValue,
+        format_id: u16,
+    ) -> XlsResult<()> {
+        if self.fmt.get_format(format_id).is_none() {
+            return Err(XlsError::InvalidFormat(format_id));
+        }
+
         let worksheet = self
             .worksheets
             .get_mut(sheet)
@@ -270,7 +387,8 @@ impl XlsWriter {
         worksheet.add_cell(WritableCell {
             row,
             col,
-            value: XlsCellValue::Formula(formula.to_string()),
+            value,
+            format_idx: format_id,
         });
 
         Ok(())
@@ -394,10 +512,14 @@ impl XlsWriter {
         // Window1 record (workbook window properties)
         biff::write_window1(&mut stream)?;
 
-        // Write minimal formatting tables so XF index 0 is valid
-        let fmt = FormattingManager::new();
-        fmt.write_fonts(&mut stream)?;
-        fmt.write_formats(&mut stream)?;
+        // Write minimal formatting tables so XF index 0 is valid.
+        // Order mirrors Apache POI's workbook creation:
+        //  - FONT records
+        //  - FORMAT records (built-in 0..7 + custom)
+        //  - XF records (style and cell formats)
+        self.fmt.write_fonts(&mut stream)?;
+        self.fmt.write_number_formats(&mut stream)?;
+        self.fmt.write_formats(&mut stream)?;
 
         // Built-in STYLE records and UseSelFS flag to align with Excel / POI
         // defaults. This makes standard cell styles (Normal, Currency, Percent,
@@ -454,16 +576,17 @@ impl XlsWriter {
             sorted_cells.sort_by_key(|(k, _)| *k);
 
             for ((row, col), cell) in sorted_cells {
+                let xf_index = self.fmt.cell_xf_index_for(cell.format_idx);
                 match &cell.value {
                     XlsCellValue::Number(value) => {
-                        biff::write_number(&mut stream, *row, *col, 15, *value)?;
+                        biff::write_number(&mut stream, *row, *col, xf_index, *value)?;
                     },
                     XlsCellValue::String(s) => {
                         let sst_index = *self.string_map.get(s).unwrap();
-                        biff::write_labelsst(&mut stream, *row, *col, 15, sst_index)?;
+                        biff::write_labelsst(&mut stream, *row, *col, xf_index, sst_index)?;
                     },
                     XlsCellValue::Boolean(value) => {
-                        biff::write_boolerr(&mut stream, *row, *col, 15, *value)?;
+                        biff::write_boolerr(&mut stream, *row, *col, xf_index, *value)?;
                     },
                     XlsCellValue::Formula(_formula) => {
                         // Formula tokenization not yet implemented
@@ -473,6 +596,69 @@ impl XlsWriter {
                     XlsCellValue::Blank => {
                         // Skip blank cells
                     },
+                }
+            }
+
+            if !worksheet.merged_ranges.is_empty() {
+                biff::write_mergedcells(
+                    &mut stream,
+                    worksheet
+                        .merged_ranges
+                        .iter()
+                        .map(|r| (r.first_row, r.last_row, r.first_col, r.last_col)),
+                )?;
+            }
+
+            if !worksheet.data_validations.is_empty() {
+                let dv_count = worksheet.data_validations.len() as u32;
+                biff::write_dval(&mut stream, dv_count)?;
+
+                for dv in &worksheet.data_validations {
+                    let (data_type, operator, is_explicit_list, formula1, formula2) =
+                        dv.validation_type.to_biff_payload()?;
+
+                    let ranges = [(dv.first_row, dv.last_row, dv.first_col, dv.last_col)];
+
+                    biff::write_dv(
+                        &mut stream,
+                        data_type,
+                        operator,
+                        0,     // errorStyle: STOP
+                        true,  // emptyCellAllowed
+                        false, // suppressDropdownArrow
+                        is_explicit_list,
+                        dv.show_input_message,
+                        dv.input_title.as_deref(),
+                        dv.input_message.as_deref(),
+                        dv.show_error_alert,
+                        dv.error_title.as_deref(),
+                        dv.error_message.as_deref(),
+                        formula1.as_deref(),
+                        formula2.as_deref(),
+                        &ranges,
+                    )?;
+                }
+            }
+
+            if !worksheet.conditional_formats.is_empty() {
+                for cf in &worksheet.conditional_formats {
+                    let ranges = [(cf.first_row, cf.last_row, cf.first_col, cf.last_col)];
+
+                    // One CFHEADER per rule with a single region keeps the
+                    // implementation simple and matches Excel's expectations.
+                    biff::write_cfheader(&mut stream, &ranges, 1)?;
+
+                    let (condition_type, comparison_op, formula1, formula2) =
+                        cf.format_type.to_biff_payload()?;
+
+                    biff::write_cfrule(
+                        &mut stream,
+                        condition_type,
+                        comparison_op,
+                        &formula1,
+                        &formula2,
+                        cf.to_biff_pattern(),
+                    )?;
                 }
             }
 
