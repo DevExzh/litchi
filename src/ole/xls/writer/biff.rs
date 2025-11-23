@@ -247,6 +247,33 @@ where
     worksheet::write_mergedcells(writer, ranges)
 }
 
+/// Write COLINFO record (column formatting and width).
+///
+/// Record type: 0x007D
+pub fn write_colinfo<W: Write>(
+    writer: &mut W,
+    first_col: u16,
+    last_col: u16,
+    col_width: u16,
+    hidden: bool,
+) -> XlsResult<()> {
+    worksheet::write_colinfo(writer, first_col, last_col, col_width, hidden)
+}
+
+/// Write ROW record (row metrics including height and hidden flag).
+///
+/// Record type: 0x0208
+pub fn write_row<W: Write>(
+    writer: &mut W,
+    row_index: u32,
+    first_col: u16,
+    last_col_plus1: u16,
+    height: u16,
+    hidden: bool,
+) -> XlsResult<()> {
+    worksheet::write_row(writer, row_index, first_col, last_col_plus1, height, hidden)
+}
+
 /// Write NUMBER record (floating point cell)
 ///
 /// Record type: 0x0203

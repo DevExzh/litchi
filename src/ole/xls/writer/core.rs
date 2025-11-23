@@ -265,6 +265,76 @@ impl XlsWriter {
         self.fmt.add_format(format)
     }
 
+    /// Set the width of a column in character units.
+    ///
+    /// The column index is 0-based (0 = column A), matching the rest of the
+    /// XLS writer API. The width is specified in the same units as Excel's
+    /// UI, i.e. the number of characters of the "0" glyph in the default
+    /// font. Internally this is converted to BIFF8 units of 1/256 characters
+    /// for the COLINFO record.
+    pub fn set_column_width(&mut self, sheet: usize, col: u16, width_chars: f64) -> XlsResult<()> {
+        if col >= 256 {
+            return Err(XlsError::InvalidData(
+                "set_column_width: column index must be < 256 for BIFF8".to_string(),
+            ));
+        }
+
+        if !(width_chars.is_finite()) || width_chars <= 0.0 {
+            return Err(XlsError::InvalidData(
+                "set_column_width: width must be a positive finite value".to_string(),
+            ));
+        }
+
+        let max_units = 255u32 * 256u32; // Excel maximum column width
+        let width_units_f = (width_chars * 256.0).round();
+        if width_units_f <= 0.0 || width_units_f > max_units as f64 {
+            return Err(XlsError::InvalidData(
+                "set_column_width: width exceeds Excel's maximum (255 characters)".to_string(),
+            ));
+        }
+
+        let width_units = width_units_f as u16;
+
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.set_column_width(col, width_units);
+        Ok(())
+    }
+
+    /// Hide a column.
+    pub fn hide_column(&mut self, sheet: usize, col: u16) -> XlsResult<()> {
+        if col >= 256 {
+            return Err(XlsError::InvalidData(
+                "hide_column: column index must be < 256 for BIFF8".to_string(),
+            ));
+        }
+
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.hide_column(col);
+        Ok(())
+    }
+
+    /// Show a previously hidden column.
+    pub fn show_column(&mut self, sheet: usize, col: u16) -> XlsResult<()> {
+        if col >= 256 {
+            return Err(XlsError::InvalidData(
+                "show_column: column index must be < 256 for BIFF8".to_string(),
+            ));
+        }
+
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.show_column(col);
+        Ok(())
+    }
+
     pub fn merge_cells(
         &mut self,
         sheet: usize,
@@ -331,6 +401,73 @@ impl XlsWriter {
             .get_mut(sheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.clear_freeze_panes();
+        Ok(())
+    }
+
+    /// Set the height of a row in points.
+    ///
+    /// The row index is 0-based (0 = first row), and the height is specified
+    /// in typographic points. Internally this is converted to twips
+    /// (1/20th of a point) for the BIFF8 ROW record.
+    pub fn set_row_height(&mut self, sheet: usize, row: u32, height_points: f64) -> XlsResult<()> {
+        if !(height_points.is_finite()) || height_points <= 0.0 {
+            return Err(XlsError::InvalidData(
+                "set_row_height: height must be a positive finite value".to_string(),
+            ));
+        }
+
+        if row > u16::MAX as u32 {
+            return Err(XlsError::InvalidData(
+                "set_row_height: row index must be <= 65535 for BIFF8".to_string(),
+            ));
+        }
+
+        let height_units_f = (height_points * 20.0).round();
+        if height_units_f <= 0.0 || height_units_f > u16::MAX as f64 {
+            return Err(XlsError::InvalidData(
+                "set_row_height: height exceeds BIFF8 row height limit".to_string(),
+            ));
+        }
+
+        let height_units = height_units_f as u16;
+
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.set_row_height(row, height_units);
+        Ok(())
+    }
+
+    /// Hide a row.
+    pub fn hide_row(&mut self, sheet: usize, row: u32) -> XlsResult<()> {
+        if row > u16::MAX as u32 {
+            return Err(XlsError::InvalidData(
+                "hide_row: row index must be <= 65535 for BIFF8".to_string(),
+            ));
+        }
+
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.hide_row(row);
+        Ok(())
+    }
+
+    /// Show a previously hidden row.
+    pub fn show_row(&mut self, sheet: usize, row: u32) -> XlsResult<()> {
+        if row > u16::MAX as u32 {
+            return Err(XlsError::InvalidData(
+                "show_row: row index must be <= 65535 for BIFF8".to_string(),
+            ));
+        }
+
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.show_row(row);
         Ok(())
     }
 
@@ -619,6 +756,62 @@ impl XlsWriter {
 
             if let Some(panes) = worksheet.freeze_panes {
                 biff::write_pane(&mut stream, panes.freeze_rows, panes.freeze_cols)?;
+            }
+
+            // Column width / hidden state via COLINFO records.
+            if !worksheet.column_widths.is_empty() || !worksheet.hidden_columns.is_empty() {
+                use std::collections::BTreeSet;
+
+                let mut cols = BTreeSet::<u16>::new();
+                cols.extend(worksheet.column_widths.keys().copied());
+                cols.extend(worksheet.hidden_columns.iter().copied());
+
+                for col in cols {
+                    let width_units = worksheet
+                        .column_widths
+                        .get(&col)
+                        .copied()
+                        // Default matches POI's ColumnInfoRecord constructor.
+                        .unwrap_or(2275u16);
+                    let hidden = worksheet.hidden_columns.contains(&col);
+                    biff::write_colinfo(&mut stream, col, col, width_units, hidden)?;
+                }
+            }
+
+            // Pre-compute row spans (first/last used column per row) for ROW records.
+            use std::collections::HashMap as StdHashMap;
+            let mut row_spans: StdHashMap<u32, (u16, u16)> = StdHashMap::new();
+
+            for &(row, col) in worksheet.cells.keys() {
+                let entry = row_spans.entry(row).or_insert((col, col.saturating_add(1)));
+                if col < entry.0 {
+                    entry.0 = col;
+                }
+                if col.saturating_add(1) > entry.1 {
+                    entry.1 = col.saturating_add(1);
+                }
+            }
+
+            // ROW records for rows with custom height or hidden state.
+            if !worksheet.row_heights.is_empty() || !worksheet.hidden_rows.is_empty() {
+                use std::collections::BTreeSet;
+
+                let mut rows = BTreeSet::<u32>::new();
+                rows.extend(worksheet.row_heights.keys().copied());
+                rows.extend(worksheet.hidden_rows.iter().copied());
+
+                for row in rows {
+                    let (first_col, last_col_plus1) =
+                        row_spans.get(&row).copied().unwrap_or((0, 0));
+                    let height = worksheet
+                        .row_heights
+                        .get(&row)
+                        // Default height matches POI's RowRecord constructor (0x00FF).
+                        .copied()
+                        .unwrap_or(0x00FFu16);
+                    let hidden = worksheet.hidden_rows.contains(&row);
+                    biff::write_row(&mut stream, row, first_col, last_col_plus1, height, hidden)?;
+                }
             }
 
             // Cell records (sorted by row, then column)

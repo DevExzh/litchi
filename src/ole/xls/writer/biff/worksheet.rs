@@ -19,6 +19,47 @@ pub fn write_wsbool<W: Write>(writer: &mut W) -> XlsResult<()> {
     Ok(())
 }
 
+/// Write COLINFO record (column formatting and width).
+///
+/// Record type: 0x007D, Length: 12
+///
+/// The width is expressed in units of 1/256 of the width of the
+/// character "0" in the workbook's default font, matching the
+/// semantics of Apache POI's `ColumnInfoRecord.setColumnWidth`.
+pub fn write_colinfo<W: Write>(
+    writer: &mut W,
+    first_col: u16,
+    last_col: u16,
+    col_width: u16,
+    hidden: bool,
+) -> XlsResult<()> {
+    write_record_header(writer, 0x007D, 12)?;
+
+    // Column range (inclusive)
+    writer.write_all(&first_col.to_le_bytes())?;
+    writer.write_all(&last_col.to_le_bytes())?;
+
+    // Column width in 1/256 character units
+    writer.write_all(&col_width.to_le_bytes())?;
+
+    // XF index: use the default cell XF (15) to match our cell records.
+    writer.write_all(&0x000Fu16.to_le_bytes())?;
+
+    // Options bitfield: base value 0x0002 as in POI, plus the hidden flag
+    // in the least significant bit when required.
+    let mut options: u16 = 0x0002;
+    if hidden {
+        options |= 0x0001;
+    }
+    writer.write_all(&options.to_le_bytes())?;
+
+    // Reserved field: POI commonly writes 2 here; Excel tolerates non-zero
+    // even though the spec marks this as reserved.
+    writer.write_all(&0x0002u16.to_le_bytes())?;
+
+    Ok(())
+}
+
 /// Write PANE record (freeze panes / split panes)
 ///
 /// Record type: 0x0041, Length: 10
@@ -135,6 +176,66 @@ pub fn write_dimensions<W: Write>(
 
     // Reserved (must be 0)
     writer.write_all(&0u16.to_le_bytes())?;
+
+    Ok(())
+}
+
+/// Write ROW record (row metrics including height and hidden flag).
+///
+/// Record type: 0x0208, Length: 16
+///
+/// The height is stored in twips (1/20 of a point) as per MS-XLS
+/// and Apache POI's `RowRecord` implementation.
+pub fn write_row<W: Write>(
+    writer: &mut W,
+    row_index: u32,
+    first_col: u16,
+    last_col_plus1: u16,
+    height: u16,
+    hidden: bool,
+) -> XlsResult<()> {
+    let row_u16 = u16::try_from(row_index).map_err(|_| {
+        XlsError::InvalidData(format!(
+            "Row index {} exceeds BIFF8 limit 65535 for ROW record",
+            row_index
+        ))
+    })?;
+
+    write_record_header(writer, 0x0208, 16)?;
+
+    // Row number
+    writer.write_all(&row_u16.to_le_bytes())?;
+
+    // First and last used column indices. A value of 0 for both is
+    // accepted by Excel for empty rows (mirrors POI's `setEmpty`).
+    writer.write_all(&first_col.to_le_bytes())?;
+    writer.write_all(&last_col_plus1.to_le_bytes())?;
+
+    // Row height in twips
+    writer.write_all(&height.to_le_bytes())?;
+
+    // Optimization hint and reserved fields: keep both at zero, as
+    // POI does for generated sheets.
+    writer.write_all(&0u16.to_le_bytes())?; // optimize
+    writer.write_all(&0u16.to_le_bytes())?; // reserved
+
+    // Option flags: always set bit 8 (0x0100) as in POI's
+    // OPTION_BITS_ALWAYS_SET, and toggle the zeroHeight bit (0x0020)
+    // when the row is hidden. When a custom height is used
+    // (height != 0x00FF), also set the badFontHeight bit (0x0040),
+    // mirroring HSSFRow.setHeightInPoints and RowRecord.
+    let mut option_flags: u16 = 0x0100;
+    if hidden {
+        option_flags |= 0x0020;
+    }
+    if height != 0x00FF {
+        option_flags |= 0x0040;
+    }
+    writer.write_all(&option_flags.to_le_bytes())?;
+
+    // Secondary option flags, including the XF index and border bits.
+    // For now we leave this at POI's default of 0x000F.
+    writer.write_all(&0x000Fu16.to_le_bytes())?;
 
     Ok(())
 }

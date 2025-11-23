@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::{XlsCellValue, XlsConditionalFormat, XlsDataValidation};
 
@@ -45,6 +45,14 @@ pub(super) struct WritableWorksheet {
     pub first_col: u16,
     /// Last used column (exclusive)
     pub last_col: u16,
+    /// Per-column widths in 1/256 character units (BIFF8 COLINFO).
+    pub column_widths: HashMap<u16, u16>,
+    /// Hidden columns (0-based indices).
+    pub hidden_columns: HashSet<u16>,
+    /// Per-row heights in 1/20 point units (BIFF8 ROW).
+    pub row_heights: HashMap<u32, u16>,
+    /// Hidden rows (0-based indices).
+    pub hidden_rows: HashSet<u32>,
     pub merged_ranges: Vec<MergedRange>,
     pub data_validations: Vec<XlsDataValidation>,
     pub conditional_formats: Vec<XlsConditionalFormat>,
@@ -61,6 +69,10 @@ impl WritableWorksheet {
             last_row: 0,
             first_col: 0,
             last_col: 0,
+            column_widths: HashMap::new(),
+            hidden_columns: HashSet::new(),
+            row_heights: HashMap::new(),
+            hidden_rows: HashSet::new(),
             merged_ranges: Vec::new(),
             data_validations: Vec::new(),
             conditional_formats: Vec::new(),
@@ -106,5 +118,29 @@ impl WritableWorksheet {
 
     pub(super) fn clear_freeze_panes(&mut self) {
         self.freeze_panes = None;
+    }
+
+    pub(super) fn set_column_width(&mut self, col: u16, width: u16) {
+        self.column_widths.insert(col, width);
+    }
+
+    pub(super) fn hide_column(&mut self, col: u16) {
+        self.hidden_columns.insert(col);
+    }
+
+    pub(super) fn show_column(&mut self, col: u16) {
+        self.hidden_columns.remove(&col);
+    }
+
+    pub(super) fn set_row_height(&mut self, row: u32, height: u16) {
+        self.row_heights.insert(row, height);
+    }
+
+    pub(super) fn hide_row(&mut self, row: u32) {
+        self.hidden_rows.insert(row);
+    }
+
+    pub(super) fn show_row(&mut self, row: u32) {
+        self.hidden_rows.remove(&row);
     }
 }
