@@ -49,7 +49,7 @@ pub use self::data_validation::{
 pub use self::named_range::XlsDefinedName;
 use self::named_range::XlsDefinedName as InternalDefinedName;
 use self::worksheet::{
-    AutoFilterRange, MergedRange, WritableCell, WritableWorksheet, XlsHyperlink,
+    AutoFilterRange, MergedRange, WritableCell, WritableWorksheet, XlsHyperlink, XlsSheetProtection,
 };
 
 fn column_to_letters(col: u16) -> String {
@@ -89,6 +89,12 @@ pub enum XlsCellValue {
     /// Blank/empty cell
     Blank,
 }
+#[derive(Debug, Clone, Copy)]
+struct XlsWorkbookProtection {
+    protect_structure: bool,
+    protect_windows: bool,
+    password_hash: Option<u16>,
+}
 /// XLS file writer
 ///
 /// Provides methods to create and modify XLS (BIFF8) files.
@@ -104,6 +110,7 @@ pub struct XlsWriter {
     fmt: FormattingManager,
     /// Total number of string occurrences (including duplicates) for SST.cstTotal
     sst_total: u32,
+    workbook_protection: Option<XlsWorkbookProtection>,
     /// Use 1904 date system (Mac) instead of 1900 (Windows)
     use_1904_dates: bool,
 }
@@ -118,6 +125,7 @@ impl XlsWriter {
             defined_names: Vec::new(),
             sst_total: 0,
             fmt: FormattingManager::new(),
+            workbook_protection: None,
             use_1904_dates: false,
         }
     }
@@ -317,6 +325,26 @@ impl XlsWriter {
         }
 
         Ok(())
+    }
+
+    fn hash_password(password: &str) -> u16 {
+        let bytes = password.as_bytes();
+        if bytes.is_empty() {
+            return 0;
+        }
+
+        let mut hash: u16 = 0;
+        for &b in bytes.iter().rev() {
+            let high_bit = (hash >> 14) & 0x0001;
+            hash = ((hash << 1) & 0x7FFF) | high_bit;
+            hash ^= b as u16;
+        }
+
+        let high_bit = (hash >> 14) & 0x0001;
+        hash = ((hash << 1) & 0x7FFF) | high_bit;
+        hash ^= bytes.len() as u16;
+        hash ^= 0xCE4B;
+        hash
     }
 
     /// Set a hyperlink for a single cell.
@@ -859,6 +887,60 @@ impl XlsWriter {
         self.use_1904_dates = use_1904;
     }
 
+    pub fn protect_workbook(
+        &mut self,
+        password: Option<&str>,
+        protect_structure: bool,
+        protect_windows: bool,
+    ) {
+        if !protect_structure && !protect_windows && password.is_none() {
+            self.workbook_protection = None;
+            return;
+        }
+
+        let password_hash = password.map(Self::hash_password);
+        self.workbook_protection = Some(XlsWorkbookProtection {
+            protect_structure,
+            protect_windows,
+            password_hash,
+        });
+    }
+
+    pub fn unprotect_workbook(&mut self) {
+        self.workbook_protection = None;
+    }
+
+    pub fn protect_sheet(
+        &mut self,
+        sheet: usize,
+        password: Option<&str>,
+        protect_objects: bool,
+        protect_scenarios: bool,
+    ) -> XlsResult<()> {
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+
+        let password_hash = password.map(Self::hash_password);
+        worksheet.sheet_protection = Some(XlsSheetProtection {
+            protect_objects,
+            protect_scenarios,
+            password_hash,
+        });
+
+        Ok(())
+    }
+
+    pub fn unprotect_sheet(&mut self, sheet: usize) -> XlsResult<()> {
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.sheet_protection = None;
+        Ok(())
+    }
+
     /// Save the XLS file
     ///
     /// # Arguments
@@ -968,6 +1050,15 @@ impl XlsWriter {
         // Window1 record (workbook window properties)
         biff::write_window1(&mut stream)?;
 
+        if let Some(protection) = self.workbook_protection {
+            biff::write_workbook_protection(
+                &mut stream,
+                protection.protect_structure,
+                protection.protect_windows,
+                protection.password_hash,
+            )?;
+        }
+
         // Write minimal formatting tables so XF index 0 is valid.
         // Order mirrors Apache POI's workbook creation:
         //  - FONT records
@@ -1053,6 +1144,15 @@ impl XlsWriter {
 
             if let Some(panes) = worksheet.freeze_panes {
                 biff::write_pane(&mut stream, panes.freeze_rows, panes.freeze_cols)?;
+            }
+
+            if let Some(protection) = worksheet.sheet_protection {
+                biff::write_sheet_protection(
+                    &mut stream,
+                    protection.protect_objects,
+                    protection.protect_scenarios,
+                    protection.password_hash,
+                )?;
             }
 
             if let Some(af) = worksheet.auto_filter {

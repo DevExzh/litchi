@@ -38,6 +38,13 @@ pub(super) struct AutoFilterRange {
     pub last_col: u16,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(super) struct XlsSheetProtection {
+    pub protect_objects: bool,
+    pub protect_scenarios: bool,
+    pub password_hash: Option<u16>,
+}
+
 /// Hyperlink target within a worksheet.
 #[derive(Debug, Clone)]
 pub(super) struct XlsHyperlink {
@@ -81,6 +88,7 @@ pub(super) struct WritableWorksheet {
     pub conditional_formats: Vec<XlsConditionalFormat>,
     /// Optional freeze panes configuration.
     pub freeze_panes: Option<FreezePanes>,
+    pub sheet_protection: Option<XlsSheetProtection>,
     pub auto_filter: Option<AutoFilterRange>,
     /// Cell or range hyperlinks stored for this worksheet.
     pub hyperlinks: Vec<XlsHyperlink>,
@@ -103,6 +111,7 @@ impl WritableWorksheet {
             data_validations: Vec::new(),
             conditional_formats: Vec::new(),
             freeze_panes: None,
+            sheet_protection: None,
             auto_filter: None,
             hyperlinks: Vec::new(),
         }

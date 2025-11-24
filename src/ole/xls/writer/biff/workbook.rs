@@ -209,6 +209,34 @@ pub fn write_window1<W: Write>(writer: &mut W) -> XlsResult<()> {
     Ok(())
 }
 
+pub fn write_workbook_protection<W: Write>(
+    writer: &mut W,
+    protect_structure: bool,
+    protect_windows: bool,
+    password_hash: Option<u16>,
+) -> XlsResult<()> {
+    if !protect_structure && !protect_windows && password_hash.is_none() {
+        return Ok(());
+    }
+
+    if protect_structure || protect_windows {
+        write_record_header(writer, 0x0012, 2)?;
+        writer.write_all(&0x0001u16.to_le_bytes())?;
+    }
+
+    if protect_windows {
+        write_record_header(writer, 0x0019, 2)?;
+        writer.write_all(&0x0001u16.to_le_bytes())?;
+    }
+
+    if let Some(hash) = password_hash {
+        write_record_header(writer, 0x0013, 2)?;
+        writer.write_all(&hash.to_le_bytes())?;
+    }
+
+    Ok(())
+}
+
 /// Write SUPBOOK record for the internal workbook.
 ///
 /// Record type: 0x01AE

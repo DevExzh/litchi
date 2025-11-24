@@ -165,6 +165,15 @@ pub fn write_autofilterinfo<W: Write>(writer: &mut W, c_entries: u16) -> XlsResu
     worksheet::write_autofilterinfo(writer, c_entries)
 }
 
+pub fn write_sheet_protection<W: Write>(
+    writer: &mut W,
+    protect_objects: bool,
+    protect_scenarios: bool,
+    password_hash: Option<u16>,
+) -> XlsResult<()> {
+    worksheet::write_sheet_protection(writer, protect_objects, protect_scenarios, password_hash)
+}
+
 /// Write HLINK (hyperlink) record for a cell or cell range.
 ///
 /// Record type: 0x01B8
@@ -227,6 +236,15 @@ pub fn write_date1904<W: Write>(writer: &mut W, is_1904: bool) -> XlsResult<()> 
 /// Record type: 0x003D
 pub fn write_window1<W: Write>(writer: &mut W) -> XlsResult<()> {
     workbook::write_window1(writer)
+}
+
+pub fn write_workbook_protection<W: Write>(
+    writer: &mut W,
+    protect_structure: bool,
+    protect_windows: bool,
+    password_hash: Option<u16>,
+) -> XlsResult<()> {
+    workbook::write_workbook_protection(writer, protect_structure, protect_windows, password_hash)
 }
 
 /// Write internal SUPBOOK record used for 3D references within this

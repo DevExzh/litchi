@@ -113,6 +113,33 @@ pub fn write_autofilterinfo<W: Write>(writer: &mut W, c_entries: u16) -> XlsResu
     Ok(())
 }
 
+pub fn write_sheet_protection<W: Write>(
+    writer: &mut W,
+    protect_objects: bool,
+    protect_scenarios: bool,
+    password_hash: Option<u16>,
+) -> XlsResult<()> {
+    write_record_header(writer, 0x0012, 2)?;
+    writer.write_all(&0x0001u16.to_le_bytes())?;
+
+    if protect_objects {
+        write_record_header(writer, 0x0063, 2)?;
+        writer.write_all(&0x0001u16.to_le_bytes())?;
+    }
+
+    if protect_scenarios {
+        write_record_header(writer, 0x00DD, 2)?;
+        writer.write_all(&0x0001u16.to_le_bytes())?;
+    }
+
+    if let Some(hash) = password_hash {
+        write_record_header(writer, 0x0013, 2)?;
+        writer.write_all(&hash.to_le_bytes())?;
+    }
+
+    Ok(())
+}
+
 fn encode_web_url_bytes(url: &str) -> Vec<u8> {
     // For URL hyperlinks we follow Apache POI's HyperlinkRecord layout:
     // the address is stored as a UTF-16LE string with a single trailing
