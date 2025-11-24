@@ -1156,6 +1156,7 @@ impl XlsWriter {
             }
 
             if let Some(af) = worksheet.auto_filter {
+                let _row_span = af.last_row.saturating_sub(af.first_row).saturating_add(1);
                 let width = u32::from(af.last_col).saturating_sub(u32::from(af.first_col)) + 1;
                 let c_entries = u16::try_from(width).map_err(|_| {
                     XlsError::InvalidData(

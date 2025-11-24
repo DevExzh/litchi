@@ -1453,12 +1453,33 @@ impl MarkdownWriter {
         }
 
         // Try OLE MTEF formulas
-        #[cfg(feature = "ole")]
+        #[cfg(all(feature = "ole", not(feature = "ooxml")))]
         {
-            // When only ole feature is enabled, Run can only be Doc variant
+            // When only `ole` is enabled, Run can only be the Doc variant, so we
+            // destructure directly without a match. This keeps the code simple
+            // and avoids the `infallible_destructuring_match` lint in ole-only
+            // builds.
+            let crate::document::Run::Doc(ole_run) = _run;
+
+            if ole_run.has_mtef_formula() {
+                // Get the MTEF formula AST
+                if let Some(mtef_ast) = ole_run.mtef_formula_ast() {
+                    // Convert MTEF AST to LaTeX
+                    let latex = self.convert_mtef_to_latex(mtef_ast);
+                    return Ok(Some(self.format_formula(&latex, true))); // true = inline
+                } else {
+                    // Fallback placeholder if AST is not available
+                    return Ok(Some(self.format_formula("[Formula]", true)));
+                }
+            }
+        }
+
+        #[cfg(all(feature = "ole", feature = "ooxml"))]
+        {
+            // When both `ole` and `ooxml` are enabled, fall back to the slower
+            // path for non-OLE runs.
             let ole_run = match _run {
                 crate::document::Run::Doc(r) => r,
-                #[cfg(feature = "ooxml")]
                 _ => return Ok(None),
             };
 

@@ -489,7 +489,6 @@ pub fn encode_ptg_tokens(tokens: &[Ptg]) -> Vec<u8> {
             },
             Ptg::PtgParen => bytes.push(0x15),
             Ptg::PtgMissArg => bytes.push(0x16),
-            _ => {}, // Other tokens not yet implemented
         }
     }
 

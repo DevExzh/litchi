@@ -490,19 +490,40 @@ impl Presentation {
     /// Vector of (slide_number, text) tuples for each slide
     #[doc(hidden)]
     pub fn extract_text_for_markdown(&self) -> Result<Vec<(usize, String)>> {
-        #[cfg(feature = "ole")]
+        // Fast PPT path when only `ole` is enabled. In this configuration
+        // PresentationImpl can only be Ppt, so we destructure directly and
+        // return early.
+        #[cfg(all(
+            feature = "ole",
+            not(any(feature = "ooxml", feature = "iwa", feature = "odf"))
+        ))]
         {
+            let PresentationImpl::Ppt(pres) = &self.inner;
+            pres.extract_text_fast().map_err(Error::from)
+        }
+
+        // When multiple presentation formats are compiled in, prefer the fast
+        // PPT extractor but keep the generic slide-based fallback for other
+        // formats.
+        #[cfg(not(all(
+            feature = "ole",
+            not(any(feature = "ooxml", feature = "iwa", feature = "odf"))
+        )))]
+        {
+            #[cfg(feature = "ole")]
             if let PresentationImpl::Ppt(pres) = &self.inner {
                 return pres.extract_text_fast().map_err(Error::from);
             }
-        }
 
-        // For other formats, extract from slides (slower but works)
-        let slides = self.slides()?;
-        Ok(slides
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, slide)| slide.text().ok().map(|text| (idx + 1, text.to_string())))
-            .collect())
+            // For other formats, extract from slides (slower but works)
+            let slides = self.slides()?;
+            Ok(slides
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, slide)| {
+                    slide.text().ok().map(|text| (idx + 1, text.to_string()))
+                })
+                .collect())
+        }
     }
 }
