@@ -3,11 +3,17 @@
 use crate::ooxml::xlsb::error::{XlsbError, XlsbResult};
 
 /// Convert column number to Excel column name (A, B, ..., Z, AA, AB, etc.)
+///
+/// Input is 1-based (1=A, 2=B, 26=Z, 27=AA, etc.)
 pub fn column_index_to_name(mut col: u32) -> String {
+    if col == 0 {
+        return String::new(); // Invalid input
+    }
+
     let mut name = String::new();
 
     while col > 0 {
-        col -= 1; // Make 0-based
+        col -= 1; // Make 0-based for calculation
         let ch = (b'A' + (col % 26) as u8) as char;
         name.insert(0, ch);
         col /= 26;
@@ -37,15 +43,23 @@ pub fn cell_reference(row: u32, col: u32) -> String {
 }
 
 /// Parse Excel cell reference to row and column indices
+///
+/// Returns 0-based row and column indices
 pub fn parse_cell_reference(ref_str: &str) -> XlsbResult<(u32, u32)> {
     let ref_str = ref_str.to_ascii_uppercase();
     let mut col_str = String::new();
     let mut row_str = String::new();
+    let mut found_digit = false;
 
     for ch in ref_str.chars() {
         if ch.is_ascii_uppercase() {
+            // Letters must come before digits
+            if found_digit {
+                return Err(XlsbError::InvalidCellReference(ref_str.to_string()));
+            }
             col_str.push(ch);
         } else if ch.is_ascii_digit() {
+            found_digit = true;
             row_str.push(ch);
         } else {
             return Err(XlsbError::InvalidCellReference(ref_str.to_string()));
@@ -91,11 +105,11 @@ mod tests {
 
     #[test]
     fn test_column_index_to_name() {
-        assert_eq!(column_index_to_name(0), "A");
-        assert_eq!(column_index_to_name(1), "B");
-        assert_eq!(column_index_to_name(25), "Z");
-        assert_eq!(column_index_to_name(26), "AA");
-        assert_eq!(column_index_to_name(702), "AAA");
+        assert_eq!(column_index_to_name(1), "A");
+        assert_eq!(column_index_to_name(2), "B");
+        assert_eq!(column_index_to_name(26), "Z");
+        assert_eq!(column_index_to_name(27), "AA");
+        assert_eq!(column_index_to_name(703), "AAA");
     }
 
     #[test]

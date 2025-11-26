@@ -198,6 +198,7 @@ impl ContentTypesItem {
             (ext, content_type),
             ("rels", ct::OPC_RELATIONSHIPS)
                 | ("xml", ct::XML)
+                | ("bin", ct::XLSB_BIN)
                 | ("png", "image/png")
                 | ("jpg", "image/jpeg")
                 | ("jpeg", "image/jpeg")

@@ -313,6 +313,7 @@ impl MarkdownWriter {
         feature = "rtf",
         feature = "iwa"
     ))]
+    #[allow(irrefutable_let_patterns)]
     pub fn write_paragraph(&mut self, para: &Paragraph) -> Result<()> {
         // First check for paragraph-level formulas (display math)
         #[cfg(feature = "ooxml")]
@@ -574,6 +575,7 @@ impl MarkdownWriter {
         feature = "rtf",
         feature = "iwa"
     ))]
+    #[allow(irrefutable_let_patterns)]
     pub fn write_run(&mut self, run: &Run) -> Result<()> {
         // First check if this run contains a formula
         if let Some(formula_markdown) = self.extract_formula_from_run(run)? {
@@ -1429,6 +1431,7 @@ impl MarkdownWriter {
         feature = "rtf",
         feature = "iwa"
     ))]
+    #[allow(irrefutable_let_patterns)]
     fn extract_formula_from_run(&self, _run: &Run) -> Result<Option<String>> {
         // Try OOXML OMML formulas first
         #[cfg(feature = "ooxml")]
@@ -1513,6 +1516,7 @@ impl MarkdownWriter {
 
     /// Convert MTEF AST nodes to LaTeX string (fallback when formula feature is disabled)
     #[cfg(not(feature = "formula"))]
+    #[allow(dead_code)]
     fn convert_mtef_to_latex(&self, _nodes: &[()]) -> String {
         "[Formula support disabled - enable 'formula' feature]".to_string()
     }

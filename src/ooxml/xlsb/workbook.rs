@@ -191,8 +191,17 @@ impl XlsbWorkbook {
         let mut cells_reader =
             crate::ooxml::xlsb::cells_reader::XlsbCellsReader::new(iter, shared_strings.to_vec())?;
 
+        // Read all cells
         while let Some(cell) = cells_reader.next_cell()? {
             worksheet.add_cell(cell);
+        }
+
+        // Transfer advanced features from reader to worksheet
+        for merged in cells_reader.merged_cells {
+            worksheet.add_merged_cell(merged);
+        }
+        for hyperlink in cells_reader.hyperlinks {
+            worksheet.add_hyperlink(hyperlink);
         }
 
         Ok(worksheet)

@@ -3,6 +3,8 @@
 use crate::common::binary;
 use crate::ooxml::xlsb::cell::XlsbCell;
 use crate::ooxml::xlsb::error::XlsbResult;
+use crate::ooxml::xlsb::hyperlinks::Hyperlink;
+use crate::ooxml::xlsb::merged_cells::MergedCell;
 use crate::ooxml::xlsb::records::RecordIter;
 use crate::sheet::CellValue;
 use std::io::{Read, Seek};
@@ -33,6 +35,10 @@ where
     dimensions: Dimensions,
     current_row: u32,
     buf: Vec<u8>,
+    /// Merged cells found in the worksheet
+    pub merged_cells: Vec<MergedCell>,
+    /// Hyperlinks found in the worksheet
+    pub hyperlinks: Vec<Hyperlink>,
 }
 
 impl<RS> XlsbCellsReader<RS>
@@ -71,6 +77,8 @@ where
             dimensions,
             current_row: 0,
             buf,
+            merged_cells: Vec::new(),
+            hyperlinks: Vec::new(),
         })
     }
 
@@ -85,7 +93,8 @@ where
             let typ = self.iter.read_type()?;
 
             if typ == 0x0092 {
-                // BrtEndSheetData
+                // BrtEndSheetData - continue to read advanced features
+                self.read_advanced_features()?;
                 return Ok(None);
             }
 
@@ -98,7 +107,7 @@ where
                 },
                 0x0001 => {
                     // BrtCellBlank
-                    if self.buf.len() >= 6 {
+                    if self.buf.len() >= 4 {
                         let col = binary::read_u32_le_at(&self.buf, 0)?;
                         return Ok(Some(XlsbCell::new(self.current_row, col, CellValue::Empty)));
                     }
@@ -184,6 +193,80 @@ where
                         return Ok(Some(XlsbCell::new(self.current_row, col, value)));
                     }
                 },
+                0x0008 => {
+                    // BrtFmlaString - formula with string result
+                    if self.buf.len() >= 10 {
+                        let col = binary::read_u32_le_at(&self.buf, 0)?;
+                        // Skip style (4 bytes) + flags (1 byte) + formula length (4 bytes)
+                        let formula_len = binary::read_u32_le_at(&self.buf, 6)? as usize;
+                        if self.buf.len() >= 10 + formula_len {
+                            // Read cached string value after formula
+                            let (string, _) =
+                                super::records::wide_str_with_len(&self.buf[10 + formula_len..])?;
+                            return Ok(Some(XlsbCell::new(
+                                self.current_row,
+                                col,
+                                CellValue::String(string),
+                            )));
+                        }
+                    }
+                },
+                0x0009 => {
+                    // BrtFmlaNum - formula with numeric result
+                    if self.buf.len() >= 18 {
+                        let col = binary::read_u32_le_at(&self.buf, 0)?;
+                        let formula_len = binary::read_u32_le_at(&self.buf, 6)? as usize;
+                        if self.buf.len() >= 10 + formula_len + 8 {
+                            let num_value = binary::read_f64_le_at(&self.buf, 10 + formula_len)?;
+                            return Ok(Some(XlsbCell::new(
+                                self.current_row,
+                                col,
+                                CellValue::Float(num_value),
+                            )));
+                        }
+                    }
+                },
+                0x000A => {
+                    // BrtFmlaBool - formula with boolean result
+                    if self.buf.len() >= 11 {
+                        let col = binary::read_u32_le_at(&self.buf, 0)?;
+                        let formula_len = binary::read_u32_le_at(&self.buf, 6)? as usize;
+                        if self.buf.len() > 10 + formula_len {
+                            let bool_value = self.buf[10 + formula_len] != 0;
+                            return Ok(Some(XlsbCell::new(
+                                self.current_row,
+                                col,
+                                CellValue::Bool(bool_value),
+                            )));
+                        }
+                    }
+                },
+                0x000B => {
+                    // BrtFmlaError - formula with error result
+                    if self.buf.len() >= 11 {
+                        let col = binary::read_u32_le_at(&self.buf, 0)?;
+                        let formula_len = binary::read_u32_le_at(&self.buf, 6)? as usize;
+                        if self.buf.len() > 10 + formula_len {
+                            let error_code = self.buf[10 + formula_len];
+                            let error_msg = match error_code {
+                                0x00 => "#NULL!",
+                                0x07 => "#DIV/0!",
+                                0x0F => "#VALUE!",
+                                0x17 => "#REF!",
+                                0x1D => "#NAME?",
+                                0x24 => "#NUM!",
+                                0x2A => "#N/A",
+                                0x2B => "#GETTING_DATA",
+                                _ => "#ERR!",
+                            };
+                            return Ok(Some(XlsbCell::new(
+                                self.current_row,
+                                col,
+                                CellValue::Error(error_msg.to_string()),
+                            )));
+                        }
+                    }
+                },
                 _ => {
                     // Skip unknown records
                 },
@@ -236,5 +319,75 @@ where
                 CellValue::Float(value)
             }
         }
+    }
+
+    /// Read advanced features after sheet data
+    ///
+    /// This reads merged cells, hyperlinks, and other advanced features
+    /// that appear after the sheet data section.
+    fn read_advanced_features(&mut self) -> XlsbResult<()> {
+        loop {
+            self.buf.clear();
+
+            // Try to read next record type
+            let typ = match self.iter.read_type() {
+                Ok(t) => t,
+                Err(_) => break, // End of stream
+            };
+
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
+
+            match typ {
+                0x00B1 => {
+                    // BrtBeginMergeCells - start of merged cells section
+                    self.read_merged_cells()?;
+                },
+                0x00B0 => {
+                    // BrtMergeCell - single merged cell
+                    if let Ok(merged) = MergedCell::parse(&self.buf) {
+                        self.merged_cells.push(merged);
+                    }
+                },
+                0x01EE => {
+                    // BrtHLink - hyperlink
+                    if let Ok(hyperlink) = Hyperlink::parse(&self.buf) {
+                        self.hyperlinks.push(hyperlink);
+                    }
+                },
+                0x0082 => {
+                    // BrtEndSheet - end of worksheet
+                    break;
+                },
+                _ => {
+                    // Skip other records
+                },
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Read merged cells section
+    fn read_merged_cells(&mut self) -> XlsbResult<()> {
+        loop {
+            self.buf.clear();
+            let typ = self.iter.read_type()?;
+
+            if typ == 0x00B2 {
+                // BrtEndMergeCells
+                break;
+            }
+
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
+
+            if typ == 0x00B0 {
+                // BrtMergeCell
+                if let Ok(merged) = MergedCell::parse(&self.buf) {
+                    self.merged_cells.push(merged);
+                }
+            }
+        }
+
+        Ok(())
     }
 }

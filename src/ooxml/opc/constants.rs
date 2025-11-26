@@ -92,6 +92,9 @@ pub mod content_type {
     pub const SML_SHARED_STRINGS: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml";
 
+    // Excel Binary File Format content types
+    pub const XLSB_BIN: &str = "application/vnd.ms-excel.sheet.binary.macroEnabled.main";
+
     // PresentationML content types
     pub const PML_PRESENTATION_MAIN: &str =
         "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml";

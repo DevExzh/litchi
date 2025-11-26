@@ -1,6 +1,9 @@
 //! Worksheet implementation for XLSB files
 
 use crate::ooxml::xlsb::cell::XlsbCell;
+use crate::ooxml::xlsb::comments::Comment;
+use crate::ooxml::xlsb::hyperlinks::Hyperlink;
+use crate::ooxml::xlsb::merged_cells::MergedCell;
 use crate::sheet::{Cell as SheetCell, CellIterator, CellValue, RowIterator, Worksheet};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -12,6 +15,9 @@ pub struct XlsbWorksheet {
     cells: BTreeMap<(u32, u32), XlsbCell>,
     max_row: u32,
     max_col: u32,
+    merged_cells: Vec<MergedCell>,
+    hyperlinks: Vec<Hyperlink>,
+    comments: Vec<Comment>,
 }
 
 impl XlsbWorksheet {
@@ -22,6 +28,9 @@ impl XlsbWorksheet {
             cells: BTreeMap::new(),
             max_row: 0,
             max_col: 0,
+            merged_cells: Vec::new(),
+            hyperlinks: Vec::new(),
+            comments: Vec::new(),
         }
     }
 
@@ -36,6 +45,36 @@ impl XlsbWorksheet {
     /// Get cell at position
     pub fn get_cell(&self, row: u32, col: u32) -> Option<&XlsbCell> {
         self.cells.get(&(row, col))
+    }
+
+    /// Add a merged cell range
+    pub fn add_merged_cell(&mut self, merged: MergedCell) {
+        self.merged_cells.push(merged);
+    }
+
+    /// Add a hyperlink
+    pub fn add_hyperlink(&mut self, hyperlink: Hyperlink) {
+        self.hyperlinks.push(hyperlink);
+    }
+
+    /// Add a comment
+    pub fn add_comment(&mut self, comment: Comment) {
+        self.comments.push(comment);
+    }
+
+    /// Get all merged cells
+    pub fn merged_cells(&self) -> &[MergedCell] {
+        &self.merged_cells
+    }
+
+    /// Get all hyperlinks
+    pub fn hyperlinks(&self) -> &[Hyperlink] {
+        &self.hyperlinks
+    }
+
+    /// Get all comments
+    pub fn comments(&self) -> &[Comment] {
+        &self.comments
     }
 }
 
