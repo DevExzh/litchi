@@ -141,17 +141,20 @@ impl<'a> DocumentPart<'a> {
     /// # Performance
     ///
     /// Uses streaming XML parsing with pre-allocated SmallVec for efficient
-    /// storage of typically small paragraph collections.
+    /// storage of typically small paragraph collections. Optimized to minimize
+    /// allocations via pre-sized reserves.
     pub fn paragraphs(&self) -> Result<SmallVec<[Paragraph; 32]>> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
+        let xml_bytes = self.xml_bytes();
+        let mut reader = Reader::from_reader(xml_bytes);
         reader.config_mut().trim_text(true);
 
-        // Use SmallVec for efficient storage of paragraph collections
-        let mut paragraphs = SmallVec::new();
-        let mut current_para_xml = Vec::with_capacity(4096); // Pre-allocate for paragraph XML (increased from 2048)
+        // Estimate paragraph count
+        let estimated = (xml_bytes.len() / 400).max(8);
+        let mut paragraphs = SmallVec::with_capacity(estimated);
+        let mut current_para_xml = Vec::with_capacity(4096);
         let mut in_para = false;
-        let mut depth = 0;
-        let mut buf = Vec::with_capacity(2048); // Reusable buffer (increased from 512 to reduce reallocations)
+        let mut depth = 0u32;
+        let mut buf = Vec::with_capacity(2048);
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -160,58 +163,36 @@ impl<'a> DocumentPart<'a> {
                         in_para = true;
                         depth = 1;
                         current_para_xml.clear();
-                        current_para_xml.extend_from_slice(b"<w:p");
-                        for attr in e.attributes().flatten() {
-                            current_para_xml.push(b' ');
-                            current_para_xml.extend_from_slice(attr.key.as_ref());
-                            current_para_xml.extend_from_slice(b"=\"");
-                            current_para_xml.extend_from_slice(&attr.value);
-                            current_para_xml.push(b'"');
-                        }
-                        current_para_xml.push(b'>');
+                        write_start_tag(&mut current_para_xml, b"<w:p", &e);
                     } else if in_para {
                         depth += 1;
-                        current_para_xml.push(b'<');
-                        current_para_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_para_xml.push(b' ');
-                            current_para_xml.extend_from_slice(attr.key.as_ref());
-                            current_para_xml.extend_from_slice(b"=\"");
-                            current_para_xml.extend_from_slice(&attr.value);
-                            current_para_xml.push(b'"');
-                        }
-                        current_para_xml.push(b'>');
+                        write_start_tag_dynamic(&mut current_para_xml, e.name().as_ref(), &e);
                     }
                 },
                 Ok(Event::End(e)) => {
                     if in_para {
+                        let name = e.name();
+                        let name_ref = name.as_ref();
+                        let close_len = 3 + name_ref.len();
+                        current_para_xml.reserve(close_len);
                         current_para_xml.extend_from_slice(b"</");
-                        current_para_xml.extend_from_slice(e.name().as_ref());
+                        current_para_xml.extend_from_slice(name_ref);
                         current_para_xml.push(b'>');
 
                         depth -= 1;
                         if depth == 0 && e.local_name().as_ref() == b"p" {
-                            // PERFORMANCE: Use mem::take to move the buffer instead of cloning
-                            // This avoids allocating a new Vec for each paragraph
                             paragraphs.push(Paragraph::new(std::mem::take(&mut current_para_xml)));
                             in_para = false;
                         }
                     }
                 },
                 Ok(Event::Text(e)) if in_para => {
-                    current_para_xml.extend_from_slice(e.as_ref());
+                    let text = e.as_ref();
+                    current_para_xml.reserve(text.len());
+                    current_para_xml.extend_from_slice(text);
                 },
                 Ok(Event::Empty(e)) if in_para => {
-                    current_para_xml.push(b'<');
-                    current_para_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        current_para_xml.push(b' ');
-                        current_para_xml.extend_from_slice(attr.key.as_ref());
-                        current_para_xml.extend_from_slice(b"=\"");
-                        current_para_xml.extend_from_slice(&attr.value);
-                        current_para_xml.push(b'"');
-                    }
-                    current_para_xml.extend_from_slice(b"/>");
+                    write_empty_tag(&mut current_para_xml, e.name().as_ref(), &e);
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -230,16 +211,17 @@ impl<'a> DocumentPart<'a> {
     /// # Performance
     ///
     /// Uses SmallVec for efficient storage of typically small table collections.
+    /// Optimized to minimize allocations via pre-sized reserves.
     pub fn tables(&self) -> Result<SmallVec<[Table; 8]>> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
+        let xml_bytes = self.xml_bytes();
+        let mut reader = Reader::from_reader(xml_bytes);
         reader.config_mut().trim_text(true);
 
-        // Use SmallVec for efficient storage of table collections
         let mut tables = SmallVec::new();
-        let mut current_table_xml = Vec::with_capacity(8192); // Pre-allocate for table XML (increased from 4096, tables can be large)
+        let mut current_table_xml = Vec::with_capacity(8192);
         let mut in_table = false;
-        let mut depth = 0;
-        let mut buf = Vec::with_capacity(2048); // Reusable buffer (increased from 512 to reduce reallocations)
+        let mut depth = 0u32;
+        let mut buf = Vec::with_capacity(2048);
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -248,58 +230,36 @@ impl<'a> DocumentPart<'a> {
                         in_table = true;
                         depth = 1;
                         current_table_xml.clear();
-                        current_table_xml.extend_from_slice(b"<w:tbl");
-                        for attr in e.attributes().flatten() {
-                            current_table_xml.push(b' ');
-                            current_table_xml.extend_from_slice(attr.key.as_ref());
-                            current_table_xml.extend_from_slice(b"=\"");
-                            current_table_xml.extend_from_slice(&attr.value);
-                            current_table_xml.push(b'"');
-                        }
-                        current_table_xml.push(b'>');
+                        write_start_tag(&mut current_table_xml, b"<w:tbl", &e);
                     } else if in_table {
                         depth += 1;
-                        current_table_xml.push(b'<');
-                        current_table_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_table_xml.push(b' ');
-                            current_table_xml.extend_from_slice(attr.key.as_ref());
-                            current_table_xml.extend_from_slice(b"=\"");
-                            current_table_xml.extend_from_slice(&attr.value);
-                            current_table_xml.push(b'"');
-                        }
-                        current_table_xml.push(b'>');
+                        write_start_tag_dynamic(&mut current_table_xml, e.name().as_ref(), &e);
                     }
                 },
                 Ok(Event::End(e)) => {
                     if in_table {
+                        let name = e.name();
+                        let name_ref = name.as_ref();
+                        let close_len = 3 + name_ref.len();
+                        current_table_xml.reserve(close_len);
                         current_table_xml.extend_from_slice(b"</");
-                        current_table_xml.extend_from_slice(e.name().as_ref());
+                        current_table_xml.extend_from_slice(name_ref);
                         current_table_xml.push(b'>');
 
                         depth -= 1;
                         if depth == 0 && e.local_name().as_ref() == b"tbl" {
-                            // PERFORMANCE: Use mem::take to move the buffer instead of cloning
-                            // This avoids allocating a new Vec for each table
                             tables.push(Table::new(std::mem::take(&mut current_table_xml)));
                             in_table = false;
                         }
                     }
                 },
                 Ok(Event::Text(e)) if in_table => {
-                    current_table_xml.extend_from_slice(e.as_ref());
+                    let text = e.as_ref();
+                    current_table_xml.reserve(text.len());
+                    current_table_xml.extend_from_slice(text);
                 },
                 Ok(Event::Empty(e)) if in_table => {
-                    current_table_xml.push(b'<');
-                    current_table_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        current_table_xml.push(b' ');
-                        current_table_xml.extend_from_slice(attr.key.as_ref());
-                        current_table_xml.extend_from_slice(b"=\"");
-                        current_table_xml.extend_from_slice(&attr.value);
-                        current_table_xml.push(b'"');
-                    }
-                    current_table_xml.extend_from_slice(b"/>");
+                    write_empty_tag(&mut current_table_xml, e.name().as_ref(), &e);
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -322,106 +282,92 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Uses a single-pass XML parser that extracts both `<w:p>` and `<w:tbl>` elements
     /// in document order, which is significantly faster than parsing the XML twice.
+    /// Optimized to minimize allocations by pre-sizing buffers and batching writes.
     pub fn elements(&self) -> Result<Vec<crate::document::DocumentElement>> {
         use crate::document::DocumentElement;
 
-        let mut reader = Reader::from_reader(self.xml_bytes());
+        let xml_bytes = self.xml_bytes();
+        let mut reader = Reader::from_reader(xml_bytes);
         reader.config_mut().trim_text(true);
 
-        let mut elements = Vec::new();
+        // Estimate element count: typical DOCX has ~1 paragraph per 200-500 bytes
+        let estimated_elements = (xml_bytes.len() / 300).max(16);
+        let mut elements = Vec::with_capacity(estimated_elements);
+
+        // Pre-allocate XML buffer; will be reused via mem::take
         let mut current_element_xml = Vec::with_capacity(8192);
         let mut in_paragraph = false;
         let mut in_table = false;
-        let mut depth = 0;
+        let mut depth = 0u32;
         let mut buf = Vec::with_capacity(2048);
 
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Start(e)) => {
+                    let local = e.local_name();
+                    let local_ref = local.as_ref();
+
                     // Start of a paragraph
-                    if e.local_name().as_ref() == b"p" && !in_paragraph && !in_table {
+                    if local_ref == b"p" && !in_paragraph && !in_table {
                         in_paragraph = true;
                         depth = 1;
                         current_element_xml.clear();
-                        current_element_xml.extend_from_slice(b"<w:p");
-                        for attr in e.attributes().flatten() {
-                            current_element_xml.push(b' ');
-                            current_element_xml.extend_from_slice(attr.key.as_ref());
-                            current_element_xml.extend_from_slice(b"=\"");
-                            current_element_xml.extend_from_slice(&attr.value);
-                            current_element_xml.push(b'"');
-                        }
-                        current_element_xml.push(b'>');
+                        write_start_tag(&mut current_element_xml, b"<w:p", &e);
                     }
                     // Start of a table
-                    else if e.local_name().as_ref() == b"tbl" && !in_table && !in_paragraph {
+                    else if local_ref == b"tbl" && !in_table && !in_paragraph {
                         in_table = true;
                         depth = 1;
                         current_element_xml.clear();
-                        current_element_xml.extend_from_slice(b"<w:tbl");
-                        for attr in e.attributes().flatten() {
-                            current_element_xml.push(b' ');
-                            current_element_xml.extend_from_slice(attr.key.as_ref());
-                            current_element_xml.extend_from_slice(b"=\"");
-                            current_element_xml.extend_from_slice(&attr.value);
-                            current_element_xml.push(b'"');
-                        }
-                        current_element_xml.push(b'>');
+                        write_start_tag(&mut current_element_xml, b"<w:tbl", &e);
                     }
                     // Nested element inside paragraph or table
                     else if in_paragraph || in_table {
                         depth += 1;
-                        current_element_xml.push(b'<');
-                        current_element_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_element_xml.push(b' ');
-                            current_element_xml.extend_from_slice(attr.key.as_ref());
-                            current_element_xml.extend_from_slice(b"=\"");
-                            current_element_xml.extend_from_slice(&attr.value);
-                            current_element_xml.push(b'"');
-                        }
-                        current_element_xml.push(b'>');
+                        write_start_tag_dynamic(&mut current_element_xml, e.name().as_ref(), &e);
                     }
                 },
                 Ok(Event::End(e)) => {
                     if in_paragraph || in_table {
+                        let name = e.name();
+                        let name_ref = name.as_ref();
+                        // Write closing tag: "</name>"
+                        let close_len = 3 + name_ref.len(); // "</" + name + ">"
+                        current_element_xml.reserve(close_len);
                         current_element_xml.extend_from_slice(b"</");
-                        current_element_xml.extend_from_slice(e.name().as_ref());
+                        current_element_xml.extend_from_slice(name_ref);
                         current_element_xml.push(b'>');
 
                         depth -= 1;
 
-                        if depth == 0 && e.local_name().as_ref() == b"p" && in_paragraph {
-                            // End of paragraph
-                            let para_xml = std::mem::take(&mut current_element_xml);
-                            elements.push(DocumentElement::Paragraph(
-                                crate::document::Paragraph::Docx(Paragraph::new(para_xml)),
-                            ));
-                            in_paragraph = false;
-                        } else if depth == 0 && e.local_name().as_ref() == b"tbl" && in_table {
-                            // End of table
-                            let table_xml = std::mem::take(&mut current_element_xml);
-                            elements.push(DocumentElement::Table(crate::document::Table::Docx(
-                                Table::new(table_xml),
-                            )));
-                            in_table = false;
+                        if depth == 0 {
+                            let local = e.local_name();
+                            let local_ref = local.as_ref();
+                            if local_ref == b"p" && in_paragraph {
+                                // End of paragraph
+                                let para_xml = std::mem::take(&mut current_element_xml);
+                                elements.push(DocumentElement::Paragraph(
+                                    crate::document::Paragraph::Docx(Paragraph::new(para_xml)),
+                                ));
+                                in_paragraph = false;
+                            } else if local_ref == b"tbl" && in_table {
+                                // End of table
+                                let table_xml = std::mem::take(&mut current_element_xml);
+                                elements.push(DocumentElement::Table(
+                                    crate::document::Table::Docx(Table::new(table_xml)),
+                                ));
+                                in_table = false;
+                            }
                         }
                     }
                 },
                 Ok(Event::Text(e)) if in_paragraph || in_table => {
-                    current_element_xml.extend_from_slice(e.as_ref());
+                    let text = e.as_ref();
+                    current_element_xml.reserve(text.len());
+                    current_element_xml.extend_from_slice(text);
                 },
                 Ok(Event::Empty(e)) if in_paragraph || in_table => {
-                    current_element_xml.push(b'<');
-                    current_element_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        current_element_xml.push(b' ');
-                        current_element_xml.extend_from_slice(attr.key.as_ref());
-                        current_element_xml.extend_from_slice(b"=\"");
-                        current_element_xml.extend_from_slice(&attr.value);
-                        current_element_xml.push(b'"');
-                    }
-                    current_element_xml.extend_from_slice(b"/>");
+                    write_empty_tag(&mut current_element_xml, e.name().as_ref(), &e);
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -432,6 +378,88 @@ impl<'a> DocumentPart<'a> {
 
         Ok(elements)
     }
+}
+
+/// Write a start tag with a known prefix (e.g., "<w:p") and attributes, ending with ">".
+/// Pre-calculates total size to do a single reserve, avoiding repeated capacity checks.
+#[inline]
+fn write_start_tag(out: &mut Vec<u8>, prefix: &[u8], e: &quick_xml::events::BytesStart<'_>) {
+    // First pass: calculate total size
+    let mut attr_len = 0;
+    for attr in e.attributes().flatten() {
+        // Space + key + ="" + value
+        attr_len += 1 + attr.key.as_ref().len() + 2 + attr.value.len() + 1;
+    }
+
+    let total = prefix.len() + attr_len + 1; // +1 for '>'
+    out.reserve(total);
+    out.extend_from_slice(prefix);
+
+    // Second pass: write attributes
+    for attr in e.attributes().flatten() {
+        out.push(b' ');
+        out.extend_from_slice(attr.key.as_ref());
+        out.extend_from_slice(b"=\"");
+        out.extend_from_slice(&attr.value);
+        out.push(b'"');
+    }
+    out.push(b'>');
+}
+
+/// Write a start tag with dynamic tag name and attributes, ending with ">".
+#[inline]
+fn write_start_tag_dynamic(
+    out: &mut Vec<u8>,
+    tag_name: &[u8],
+    e: &quick_xml::events::BytesStart<'_>,
+) {
+    // First pass: calculate total size
+    let mut attr_len = 0;
+    for attr in e.attributes().flatten() {
+        attr_len += 1 + attr.key.as_ref().len() + 2 + attr.value.len() + 1;
+    }
+
+    // "<" + tag_name + attrs + ">"
+    let total = 1 + tag_name.len() + attr_len + 1;
+    out.reserve(total);
+    out.push(b'<');
+    out.extend_from_slice(tag_name);
+
+    // Second pass: write attributes
+    for attr in e.attributes().flatten() {
+        out.push(b' ');
+        out.extend_from_slice(attr.key.as_ref());
+        out.extend_from_slice(b"=\"");
+        out.extend_from_slice(&attr.value);
+        out.push(b'"');
+    }
+    out.push(b'>');
+}
+
+/// Write an empty tag "<name attrs/>".
+#[inline]
+fn write_empty_tag(out: &mut Vec<u8>, tag_name: &[u8], e: &quick_xml::events::BytesStart<'_>) {
+    // First pass: calculate total size
+    let mut attr_len = 0;
+    for attr in e.attributes().flatten() {
+        attr_len += 1 + attr.key.as_ref().len() + 2 + attr.value.len() + 1;
+    }
+
+    // "<" + tag_name + attrs + "/>"
+    let total = 1 + tag_name.len() + attr_len + 2;
+    out.reserve(total);
+    out.push(b'<');
+    out.extend_from_slice(tag_name);
+
+    // Second pass: write attributes
+    for attr in e.attributes().flatten() {
+        out.push(b' ');
+        out.extend_from_slice(attr.key.as_ref());
+        out.extend_from_slice(b"=\"");
+        out.extend_from_slice(&attr.value);
+        out.push(b'"');
+    }
+    out.extend_from_slice(b"/>");
 }
 
 #[cfg(test)]
