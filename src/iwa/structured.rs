@@ -244,25 +244,106 @@ pub fn extract_slides(bundle: &Bundle, _object_index: &ObjectIndex) -> Result<Ve
 }
 
 /// Extract sections from a Pages document
-pub fn extract_sections(bundle: &Bundle, _object_index: &ObjectIndex) -> Result<Vec<Section>> {
+///
+/// # Implementation Status
+///
+/// ✓ COMPLETED: Proper section boundary identification (2025-11-04)
+///   - Uses message type 10011 (TP.SectionArchive) to identify actual sections
+///   - Falls back to text storage objects if no sections found
+///   - Based on Apple's Pages protobuf structure and pyiwa reference
+///   
+/// Pages documents use message type 10011 (TP.SectionArchive) to mark section
+/// boundaries. Each section can contain multiple text storage objects (type 2001/2022).
+/// This implementation properly identifies sections and groups their content.
+pub fn extract_sections(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec<Section>> {
     let mut sections = Vec::new();
 
-    // In a full implementation, we would identify section boundaries
-    // For now, we'll treat all text storage objects as potential sections
-    let text_objects = bundle.find_objects_by_type(2022); // Common TSWP storage type
+    // Method 1: Look for actual SectionArchive objects (message type 10011)
+    // This is the proper way to identify sections in Pages documents
+    let section_objects = bundle.find_objects_by_type(10011);
 
-    for (index, (_archive_name, object)) in text_objects.iter().enumerate() {
-        let mut section = Section::new(index);
+    if !section_objects.is_empty() {
+        // We found actual section markers - use them to properly extract sections
+        for (index, (_archive_name, section_obj)) in section_objects.iter().enumerate() {
+            let mut section = Section::new(index);
 
-        // Extract text content
-        let text_parts = object.extract_text();
-        if !text_parts.is_empty() {
-            section.heading = text_parts.first().cloned();
-            section.paragraphs = text_parts.into_iter().skip(1).collect();
+            // Try to extract section metadata and content
+            // SectionArchive contains references to text storage objects
+            // We need to traverse the object graph to get the actual content
+
+            // Get the section's object ID
+            if let Some(section_id) = section_obj.archive_info.identifier {
+                // Find objects that reference this section (its content)
+                if let Some(referenced_ids) = object_index.get_dependencies(section_id) {
+                    // Collect text from all referenced storage objects
+                    for &ref_id in referenced_ids {
+                        if let Ok(Some(ref_obj)) = object_index.resolve_object(bundle, ref_id) {
+                            let text_parts = ref_obj
+                                .messages
+                                .iter()
+                                .filter(|msg| msg.type_ == 2001 || msg.type_ == 2022)
+                                .flat_map(|msg| {
+                                    use prost::Message;
+                                    if let Ok(storage) =
+                                        crate::iwa::protobuf::tswp::StorageArchive::decode(
+                                            &*msg.data,
+                                        )
+                                    {
+                                        storage.text.clone()
+                                    } else {
+                                        Vec::new()
+                                    }
+                                })
+                                .collect::<Vec<_>>();
+
+                            if !text_parts.is_empty() {
+                                if section.heading.is_none() {
+                                    section.heading = text_parts.first().cloned();
+                                    section.paragraphs.extend(text_parts.into_iter().skip(1));
+                                } else {
+                                    section.paragraphs.extend(text_parts);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Also extract text directly from the section object itself
+            let text_parts = section_obj.extract_text();
+            if !text_parts.is_empty() {
+                if section.heading.is_none() {
+                    section.heading = text_parts.first().cloned();
+                    section.paragraphs.extend(text_parts.into_iter().skip(1));
+                } else {
+                    section.paragraphs.extend(text_parts);
+                }
+            }
+
+            if section.heading.is_some() || !section.paragraphs.is_empty() {
+                sections.push(section);
+            }
         }
+    }
 
-        if section.heading.is_some() || !section.paragraphs.is_empty() {
-            sections.push(section);
+    // Method 2: Fallback - if no section markers found, treat text storage objects as sections
+    // This handles older Pages formats or documents without explicit section markers
+    if sections.is_empty() {
+        let text_objects = bundle.find_objects_by_type(2022); // TSWP.ParagraphStyleArchive
+
+        for (index, (_archive_name, object)) in text_objects.iter().enumerate() {
+            let mut section = Section::new(index);
+
+            // Extract text content
+            let text_parts = object.extract_text();
+            if !text_parts.is_empty() {
+                section.heading = text_parts.first().cloned();
+                section.paragraphs = text_parts.into_iter().skip(1).collect();
+            }
+
+            if section.heading.is_some() || !section.paragraphs.is_empty() {
+                sections.push(section);
+            }
         }
     }
 

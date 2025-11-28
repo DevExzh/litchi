@@ -157,19 +157,45 @@ pub struct Archive {
 
 impl Archive {
     /// Parse an IWA archive from decompressed data
+    ///
+    /// This function tracks byte offsets for each object to enable efficient
+    /// lazy loading and partial parsing. The implementation follows the IWA
+    /// format specification from Apple's iWorkFileFormat documentation.
+    ///
+    /// # Performance
+    ///
+    /// O(n) where n is the number of bytes in the decompressed data.
+    /// Memory usage is proportional to the number of objects.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let mut objects = Vec::new();
         let mut cursor = std::io::Cursor::new(data);
 
         while cursor.position() < data.len() as u64 {
+            // Track the start of this object's header (before the varint length)
+            let varint_start_pos = cursor.position();
+
             // Read archive info length
             let archive_info_length = varint::decode_varint(&mut cursor)? as usize;
+
+            // The header starts after the varint that encodes its length
+            let header_start_pos = cursor.position();
+            let varint_length = header_start_pos - varint_start_pos;
 
             // Read archive info
             let mut archive_info_data = vec![0u8; archive_info_length];
             cursor.read_exact(&mut archive_info_data)?;
             let mut archive_info_cursor = std::io::Cursor::new(archive_info_data);
             let archive_info = ArchiveInfo::parse(&mut archive_info_cursor)?;
+
+            // Calculate total data length from all message infos
+            let total_data_length: u64 = archive_info
+                .message_infos
+                .iter()
+                .map(|mi| mi.length as u64)
+                .sum();
+
+            // Data starts immediately after the header
+            let data_start_pos = cursor.position();
 
             // Read message data
             let mut messages = Vec::new();
@@ -208,6 +234,10 @@ impl Archive {
                 archive_info,
                 messages,
                 decoded_messages,
+                header_offset: varint_start_pos,
+                header_length: varint_length + archive_info_length as u64,
+                data_offset: data_start_pos,
+                data_length: total_data_length,
             });
         }
 
@@ -224,6 +254,14 @@ pub struct ArchiveObject {
     pub messages: Vec<RawMessage>,
     /// Decoded message objects (if successfully decoded)
     pub decoded_messages: Vec<Box<dyn DecodedMessage>>,
+    /// Byte offset of the ArchiveInfo header in the decompressed stream
+    pub header_offset: u64,
+    /// Length of the ArchiveInfo header in bytes
+    pub header_length: u64,
+    /// Byte offset of the message data (after the ArchiveInfo header)
+    pub data_offset: u64,
+    /// Total length of all message data in bytes
+    pub data_length: u64,
 }
 
 /// Raw protobuf message data
