@@ -67,7 +67,7 @@ impl PptRecordParser {
         let all_text = self.extract_all_text()?;
 
         // For now, treat all text as a single slide
-        // TODO: Properly associate text with individual slides
+        // Note: Full slide association would require parsing SlideListWithText structure
         if !all_text.is_empty() && all_text != "No text content found" {
             self.slide_atoms_sets.push(all_text.into_bytes());
         }

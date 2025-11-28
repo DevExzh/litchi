@@ -54,6 +54,9 @@
 pub mod package;
 pub mod presentation;
 
+/// PPT file writing
+pub mod writer;
+
 /// Slide module with factory and enhanced implementation
 pub mod slide;
 
@@ -93,3 +96,6 @@ pub use current_user::CurrentUser;
 pub use escher_textbox::EscherTextboxWrapper;
 pub use text_prop::{TextProp, TextPropCollection, TextPropType};
 pub use text_run::{TextRun, TextRunExtractor, TextRunFormatting};
+
+// Re-export writer types
+pub use writer::{PptWriteError, PptWriter, ShapeProperties, ShapeType, TextAlignment};

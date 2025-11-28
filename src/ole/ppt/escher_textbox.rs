@@ -127,12 +127,13 @@ mod tests {
     #[test]
     fn test_escher_textbox_wrapper_creation() {
         // Create a simple textbox with a TextCharsAtom
+        // PPT record header: ver/inst (2 bytes) | type (2 bytes) | length (4 bytes)
         let mut data = Vec::new();
 
-        // TextCharsAtom header
-        data.extend_from_slice(&[0xA0, 0x0F]); // Record type 0x0FA0 (4000)
-        data.extend_from_slice(&[0x0A, 0x00, 0x00, 0x00]); // Length: 10 bytes
-        data.extend_from_slice(&[0x00, 0x00]); // Version/instance
+        // TextCharsAtom: Record type 0x0FA0 (4000)
+        data.extend_from_slice(&[0x00, 0x00]); // Version/instance (ver=0, inst=0)
+        data.extend_from_slice(&[0xA0, 0x0F]); // Record type 0x0FA0 (little-endian)
+        data.extend_from_slice(&[0x0A, 0x00, 0x00, 0x00]); // Length: 10 bytes (little-endian)
 
         // Text data (UTF-16LE): "Hello"
         data.extend_from_slice(&[

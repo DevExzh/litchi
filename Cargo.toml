@@ -65,6 +65,7 @@ imgconv = ["dep:image"]
 [dependencies]
 atoi_simd = "0.17" # SIMD-optimized conversion of byte slices to integers
 base64 = "0.22" # Base64 encoding/decoding for embedded binary data in XML
+bitflags = { version = "2.10", features = ["std", "serde"] } # Bit flags for efficient flag combinations
 bumpalo = { version = "3", features = ["collections"], optional = true } # Fast bump allocator for temporary formula parsing data
 bytes = { version = "1", features = ["serde"] } # Efficient byte buffer operations with zero-copy slicing
 chrono = { version = "0", features = ["serde"] } # Date and time types for Office timestamps
@@ -93,7 +94,7 @@ smallvec = "1.15" # Stack-allocated vectors for small collections to avoid heap 
 snap = { version = "1", optional = true } # Snappy compression used in iWork file formats (.pages, .numbers, .key)
 thiserror = "2.0" # Convenient derive macros for error types
 xml-minifier = { path = "xml-minifier" }
-zerocopy = "0.8" # Safe zero-cost type conversions between bytes and structured data
+zerocopy = { version = "0.8", features = ["std"] } # Safe zero-cost type conversions between bytes and structured data
 zerocopy-derive = "0.8" # Derive macros for zerocopy traits
 zip = { version = "6", optional = true } # ZIP archive handling for modern Office Open XML formats
 

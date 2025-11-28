@@ -34,10 +34,14 @@ struct CurrentUserHeader {
     header_token: u32,
     /// Offset to the current UserEditAtom record
     current_edit_offset: u32,
-    /// Username length in characters
+    /// Username length in characters (Unicode)
     username_len: u16,
     /// Release version
     release_version: u16,
+    /// ANSI username length in characters
+    ansi_username_len: u16,
+    /// Padding to align to 16 bytes
+    _padding: u16,
 }
 
 impl CurrentUser {
@@ -214,26 +218,38 @@ mod tests {
     #[test]
     fn test_current_user_valid() {
         let mut data = vec![0u8; 32];
-        // Set size
+        // Set size (first 4 bytes before header)
         data[0] = 0x1C;
         data[1] = 0x00;
         data[2] = 0x00;
         data[3] = 0x00;
+        // CurrentUserHeader starts at byte 4 (16 bytes total)
         // Set valid header token (0xF3D1C4DF)
         data[4] = 0xDF;
         data[5] = 0xC4;
         data[6] = 0xD1;
         data[7] = 0xF3;
-        // Set current edit offset
+        // Set current edit offset (offset 4-7 in header, bytes 8-11 in data)
         data[8] = 0x00;
         data[9] = 0x10;
         data[10] = 0x00;
         data[11] = 0x00;
-        // Set username length (0)
+        // Set username length (offset 8-9 in header, bytes 12-13 in data)
         data[12] = 0x00;
         data[13] = 0x00;
+        // Set release version (offset 10-13 in header, bytes 14-17 in data)
+        data[14] = 0x03;
+        data[15] = 0x00;
+        data[16] = 0x00;
+        data[17] = 0x00;
+        // Set ANSI username length (offset 14-15 in header, bytes 18-19 in data)
+        data[18] = 0x00;
+        data[19] = 0x00;
 
         let result = CurrentUser::parse(&data);
+        if let Err(ref e) = result {
+            eprintln!("Parse error: {:?}", e);
+        }
         assert!(result.is_ok());
 
         let current_user = result.unwrap();

@@ -127,7 +127,6 @@ impl PptRecord {
                 | PptRecordType::ExObjList
                 | PptRecordType::VBAInfo
                 | PptRecordType::SlideListWithText
-                | PptRecordType::PersistPtrHolder
                 | PptRecordType::Environment
                 | PptRecordType::InteractiveInfo
                 | PptRecordType::AnimationInfo
