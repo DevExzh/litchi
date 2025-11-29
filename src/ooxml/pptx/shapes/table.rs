@@ -44,10 +44,9 @@ impl Table {
         let mut table_xml = Vec::new();
         let mut in_table = false;
         let mut depth = 0;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"tbl" && !in_table {
                         in_table = true;
@@ -99,7 +98,6 @@ impl Table {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Err(OoxmlError::PartNotFound(
@@ -113,10 +111,9 @@ impl Table {
         reader.config_mut().trim_text(true);
 
         let mut count = 0;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     // DrawingML table rows are <a:tr>
                     if e.local_name().as_ref() == b"tr" {
@@ -127,7 +124,6 @@ impl Table {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(count)
@@ -154,10 +150,9 @@ impl Table {
         let mut current_row_xml = Vec::new();
         let mut in_row = false;
         let mut depth = 0;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"tr" && !in_row {
                         in_row = true;
@@ -210,7 +205,6 @@ impl Table {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(rows)
@@ -249,10 +243,9 @@ impl TableRow {
         reader.config_mut().trim_text(true);
 
         let mut count = 0;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     // DrawingML table cells are <a:tc>
                     if e.local_name().as_ref() == b"tc" {
@@ -263,7 +256,6 @@ impl TableRow {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(count)
@@ -278,10 +270,9 @@ impl TableRow {
         let mut current_cell_xml = Vec::new();
         let mut in_cell = false;
         let mut depth = 0;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"tc" && !in_cell {
                         in_cell = true;
@@ -334,7 +325,6 @@ impl TableRow {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(cells)
@@ -361,10 +351,9 @@ impl TableCell {
 
         let mut text = String::new();
         let mut in_text_element = false;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = true;
@@ -387,7 +376,6 @@ impl TableCell {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(text.trim().to_string())

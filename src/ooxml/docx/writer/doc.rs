@@ -515,7 +515,7 @@ impl MutableDocument {
         toc_field_para
             .elements
             .push(super::paragraph::ParagraphElement::Field(
-                MutableField::instruction(instruction),
+                MutableField::instruction_char(instruction),
             ));
         toc_field_para
             .elements
@@ -576,7 +576,7 @@ impl MutableDocument {
             hyperlink
                 .elements
                 .push(super::hyperlink::HyperlinkElement::Field(
-                    MutableField::instruction(pageref_instr),
+                    MutableField::instruction_char(pageref_instr),
                 ));
 
             hyperlink

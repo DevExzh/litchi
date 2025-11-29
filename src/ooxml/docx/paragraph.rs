@@ -1,5 +1,6 @@
 /// Paragraph and Run structures for Word documents.
 use crate::common::VerticalPosition;
+use crate::common::XmlSlice;
 use crate::ooxml::docx::drawing::{DrawingObject, parse_drawing_objects};
 use crate::ooxml::docx::hyperlink::Hyperlink;
 use crate::ooxml::docx::image::{InlineImage, parse_inline_images};
@@ -10,6 +11,7 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 use smallvec::SmallVec;
 use std::borrow::Cow;
+use std::sync::Arc;
 
 /// A paragraph in a Word document.
 ///
@@ -26,20 +28,79 @@ use std::borrow::Cow;
 ///     }
 /// }
 /// ```
+/// Internal storage for paragraph XML data.
+/// Supports both owned data (for standalone parsing) and shared slices (for arena-based parsing).
+#[derive(Debug, Clone)]
+enum XmlData {
+    /// Owned data for standalone paragraphs
+    Owned(Box<[u8]>),
+    /// Shared slice into an arena for zero-copy batch parsing
+    Shared(XmlSlice),
+}
+
+impl XmlData {
+    #[inline]
+    fn as_bytes(&self) -> &[u8] {
+        match self {
+            XmlData::Owned(b) => b,
+            XmlData::Shared(s) => s.as_bytes(),
+        }
+    }
+
+    /// Get or create an Arc for this data.
+    /// If already shared, returns the existing Arc (cheap clone).
+    /// If owned, creates a new Arc (allocates once).
+    #[inline]
+    fn get_or_create_arc(&self) -> (Arc<Vec<u8>>, u32) {
+        match self {
+            XmlData::Owned(b) => (Arc::new(b.to_vec()), 0),
+            XmlData::Shared(s) => (s.arc(), s.start()),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Paragraph {
     /// The raw XML bytes for this paragraph
-    xml_bytes: Vec<u8>,
+    xml_data: XmlData,
 }
 
 impl Paragraph {
-    /// Create a new Paragraph from XML bytes.
+    /// Create a new Paragraph from XML bytes (owned).
     ///
     /// # Arguments
     ///
     /// * `xml_bytes` - The XML content of the `<w:p>` element
+    #[inline]
     pub fn new(xml_bytes: Vec<u8>) -> Self {
-        Self { xml_bytes }
+        Self {
+            xml_data: XmlData::Owned(xml_bytes.into_boxed_slice()),
+        }
+    }
+
+    /// Create a new Paragraph from a shared XML slice (zero-copy).
+    ///
+    /// This is used for arena-based parsing where all element XMLs are stored
+    /// in a single contiguous buffer.
+    #[inline]
+    pub fn from_slice(slice: XmlSlice) -> Self {
+        Self {
+            xml_data: XmlData::Shared(slice),
+        }
+    }
+
+    /// Create a Paragraph from an Arc<Vec<u8>> and byte range.
+    ///
+    /// This is a convenience method for arena-based parsing.
+    #[inline]
+    pub fn from_arc_range(arena: Arc<Vec<u8>>, start: u32, len: u32) -> Self {
+        Self::from_slice(XmlSlice::new(arena, start, len))
+    }
+
+    /// Get the raw XML bytes.
+    #[inline]
+    fn xml_bytes(&self) -> &[u8] {
+        self.xml_data.as_bytes()
     }
 
     /// Get the text content of this paragraph.
@@ -50,18 +111,17 @@ impl Paragraph {
     ///
     /// Uses streaming XML parsing with pre-allocated buffer to extract text efficiently.
     pub fn text(&self) -> Result<String> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let xml_bytes = self.xml_bytes();
+        let mut reader = Reader::from_reader(xml_bytes);
         reader.config_mut().trim_text(true);
 
         // Pre-allocate string with estimated capacity to reduce reallocations
-        let estimated_capacity = self.xml_bytes.len() / 4; // Rough estimate
+        let estimated_capacity = xml_bytes.len() / 4; // Rough estimate
         let mut result = String::with_capacity(estimated_capacity);
         let mut in_text_element = false;
-        let mut buf = Vec::with_capacity(1024); // Reusable buffer (increased from 512)
 
         loop {
-            buf.clear();
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = true;
@@ -91,95 +151,91 @@ impl Paragraph {
     /// Get an iterator over the runs in this paragraph.
     ///
     /// Each run represents a `<w:r>` element and may have different formatting.
+    ///
+    /// # Performance
+    ///
+    /// Uses zero-copy parsing with NO Vec::push calls.
+    /// Reuses existing Arc if paragraph is already shared.
     pub fn runs(&self) -> Result<SmallVec<[Run; 8]>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
+        let xml_bytes = self.xml_bytes();
+        let len = xml_bytes.len();
 
-        // Use SmallVec for efficient storage of typically small run collections
-        let mut runs = SmallVec::new();
-        let mut current_run_xml = Vec::with_capacity(2048); // Pre-allocate for XML fragments (increased from 1024)
-        let mut in_run = false;
-        let mut depth = 0;
-        let mut buf = Vec::with_capacity(1024); // Reusable buffer (increased from 512)
+        // PASS 1: Count runs
+        let count = count_runs(xml_bytes);
+        if count == 0 {
+            return Ok(SmallVec::new());
+        }
 
-        loop {
-            match reader.read_event_into(&mut buf) {
-                Ok(Event::Start(ref e)) => {
-                    // Check for w:r (word run) specifically using the full name
-                    // This avoids confusion with m:r (math run) which appears in OMML formulas
-                    let is_word_run = e.local_name().as_ref() == b"r"
-                        && !in_run
-                        && (e.name().as_ref() == b"w:r" || e.name().as_ref() == b"r");
+        // Reuse Arc if available (cheap), or create one (allocates once)
+        let (source_arc, base_offset) = self.xml_data.get_or_create_arc();
 
-                    if is_word_run {
-                        in_run = true;
-                        depth = 1;
-                        current_run_xml.clear();
-                        // Pre-allocate with estimated size for run XML
-                        current_run_xml.reserve(512);
+        // Pre-allocate SmallVec with exact capacity
+        let mut runs: SmallVec<[Run; 8]> = SmallVec::with_capacity(count);
 
-                        // Build opening tag more efficiently
-                        current_run_xml.extend_from_slice(b"<w:r");
-                        for attr in e.attributes().flatten() {
-                            current_run_xml.push(b' ');
-                            current_run_xml.extend_from_slice(attr.key.as_ref());
-                            current_run_xml.extend_from_slice(b"=\"");
-                            current_run_xml.extend_from_slice(&attr.value);
-                            current_run_xml.push(b'"');
-                        }
-                        current_run_xml.push(b'>');
-                    } else if in_run {
-                        depth += 1;
-                        current_run_xml.push(b'<');
-                        current_run_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_run_xml.push(b' ');
-                            current_run_xml.extend_from_slice(attr.key.as_ref());
-                            current_run_xml.extend_from_slice(b"=\"");
-                            current_run_xml.extend_from_slice(&attr.value);
-                            current_run_xml.push(b'"');
-                        }
-                        current_run_xml.push(b'>');
-                    }
-                },
-                Ok(Event::End(ref e)) => {
-                    if in_run {
-                        current_run_xml.extend_from_slice(b"</");
-                        current_run_xml.extend_from_slice(e.name().as_ref());
-                        current_run_xml.push(b'>');
-
-                        // Only decrement depth and check for run end when we see w:r or r (without namespace)
-                        // This prevents m:r (math run) from being mistaken for the end of w:r (word run)
-                        let is_word_run_end = e.local_name().as_ref() == b"r"
-                            && (e.name().as_ref() == b"w:r" || e.name().as_ref() == b"r");
-
-                        depth -= 1;
-                        if is_word_run_end && depth == 0 {
-                            runs.push(Run::new(current_run_xml.clone()));
-                            in_run = false;
-                        }
-                    }
-                },
-                Ok(Event::Text(e)) if in_run => {
-                    current_run_xml.extend_from_slice(e.as_ref());
-                },
-                Ok(Event::Empty(e)) if in_run => {
-                    current_run_xml.push(b'<');
-                    current_run_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        current_run_xml.push(b' ');
-                        current_run_xml.extend_from_slice(attr.key.as_ref());
-                        current_run_xml.extend_from_slice(b"=\"");
-                        current_run_xml.extend_from_slice(&attr.value);
-                        current_run_xml.push(b'"');
-                    }
-                    current_run_xml.extend_from_slice(b"/>");
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
+        // OPTIMIZATION: Pre-increment Arc refcount to avoid per-run atomic operations.
+        let arc_ptr = Arc::into_raw(source_arc);
+        // SAFETY: arc_ptr came from Arc::into_raw, so it's valid.
+        unsafe {
+            for _ in 0..(count - 1) {
+                Arc::increment_strong_count(arc_ptr);
             }
-            buf.clear();
+        }
+
+        // PASS 2: Fill directly using unsafe to avoid push
+        let mut write_idx = 0usize;
+        let mut i = 0usize;
+        let runs_ptr = runs.as_mut_ptr();
+
+        while i < len && write_idx < count {
+            let Some(tag_start) = memchr::memchr(b'<', &xml_bytes[i..]) else {
+                break;
+            };
+            let tag_start = i + tag_start;
+
+            if tag_start + 5 < len && &xml_bytes[tag_start..tag_start + 4] == b"<w:r" {
+                let next_char = xml_bytes[tag_start + 4];
+                if (next_char == b'>' || next_char == b' ' || next_char == b'/')
+                    && let Some(end) = find_run_end(&xml_bytes[tag_start..])
+                {
+                    let end_pos = tag_start + end;
+                    let run_len = (end_pos - tag_start) as u32;
+
+                    // SAFETY: arc_ptr is valid; each from_raw consumes one refcount we pre-incremented
+                    let arc_clone = unsafe { Arc::from_raw(arc_ptr) };
+
+                    // Write directly to pre-allocated slot (no push)
+                    // Add base_offset to get absolute position in source Arc
+                    unsafe {
+                        std::ptr::write(
+                            runs_ptr.add(write_idx),
+                            Run::from_slice(XmlSlice::new(
+                                arc_clone,
+                                base_offset + tag_start as u32,
+                                run_len,
+                            )),
+                        );
+                    }
+                    write_idx += 1;
+                    i = end_pos;
+                    continue;
+                }
+            }
+
+            i = tag_start + 1;
+        }
+
+        // Handle refcount mismatch: decrement unused pre-incremented refcounts
+        if write_idx < count {
+            unsafe {
+                for _ in 0..(count - write_idx) {
+                    Arc::decrement_strong_count(arc_ptr);
+                }
+            }
+        }
+
+        // Set final length
+        unsafe {
+            runs.set_len(write_idx);
         }
 
         Ok(runs)
@@ -219,7 +275,7 @@ impl Paragraph {
     /// ```
     #[inline]
     pub fn images(&self) -> Result<SmallVec<[InlineImage; 4]>> {
-        parse_inline_images(&self.xml_bytes)
+        parse_inline_images(self.xml_bytes())
     }
 
     /// Extract all drawing objects (shapes, text boxes) from this paragraph.
@@ -244,7 +300,7 @@ impl Paragraph {
     /// ```
     #[inline]
     pub fn drawing_objects(&self) -> Result<SmallVec<[DrawingObject; 4]>> {
-        parse_drawing_objects(&self.xml_bytes)
+        parse_drawing_objects(self.xml_bytes())
     }
 
     /// Extract all tracked changes (revisions) from this paragraph.
@@ -267,7 +323,7 @@ impl Paragraph {
     /// ```
     #[inline]
     pub fn revisions(&self) -> Result<SmallVec<[Revision; 4]>> {
-        parse_revisions(&self.xml_bytes)
+        parse_revisions(self.xml_bytes())
     }
 
     /// Extract paragraph-level OMML formulas.
@@ -284,7 +340,7 @@ impl Paragraph {
     /// }
     /// ```
     pub fn paragraph_level_formulas(&self) -> Result<Vec<String>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
         let mut formulas = Vec::new();
@@ -294,10 +350,9 @@ impl Paragraph {
         let mut word_depth = 0; // Track nesting depth of Word elements
         let mut depth = 0;
         let mut omml_content = String::with_capacity(512);
-        let mut buf = Vec::with_capacity(256);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     let name = e.local_name();
                     let full_name = e.name();
@@ -453,7 +508,6 @@ impl Paragraph {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(formulas)
@@ -478,7 +532,7 @@ impl Paragraph {
     /// }
     /// ```
     pub fn hyperlinks(&self, rels: &Relationships) -> Result<Vec<Hyperlink>> {
-        Hyperlink::extract_from_paragraph(&self.xml_bytes, rels)
+        Hyperlink::extract_from_paragraph(self.xml_bytes(), rels)
     }
 }
 
@@ -516,16 +570,49 @@ pub struct RunProperties {
     pub vertical_position: Option<VerticalPosition>,
 }
 
+/// Internal storage for run XML data (same pattern as Paragraph).
+#[derive(Debug, Clone)]
+enum RunXmlData {
+    Owned(Vec<u8>),
+    Shared(XmlSlice),
+}
+
+impl RunXmlData {
+    #[inline]
+    fn as_bytes(&self) -> &[u8] {
+        match self {
+            RunXmlData::Owned(v) => v,
+            RunXmlData::Shared(s) => s.as_bytes(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Run {
-    /// The raw XML bytes for this run
-    xml_bytes: Vec<u8>,
+    /// The raw XML data for this run
+    xml_data: RunXmlData,
 }
 
 impl Run {
-    /// Create a new Run from XML bytes.
+    /// Create a new Run from XML bytes (owned).
     pub fn new(xml_bytes: Vec<u8>) -> Self {
-        Self { xml_bytes }
+        Self {
+            xml_data: RunXmlData::Owned(xml_bytes),
+        }
+    }
+
+    /// Create a Run from a shared XML slice (zero-copy).
+    #[inline]
+    pub fn from_slice(slice: XmlSlice) -> Self {
+        Self {
+            xml_data: RunXmlData::Shared(slice),
+        }
+    }
+
+    /// Get the raw XML bytes.
+    #[inline]
+    fn xml_bytes(&self) -> &[u8] {
+        self.xml_data.as_bytes()
     }
 
     /// Get the text content of this run.
@@ -534,17 +621,17 @@ impl Run {
     /// - `<w:tab/>` → tab character
     /// - `<w:br/>` → newline character
     pub fn text(&self) -> Result<String> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let xml_bytes = self.xml_bytes();
+        let mut reader = Reader::from_reader(xml_bytes);
         reader.config_mut().trim_text(true);
 
         // Pre-allocate with estimated capacity
-        let estimated_capacity = self.xml_bytes.len() / 8; // Rough estimate for text content
+        let estimated_capacity = xml_bytes.len() / 8; // Rough estimate for text content
         let mut result = String::with_capacity(estimated_capacity);
         let mut in_text_element = false;
-        let mut buf = Vec::with_capacity(512); // Reusable buffer (increased from 256)
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     let name = e.local_name();
                     if name.as_ref() == b"t" {
@@ -569,7 +656,6 @@ impl Run {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(result)
@@ -601,14 +687,13 @@ impl Run {
     /// Note: This is simplified. Full implementation would return
     /// the underline style (single, double, wavy, etc.).
     pub fn underline(&self) -> Result<Option<bool>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
         let mut in_r_pr = false;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     let name = e.local_name();
                     if name.as_ref() == b"rPr" {
@@ -626,7 +711,6 @@ impl Run {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(None)
@@ -664,17 +748,16 @@ impl Run {
     /// }
     /// ```
     pub fn get_text_and_properties(&self) -> Result<(String, RunProperties)> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
         let mut props = RunProperties::default();
-        let mut text = String::with_capacity(self.xml_bytes.len() / 8);
+        let mut text = String::with_capacity(self.xml_bytes().len() / 8);
         let mut in_r_pr = false;
         let mut in_text_element = false;
-        let mut buf = Vec::with_capacity(512);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     let name = e.local_name();
 
@@ -768,7 +851,6 @@ impl Run {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok((text, props))
@@ -800,15 +882,14 @@ impl Run {
     /// }
     /// ```
     pub fn get_properties(&self) -> Result<RunProperties> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
         let mut props = RunProperties::default();
         let mut in_r_pr = false;
-        let mut buf = Vec::with_capacity(512);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     let name = e.local_name();
                     if name.as_ref() == b"rPr" {
@@ -888,7 +969,6 @@ impl Run {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(props)
@@ -898,14 +978,13 @@ impl Run {
     ///
     /// Returns the vertical positioning if specified, None if normal.
     pub fn vertical_position(&self) -> Result<Option<VerticalPosition>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
         let mut in_r_pr = false;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     let name = e.local_name();
                     if name.as_ref() == b"rPr" {
@@ -934,7 +1013,6 @@ impl Run {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(None)
@@ -944,14 +1022,13 @@ impl Run {
     ///
     /// Returns the typeface name if specified, None if inherited.
     pub fn font_name(&self) -> Result<Option<String>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
         let mut in_r_pr = false;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     let name = e.local_name();
                     if name.as_ref() == b"rPr" {
@@ -974,7 +1051,6 @@ impl Run {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(None)
@@ -985,14 +1061,13 @@ impl Run {
     /// Returns the size if specified, None if inherited.
     /// Note: Word stores font size in half-points (e.g., 24 = 12pt).
     pub fn font_size(&self) -> Result<Option<u32>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
         let mut in_r_pr = false;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     let name = e.local_name();
                     if name.as_ref() == b"rPr" {
@@ -1017,7 +1092,6 @@ impl Run {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(None)
@@ -1031,17 +1105,16 @@ impl Run {
     /// The extracted OMML is cleaned to remove or fix improperly nested Word namespace
     /// elements that can cause XML parsing errors.
     pub fn omml_formula(&self) -> Result<Option<String>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
         let mut in_omath = false;
         let mut skip_word_element = false; // Track when we're skipping Word namespace elements
         let mut word_depth = 0; // Track nesting depth of Word elements to skip
         let mut omml_content = String::with_capacity(512); // Pre-allocate for performance
-        let mut buf = Vec::with_capacity(256);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     let name = e.local_name();
                     let full_name = e.name();
@@ -1221,7 +1294,6 @@ impl Run {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         if omml_content.is_empty() {
@@ -1236,14 +1308,13 @@ impl Run {
     /// Handles the tri-state logic where w:val can be "true", "false", "1", "0"
     /// or the element can be present without a val attribute (implies true).
     fn get_bool_property(&self, property_name: &[u8]) -> Result<Option<bool>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
         let mut in_r_pr = false;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     let name = e.local_name();
                     if name.as_ref() == b"rPr" {
@@ -1269,11 +1340,80 @@ impl Run {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(None)
     }
+}
+
+/// Count runs in a paragraph XML (for pre-allocation).
+#[inline]
+fn count_runs(xml_bytes: &[u8]) -> usize {
+    let mut count = 0usize;
+    let mut i = 0usize;
+    let len = xml_bytes.len();
+
+    while i < len {
+        let Some(tag_start) = memchr::memchr(b'<', &xml_bytes[i..]) else {
+            break;
+        };
+        let tag_start = i + tag_start;
+
+        if tag_start + 5 < len && &xml_bytes[tag_start..tag_start + 4] == b"<w:r" {
+            let c = xml_bytes[tag_start + 4];
+            if (c == b'>' || c == b' ' || c == b'/')
+                && let Some(end) = find_run_end(&xml_bytes[tag_start..])
+            {
+                count += 1;
+                i = tag_start + end;
+                continue;
+            }
+        }
+        i = tag_start + 1;
+    }
+    count
+}
+
+/// Find the end of a `<w:r>` element.
+/// Returns byte offset AFTER the closing `</w:r>`.
+#[inline]
+fn find_run_end(xml: &[u8]) -> Option<usize> {
+    let first_gt = memchr::memchr(b'>', xml)?;
+    if first_gt > 0 && xml[first_gt - 1] == b'/' {
+        return Some(first_gt + 1); // Self-closing
+    }
+
+    let mut depth = 1i32;
+    let mut pos = first_gt + 1;
+
+    while pos < xml.len() && depth > 0 {
+        let Some(next_lt) = memchr::memchr(b'<', &xml[pos..]) else {
+            break;
+        };
+        pos += next_lt;
+
+        // Check for </w:r>
+        if pos + 6 <= xml.len() && &xml[pos..pos + 5] == b"</w:r" {
+            if xml[pos + 5] == b'>' {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(pos + 6);
+                }
+            }
+        }
+        // Check for nested <w:r> (shouldn't happen but handle it)
+        else if pos + 5 <= xml.len() && &xml[pos..pos + 4] == b"<w:r" {
+            let c = xml[pos + 4];
+            if c == b'>' || c == b' ' {
+                let gt = memchr::memchr(b'>', &xml[pos..])?;
+                if gt > 0 && xml[pos + gt - 1] != b'/' {
+                    depth += 1;
+                }
+            }
+        }
+        pos += 1;
+    }
+    None
 }
 
 #[cfg(test)]

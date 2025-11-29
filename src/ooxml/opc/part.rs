@@ -28,6 +28,10 @@ pub trait Part {
     /// Returns a reference to the blob data for efficient access.
     fn blob(&self) -> &[u8];
 
+    /// Get the binary content as a shared Arc (zero-copy sharing).
+    /// This allows creating sub-slices that share the same allocation.
+    fn blob_arc(&self) -> Arc<Vec<u8>>;
+
     /// Set the binary content of this part.
     ///
     /// This allows for modification of part content.
@@ -132,6 +136,10 @@ impl Part for BlobPart {
         &self.blob
     }
 
+    fn blob_arc(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.blob)
+    }
+
     fn set_blob(&mut self, blob: Vec<u8>) {
         self.blob = Arc::new(blob);
     }
@@ -189,12 +197,12 @@ impl XmlPart {
     }
 
     /// Load an XML part from raw data.
-    pub fn load(partname: PackURI, content_type: String, xml_bytes: Vec<u8>) -> Result<Self> {
-        // Validate that it's valid UTF-8 XML
-        std::str::from_utf8(&xml_bytes)
-            .map_err(|e| OpcError::XmlError(format!("Invalid UTF-8 in XML: {}", e)))?;
-
-        Ok(Self::new(partname, content_type, xml_bytes))
+    ///
+    /// Note: UTF-8 validation is deferred until actual parsing/access for performance.
+    /// Invalid UTF-8 will be caught by quick-xml during parsing or by `xml_str()`.
+    #[inline]
+    pub fn load(partname: PackURI, content_type: String, xml_bytes: Vec<u8>) -> Self {
+        Self::new(partname, content_type, xml_bytes)
     }
 
     /// Get a reader for parsing the XML content.
@@ -202,7 +210,7 @@ impl XmlPart {
     /// Returns a quick-xml Reader configured for efficient parsing.
     /// The reader uses zero-copy parsing where possible.
     pub fn reader(&self) -> Reader<&[u8]> {
-        let mut reader = Reader::from_reader(&**self.xml_bytes);
+        let mut reader = Reader::from_reader(self.xml_bytes.as_slice());
         reader.config_mut().trim_text(true);
         reader
     }
@@ -320,6 +328,10 @@ impl Part for XmlPart {
         &self.xml_bytes
     }
 
+    fn blob_arc(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.xml_bytes)
+    }
+
     fn set_blob(&mut self, blob: Vec<u8>) {
         self.xml_bytes = Arc::new(blob);
         // Clear cache when blob is updated
@@ -354,7 +366,7 @@ impl PartFactory {
     pub fn load(partname: PackURI, content_type: String, blob: Vec<u8>) -> Result<Box<dyn Part>> {
         // Determine if this is an XML part based on content type
         if Self::is_xml_content_type(&content_type) {
-            Ok(Box::new(XmlPart::load(partname, content_type, blob)?))
+            Ok(Box::new(XmlPart::load(partname, content_type, blob)))
         } else {
             Ok(Box::new(BlobPart::load(partname, content_type, blob)))
         }

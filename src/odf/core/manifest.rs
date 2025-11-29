@@ -4,8 +4,8 @@
 //! including their MIME types, sizes, and encryption status.
 
 use crate::common::{Error, Result};
+use soapberry_zip::office::ArchiveReader;
 use std::collections::HashMap;
-use std::io::{Read, Seek};
 
 /// ODF manifest (META-INF/manifest.xml)
 #[derive(Debug, Clone)]
@@ -26,17 +26,13 @@ pub struct ManifestEntry {
 }
 
 impl Manifest {
-    /// Parse manifest from ZIP archive
-    pub fn from_archive<R: Read + Seek>(archive: &mut zip::ZipArchive<R>) -> Result<Self> {
+    /// Parse manifest from ArchiveReader
+    pub fn from_archive_reader(archive: &ArchiveReader<'_>) -> Result<Self> {
         // Try to read manifest.xml from META-INF/manifest.xml first
-        let manifest_content = if let Ok(mut file) = archive.by_name("META-INF/manifest.xml") {
-            let mut content = String::new();
-            file.read_to_string(&mut content)?;
+        let manifest_content = if let Ok(content) = archive.read_string("META-INF/manifest.xml") {
             content
-        } else if let Ok(mut file) = archive.by_name("manifest.xml") {
+        } else if let Ok(content) = archive.read_string("manifest.xml") {
             // Try alternate manifest location for some ODF files
-            let mut content = String::new();
-            file.read_to_string(&mut content)?;
             content
         } else {
             return Err(Error::InvalidFormat(

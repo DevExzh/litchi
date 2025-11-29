@@ -112,10 +112,9 @@ impl HeaderFooter {
         let estimated_capacity = self.xml_bytes.len() / 8;
         let mut result = String::with_capacity(estimated_capacity);
         let mut in_text_element = false;
-        let mut buf = Vec::with_capacity(512);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = true;
@@ -135,7 +134,6 @@ impl HeaderFooter {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         result.shrink_to_fit();
@@ -171,10 +169,9 @@ impl HeaderFooter {
         let mut current_para_xml = Vec::with_capacity(4096);
         let mut in_para = false;
         let mut depth = 0;
-        let mut buf = Vec::with_capacity(1024);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"p" && !in_para {
                         in_para = true;
@@ -244,7 +241,6 @@ impl HeaderFooter {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(paragraphs)
@@ -279,10 +275,9 @@ impl HeaderFooter {
         let mut current_table_xml = Vec::with_capacity(8192);
         let mut in_table = false;
         let mut depth = 0;
-        let mut buf = Vec::with_capacity(1024);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"tbl" && !in_table {
                         in_table = true;
@@ -351,7 +346,6 @@ impl HeaderFooter {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(tables)
@@ -363,10 +357,9 @@ impl HeaderFooter {
         reader.config_mut().trim_text(true);
 
         let mut count = 0;
-        let mut buf = Vec::with_capacity(512);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     if e.local_name().as_ref() == b"p" {
                         count += 1;
@@ -376,7 +369,6 @@ impl HeaderFooter {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(count)
@@ -388,10 +380,9 @@ impl HeaderFooter {
         reader.config_mut().trim_text(true);
 
         let mut count = 0;
-        let mut buf = Vec::with_capacity(512);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"tbl" {
                         count += 1;
@@ -401,7 +392,6 @@ impl HeaderFooter {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(count)

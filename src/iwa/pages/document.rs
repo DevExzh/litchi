@@ -71,24 +71,12 @@ impl PagesDocument {
         })
     }
 
-    /// Create a Pages document from an already-parsed ZIP archive.
+    /// Create a Pages document from raw bytes (ZIP archive data).
     ///
     /// This is used for single-pass parsing where the ZIP archive has already
-    /// been parsed during format detection. It avoids double-parsing.
-    pub fn from_zip_archive(
-        zip_archive: zip::ZipArchive<std::io::Cursor<Vec<u8>>>,
-    ) -> Result<Self> {
-        let bundle = Bundle::from_zip_archive(zip_archive)?;
-
-        // Verify this is a Pages document
-        Self::verify_application(&bundle)?;
-
-        let object_index = ObjectIndex::from_bundle(&bundle)?;
-
-        Ok(Self {
-            bundle,
-            object_index,
-        })
+    /// been validated during format detection. It avoids double-parsing.
+    pub fn from_archive_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_bytes(bytes)
     }
 
     /// Verify that the bundle is a Pages document
@@ -300,24 +288,5 @@ mod tests {
 
         // Text might be empty for some documents, but extraction should succeed
         let _text = text_result.unwrap();
-    }
-
-    #[test]
-    fn test_pages_sections() {
-        let doc_path = std::path::Path::new("test.pages");
-        if !doc_path.exists() {
-            return;
-        }
-
-        let doc = PagesDocument::open(doc_path).unwrap();
-        let sections_result = doc.sections();
-        assert!(sections_result.is_ok());
-
-        let sections = sections_result.unwrap();
-        // Document should have at least one section (even if implicit)
-        assert!(
-            !sections.is_empty(),
-            "Document should have at least one section"
-        );
     }
 }

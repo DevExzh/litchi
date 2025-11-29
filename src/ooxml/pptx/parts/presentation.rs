@@ -59,10 +59,9 @@ impl<'a> PresentationPart<'a> {
         reader.config_mut().trim_text(true);
 
         let mut count = 0;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     if e.local_name().as_ref() == b"sldId" {
                         count += 1;
@@ -72,7 +71,6 @@ impl<'a> PresentationPart<'a> {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(count)
@@ -93,10 +91,8 @@ impl<'a> PresentationPart<'a> {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
-        let mut buf = Vec::new();
-
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     if e.local_name().as_ref() == b"sldSz" {
                         for attr in e.attributes().flatten() {
@@ -114,7 +110,6 @@ impl<'a> PresentationPart<'a> {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(None)
@@ -135,10 +130,8 @@ impl<'a> PresentationPart<'a> {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
-        let mut buf = Vec::new();
-
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     if e.local_name().as_ref() == b"sldSz" {
                         for attr in e.attributes().flatten() {
@@ -156,7 +149,6 @@ impl<'a> PresentationPart<'a> {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(None)
@@ -180,10 +172,9 @@ impl<'a> PresentationPart<'a> {
         reader.config_mut().trim_text(true);
 
         let mut rids = Vec::new();
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     if e.local_name().as_ref() == b"sldId" {
                         for attr in e.attributes().flatten() {
@@ -210,7 +201,6 @@ impl<'a> PresentationPart<'a> {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(rids)
@@ -228,10 +218,9 @@ impl<'a> PresentationPart<'a> {
         reader.config_mut().trim_text(true);
 
         let mut rids = Vec::new();
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     if e.local_name().as_ref() == b"sldMasterId" {
                         for attr in e.attributes().flatten() {
@@ -258,7 +247,6 @@ impl<'a> PresentationPart<'a> {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(rids)

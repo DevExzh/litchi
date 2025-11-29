@@ -1,7 +1,8 @@
-/// Package writer for OPC packages.
-///
-/// This module provides functionality to serialize and write OPC packages to disk,
-/// including writing the [Content_Types].xml, relationships, and all parts.
+//! Package writer for OPC packages.
+//!
+//! This module provides functionality to serialize and write OPC packages to disk,
+//! including writing the [Content_Types].xml, relationships, and all parts.
+
 use crate::ooxml::opc::constants::content_type as ct;
 use crate::ooxml::opc::error::Result;
 use crate::ooxml::opc::package::OpcPackage;
@@ -37,33 +38,31 @@ impl PackageWriter {
     /// * `path` - Path where the package should be written
     /// * `package` - The OPC package to write
     pub fn write<P: AsRef<Path>>(path: P, package: &OpcPackage) -> Result<()> {
-        let mut phys_writer = PhysPkgWriter::create(path)?;
-
-        // Write [Content_Types].xml
-        Self::write_content_types(&mut phys_writer, package)?;
-
-        // Write package-level relationships (_rels/.rels)
-        Self::write_pkg_rels(&mut phys_writer, package)?;
-
-        // Write all parts and their relationships
-        Self::write_parts(&mut phys_writer, package)?;
-
-        // Finish writing and close the package
-        phys_writer.finish()?;
-
+        let bytes = Self::to_bytes(package)?;
+        std::fs::write(path, bytes)?;
         Ok(())
     }
 
     /// Write an OPC package to a stream.
     ///
     /// # Arguments
-    /// * `writer` - A writer that implements Write + Seek
+    /// * `writer` - A writer that implements Write
     /// * `package` - The OPC package to write
-    pub fn write_to_stream<W: std::io::Write + std::io::Seek>(
-        writer: W,
-        package: &OpcPackage,
-    ) -> Result<()> {
-        let mut phys_writer = PhysPkgWriter::new(writer);
+    pub fn write_to_stream<W: std::io::Write>(mut writer: W, package: &OpcPackage) -> Result<()> {
+        let bytes = Self::to_bytes(package)?;
+        writer.write_all(&bytes)?;
+        Ok(())
+    }
+
+    /// Serialize an OPC package to bytes.
+    ///
+    /// # Arguments
+    /// * `package` - The OPC package to serialize
+    ///
+    /// # Returns
+    /// The serialized package as a byte vector
+    pub fn to_bytes(package: &OpcPackage) -> Result<Vec<u8>> {
+        let mut phys_writer = PhysPkgWriter::new();
 
         // Write [Content_Types].xml
         Self::write_content_types(&mut phys_writer, package)?;
@@ -74,19 +73,14 @@ impl PackageWriter {
         // Write all parts and their relationships
         Self::write_parts(&mut phys_writer, package)?;
 
-        // Finish writing and close the package
-        phys_writer.finish()?;
-
-        Ok(())
+        // Finish writing and return the bytes
+        phys_writer.finish()
     }
 
     /// Write the [Content_Types].xml part.
     ///
     /// This file maps file extensions and part names to content types.
-    fn write_content_types<W: std::io::Write + std::io::Seek>(
-        phys_writer: &mut PhysPkgWriter<W>,
-        package: &OpcPackage,
-    ) -> Result<()> {
+    fn write_content_types(phys_writer: &mut PhysPkgWriter, package: &OpcPackage) -> Result<()> {
         let cti = ContentTypesItem::from_package(package);
         let blob = cti.to_xml();
 
@@ -98,10 +92,7 @@ impl PackageWriter {
     }
 
     /// Write package-level relationships.
-    fn write_pkg_rels<W: std::io::Write + std::io::Seek>(
-        phys_writer: &mut PhysPkgWriter<W>,
-        package: &OpcPackage,
-    ) -> Result<()> {
+    fn write_pkg_rels(phys_writer: &mut PhysPkgWriter, package: &OpcPackage) -> Result<()> {
         let package_uri = PackURI::new(PACKAGE_URI)
             .map_err(crate::ooxml::opc::error::OpcError::InvalidPackUri)?;
         let rels_uri = package_uri
@@ -114,10 +105,7 @@ impl PackageWriter {
     }
 
     /// Write all parts and their relationships.
-    fn write_parts<W: std::io::Write + std::io::Seek>(
-        phys_writer: &mut PhysPkgWriter<W>,
-        package: &OpcPackage,
-    ) -> Result<()> {
+    fn write_parts(phys_writer: &mut PhysPkgWriter, package: &OpcPackage) -> Result<()> {
         for part in package.iter_parts() {
             // Write the part itself
             let blob = part.blob();

@@ -3,9 +3,9 @@
 use crate::common::Error;
 use std::io::{Read, Seek, SeekFrom};
 
-// ZIP is needed for refining detection of OOXML, iWork and ODF containers
+// soapberry-zip is used for refining detection of OOXML, iWork and ODF containers
 #[cfg(any(feature = "iwa", feature = "ooxml", feature = "odf"))]
-use zip;
+use soapberry_zip::office::ArchiveReader;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -89,8 +89,6 @@ pub fn refine_workbook_format<R: Read + Seek>(
     reader: &mut R,
     initial_format: WorkbookFormat,
 ) -> Result<WorkbookFormat> {
-    use std::io::SeekFrom;
-
     // Only refine if it's a ZIP-based format
     if initial_format != WorkbookFormat::Xlsx {
         return Ok(initial_format);
@@ -98,8 +96,12 @@ pub fn refine_workbook_format<R: Read + Seek>(
 
     reader.seek(SeekFrom::Start(0))?;
 
+    // Read all data from the reader
+    let mut data = Vec::new();
+    reader.read_to_end(&mut data)?;
+
     // Open ZIP archive once
-    let mut archive = match zip::ZipArchive::new(reader) {
+    let archive = match ArchiveReader::new(&data) {
         Ok(archive) => archive,
         Err(_) => return Ok(initial_format),
     };
@@ -107,11 +109,7 @@ pub fn refine_workbook_format<R: Read + Seek>(
     // Check for ODF by inspecting the mimetype file
     #[cfg(feature = "odf")]
     {
-        if let Ok(mut mimetype_file) = archive.by_name("mimetype") {
-            use std::io::Read as _;
-            let mut mime = String::new();
-            // Best-effort read; if it fails, just continue detection
-            let _ = mimetype_file.read_to_string(&mut mime);
+        if let Ok(mime) = archive.read_string("mimetype") {
             let mime_trimmed = mime.trim();
             if mime_trimmed == "application/vnd.oasis.opendocument.spreadsheet"
                 || mime_trimmed == "application/vnd.oasis.opendocument.spreadsheet-template"
@@ -125,17 +123,14 @@ pub fn refine_workbook_format<R: Read + Seek>(
     #[cfg(feature = "iwa")]
     {
         // Check for Index.zip (older iWork format)
-        if archive.by_name("Index.zip").is_ok() {
+        if archive.contains("Index.zip") {
             return Ok(WorkbookFormat::Numbers);
         }
 
         // Check for Index/ directory with .iwa files (newer iWork format)
-        for i in 0..archive.len() {
-            if let Ok(file) = archive.by_index(i) {
-                let name = file.name();
-                if name.starts_with("Index/") && name.ends_with(".iwa") {
-                    return Ok(WorkbookFormat::Numbers);
-                }
+        for name in archive.file_names() {
+            if name.starts_with("Index/") && name.ends_with(".iwa") {
+                return Ok(WorkbookFormat::Numbers);
             }
         }
     }
@@ -144,7 +139,7 @@ pub fn refine_workbook_format<R: Read + Seek>(
     #[cfg(feature = "ooxml")]
     {
         // XLSB uses .bin extension for parts
-        if archive.by_name("xl/workbook.bin").is_ok() {
+        if archive.contains("xl/workbook.bin") {
             return Ok(WorkbookFormat::Xlsb);
         }
     }

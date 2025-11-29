@@ -679,14 +679,14 @@ impl Document {
                 let rows = self.extract_rows_from_table_paragraphs(&table_paras, 1)?;
 
                 if !rows.is_empty() {
-                    elements.push(DocumentElement::Table(crate::document::Table::Doc(
-                        Table::new(rows),
+                    elements.push(DocumentElement::Table(Box::new(
+                        crate::document::Table::Doc(Table::new(rows)),
                     )));
                 }
             } else if !props.in_table {
                 // This is a regular paragraph (not in a table)
-                elements.push(DocumentElement::Paragraph(crate::document::Paragraph::Doc(
-                    para.clone(),
+                elements.push(DocumentElement::Paragraph(Box::new(
+                    crate::document::Paragraph::Doc(para.clone()),
                 )));
                 i += 1;
             } else {

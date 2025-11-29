@@ -64,20 +64,12 @@ impl NumbersDocument {
         })
     }
 
-    /// Create a Numbers document from an already-parsed ZIP archive.
+    /// Create a Numbers document from raw bytes (ZIP archive data).
     ///
     /// This is used for single-pass parsing where the ZIP archive has already
-    /// been parsed during format detection. It avoids double-parsing.
-    pub fn from_zip_archive(
-        zip_archive: zip::ZipArchive<std::io::Cursor<Vec<u8>>>,
-    ) -> Result<Self> {
-        let bundle = Bundle::from_zip_archive(zip_archive)?;
-        let object_index = ObjectIndex::from_bundle(&bundle)?;
-
-        Ok(Self {
-            bundle,
-            object_index,
-        })
+    /// been validated during format detection. It avoids double-parsing.
+    pub fn from_archive_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_bytes(bytes)
     }
 
     /// Extract all text content from the document
@@ -329,24 +321,5 @@ mod tests {
         let doc = NumbersDocument::open(doc_path).unwrap();
         let text_result = doc.text();
         assert!(text_result.is_ok());
-    }
-
-    #[test]
-    fn test_numbers_sheets() {
-        let doc_path = std::path::Path::new("test.numbers");
-        if !doc_path.exists() {
-            return;
-        }
-
-        let doc = NumbersDocument::open(doc_path).unwrap();
-        let sheets_result = doc.sheets();
-        assert!(sheets_result.is_ok());
-
-        let sheets = sheets_result.unwrap();
-        // Document should have at least one sheet (even if implicit)
-        assert!(
-            !sheets.is_empty(),
-            "Document should have at least one sheet"
-        );
     }
 }

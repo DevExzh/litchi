@@ -2,31 +2,40 @@
 //!
 //! This module handles the low-level reading of OPC packages from ZIP archives,
 //! providing efficient access to package contents with minimal memory allocation.
+//!
+//! Uses the high-performance soapberry-zip library for zero-copy ZIP parsing.
 
 use crate::ooxml::opc::error::{OpcError, Result};
 use crate::ooxml::opc::packuri::PackURI;
-use std::fs::File;
-use std::io::{BufReader, Read, Seek};
+use soapberry_zip::office::ArchiveReader;
+use std::io::Read;
 use std::path::Path;
-use zip::ZipArchive;
 
 /// Physical package reader that provides access to parts in a ZIP-based OPC package.
 ///
-/// Uses zip::ZipArchive for efficient random access to package members.
-/// Implements buffered reading to minimize system calls and improve performance.
-pub struct PhysPkgReader<R: Read + Seek> {
-    /// The underlying ZIP archive
-    archive: ZipArchive<R>,
+/// Uses soapberry_zip for high-performance zero-copy ZIP parsing with lazy decompression.
+/// File contents are only decompressed when accessed.
+pub struct PhysPkgReader<'data> {
+    /// The underlying ZIP archive reader
+    archive: ArchiveReader<'data>,
 }
 
-impl PhysPkgReader<BufReader<File>> {
+/// Owned version of PhysPkgReader that owns the data buffer.
+///
+/// This is used when reading from files or readers where we need to own the data.
+pub struct OwnedPhysPkgReader {
+    /// The owned data buffer
+    data: Vec<u8>,
+}
+
+impl OwnedPhysPkgReader {
     /// Open an OPC package from a file path.
     ///
     /// # Arguments
     /// * `path` - Path to the OPC package file (.docx, .xlsx, .pptx, etc.)
     ///
     /// # Returns
-    /// A new PhysPkgReader instance
+    /// A new OwnedPhysPkgReader instance
     ///
     /// # Errors
     /// Returns an error if the file doesn't exist, isn't a valid ZIP file,
@@ -38,60 +47,126 @@ impl PhysPkgReader<BufReader<File>> {
             return Err(OpcError::PackageNotFound(path.display().to_string()));
         }
 
-        let file = File::open(path)?;
-        // Use BufReader for better I/O performance
-        let buf_reader = BufReader::with_capacity(8192, file);
+        let data = std::fs::read(path)?;
+        Self::from_bytes(data)
+    }
 
-        Self::new(buf_reader)
+    /// Create a new OwnedPhysPkgReader from owned bytes.
+    pub fn from_bytes(data: Vec<u8>) -> Result<Self> {
+        // Validate the ZIP archive can be parsed
+        let _ = ArchiveReader::new(&data)?;
+        Ok(Self { data })
+    }
+
+    /// Create a new OwnedPhysPkgReader from a reader.
+    ///
+    /// # Arguments
+    /// * `reader` - A reader that implements Read
+    ///
+    /// # Returns
+    /// A new OwnedPhysPkgReader instance
+    pub fn from_reader<R: Read>(mut reader: R) -> Result<Self> {
+        let mut data = Vec::new();
+        reader.read_to_end(&mut data)?;
+        Self::from_bytes(data)
+    }
+
+    /// Get a borrowed reader for accessing archive contents.
+    #[inline]
+    pub fn reader(&self) -> Result<PhysPkgReader<'_>> {
+        PhysPkgReader::new(&self.data)
+    }
+
+    /// Get the binary content for a part by its PackURI.
+    #[inline]
+    pub fn blob_for(&self, pack_uri: &PackURI) -> Result<Vec<u8>> {
+        self.reader()?.blob_for(pack_uri)
+    }
+
+    /// Get the [Content_Types].xml content.
+    #[inline]
+    pub fn content_types_xml(&self) -> Result<Vec<u8>> {
+        self.reader()?.content_types_xml()
+    }
+
+    /// Get the relationships XML for a specific source URI.
+    #[inline]
+    pub fn rels_xml_for(&self, source_uri: &PackURI) -> Result<Option<Vec<u8>>> {
+        self.reader()?.rels_xml_for(source_uri)
+    }
+
+    /// Get the number of files in the package.
+    #[inline]
+    pub fn len(&self) -> Result<usize> {
+        Ok(self.reader()?.len())
+    }
+
+    /// Check if the package is empty.
+    #[inline]
+    pub fn is_empty(&self) -> Result<bool> {
+        Ok(self.reader()?.is_empty())
+    }
+
+    /// List all member names in the package.
+    #[inline]
+    pub fn member_names(&self) -> Result<Vec<String>> {
+        self.reader()?.member_names()
+    }
+
+    /// Check if a specific member exists in the package.
+    #[inline]
+    pub fn contains(&self, pack_uri: &PackURI) -> Result<bool> {
+        Ok(self.reader()?.contains(pack_uri))
+    }
+
+    /// Consume self and return the underlying data.
+    #[inline]
+    pub fn into_inner(self) -> Vec<u8> {
+        self.data
+    }
+
+    /// Get a reference to the underlying data.
+    #[inline]
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.data
     }
 }
 
-impl<R: Read + Seek> PhysPkgReader<R> {
-    /// Create a new PhysPkgReader from a reader.
+impl<'data> PhysPkgReader<'data> {
+    /// Create a new PhysPkgReader from a byte slice.
     ///
     /// # Arguments
-    /// * `reader` - A reader that implements Read + Seek (e.g., File, BufReader)
+    /// * `data` - The ZIP archive data as a byte slice
     ///
     /// # Returns
     /// A new PhysPkgReader instance
-    pub fn new(reader: R) -> Result<Self> {
-        let archive = ZipArchive::new(reader)?;
+    pub fn new(data: &'data [u8]) -> Result<Self> {
+        let archive = ArchiveReader::new(data)?;
         Ok(Self { archive })
     }
 
     /// Get the binary content for a part by its PackURI.
     ///
-    /// Uses efficient reading with minimal allocation. The returned vector
-    /// is pre-allocated to the exact size needed, avoiding reallocation.
+    /// Uses efficient lazy decompression. The returned vector contains
+    /// the decompressed content.
     ///
     /// # Arguments
     /// * `pack_uri` - The PackURI of the part to read
     ///
     /// # Returns
     /// The binary content of the part
-    pub fn blob_for(&mut self, pack_uri: &PackURI) -> Result<Vec<u8>> {
+    pub fn blob_for(&self, pack_uri: &PackURI) -> Result<Vec<u8>> {
         let membername = pack_uri.membername();
 
-        // Get the file from the ZIP archive
-        let mut file = self
-            .archive
-            .by_name(membername)
-            .map_err(|_| OpcError::PartNotFound(pack_uri.to_string()))?;
-
-        // Pre-allocate vector to exact size to avoid reallocation
-        let size = file.size() as usize;
-        let mut buffer = Vec::with_capacity(size);
-
-        // Read directly into the vector
-        file.read_to_end(&mut buffer)?;
-
-        Ok(buffer)
+        self.archive
+            .read(membername)
+            .map_err(|_| OpcError::PartNotFound(pack_uri.to_string()))
     }
 
     /// Get the [Content_Types].xml content.
     ///
     /// This is a required part of every OPC package that maps parts to content types.
-    pub fn content_types_xml(&mut self) -> Result<Vec<u8>> {
+    pub fn content_types_xml(&self) -> Result<Vec<u8>> {
         let content_types_uri = PackURI::new(crate::ooxml::opc::packuri::CONTENT_TYPES_URI)
             .map_err(OpcError::InvalidPackUri)?;
         self.blob_for(&content_types_uri)
@@ -104,7 +179,7 @@ impl<R: Read + Seek> PhysPkgReader<R> {
     ///
     /// # Arguments
     /// * `source_uri` - The PackURI of the source (part or package)
-    pub fn rels_xml_for(&mut self, source_uri: &PackURI) -> Result<Option<Vec<u8>>> {
+    pub fn rels_xml_for(&self, source_uri: &PackURI) -> Result<Option<Vec<u8>>> {
         let rels_uri = source_uri.rels_uri().map_err(OpcError::InvalidPackUri)?;
 
         match self.blob_for(&rels_uri) {
@@ -114,127 +189,156 @@ impl<R: Read + Seek> PhysPkgReader<R> {
         }
     }
 
-    /// Get the number of files in the package.
+    /// Get the number of files in the package (excluding directories).
     pub fn len(&self) -> usize {
         self.archive.len()
     }
 
     /// Check if the package is empty.
     pub fn is_empty(&self) -> bool {
-        self.archive.len() == 0
+        self.archive.is_empty()
     }
 
     /// List all member names in the package.
     ///
-    /// Returns an iterator over the names of all files in the ZIP archive.
+    /// Returns all file names in the ZIP archive (excluding directories).
     /// Useful for debugging or exploring package contents.
-    pub fn member_names(&mut self) -> Result<Vec<String>> {
-        let mut names = Vec::with_capacity(self.archive.len());
-
-        for i in 0..self.archive.len() {
-            let file = self.archive.by_index(i)?;
-            names.push(file.name().to_string());
-        }
-
-        Ok(names)
+    pub fn member_names(&self) -> Result<Vec<String>> {
+        Ok(self.archive.file_names().map(String::from).collect())
     }
 
     /// Check if a specific member exists in the package.
     ///
-    /// Uses fast string searching to locate the member without reading its content.
+    /// Uses the pre-built index for O(1) lookup.
     ///
     /// # Arguments
     /// * `pack_uri` - The PackURI to check
-    pub fn contains(&mut self, pack_uri: &PackURI) -> bool {
+    pub fn contains(&self, pack_uri: &PackURI) -> bool {
         let membername = pack_uri.membername();
-        self.archive.by_name(membername).is_ok()
+        self.archive.contains(membername)
+    }
+
+    /// Read multiple blobs in parallel.
+    ///
+    /// Uses rayon for parallel decompression, providing significant speedup
+    /// when reading many parts at once.
+    ///
+    /// # Arguments
+    /// * `uris` - Slice of PackURIs to read
+    ///
+    /// # Returns
+    /// A HashMap mapping member names to their decompressed contents.
+    /// Parts that fail to read are not included in the result.
+    pub fn blobs_parallel(&self, uris: &[PackURI]) -> std::collections::HashMap<String, Vec<u8>> {
+        let names: Vec<&str> = uris.iter().map(|uri| uri.membername()).collect();
+        let results = self.archive.read_many_parallel(&names);
+
+        results
+            .into_iter()
+            .filter_map(|(name, result)| result.ok().map(|data| ((*name).to_string(), data)))
+            .collect()
+    }
+
+    /// Get a reference to the underlying archive reader.
+    ///
+    /// Useful for advanced operations like parallel bulk reading.
+    #[inline]
+    pub fn archive(&self) -> &ArchiveReader<'data> {
+        &self.archive
     }
 }
 
 /// Physical package writer for creating OPC packages.
 ///
 /// Handles the low-level writing of parts to a ZIP archive with optimal compression.
-pub struct PhysPkgWriter<W: std::io::Write + std::io::Seek> {
+/// Uses soapberry-zip's high-performance writer.
+pub struct PhysPkgWriter {
     /// The underlying ZIP archive writer
-    archive: zip::ZipWriter<W>,
+    archive: soapberry_zip::office::StreamingArchiveWriter<std::io::Cursor<Vec<u8>>>,
 }
 
-impl PhysPkgWriter<File> {
-    /// Create a new package writer for a file path.
-    ///
-    /// # Arguments
-    /// * `path` - Path where the package should be written
-    pub fn create<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let file = File::create(path)?;
-        let archive = zip::ZipWriter::new(file);
-        Ok(Self { archive })
-    }
-}
-
-impl<W: std::io::Write + std::io::Seek> PhysPkgWriter<W> {
-    /// Create a new package writer from a writer stream.
-    ///
-    /// # Arguments
-    /// * `writer` - A writer that implements Write + Seek
-    pub fn new(writer: W) -> Self {
+impl PhysPkgWriter {
+    /// Create a new package writer that writes to memory.
+    pub fn new() -> Self {
         Self {
-            archive: zip::ZipWriter::new(writer),
+            archive: soapberry_zip::office::StreamingArchiveWriter::new(),
         }
     }
 
-    /// Write a part to the package.
+    /// Write a part to the package with Deflate compression.
     ///
     /// # Arguments
     /// * `pack_uri` - The PackURI for the part
     /// * `blob` - The binary content to write
     pub fn write(&mut self, pack_uri: &PackURI, blob: &[u8]) -> Result<()> {
-        use zip::write::SimpleFileOptions;
-
-        let options = SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Deflated)
-            .compression_level(Some(6)); // Balanced compression level
-
-        self.archive.start_file(pack_uri.membername(), options)?;
-        std::io::copy(&mut std::io::Cursor::new(blob), &mut self.archive)?;
-
-        Ok(())
+        self.archive
+            .write_deflated(pack_uri.membername(), blob)
+            .map_err(|e| OpcError::ZipError(e.to_string()))
     }
 
-    /// Finish writing and close the package.
+    /// Write a part to the package without compression (stored).
     ///
-    /// This must be called to ensure all data is flushed to disk.
-    pub fn finish(self) -> Result<()> {
-        self.archive.finish()?;
-        Ok(())
+    /// # Arguments
+    /// * `pack_uri` - The PackURI for the part
+    /// * `blob` - The binary content to write
+    pub fn write_stored(&mut self, pack_uri: &PackURI, blob: &[u8]) -> Result<()> {
+        self.archive
+            .write_stored(pack_uri.membername(), blob)
+            .map_err(|e| OpcError::ZipError(e.to_string()))
+    }
+
+    /// Finish writing and return the package bytes.
+    ///
+    /// Consumes the writer and returns the complete ZIP archive.
+    pub fn finish(self) -> Result<Vec<u8>> {
+        self.archive
+            .finish_to_bytes()
+            .map_err(|e| OpcError::ZipError(e.to_string()))
+    }
+}
+
+impl Default for PhysPkgWriter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
 
     #[test]
-    fn test_reader_from_cursor() {
-        // Create a minimal ZIP archive in memory
-        let mut zip_data = Vec::new();
-        {
-            let cursor = Cursor::new(&mut zip_data);
-            let mut writer = zip::ZipWriter::new(cursor);
-
-            use zip::write::SimpleFileOptions;
-            let options = SimpleFileOptions::default();
-            writer.start_file("test.txt", options).unwrap();
-            std::io::Write::write_all(&mut writer, b"Hello, World!").unwrap();
-            writer.finish().unwrap();
-        }
+    fn test_round_trip() {
+        // Create a ZIP archive with soapberry-zip
+        let mut writer = PhysPkgWriter::new();
+        let pack_uri = PackURI::new("/test.txt").unwrap();
+        writer.write(&pack_uri, b"Hello, World!").unwrap();
+        let zip_data = writer.finish().unwrap();
 
         // Read the ZIP archive
-        let cursor = Cursor::new(zip_data);
-        let mut reader = PhysPkgReader::new(cursor).unwrap();
-
-        let pack_uri = PackURI::new("/test.txt").unwrap();
+        let reader = PhysPkgReader::new(&zip_data).unwrap();
         let content = reader.blob_for(&pack_uri).unwrap();
         assert_eq!(content, b"Hello, World!");
+    }
+
+    #[test]
+    fn test_multiple_parts() {
+        let mut writer = PhysPkgWriter::new();
+
+        let content_types = PackURI::new("/[Content_Types].xml").unwrap();
+        let rels = PackURI::new("/_rels/.rels").unwrap();
+        let document = PackURI::new("/word/document.xml").unwrap();
+
+        writer.write(&content_types, b"<Types/>").unwrap();
+        writer.write(&rels, b"<Relationships/>").unwrap();
+        writer.write(&document, b"<document/>").unwrap();
+
+        let zip_data = writer.finish().unwrap();
+        let reader = PhysPkgReader::new(&zip_data).unwrap();
+
+        assert!(reader.contains(&content_types));
+        assert!(reader.contains(&rels));
+        assert!(reader.contains(&document));
+        assert_eq!(reader.blob_for(&document).unwrap(), b"<document/>");
     }
 }

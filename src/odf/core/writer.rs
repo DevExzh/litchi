@@ -2,10 +2,11 @@
 //!
 //! This module provides utilities for creating and writing ODF files as ZIP archives,
 //! including generating manifests and proper file structure.
+//!
+//! Uses soapberry-zip for high-performance ZIP writing.
 
 use crate::common::{Error, Result};
-use std::io::Write;
-use zip::write::{SimpleFileOptions, ZipWriter};
+use soapberry_zip::office::StreamingArchiveWriter;
 
 /// Builder for creating ODF packages (ZIP archives)
 ///
@@ -29,8 +30,8 @@ use zip::write::{SimpleFileOptions, ZipWriter};
 /// # Ok(())
 /// # }
 /// ```
-pub struct PackageWriter<W: Write + std::io::Seek> {
-    zip_writer: ZipWriter<W>,
+pub struct PackageWriter {
+    zip_writer: StreamingArchiveWriter<std::io::Cursor<Vec<u8>>>,
     mimetype: Option<String>,
     manifest_entries: Vec<ManifestEntry>,
 }
@@ -42,23 +43,11 @@ struct ManifestEntry {
     media_type: String,
 }
 
-impl PackageWriter<std::io::Cursor<Vec<u8>>> {
+impl PackageWriter {
     /// Create a new package writer that writes to memory
     pub fn new() -> Self {
         Self {
-            zip_writer: ZipWriter::new(std::io::Cursor::new(Vec::new())),
-            mimetype: None,
-            manifest_entries: Vec::new(),
-        }
-    }
-}
-
-impl<W: Write + std::io::Seek> PackageWriter<W> {
-    /// Create a new package writer with a custom writer
-    #[allow(dead_code)] // Reserved for future use
-    pub fn with_writer(writer: W) -> Self {
-        Self {
-            zip_writer: ZipWriter::new(writer),
+            zip_writer: StreamingArchiveWriter::new(),
             mimetype: None,
             manifest_entries: Vec::new(),
         }
@@ -104,14 +93,15 @@ impl<W: Write + std::io::Seek> PackageWriter<W> {
         });
 
         // Add to ZIP with no compression for mimetype, normal compression for others
-        let options = if path == "mimetype" {
-            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored)
+        if path == "mimetype" {
+            self.zip_writer
+                .write_stored(path, content)
+                .map_err(|e| Error::ZipError(e.to_string()))?;
         } else {
-            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated)
-        };
-
-        self.zip_writer.start_file(path, options)?;
-        self.zip_writer.write_all(content)?;
+            self.zip_writer
+                .write_deflated(path, content)
+                .map_err(|e| Error::ZipError(e.to_string()))?;
+        }
 
         Ok(())
     }
@@ -137,14 +127,15 @@ impl<W: Write + std::io::Seek> PackageWriter<W> {
         });
 
         // Add to ZIP
-        let options = if path == "mimetype" {
-            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored)
+        if path == "mimetype" {
+            self.zip_writer
+                .write_stored(path, content)
+                .map_err(|e| Error::ZipError(e.to_string()))?;
         } else {
-            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated)
-        };
-
-        self.zip_writer.start_file(path, options)?;
-        self.zip_writer.write_all(content)?;
+            self.zip_writer
+                .write_deflated(path, content)
+                .map_err(|e| Error::ZipError(e.to_string()))?;
+        }
 
         Ok(())
     }
@@ -199,7 +190,7 @@ impl<W: Write + std::io::Seek> PackageWriter<W> {
         }
     }
 
-    /// Finish writing the package and return the result
+    /// Finish writing the package and return the bytes.
     ///
     /// This method writes the mimetype file, manifest, and finalizes the ZIP archive.
     ///
@@ -208,7 +199,7 @@ impl<W: Write + std::io::Seek> PackageWriter<W> {
     /// Returns an error if:
     /// - No MIME type has been set
     /// - Writing to the ZIP archive fails
-    pub fn finish(mut self) -> Result<W> {
+    pub fn finish(mut self) -> Result<Vec<u8>> {
         let mimetype = self
             .mimetype
             .as_ref()
@@ -216,10 +207,9 @@ impl<W: Write + std::io::Seek> PackageWriter<W> {
             .clone();
 
         // First, write the mimetype file (must be first and uncompressed per ODF spec)
-        let options =
-            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
-        self.zip_writer.start_file("mimetype", options)?;
-        self.zip_writer.write_all(mimetype.as_bytes())?;
+        self.zip_writer
+            .write_stored("mimetype", mimetype.as_bytes())
+            .map_err(|e| Error::ZipError(e.to_string()))?;
 
         // Add META-INF directory to manifest
         self.manifest_entries.push(ManifestEntry {
@@ -229,29 +219,25 @@ impl<W: Write + std::io::Seek> PackageWriter<W> {
 
         // Generate and write manifest
         let manifest_content = self.generate_manifest();
-        let options =
-            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
         self.zip_writer
-            .start_file("META-INF/manifest.xml", options)?;
-        self.zip_writer.write_all(manifest_content.as_bytes())?;
+            .write_deflated("META-INF/manifest.xml", manifest_content.as_bytes())
+            .map_err(|e| Error::ZipError(e.to_string()))?;
 
-        // Finish ZIP archive
-        let writer = self.zip_writer.finish()?;
-        Ok(writer)
+        // Finish ZIP archive and return bytes
+        self.zip_writer
+            .finish_to_bytes()
+            .map_err(|e| Error::ZipError(e.to_string()))
+    }
+
+    /// Alias for `finish()` for API compatibility.
+    pub fn finish_to_bytes(self) -> Result<Vec<u8>> {
+        self.finish()
     }
 }
 
-impl Default for PackageWriter<std::io::Cursor<Vec<u8>>> {
+impl Default for PackageWriter {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl PackageWriter<std::io::Cursor<Vec<u8>>> {
-    /// Finish writing and return the bytes
-    pub fn finish_to_bytes(self) -> Result<Vec<u8>> {
-        let cursor = self.finish()?;
-        Ok(cursor.into_inner())
     }
 }
 

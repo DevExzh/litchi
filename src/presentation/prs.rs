@@ -194,11 +194,10 @@ impl Presentation {
                 })
             },
             #[cfg(feature = "iwa")]
-            DetectedFormat::Keynote(zip_archive) => {
-                let doc = crate::iwa::keynote::KeynoteDocument::from_zip_archive(zip_archive)
-                    .map_err(|e| {
-                        Error::ParseError(format!("Failed to open Keynote from bytes: {}", e))
-                    })?;
+            DetectedFormat::Keynote(data) => {
+                let doc = crate::iwa::keynote::KeynoteDocument::from_bytes(&data).map_err(|e| {
+                    Error::ParseError(format!("Failed to open Keynote from bytes: {}", e))
+                })?;
 
                 // Extract Keynote metadata from bundle properties
                 let cached_metadata = doc.metadata().ok().flatten().and_then(|metadata| {
@@ -217,8 +216,8 @@ impl Presentation {
                 })
             },
             #[cfg(feature = "odf")]
-            DetectedFormat::Odp(zip_archive) => {
-                let doc = crate::odf::Presentation::from_zip_archive(zip_archive).map_err(|e| {
+            DetectedFormat::Odp(data) => {
+                let doc = crate::odf::Presentation::from_bytes(data).map_err(|e| {
                     Error::ParseError(format!(
                         "Failed to parse ODP presentation from bytes: {}",
                         e

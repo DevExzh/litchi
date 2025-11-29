@@ -2,11 +2,13 @@
 //!
 //! This module provides common functionality for reading and parsing IWA files
 //! from ZIP archives, avoiding code duplication across the codebase.
+//!
+//! Uses soapberry-zip for high-performance ZIP reading.
 
 use std::collections::HashMap;
-use std::io::{Cursor, Read};
+use std::io::Cursor;
 
-use zip::ZipArchive;
+use soapberry_zip::office::ArchiveReader;
 
 use crate::iwa::archive::Archive;
 use crate::iwa::snappy::SnappyStream;
@@ -19,7 +21,7 @@ use crate::iwa::{Error, Result};
 ///
 /// # Arguments
 ///
-/// * `zip_archive` - A mutable reference to a ZipArchive to parse
+/// * `archive` - A reference to an ArchiveReader to parse
 ///
 /// # Returns
 ///
@@ -28,39 +30,32 @@ use crate::iwa::{Error, Result};
 /// # Examples
 ///
 /// ```rust,no_run
-/// use std::fs::File;
-/// use zip::ZipArchive;
-/// use litchi::iwa::zip_utils::parse_iwa_files_from_zip;
+/// use soapberry_zip::office::ArchiveReader;
+/// use litchi::iwa::zip_utils::parse_iwa_files_from_archive;
 ///
-/// let file = File::open("Index.zip")?;
-/// let mut archive = ZipArchive::new(file)?;
-/// let archives = parse_iwa_files_from_zip(&mut archive)?;
+/// let data = std::fs::read("document.pages")?;
+/// let archive = ArchiveReader::new(&data)?;
+/// let archives = parse_iwa_files_from_archive(&archive)?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-pub fn parse_iwa_files_from_zip<R: Read + std::io::Seek>(
-    zip_archive: &mut ZipArchive<R>,
+pub fn parse_iwa_files_from_archive(
+    archive: &ArchiveReader<'_>,
 ) -> Result<HashMap<String, Archive>> {
     let mut archives = HashMap::new();
 
-    for i in 0..zip_archive.len() {
-        let mut zip_file = zip_archive
-            .by_index(i)
-            .map_err(|e| Error::Bundle(format!("Failed to read zip entry: {}", e)))?;
-
-        if zip_file.name().ends_with(".iwa") {
-            let mut compressed_data = Vec::new();
-            zip_file
-                .read_to_end(&mut compressed_data)
-                .map_err(Error::Io)?;
+    for name in archive.file_names() {
+        if name.ends_with(".iwa") {
+            let compressed_data = archive
+                .read(name)
+                .map_err(|e| Error::Bundle(format!("Failed to read zip entry: {}", e)))?;
 
             // Decompress IWA file
             let mut cursor = Cursor::new(&compressed_data);
             let decompressed = SnappyStream::decompress(&mut cursor)?;
 
             // Parse archive
-            let archive = Archive::parse(decompressed.data())?;
-            let name = zip_file.name().to_string();
-            archives.insert(name, archive);
+            let iwa_archive = Archive::parse(decompressed.data())?;
+            archives.insert(name.to_string(), iwa_archive);
         }
     }
 
@@ -69,12 +64,12 @@ pub fn parse_iwa_files_from_zip<R: Read + std::io::Seek>(
 
 /// Extract message types from all IWA files in a ZIP archive.
 ///
-/// This is a lightweight alternative to `parse_iwa_files_from_zip` that only extracts
+/// This is a lightweight alternative to `parse_iwa_files_from_archive` that only extracts
 /// message types without fully parsing the archives. Useful for format detection.
 ///
 /// # Arguments
 ///
-/// * `zip_archive` - A mutable reference to a ZipArchive to analyze
+/// * `archive` - A reference to an ArchiveReader to analyze
 ///
 /// # Returns
 ///
@@ -83,31 +78,23 @@ pub fn parse_iwa_files_from_zip<R: Read + std::io::Seek>(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use std::fs::File;
-/// use zip::ZipArchive;
-/// use litchi::iwa::zip_utils::extract_message_types_from_zip;
+/// use soapberry_zip::office::ArchiveReader;
+/// use litchi::iwa::zip_utils::extract_message_types_from_archive;
 ///
-/// let file = File::open("document.pages")?;
-/// let mut archive = ZipArchive::new(file)?;
-/// let message_types = extract_message_types_from_zip(&mut archive)?;
+/// let data = std::fs::read("document.pages")?;
+/// let archive = ArchiveReader::new(&data)?;
+/// let message_types = extract_message_types_from_archive(&archive)?;
 /// println!("Found {} message types", message_types.len());
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-pub fn extract_message_types_from_zip<R: Read + std::io::Seek>(
-    zip_archive: &mut ZipArchive<R>,
-) -> Result<Vec<u32>> {
+pub fn extract_message_types_from_archive(archive: &ArchiveReader<'_>) -> Result<Vec<u32>> {
     let mut all_message_types = Vec::new();
 
-    for i in 0..zip_archive.len() {
-        let mut zip_file = zip_archive
-            .by_index(i)
-            .map_err(|e| Error::Bundle(format!("Failed to read zip entry: {}", e)))?;
-
-        if zip_file.name().ends_with(".iwa") {
-            let mut compressed_data = Vec::new();
-            if zip_file.read_to_end(&mut compressed_data).is_err() {
+    for name in archive.file_names() {
+        if name.ends_with(".iwa") {
+            let Ok(compressed_data) = archive.read(name) else {
                 continue; // Skip files we can't read
-            }
+            };
 
             // Try to decompress and parse the IWA file
             let mut cursor = Cursor::new(&compressed_data);
@@ -138,40 +125,34 @@ pub fn extract_message_types_from_zip<R: Read + std::io::Seek>(
 ///
 /// # Arguments
 ///
-/// * `zip_archive` - A mutable reference to a ZipArchive to analyze
+/// * `archive` - A reference to an ArchiveReader to analyze
 ///
 /// # Returns
 ///
 /// * `FileStructureInfo` - Summary of file structure patterns found
-pub fn analyze_file_structure<R: Read + std::io::Seek>(
-    zip_archive: &mut ZipArchive<R>,
-) -> FileStructureInfo {
+pub fn analyze_file_structure(archive: &ArchiveReader<'_>) -> FileStructureInfo {
     let mut info = FileStructureInfo::default();
 
-    for i in 0..zip_archive.len() {
-        if let Ok(zip_file) = zip_archive.by_index(i) {
-            let name = zip_file.name();
-
-            // Count table files
-            if name.starts_with("Index/Tables/") && name.ends_with(".iwa") {
-                info.table_file_count += 1;
-            }
-
-            // Check for Numbers-specific patterns
-            if name == "Index/CalculationEngine.iwa" {
-                info.has_calculation_engine = true;
-            }
-
-            // Count presentation files (slides and templates)
-            if (name.starts_with("Index/Slide") || name.starts_with("Index/TemplateSlide"))
-                && name.ends_with(".iwa")
-            {
-                info.slide_file_count += 1;
-            }
-
-            // Track all file names for debugging
-            info.file_names.push(name.to_string());
+    for name in archive.file_names() {
+        // Count table files
+        if name.starts_with("Index/Tables/") && name.ends_with(".iwa") {
+            info.table_file_count += 1;
         }
+
+        // Check for Numbers-specific patterns
+        if name == "Index/CalculationEngine.iwa" {
+            info.has_calculation_engine = true;
+        }
+
+        // Count presentation files (slides and templates)
+        if (name.starts_with("Index/Slide") || name.starts_with("Index/TemplateSlide"))
+            && name.ends_with(".iwa")
+        {
+            info.slide_file_count += 1;
+        }
+
+        // Track all file names for debugging
+        info.file_names.push(name.to_string());
     }
 
     info

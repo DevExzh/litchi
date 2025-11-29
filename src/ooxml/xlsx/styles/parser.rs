@@ -20,11 +20,9 @@ pub fn parse_styles(content: &str) -> Result<Styles> {
     reader.config_mut().trim_text(true);
 
     let mut styles = Styles::new();
-    let mut buf = Vec::with_capacity(1024);
 
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Start(e)) | Ok(Event::Empty(e)) => match e.local_name().as_ref() {
                 b"numFmts" => {
                     parse_number_formats(&mut reader, &mut styles.number_formats)?;
@@ -62,11 +60,8 @@ fn parse_number_formats(
     reader: &mut Reader<&[u8]>,
     number_formats: &mut HashMap<u32, NumberFormat>,
 ) -> Result<()> {
-    let mut buf = Vec::with_capacity(512);
-
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"numFmt" => {
                 let mut id = None;
                 let mut code = None;
@@ -103,11 +98,8 @@ fn parse_number_formats(
 
 /// Parse fonts section.
 fn parse_fonts(reader: &mut Reader<&[u8]>, fonts: &mut Vec<Font>) -> Result<()> {
-    let mut buf = Vec::with_capacity(512);
-
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Start(e)) if e.local_name().as_ref() == b"font" => {
                 let font = parse_font(reader)?;
                 fonts.push(font);
@@ -125,11 +117,9 @@ fn parse_fonts(reader: &mut Reader<&[u8]>, fonts: &mut Vec<Font>) -> Result<()> 
 /// Parse a single font element.
 fn parse_font(reader: &mut Reader<&[u8]>) -> Result<Font> {
     let mut font = Font::new();
-    let mut buf = Vec::with_capacity(256);
 
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                 match e.local_name().as_ref() {
                     b"name" => {
@@ -210,11 +200,8 @@ fn parse_font(reader: &mut Reader<&[u8]>) -> Result<Font> {
 
 /// Parse fills section.
 fn parse_fills(reader: &mut Reader<&[u8]>, fills: &mut Vec<Fill>) -> Result<()> {
-    let mut buf = Vec::with_capacity(512);
-
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Start(e)) if e.local_name().as_ref() == b"fill" => {
                 let fill = parse_fill(reader)?;
                 fills.push(fill);
@@ -232,11 +219,9 @@ fn parse_fills(reader: &mut Reader<&[u8]>, fills: &mut Vec<Fill>) -> Result<()> 
 /// Parse a single fill element.
 fn parse_fill(reader: &mut Reader<&[u8]>) -> Result<Fill> {
     let mut fill = Fill::None;
-    let mut buf = Vec::with_capacity(256);
 
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Start(e)) if e.local_name().as_ref() == b"patternFill" => {
                 fill = parse_pattern_fill(reader, &e)?;
             },
@@ -271,10 +256,8 @@ fn parse_pattern_fill(
         }
     }
 
-    let mut buf = Vec::with_capacity(128);
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Start(e)) | Ok(Event::Empty(e)) => match e.local_name().as_ref() {
                 b"fgColor" => {
                     fg_color = parse_color(reader, &e)?;
@@ -320,11 +303,9 @@ fn parse_gradient_fill(
     }
 
     // Skip to end of gradientFill (full gradient parsing can be added later)
-    let mut buf = Vec::with_capacity(128);
     let mut depth = 1;
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Start(e)) if e.local_name().as_ref() == b"gradientFill" => depth += 1,
             Ok(Event::End(e)) if e.local_name().as_ref() == b"gradientFill" => {
                 depth -= 1;
@@ -346,11 +327,8 @@ fn parse_gradient_fill(
 
 /// Parse borders section.
 fn parse_borders(reader: &mut Reader<&[u8]>, borders: &mut Vec<Border>) -> Result<()> {
-    let mut buf = Vec::with_capacity(512);
-
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Start(e)) if e.local_name().as_ref() == b"border" => {
                 let border = parse_border(reader, &e)?;
                 borders.push(border);
@@ -393,10 +371,8 @@ fn parse_border(
         }
     }
 
-    let mut buf = Vec::with_capacity(256);
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Start(e)) if e.local_name().as_ref() == b"left" => {
                 border.left = parse_border_side(reader, &e)?;
             },
@@ -440,11 +416,9 @@ fn parse_border_side(
     }
 
     // Parse color
-    let mut buf = Vec::with_capacity(128);
     let side_name = start.local_name();
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"color" => {
                 color = parse_color(reader, &e)?;
             },
@@ -464,11 +438,8 @@ fn parse_border_side(
 
 /// Parse cell XFs (cell format records).
 fn parse_cell_xfs(reader: &mut Reader<&[u8]>, cell_xfs: &mut Vec<CellStyle>) -> Result<()> {
-    let mut buf = Vec::with_capacity(512);
-
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Start(e)) if e.local_name().as_ref() == b"xf" => {
                 let style = parse_xf(reader, &e)?;
                 cell_xfs.push(style);
@@ -558,10 +529,8 @@ fn parse_xf(
     }
 
     // Parse child elements
-    let mut buf = Vec::with_capacity(256);
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Start(e)) | Ok(Event::Empty(e))
                 if e.local_name().as_ref() == b"alignment" =>
             {

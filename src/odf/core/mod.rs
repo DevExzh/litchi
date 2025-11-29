@@ -66,6 +66,6 @@ mod xml;
 // Manifest is internal to the package system
 #[allow(unused_imports)]
 pub use manifest::Manifest;
-pub use package::Package;
+pub use package::OwnedPackage;
 pub use writer::{OdfStructure, PackageWriter};
 pub use xml::{Content, Meta, Styles};

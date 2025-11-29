@@ -1,11 +1,10 @@
 //! OpenDocument Text document structure and API.
 
 use crate::common::{Error, Metadata, Result};
-use crate::odf::core::{Content, Meta, Package, Styles};
+use crate::odf::core::{Content, Meta, OwnedPackage, Styles};
 use crate::odf::elements::style::{StyleElements, StyleRegistry};
 use crate::odf::elements::table::Table as ElementTable;
 use crate::odf::elements::text::{Paragraph as ElementParagraph, TextElements};
-use std::io::Cursor;
 use std::path::Path;
 
 /// An OpenDocument text document (.odt).
@@ -44,7 +43,7 @@ use std::path::Path;
 #[allow(dead_code)]
 pub struct Document {
     /// ZIP package containing all document files
-    package: Package<Cursor<Vec<u8>>>,
+    package: OwnedPackage,
     /// Parsed content.xml (main document content)
     content: Content,
     /// Parsed styles.xml (document styles), if present
@@ -113,8 +112,8 @@ impl Document {
     /// # }
     /// ```
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let cursor = Cursor::new(bytes);
-        let package = Package::from_reader(cursor)?;
+        let owned_package = OwnedPackage::from_bytes(bytes)?;
+        let package = owned_package.package()?;
 
         // Verify this is a text document
         let mime_type = package.mimetype();
@@ -162,7 +161,7 @@ impl Document {
         }
 
         Ok(Self {
-            package,
+            package: owned_package,
             content,
             styles,
             meta,
@@ -170,67 +169,12 @@ impl Document {
         })
     }
 
-    /// Create an ODT document from an already-parsed ZIP archive.
+    /// Create an ODT document from raw bytes (ZIP archive data).
     ///
     /// This is used for single-pass parsing where the ZIP archive has already
-    /// been parsed during format detection. It avoids double-parsing.
-    pub fn from_zip_archive(
-        zip_archive: zip::ZipArchive<std::io::Cursor<Vec<u8>>>,
-    ) -> Result<Self> {
-        let package = Package::from_zip_archive(zip_archive)?;
-
-        // Verify this is a text document
-        let mime_type = package.mimetype();
-        if !mime_type.contains("opendocument.text") {
-            return Err(Error::InvalidFormat(format!(
-                "Not an ODT file: MIME type is {}",
-                mime_type
-            )));
-        }
-
-        // Parse core components
-        let content_bytes = package.get_file("content.xml")?;
-        let content = Content::from_bytes(&content_bytes)?;
-
-        let styles = if package.has_file("styles.xml") {
-            let styles_bytes = package.get_file("styles.xml")?;
-            Some(Styles::from_bytes(&styles_bytes)?)
-        } else {
-            None
-        };
-
-        let meta = if package.has_file("meta.xml") {
-            let meta_bytes = package.get_file("meta.xml")?;
-            Some(Meta::from_bytes(&meta_bytes)?)
-        } else {
-            None
-        };
-
-        // Initialize style registry
-        let mut style_registry = StyleRegistry::default();
-
-        // Parse styles from styles.xml if available
-        if let Some(ref styles_part) = styles
-            && let Ok(registry) = StyleElements::parse_styles(styles_part.xml_content())
-        {
-            style_registry = registry;
-        }
-
-        // Also parse styles from content.xml (automatic styles)
-        if let Ok(content_registry) = StyleElements::parse_styles(content.xml_content()) {
-            // Merge content styles into main registry (content styles take precedence)
-            for (_name, style) in content_registry.styles {
-                style_registry.add_style(style);
-            }
-        }
-
-        Ok(Self {
-            package,
-            content,
-            styles,
-            meta,
-            style_registry,
-        })
+    /// been validated during format detection. It avoids double-parsing.
+    pub fn from_archive_bytes(bytes: Vec<u8>) -> Result<Self> {
+        Self::from_bytes(bytes)
     }
 
     /// Extract all text content from the document.
@@ -696,7 +640,7 @@ impl Document {
         let mut writer = PackageWriter::new();
 
         // Set MIME type
-        writer.set_mimetype(self.package.mimetype())?;
+        writer.set_mimetype(&self.package.mimetype()?)?;
 
         // Add content.xml
         let content_xml = self.content.xml_content();
@@ -715,7 +659,7 @@ impl Document {
         }
 
         // Copy settings.xml if present
-        if self.package.has_file("settings.xml") {
+        if self.package.has_file("settings.xml")? {
             let settings_bytes = self.package.get_file("settings.xml")?;
             writer.add_file("settings.xml", &settings_bytes)?;
         }
@@ -731,7 +675,7 @@ impl Document {
         // Copy other common ODF files if they exist
         let other_files = vec!["Thumbnails/thumbnail.png", "Configurations2/"];
         for file_path in other_files {
-            if self.package.has_file(file_path)
+            if self.package.has_file(file_path)?
                 && let Ok(file_bytes) = self.package.get_file(file_path)
             {
                 writer.add_file(file_path, &file_bytes)?;

@@ -64,20 +64,12 @@ impl KeynoteDocument {
         })
     }
 
-    /// Create a Keynote document from an already-parsed ZIP archive.
+    /// Create a Keynote document from raw bytes (ZIP archive data).
     ///
     /// This is used for single-pass parsing where the ZIP archive has already
-    /// been parsed during format detection. It avoids double-parsing.
-    pub fn from_zip_archive(
-        zip_archive: zip::ZipArchive<std::io::Cursor<Vec<u8>>>,
-    ) -> Result<Self> {
-        let bundle = Bundle::from_zip_archive(zip_archive)?;
-        let object_index = ObjectIndex::from_bundle(&bundle)?;
-
-        Ok(Self {
-            bundle,
-            object_index,
-        })
+    /// been validated during format detection. It avoids double-parsing.
+    pub fn from_archive_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_bytes(bytes)
     }
 
     /// Extract all text content from the presentation

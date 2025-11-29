@@ -1,111 +1,158 @@
-//! iWork format detection (Pages, Keynote, Numbers).
+//! Detection utilities for iWork file formats (Pages, Numbers, Keynote).
 //!
-//! iWork files follow Apple's bundle format standard where each document
-//! is stored as a directory containing multiple files including Index.zip.
-//! Detection follows the iWork Archive (IWA) format specification.
+//! This module provides functionality to detect and identify iWork file formats,
+//! including both modern iWork '13+ formats (.pages, .numbers, .key) and legacy formats.
 //!
-//! Uses SIMD-accelerated signature matching for improved performance.
+//! Uses soapberry-zip for high-performance ZIP reading.
 
-use crate::common::detection::FileFormat;
-#[cfg(feature = "iwa")]
-use crate::common::detection::simd_utils::signature_matches;
-#[cfg(feature = "iwa")]
-use std::io::Read;
+use soapberry_zip::office::ArchiveReader;
 use std::path::Path;
 
-/// Detect iWork formats from bytes.
-/// iWork files can be ZIP archives containing IWA files.
-/// Detection analyzes the ZIP structure and IWA message types.
-/// Uses SIMD-accelerated signature matching.
-#[cfg(feature = "iwa")]
-pub fn detect_iwork_format(bytes: &[u8]) -> Option<FileFormat> {
-    // Check if it starts with ZIP signature using SIMD
-    if bytes.len() < 4 || !signature_matches(bytes, crate::common::detection::utils::ZIP_SIGNATURE)
-    {
-        return None;
+use super::FileFormat;
+use crate::common::Result;
+use crate::common::error::Error;
+
+/// Detect iWork format from a ZIP archive.
+///
+/// This function analyzes the contents of a ZIP archive to determine which iWork
+/// application created it (Pages, Numbers, or Keynote).
+///
+/// # Arguments
+///
+/// * `archive` - A reference to an ArchiveReader to analyze
+///
+/// # Returns
+///
+/// * `Result<FileFormat>` - The detected iWork format flavor, or an error if not recognized
+pub fn detect_iwork_format(archive: &ArchiveReader<'_>) -> Result<FileFormat> {
+    // First, check for specific marker files that definitively identify each format
+    if let Ok(flavor) = detect_from_marker_files(archive) {
+        return Ok(flavor);
     }
 
-    // Try to open as ZIP archive and check for IWA files
-    let cursor = std::io::Cursor::new(bytes);
-    match zip::ZipArchive::new(cursor) {
-        Ok(mut archive) => {
-            // Check if archive contains IWA files
-            let has_iwa_files = (0..archive.len()).any(|i| {
-                archive
-                    .by_index(i)
-                    .ok()
-                    .map(|file| file.name().ends_with(".iwa"))
-                    .unwrap_or(false)
-            });
-
-            if !has_iwa_files {
-                return None;
-            }
-
-            // Try to extract message types and detect application
-            detect_application_from_zip_archive(&mut archive)
-        },
-        Err(_) => None,
+    // If marker files don't work, fall back to IWA message type analysis
+    if let Ok(flavor) = detect_from_iwa_messages(archive) {
+        return Ok(flavor);
     }
+
+    // If still can't determine, analyze file structure patterns
+    detect_from_file_structure(archive)
 }
 
-#[cfg(not(feature = "iwa"))]
-pub fn detect_iwork_format(_bytes: &[u8]) -> Option<FileFormat> {
-    None
-}
-
-/// Detect iWork formats from reader.
-/// iWork files are ZIP archives that can be detected from stream data.
-/// Uses SIMD-accelerated signature matching.
-#[cfg(feature = "iwa")]
-pub fn detect_iwork_format_from_reader<R: std::io::Read + std::io::Seek>(
-    reader: &mut R,
-) -> Option<FileFormat> {
-    // Read the first 4 bytes to check for ZIP signature
-    let mut header = [0u8; 4];
-    if reader.read_exact(&mut header).is_err() {
-        return None;
+/// Detect from marker files that definitively identify the iWork application.
+fn detect_from_marker_files(archive: &ArchiveReader<'_>) -> Result<FileFormat> {
+    // Check for Keynote-specific files
+    if archive.contains("Index/MasterSlide.iwa") || archive.contains("Index/Slide.iwa") {
+        return Ok(FileFormat::Keynote);
     }
 
-    // Reset to beginning
-    let _ = reader.seek(std::io::SeekFrom::Start(0));
+    // Check for Numbers-specific files
+    if archive.contains("Index/CalculationEngine.iwa") {
+        return Ok(FileFormat::Numbers);
+    }
 
-    // Check for ZIP signature using SIMD
-    if signature_matches(
-        &header[0..4],
-        crate::common::detection::utils::ZIP_SIGNATURE,
-    ) {
-        // Try to open as ZIP archive and check for IWA files
-        if let Ok(mut archive) = zip::ZipArchive::new(reader) {
-            // Check if archive contains IWA files
-            let has_iwa_files = (0..archive.len()).any(|i| {
-                archive
-                    .by_index(i)
-                    .ok()
-                    .map(|file| file.name().ends_with(".iwa"))
-                    .unwrap_or(false)
-            });
-
-            if has_iwa_files {
-                // Try to extract message types and detect application
-                return detect_application_from_zip_archive(&mut archive);
-            }
+    // Check for document.iwa which is common to Pages
+    if archive.contains("Index/Document.iwa") && !archive.contains("Index/CalculationEngine.iwa") {
+        // Could be Pages - but need more verification
+        // Check for absence of presentation-specific files
+        let has_slides = archive.file_names().any(|n| n.contains("Slide"));
+        if !has_slides {
+            return Ok(FileFormat::Pages);
         }
     }
 
-    None
+    Err(Error::InvalidFormat(
+        "Could not detect iWork format from marker files".to_string(),
+    ))
+}
+
+/// Detect from IWA message types.
+#[cfg(feature = "iwa")]
+fn detect_from_iwa_messages(archive: &ArchiveReader<'_>) -> Result<FileFormat> {
+    use crate::iwa::zip_utils::extract_message_types_from_archive;
+
+    let message_types = extract_message_types_from_archive(archive)
+        .map_err(|e| Error::InvalidFormat(format!("Failed to extract message types: {}", e)))?;
+
+    if message_types.is_empty() {
+        return Err(Error::InvalidFormat(
+            "No IWA message types found".to_string(),
+        ));
+    }
+
+    // Use the registry to detect application
+    match crate::iwa::registry::detect_application(&message_types) {
+        Some(app) => match app {
+            crate::iwa::registry::Application::Pages => Ok(FileFormat::Pages),
+            crate::iwa::registry::Application::Keynote => Ok(FileFormat::Keynote),
+            crate::iwa::registry::Application::Numbers => Ok(FileFormat::Numbers),
+            crate::iwa::registry::Application::Common => Err(Error::InvalidFormat(
+                "Only common message types found".to_string(),
+            )),
+        },
+        None => Err(Error::InvalidFormat(
+            "Could not detect application from message types".to_string(),
+        )),
+    }
 }
 
 #[cfg(not(feature = "iwa"))]
-pub fn detect_iwork_format_from_reader<R: std::io::Read + std::io::Seek>(
-    _reader: &mut R,
-) -> Option<FileFormat> {
+fn detect_from_iwa_messages(_archive: &ArchiveReader<'_>) -> Result<FileFormat> {
+    Err(Error::InvalidFormat("IWA feature not enabled".to_string()))
+}
+
+/// Detect from file structure patterns.
+#[cfg(feature = "iwa")]
+fn detect_from_file_structure(archive: &ArchiveReader<'_>) -> Result<FileFormat> {
+    use crate::iwa::zip_utils::analyze_file_structure;
+
+    let info = analyze_file_structure(archive);
+
+    // Apply detection logic based on file patterns
+    if info.is_likely_keynote() {
+        return Ok(FileFormat::Keynote);
+    }
+
+    if info.is_likely_numbers() {
+        return Ok(FileFormat::Numbers);
+    }
+
+    if info.is_likely_pages() {
+        return Ok(FileFormat::Pages);
+    }
+
+    Err(Error::InvalidFormat(
+        "Could not detect iWork format from file structure".to_string(),
+    ))
+}
+
+#[cfg(not(feature = "iwa"))]
+fn detect_from_file_structure(_archive: &ArchiveReader<'_>) -> Result<FileFormat> {
+    Err(Error::InvalidFormat("IWA feature not enabled".to_string()))
+}
+
+/// Detect iWork format from bytes.
+#[cfg(feature = "iwa")]
+pub fn detect_iwork_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
+    let archive = ArchiveReader::new(bytes).ok()?;
+
+    // Check if archive contains IWA files
+    let has_iwa_files = archive.file_names().any(|name| name.ends_with(".iwa"));
+    if !has_iwa_files {
+        return None;
+    }
+
+    detect_iwork_format(&archive).ok()
+}
+
+#[cfg(not(feature = "iwa"))]
+pub fn detect_iwork_format_from_bytes(_bytes: &[u8]) -> Option<FileFormat> {
     None
 }
 
 /// Detect iWork format from file path.
 /// Validates bundle structure following Apple's bundle format standard.
-/// Checks for identifying files and uses IWA message types to identify application.
+#[cfg(feature = "iwa")]
 pub fn detect_iwork_format_from_path<P: AsRef<Path>>(path: P) -> Option<FileFormat> {
     let path = path.as_ref();
 
@@ -113,58 +160,51 @@ pub fn detect_iwork_format_from_path<P: AsRef<Path>>(path: P) -> Option<FileForm
     if !path.is_dir() {
         // It's a file, try ZIP-based detection
         if let Ok(data) = std::fs::read(path) {
-            return detect_iwork_format(&data);
+            return detect_iwork_format_from_bytes(&data);
         }
         return None;
     }
 
     // Try direct file-based detection first (faster and more reliable)
-    if let Some(format) = detect_iwork_format_from_files(path) {
+    if let Some(format) = detect_iwork_format_from_bundle_files(path) {
         return Some(format);
     }
 
     // Fallback to IWA bundle parsing if direct detection fails
-    // Validate bundle structure by attempting to open with Bundle::open()
-    // This follows the iWork Archive format specification
-    #[cfg(feature = "iwa")]
-    {
-        match crate::iwa::bundle::Bundle::open(path) {
-            Ok(bundle) => {
-                // Extract message types from all archives to identify application
-                let all_message_types: Vec<u32> = bundle
-                    .archives()
-                    .values()
-                    .flat_map(|archive| &archive.objects)
-                    .flat_map(|obj| &obj.messages)
-                    .map(|msg| msg.type_)
-                    .collect();
+    match crate::iwa::bundle::Bundle::open(path) {
+        Ok(bundle) => {
+            // Extract message types from all archives to identify application
+            let all_message_types: Vec<u32> = bundle
+                .archives()
+                .values()
+                .flat_map(|archive| &archive.objects)
+                .flat_map(|obj| &obj.messages)
+                .map(|msg| msg.type_)
+                .collect();
 
-                // Detect application type from IWA message types
-                match crate::iwa::registry::detect_application(&all_message_types) {
-                    Some(app) => {
-                        let format = match app {
-                            crate::iwa::registry::Application::Pages => FileFormat::Pages,
-                            crate::iwa::registry::Application::Keynote => FileFormat::Keynote,
-                            crate::iwa::registry::Application::Numbers => FileFormat::Numbers,
-                            crate::iwa::registry::Application::Common => return None, // Common alone doesn't indicate a specific format
-                        };
-
-                        Some(format)
-                    },
-                    None => None,
-                }
-            },
-            Err(_) => None,
-        }
+            // Detect application type from IWA message types
+            match crate::iwa::registry::detect_application(&all_message_types) {
+                Some(app) => match app {
+                    crate::iwa::registry::Application::Pages => Some(FileFormat::Pages),
+                    crate::iwa::registry::Application::Keynote => Some(FileFormat::Keynote),
+                    crate::iwa::registry::Application::Numbers => Some(FileFormat::Numbers),
+                    crate::iwa::registry::Application::Common => None,
+                },
+                None => None,
+            }
+        },
+        Err(_) => None,
     }
+}
 
-    #[cfg(not(feature = "iwa"))]
+#[cfg(not(feature = "iwa"))]
+pub fn detect_iwork_format_from_path<P: AsRef<Path>>(_path: P) -> Option<FileFormat> {
     None
 }
 
 /// Detect iWork format by checking for identifying files in the bundle directory.
-/// Uses Apple's iWork bundle format standards to identify application types.
-fn detect_iwork_format_from_files(bundle_path: &Path) -> Option<FileFormat> {
+#[cfg(feature = "iwa")]
+fn detect_iwork_format_from_bundle_files(bundle_path: &Path) -> Option<FileFormat> {
     // Check for Keynote: contains index.apxl file
     let keynote_index = bundle_path.join("index.apxl");
     if keynote_index.exists() && keynote_index.is_file() {
@@ -183,12 +223,9 @@ fn detect_iwork_format_from_files(bundle_path: &Path) -> Option<FileFormat> {
         return Some(FileFormat::Numbers);
     }
 
-    // Additional checks for other common iWork identifying files
-
     // Check for Keynote presentation files
     let keynote_data = bundle_path.join("Data");
     if keynote_data.exists() && keynote_data.is_dir() {
-        // Look for Keynote-specific files
         let keynote_theme = bundle_path.join("theme-preview.jpg");
         let keynote_assets = bundle_path.join("Assets");
         if keynote_theme.exists() || (keynote_assets.exists() && keynote_assets.is_dir()) {
@@ -199,7 +236,6 @@ fn detect_iwork_format_from_files(bundle_path: &Path) -> Option<FileFormat> {
     // Check for Numbers-specific structure
     let numbers_calc = bundle_path.join("Index");
     if numbers_calc.exists() && numbers_calc.is_dir() {
-        // Look for Numbers calculation files
         let calc_files = std::fs::read_dir(&numbers_calc).ok()?;
         for entry in calc_files.flatten() {
             if entry.path().extension().is_some_and(|ext| ext == "iwa") {
@@ -209,75 +245,4 @@ fn detect_iwork_format_from_files(bundle_path: &Path) -> Option<FileFormat> {
     }
 
     None
-}
-
-/// Detect application type from a ZIP archive containing IWA files
-#[cfg(feature = "iwa")]
-pub fn detect_application_from_zip_archive<R: Read + std::io::Seek>(
-    archive: &mut zip::ZipArchive<R>,
-) -> Option<FileFormat> {
-    // Use shared utility to analyze file structure
-    let info = crate::iwa::zip_utils::analyze_file_structure(archive);
-
-    // Apply detection logic based on file patterns with priorities
-    if info.slide_file_count > 0 && info.table_file_count == 0 {
-        // Pure Keynote: has slides but no tables
-        Some(FileFormat::Keynote)
-    } else if info.slide_file_count > 0 && info.has_calculation_engine {
-        // Document with slides and calc engine: Keynote (prioritize presentation aspect)
-        Some(FileFormat::Keynote)
-    } else if info.table_file_count > 0 && info.slide_file_count == 0 {
-        // Pure document with tables: could be Pages or Numbers
-        if info.has_calculation_engine {
-            // Has calc engine: Numbers
-            Some(FileFormat::Numbers)
-        } else {
-            // No calc engine: Pages
-            Some(FileFormat::Pages)
-        }
-    } else if info.slide_file_count > 0 {
-        // Has slides: Keynote
-        Some(FileFormat::Keynote)
-    } else if info.has_calculation_engine {
-        // Has calculation engine: Numbers
-        Some(FileFormat::Numbers)
-    } else {
-        // Fallback: try message type detection
-        detect_application_from_message_types(archive)
-    }
-}
-
-/// Fallback detection using message types when file patterns don't give a clear answer
-#[cfg(feature = "iwa")]
-fn detect_application_from_message_types<R: Read + std::io::Seek>(
-    archive: &mut zip::ZipArchive<R>,
-) -> Option<FileFormat> {
-    // Use shared utility to extract message types
-    let all_message_types = crate::iwa::zip_utils::extract_message_types_from_zip(archive).ok()?;
-
-    // Simple heuristic: look for known message type ranges
-    // This is a rough approximation based on observed patterns
-    let mut pages_score = 0;
-    let mut keynote_score = 0;
-    let mut numbers_score = 0;
-
-    for &type_id in &all_message_types {
-        match type_id {
-            10000..=19999 => pages_score += 1, // Pages tends to have higher type IDs
-            200..=999 => keynote_score += 1,   // Keynote has mid-range IDs
-            1..=199 => numbers_score += 1,     // Numbers has lower IDs
-            _ => {},
-        }
-    }
-
-    // Return the application with the highest score
-    if pages_score > keynote_score && pages_score > numbers_score {
-        Some(FileFormat::Pages)
-    } else if keynote_score > pages_score && keynote_score > numbers_score {
-        Some(FileFormat::Keynote)
-    } else if numbers_score > pages_score && numbers_score > keynote_score {
-        Some(FileFormat::Numbers)
-    } else {
-        None
-    }
 }

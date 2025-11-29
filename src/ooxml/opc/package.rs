@@ -1,17 +1,18 @@
+//! Objects that implement reading and writing OPC packages.
+//!
+//! This module provides the main OpcPackage type, which represents an Open Packaging
+//! Convention package in memory. It manages parts, relationships, and provides
+//! high-level operations for working with office documents.
+
 use crate::ooxml::opc::constants::relationship_type;
 use crate::ooxml::opc::error::{OpcError, Result};
 use crate::ooxml::opc::packuri::{PACKAGE_URI, PackURI};
 use crate::ooxml::opc::part::{Part, PartFactory};
-use crate::ooxml::opc::phys_pkg::PhysPkgReader;
+use crate::ooxml::opc::phys_pkg::{OwnedPhysPkgReader, PhysPkgReader};
 use crate::ooxml::opc::pkgreader::PackageReader;
 use crate::ooxml::opc::rel::Relationships;
-/// Objects that implement reading and writing OPC packages.
-///
-/// This module provides the main OpcPackage type, which represents an Open Packaging
-/// Convention package in memory. It manages parts, relationships, and provides
-/// high-level operations for working with office documents.
 use std::collections::HashMap;
-use std::io::{Read, Seek};
+use std::io::Read;
 use std::path::Path;
 
 /// Main API class for working with OPC packages.
@@ -62,22 +63,30 @@ impl OpcPackage {
     /// let pkg = OpcPackage::open("document.docx").unwrap();
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let phys_reader = PhysPkgReader::open(path)?;
-        Self::from_phys_reader(phys_reader)
+        let owned_reader = OwnedPhysPkgReader::open(path)?;
+        let phys_reader = owned_reader.reader()?;
+        let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
+        Self::unmarshal(pkg_reader)
     }
 
     /// Load an OPC package from a reader.
     ///
     /// # Arguments
-    /// * `reader` - A reader that implements Read + Seek
-    pub fn from_reader<R: Read + Seek>(reader: R) -> Result<Self> {
-        let phys_reader = PhysPkgReader::new(reader)?;
-        Self::from_phys_reader(phys_reader)
+    /// * `reader` - A reader that implements Read
+    pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
+        let owned_reader = OwnedPhysPkgReader::from_reader(reader)?;
+        let phys_reader = owned_reader.reader()?;
+        let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
+        Self::unmarshal(pkg_reader)
     }
 
-    /// Load an OPC package from a physical package reader.
-    fn from_phys_reader<R: Read + Seek>(phys_reader: PhysPkgReader<R>) -> Result<Self> {
-        let pkg_reader = PackageReader::from_phys_reader(phys_reader)?;
+    /// Load an OPC package from a byte slice.
+    ///
+    /// # Arguments
+    /// * `data` - The ZIP archive data as a byte slice
+    pub fn from_bytes(data: &[u8]) -> Result<Self> {
+        let phys_reader = PhysPkgReader::new(data)?;
+        let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
         Self::unmarshal(pkg_reader)
     }
 
@@ -350,47 +359,48 @@ impl Default for OpcPackage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::{Cursor, Write};
-    use zip::ZipWriter;
-    use zip::write::SimpleFileOptions;
+    use soapberry_zip::office::StreamingArchiveWriter;
+    use std::io::Cursor;
 
     fn create_minimal_docx() -> Vec<u8> {
-        let mut zip_data = Vec::new();
-        {
-            let cursor = Cursor::new(&mut zip_data);
-            let mut writer = ZipWriter::new(cursor);
-            let options = SimpleFileOptions::default();
+        let mut writer = StreamingArchiveWriter::new();
 
-            // Add [Content_Types].xml
-            writer.start_file("[Content_Types].xml", options).unwrap();
-            writer.write_all(br#"<?xml version="1.0"?>
+        // Add [Content_Types].xml
+        writer
+            .write_deflated(
+                "[Content_Types].xml",
+                br#"<?xml version="1.0"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
     <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
     <Default Extension="xml" ContentType="application/xml"/>
     <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-</Types>"#).unwrap();
+</Types>"#,
+            )
+            .unwrap();
 
-            // Add _rels/.rels
-            writer.start_file("_rels/.rels", options).unwrap();
-            writer.write_all(br#"<?xml version="1.0"?>
+        // Add _rels/.rels
+        writer
+            .write_deflated(
+                "_rels/.rels",
+                br#"<?xml version="1.0"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
     <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>"#).unwrap();
+</Relationships>"#,
+            )
+            .unwrap();
 
-            // Add word/document.xml
-            writer.start_file("word/document.xml", options).unwrap();
-            writer
-                .write_all(
-                    br#"<?xml version="1.0"?>
+        // Add word/document.xml
+        writer
+            .write_deflated(
+                "word/document.xml",
+                br#"<?xml version="1.0"?>
 <document xmlns="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
     <body><p><t>Test</t></p></body>
 </document>"#,
-                )
-                .unwrap();
+            )
+            .unwrap();
 
-            writer.finish().unwrap();
-        }
-        zip_data
+        writer.finish_to_bytes().unwrap()
     }
 
     #[test]

@@ -1,11 +1,31 @@
+use crate::common::XmlSlice;
 /// Table, Row, and Cell structures for Word documents.
 use crate::ooxml::docx::paragraph::Paragraph;
 use crate::ooxml::error::{OoxmlError, Result};
-use parking_lot::RwLock;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use smallvec::SmallVec;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
+
+/// Internal storage for table XML data.
+/// Supports both owned data and shared slices for arena-based parsing.
+#[derive(Debug, Clone)]
+enum XmlData {
+    /// Owned data for standalone tables
+    Owned(Box<[u8]>),
+    /// Shared slice into an arena for zero-copy batch parsing
+    Shared(XmlSlice),
+}
+
+impl XmlData {
+    #[inline]
+    fn as_bytes(&self) -> &[u8] {
+        match self {
+            XmlData::Owned(b) => b,
+            XmlData::Shared(s) => s.as_bytes(),
+        }
+    }
+}
 
 /// Vertical merge state for table cells.
 ///
@@ -42,34 +62,59 @@ pub enum VMergeState {
 ///
 /// Uses lazy parsing with caching - XML is parsed once on first access,
 /// then cached results are returned on subsequent calls.
-/// Uses Arc and parking_lot RwLock for thread-safe caching, enabling Send + Sync.
-#[derive(Debug, Clone)]
+/// Uses OnceLock for thread-safe single-initialization caching.
+#[derive(Debug)]
 pub struct Table {
-    /// The raw XML bytes for this table (shared via Arc for efficient cloning)
-    xml_bytes: Arc<Vec<u8>>,
-    /// Cached parsed rows (lazy initialization with thread-safe parking_lot RwLock)
-    cached_rows: Arc<RwLock<Option<SmallVec<[Row; 16]>>>>,
+    /// The raw XML data for this table
+    xml_data: XmlData,
+    /// Cached parsed rows (lazy initialization with thread-safe OnceLock)
+    cached_rows: OnceLock<SmallVec<[Row; 16]>>,
+}
+
+impl Clone for Table {
+    fn clone(&self) -> Self {
+        Self {
+            xml_data: self.xml_data.clone(),
+            // Don't clone the cache - it will be lazily recomputed if needed
+            cached_rows: OnceLock::new(),
+        }
+    }
 }
 
 impl Table {
-    /// Create a new Table from XML bytes.
+    /// Create a new Table from XML bytes (owned).
+    #[inline]
     pub fn new(xml_bytes: Vec<u8>) -> Self {
         Self {
-            xml_bytes: Arc::new(xml_bytes),
-            cached_rows: Arc::new(RwLock::new(None)),
+            xml_data: XmlData::Owned(xml_bytes.into_boxed_slice()),
+            cached_rows: OnceLock::new(),
         }
+    }
+
+    /// Create a Table from an Arc<Vec<u8>> and byte range (zero-copy).
+    #[inline]
+    pub fn from_arc_range(arena: Arc<Vec<u8>>, start: u32, len: u32) -> Self {
+        Self {
+            xml_data: XmlData::Shared(XmlSlice::new(arena, start, len)),
+            cached_rows: OnceLock::new(),
+        }
+    }
+
+    /// Get the raw XML bytes.
+    #[inline]
+    fn xml_bytes(&self) -> &[u8] {
+        self.xml_data.as_bytes()
     }
 
     /// Get the number of rows in this table.
     pub fn row_count(&self) -> Result<usize> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
         let mut count = 0;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"tr" {
                         count += 1;
@@ -79,7 +124,6 @@ impl Table {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(count)
@@ -102,28 +146,20 @@ impl Table {
     /// # Performance
     ///
     /// Uses lazy parsing with caching - parses XML once on first call,
-    /// returns cached results on subsequent calls. Thread-safe via parking_lot RwLock.
+    /// returns cached results on subsequent calls. Thread-safe via OnceLock.
     pub fn rows(&self) -> Result<SmallVec<[Row; 16]>> {
-        // Check if we have cached rows (read lock)
-        {
-            let cache = self.cached_rows.read();
-            if let Some(ref rows) = *cache {
-                return Ok(rows.clone());
-            }
+        // Fast path: return cached rows if available
+        if let Some(rows) = self.cached_rows.get() {
+            return Ok(rows.clone());
         }
-
-        // Parse rows from XML
+        // Slow path: parse and cache
         let rows = self.parse_rows()?;
-
-        // Cache the result (write lock)
-        *self.cached_rows.write() = Some(rows.clone());
-
-        Ok(rows)
+        Ok(self.cached_rows.get_or_init(|| rows).clone())
     }
 
     /// Parse rows from XML (internal method).
     fn parse_rows(&self) -> Result<SmallVec<[Row; 16]>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
         // Use SmallVec for efficient storage of row collections
@@ -131,10 +167,9 @@ impl Table {
         let mut current_row_xml = Vec::with_capacity(4096); // Pre-allocate for row XML (increased from 2048)
         let mut in_row = false;
         let mut depth = 0;
-        let mut buf = Vec::with_capacity(1024); // Reusable buffer (increased from 512)
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"tr" && !in_row {
                         in_row = true;
@@ -171,11 +206,10 @@ impl Table {
 
                         depth -= 1;
                         if depth == 0 && e.local_name().as_ref() == b"tr" {
-                            // Move the XML bytes instead of cloning for the last item
-                            // For others, we must clone since we reuse the buffer
-                            let row_xml = std::mem::take(&mut current_row_xml);
+                            // Clone bytes and clear buffer (preserves capacity for next row)
+                            let row_xml = current_row_xml.clone();
+                            current_row_xml.clear();
                             rows.push(Row::new(row_xml));
-                            current_row_xml = Vec::with_capacity(2048);
                             in_row = false;
                         }
                     }
@@ -199,7 +233,6 @@ impl Table {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(rows)
@@ -227,20 +260,31 @@ impl Table {
 ///
 /// Uses lazy parsing with caching - XML is parsed once on first access,
 /// then cached results are returned on subsequent calls.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Row {
-    /// The raw XML bytes for this row (shared via Arc for efficient cloning)
-    xml_bytes: Arc<Vec<u8>>,
-    /// Cached parsed cells (lazy initialization with thread-safe parking_lot RwLock)
-    cached_cells: Arc<RwLock<Option<SmallVec<[Cell; 16]>>>>,
+    /// The raw XML bytes for this row (boxed slice for efficient storage)
+    xml_bytes: Box<[u8]>,
+    /// Cached parsed cells (lazy initialization with thread-safe OnceLock)
+    cached_cells: OnceLock<SmallVec<[Cell; 16]>>,
+}
+
+impl Clone for Row {
+    fn clone(&self) -> Self {
+        Self {
+            xml_bytes: self.xml_bytes.clone(),
+            // Don't clone the cache - it will be lazily recomputed if needed
+            cached_cells: OnceLock::new(),
+        }
+    }
 }
 
 impl Row {
     /// Create a new Row from XML bytes.
+    #[inline]
     pub fn new(xml_bytes: Vec<u8>) -> Self {
         Self {
-            xml_bytes: Arc::new(xml_bytes),
-            cached_cells: Arc::new(RwLock::new(None)),
+            xml_bytes: xml_bytes.into_boxed_slice(),
+            cached_cells: OnceLock::new(),
         }
     }
 
@@ -250,10 +294,9 @@ impl Row {
         reader.config_mut().trim_text(true);
 
         let mut count = 0;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"tc" {
                         count += 1;
@@ -263,7 +306,6 @@ impl Row {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(count)
@@ -274,23 +316,15 @@ impl Row {
     /// # Performance
     ///
     /// Uses lazy parsing with caching - parses XML once on first call,
-    /// returns cached results on subsequent calls. Thread-safe via parking_lot RwLock.
+    /// returns cached results on subsequent calls. Thread-safe via OnceLock.
     pub fn cells(&self) -> Result<SmallVec<[Cell; 16]>> {
-        // Check if we have cached cells (read lock)
-        {
-            let cache = self.cached_cells.read();
-            if let Some(ref cells) = *cache {
-                return Ok(cells.clone());
-            }
+        // Fast path: return cached cells if available
+        if let Some(cells) = self.cached_cells.get() {
+            return Ok(cells.clone());
         }
-
-        // Parse cells from XML
+        // Slow path: parse and cache
         let cells = self.parse_cells()?;
-
-        // Cache the result (write lock)
-        *self.cached_cells.write() = Some(cells.clone());
-
-        Ok(cells)
+        Ok(self.cached_cells.get_or_init(|| cells).clone())
     }
 
     /// Parse cells from XML (internal method).
@@ -303,10 +337,9 @@ impl Row {
         let mut current_cell_xml = Vec::with_capacity(4096); // Pre-allocate for cell XML (increased from 2048)
         let mut in_cell = false;
         let mut depth = 0;
-        let mut buf = Vec::with_capacity(1024); // Reusable buffer (increased from 512)
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"tc" && !in_cell {
                         in_cell = true;
@@ -343,10 +376,10 @@ impl Row {
 
                         depth -= 1;
                         if depth == 0 && e.local_name().as_ref() == b"tc" {
-                            // Move the XML bytes instead of cloning
-                            let cell_xml = std::mem::take(&mut current_cell_xml);
+                            // Clone bytes and clear buffer (preserves capacity for next cell)
+                            let cell_xml = current_cell_xml.clone();
+                            current_cell_xml.clear();
                             cells.push(Cell::new(cell_xml));
-                            current_cell_xml = Vec::with_capacity(2048);
                             in_cell = false;
                         }
                     }
@@ -370,7 +403,6 @@ impl Row {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(cells)
@@ -385,20 +417,31 @@ impl Row {
 ///
 /// Uses lazy parsing with caching - text is extracted once on first access,
 /// then cached results are returned on subsequent calls.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Cell {
-    /// The raw XML bytes for this cell (shared via Arc for efficient cloning)
-    xml_bytes: Arc<Vec<u8>>,
-    /// Cached extracted text (lazy initialization with thread-safe parking_lot RwLock)
-    cached_text: Arc<RwLock<Option<String>>>,
+    /// The raw XML bytes for this cell (boxed slice for efficient storage)
+    xml_bytes: Box<[u8]>,
+    /// Cached extracted text (lazy initialization with thread-safe OnceLock)
+    cached_text: OnceLock<String>,
+}
+
+impl Clone for Cell {
+    fn clone(&self) -> Self {
+        Self {
+            xml_bytes: self.xml_bytes.clone(),
+            // Don't clone the cache - it will be lazily recomputed if needed
+            cached_text: OnceLock::new(),
+        }
+    }
 }
 
 impl Cell {
     /// Create a new Cell from XML bytes.
+    #[inline]
     pub fn new(xml_bytes: Vec<u8>) -> Self {
         Self {
-            xml_bytes: Arc::new(xml_bytes),
-            cached_text: Arc::new(RwLock::new(None)),
+            xml_bytes: xml_bytes.into_boxed_slice(),
+            cached_text: OnceLock::new(),
         }
     }
 
@@ -422,10 +465,9 @@ impl Cell {
         reader.config_mut().trim_text(true);
 
         let mut in_tc_pr = false;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     let name = e.local_name();
                     if name.as_ref() == b"tcPr" {
@@ -453,7 +495,6 @@ impl Cell {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         // Default: no horizontal merge
@@ -491,10 +532,9 @@ impl Cell {
         reader.config_mut().trim_text(true);
 
         let mut in_tc_pr = false;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     let name = e.local_name();
                     if name.as_ref() == b"tcPr" {
@@ -524,7 +564,6 @@ impl Cell {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         // Default: no vertical merge
@@ -538,23 +577,15 @@ impl Cell {
     /// # Performance
     ///
     /// Uses lazy parsing with caching - parses XML once on first call,
-    /// returns cached results on subsequent calls. Thread-safe via parking_lot RwLock.
+    /// returns cached results on subsequent calls. Thread-safe via OnceLock.
     pub fn text(&self) -> Result<String> {
-        // Check if we have cached text (read lock)
-        {
-            let cache = self.cached_text.read();
-            if let Some(ref text) = *cache {
-                return Ok(text.clone());
-            }
+        // Fast path: return cached text if available
+        if let Some(text) = self.cached_text.get() {
+            return Ok(text.clone());
         }
-
-        // Extract text from XML
+        // Slow path: extract and cache
         let text = self.extract_text()?;
-
-        // Cache the result (write lock)
-        *self.cached_text.write() = Some(text.clone());
-
-        Ok(text)
+        Ok(self.cached_text.get_or_init(|| text).clone())
     }
 
     /// Extract text from XML (internal method).
@@ -566,10 +597,9 @@ impl Cell {
 
         let mut result = String::new();
         let mut in_text_element = false;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = true;
@@ -588,7 +618,6 @@ impl Cell {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(result)
@@ -608,10 +637,9 @@ impl Cell {
         let mut current_para_xml = Vec::with_capacity(1024); // Pre-allocate for paragraph XML
         let mut in_para = false;
         let mut depth = 0;
-        let mut buf = Vec::with_capacity(512); // Reusable buffer
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"p" && !in_para {
                         in_para = true;
@@ -648,10 +676,10 @@ impl Cell {
 
                         depth -= 1;
                         if depth == 0 && e.local_name().as_ref() == b"p" {
-                            // Move the XML bytes instead of cloning
-                            let para_xml = std::mem::take(&mut current_para_xml);
+                            // Clone bytes and clear buffer (preserves capacity for next paragraph)
+                            let para_xml = current_para_xml.clone();
+                            current_para_xml.clear();
                             paragraphs.push(Paragraph::new(para_xml));
-                            current_para_xml = Vec::with_capacity(1024);
                             in_para = false;
                         }
                     }
@@ -675,7 +703,6 @@ impl Cell {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(paragraphs)

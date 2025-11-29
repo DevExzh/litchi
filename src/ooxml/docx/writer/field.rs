@@ -64,8 +64,8 @@ impl MutableField {
         Self::Begin
     }
 
-    /// Create a field instruction.
-    pub fn instruction(text: String) -> Self {
+    /// Create a field instruction character.
+    pub fn instruction_char(text: String) -> Self {
         Self::Instruction(text)
     }
 
@@ -91,6 +91,20 @@ impl MutableField {
             Self::Instruction(text) => Some(text),
             _ => None,
         }
+    }
+
+    /// Get the field instruction as a string reference.
+    ///
+    /// # Panics
+    /// Panics if this is not a Complete or Instruction field variant.
+    pub fn instruction(&self) -> &str {
+        self.get_instruction()
+            .expect("instruction() called on non-instruction field variant")
+    }
+
+    /// Get the field result (alias for get_result).
+    pub fn result(&self) -> Option<&str> {
+        self.get_result()
     }
 
     /// Set the field instruction (for Complete fields only).

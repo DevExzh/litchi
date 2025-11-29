@@ -13,8 +13,6 @@ use std::io::{Read, Seek};
 
 #[cfg(feature = "odf")]
 use crate::common::detection::simd_utils::signature_matches;
-#[cfg(feature = "odf")]
-use std::io::Cursor;
 
 /// Standard ODF MIME types for supported document types.
 const ODT_MIME: &str = "application/vnd.oasis.opendocument.text";
@@ -89,15 +87,14 @@ pub fn detect_odf_format(bytes: &[u8]) -> Option<FileFormat> {
         return None;
     }
 
-    // Create a cursor to read the ZIP file without copying
-    let cursor = Cursor::new(bytes);
-    let mut archive = zip::ZipArchive::new(cursor).ok()?;
+    // Open archive using soapberry-zip
+    let archive = soapberry_zip::office::ArchiveReader::new(bytes).ok()?;
 
     // ODF files must have a mimetype file as the first entry
     // Read it to determine the specific format
-    let mimetype = crate::common::detection::utils::read_zip_file(&mut archive, "mimetype").ok()?;
+    let mimetype = archive.read_string("mimetype").ok()?;
 
-    detect_odf_format_from_mimetype(&mimetype)
+    detect_odf_format_from_mimetype(mimetype.as_bytes())
 }
 
 /// Stub implementation when `odf` feature is disabled.
@@ -131,14 +128,18 @@ pub fn detect_odf_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<F
     // Reset to beginning
     reader.seek(SeekFrom::Start(0)).ok()?;
 
-    // Try to open as ZIP archive directly from the reader
-    let mut archive = zip::ZipArchive::new(reader).ok()?;
+    // Read all data for ArchiveReader
+    let mut data = Vec::new();
+    reader.read_to_end(&mut data).ok()?;
+
+    // Try to open as ZIP archive
+    let archive = soapberry_zip::office::ArchiveReader::new(&data).ok()?;
 
     // ODF files must have a mimetype file
     // Read it to determine the specific format
-    let mimetype = crate::common::detection::utils::read_zip_file(&mut archive, "mimetype").ok()?;
+    let mimetype = archive.read_string("mimetype").ok()?;
 
-    detect_odf_format_from_mimetype(&mimetype)
+    detect_odf_format_from_mimetype(mimetype.as_bytes())
 }
 
 /// Stub implementation when `odf` feature is disabled.

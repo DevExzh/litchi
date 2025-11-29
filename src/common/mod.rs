@@ -15,6 +15,8 @@ pub mod simd;
 pub mod style;
 /// Common unit conversion utilities (length units used across all formats)
 pub mod unit;
+/// Shared byte slice for zero-copy element storage across formats
+pub mod xml_slice;
 
 // Re-exports for convenience
 pub use detection::{FileFormat, detect_file_format, detect_file_format_from_bytes};
@@ -24,3 +26,5 @@ pub use shapes::{PlaceholderType, ShapeType};
 pub use style::{Length, RGBColor, VerticalPosition};
 // Unit conversions
 pub use unit::{Length as MeasuredLength, LengthUnit};
+// Shared slice types
+pub use xml_slice::{XmlArenaBuilder, XmlSlice};

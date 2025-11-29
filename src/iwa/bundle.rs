@@ -8,14 +8,13 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use plist::Value;
-use zip::ZipArchive;
+use soapberry_zip::office::ArchiveReader;
 
 use crate::iwa::archive::{Archive, ArchiveObject};
-use crate::iwa::zip_utils::parse_iwa_files_from_zip;
+use crate::iwa::zip_utils::parse_iwa_files_from_archive;
 use crate::iwa::{Error, Result};
 
 /// Represents an iWork document bundle
@@ -91,13 +90,15 @@ impl Bundle {
         })
     }
 
-    /// Create a Bundle from an already-parsed ZIP archive.
+    /// Create a Bundle from raw bytes (ZIP archive).
     ///
     /// This is used for single-pass parsing where the ZIP archive has already
     /// been parsed during format detection. It avoids double-parsing.
-    pub fn from_zip_archive(mut zip_archive: ZipArchive<std::io::Cursor<Vec<u8>>>) -> Result<Self> {
+    pub fn from_archive_bytes(bytes: &[u8]) -> Result<Self> {
         // Parse IWA files from the ZIP archive
-        let archives = parse_iwa_files_from_zip(&mut zip_archive)?;
+        let archive = ArchiveReader::new(bytes)
+            .map_err(|e| Error::Bundle(format!("Failed to open ZIP archive: {}", e)))?;
+        let archives = parse_iwa_files_from_archive(&archive)?;
 
         // For single-file bundles, metadata is typically embedded
         let metadata = BundleMetadata {
@@ -178,31 +179,30 @@ impl Bundle {
     /// Parse Index.zip and extract all IWA files
     fn parse_index_zip(bundle_path: &Path) -> Result<HashMap<String, Archive>> {
         let index_zip_path = bundle_path.join("Index.zip");
-        let file = fs::File::open(&index_zip_path).map_err(Error::Io)?;
+        let data = fs::read(&index_zip_path).map_err(Error::Io)?;
 
-        let mut zip_archive = ZipArchive::new(file)
+        let archive = ArchiveReader::new(&data)
             .map_err(|e| Error::Bundle(format!("Failed to open Index.zip: {}", e)))?;
 
-        parse_iwa_files_from_zip(&mut zip_archive)
+        parse_iwa_files_from_archive(&archive)
     }
 
     /// Parse a single-file bundle (zip archive) and extract all IWA files
     fn parse_zip_bundle(bundle_path: &Path) -> Result<HashMap<String, Archive>> {
-        let file = fs::File::open(bundle_path).map_err(Error::Io)?;
+        let data = fs::read(bundle_path).map_err(Error::Io)?;
 
-        let mut zip_archive = ZipArchive::new(file)
+        let archive = ArchiveReader::new(&data)
             .map_err(|e| Error::Bundle(format!("Failed to open bundle file: {}", e)))?;
 
-        parse_iwa_files_from_zip(&mut zip_archive)
+        parse_iwa_files_from_archive(&archive)
     }
 
     /// Parse a ZIP archive from raw bytes and extract all IWA files
     fn parse_zip_bytes(bytes: &[u8]) -> Result<HashMap<String, Archive>> {
-        let cursor = Cursor::new(bytes);
-        let mut zip_archive = ZipArchive::new(cursor)
+        let archive = ArchiveReader::new(bytes)
             .map_err(|e| Error::Bundle(format!("Failed to open ZIP archive from bytes: {}", e)))?;
 
-        parse_iwa_files_from_zip(&mut zip_archive)
+        parse_iwa_files_from_archive(&archive)
     }
 
     /// Parse metadata from Metadata/ directory

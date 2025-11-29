@@ -165,8 +165,8 @@ pub use snappy::SnappyStream;
 pub use structured::{CellValue, Section, Slide, StructuredData, Table};
 pub use text::{ParagraphStyle, TextExtractor, TextFragment, TextStorage, TextStyle};
 pub use zip_utils::{
-    FileStructureInfo, analyze_file_structure, extract_message_types_from_zip,
-    parse_iwa_files_from_zip,
+    FileStructureInfo, analyze_file_structure, extract_message_types_from_archive,
+    parse_iwa_files_from_archive,
 };
 
 /// Error types for iWork parsing

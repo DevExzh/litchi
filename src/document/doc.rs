@@ -184,15 +184,10 @@ impl Document {
                 })
             },
             #[cfg(feature = "iwa")]
-            DetectedFormat::Pages(zip_archive) => {
-                let doc = crate::iwa::pages::PagesDocument::from_zip_archive(zip_archive).map_err(
-                    |e| {
-                        Error::ParseError(format!(
-                            "Failed to open Pages document from bytes: {}",
-                            e
-                        ))
-                    },
-                )?;
+            DetectedFormat::Pages(data) => {
+                let doc = crate::iwa::pages::PagesDocument::from_bytes(&data).map_err(|e| {
+                    Error::ParseError(format!("Failed to open Pages document from bytes: {}", e))
+                })?;
 
                 Ok(Self {
                     inner: DocumentImpl::Pages(doc),
@@ -201,8 +196,8 @@ impl Document {
                 })
             },
             #[cfg(feature = "odf")]
-            DetectedFormat::Odt(zip_archive) => {
-                let doc = crate::odf::Document::from_zip_archive(zip_archive).map_err(|e| {
+            DetectedFormat::Odt(data) => {
+                let doc = crate::odf::Document::from_bytes(data).map_err(|e| {
                     Error::ParseError(format!("Failed to parse ODT document from bytes: {}", e))
                 })?;
 
@@ -386,7 +381,10 @@ impl Document {
             #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(doc, _) => {
                 let tables = doc.tables().map_err(Error::from)?;
-                Ok(tables.into_iter().map(Table::Docx).collect())
+                Ok(tables
+                    .into_iter()
+                    .map(|t| Table::Docx(Box::new(t)))
+                    .collect())
             },
             #[cfg(feature = "iwa")]
             DocumentImpl::Pages(_doc) => {
@@ -476,10 +474,9 @@ impl Document {
                 let elements: Vec<_> = sections
                     .iter()
                     .flat_map(|section| {
-                        section
-                            .paragraphs
-                            .iter()
-                            .map(|text| DocumentElement::Paragraph(Paragraph::Pages(text.clone())))
+                        section.paragraphs.iter().map(|text| {
+                            DocumentElement::Paragraph(Box::new(Paragraph::Pages(text.clone())))
+                        })
                     })
                     .collect();
                 Ok(elements)
@@ -508,7 +505,9 @@ impl Document {
                                     })
                                     .collect(),
                             );
-                            elements.push(DocumentElement::Paragraph(Paragraph::Rtf(owned_para)));
+                            elements.push(DocumentElement::Paragraph(Box::new(Paragraph::Rtf(
+                                owned_para,
+                            ))));
                         },
                         crate::rtf::DocumentElement::Table(table) => {
                             let mut owned_table = crate::rtf::Table::new();
@@ -522,7 +521,8 @@ impl Document {
                                 }
                                 owned_table.add_row(owned_row);
                             }
-                            elements.push(DocumentElement::Table(Table::Rtf(owned_table)));
+                            elements
+                                .push(DocumentElement::Table(Box::new(Table::Rtf(owned_table))));
                         },
                     }
                 }
@@ -544,7 +544,8 @@ impl Document {
                 for element in odf_elements {
                     match element {
                         DocumentOrderElement::Paragraph(para) => {
-                            elements.push(DocumentElement::Paragraph(Paragraph::Odt(para)));
+                            elements
+                                .push(DocumentElement::Paragraph(Box::new(Paragraph::Odt(para))));
                         },
                         DocumentOrderElement::Heading(heading) => {
                             // Convert heading to paragraph for unified API
@@ -554,11 +555,13 @@ impl Document {
                                 if let Some(style) = heading.style_name() {
                                     para.set_style_name(style);
                                 }
-                                elements.push(DocumentElement::Paragraph(Paragraph::Odt(para)));
+                                elements.push(DocumentElement::Paragraph(Box::new(
+                                    Paragraph::Odt(para),
+                                )));
                             }
                         },
                         DocumentOrderElement::Table(table) => {
-                            elements.push(DocumentElement::Table(Table::Odt(table)));
+                            elements.push(DocumentElement::Table(Box::new(Table::Odt(table))));
                         },
                         DocumentOrderElement::List(_list) => {
                             // Lists are typically expanded to paragraphs in text extraction

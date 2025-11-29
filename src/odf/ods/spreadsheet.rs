@@ -2,8 +2,7 @@
 
 use super::Sheet;
 use crate::common::{Error, Metadata, Result};
-use crate::odf::core::{Content, Meta, Package, Styles};
-use std::io::Cursor;
+use crate::odf::core::{Content, Meta, OwnedPackage, Styles};
 use std::path::Path;
 
 /// An OpenDocument spreadsheet (.ods).
@@ -34,7 +33,7 @@ use std::path::Path;
 /// # }
 /// ```
 pub struct Spreadsheet {
-    package: Package<Cursor<Vec<u8>>>,
+    package: OwnedPackage,
     #[allow(dead_code)]
     content: Content,
     #[allow(dead_code)]
@@ -90,8 +89,8 @@ impl Spreadsheet {
     /// # }
     /// ```
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let cursor = Cursor::new(bytes);
-        let package = Package::from_reader(cursor)?;
+        let owned_package = OwnedPackage::from_bytes(bytes)?;
+        let package = owned_package.package()?;
 
         // Verify this is a spreadsheet
         let mime_type = package.mimetype();
@@ -121,55 +120,19 @@ impl Spreadsheet {
         };
 
         Ok(Self {
-            package,
+            package: owned_package,
             content,
             styles,
             meta,
         })
     }
 
-    /// Create an ODS spreadsheet from an already-parsed ZIP archive.
+    /// Create an ODS spreadsheet from raw bytes (ZIP archive data).
     ///
     /// This is used for single-pass parsing where the ZIP archive has already
-    /// been parsed during format detection. It avoids double-parsing.
-    pub fn from_zip_archive(
-        zip_archive: zip::ZipArchive<std::io::Cursor<Vec<u8>>>,
-    ) -> Result<Self> {
-        let package = Package::from_zip_archive(zip_archive)?;
-
-        // Verify this is a spreadsheet
-        let mime_type = package.mimetype();
-        if !mime_type.contains("opendocument.spreadsheet") {
-            return Err(Error::InvalidFormat(format!(
-                "Not an ODS file: MIME type is {}",
-                mime_type
-            )));
-        }
-
-        // Parse core components
-        let content_bytes = package.get_file("content.xml")?;
-        let content = Content::from_bytes(&content_bytes)?;
-
-        let styles = if package.has_file("styles.xml") {
-            let styles_bytes = package.get_file("styles.xml")?;
-            Some(Styles::from_bytes(&styles_bytes)?)
-        } else {
-            None
-        };
-
-        let meta = if package.has_file("meta.xml") {
-            let meta_bytes = package.get_file("meta.xml")?;
-            Some(Meta::from_bytes(&meta_bytes)?)
-        } else {
-            None
-        };
-
-        Ok(Self {
-            package,
-            content,
-            styles,
-            meta,
-        })
+    /// been validated during format detection. It avoids double-parsing.
+    pub fn from_archive_bytes(bytes: Vec<u8>) -> Result<Self> {
+        Self::from_bytes(bytes)
     }
 
     /// Get the number of sheets in the spreadsheet.
@@ -184,7 +147,8 @@ impl Spreadsheet {
     pub fn sheets(&mut self) -> Result<Vec<Sheet>> {
         use super::parser::OdsParser;
 
-        let content_bytes = self.package.get_file("content.xml")?;
+        let package = self.package.package()?;
+        let content_bytes = package.get_file("content.xml")?;
         let content = Content::from_bytes(&content_bytes)?;
 
         OdsParser::parse_sheets(content.xml_content())
@@ -357,7 +321,7 @@ impl Spreadsheet {
         let mut writer = PackageWriter::new();
 
         // Set MIME type
-        writer.set_mimetype(self.package.mimetype())?;
+        writer.set_mimetype(&self.package.mimetype()?)?;
 
         // Add content.xml
         let content_xml = self.content.xml_content();
@@ -376,7 +340,7 @@ impl Spreadsheet {
         }
 
         // Copy settings.xml if present
-        if self.package.has_file("settings.xml") {
+        if self.package.has_file("settings.xml")? {
             let settings_bytes = self.package.get_file("settings.xml")?;
             writer.add_file("settings.xml", &settings_bytes)?;
         }
@@ -392,7 +356,7 @@ impl Spreadsheet {
         // Copy other common ODF files if they exist
         let other_files = vec!["Thumbnails/thumbnail.png", "Configurations2/"];
         for file_path in other_files {
-            if self.package.has_file(file_path)
+            if self.package.has_file(file_path)?
                 && let Ok(file_bytes) = self.package.get_file(file_path)
             {
                 writer.add_file(file_path, &file_bytes)?;

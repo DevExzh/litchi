@@ -249,7 +249,7 @@ impl<'a> TableDataExtractor<'a> {
         let mut pos = 0;
 
         while pos < offsets_buffer.len() {
-            let (offset, bytes_read) = self.decode_varint(&offsets_buffer[pos..])?;
+            let (offset, bytes_read) = Self::decode_varint(&offsets_buffer[pos..])?;
             pos += bytes_read;
 
             // Offsets are cumulative
@@ -263,7 +263,7 @@ impl<'a> TableDataExtractor<'a> {
     /// Decode a single varint from a byte slice
     ///
     /// Returns (value, bytes_consumed)
-    fn decode_varint(&self, data: &[u8]) -> Result<(usize, usize)> {
+    fn decode_varint(data: &[u8]) -> Result<(usize, usize)> {
         let mut result: u64 = 0;
         let mut shift = 0;
         let mut bytes_read = 0;
@@ -643,27 +643,22 @@ mod tests {
 
     #[test]
     fn test_varint_decoding() {
-        let extractor = TableDataExtractor {
-            bundle: unsafe { &*(std::ptr::null() as *const Bundle) },
-            object_index: unsafe { &*(std::ptr::null() as *const ObjectIndex) },
-        };
-
         // Test single-byte varint: 0
         let data = vec![0x00];
-        let (value, bytes) = extractor.decode_varint(&data).unwrap();
+        let (value, bytes) = TableDataExtractor::decode_varint(&data).unwrap();
         assert_eq!(value, 0);
         assert_eq!(bytes, 1);
 
         // Test single-byte varint: 127
         let data = vec![0x7F];
-        let (value, bytes) = extractor.decode_varint(&data).unwrap();
+        let (value, bytes) = TableDataExtractor::decode_varint(&data).unwrap();
         assert_eq!(value, 127);
         assert_eq!(bytes, 1);
 
         // Test two-byte varint: 300 = 0b100101100
         // Encoded as: 0xAC 0x02 (10101100 00000010)
         let data = vec![0xAC, 0x02];
-        let (value, bytes) = extractor.decode_varint(&data).unwrap();
+        let (value, bytes) = TableDataExtractor::decode_varint(&data).unwrap();
         assert_eq!(value, 300);
         assert_eq!(bytes, 2);
     }

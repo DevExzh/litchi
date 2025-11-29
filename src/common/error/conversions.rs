@@ -103,8 +103,8 @@ impl From<quick_xml::Error> for Error {
 }
 
 #[cfg(any(feature = "ooxml", feature = "odf", feature = "iwa"))]
-impl From<zip::result::ZipError> for Error {
-    fn from(err: zip::result::ZipError) -> Self {
+impl From<soapberry_zip::Error> for Error {
+    fn from(err: soapberry_zip::Error) -> Self {
         Error::ZipError(err.to_string())
     }
 }

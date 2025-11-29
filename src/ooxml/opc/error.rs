@@ -25,7 +25,7 @@ pub enum OpcError {
     XmlError(String),
 
     #[error("ZIP error: {0}")]
-    ZipError(#[from] zip::result::ZipError),
+    ZipError(String),
 
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
@@ -41,6 +41,12 @@ pub enum OpcError {
 
     #[error("Attribute error: {0}")]
     AttrError(String),
+}
+
+impl From<soapberry_zip::Error> for OpcError {
+    fn from(err: soapberry_zip::Error) -> Self {
+        OpcError::ZipError(err.to_string())
+    }
 }
 
 impl From<quick_xml::events::attributes::AttrError> for OpcError {

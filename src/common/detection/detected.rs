@@ -12,8 +12,8 @@
 /// includes its already-parsed data structure to avoid double parsing:
 /// - OOXML formats (DOCX, PPTX, XLSX, XLSB): include parsed OPC package
 /// - OLE2 formats (DOC, PPT, XLS): include parsed OleFile
-/// - iWork formats (Pages, Keynote, Numbers): include parsed ZIP archive
-/// - ODF formats (ODT, ODP, ODS): include parsed ZIP archive
+/// - iWork formats (Pages, Keynote, Numbers): include raw bytes (lazy parsing)
+/// - ODF formats (ODT, ODP, ODS): include raw bytes (lazy parsing)
 /// - RTF: just bytes (no parsing needed)
 ///
 /// # Performance
@@ -43,21 +43,21 @@ pub enum DetectedFormat {
     #[cfg(feature = "ole")]
     Xls(crate::ole::OleFile<std::io::Cursor<Vec<u8>>>),
 
-    // iWork formats with parsed ZIP archive
+    // iWork formats with validated ZIP archive data (lazy parsing)
     #[cfg(feature = "iwa")]
-    Pages(zip::ZipArchive<std::io::Cursor<Vec<u8>>>),
+    Pages(Vec<u8>),
     #[cfg(feature = "iwa")]
-    Keynote(zip::ZipArchive<std::io::Cursor<Vec<u8>>>),
+    Keynote(Vec<u8>),
     #[cfg(feature = "iwa")]
-    Numbers(zip::ZipArchive<std::io::Cursor<Vec<u8>>>),
+    Numbers(Vec<u8>),
 
-    // ODF formats with parsed ZIP archive
+    // ODF formats with validated ZIP archive data (lazy parsing)
     #[cfg(feature = "odf")]
-    Odt(zip::ZipArchive<std::io::Cursor<Vec<u8>>>),
+    Odt(Vec<u8>),
     #[cfg(feature = "odf")]
-    Odp(zip::ZipArchive<std::io::Cursor<Vec<u8>>>),
+    Odp(Vec<u8>),
     #[cfg(feature = "odf")]
-    Ods(zip::ZipArchive<std::io::Cursor<Vec<u8>>>),
+    Ods(Vec<u8>),
 
     // RTF format (plain text, no parsing structure needed)
     #[cfg(feature = "rtf")]
@@ -135,8 +135,7 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
         // Try to parse as OPC package (OOXML) first - single parse!
         #[cfg(feature = "ooxml")]
         {
-            let cursor = std::io::Cursor::new(bytes.clone());
-            if let Ok(package) = crate::ooxml::OpcPackage::from_reader(cursor) {
+            if let Ok(package) = crate::ooxml::OpcPackage::from_bytes(&bytes) {
                 // Use existing OOXML detection logic
                 if let Some(format) =
                     crate::common::detection::ooxml::detect_ooxml_format_from_package(&package)
@@ -155,20 +154,19 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
         // Not OOXML, try as regular ZIP - parse once for iWork/ODF
         #[cfg(any(feature = "iwa", feature = "odf"))]
         {
-            let cursor = std::io::Cursor::new(bytes);
-            if let Ok(mut zip) = zip::ZipArchive::new(cursor) {
+            use soapberry_zip::office::ArchiveReader;
+
+            if let Ok(archive) = ArchiveReader::new(&bytes) {
                 // Check iWork formats using existing detection logic
                 #[cfg(feature = "iwa")]
                 {
-                    if let Some(format) =
-                        crate::common::detection::iwork::detect_application_from_zip_archive(
-                            &mut zip,
-                        )
+                    if let Ok(format) =
+                        crate::common::detection::iwork::detect_iwork_format(&archive)
                     {
                         return match format {
-                            FileFormat::Keynote => Some(DetectedFormat::Keynote(zip)),
-                            FileFormat::Pages => Some(DetectedFormat::Pages(zip)),
-                            FileFormat::Numbers => Some(DetectedFormat::Numbers(zip)),
+                            FileFormat::Keynote => Some(DetectedFormat::Keynote(bytes)),
+                            FileFormat::Pages => Some(DetectedFormat::Pages(bytes)),
+                            FileFormat::Numbers => Some(DetectedFormat::Numbers(bytes)),
                             _ => None,
                         };
                     }
@@ -178,19 +176,17 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
                 #[cfg(feature = "odf")]
                 {
                     // Read mimetype file to determine ODF format
-                    if let Ok(mimetype) =
-                        crate::common::detection::utils::read_zip_file(&mut zip, "mimetype")
-                    {
+                    if let Ok(mimetype) = archive.read_string("mimetype") {
                         // Use existing ODF detection logic
                         if let Some(format) =
                             crate::common::detection::odf::detect_odf_format_from_mimetype(
-                                &mimetype,
+                                mimetype.as_bytes(),
                             )
                         {
                             return match format {
-                                FileFormat::Odt => Some(DetectedFormat::Odt(zip)),
-                                FileFormat::Odp => Some(DetectedFormat::Odp(zip)),
-                                FileFormat::Ods => Some(DetectedFormat::Ods(zip)),
+                                FileFormat::Odt => Some(DetectedFormat::Odt(bytes)),
+                                FileFormat::Odp => Some(DetectedFormat::Odp(bytes)),
+                                FileFormat::Ods => Some(DetectedFormat::Ods(bytes)),
                                 _ => None,
                             };
                         }

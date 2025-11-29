@@ -32,6 +32,22 @@ pub enum CellValue {
 impl CellValue {
     /// Static reference to an empty cell value for zero-copy returns.
     pub const EMPTY: &'static CellValue = &CellValue::Empty;
+
+    /// Get the value as a string slice if it's a String variant.
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            CellValue::String(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// Get the value as a float if it's a Float variant.
+    pub fn as_float(&self) -> Option<f64> {
+        match self {
+            CellValue::Float(f) => Some(*f),
+            _ => None,
+        }
+    }
 }
 
 // Implement From for convenient cell value creation

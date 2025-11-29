@@ -29,10 +29,10 @@ use super::{Paragraph, Table};
 /// ```
 #[derive(Debug, Clone)]
 pub enum DocumentElement {
-    /// A paragraph element
-    Paragraph(Paragraph),
-    /// A table element
-    Table(Table),
+    /// A paragraph element (boxed to reduce enum size)
+    Paragraph(Box<Paragraph>),
+    /// A table element (boxed to reduce enum size from 12KB to ~224 bytes)
+    Table(Box<Table>),
 }
 
 impl DocumentElement {
@@ -65,7 +65,7 @@ impl DocumentElement {
     #[inline]
     pub fn as_table(&self) -> Option<&Table> {
         match self {
-            DocumentElement::Table(t) => Some(t),
+            DocumentElement::Table(t) => Some(t.as_ref()),
             _ => None,
         }
     }
@@ -76,7 +76,7 @@ impl DocumentElement {
     #[inline]
     pub fn into_paragraph(self) -> Option<Paragraph> {
         match self {
-            DocumentElement::Paragraph(p) => Some(p),
+            DocumentElement::Paragraph(p) => Some(*p),
             _ => None,
         }
     }
@@ -87,7 +87,7 @@ impl DocumentElement {
     #[inline]
     pub fn into_table(self) -> Option<Table> {
         match self {
-            DocumentElement::Table(t) => Some(t),
+            DocumentElement::Table(t) => Some(*t),
             _ => None,
         }
     }

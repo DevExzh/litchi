@@ -117,9 +117,9 @@ impl AsRef<[u8]> for SnappyStream {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use soapberry_zip::office::ArchiveReader;
     use std::fs::File;
     use std::io::Cursor;
-    use zip::ZipArchive;
 
     #[test]
     fn test_empty_stream() {
@@ -146,6 +146,8 @@ mod tests {
 
     #[test]
     fn test_real_iwa_decompression() {
+        use std::io::Read;
+
         // Test decompression with real IWA files from test bundles
         let test_files = vec!["test.pages", "test.numbers"];
 
@@ -154,26 +156,26 @@ mod tests {
                 continue; // Skip if test file doesn't exist
             }
 
-            let file = File::open(test_file).expect("Failed to open test file");
-            let mut zip_archive = ZipArchive::new(file).expect("Failed to read zip archive");
+            // Read entire file into memory for soapberry_zip
+            let mut file = File::open(test_file).expect("Failed to open test file");
+            let mut file_data = Vec::new();
+            file.read_to_end(&mut file_data)
+                .expect("Failed to read test file");
+
+            let archive = ArchiveReader::new(&file_data).expect("Failed to read zip archive");
 
             // Find an IWA file to test with
-            for i in 0..zip_archive.len() {
-                let mut zip_file = zip_archive.by_index(i).expect("Failed to read zip entry");
+            for file_name in archive.file_names() {
+                if file_name.ends_with(".iwa") {
+                    let compressed_data = archive.read(file_name).expect("Failed to read IWA file");
 
-                if zip_file.name().ends_with(".iwa") {
-                    let mut compressed_data = Vec::new();
-                    zip_file
-                        .read_to_end(&mut compressed_data)
-                        .expect("Failed to read IWA file");
-
-                    let mut cursor = Cursor::new(&compressed_data);
+                    let mut cursor = Cursor::new(compressed_data.as_slice());
                     let result = SnappyStream::decompress(&mut cursor);
 
                     assert!(
                         result.is_ok(),
                         "Failed to decompress {} from {}: {:?}",
-                        zip_file.name(),
+                        file_name,
                         test_file,
                         result.err()
                     );
@@ -182,7 +184,7 @@ mod tests {
                     assert!(
                         !decompressed.data().is_empty(),
                         "Decompressed data should not be empty for {}",
-                        zip_file.name()
+                        file_name
                     );
 
                     // Verify it's valid protobuf data (starts with a varint length)

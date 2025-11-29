@@ -112,7 +112,7 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
         }
 
         // Finally try iWork detection
-        if let Some(result) = iwork::detect_iwork_format(bytes) {
+        if let Some(result) = iwork::detect_iwork_format_from_bytes(bytes) {
             return Some(result);
         }
 
@@ -127,7 +127,7 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
     }
 
     // Check for iWork bundle formats (non-ZIP based)
-    if let Some(result) = iwork::detect_iwork_format(bytes) {
+    if let Some(result) = iwork::detect_iwork_format_from_bytes(bytes) {
         return Some(result);
     }
 
@@ -176,20 +176,16 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
         #[cfg(feature = "iwa")]
         {
             let _ = reader.seek(std::io::SeekFrom::Start(0));
-            if let Ok(mut zip_archive) = zip::ZipArchive::new(&mut *reader) {
-                let has_iwa_files = (0..zip_archive.len()).any(|i| {
-                    zip_archive
-                        .by_index(i)
-                        .ok()
-                        .map(|file| file.name().ends_with(".iwa"))
-                        .unwrap_or(false)
-                });
+            // Read all data for ArchiveReader
+            let mut data = Vec::new();
+            if reader.read_to_end(&mut data).is_ok()
+                && let Ok(archive) = soapberry_zip::office::ArchiveReader::new(&data)
+            {
+                let has_iwa_files = archive.file_names().any(|name| name.ends_with(".iwa"));
 
                 if has_iwa_files {
                     // This is an iWork file, detect the specific type
-                    if let Some(result) =
-                        iwork::detect_application_from_zip_archive(&mut zip_archive)
-                    {
+                    if let Ok(result) = iwork::detect_iwork_format(&archive) {
                         return Some(result);
                     }
                     return None;
@@ -223,10 +219,8 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
         return Some(result);
     }
 
-    // Check for iWork bundle formats (non-ZIP based)
-    if let Some(result) = iwork::detect_iwork_format_from_reader(reader) {
-        return Some(result);
-    }
+    // Note: iWork format detection from reader is handled via byte-based detection
+    // Use detect_iwork_format_from_bytes() for iWork detection
 
     None
 }
@@ -262,42 +256,29 @@ mod tests {
         assert!(format.is_none());
     }
 
-    #[test]
-    fn test_detect_iwork_pages() {
-        // This would require creating a mock iWork bundle structure
-        // For now, test the extension-based detection logic
-        let mock_path = std::path::Path::new("test.pages");
-        let format = detect_iwork_format_from_path(mock_path);
-        // Will return None since the file doesn't exist
-        assert!(format.is_none());
-    }
-
     // Helper function to create a minimal DOCX-like ZIP for testing
     #[cfg(feature = "ooxml")]
     fn create_minimal_docx_zip() -> Vec<u8> {
-        use std::io::Write;
+        use soapberry_zip::office::StreamingArchiveWriter;
 
-        let mut buffer = Vec::new();
-        {
-            let mut zip = zip::ZipWriter::new(Cursor::new(&mut buffer));
+        let mut writer = StreamingArchiveWriter::new();
 
-            let options = zip::write::SimpleFileOptions::default();
-
-            // Add [Content_Types].xml
-            zip.start_file("[Content_Types].xml", options).unwrap();
-            zip.write_all(
+        // Add [Content_Types].xml
+        writer
+            .write_deflated(
+                "[Content_Types].xml",
                 b"<Types><Default Extension=\"xml\" ContentType=\"application/xml\"/></Types>",
             )
             .unwrap();
 
-            // Add word/document.xml
-            zip.start_file("word/document.xml", options).unwrap();
-            zip.write_all(b"<document><body><p>Hello</p></body></document>")
-                .unwrap();
+        // Add word/document.xml
+        writer
+            .write_deflated(
+                "word/document.xml",
+                b"<document><body><p>Hello</p></body></document>",
+            )
+            .unwrap();
 
-            zip.finish().unwrap();
-        }
-
-        buffer
+        writer.finish_to_bytes().unwrap()
     }
 }

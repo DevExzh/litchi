@@ -1,17 +1,17 @@
+//! Low-level, read-only API to a serialized Open Packaging Convention (OPC) package.
+//!
+//! This module provides the PackageReader for parsing OPC packages, including
+//! content type mapping, relationship resolution, and part loading. It uses
+//! efficient algorithms for parsing and minimal memory allocation.
+
 use crate::ooxml::opc::constants::target_mode;
 use crate::ooxml::opc::error::{OpcError, Result};
 use crate::ooxml::opc::packuri::{PACKAGE_URI, PackURI};
 use crate::ooxml::opc::phys_pkg::PhysPkgReader;
 use quick_xml::Reader;
 use quick_xml::events::Event;
-/// Low-level, read-only API to a serialized Open Packaging Convention (OPC) package.
-///
-/// This module provides the PackageReader for parsing OPC packages, including
-/// content type mapping, relationship resolution, and part loading. It uses
-/// efficient algorithms for parsing and minimal memory allocation.
 use smallvec::SmallVec;
 use std::collections::HashMap;
-use std::io::{Read, Seek};
 
 /// Serialized part with its content and relationships.
 ///
@@ -220,43 +220,66 @@ pub struct PackageReader {
 }
 
 impl PackageReader {
-    /// Open and parse an OPC package file.
+    /// Open and parse an OPC package from a byte slice.
+    ///
+    /// Uses parallel decompression for maximum performance:
+    /// 1. Pre-load ALL archive contents in parallel
+    /// 2. Parse content types and relationships from memory
+    /// 3. Traverse relationship graph using pre-loaded data
     ///
     /// # Arguments
     /// * `phys_reader` - Physical package reader for accessing ZIP contents
     ///
     /// # Returns
     /// A new PackageReader with all parts and relationships loaded
-    pub fn from_phys_reader<R: Read + Seek>(mut phys_reader: PhysPkgReader<R>) -> Result<Self> {
-        // Parse content types
-        let content_types_xml = phys_reader.content_types_xml()?;
-        let content_types = ContentTypeMap::from_xml(&content_types_xml)?;
+    pub fn from_phys_reader(phys_reader: &PhysPkgReader<'_>) -> Result<Self> {
+        // Phase 1: Pre-load ALL files in parallel (the expensive CPU-bound work)
+        let mut all_files = phys_reader.archive().read_all_parallel();
 
-        // Get package-level relationships
+        // Phase 2: Parse content types from pre-loaded data
+        let content_types_path =
+            crate::ooxml::opc::packuri::CONTENT_TYPES_URI.trim_start_matches('/');
+        let content_types_xml = all_files
+            .get(content_types_path)
+            .ok_or_else(|| OpcError::PartNotFound("[Content_Types].xml".to_string()))?;
+        let content_types = ContentTypeMap::from_xml(content_types_xml)?;
+
+        // Phase 3: Get package-level relationships from pre-loaded data
         let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
-        let pkg_srels = Self::load_rels(&mut phys_reader, &package_uri)?;
+        let pkg_srels = Self::load_rels_from_cache(&all_files, &package_uri)?;
 
-        // Load all parts by walking the relationship graph
-        let sparts = Self::load_parts(&mut phys_reader, &pkg_srels, &content_types)?;
+        // Phase 4: Load all parts by walking the relationship graph (all in-memory now)
+        // Takes ownership of blobs from cache to avoid cloning
+        let sparts = Self::load_parts_from_cache(&mut all_files, &pkg_srels, &content_types)?;
 
         Ok(Self { pkg_srels, sparts })
     }
 
-    /// Parse relationships from a .rels file.
+    /// Load relationships from pre-loaded file cache.
     ///
-    /// Uses efficient XML parsing with quick-xml to extract relationship information.
-    fn load_rels<R: Read + Seek>(
-        phys_reader: &mut PhysPkgReader<R>,
+    /// Same as load_rels but uses pre-decompressed data from cache instead of reading from archive.
+    fn load_rels_from_cache(
+        cache: &HashMap<String, Vec<u8>>,
         source_uri: &PackURI,
     ) -> Result<SmallVec<[SerializedRelationship; 8]>> {
-        let rels_xml = match phys_reader.rels_xml_for(source_uri)? {
+        let rels_uri = source_uri.rels_uri().map_err(OpcError::InvalidPackUri)?;
+        let rels_path = rels_uri.membername().to_string();
+
+        let rels_xml = match cache.get(&rels_path) {
             Some(xml) => xml,
             None => return Ok(SmallVec::new()), // No relationships file
         };
 
-        let base_uri = source_uri.base_uri().to_string();
+        Self::parse_rels_xml(rels_xml, source_uri.base_uri())
+    }
+
+    /// Parse relationships XML into SerializedRelationship structs.
+    fn parse_rels_xml(
+        rels_xml: &[u8],
+        base_uri: &str,
+    ) -> Result<SmallVec<[SerializedRelationship; 8]>> {
         let mut srels = SmallVec::new();
-        let mut reader = Reader::from_reader(&rels_xml[..]);
+        let mut reader = Reader::from_reader(rels_xml);
         reader.config_mut().trim_text(true);
 
         let mut buf = Vec::new();
@@ -283,7 +306,7 @@ impl PackageReader {
 
                         if let (Some(id), Some(rt), Some(tr)) = (r_id, reltype, target_ref) {
                             srels.push(SerializedRelationship {
-                                base_uri: base_uri.clone(),
+                                base_uri: base_uri.to_string(),
                                 r_id: id,
                                 reltype: rt,
                                 target_ref: tr,
@@ -302,24 +325,20 @@ impl PackageReader {
         Ok(srels)
     }
 
-    /// Load all parts by walking the relationship graph.
+    /// Load all parts from pre-loaded file cache.
     ///
-    /// Uses iterative depth-first traversal to discover all parts reachable from
-    /// package-level relationships. Tracks visited parts to avoid cycles.
-    /// Optimized for performance with minimal allocations.
-    fn load_parts<R: Read + Seek>(
-        phys_reader: &mut PhysPkgReader<R>,
+    /// Traverses the relationship graph using only pre-decompressed data.
+    /// This is the fully parallelized version where all decompression happened upfront.
+    /// Takes ownership of blobs from cache to avoid cloning large byte vectors.
+    fn load_parts_from_cache(
+        cache: &mut HashMap<String, Vec<u8>>,
         pkg_srels: &[SerializedRelationship],
         content_types: &ContentTypeMap,
     ) -> Result<Vec<SerializedPart>> {
         use std::collections::HashSet;
 
-        // Pre-allocate with reasonable capacity (typical Office docs have 20-50 parts)
         let mut sparts = Vec::with_capacity(32);
         let mut visited = HashSet::with_capacity(32);
-
-        // Work queue for iterative traversal - avoids recursion overhead
-        // SmallVec optimizes for typical small relationship counts
         let mut work_queue: Vec<(PackURI, String)> = Vec::with_capacity(pkg_srels.len());
 
         // Initialize work queue with package-level relationships
@@ -335,31 +354,32 @@ impl PackageReader {
             }
         }
 
-        // Iterative depth-first traversal
+        // Iterative traversal using cached data only
         while let Some((partname, reltype)) = work_queue.pop() {
-            // Load part content
-            let blob = phys_reader.blob_for(&partname)?;
-            let content_type = content_types.get(&partname)?;
+            let membername = partname.membername().to_string();
 
-            // Load part relationships
-            let part_srels = Self::load_rels(phys_reader, &partname)?;
+            // Load relationships from cache FIRST (before taking blob ownership)
+            let part_srels = Self::load_rels_from_cache(cache, &partname)?;
 
-            // Add child parts to work queue before creating SerializedPart
-            // This allows us to move part_srels instead of cloning
+            // Add child parts to work queue
             for child_srel in &part_srels {
                 if child_srel.is_external() {
                     continue;
                 }
                 if let Ok(child_partname) = child_srel.target_partname() {
                     let child_partname_str = child_partname.to_string();
-                    // HashSet::insert returns true if the value was newly inserted
                     if visited.insert(child_partname_str) {
                         work_queue.push((child_partname, child_srel.reltype.clone()));
                     }
                 }
             }
 
-            // Create serialized part - move part_srels instead of cloning
+            // Take ownership of blob from cache (zero-copy move)
+            let blob = cache
+                .remove(&membername)
+                .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
+            let content_type = content_types.get(&partname)?;
+
             sparts.push(SerializedPart {
                 partname,
                 content_type,

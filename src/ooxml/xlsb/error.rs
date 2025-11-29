@@ -11,7 +11,7 @@ pub enum XlsbError {
     /// I/O error
     Io(std::io::Error),
     /// ZIP error
-    Zip(zip::result::ZipError),
+    Zip(String),
     /// XML parsing error
     Xml(quick_xml::Error),
     /// Invalid record type
@@ -121,7 +121,6 @@ impl std::error::Error for XlsbError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             XlsbError::Io(e) => Some(e),
-            XlsbError::Zip(e) => Some(e),
             XlsbError::Xml(e) => Some(e),
             _ => None,
         }
@@ -134,9 +133,9 @@ impl From<std::io::Error> for XlsbError {
     }
 }
 
-impl From<zip::result::ZipError> for XlsbError {
-    fn from(err: zip::result::ZipError) -> Self {
-        XlsbError::Zip(err)
+impl From<soapberry_zip::Error> for XlsbError {
+    fn from(err: soapberry_zip::Error) -> Self {
+        XlsbError::Zip(err.to_string())
     }
 }
 

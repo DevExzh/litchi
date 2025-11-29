@@ -34,10 +34,8 @@ impl<'a> SlidePart<'a> {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
-        let mut buf = Vec::new();
-
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     if e.local_name().as_ref() == b"cSld" {
                         for attr in e.attributes().flatten() {
@@ -53,7 +51,6 @@ impl<'a> SlidePart<'a> {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(String::new())
@@ -68,10 +65,9 @@ impl<'a> SlidePart<'a> {
 
         let mut text = String::new();
         let mut in_text_element = false;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     // Check if this is an a:t element (DrawingML text)
                     if e.local_name().as_ref() == b"t" {
@@ -96,7 +92,6 @@ impl<'a> SlidePart<'a> {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(text)
@@ -117,11 +112,9 @@ impl<'a> SlidePart<'a> {
         reader.config_mut().trim_text(true);
 
         let mut shapes = Vec::new();
-        let mut buf = Vec::new();
 
         loop {
-            buf.clear();
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(ref e)) => {
                     let local_name = e.local_name();
                     let tag_name_bytes = local_name.as_ref();
@@ -160,7 +153,7 @@ impl<'a> SlidePart<'a> {
     fn extract_shape_xml(
         reader: &mut Reader<&[u8]>,
         tag_name: &[u8],
-        buf: &mut Vec<u8>,
+        _buf: &mut Vec<u8>,
     ) -> Result<Vec<u8>> {
         let mut shape_xml = Vec::new();
         let mut depth = 1;
@@ -171,8 +164,7 @@ impl<'a> SlidePart<'a> {
         shape_xml.push(b'>');
 
         loop {
-            buf.clear();
-            match reader.read_event_into(buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     depth += 1;
                     shape_xml.push(b'<');
@@ -262,10 +254,8 @@ impl<'a> SlideLayoutPart<'a> {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
-        let mut buf = Vec::new();
-
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     if e.local_name().as_ref() == b"cSld" {
                         for attr in e.attributes().flatten() {
@@ -281,7 +271,6 @@ impl<'a> SlideLayoutPart<'a> {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(String::new())
@@ -319,10 +308,8 @@ impl<'a> SlideMasterPart<'a> {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
-        let mut buf = Vec::new();
-
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     if e.local_name().as_ref() == b"cSld" {
                         for attr in e.attributes().flatten() {
@@ -338,7 +325,6 @@ impl<'a> SlideMasterPart<'a> {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(String::new())
@@ -350,10 +336,9 @@ impl<'a> SlideMasterPart<'a> {
         reader.config_mut().trim_text(true);
 
         let mut rids = Vec::new();
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     if e.local_name().as_ref() == b"sldLayoutId" {
                         for attr in e.attributes().flatten() {
@@ -380,7 +365,6 @@ impl<'a> SlideMasterPart<'a> {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(rids)

@@ -99,12 +99,11 @@ impl Workbook {
         // Open with appropriate implementation and extract metadata
         let (inner, metadata) = match detected {
             #[cfg(feature = "iwa")]
-            DetectedFormat::Numbers(zip_archive) => {
-                let doc = crate::iwa::numbers::NumbersDocument::from_zip_archive(zip_archive)
-                    .map_err(|e| {
-                        Box::new(Error::ParseError(format!("Failed to parse Numbers: {}", e)))
-                            as Box<dyn std::error::Error>
-                    })?;
+            DetectedFormat::Numbers(data) => {
+                let doc = crate::iwa::numbers::NumbersDocument::from_bytes(&data).map_err(|e| {
+                    Box::new(Error::ParseError(format!("Failed to parse Numbers: {}", e)))
+                        as Box<dyn std::error::Error>
+                })?;
 
                 // Extract metadata from Numbers bundle
                 let metadata = Self::extract_numbers_metadata(&doc);
@@ -149,8 +148,8 @@ impl Workbook {
             },
 
             #[cfg(feature = "odf")]
-            DetectedFormat::Ods(zip_archive) => {
-                let ods = crate::odf::Spreadsheet::from_zip_archive(zip_archive)
+            DetectedFormat::Ods(data) => {
+                let ods = crate::odf::Spreadsheet::from_bytes(data)
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
                 let metadata = ods.metadata().unwrap_or_default();
                 (WorkbookImpl::Ods(std::cell::RefCell::new(ods)), metadata)
