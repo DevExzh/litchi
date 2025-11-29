@@ -10,6 +10,8 @@ categories = ["filesystem", "compression", "parser-implementations"]
 rust-version = "1.70"
 
 [dependencies]
+# Hardware-accelerated CRC32 (uses SIMD/PCLMULQDQ when available)
+crc32fast = "1"
 # Deflate compression - used by all Office formats
 flate2 = { version = "1", features = ["zlib-rs"], default-features = false }
 # Parallel processing for multi-threaded decompression

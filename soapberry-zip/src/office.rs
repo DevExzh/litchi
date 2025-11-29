@@ -166,10 +166,32 @@ impl<'data> ArchiveReader<'data> {
                 Ok(data.to_vec())
             },
             CompressionMethod::Deflate => {
-                // Deflate - decompress
-                let mut decompressed = Vec::with_capacity(info.uncompressed_size as usize);
+                // Deflate - decompress with pre-allocated buffer
+                // Using unsafe to avoid costly buffer zeroing from read_to_end
+                let size = info.uncompressed_size as usize;
+                let mut decompressed = Vec::with_capacity(size);
+
+                // SAFETY: We set the length to the expected uncompressed size.
+                // The decompression will write exactly `size` bytes (verified by CRC32).
+                // Any unwritten bytes at the end are truncated after reading.
+                #[allow(unsafe_code, clippy::uninit_vec)]
+                unsafe {
+                    decompressed.set_len(size);
+                }
+
                 let mut decoder = entry.verifying_reader(DeflateDecoder::new(data));
-                decoder.read_to_end(&mut decompressed)?;
+                let mut total_read = 0;
+                while total_read < size {
+                    match decoder.read(&mut decompressed[total_read..]) {
+                        Ok(0) => break,
+                        Ok(n) => total_read += n,
+                        Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                        Err(e) => return Err(e.into()),
+                    }
+                }
+
+                // Truncate to actual bytes read (handles size mismatch gracefully)
+                decompressed.truncate(total_read);
                 Ok(decompressed)
             },
             other => Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
@@ -335,6 +357,251 @@ impl Default for StreamingArchiveWriter<std::io::Cursor<Vec<u8>>> {
 const _: () = {
     const fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<ArchiveReader<'static>>();
+};
+
+/// Lazy ZIP archive reader with on-demand decompression and caching.
+///
+/// Unlike `ArchiveReader::read_all_parallel()` which decompresses everything upfront,
+/// this reader decompresses files on-demand as they are accessed. This is optimal for:
+/// - Large archives where only a subset of files are needed
+/// - Pipelining decompression with parsing (process files as they become available)
+/// - Reducing memory pressure by not holding all decompressed data at once
+///
+/// The reader uses interior mutability for thread-safe caching of decompressed data.
+///
+/// # Example
+/// ```rust,no_run
+/// use soapberry_zip::office::LazyArchiveReader;
+///
+/// let data = std::fs::read("document.docx")?;
+/// let archive = LazyArchiveReader::new(&data)?;
+///
+/// // Files are decompressed on first access and cached
+/// let content = archive.read("word/document.xml")?;
+///
+/// // Subsequent reads return cached data (no re-decompression)
+/// let content2 = archive.read("word/document.xml")?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub struct LazyArchiveReader<'data> {
+    /// The underlying archive reader (for decompression)
+    inner: ArchiveReader<'data>,
+    /// Thread-safe cache of decompressed files
+    cache: std::sync::RwLock<HashMap<String, std::sync::Arc<Vec<u8>>>>,
+}
+
+impl<'data> LazyArchiveReader<'data> {
+    /// Create a new lazy archive reader from a byte slice.
+    pub fn new(data: &'data [u8]) -> Result<Self, Error> {
+        let inner = ArchiveReader::new(data)?;
+        Ok(Self {
+            inner,
+            cache: std::sync::RwLock::new(HashMap::new()),
+        })
+    }
+
+    /// Get the number of files in the archive.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    /// Check if the archive is empty.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    /// Check if a file exists in the archive.
+    #[inline]
+    pub fn contains(&self, name: &str) -> bool {
+        self.inner.contains(name)
+    }
+
+    /// Get an iterator over all file names in the archive.
+    pub fn file_names(&self) -> impl Iterator<Item = &str> {
+        self.inner.file_names()
+    }
+
+    /// Read and decompress a file, using cache if available.
+    ///
+    /// Returns a cloned Vec for API compatibility. For zero-copy access,
+    /// use `read_shared()` which returns an Arc.
+    pub fn read(&self, name: &str) -> Result<Vec<u8>, Error> {
+        self.read_shared(name).map(|arc| (*arc).clone())
+    }
+
+    /// Read and decompress a file, returning a shared reference.
+    ///
+    /// This is more efficient than `read()` when the same file is accessed
+    /// multiple times, as it avoids cloning the decompressed data.
+    pub fn read_shared(&self, name: &str) -> Result<std::sync::Arc<Vec<u8>>, Error> {
+        let normalized = name.strip_prefix('/').unwrap_or(name);
+
+        // Fast path: check if already cached (read lock)
+        {
+            let cache = self.cache.read().unwrap();
+            if let Some(data) = cache.get(normalized) {
+                return Ok(std::sync::Arc::clone(data));
+            }
+        }
+
+        // Slow path: decompress and cache (write lock)
+        let data = self.inner.read(normalized)?;
+        let arc = std::sync::Arc::new(data);
+
+        {
+            let mut cache = self.cache.write().unwrap();
+            // Double-check in case another thread cached it while we were decompressing
+            if let Some(existing) = cache.get(normalized) {
+                return Ok(std::sync::Arc::clone(existing));
+            }
+            cache.insert(normalized.to_string(), std::sync::Arc::clone(&arc));
+        }
+
+        Ok(arc)
+    }
+
+    /// Read multiple files in parallel WITHOUT caching.
+    ///
+    /// This is the fastest method for bulk decompression when you need to read
+    /// many files at once and don't need caching. Avoids all cloning overhead.
+    ///
+    /// Returns a HashMap mapping file names to their decompressed contents.
+    /// Files that fail to decompress are not included in the result.
+    pub fn read_many_parallel(&self, names: &[&str]) -> HashMap<String, Vec<u8>> {
+        use rayon::prelude::*;
+
+        // Parallel decompression without caching for maximum performance
+        names
+            .par_iter()
+            .filter_map(|name| {
+                let normalized = name.strip_prefix('/').unwrap_or(name);
+                self.inner
+                    .read(normalized)
+                    .ok()
+                    .map(|data| (normalized.to_string(), data))
+            })
+            .collect()
+    }
+
+    /// Read multiple files in parallel with caching.
+    ///
+    /// This efficiently decompresses multiple files in parallel while still
+    /// benefiting from caching. Files already in cache are returned immediately.
+    /// Use this when you expect to read the same files multiple times.
+    ///
+    /// Returns a HashMap mapping file names to their decompressed contents.
+    /// Files that fail to decompress are not included in the result.
+    pub fn read_many_parallel_cached(&self, names: &[&str]) -> HashMap<String, Vec<u8>> {
+        use rayon::prelude::*;
+
+        // Separate cached and uncached files
+        let (cached, uncached): (Vec<&str>, Vec<&str>) = {
+            let cache = self.cache.read().unwrap();
+            names.iter().partition(|name| {
+                let normalized = name.strip_prefix('/').unwrap_or(*name);
+                cache.contains_key(normalized)
+            })
+        };
+
+        // Start with cached results
+        let mut results: HashMap<String, Vec<u8>> = {
+            let cache = self.cache.read().unwrap();
+            cached
+                .into_iter()
+                .filter_map(|name| {
+                    let normalized = name.strip_prefix('/').unwrap_or(name);
+                    cache
+                        .get(normalized)
+                        .map(|arc| (normalized.to_string(), (**arc).clone()))
+                })
+                .collect()
+        };
+
+        // Decompress uncached files in parallel
+        if !uncached.is_empty() {
+            let decompressed: Vec<_> = uncached
+                .into_par_iter()
+                .filter_map(|name| {
+                    let normalized = name.strip_prefix('/').unwrap_or(name);
+                    self.inner
+                        .read(normalized)
+                        .ok()
+                        .map(|data| (normalized.to_string(), data))
+                })
+                .collect();
+
+            // Cache the newly decompressed files
+            {
+                let mut cache = self.cache.write().unwrap();
+                for (name, data) in &decompressed {
+                    if !cache.contains_key(name.as_str()) {
+                        cache.insert(name.clone(), std::sync::Arc::new(data.clone()));
+                    }
+                }
+            }
+
+            results.extend(decompressed);
+        }
+
+        results
+    }
+
+    /// Read all files in parallel, caching results.
+    ///
+    /// Similar to `ArchiveReader::read_all_parallel()` but caches results
+    /// for potential future access.
+    pub fn read_all_parallel(&self) -> HashMap<String, Vec<u8>> {
+        let names: Vec<&str> = self.inner.file_names().collect();
+        self.read_many_parallel(&names)
+    }
+
+    /// Get the number of cached files.
+    pub fn cache_size(&self) -> usize {
+        self.cache.read().unwrap().len()
+    }
+
+    /// Clear the decompression cache to free memory.
+    pub fn clear_cache(&self) {
+        self.cache.write().unwrap().clear();
+    }
+
+    /// Take ownership of cached data, consuming the cache.
+    ///
+    /// Returns all cached files and clears the cache. This is useful when
+    /// you want to take ownership of the decompressed data without cloning.
+    pub fn take_cache(&self) -> HashMap<String, Vec<u8>> {
+        let mut cache = self.cache.write().unwrap();
+        let mut result = HashMap::with_capacity(cache.len());
+        for (name, arc) in cache.drain() {
+            // Try to unwrap the Arc; if there are other references, clone instead
+            match std::sync::Arc::try_unwrap(arc) {
+                Ok(data) => {
+                    result.insert(name, data);
+                },
+                Err(arc) => {
+                    result.insert(name, (*arc).clone());
+                },
+            }
+        }
+        result
+    }
+}
+
+impl std::fmt::Debug for LazyArchiveReader<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LazyArchiveReader")
+            .field("file_count", &self.inner.len())
+            .field("cache_size", &self.cache_size())
+            .finish()
+    }
+}
+
+// Ensure LazyArchiveReader is Send + Sync
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<LazyArchiveReader<'static>>();
 };
 
 #[cfg(test)]

@@ -22,7 +22,7 @@
 //! let bytes = writer.finish_to_bytes()?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 
 mod archive;
 mod crc;

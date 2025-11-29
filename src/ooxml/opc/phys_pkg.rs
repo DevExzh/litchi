@@ -7,17 +7,18 @@
 
 use crate::ooxml::opc::error::{OpcError, Result};
 use crate::ooxml::opc::packuri::PackURI;
-use soapberry_zip::office::ArchiveReader;
+use soapberry_zip::office::LazyArchiveReader;
 use std::io::Read;
 use std::path::Path;
 
 /// Physical package reader that provides access to parts in a ZIP-based OPC package.
 ///
 /// Uses soapberry_zip for high-performance zero-copy ZIP parsing with lazy decompression.
-/// File contents are only decompressed when accessed.
+/// File contents are decompressed on-demand and cached for efficiency. This enables
+/// pipelining of decompression with XML parsing for better throughput.
 pub struct PhysPkgReader<'data> {
-    /// The underlying ZIP archive reader
-    archive: ArchiveReader<'data>,
+    /// The underlying ZIP archive reader (lazy decompression with caching)
+    archive: LazyArchiveReader<'data>,
 }
 
 /// Owned version of PhysPkgReader that owns the data buffer.
@@ -54,7 +55,7 @@ impl OwnedPhysPkgReader {
     /// Create a new OwnedPhysPkgReader from owned bytes.
     pub fn from_bytes(data: Vec<u8>) -> Result<Self> {
         // Validate the ZIP archive can be parsed
-        let _ = ArchiveReader::new(&data)?;
+        let _ = LazyArchiveReader::new(&data)?;
         Ok(Self { data })
     }
 
@@ -141,7 +142,7 @@ impl<'data> PhysPkgReader<'data> {
     /// # Returns
     /// A new PhysPkgReader instance
     pub fn new(data: &'data [u8]) -> Result<Self> {
-        let archive = ArchiveReader::new(data)?;
+        let archive = LazyArchiveReader::new(data)?;
         Ok(Self { archive })
     }
 
@@ -231,19 +232,15 @@ impl<'data> PhysPkgReader<'data> {
     /// Parts that fail to read are not included in the result.
     pub fn blobs_parallel(&self, uris: &[PackURI]) -> std::collections::HashMap<String, Vec<u8>> {
         let names: Vec<&str> = uris.iter().map(|uri| uri.membername()).collect();
-        let results = self.archive.read_many_parallel(&names);
-
-        results
-            .into_iter()
-            .filter_map(|(name, result)| result.ok().map(|data| ((*name).to_string(), data)))
-            .collect()
+        self.archive.read_many_parallel(&names)
     }
 
-    /// Get a reference to the underlying archive reader.
+    /// Get a reference to the underlying lazy archive reader.
     ///
-    /// Useful for advanced operations like parallel bulk reading.
+    /// The lazy reader decompresses files on-demand and caches results.
+    /// This enables pipelining of decompression with parsing.
     #[inline]
-    pub fn archive(&self) -> &ArchiveReader<'data> {
+    pub fn archive(&self) -> &LazyArchiveReader<'data> {
         &self.archive
     }
 }

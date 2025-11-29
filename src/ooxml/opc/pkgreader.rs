@@ -219,10 +219,15 @@ pub struct PackageReader {
 impl PackageReader {
     /// Open and parse an OPC package from a byte slice.
     ///
-    /// Uses parallel decompression for maximum performance:
-    /// 1. Pre-load ALL archive contents in parallel
-    /// 2. Parse content types and relationships from memory
-    /// 3. Traverse relationship graph using pre-loaded data
+    /// Uses lazy decompression for maximum throughput:
+    /// 1. Decompress files on-demand during relationship graph traversal
+    /// 2. Parse each file as soon as it's decompressed (pipelining)
+    /// 3. Cache decompressed data to avoid redundant work
+    ///
+    /// This approach is faster than pre-loading everything because:
+    /// - Parsing can start while other files are still being decompressed
+    /// - Files not in the relationship graph are never decompressed
+    /// - Memory pressure is reduced (don't hold all decompressed data at once)
     ///
     /// # Arguments
     /// * `phys_reader` - Physical package reader for accessing ZIP contents
@@ -230,44 +235,25 @@ impl PackageReader {
     /// # Returns
     /// A new PackageReader with all parts and relationships loaded
     pub fn from_phys_reader(phys_reader: &PhysPkgReader<'_>) -> Result<Self> {
-        // Phase 1: Pre-load ALL files in parallel (the expensive CPU-bound work)
-        let mut all_files = phys_reader.archive().read_all_parallel();
+        let archive = phys_reader.archive();
 
-        // Phase 2: Parse content types from pre-loaded data
+        // Phase 1: Decompress and parse content types (on-demand)
         let content_types_path =
             crate::ooxml::opc::packuri::CONTENT_TYPES_URI.trim_start_matches('/');
-        let content_types_xml = all_files
-            .get(content_types_path)
-            .ok_or_else(|| OpcError::PartNotFound("[Content_Types].xml".to_string()))?;
-        let content_types = ContentTypeMap::from_xml(content_types_xml)?;
+        let content_types_xml = archive
+            .read(content_types_path)
+            .map_err(|_| OpcError::PartNotFound("[Content_Types].xml".to_string()))?;
+        let content_types = ContentTypeMap::from_xml(&content_types_xml)?;
 
-        // Phase 3: Get package-level relationships from pre-loaded data
+        // Phase 2: Get package-level relationships (on-demand decompression)
         let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
-        let pkg_srels = Self::load_rels_from_cache(&all_files, &package_uri)?;
+        let pkg_srels = Self::load_rels_lazy(archive, &package_uri)?;
 
-        // Phase 4: Load all parts by walking the relationship graph (all in-memory now)
-        // Takes ownership of blobs from cache to avoid cloning
-        let sparts = Self::load_parts_from_cache(&mut all_files, &pkg_srels, &content_types)?;
+        // Phase 3: Load all parts by walking the relationship graph
+        // Each part is decompressed on-demand as it's traversed
+        let sparts = Self::load_parts_lazy(archive, &pkg_srels, &content_types)?;
 
         Ok(Self { pkg_srels, sparts })
-    }
-
-    /// Load relationships from pre-loaded file cache.
-    ///
-    /// Same as load_rels but uses pre-decompressed data from cache instead of reading from archive.
-    fn load_rels_from_cache(
-        cache: &HashMap<String, Vec<u8>>,
-        source_uri: &PackURI,
-    ) -> Result<SmallVec<[SerializedRelationship; 8]>> {
-        let rels_uri = source_uri.rels_uri().map_err(OpcError::InvalidPackUri)?;
-        let rels_path = rels_uri.membername().to_string();
-
-        let rels_xml = match cache.get(&rels_path) {
-            Some(xml) => xml,
-            None => return Ok(SmallVec::new()), // No relationships file
-        };
-
-        Self::parse_rels_xml(rels_xml, source_uri.base_uri())
     }
 
     /// Parse relationships XML into SerializedRelationship structs.
@@ -319,19 +305,42 @@ impl PackageReader {
         Ok(srels)
     }
 
-    /// Load all parts from pre-loaded file cache.
+    /// Load relationships using lazy on-demand decompression.
     ///
-    /// Traverses the relationship graph using only pre-decompressed data.
-    /// This is the fully parallelized version where all decompression happened upfront.
-    /// Takes ownership of blobs from cache to avoid cloning large byte vectors.
-    fn load_parts_from_cache(
-        cache: &mut HashMap<String, Vec<u8>>,
+    /// Decompresses and parses the relationships file for a given source URI.
+    /// The result is cached by the lazy archive reader for subsequent access.
+    fn load_rels_lazy(
+        archive: &soapberry_zip::office::LazyArchiveReader<'_>,
+        source_uri: &PackURI,
+    ) -> Result<SmallVec<[SerializedRelationship; 8]>> {
+        let rels_uri = source_uri.rels_uri().map_err(OpcError::InvalidPackUri)?;
+        let rels_path = rels_uri.membername();
+
+        match archive.read(rels_path) {
+            Ok(rels_xml) => Self::parse_rels_xml(&rels_xml, source_uri.base_uri()),
+            Err(_) => Ok(SmallVec::new()), // No relationships file
+        }
+    }
+
+    /// Load all parts using parallel decompression of only referenced files.
+    ///
+    /// This is a two-phase approach for maximum performance:
+    /// 1. First pass: traverse relationship graph using small .rels files to discover all parts
+    /// 2. Second pass: decompress ALL discovered part contents in PARALLEL
+    ///
+    /// This avoids decompressing unreferenced files (like unused images) while still
+    /// getting full parallel decompression for all needed parts.
+    fn load_parts_lazy(
+        archive: &soapberry_zip::office::LazyArchiveReader<'_>,
         pkg_srels: &[SerializedRelationship],
         content_types: &ContentTypeMap,
     ) -> Result<Vec<SerializedPart>> {
         use std::collections::HashSet;
 
-        let mut sparts = Vec::with_capacity(32);
+        // Phase 1: Discover all parts by traversing relationships (small files only)
+        // This collects: (partname, reltype, relationships)
+        let mut discovered: Vec<(PackURI, String, SmallVec<[SerializedRelationship; 8]>)> =
+            Vec::with_capacity(32);
         let mut visited = HashSet::with_capacity(32);
         let mut work_queue: Vec<(PackURI, String)> = Vec::with_capacity(pkg_srels.len());
 
@@ -342,18 +351,16 @@ impl PackageReader {
             }
             if let Ok(partname) = srel.target_partname() {
                 let partname_str = partname.to_string();
-                if visited.insert(partname_str.clone()) {
+                if visited.insert(partname_str) {
                     work_queue.push((partname, srel.reltype.clone()));
                 }
             }
         }
 
-        // Iterative traversal using cached data only
+        // Traverse relationship graph (only decompresses small .rels files)
         while let Some((partname, reltype)) = work_queue.pop() {
-            let membername = partname.membername().to_string();
-
-            // Load relationships from cache FIRST (before taking blob ownership)
-            let part_srels = Self::load_rels_from_cache(cache, &partname)?;
+            // Load relationships for this part
+            let part_srels = Self::load_rels_lazy(archive, &partname)?;
 
             // Add child parts to work queue
             for child_srel in &part_srels {
@@ -368,9 +375,26 @@ impl PackageReader {
                 }
             }
 
-            // Take ownership of blob from cache (zero-copy move)
-            let blob = cache
-                .remove(&membername)
+            discovered.push((partname, reltype, part_srels));
+        }
+
+        // Phase 2: Parallel decompression of all discovered parts
+        // Collect member names for parallel batch read
+        let member_names: Vec<&str> = discovered
+            .iter()
+            .map(|(partname, _, _)| partname.membername())
+            .collect();
+
+        // Decompress all part contents in parallel
+        let mut decompressed = archive.read_many_parallel(&member_names);
+
+        // Phase 3: Build SerializedPart structures (take ownership, no cloning)
+        let mut sparts = Vec::with_capacity(discovered.len());
+        for (partname, reltype, part_srels) in discovered {
+            let membername = partname.membername();
+            // Remove from map to take ownership instead of cloning
+            let blob = decompressed
+                .remove(membername)
                 .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
             let content_type = content_types.get(&partname)?;
 
