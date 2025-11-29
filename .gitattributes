@@ -1,0 +1,17 @@
+# Treat all the Office files as binary
+*.pptx binary
+*.docx binary
+*.xls binary
+*.xlsx binary
+*.xlsb binary
+*.doc binary
+*.ppt binary
+*.odt binary
+*.ods binary
+*.odp binary
+*.pages binary
+*.numbers binary
+*.key binary
+# Though RTF could be text, it's better to treat it as binary
+*.rtf binary
+*.zip binary
