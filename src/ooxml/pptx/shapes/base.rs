@@ -89,10 +89,9 @@ impl BaseShape {
 
         let mut reader = Reader::from_reader(&self.xml_bytes[..]);
         reader.config_mut().trim_text(true);
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"cNvPr" {
                         for attr in e.attributes().flatten() {
@@ -109,7 +108,6 @@ impl BaseShape {
                 Err(_) => break,
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(String::new())
@@ -143,10 +141,9 @@ impl BaseShape {
     pub fn is_placeholder(&self) -> bool {
         // Look for <p:ph> element
         let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"ph" {
                         return true;
@@ -156,7 +153,6 @@ impl BaseShape {
                 Err(_) => break,
                 _ => {},
             }
-            buf.clear();
         }
 
         false
@@ -178,10 +174,9 @@ impl BaseShape {
     /// ```
     pub fn placeholder_type(&self) -> Result<String> {
         let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"ph" {
                         // Look for the type attribute
@@ -202,7 +197,6 @@ impl BaseShape {
                 Err(e) => return Err(crate::ooxml::error::OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(String::new())
@@ -232,7 +226,6 @@ impl BaseShape {
 
         let mut reader = Reader::from_reader(&self.xml_bytes[..]);
         reader.config_mut().trim_text(true);
-        let mut buf = Vec::new();
 
         let mut x = 0;
         let mut y = 0;
@@ -240,7 +233,7 @@ impl BaseShape {
         let mut cy = 0;
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e)) => {
                     let tag_name = e.local_name();
 
@@ -286,7 +279,6 @@ impl BaseShape {
                 Err(_) => break,
                 _ => {},
             }
-            buf.clear();
         }
 
         self.geometry = Some(ShapeGeometry { x, y, cx, cy });

@@ -74,13 +74,11 @@ impl<'a> CommentsPart<'a> {
         reader.config_mut().trim_text(true);
 
         let mut comments = Vec::new();
-        let mut buf = Vec::new();
         let mut current_comment: Option<Comment> = None;
         let mut in_text = false;
 
         loop {
-            buf.clear();
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                     let tag_name = e.local_name();
 
@@ -225,11 +223,9 @@ impl<'a> CommentAuthorsPart<'a> {
         reader.config_mut().trim_text(true);
 
         let mut authors = Vec::new();
-        let mut buf = Vec::new();
 
         loop {
-            buf.clear();
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                     if e.local_name().as_ref() == b"cmAuthor" {
                         let mut id = 0;

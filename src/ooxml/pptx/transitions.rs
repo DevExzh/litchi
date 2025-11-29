@@ -259,14 +259,13 @@ impl SlideTransition {
 
         let mut reader = Reader::from_reader(xml);
         reader.config_mut().trim_text(true);
-        let mut buf = Vec::new();
 
         let mut transition: Option<SlideTransition> = None;
         let mut advance_on_click = true;
         let mut advance_after_ms: Option<u32> = None;
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                     let tag_name = e.local_name();
 
@@ -327,7 +326,6 @@ impl SlideTransition {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(transition)

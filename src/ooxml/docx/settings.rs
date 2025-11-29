@@ -123,10 +123,9 @@ impl DocumentSettings {
         reader.config_mut().trim_text(true);
 
         let mut settings = Self::new();
-        let mut buf = Vec::with_capacity(1024);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
                     match e.local_name().as_ref() {
                         b"documentProtection" => {
@@ -179,7 +178,6 @@ impl DocumentSettings {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(settings)

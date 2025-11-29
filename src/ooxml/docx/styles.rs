@@ -120,11 +120,10 @@ impl<'a> Styles<'a> {
         reader.config_mut().trim_text(true);
 
         let mut styles = SmallVec::new();
-        let mut buf = Vec::with_capacity(512);
         let mut current_style: Option<StyleBuilder> = None;
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) if e.local_name().as_ref() == b"style" => {
                     // Start a new style
                     let mut builder = StyleBuilder::default();
@@ -235,7 +234,6 @@ impl<'a> Styles<'a> {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         self.style_list = Some(styles);

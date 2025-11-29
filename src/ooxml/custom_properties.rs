@@ -486,14 +486,13 @@ impl CustomProperties {
 
         let mut properties = HashMap::new();
         let mut max_pid = 1;
-        let mut buf = Vec::new();
 
         // Current property being parsed
         let mut current_name: Option<String> = None;
         let mut current_pid: Option<i32> = None;
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                     let local_name = e.local_name();
                     let name_str = std::str::from_utf8(local_name.as_ref()).map_err(|e| {
@@ -537,9 +536,8 @@ impl CustomProperties {
                             // This is a value type element
                             let type_name = other.strip_prefix("vt:").unwrap_or(other);
 
-                            // Read the text content using a separate buffer
-                            let mut text_buf = Vec::new();
-                            if let Ok(Event::Text(text)) = reader.read_event_into(&mut text_buf) {
+                            // Read the text content
+                            if let Ok(Event::Text(text)) = reader.read_event() {
                                 let text_content =
                                     std::str::from_utf8(text.as_ref()).map_err(|e| {
                                         OoxmlError::Xml(format!("Invalid UTF-8 in text: {}", e))
@@ -569,7 +567,6 @@ impl CustomProperties {
                 Err(e) => return Err(OoxmlError::Xml(format!("XML parsing error: {}", e))),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(Self {

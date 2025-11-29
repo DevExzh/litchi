@@ -77,15 +77,13 @@ impl<'a> ThemePart<'a> {
         let mut minor_font: Option<ThemeFont> = None;
         let mut colors = Vec::new();
 
-        let mut buf = Vec::new();
         let mut in_major_font = false;
         let mut in_minor_font = false;
         let mut in_color_scheme = false;
         let mut current_color_name = String::new();
 
         loop {
-            buf.clear();
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                     let tag_name = e.local_name();
 

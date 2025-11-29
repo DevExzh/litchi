@@ -53,10 +53,9 @@ impl Picture {
     pub fn image_r_id(&self) -> Result<String> {
         let mut reader = Reader::from_reader(self.base.xml_bytes());
         reader.config_mut().trim_text(true);
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
                     // Look for <a:blip r:embed="rId..."/>
                     if e.local_name().as_ref() == b"blip" {
@@ -79,7 +78,6 @@ impl Picture {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Err(OoxmlError::PartNotFound(

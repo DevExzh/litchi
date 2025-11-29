@@ -83,13 +83,11 @@ impl<'a> ChartPart<'a> {
         let mut title: Option<String> = None;
         let mut has_legend = false;
 
-        let mut buf = Vec::new();
         let mut in_title = false;
         let mut in_title_text = false;
 
         loop {
-            buf.clear();
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                     let tag_name = e.local_name();
 

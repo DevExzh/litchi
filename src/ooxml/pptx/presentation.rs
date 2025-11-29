@@ -735,11 +735,9 @@ impl<'a> Presentation<'a> {
         reader.config_mut().trim_text(true);
 
         let mut hyperlinks = Vec::new();
-        let mut buf = Vec::new();
 
         loop {
-            buf.clear();
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                     if e.local_name().as_ref() == b"hlinkClick" {
                         let mut action = None;
@@ -808,12 +806,10 @@ impl<'a> Presentation<'a> {
         reader.config_mut().trim_text(true);
 
         let mut sections = Vec::new();
-        let mut buf = Vec::new();
         let mut current_section: Option<(String, usize)> = None;
 
         loop {
-            buf.clear();
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                     if e.local_name().as_ref() == b"section" {
                         let mut name = String::new();

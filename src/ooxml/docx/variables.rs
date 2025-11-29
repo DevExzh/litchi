@@ -85,10 +85,9 @@ impl DocumentVariables {
         reader.config_mut().trim_text(true);
 
         let mut variables = HashMap::new();
-        let mut buf = Vec::with_capacity(1024);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"docVar" {
                         let mut name = None;
@@ -115,7 +114,6 @@ impl DocumentVariables {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(Self { variables })

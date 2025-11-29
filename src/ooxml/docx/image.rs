@@ -260,11 +260,8 @@ pub(crate) fn parse_inline_images(xml_bytes: &[u8]) -> Result<SmallVec<[InlineIm
     let mut name = String::new();
     let mut r_embed = String::new();
 
-    let mut buf = Vec::with_capacity(1024); // Reusable buffer
-
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                 let local_name_ref = e.local_name();
                 let local_name = local_name_ref.as_ref();

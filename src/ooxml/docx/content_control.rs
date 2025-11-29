@@ -111,10 +111,9 @@ impl ContentControl {
         let mut current_type: Option<String> = None;
         let mut current_lock_delete = false;
         let mut current_lock_content = false;
-        let mut buf = Vec::with_capacity(1024);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     match e.local_name().as_ref() {
                         b"sdtPr" => {
@@ -205,7 +204,6 @@ impl ContentControl {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(controls)

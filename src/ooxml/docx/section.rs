@@ -248,10 +248,9 @@ impl Section {
         let mut page_size = PageSize::default();
         let mut reader = Reader::from_reader(self.xml_bytes.as_slice());
         reader.config_mut().trim_text(true);
-        let mut buf = Vec::with_capacity(128);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Empty(e)) if e.local_name().as_ref() == b"pgSz" => {
                     // Parse page size attributes
                     for attr in e.attributes().flatten() {
@@ -285,7 +284,6 @@ impl Section {
                 Err(_) => break,
                 _ => {},
             }
-            buf.clear();
         }
 
         self.page_size = Some(page_size);
@@ -300,10 +298,9 @@ impl Section {
         let mut margins = Margins::default();
         let mut reader = Reader::from_reader(self.xml_bytes.as_slice());
         reader.config_mut().trim_text(true);
-        let mut buf = Vec::with_capacity(128);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Empty(e)) if e.local_name().as_ref() == b"pgMar" => {
                     // Parse margin attributes
                     for attr in e.attributes().flatten() {
@@ -365,7 +362,6 @@ impl Section {
                 Err(_) => break,
                 _ => {},
             }
-            buf.clear();
         }
 
         self.margins = Some(margins);
@@ -380,10 +376,9 @@ impl Section {
         let mut start_type = WdSectionStart::default();
         let mut reader = Reader::from_reader(self.xml_bytes.as_slice());
         reader.config_mut().trim_text(true);
-        let mut buf = Vec::with_capacity(128);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Empty(e)) if e.local_name().as_ref() == b"type" => {
                     // Parse type attribute
                     for attr in e.attributes().flatten() {
@@ -399,7 +394,6 @@ impl Section {
                 Err(_) => break,
                 _ => {},
             }
-            buf.clear();
         }
 
         self.start_type = Some(start_type);

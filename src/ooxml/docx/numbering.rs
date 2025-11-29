@@ -115,10 +115,9 @@ impl Numbering {
         let mut current_abstract_type: Option<String> = None;
         let mut current_num_id: Option<u32> = None;
         let mut current_abstract_num_id: Option<u32> = None;
-        let mut buf = Vec::with_capacity(1024);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     match e.local_name().as_ref() {
                         b"abstractNum" => {
@@ -196,7 +195,6 @@ impl Numbering {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(Self {

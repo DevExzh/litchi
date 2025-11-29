@@ -117,10 +117,9 @@ impl Comment {
         let estimated_capacity = self.xml_bytes.len() / 8;
         let mut result = String::with_capacity(estimated_capacity);
         let mut in_text_element = false;
-        let mut buf = Vec::with_capacity(512);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = true;
@@ -139,7 +138,6 @@ impl Comment {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         result.shrink_to_fit();
@@ -168,10 +166,9 @@ impl Comment {
         let mut current_author = String::new();
         let mut current_initials: Option<String> = None;
         let mut current_date: Option<String> = None;
-        let mut buf = Vec::with_capacity(1024);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"comment" && !in_comment {
                         in_comment = true;
@@ -268,7 +265,6 @@ impl Comment {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(comments)

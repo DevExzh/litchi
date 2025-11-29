@@ -289,13 +289,12 @@ impl SlideBackground {
 
         let mut reader = Reader::from_reader(xml);
         reader.config_mut().trim_text(true);
-        let mut buf = Vec::new();
 
         let mut in_bg = false;
         let mut background: Option<SlideBackground> = None;
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                     let tag_name = e.local_name();
 
@@ -307,25 +306,25 @@ impl SlideBackground {
                         // Parse solid fill
                         if tag_name.as_ref() == b"solidFill" {
                             // Look for color
-                            if let Some(color) = Self::parse_color(&mut reader, &mut buf)? {
+                            if let Some(color) = Self::parse_color(&mut reader)? {
                                 background = Some(SlideBackground::Solid { color });
                             }
                         }
                         // Parse gradient fill
                         else if tag_name.as_ref() == b"gradFill" {
-                            if let Some(gradient) = Self::parse_gradient(&mut reader, &mut buf)? {
+                            if let Some(gradient) = Self::parse_gradient(&mut reader)? {
                                 background = Some(gradient);
                             }
                         }
                         // Parse picture fill (blipFill)
                         else if tag_name.as_ref() == b"blipFill" {
-                            if let Some(picture) = Self::parse_picture(&mut reader, &mut buf)? {
+                            if let Some(picture) = Self::parse_picture(&mut reader)? {
                                 background = Some(picture);
                             }
                         }
                         // Parse pattern fill
                         else if tag_name.as_ref() == b"pattFill"
-                            && let Some(pattern) = Self::parse_pattern(&mut reader, &mut buf)?
+                            && let Some(pattern) = Self::parse_pattern(&mut reader)?
                         {
                             background = Some(pattern);
                         }
@@ -340,22 +339,17 @@ impl SlideBackground {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(background)
     }
 
     /// Parse color from XML.
-    fn parse_color(
-        reader: &mut quick_xml::Reader<&[u8]>,
-        buf: &mut Vec<u8>,
-    ) -> Result<Option<String>> {
+    fn parse_color(reader: &mut quick_xml::Reader<&[u8]>) -> Result<Option<String>> {
         use quick_xml::events::Event;
 
         loop {
-            buf.clear();
-            match reader.read_event_into(buf) {
+            match reader.read_event() {
                 Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e)) => {
                     let tag_name = e.local_name();
                     if tag_name.as_ref() == b"srgbClr" {
@@ -387,10 +381,7 @@ impl SlideBackground {
     }
 
     /// Parse gradient fill from XML.
-    fn parse_gradient(
-        reader: &mut quick_xml::Reader<&[u8]>,
-        buf: &mut Vec<u8>,
-    ) -> Result<Option<SlideBackground>> {
+    fn parse_gradient(reader: &mut quick_xml::Reader<&[u8]>) -> Result<Option<SlideBackground>> {
         use quick_xml::events::Event;
 
         let mut gradient_type = GradientType::Linear;
@@ -399,8 +390,7 @@ impl SlideBackground {
         let mut depth = 0;
 
         loop {
-            buf.clear();
-            match reader.read_event_into(buf) {
+            match reader.read_event() {
                 Ok(Event::Start(ref e)) => {
                     depth += 1;
                     let tag_name = e.local_name();
@@ -420,7 +410,7 @@ impl SlideBackground {
                         }
 
                         // Parse color for this stop
-                        if let Some(color) = Self::parse_color(reader, buf)? {
+                        if let Some(color) = Self::parse_color(reader)? {
                             stops.push(GradientStop { position, color });
                         }
                     }
@@ -480,10 +470,7 @@ impl SlideBackground {
     }
 
     /// Parse picture fill from XML.
-    fn parse_picture(
-        _reader: &mut quick_xml::Reader<&[u8]>,
-        _buf: &mut Vec<u8>,
-    ) -> Result<Option<SlideBackground>> {
+    fn parse_picture(_reader: &mut quick_xml::Reader<&[u8]>) -> Result<Option<SlideBackground>> {
         // Note: Picture fills in backgrounds require accessing the image data
         // from the package relationships, which is not available in this parsing context.
         // The image data and relationship ID should be handled at a higher level
@@ -493,10 +480,7 @@ impl SlideBackground {
     }
 
     /// Parse pattern fill from XML.
-    fn parse_pattern(
-        reader: &mut quick_xml::Reader<&[u8]>,
-        buf: &mut Vec<u8>,
-    ) -> Result<Option<SlideBackground>> {
+    fn parse_pattern(reader: &mut quick_xml::Reader<&[u8]>) -> Result<Option<SlideBackground>> {
         use quick_xml::events::Event;
 
         let mut pattern_type = PatternType::Pct50;
@@ -507,8 +491,7 @@ impl SlideBackground {
         let mut in_bg = false;
 
         loop {
-            buf.clear();
-            match reader.read_event_into(buf) {
+            match reader.read_event() {
                 Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                     let tag_name = e.local_name();
 

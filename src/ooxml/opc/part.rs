@@ -229,7 +229,6 @@ impl XmlPart {
         }
 
         let mut reader = self.reader();
-        let mut buf = Vec::new();
         let mut in_target_element = false;
         let mut text_content = String::new();
 
@@ -237,7 +236,7 @@ impl XmlPart {
         let element_name_bytes = element_name.as_bytes();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                     // Fast byte-level comparison
                     if e.local_name().as_ref() == element_name_bytes {
@@ -264,7 +263,6 @@ impl XmlPart {
                 Err(e) => return Err(OpcError::XmlError(format!("XML parse error: {}", e))),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(None)
@@ -279,12 +277,11 @@ impl XmlPart {
         element_name: &str,
     ) -> Result<Vec<HashMap<String, String>>> {
         let mut reader = self.reader();
-        let mut buf = Vec::new();
         let mut results = Vec::new();
         let element_name_bytes = element_name.as_bytes();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                     if e.local_name().as_ref() == element_name_bytes {
                         let mut attrs = HashMap::new();
@@ -301,7 +298,6 @@ impl XmlPart {
                 Err(e) => return Err(OpcError::XmlError(format!("XML parse error: {}", e))),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(results)

@@ -69,10 +69,9 @@ impl Bookmark {
         reader.config_mut().trim_text(true);
 
         let mut bookmarks = Vec::new();
-        let mut buf = Vec::with_capacity(512);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"bookmarkStart" {
                         let mut id: Option<u32> = None;
@@ -105,7 +104,6 @@ impl Bookmark {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(bookmarks)

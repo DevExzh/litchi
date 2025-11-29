@@ -46,10 +46,9 @@ impl TextFrame {
 
         let mut text = String::new();
         let mut in_text_element = false;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     // Check if this is an a:t element (DrawingML text)
                     if e.local_name().as_ref() == b"t" {
@@ -74,7 +73,6 @@ impl TextFrame {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(text)
@@ -91,10 +89,9 @@ impl TextFrame {
         let mut current_para_xml = Vec::new();
         let mut in_para = false;
         let mut depth = 0;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     // DrawingML paragraphs are <a:p>
                     if e.local_name().as_ref() == b"p" && !in_para {
@@ -148,7 +145,6 @@ impl TextFrame {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(paragraphs)
@@ -196,10 +192,9 @@ impl Paragraph {
 
         let mut text = String::new();
         let mut in_text_element = false;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = true;
@@ -219,7 +214,6 @@ impl Paragraph {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(text)

@@ -136,10 +136,9 @@ impl Note {
         let estimated_capacity = self.xml_bytes.len() / 8;
         let mut result = String::with_capacity(estimated_capacity);
         let mut in_text_element = false;
-        let mut buf = Vec::with_capacity(512);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = true;
@@ -158,7 +157,6 @@ impl Note {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         result.shrink_to_fit();
@@ -194,10 +192,9 @@ impl Note {
         let mut current_para_xml = Vec::with_capacity(4096);
         let mut in_para = false;
         let mut depth = 0;
-        let mut buf = Vec::with_capacity(1024);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"p" && !in_para {
                         in_para = true;
@@ -266,7 +263,6 @@ impl Note {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(paragraphs)
@@ -310,10 +306,9 @@ impl Note {
         let mut depth = 0;
         let mut current_id: Option<u32> = None;
         let mut current_type = NoteType::Normal;
-        let mut buf = Vec::with_capacity(1024);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == note_tag && !in_note {
                         in_note = true;
@@ -405,7 +400,6 @@ impl Note {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(notes)

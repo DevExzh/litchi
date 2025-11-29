@@ -108,10 +108,8 @@ impl ContentTypeMap {
         let mut reader = Reader::from_reader(xml);
         reader.config_mut().trim_text(true);
 
-        let mut buf = Vec::new();
-
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Empty(ref e)) => {
                     match e.local_name().as_ref() {
                         b"Default" => {
@@ -170,7 +168,6 @@ impl ContentTypeMap {
                 },
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(map)
@@ -282,10 +279,8 @@ impl PackageReader {
         let mut reader = Reader::from_reader(rels_xml);
         reader.config_mut().trim_text(true);
 
-        let mut buf = Vec::new();
-
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e)) => {
                     if e.local_name().as_ref() == b"Relationship" {
                         let mut r_id = None;
@@ -319,7 +314,6 @@ impl PackageReader {
                 Err(e) => return Err(OpcError::XmlError(format!("Rels parse error: {}", e))),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(srels)

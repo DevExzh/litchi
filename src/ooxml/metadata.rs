@@ -13,7 +13,6 @@ use crate::ooxml::opc::{OpcPackage, PackURI};
 use chrono::{DateTime, Utc};
 use quick_xml::Reader;
 use quick_xml::events::Event;
-use std::io::BufRead;
 
 /// Extract metadata from an OOXML package.
 ///
@@ -70,79 +69,78 @@ fn find_core_properties_part(package: &OpcPackage) -> Result<&dyn crate::ooxml::
 /// The core properties XML follows the Dublin Core metadata standard
 /// and OPC-specific extensions.
 fn parse_core_properties_xml(xml: &str) -> Result<Metadata> {
-    let mut reader = Reader::from_str(xml);
+    let mut reader = Reader::from_reader(xml.as_bytes());
     reader.config_mut().trim_text(true);
 
     let mut metadata = Metadata::default();
-    let mut buf = Vec::new();
 
     loop {
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Start(ref e)) => {
                 match e.name().as_ref() {
                     b"dc:title" | b"cp:title" => {
-                        if let Some(text) = read_text_element(&mut reader, &mut buf)? {
+                        if let Some(text) = read_text_element(&mut reader)? {
                             metadata.title = Some(text);
                         }
                     },
                     b"dc:subject" | b"cp:subject" => {
-                        if let Some(text) = read_text_element(&mut reader, &mut buf)? {
+                        if let Some(text) = read_text_element(&mut reader)? {
                             metadata.subject = Some(text);
                         }
                     },
                     b"dc:creator" | b"cp:creator" | b"dc:author" | b"cp:author" => {
-                        if let Some(text) = read_text_element(&mut reader, &mut buf)? {
+                        if let Some(text) = read_text_element(&mut reader)? {
                             metadata.author = Some(text);
                         }
                     },
                     b"cp:keywords" => {
-                        if let Some(text) = read_text_element(&mut reader, &mut buf)? {
+                        if let Some(text) = read_text_element(&mut reader)? {
                             metadata.keywords = Some(text);
                         }
                     },
                     b"dc:description" | b"cp:description" | b"cp:comment" => {
-                        if let Some(text) = read_text_element(&mut reader, &mut buf)? {
+                        if let Some(text) = read_text_element(&mut reader)? {
                             metadata.description = Some(text);
                         }
                     },
                     b"cp:lastModifiedBy" => {
-                        if let Some(text) = read_text_element(&mut reader, &mut buf)? {
+                        if let Some(text) = read_text_element(&mut reader)? {
                             metadata.last_modified_by = Some(text);
                         }
                     },
                     b"cp:revision" => {
-                        if let Some(text) = read_text_element(&mut reader, &mut buf)?
+                        if let Some(text) = read_text_element(&mut reader)?
                             && let Ok(rev) = text.parse::<u32>()
                         {
                             metadata.revision = Some(rev.to_string());
                         }
                     },
                     b"cp:category" => {
-                        if let Some(text) = read_text_element(&mut reader, &mut buf)? {
+                        if let Some(text) = read_text_element(&mut reader)? {
                             metadata.category = Some(text);
                         }
                     },
                     b"cp:contentStatus" => {
-                        if let Some(text) = read_text_element(&mut reader, &mut buf)? {
+                        if let Some(text) = read_text_element(&mut reader)? {
                             metadata.content_status = Some(text);
                         }
                     },
                     b"dcterms:created" | b"cp:created" => {
-                        if let Some(text) = read_text_element(&mut reader, &mut buf)?
+                        if let Some(text) = read_text_element(&mut reader)?
                             && let Ok(dt) = parse_datetime(&text)
                         {
                             metadata.created = Some(dt);
                         }
                     },
                     b"dcterms:modified" | b"cp:modified" => {
-                        if let Some(text) = read_text_element(&mut reader, &mut buf)?
+                        if let Some(text) = read_text_element(&mut reader)?
                             && let Ok(dt) = parse_datetime(&text)
                         {
                             metadata.modified = Some(dt);
                         }
                     },
                     b"cp:lastPrinted" => {
-                        if let Some(text) = read_text_element(&mut reader, &mut buf)?
+                        if let Some(text) = read_text_element(&mut reader)?
                             && let Ok(dt) = parse_datetime(&text)
                         {
                             metadata.last_printed_time = Some(dt);
@@ -159,21 +157,17 @@ fn parse_core_properties_xml(xml: &str) -> Result<Metadata> {
                 // Skip other events
             },
         }
-        buf.clear();
     }
 
     Ok(metadata)
 }
 
 /// Read the text content of an XML element.
-fn read_text_element<B: BufRead>(
-    reader: &mut Reader<B>,
-    buf: &mut Vec<u8>,
-) -> Result<Option<String>> {
+fn read_text_element(reader: &mut Reader<&[u8]>) -> Result<Option<String>> {
     let mut text = String::new();
 
     loop {
-        match reader.read_event_into(buf) {
+        match reader.read_event() {
             Ok(Event::Text(e)) => {
                 // Convert bytes to string (XML should be UTF-8)
                 let text_content = std::str::from_utf8(e.as_ref()).map_err(|e| {

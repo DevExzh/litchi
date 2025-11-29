@@ -118,10 +118,9 @@ impl Field {
         let mut current_result = String::new();
         let mut current_dirty = false;
         let mut field_depth: i32 = 0;
-        let mut buf = Vec::with_capacity(512);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     match e.local_name().as_ref() {
                         b"fldChar" => {
@@ -217,7 +216,6 @@ impl Field {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(fields)

@@ -38,8 +38,6 @@ impl<'arena> OmmlParser<'arena> {
         let mut reader = Reader::from_str(xml);
         reader.config_mut().trim_text(true);
 
-        let mut buf = Vec::with_capacity(1024); // Pre-allocate buffer for performance
-
         // Use high-performance element stack with capacity hint and context pooling
         let mut stack = ElementStack::with_capacity(64);
         let mut context_pool = ContextPool::new(32);
@@ -48,7 +46,7 @@ impl<'arena> OmmlParser<'arena> {
         const MAX_DEPTH: usize = 1000; // Prevent stack overflow attacks
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(ref e)) => {
                     depth += 1;
                     if depth > MAX_DEPTH {
@@ -89,7 +87,6 @@ impl<'arena> OmmlParser<'arena> {
                 },
                 _ => {}, // Skip other events (comments, processing instructions, etc.)
             }
-            buf.clear();
         }
 
         // Validate that we have a properly closed document

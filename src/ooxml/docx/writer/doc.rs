@@ -989,10 +989,9 @@ impl DocumentBody {
         let mut in_paragraph = false;
         let mut in_table = false;
         let mut depth = 0;
-        let mut buf = Vec::with_capacity(2048);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     let tag = e.local_name();
                     if tag.as_ref() == b"p" && !in_paragraph && !in_table {
@@ -1111,7 +1110,6 @@ impl DocumentBody {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(body)

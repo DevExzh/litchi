@@ -219,11 +219,8 @@ pub(crate) fn parse_revisions(xml_bytes: &[u8]) -> Result<SmallVec<[Revision; 4]
     let mut in_revision_text = false;
     let mut current_revision: Option<Revision> = None;
 
-    let mut buf = Vec::with_capacity(1024); // Reusable buffer
-
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                 let local_name_ref = e.local_name();
                 let local_name = local_name_ref.as_ref();

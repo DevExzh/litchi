@@ -136,10 +136,9 @@ impl Hyperlink {
         let mut current_anchor: Option<String> = None;
         let mut current_tooltip: Option<String> = None;
         let mut in_text = false;
-        let mut buf = Vec::with_capacity(512);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     match e.local_name().as_ref() {
                         b"hyperlink" => {
@@ -220,7 +219,6 @@ impl Hyperlink {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(hyperlinks)
@@ -250,10 +248,9 @@ impl Hyperlink {
         let mut current_anchor: Option<String> = None;
         let mut current_tooltip: Option<String> = None;
         let mut in_text = false;
-        let mut buf = Vec::with_capacity(512);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     match e.local_name().as_ref() {
                         b"hyperlink" => {
@@ -328,7 +325,6 @@ impl Hyperlink {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(hyperlinks)

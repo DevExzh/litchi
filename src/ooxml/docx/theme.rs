@@ -79,10 +79,9 @@ impl Theme {
         let mut theme = Self::new();
         let mut in_major_font = false;
         let mut in_minor_font = false;
-        let mut buf = Vec::with_capacity(1024);
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => match e.local_name().as_ref() {
                     b"theme" => {
                         for attr in e.attributes().flatten() {
@@ -129,7 +128,6 @@ impl Theme {
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(theme)

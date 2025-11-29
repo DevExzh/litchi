@@ -459,10 +459,9 @@ impl<'a> Slide<'a> {
 
         let mut text = String::new();
         let mut in_text_element = false;
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     if e.local_name().as_ref() == b"t" {
                         in_text_element = true;
@@ -485,7 +484,6 @@ impl<'a> Slide<'a> {
                 Err(e) => return Err(crate::ooxml::error::OoxmlError::Xml(e.to_string())),
                 _ => {},
             }
-            buf.clear();
         }
 
         if text.is_empty() {
