@@ -50,10 +50,15 @@ pub mod escher_prop {
     pub const ADJUST_VALUE: u16 = 0x0080;
     pub const FILL_COLOR: u16 = 0x0181;
     pub const FILL_BACK_COLOR: u16 = 0x0183;
+    pub const FILL_RECT_RIGHT: u16 = 0x0188;
+    pub const FILL_RECT_BOTTOM: u16 = 0x0189;
     pub const NO_FILL_HIT_TEST: u16 = 0x01BF;
     pub const LINE_COLOR: u16 = 0x01C0;
+    pub const LINE_NO_DRAW_DASH: u16 = 0x01FF; // lineStyleBooleanProperties
     pub const SHAPE_BOOL: u16 = 0x01FF;
     pub const SHADOW_COLOR: u16 = 0x0201;
+    pub const BW_MODE: u16 = 0x0304; // blackAndWhiteMode
+    pub const BACKGROUND_SHAPE: u16 = 0x017F; // fBackground
     // Complex property flag
     pub const COMPLEX_FLAG: u16 = 0x4000;
 }
@@ -65,9 +70,11 @@ pub mod escher_prop {
 /// Drawing structure constants
 pub mod drawing_counts {
     pub const MASTER_DRAWING_ID: u32 = 1;
-    pub const MASTER_SHAPE_COUNT: u32 = 6;
+    pub const MASTER_SHAPE_COUNT: u32 = 7; // 1 group + 5 placeholders + 1 background
     pub const MASTER_BASE_SPID: u32 = 0x0400;
-    pub const MASTER_LAST_SPID: u32 = 0x0406;
+    pub const MASTER_BG_SPID: u32 = 0x0401; // Background shape ID (group + 1)
+    /// spidCur - next available shape ID (base + shape_count)
+    pub const MASTER_SPID_CUR: u32 = 0x0407; // 0x0400 + 7 = 1031
 }
 
 // =============================================================================
@@ -241,6 +248,39 @@ impl MasterPPDrawingBuilder {
         start
     }
 
+    /// Build background SpContainer (outside SpgrContainer, per POI)
+    fn build_background_sp_container(&mut self) {
+        let start = self.data.len();
+        // SpContainer header (will be patched)
+        self.write_escher_header(0x0F, 0, escher_rt::SP_CONTAINER, 0);
+        let content_start = self.data.len();
+
+        // Background Sp record: rectangle shape type, BACKGROUND | HAVE_SPT flags
+        self.build_escher_sp(
+            1, // RECTANGLE shape type
+            drawing_counts::MASTER_BG_SPID,
+            (ShapeFlags::BACKGROUND | ShapeFlags::HAVE_SPT).bits(),
+        );
+
+        // Background EscherOpt properties (per POI PPDrawing.create())
+        let bg_props = [
+            (escher_prop::FILL_COLOR, 0x08000000),        // fillColor
+            (escher_prop::FILL_BACK_COLOR, 0x08000005),   // fillBackColor
+            (escher_prop::FILL_RECT_RIGHT, 0x0099A040),   // fillRectRight (10064960)
+            (escher_prop::FILL_RECT_BOTTOM, 0x0076BE60),  // fillRectBottom (7782016)
+            (escher_prop::NO_FILL_HIT_TEST, 0x00120012),  // noFillHitTest
+            (escher_prop::LINE_NO_DRAW_DASH, 0x00080000), // lineNoDrawDash
+            (escher_prop::BW_MODE, 0x00000009),           // bwMode
+            (escher_prop::BACKGROUND_SHAPE, 0x00010001),  // fBackground
+        ];
+        self.build_escher_opt(bg_props.len() as u16, &bg_props);
+
+        // Patch container length
+        let content_len = (self.data.len() - content_start) as u32;
+        let len_bytes = content_len.to_le_bytes();
+        self.data[start + 4..start + 8].copy_from_slice(&len_bytes);
+    }
+
     /// Build a placeholder SpContainer
     fn build_placeholder_container(
         &mut self,
@@ -313,7 +353,7 @@ impl MasterPPDrawingBuilder {
         // EscherDg
         self.build_escher_dg(
             drawing_counts::MASTER_SHAPE_COUNT,
-            drawing_counts::MASTER_LAST_SPID,
+            drawing_counts::MASTER_SPID_CUR,
         );
 
         // SpgrContainer (will be patched)
@@ -409,6 +449,9 @@ impl MasterPPDrawingBuilder {
         let spgr_len = (self.data.len() - spgr_container_start) as u32;
         let len_bytes = spgr_len.to_le_bytes();
         self.data[spgr_container_start - 4..spgr_container_start].copy_from_slice(&len_bytes);
+
+        // Background SpContainer (outside SpgrContainer, per POI PPDrawing.create())
+        self.build_background_sp_container();
 
         // Patch DgContainer length
         let dg_len = (self.data.len() - dg_container_start) as u32;

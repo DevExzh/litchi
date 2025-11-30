@@ -51,6 +51,7 @@ pub mod record_type {
     pub const PP_DRAWING_GROUP: u16 = 1035;
     pub const PP_DRAWING: u16 = 1036;
     pub const FONT_COLLECTION: u16 = 2005;
+    pub const FONT_ENTITY_ATOM: u16 = 2006;
     pub const COLOR_SCHEME_ATOM: u16 = 2032;
     pub const TX_MASTER_STYLE_ATOM: u16 = 4003; // TxMasterStyleAtom
     pub const TX_CF_STYLE_ATOM: u16 = 4004; // TxCFStyleAtom
@@ -68,6 +69,8 @@ pub mod record_type {
     pub const PROG_BINARY_TAG: u16 = 5002;
     pub const BINARY_TAG_DATA: u16 = 5003;
     pub const CSTRING: u16 = 4026;
+    pub const TEXT_HEADER_ATOM: u16 = 3999;
+    pub const STYLE_TEXT_PROP_ATOM: u16 = 4001;
     // Escher types (payloads of PPDrawing/PPDrawingGroup)
     pub const DRAWING: u16 = 0xF008;
     pub const DRAWING_GROUP: u16 = 0xF006;
@@ -77,6 +80,8 @@ pub mod record_type {
     pub const PERSIST_PTR_HOLDER: u16 = 6001; // PersistDirectoryAtom (full)
     pub const PERSIST_PTR_INCREMENTAL_BLOCK: u16 = 6002; // PersistPtrIncrementalBlock (incremental)
     pub const USER_EDIT_ATOM: u16 = 4085;
+    pub const INTERACTIVE_INFO: u16 = 4082; // InteractiveInfo container
+    pub const INTERACTIVE_INFO_ATOM: u16 = 4083; // InteractiveInfoAtom
 }
 
 /// PPT record header
@@ -444,7 +449,7 @@ pub fn create_environment_minimal() -> Result<Vec<u8>, PptError> {
 
     // 2) FontCollection container with FontEntityAtom (Arial)
     let mut fc = RecordBuilder::new(0x0F, 0, record_type::FONT_COLLECTION);
-    let mut fea = RecordBuilder::new(0x00, 0, 4023); // FontEntityAtom
+    let mut fea = RecordBuilder::new(0x00, 0, record_type::FONT_ENTITY_ATOM);
     let mut fe_data = vec![0u8; 68];
     // Write "Arial\0" as UTF-16LE into first 64 bytes
     for (i, ch) in "Arial\0".encode_utf16().enumerate() {
@@ -498,6 +503,27 @@ pub fn create_slide_list_with_text_slides(entries: &[(u32, u32)]) -> Result<Vec<
         data.extend_from_slice(&4u32.to_le_bytes()); // flags: HAS_SHAPES_OTHER_THAN_PLACEHOLDERS
         data.extend_from_slice(&0u32.to_le_bytes()); // numPlaceholderTexts
         data.extend_from_slice(&slide_identifier.to_le_bytes()); // slideIdentifier
+        // reserved 4 bytes
+        data.extend_from_slice(&0u32.to_le_bytes());
+        spa.write_data(&data);
+        builder.write_child(&spa.build()?);
+    }
+
+    builder.build()
+}
+
+/// Create a SlideListWithText (instance=NOTES) containing SlidePersistAtom entries for notes.
+/// Each entry is (persist_id_ref, notes_identifier).
+pub fn create_slide_list_with_text_notes(entries: &[(u32, u32)]) -> Result<Vec<u8>, PptError> {
+    let mut builder = RecordBuilder::new(0x0F, 2, record_type::SLIDE_LIST_WITH_TEXT); // instance=2 for NOTES
+
+    for &(persist_id_ref, notes_identifier) in entries {
+        let mut spa = RecordBuilder::new(0x00, 0, record_type::SLIDE_PERSIST_ATOM);
+        let mut data = Vec::with_capacity(24);
+        data.extend_from_slice(&persist_id_ref.to_le_bytes()); // refID
+        data.extend_from_slice(&4u32.to_le_bytes()); // flags: HAS_SHAPES_OTHER_THAN_PLACEHOLDERS
+        data.extend_from_slice(&0u32.to_le_bytes()); // numPlaceholderTexts
+        data.extend_from_slice(&notes_identifier.to_le_bytes()); // slideIdentifier (for notes, often slide# + offset)
         // reserved 4 bytes
         data.extend_from_slice(&0u32.to_le_bytes());
         spa.write_data(&data);

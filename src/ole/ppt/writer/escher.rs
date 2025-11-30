@@ -118,15 +118,19 @@ pub mod prop_id {
     pub const ADJUST_VALUE: u16 = 0x0080;
     pub const ADJUST2_VALUE: u16 = 0x0081;
 
-    // Fill style
+    // Fill style (MS-ODRAW section 2.3.7)
     pub const FILL_TYPE: u16 = 0x0180;
     pub const FILL_COLOR: u16 = 0x0181;
     pub const FILL_OPACITY: u16 = 0x0182;
     pub const FILL_BACK_COLOR: u16 = 0x0183;
     pub const FILL_BACK_OPACITY: u16 = 0x0184;
     pub const FILL_BLIP: u16 = 0x4186;
-    pub const FILL_RECT_RIGHT: u16 = 0x0193;
-    pub const FILL_RECT_BOTTOM: u16 = 0x0194;
+    pub const FILL_WIDTH: u16 = 0x0187; // fillWidth for pattern fills
+    pub const FILL_HEIGHT: u16 = 0x0188; // fillHeight for pattern fills
+    pub const FILL_ANGLE: u16 = 0x018A; // fillAngle for gradients (degrees * 65536)
+    pub const FILL_FOCUS: u16 = 0x018B; // fillFocus for gradients (-100 to 100)
+    pub const FILL_RECT_RIGHT: u16 = 0x0193; // fillRectRight per MS-ODRAW
+    pub const FILL_RECT_BOTTOM: u16 = 0x0194; // fillRectBottom per MS-ODRAW
     pub const NO_FILL_HIT_TEST: u16 = 0x01BF;
 
     // Line style
@@ -136,6 +140,12 @@ pub mod prop_id {
     pub const LINE_WIDTH: u16 = 0x01CB;
     pub const LINE_STYLE: u16 = 0x01CD;
     pub const LINE_DASH_STYLE: u16 = 0x01CE;
+    pub const LINE_START_ARROW: u16 = 0x01D0;
+    pub const LINE_END_ARROW: u16 = 0x01D1;
+    pub const LINE_START_ARROW_WIDTH: u16 = 0x01D2;
+    pub const LINE_START_ARROW_LENGTH: u16 = 0x01D3;
+    pub const LINE_END_ARROW_WIDTH: u16 = 0x01D4;
+    pub const LINE_END_ARROW_LENGTH: u16 = 0x01D5;
     pub const LINE_BLIP: u16 = 0x41C5;
     pub const LINE_STYLE_BOOL: u16 = 0x01FF;
 
@@ -143,11 +153,14 @@ pub mod prop_id {
     pub const SHADOW_TYPE: u16 = 0x0200;
     pub const SHADOW_COLOR: u16 = 0x0201;
     pub const SHADOW_OPACITY: u16 = 0x0204;
+    pub const SHADOW_OFFSET_X: u16 = 0x0205;
+    pub const SHADOW_OFFSET_Y: u16 = 0x0206;
+    pub const SHADOW_BOOL: u16 = 0x023F; // shadowObscured
 
     // Shape
     pub const BW_MODE: u16 = 0x0304;
     pub const SHAPE_BOOL: u16 = 0x01FF;
-    pub const BACKGROUND_SHAPE: u16 = 0x033F;
+    pub const BACKGROUND_SHAPE: u16 = 0x017F; // fBackground per MS-ODRAW
 }
 
 // =============================================================================
@@ -557,32 +570,32 @@ impl EscherBuilder {
 /// Create a DggContainer (Drawing Group Container) per MS-ODRAW
 ///
 /// # Arguments
-/// * `drawing_count` - Number of drawings (master + slides)
 /// * `master_shapes` - Number of shapes in the master (6 for POI template)
-/// * `slide_shapes` - Number of shapes per slide (typically 2: group + background)
+/// * `slide_shape_counts` - Shape count for each slide (including group+background, so user_shapes+2)
 pub fn create_dgg_container(
-    drawing_count: u32,
     master_shapes: u32,
-    slide_shapes: u32,
+    slide_shape_counts: &[u32],
 ) -> Result<Vec<u8>, PptError> {
     let mut container =
         EscherBuilder::new(header_version::CONTAINER, 0, record_type::DGG_CONTAINER);
 
-    // Calculate total shapes: master has master_shapes, each slide has slide_shapes
-    let slide_count = drawing_count.saturating_sub(1);
-    let csp_saved = master_shapes + slide_count * slide_shapes;
+    // Total drawings = 1 (master) + number of slides
+    let drawing_count = (slide_shape_counts.len() as u32) + 1;
+
+    // Calculate total shapes: master + sum of all slide shapes
+    let total_slide_shapes: u32 = slide_shape_counts.iter().sum();
+    let csp_saved = master_shapes + total_slide_shapes;
 
     // POI uses cidcl=4 (3 clusters) even for 1 drawing
     let num_clusters = std::cmp::max(3, drawing_count as usize);
     let cidcl = (num_clusters + 1) as u32;
 
-    // spidMax: POI's empty.ppt uses exactly 3076 = 3*1024 + 4
+    // spidMax: Calculate based on highest drawing ID * 1024 + shapes in that drawing
+    let max_slide_shapes = slide_shape_counts.iter().max().copied().unwrap_or(2);
     let spid_max = if drawing_count == 1 && master_shapes == prop_value::POI_MASTER_SHAPE_COUNT {
         prop_value::POI_SPID_MAX
-    } else if drawing_count == 1 {
-        3 * 1024 + csp_saved
     } else {
-        drawing_count * 1024 + slide_shapes
+        drawing_count * 1024 + max_slide_shapes
     };
 
     // Build EscherDgg record (OfficeArtFDGGBlock)
@@ -599,11 +612,13 @@ pub fn create_dgg_container(
     dgg_data.extend_from_slice(header.as_bytes());
 
     // FileIdClusters: each drawing gets its own cluster
+    // dg_id 1 = master, dg_id 2+ = slides
     for dg_id in 1..=drawing_count {
         let cspid_cur = if dg_id == 1 {
             master_shapes + 1
         } else {
-            slide_shapes + 1
+            let slide_idx = (dg_id - 2) as usize;
+            slide_shape_counts.get(slide_idx).copied().unwrap_or(2) + 1
         };
         let cluster = FileIdCluster::new(dg_id, cspid_cur);
         dgg_data.extend_from_slice(cluster.as_bytes());
@@ -615,6 +630,9 @@ pub fn create_dgg_container(
     }
     dgg.add_data(&dgg_data);
     container.add_data(&dgg.build()?);
+
+    // NOTE: BStore container goes here if pictures are present
+    // Call create_dgg_container_with_blips() instead if you have pictures
 
     // Add EscherOpt with default properties using const array
     let mut opt = EscherBuilder::new(
@@ -628,6 +646,90 @@ pub fn create_dgg_container(
     container.add_data(&opt.build()?);
 
     // Add SplitMenuColors using zerocopy struct
+    let mut colors = EscherBuilder::new(header_version::SIMPLE, 4, record_type::SPLIT_MENU_COLORS);
+    colors.add_data(SplitMenuColors::DEFAULT.as_bytes());
+    container.add_data(&colors.build()?);
+
+    container.build()
+}
+
+/// Create a DggContainer with BStore for pictures
+///
+/// Same as `create_dgg_container` but includes a BStoreContainer for pictures.
+/// The bstore_blob should be the raw bytes from `BlipStoreBuilder::build()`.
+pub fn create_dgg_container_with_blips(
+    master_shapes: u32,
+    slide_shape_counts: &[u32],
+    bstore_blob: &[u8],
+) -> Result<Vec<u8>, PptError> {
+    let mut container =
+        EscherBuilder::new(header_version::CONTAINER, 0, record_type::DGG_CONTAINER);
+
+    // Total drawings = 1 (master) + number of slides
+    let drawing_count = (slide_shape_counts.len() as u32) + 1;
+
+    // Calculate total shapes: master + sum of all slide shapes
+    let total_slide_shapes: u32 = slide_shape_counts.iter().sum();
+    let csp_saved = master_shapes + total_slide_shapes;
+
+    // POI uses cidcl=4 (3 clusters) even for 1 drawing
+    let num_clusters = std::cmp::max(3, drawing_count as usize);
+    let cidcl = (num_clusters + 1) as u32;
+
+    // spidMax: Calculate based on highest drawing ID * 1024 + shapes in that drawing
+    let max_slide_shapes = slide_shape_counts.iter().max().copied().unwrap_or(2);
+    let spid_max = if drawing_count == 1 && master_shapes == prop_value::POI_MASTER_SHAPE_COUNT {
+        prop_value::POI_SPID_MAX
+    } else {
+        drawing_count * 1024 + max_slide_shapes
+    };
+
+    // Build EscherDgg record (OfficeArtFDGGBlock)
+    let mut dgg = EscherBuilder::new(header_version::SIMPLE, 0, record_type::DGG);
+    let mut dgg_data = Vec::with_capacity(16 + num_clusters * 8);
+
+    let header = EscherDggHeader {
+        spid_max,
+        cidcl,
+        csp_saved,
+        cdg_saved: drawing_count,
+    };
+    dgg_data.extend_from_slice(header.as_bytes());
+
+    for dg_id in 1..=drawing_count {
+        let cspid_cur = if dg_id == 1 {
+            master_shapes + 1
+        } else {
+            let slide_idx = (dg_id - 2) as usize;
+            slide_shape_counts.get(slide_idx).copied().unwrap_or(2) + 1
+        };
+        let cluster = FileIdCluster::new(dg_id, cspid_cur);
+        dgg_data.extend_from_slice(cluster.as_bytes());
+    }
+
+    for _ in drawing_count..num_clusters as u32 {
+        dgg_data.extend_from_slice(FileIdCluster::reserved().as_bytes());
+    }
+    dgg.add_data(&dgg_data);
+    container.add_data(&dgg.build()?);
+
+    // BStore container (if not empty)
+    if !bstore_blob.is_empty() {
+        container.add_data(bstore_blob);
+    }
+
+    // Add EscherOpt with default properties
+    let mut opt = EscherBuilder::new(
+        header_version::OPT,
+        DGG_DEFAULT_PROPERTIES.len() as u16,
+        record_type::OPT,
+    );
+    for prop in &DGG_DEFAULT_PROPERTIES {
+        opt.add_data(prop.as_bytes());
+    }
+    container.add_data(&opt.build()?);
+
+    // Add SplitMenuColors
     let mut colors = EscherBuilder::new(header_version::SIMPLE, 4, record_type::SPLIT_MENU_COLORS);
     colors.add_data(SplitMenuColors::DEFAULT.as_bytes());
     container.add_data(&colors.build()?);
@@ -671,7 +773,10 @@ pub fn create_dg_container(drawing_id: u32, shape_count: u32) -> Result<Vec<u8>,
 
     spgr_container.add_data(&group_sp_container.build()?);
 
-    // Background shape container
+    // Add SpgrContainer to DgContainer first
+    container.add_data(&spgr_container.build()?);
+
+    // Background shape container - added to DgContainer OUTSIDE SpgrContainer (per POI)
     let mut bg_sp_container =
         EscherBuilder::new(header_version::CONTAINER, 0, record_type::SP_CONTAINER);
 
@@ -681,7 +786,7 @@ pub fn create_dg_container(drawing_id: u32, shape_count: u32) -> Result<Vec<u8>,
     bg_sp.add_data(EscherSpData::background(bg_spid).as_bytes());
     bg_sp_container.add_data(&bg_sp.build()?);
 
-    // Background EscherOpt properties
+    // Background EscherOpt properties (per POI PPDrawing.create())
     let mut opt = EscherBuilder::new(
         header_version::OPT,
         BG_SHAPE_PROPERTIES.len() as u16,
@@ -692,23 +797,11 @@ pub fn create_dg_container(drawing_id: u32, shape_count: u32) -> Result<Vec<u8>,
     }
     bg_sp_container.add_data(&opt.build()?);
 
-    // ClientAnchor (8 bytes zeros)
-    let mut client_anchor =
-        EscherBuilder::new(header_version::SIMPLE, 0, record_type::CLIENT_ANCHOR);
-    client_anchor.add_data(ClientAnchor::ZERO.as_bytes());
-    bg_sp_container.add_data(&client_anchor.build()?);
+    // NOTE: Per POI's PPDrawing.create(), background SpContainer has NO ClientAnchor or ClientData
+    // Only Sp + Opt records are present
 
-    // ClientData with nested OEPlaceholderAtom
-    let mut client_data =
-        EscherBuilder::new(header_version::CONTAINER, 0, record_type::CLIENT_DATA);
-    // PPT record header for OEPlaceholderAtom
-    let placeholder_header = EscherRecordHeader::new(0, 0, ppt_record_type::OE_PLACEHOLDER_ATOM, 8);
-    client_data.add_data(placeholder_header.as_bytes());
-    client_data.add_data(OEPlaceholderAtom::BACKGROUND.as_bytes());
-    bg_sp_container.add_data(&client_data.build()?);
-
-    spgr_container.add_data(&bg_sp_container.build()?);
-    container.add_data(&spgr_container.build()?);
+    // Add background SpContainer to DgContainer (NOT to SpgrContainer)
+    container.add_data(&bg_sp_container.build()?);
 
     container.build()
 }
@@ -754,6 +847,510 @@ pub struct ChildAnchor {
     pub top: i32,
     pub right: i32,
     pub bottom: i32,
+}
+
+// =============================================================================
+// User Shape Building
+// =============================================================================
+
+/// Shape data for building user shapes
+#[derive(Debug, Clone)]
+pub struct UserShapeData {
+    /// Shape type (Escher MSOSPT value)
+    pub shape_type: u16,
+    /// Position and size in EMUs
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+    /// Fill color (RGB, None = no fill)
+    pub fill_color: Option<u32>,
+    /// Fill type (0=solid, 4=shade/gradient, 5=shadecenter, etc.)
+    pub fill_type: Option<u32>,
+    /// Fill opacity (0-65536, 65536 = 100%)
+    pub fill_opacity: Option<u32>,
+    /// Fill back color (for gradients)
+    pub fill_back_color: Option<u32>,
+    /// Fill gradient angle (in degrees * 65536)
+    pub fill_angle: Option<i32>,
+    /// Line color (RGB, None = no line)
+    pub line_color: Option<u32>,
+    /// Line width in EMUs (12700 = 1pt)
+    pub line_width: Option<i32>,
+    /// Line dash style (0=solid, 1=dash, 2=dot, etc.)
+    pub line_dash_style: Option<u32>,
+    /// Line start arrow style
+    pub line_start_arrow: Option<u32>,
+    /// Line end arrow style
+    pub line_end_arrow: Option<u32>,
+    /// Text content (simple string, ignored if paragraphs set)
+    pub text: Option<String>,
+    /// Rich text paragraphs (with formatting)
+    pub paragraphs: Option<Vec<super::text_format::Paragraph>>,
+    /// Text type for TextHeaderAtom (0=Title, 1=Body, 2=Notes, 4=Other)
+    pub text_type: u32,
+    /// Placeholder type for notes/master shapes (None = not a placeholder)
+    pub placeholder_type: Option<u8>,
+    /// Shadow enabled
+    pub has_shadow: bool,
+    /// Flip horizontal
+    pub flip_h: bool,
+    /// Flip vertical
+    pub flip_v: bool,
+    /// Hyperlink ID (reference to ExObjList)
+    pub hyperlink_id: Option<u32>,
+    /// Hyperlink action type (for InteractiveInfoAtom)
+    pub hyperlink_action: u8,
+    /// Hyperlink jump type (for InteractiveInfoAtom)
+    pub hyperlink_jump: u8,
+    /// Hyperlink type (for InteractiveInfoAtom)
+    pub hyperlink_type: u8,
+    /// Picture BLIP index (1-based, for picture shapes)
+    pub picture_index: Option<u32>,
+}
+
+impl Default for UserShapeData {
+    fn default() -> Self {
+        Self {
+            shape_type: shape_type::RECTANGLE,
+            x: 0,
+            y: 0,
+            width: 914400, // 1 inch
+            height: 914400,
+            fill_color: None,
+            fill_type: None,
+            fill_opacity: None,
+            fill_back_color: None,
+            fill_angle: None,
+            line_color: Some(0x000000), // Black line by default
+            line_width: Some(12700),    // 1pt
+            line_dash_style: None,
+            line_start_arrow: None,
+            line_end_arrow: None,
+            text: None,
+            paragraphs: None,
+            text_type: 4,           // OTHER by default
+            placeholder_type: None, // Not a placeholder by default
+            has_shadow: false,
+            flip_h: false,
+            flip_v: false,
+            hyperlink_id: None,
+            hyperlink_action: 4, // ACTION_HYPERLINK
+            hyperlink_jump: 0,   // JUMP_NONE
+            hyperlink_type: 8,   // LINK_Url
+            picture_index: None, // Not a picture by default
+        }
+    }
+}
+
+/// Create a DgContainer with user shapes
+pub fn create_dg_container_with_shapes(
+    drawing_id: u32,
+    shapes: &[UserShapeData],
+) -> Result<Vec<u8>, PptError> {
+    let mut container = EscherBuilder::new(header_version::CONTAINER, 0, record_type::DG_CONTAINER);
+
+    // Total shapes = group + background + user shapes
+    let total_shapes = (shapes.len() as u32).saturating_add(2);
+
+    // Add DG record
+    let mut dg = EscherBuilder::new(header_version::DG, drawing_id as u16, record_type::DG);
+    let dg_data = EscherDgData::new(total_shapes, drawing_id);
+    dg.add_data(dg_data.as_bytes());
+    container.add_data(&dg.build()?);
+
+    // SpgrContainer
+    let mut spgr_container =
+        EscherBuilder::new(header_version::CONTAINER, 0, record_type::SPGR_CONTAINER);
+
+    // Group patriarch SpContainer
+    let mut group_sp_container =
+        EscherBuilder::new(header_version::CONTAINER, 0, record_type::SP_CONTAINER);
+
+    let mut spgr = EscherBuilder::new(header_version::SPGR, 0, record_type::SPGR);
+    spgr.add_data(EscherSpgrData::ZERO.as_bytes());
+    group_sp_container.add_data(&spgr.build()?);
+
+    let group_spid = drawing_id << 10;
+    let mut sp = EscherBuilder::new(
+        header_version::SP,
+        shape_type::NOT_PRIMITIVE,
+        record_type::SP,
+    );
+    sp.add_data(EscherSpData::group_patriarch(group_spid).as_bytes());
+    group_sp_container.add_data(&sp.build()?);
+
+    spgr_container.add_data(&group_sp_container.build()?);
+
+    // User shapes go INSIDE SpgrContainer (after group patriarch)
+    let bg_spid = group_spid + 1;
+    for (i, shape) in shapes.iter().enumerate() {
+        let shape_spid = bg_spid + 1 + (i as u32);
+        let sp_container = create_user_shape_container(shape_spid, shape)?;
+        spgr_container.add_data(&sp_container);
+    }
+
+    // Add SpgrContainer to DgContainer
+    container.add_data(&spgr_container.build()?);
+
+    // Background shape container - added to DgContainer OUTSIDE SpgrContainer (per POI)
+    let mut bg_sp_container =
+        EscherBuilder::new(header_version::CONTAINER, 0, record_type::SP_CONTAINER);
+
+    let mut bg_sp = EscherBuilder::new(header_version::SP, shape_type::RECTANGLE, record_type::SP);
+    bg_sp.add_data(EscherSpData::background(bg_spid).as_bytes());
+    bg_sp_container.add_data(&bg_sp.build()?);
+
+    let mut opt = EscherBuilder::new(
+        header_version::OPT,
+        BG_SHAPE_PROPERTIES.len() as u16,
+        record_type::OPT,
+    );
+    for prop in &BG_SHAPE_PROPERTIES {
+        opt.add_data(prop.as_bytes());
+    }
+    bg_sp_container.add_data(&opt.build()?);
+
+    // NOTE: Per POI's PPDrawing.create(), background SpContainer has NO ClientAnchor or ClientData
+    // Only Sp + Opt records are present
+
+    // Add background SpContainer to DgContainer (NOT to SpgrContainer)
+    container.add_data(&bg_sp_container.build()?);
+
+    container.build()
+}
+
+/// Convert EMU to master units (1/576 inch)
+/// EMU = 914400 per inch, Master = 576 per inch
+/// master = emu * 576 / 914400 = emu / 1588.0
+fn emu_to_master(emu: i32) -> i16 {
+    (emu as f64 / 1588.0).round() as i16
+}
+
+/// Create a user shape SpContainer
+fn create_user_shape_container(shape_id: u32, shape: &UserShapeData) -> Result<Vec<u8>, PptError> {
+    let mut container = EscherBuilder::new(header_version::CONTAINER, 0, record_type::SP_CONTAINER);
+
+    // Shape flags
+    let mut flags = ShapeFlags::HAVE_ANCHOR | ShapeFlags::HAVE_SPT;
+    if shape.flip_h {
+        flags |= ShapeFlags::FLIP_H;
+    }
+    if shape.flip_v {
+        flags |= ShapeFlags::FLIP_V;
+    }
+
+    // SP record
+    let mut sp = EscherBuilder::new(header_version::SP, shape.shape_type, record_type::SP);
+    sp.add_data(EscherSpData::with_flags(shape_id, flags).as_bytes());
+    container.add_data(&sp.build()?);
+
+    // OPT record with shape properties (sorted by property number, not full ID)
+    // Per POI: sort by getPropertyNumber() which masks out flags (id & 0x3FFF)
+    let mut properties = build_shape_properties(shape);
+    properties.sort_by_key(|p| p.prop_id & 0x3FFF);
+    let mut opt = EscherBuilder::new(
+        header_version::OPT,
+        properties.len() as u16,
+        record_type::OPT,
+    );
+    for prop in &properties {
+        opt.add_data(prop.as_bytes());
+    }
+    container.add_data(&opt.build()?);
+
+    // ClientAnchor with position/size (8-byte short format for PPT top-level shapes)
+    // POI uses: flag(y1), col1(x1), dx1(x2), row1(y2) - all shorts in master units
+    let mut anchor = EscherBuilder::new(header_version::SIMPLE, 0, record_type::CLIENT_ANCHOR);
+    let x1 = emu_to_master(shape.x);
+    let y1 = emu_to_master(shape.y);
+    let x2 = emu_to_master(shape.x + shape.width);
+    let y2 = emu_to_master(shape.y + shape.height);
+    // Short record format: 8 bytes (4 shorts)
+    anchor.add_data(&y1.to_le_bytes()); // flag/top
+    anchor.add_data(&x1.to_le_bytes()); // col1/left
+    anchor.add_data(&x2.to_le_bytes()); // dx1/right
+    anchor.add_data(&y2.to_le_bytes()); // row1/bottom
+    container.add_data(&anchor.build()?);
+
+    // ClientData with OEPlaceholderAtom for placeholders OR InteractiveInfo for hyperlinks
+    // MUST come BEFORE ClientTextbox per POI (addChildBefore(clientData, EscherTextboxRecord.RECORD_ID))
+    if let Some(placeholder_type) = shape.placeholder_type {
+        let client_data = build_client_data_with_placeholder(placeholder_type)?;
+        container.add_data(&client_data);
+    } else if let Some(hyperlink_id) = shape.hyperlink_id {
+        let client_data = build_client_data_with_hyperlink(
+            hyperlink_id,
+            shape.hyperlink_action,
+            shape.hyperlink_jump,
+            shape.hyperlink_type,
+        )?;
+        container.add_data(&client_data);
+    }
+
+    // ClientTextBox if text present (prefer paragraphs with formatting over plain text)
+    if let Some(paragraphs) = &shape.paragraphs {
+        if !paragraphs.is_empty() {
+            let textbox = build_client_textbox_formatted(paragraphs, shape.text_type)?;
+            container.add_data(&textbox);
+        }
+    } else if let Some(text) = &shape.text {
+        let textbox = build_client_textbox(text, shape.text_type)?;
+        container.add_data(&textbox);
+    }
+
+    container.build()
+}
+
+/// Build ClientData record with InteractiveInfo for hyperlink
+/// Per POI HSLFShape.getClientData(): clientData.setOptions((short)15) => version=0xF, instance=0
+fn build_client_data_with_hyperlink(
+    hyperlink_id: u32,
+    action: u8,
+    jump: u8,
+    hyperlink_type: u8,
+) -> Result<Vec<u8>, PptError> {
+    // Build InteractiveInfoAtom manually (16 bytes of data per POI)
+    // Offset 0-3: soundRef = 0
+    // Offset 4-7: hyperlinkID
+    // Offset 8: action
+    // Offset 9: oleVerb = 0
+    // Offset 10: jump
+    // Offset 11: flags = 0
+    // Offset 12: hyperlinkType
+    // Offset 13-15: reserved = 0
+    let mut atom_data = [0u8; 16];
+    atom_data[4..8].copy_from_slice(&hyperlink_id.to_le_bytes());
+    atom_data[8] = action;
+    atom_data[10] = jump;
+    atom_data[12] = hyperlink_type;
+
+    // InteractiveInfoAtom PPT record header (type 4083, 16 bytes data)
+    let mut info_atom = Vec::with_capacity(24);
+    info_atom.extend_from_slice(&[0x00, 0x00]); // version=0, instance=0
+    info_atom.extend_from_slice(&4083u16.to_le_bytes()); // RT_InteractiveInfoAtom
+    info_atom.extend_from_slice(&16u32.to_le_bytes()); // length
+    info_atom.extend_from_slice(&atom_data);
+
+    // InteractiveInfo container PPT record (type 4082)
+    let mut info_container = Vec::with_capacity(32);
+    info_container.extend_from_slice(&[0x0F, 0x00]); // version=F (container), instance=0
+    info_container.extend_from_slice(&4082u16.to_le_bytes()); // RT_InteractiveInfo
+    info_container.extend_from_slice(&(info_atom.len() as u32).to_le_bytes()); // length
+    info_container.extend_from_slice(&info_atom);
+
+    // ClientData Escher record (0xF011) wrapping InteractiveInfo PPT record
+    // POI uses options=15 (0x000F) => version=0xF, instance=0 (container version!)
+    let mut client_data =
+        EscherBuilder::new(header_version::CONTAINER, 0, record_type::CLIENT_DATA);
+    client_data.add_data(&info_container);
+
+    client_data.build()
+}
+
+/// Build ClientData record with OEPlaceholderAtom for placeholder shapes
+/// Per POI HSLFSimpleShape - placeholders have OEPlaceholderAtom in ClientData
+fn build_client_data_with_placeholder(placeholder_type: u8) -> Result<Vec<u8>, PptError> {
+    use super::records::RecordBuilder;
+
+    // OEPlaceholderAtom (type 0x0BC3 = 3011)
+    // Structure: position (4 bytes), placeholderType (1 byte), size (1 byte), unused (2 bytes)
+    let mut oe_atom = RecordBuilder::new(0x00, 0, ppt_record_type::OE_PLACEHOLDER_ATOM);
+    oe_atom.write_data(&0u32.to_le_bytes()); // position = 0
+    oe_atom.write_data(&[placeholder_type]); // placeholder type (12 = NotesBody per MS-PPT)
+    oe_atom.write_data(&[0x00]); // size = full
+    oe_atom.write_data(&[0x00, 0x00]); // unused
+    let oe_bytes = oe_atom.build()?;
+
+    // ClientData Escher record (0xF011) wrapping OEPlaceholderAtom
+    let mut client_data =
+        EscherBuilder::new(header_version::CONTAINER, 0, record_type::CLIENT_DATA);
+    client_data.add_data(&oe_bytes);
+
+    client_data.build()
+}
+
+/// Build shape properties for OPT record
+/// Based on Apache POI HSLFTextBox.createSpContainer() defaults
+fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
+    let mut props = Vec::with_capacity(16);
+
+    // Picture shapes have special handling - BLIP reference only, no fill/line
+    if shape.picture_index.is_some() {
+        // PROTECTION__LOCKAGAINSTGROUPING (0x007F) = 0x800080 per POI
+        props.push(EscherProperty::new(0x007F, 0x0080_0080));
+        // BLIP__BLIPTODISPLAY (0x4104) - with isBlipId flag (0x4000 + 0x0104)
+        props.push(EscherProperty::new(0x4104, shape.picture_index.unwrap()));
+        // No fill for pictures (picture IS the fill)
+        props.push(EscherProperty::new(prop_id::NO_FILL_HIT_TEST, 0x0010_0000));
+        // No line for pictures
+        props.push(EscherProperty::new(prop_id::LINE_STYLE_BOOL, 0x0008_0000));
+        return props;
+    }
+
+    // Fill properties
+    if let Some(fill_color) = shape.fill_color {
+        // Fill type (0=solid, 4=shade/gradient)
+        if let Some(fill_type) = shape.fill_type {
+            props.push(EscherProperty::new(prop_id::FILL_TYPE, fill_type));
+        }
+
+        // Fill color
+        props.push(EscherProperty::new(prop_id::FILL_COLOR, fill_color));
+
+        // Fill opacity
+        if let Some(opacity) = shape.fill_opacity {
+            props.push(EscherProperty::new(prop_id::FILL_OPACITY, opacity));
+        }
+
+        // Back color (for gradients)
+        if let Some(back_color) = shape.fill_back_color {
+            props.push(EscherProperty::new(prop_id::FILL_BACK_COLOR, back_color));
+        } else {
+            props.push(EscherProperty::new(prop_id::FILL_BACK_COLOR, 0x0800_0000)); // scheme bg
+        }
+
+        // Gradient angle (for gradient fills)
+        if let Some(angle) = shape.fill_angle {
+            props.push(EscherProperty::new(prop_id::FILL_ANGLE, angle as u32));
+        }
+
+        // Fill boolean: filled = true (0x00010001 per POI)
+        props.push(EscherProperty::new(prop_id::NO_FILL_HIT_TEST, 0x0001_0001));
+    } else {
+        // Default: scheme fill colors with no-fill flag
+        props.push(EscherProperty::new(prop_id::FILL_COLOR, 0x0800_0004)); // scheme fill
+        props.push(EscherProperty::new(prop_id::FILL_BACK_COLOR, 0x0800_0000));
+        props.push(EscherProperty::new(prop_id::NO_FILL_HIT_TEST, 0x0010_0000)); // no fill
+    }
+
+    // Line properties (based on POI HSLFSimpleShape)
+    if let Some(line_color) = shape.line_color {
+        props.push(EscherProperty::new(prop_id::LINE_COLOR, line_color));
+        if let Some(width) = shape.line_width {
+            props.push(EscherProperty::new(prop_id::LINE_WIDTH, width as u32));
+        }
+        // Line dash style
+        if let Some(dash) = shape.line_dash_style {
+            props.push(EscherProperty::new(prop_id::LINE_DASH_STYLE, dash));
+        }
+        // Line start arrow
+        if let Some(arrow) = shape.line_start_arrow {
+            props.push(EscherProperty::new(prop_id::LINE_START_ARROW, arrow));
+            props.push(EscherProperty::new(prop_id::LINE_START_ARROW_WIDTH, 1)); // Medium
+            props.push(EscherProperty::new(prop_id::LINE_START_ARROW_LENGTH, 1)); // Medium
+        }
+        // Line end arrow
+        if let Some(arrow) = shape.line_end_arrow {
+            props.push(EscherProperty::new(prop_id::LINE_END_ARROW, arrow));
+            props.push(EscherProperty::new(prop_id::LINE_END_ARROW_WIDTH, 1)); // Medium
+            props.push(EscherProperty::new(prop_id::LINE_END_ARROW_LENGTH, 1)); // Medium
+        }
+        // Enable line: 0x180018 = line visible
+        props.push(EscherProperty::new(prop_id::LINE_STYLE_BOOL, 0x0018_0018));
+    } else {
+        // No line: POI uses 0x80000 for no line
+        props.push(EscherProperty::new(prop_id::LINE_COLOR, 0x0800_0001)); // scheme line
+        props.push(EscherProperty::new(prop_id::LINE_STYLE_BOOL, 0x0008_0000));
+    }
+
+    // Shadow properties
+    props.push(EscherProperty::new(prop_id::SHADOW_COLOR, 0x0800_0002)); // scheme shadow
+    if shape.has_shadow {
+        // Enable shadow: offset and boolean
+        props.push(EscherProperty::new(prop_id::SHADOW_OFFSET_X, 25400)); // 2pt offset
+        props.push(EscherProperty::new(prop_id::SHADOW_OFFSET_Y, 25400));
+        props.push(EscherProperty::new(prop_id::SHADOW_BOOL, 0x0003_0003)); // shadow on
+    }
+
+    props
+}
+
+/// Build ClientTextBox record with plain text content (no formatting)
+/// Based on Apache POI EscherTextboxWrapper and HSLFTextShape
+/// text_type: 0=Title, 1=Body, 2=Notes, 4=Other
+fn build_client_textbox(text: &str, text_type: u32) -> Result<Vec<u8>, PptError> {
+    use super::records::{RecordBuilder, record_type as ppt_rt};
+
+    let mut result = Vec::new();
+    let mut ppt_content = Vec::new();
+
+    // TextHeaderAtom (type=3999): textType from parameter
+    let mut text_header = RecordBuilder::new(0, 0, ppt_rt::TEXT_HEADER_ATOM);
+    text_header.write_data(&text_type.to_le_bytes());
+    ppt_content.extend_from_slice(&text_header.build()?);
+
+    // TextBytesAtom (type=4008) for ASCII or TextCharsAtom (type=4000) for Unicode
+    let is_ascii = text.is_ascii();
+    if is_ascii {
+        let mut text_atom = RecordBuilder::new(0, 0, ppt_rt::TEXT_BYTES_ATOM);
+        text_atom.write_data(text.as_bytes());
+        ppt_content.extend_from_slice(&text_atom.build()?);
+    } else {
+        let mut text_atom = RecordBuilder::new(0, 0, ppt_rt::TEXT_CHARS_ATOM);
+        for ch in text.encode_utf16() {
+            text_atom.write_data(&ch.to_le_bytes());
+        }
+        ppt_content.extend_from_slice(&text_atom.build()?);
+    }
+
+    // StyleTextPropAtom with no formatting
+    let char_count = text.chars().count() as u32 + 1;
+    let mut style_atom = RecordBuilder::new(0, 0, ppt_rt::STYLE_TEXT_PROP_ATOM);
+    style_atom.write_data(&char_count.to_le_bytes()); // para char count
+    style_atom.write_data(&0u16.to_le_bytes()); // indent
+    style_atom.write_data(&0u32.to_le_bytes()); // para mask
+    style_atom.write_data(&char_count.to_le_bytes()); // char count
+    style_atom.write_data(&0u32.to_le_bytes()); // char mask
+    ppt_content.extend_from_slice(&style_atom.build()?);
+
+    let header = EscherRecordHeader::new(0x0F, 0, 0xF00D, ppt_content.len() as u32);
+    result.extend_from_slice(header.as_bytes());
+    result.extend_from_slice(&ppt_content);
+
+    Ok(result)
+}
+
+/// Build ClientTextBox record with rich text formatting (paragraphs with runs)
+/// text_type: 0=Title, 1=Body, 2=Notes, 4=Other
+fn build_client_textbox_formatted(
+    paragraphs: &[super::text_format::Paragraph],
+    text_type: u32,
+) -> Result<Vec<u8>, PptError> {
+    use super::records::{RecordBuilder, record_type as ppt_rt};
+    use super::text_format::TextPropsBuilder;
+
+    let mut result = Vec::new();
+    let mut ppt_content = Vec::new();
+
+    // TextHeaderAtom (type=3999): textType from parameter
+    let mut text_header = RecordBuilder::new(0, 0, ppt_rt::TEXT_HEADER_ATOM);
+    text_header.write_data(&text_type.to_le_bytes());
+    ppt_content.extend_from_slice(&text_header.build()?);
+
+    // Build text content from paragraphs
+    let mut builder = TextPropsBuilder::new();
+    for para in paragraphs {
+        builder.add_paragraph(para.clone());
+    }
+
+    // Use TextCharsAtom (UTF-16) since we might have unicode
+    let text_chars = builder.build_text_chars();
+    let mut text_atom = RecordBuilder::new(0, 0, ppt_rt::TEXT_CHARS_ATOM);
+    text_atom.write_data(&text_chars);
+    ppt_content.extend_from_slice(&text_atom.build()?);
+
+    // StyleTextPropAtom with full formatting
+    let style_data = builder.build_style_text_prop();
+    let mut style_atom = RecordBuilder::new(0, 0, ppt_rt::STYLE_TEXT_PROP_ATOM);
+    style_atom.write_data(&style_data);
+    ppt_content.extend_from_slice(&style_atom.build()?);
+
+    let header = EscherRecordHeader::new(0x0F, 0, 0xF00D, ppt_content.len() as u32);
+    result.extend_from_slice(header.as_bytes());
+    result.extend_from_slice(&ppt_content);
+
+    Ok(result)
 }
 
 #[cfg(test)]
