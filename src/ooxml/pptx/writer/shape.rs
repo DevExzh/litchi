@@ -58,6 +58,32 @@ pub(crate) enum ShapeType {
         height: i64,
         description: String,
     },
+    /// Table shape (p:graphicFrame containing a:tbl)
+    Table {
+        x: i64,
+        y: i64,
+        width: i64,
+        height: i64,
+        /// Table data: rows of cells, each cell is a string
+        data: Vec<Vec<String>>,
+        /// Column widths in EMUs (optional, auto-calculated if not provided)
+        col_widths: Option<Vec<i64>>,
+        /// Row heights in EMUs (optional, auto-calculated if not provided)
+        row_heights: Option<Vec<i64>>,
+        /// First row is header
+        first_row: bool,
+        /// Band rows (alternating row colors)
+        band_row: bool,
+    },
+    /// Group shape containing multiple child shapes
+    GroupShape {
+        x: i64,
+        y: i64,
+        width: i64,
+        height: i64,
+        /// Child shapes within the group
+        children: Vec<MutableShape>,
+    },
 }
 
 impl MutableShape {
@@ -228,10 +254,78 @@ impl MutableShape {
         })
     }
 
+    /// Create a new table shape.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new_table(
+        shape_id: u32,
+        x: i64,
+        y: i64,
+        width: i64,
+        height: i64,
+        data: Vec<Vec<String>>,
+        col_widths: Option<Vec<i64>>,
+        row_heights: Option<Vec<i64>>,
+        first_row: bool,
+        band_row: bool,
+    ) -> Self {
+        Self {
+            shape_id,
+            shape_type: ShapeType::Table {
+                x,
+                y,
+                width,
+                height,
+                data,
+                col_widths,
+                row_heights,
+                first_row,
+                band_row,
+            },
+        }
+    }
+
+    /// Create a new group shape.
+    pub(crate) fn new_group(
+        shape_id: u32,
+        x: i64,
+        y: i64,
+        width: i64,
+        height: i64,
+        children: Vec<MutableShape>,
+    ) -> Self {
+        Self {
+            shape_id,
+            shape_type: ShapeType::GroupShape {
+                x,
+                y,
+                width,
+                height,
+                children,
+            },
+        }
+    }
+
     /// Get image data if this shape is a picture.
     pub(crate) fn get_image_data(&self) -> Option<(&[u8], ImageFormat)> {
         match &self.shape_type {
             ShapeType::Picture { data, format, .. } => Some((data.as_slice(), *format)),
+            _ => None,
+        }
+    }
+
+    /// Get child shapes if this is a group shape.
+    #[allow(dead_code)] // Public API for group shape access
+    pub(crate) fn get_children(&self) -> Option<&[MutableShape]> {
+        match &self.shape_type {
+            ShapeType::GroupShape { children, .. } => Some(children.as_slice()),
+            _ => None,
+        }
+    }
+
+    /// Get mutable child shapes if this is a group shape.
+    pub(crate) fn get_children_mut(&mut self) -> Option<&mut Vec<MutableShape>> {
+        match &mut self.shape_type {
+            ShapeType::GroupShape { children, .. } => Some(children),
             _ => None,
         }
     }
@@ -441,7 +535,217 @@ impl MutableShape {
                 xml.push_str("</p:spPr>");
                 xml.push_str("</p:pic>");
             },
+            ShapeType::Table {
+                x,
+                y,
+                width,
+                height,
+                data,
+                col_widths,
+                row_heights,
+                first_row,
+                band_row,
+            } => {
+                self.write_table_xml(
+                    xml,
+                    *x,
+                    *y,
+                    *width,
+                    *height,
+                    data,
+                    col_widths.as_deref(),
+                    row_heights.as_deref(),
+                    *first_row,
+                    *band_row,
+                )?;
+            },
+            ShapeType::GroupShape {
+                x,
+                y,
+                width,
+                height,
+                children,
+            } => {
+                self.write_group_xml(xml, *x, *y, *width, *height, children, rel_id)?;
+            },
         }
+
+        Ok(())
+    }
+
+    /// Write table XML (p:graphicFrame containing a:tbl).
+    #[allow(clippy::too_many_arguments)]
+    fn write_table_xml(
+        &self,
+        xml: &mut String,
+        x: i64,
+        y: i64,
+        width: i64,
+        height: i64,
+        data: &[Vec<String>],
+        col_widths: Option<&[i64]>,
+        row_heights: Option<&[i64]>,
+        first_row: bool,
+        band_row: bool,
+    ) -> Result<()> {
+        let num_rows = data.len();
+        let num_cols = data.first().map(|r| r.len()).unwrap_or(0);
+
+        if num_rows == 0 || num_cols == 0 {
+            return Ok(());
+        }
+
+        // Calculate column widths if not provided
+        let calculated_col_widths: Vec<i64> = col_widths
+            .map(|w| w.to_vec())
+            .unwrap_or_else(|| vec![width / num_cols as i64; num_cols]);
+
+        // Calculate row heights if not provided
+        let calculated_row_heights: Vec<i64> = row_heights
+            .map(|h| h.to_vec())
+            .unwrap_or_else(|| vec![height / num_rows as i64; num_rows]);
+
+        // Start graphic frame
+        xml.push_str("<p:graphicFrame>");
+        xml.push_str("<p:nvGraphicFramePr>");
+        write!(
+            xml,
+            r#"<p:cNvPr id="{}" name="Table {}"/>"#,
+            self.shape_id, self.shape_id
+        )
+        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+        xml.push_str(
+            r#"<p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr>"#,
+        );
+        xml.push_str("<p:nvPr/>");
+        xml.push_str("</p:nvGraphicFramePr>");
+
+        // Transform
+        xml.push_str("<p:xfrm>");
+        write!(xml, r#"<a:off x="{}" y="{}"/>"#, x, y)
+            .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+        write!(xml, r#"<a:ext cx="{}" cy="{}"/>"#, width, height)
+            .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+        xml.push_str("</p:xfrm>");
+
+        // Graphic element containing table
+        xml.push_str("<a:graphic>");
+        xml.push_str(
+            r#"<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table">"#,
+        );
+
+        // Table element
+        xml.push_str("<a:tbl>");
+
+        // Table properties
+        xml.push_str("<a:tblPr");
+        if first_row {
+            xml.push_str(" firstRow=\"1\"");
+        }
+        if band_row {
+            xml.push_str(" bandRow=\"1\"");
+        }
+        xml.push('>');
+        // Default table style
+        xml.push_str("<a:tableStyleId>{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}</a:tableStyleId>");
+        xml.push_str("</a:tblPr>");
+
+        // Table grid (column definitions)
+        xml.push_str("<a:tblGrid>");
+        for col_width in &calculated_col_widths {
+            write!(xml, r#"<a:gridCol w="{}"/>"#, col_width)
+                .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+        }
+        xml.push_str("</a:tblGrid>");
+
+        // Table rows
+        for (row_idx, row) in data.iter().enumerate() {
+            let row_height = calculated_row_heights
+                .get(row_idx)
+                .copied()
+                .unwrap_or(370840);
+            write!(xml, r#"<a:tr h="{}">"#, row_height)
+                .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+
+            for cell_text in row {
+                xml.push_str("<a:tc>");
+                xml.push_str("<a:txBody>");
+                xml.push_str("<a:bodyPr/>");
+                xml.push_str("<a:lstStyle/>");
+                xml.push_str("<a:p>");
+                if !cell_text.is_empty() {
+                    xml.push_str("<a:r>");
+                    xml.push_str(r#"<a:rPr lang="en-US" dirty="0"/>"#);
+                    write!(xml, "<a:t>{}</a:t>", escape_xml(cell_text))
+                        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                    xml.push_str("</a:r>");
+                } else {
+                    xml.push_str(r#"<a:endParaRPr lang="en-US"/>"#);
+                }
+                xml.push_str("</a:p>");
+                xml.push_str("</a:txBody>");
+                xml.push_str("<a:tcPr/>");
+                xml.push_str("</a:tc>");
+            }
+
+            xml.push_str("</a:tr>");
+        }
+
+        xml.push_str("</a:tbl>");
+        xml.push_str("</a:graphicData>");
+        xml.push_str("</a:graphic>");
+        xml.push_str("</p:graphicFrame>");
+
+        Ok(())
+    }
+
+    /// Write group shape XML (p:grpSp).
+    #[allow(clippy::too_many_arguments)]
+    fn write_group_xml(
+        &self,
+        xml: &mut String,
+        x: i64,
+        y: i64,
+        width: i64,
+        height: i64,
+        children: &[MutableShape],
+        rel_id: Option<&str>,
+    ) -> Result<()> {
+        xml.push_str("<p:grpSp>");
+
+        // Non-visual group shape properties
+        xml.push_str("<p:nvGrpSpPr>");
+        write!(
+            xml,
+            r#"<p:cNvPr id="{}" name="Group {}"/>"#,
+            self.shape_id, self.shape_id
+        )
+        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+        xml.push_str("<p:cNvGrpSpPr/>");
+        xml.push_str("<p:nvPr/>");
+        xml.push_str("</p:nvGrpSpPr>");
+
+        // Group shape properties with transforms
+        xml.push_str("<p:grpSpPr>");
+        xml.push_str("<a:xfrm>");
+        write!(xml, r#"<a:off x="{}" y="{}"/>"#, x, y)
+            .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+        write!(xml, r#"<a:ext cx="{}" cy="{}"/>"#, width, height)
+            .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+        // Child offset and extents (same as outer for 1:1 mapping)
+        write!(xml, r#"<a:chOff x="{}" y="{}"/>"#, x, y)
+            .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+        write!(xml, r#"<a:chExt cx="{}" cy="{}"/>"#, width, height)
+            .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+        xml.push_str("</a:xfrm>");
+        xml.push_str("</p:grpSpPr>");
+
+        // Write child shapes
+        for child in children {
+            child.to_xml(xml, rel_id)?;
+        }
+
+        xml.push_str("</p:grpSp>");
 
         Ok(())
     }

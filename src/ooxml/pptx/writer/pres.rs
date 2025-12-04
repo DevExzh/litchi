@@ -341,6 +341,54 @@ impl MutablePresentation {
         background_images
     }
 
+    /// Collect all media (audio/video) from all slides in the presentation.
+    ///
+    /// Returns a vector of tuples: (slide_index, media_index_in_slide, media_data, media_format).
+    pub(crate) fn collect_all_media(
+        &self,
+    ) -> Vec<(usize, usize, &[u8], crate::ooxml::pptx::media::MediaFormat)> {
+        let mut all_media = Vec::new();
+
+        for (slide_index, slide) in self.slides.iter().enumerate() {
+            for (media_index, (media_data, media_format)) in
+                slide.collect_media().iter().enumerate()
+            {
+                all_media.push((slide_index, media_index, *media_data, *media_format));
+            }
+        }
+
+        all_media
+    }
+
+    /// Collect all comments from all slides in the presentation.
+    ///
+    /// Returns a vector of tuples: (slide_index, comments_slice).
+    pub(crate) fn collect_all_comments(
+        &self,
+    ) -> Vec<(usize, &[crate::ooxml::pptx::parts::Comment])> {
+        let mut all_comments = Vec::new();
+
+        for (slide_index, slide) in self.slides.iter().enumerate() {
+            if !slide.comments().is_empty() {
+                all_comments.push((slide_index, slide.comments()));
+            }
+        }
+
+        all_comments
+    }
+
+    /// Check if any slide has comments.
+    #[allow(dead_code)] // Public API for future use
+    pub(crate) fn has_comments(&self) -> bool {
+        self.slides.iter().any(|s| !s.comments().is_empty())
+    }
+
+    /// Check if any slide has media (audio/video).
+    #[allow(dead_code)] // Public API for future use
+    pub(crate) fn has_media(&self) -> bool {
+        self.slides.iter().any(|s| !s.media().is_empty())
+    }
+
     /// Generate presentation.xml content.
     pub fn generate_presentation_xml(&self) -> Result<String> {
         self.generate_presentation_xml_with_rels(None)

@@ -139,23 +139,23 @@ This document tracks the implementation status of features across all supported 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Slide manipulation | ✅ | ✅ | ✅ | Add, duplicate support |
-| Tables | 🟡 | ✅ | ❌ | Read only |
-| Charts | ❌ | ❌ | ❌ | Not implemented |
+| Tables | ✅ | ✅ | ✅ | Full read/write support |
+| Charts | 🟡 | ✅ | ❌ | Read only (chart info) |
 | SmartArt | ❌ | ❌ | ❌ | Not implemented |
-| Audio/Video | ❌ | ❌ | ❌ | Not implemented |
+| Audio/Video | ✅ | ✅ | ✅ | MP3, WAV, MP4, WMV, etc. |
 | Animations | ❌ | ❌ | ❌ | Not implemented |
 | Transitions | ✅ | ✅ | ✅ | 25+ transition types |
-| Comments | ❌ | ❌ | ❌ | Not implemented |
+| Comments | ✅ | ✅ | ✅ | Full read/write support |
 | Notes | ✅ | ✅ | ✅ | Speaker notes support |
 | Handout master | ❌ | ❌ | ❌ | Not implemented |
 | Custom slide shows | ❌ | ❌ | ❌ | Not implemented |
 | Hyperlinks | ✅ | ✅ | ✅ | Full hyperlink support |
-| Group shapes | ❌ | ❌ | ❌ | Not implemented |
+| Group shapes | ✅ | ✅ | ✅ | Nested shape groups |
 | Shape formatting | ✅ | ✅ | ✅ | Text format, fill colors |
 | Themes | ✅ | ✅ | ❌ | Read only |
 | Slide backgrounds | ✅ | ✅ | ✅ | Solid, gradient, pattern, picture |
 | Presentation protection | ❌ | ❌ | ❌ | Not implemented |
-| Sections | ❌ | ❌ | ❌ | Not implemented |
+| Sections | ✅ | ✅ | ✅ | Slide organization groups |
 
 ### Metadata & Properties
 | Feature | Status | Read | Write | Notes |

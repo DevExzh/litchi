@@ -118,6 +118,20 @@ pub mod content_type {
         "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml";
     pub const PML_HANDOUT_MASTER: &str =
         "application/vnd.openxmlformats-officedocument.presentationml.handoutMaster+xml";
+    pub const PML_COMMENTS: &str =
+        "application/vnd.openxmlformats-officedocument.presentationml.comments+xml";
+    pub const PML_COMMENT_AUTHORS: &str =
+        "application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml";
+
+    // Audio/Video content types
+    pub const AUDIO_MPEG: &str = "audio/mpeg";
+    pub const AUDIO_WAV: &str = "audio/wav";
+    pub const AUDIO_WMA: &str = "audio/x-ms-wma";
+    pub const AUDIO_M4A: &str = "audio/mp4";
+    pub const VIDEO_MP4: &str = "video/mp4";
+    pub const VIDEO_WMV: &str = "video/x-ms-wmv";
+    pub const VIDEO_AVI: &str = "video/avi";
+    pub const VIDEO_MOV: &str = "video/quicktime";
 
     // Generic XML
     pub const XML: &str = "application/xml";
@@ -199,6 +213,8 @@ pub mod relationship_type {
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio";
     pub const VIDEO: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/video";
+    /// Microsoft Office 2007+ media relationship type (required for embedded media)
+    pub const MEDIA: &str = "http://schemas.microsoft.com/office/2007/relationships/media";
 
     // Chart and drawing
     pub const CHART: &str =

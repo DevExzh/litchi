@@ -19,6 +19,28 @@ pub struct CommentAuthor {
     pub initials: String,
 }
 
+impl CommentAuthor {
+    /// Create a new comment author.
+    pub fn new(id: u32, name: impl Into<String>, initials: impl Into<String>) -> Self {
+        Self {
+            id,
+            name: name.into(),
+            initials: initials.into(),
+        }
+    }
+
+    /// Generate XML element for this author.
+    pub fn to_xml(&self) -> String {
+        format!(
+            r#"<p:cmAuthor id="{}" name="{}" initials="{}" lastIdx="0" clrIdx="{}"/>"#,
+            self.id,
+            escape_xml(&self.name),
+            escape_xml(&self.initials),
+            self.id % 6 // Color index cycles through 0-5
+        )
+    }
+}
+
 /// A comment in a presentation.
 ///
 /// Comments are annotations attached to specific positions on slides.
@@ -36,6 +58,120 @@ pub struct Comment {
     pub datetime: Option<String>,
     /// Comment index
     pub index: Option<u32>,
+}
+
+impl Comment {
+    /// Create a new comment.
+    pub fn new(author_id: u32, text: impl Into<String>, x: i64, y: i64) -> Self {
+        Self {
+            author_id,
+            text: text.into(),
+            x,
+            y,
+            datetime: None,
+            index: None,
+        }
+    }
+
+    /// Create a new comment with datetime.
+    pub fn with_datetime(mut self, datetime: impl Into<String>) -> Self {
+        self.datetime = Some(datetime.into());
+        self
+    }
+
+    /// Create a new comment with index.
+    pub fn with_index(mut self, index: u32) -> Self {
+        self.index = Some(index);
+        self
+    }
+
+    /// Generate XML element for this comment.
+    pub fn to_xml(&self) -> String {
+        let mut xml = String::with_capacity(256);
+
+        xml.push_str(r#"<p:cm authorId=""#);
+        xml.push_str(&self.author_id.to_string());
+        xml.push('"');
+
+        if let Some(ref dt) = self.datetime {
+            xml.push_str(r#" dt=""#);
+            xml.push_str(&escape_xml(dt));
+            xml.push('"');
+        }
+
+        if let Some(idx) = self.index {
+            xml.push_str(r#" idx=""#);
+            xml.push_str(&idx.to_string());
+            xml.push('"');
+        }
+
+        xml.push('>');
+
+        // Position
+        xml.push_str(r#"<p:pos x=""#);
+        xml.push_str(&self.x.to_string());
+        xml.push_str(r#"" y=""#);
+        xml.push_str(&self.y.to_string());
+        xml.push_str(r#""/>"#);
+
+        // Text
+        xml.push_str("<p:text>");
+        xml.push_str(&escape_xml(&self.text));
+        xml.push_str("</p:text>");
+
+        xml.push_str("</p:cm>");
+
+        xml
+    }
+}
+
+/// Escape XML special characters.
+fn escape_xml(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+/// Generate comments part XML.
+///
+/// Creates the complete `/ppt/comments/commentN.xml` content.
+pub fn generate_comments_xml(comments: &[Comment]) -> String {
+    let mut xml = String::with_capacity(1024);
+
+    xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
+    xml.push_str(
+        r#"<p:cmLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+    );
+
+    for comment in comments {
+        xml.push_str(&comment.to_xml());
+    }
+
+    xml.push_str("</p:cmLst>");
+
+    xml
+}
+
+/// Generate comment authors part XML.
+///
+/// Creates the complete `/ppt/commentAuthors.xml` content.
+pub fn generate_comment_authors_xml(authors: &[CommentAuthor]) -> String {
+    let mut xml = String::with_capacity(512);
+
+    xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
+    xml.push_str(
+        r#"<p:cmAuthorLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+    );
+
+    for author in authors {
+        xml.push_str(&author.to_xml());
+    }
+
+    xml.push_str("</p:cmAuthorLst>");
+
+    xml
 }
 
 /// Comments part - contains comments for a slide.

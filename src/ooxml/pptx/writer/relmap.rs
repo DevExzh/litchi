@@ -20,6 +20,13 @@ pub struct RelationshipMapper {
     notes_ids: HashMap<usize, String>,
     /// Maps slide_index to background image relationship ID
     background_ids: HashMap<usize, String>,
+    /// Maps (slide_index, media_index_in_slide) to (video_rel_id, media_rel_id, poster_rel_id)
+    /// - video_rel_id: OOXML video/audio relationship (for r:link in videoFile/audioFile)
+    /// - media_rel_id: Microsoft media relationship (for r:embed in p14:media)
+    /// - poster_rel_id: Poster image relationship (for r:embed in blipFill/blip)
+    media_ids: HashMap<(usize, usize), (String, String, String)>,
+    /// Maps slide_index to comments relationship ID
+    comments_ids: HashMap<usize, String>,
 }
 
 impl RelationshipMapper {
@@ -83,5 +90,65 @@ impl RelationshipMapper {
     /// * `slide_index` - The index of the slide (0-based)
     pub fn get_background_id(&self, slide_index: usize) -> Option<&str> {
         self.background_ids.get(&slide_index).map(|s| s.as_str())
+    }
+
+    /// Add a media relationship mapping for a specific slide.
+    ///
+    /// # Arguments
+    /// * `slide_index` - The index of the slide (0-based)
+    /// * `media_index_in_slide` - The index of the media within that slide (0-based)
+    /// * `video_rel_id` - The OOXML video/audio relationship ID (for r:link)
+    /// * `media_rel_id` - The Microsoft media relationship ID (for r:embed in p14:media)
+    /// * `poster_rel_id` - The poster image relationship ID (for r:embed in blipFill/blip)
+    pub fn add_media(
+        &mut self,
+        slide_index: usize,
+        media_index_in_slide: usize,
+        video_rel_id: String,
+        media_rel_id: String,
+        poster_rel_id: String,
+    ) {
+        self.media_ids.insert(
+            (slide_index, media_index_in_slide),
+            (video_rel_id, media_rel_id, poster_rel_id),
+        );
+    }
+
+    /// Get the relationship IDs for a media element in a specific slide.
+    ///
+    /// Returns (video_rel_id, media_rel_id, poster_rel_id) where:
+    /// - video_rel_id is for r:link in a:videoFile/a:audioFile
+    /// - media_rel_id is for r:embed in p14:media
+    /// - poster_rel_id is for r:embed in blipFill/blip
+    ///
+    /// # Arguments
+    /// * `slide_index` - The index of the slide (0-based)
+    /// * `media_index_in_slide` - The index of the media within that slide (0-based)
+    pub fn get_media_ids(
+        &self,
+        slide_index: usize,
+        media_index_in_slide: usize,
+    ) -> Option<(&str, &str, &str)> {
+        self.media_ids
+            .get(&(slide_index, media_index_in_slide))
+            .map(|(v, m, p)| (v.as_str(), m.as_str(), p.as_str()))
+    }
+
+    /// Add a comments relationship mapping for a specific slide.
+    ///
+    /// # Arguments
+    /// * `slide_index` - The index of the slide (0-based)
+    /// * `rel_id` - The relationship ID (e.g., "rId6")
+    pub fn add_comments(&mut self, slide_index: usize, rel_id: String) {
+        self.comments_ids.insert(slide_index, rel_id);
+    }
+
+    /// Get the comments relationship ID for a specific slide.
+    ///
+    /// # Arguments
+    /// * `slide_index` - The index of the slide (0-based)
+    #[allow(dead_code)] // Public API for future use
+    pub fn get_comments_id(&self, slide_index: usize) -> Option<&str> {
+        self.comments_ids.get(&slide_index).map(|s| s.as_str())
     }
 }

@@ -11,6 +11,21 @@ use crate::ooxml::pptx::writer::MutablePresentation;
 use std::io::{Read, Seek};
 use std::path::Path;
 
+/// Default media poster image - a simple 1x1 gray PNG.
+/// This is used as a placeholder for media shapes that don't have a custom poster frame.
+/// It's a valid minimal PNG image (67 bytes).
+const DEFAULT_MEDIA_POSTER: &[u8] = &[
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+    0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1x1 pixel
+    0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, 0xDE, // 8-bit RGB
+    0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, // IDAT chunk
+    0x08, 0xD7, 0x63, 0x78, 0x78, 0x78, 0x00, 0x00, // Compressed gray pixel
+    0x00, 0x85, 0x00, 0x82, 0x3E, 0x8F, 0xFE, 0xB6, // CRC
+    0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, // IEND chunk
+    0xAE, 0x42, 0x60, 0x82, // CRC
+];
+
 /// A PowerPoint (.pptx) package.
 ///
 /// This is the main entry point for working with PowerPoint presentations.
@@ -532,6 +547,8 @@ impl Package {
         use crate::ooxml::opc::constants::content_type as ct;
         use crate::ooxml::opc::constants::relationship_type as rt;
         use crate::ooxml::opc::part::{BlobPart, Part};
+        use crate::ooxml::pptx::parts::CommentAuthor;
+        use crate::ooxml::pptx::parts::{generate_comment_authors_xml, generate_comments_xml};
         use crate::ooxml::pptx::writer::relmap::RelationshipMapper;
 
         // Initialize relationship mapper
@@ -543,8 +560,17 @@ impl Package {
         // Collect all background images
         let all_bg_images = pres.collect_all_background_images();
 
+        // Collect all media (audio/video) from all slides
+        let all_media = pres.collect_all_media();
+
+        // Collect all comments from all slides
+        let all_comments = pres.collect_all_comments();
+
         // Track the total number of images for unique numbering
         let mut total_image_count = 0;
+
+        // Track the total number of media files for unique numbering
+        let mut total_media_count = 0;
 
         // Create image parts for shape images first and add to package
         for (_slide_index, image_data, image_format) in &all_images {
@@ -588,6 +614,59 @@ impl Package {
             self.opc.add_part(Box::new(image_part));
         }
 
+        // Create media parts (audio/video) and poster images, add to package
+        for (_slide_index, _media_index, media_data, media_format) in &all_media {
+            total_media_count += 1;
+            let ext = media_format.extension();
+
+            // Create media part URI
+            let media_partname = format!("/ppt/media/media{}.{}", total_media_count, ext);
+            let media_uri = PackURI::new(&media_partname)
+                .map_err(|e| OoxmlError::InvalidUri(format!("media URI: {}", e)))?;
+
+            // Create media part
+            let media_part = BlobPart::new(
+                media_uri,
+                media_format.mime_type().to_string(),
+                media_data.to_vec(),
+            );
+
+            // Add media part to package
+            self.opc.add_part(Box::new(media_part));
+
+            // Create poster image part for this media
+            // Each media needs a poster image for blipFill/blip
+            let poster_partname = format!("/ppt/media/poster{}.png", total_media_count);
+            let poster_uri = PackURI::new(&poster_partname)
+                .map_err(|e| OoxmlError::InvalidUri(format!("poster URI: {}", e)))?;
+
+            let poster_part = BlobPart::new(
+                poster_uri,
+                "image/png".to_string(),
+                DEFAULT_MEDIA_POSTER.to_vec(),
+            );
+
+            self.opc.add_part(Box::new(poster_part));
+        }
+
+        // Create comment authors part if there are any comments
+        if !all_comments.is_empty() {
+            // Create a default author for now (could be extended to support multiple authors)
+            let authors = vec![CommentAuthor::new(0, "Author", "A")];
+            let authors_xml = generate_comment_authors_xml(&authors);
+
+            let authors_uri = PackURI::new("/ppt/commentAuthors.xml")
+                .map_err(|e| OoxmlError::InvalidUri(format!("commentAuthors URI: {}", e)))?;
+
+            let authors_part = BlobPart::new(
+                authors_uri,
+                ct::PML_COMMENT_AUTHORS.to_string(),
+                authors_xml.into_bytes(),
+            );
+
+            self.opc.add_part(Box::new(authors_part));
+        }
+
         // Create presentation part and add relationships
         let pres_uri = PackURI::new("/ppt/presentation.xml")
             .map_err(|e| OoxmlError::InvalidUri(format!("presentation URI: {}", e)))?;
@@ -610,6 +689,11 @@ impl Package {
 
         // Add relationship to notesMaster (required when we have notesSlides)
         temp_pres_part.relate_to("notesMasters/notesMaster1.xml", rt::NOTES_MASTER);
+
+        // Add relationship to commentAuthors if there are comments
+        if !all_comments.is_empty() {
+            temp_pres_part.relate_to("commentAuthors.xml", rt::COMMENT_AUTHORS);
+        }
 
         // Track slide relationship IDs for presentation.xml generation
         let mut slide_rel_ids: Vec<String> = Vec::new();
@@ -672,6 +756,55 @@ impl Package {
                 rel_mapper.add_notes(slide_index, rid);
             }
 
+            // Add relationships for media (audio/video) on this slide
+            // PowerPoint requires THREE relationships per media file:
+            // 1. OOXML video/audio type (for r:link in a:videoFile/a:audioFile)
+            // 2. Microsoft media type (for r:embed in p14:media extension)
+            // 3. Poster image type (for r:embed in blipFill/blip)
+            let slide_media = slide.collect_media();
+            for (media_index_in_slide, (_, media_format)) in slide_media.iter().enumerate() {
+                // Find the global media index for this slide's media
+                for (global_idx, (s_idx, m_idx, _, _)) in all_media.iter().enumerate() {
+                    if *s_idx == slide_index && *m_idx == media_index_in_slide {
+                        let media_num = global_idx + 1;
+                        let ext = media_format.extension();
+                        let media_rel_target = format!("../media/media{}.{}", media_num, ext);
+
+                        // Add OOXML video/audio relationship (for r:link in a:videoFile/a:audioFile)
+                        let video_rel_type = match media_format.media_type() {
+                            crate::ooxml::pptx::media::MediaType::Audio => rt::AUDIO,
+                            crate::ooxml::pptx::media::MediaType::Video => rt::VIDEO,
+                        };
+                        let video_rid =
+                            temp_slide_part.relate_to(&media_rel_target, video_rel_type);
+
+                        // Add Microsoft media relationship (for r:embed in p14:media)
+                        let media_rid = temp_slide_part.relate_to(&media_rel_target, rt::MEDIA);
+
+                        // Add poster image for this media (required for blipFill/blip)
+                        // Use a default placeholder image - shared across all media on this slide
+                        let poster_image_path = format!("../media/poster{}.png", media_num);
+                        let poster_rid = temp_slide_part.relate_to(&poster_image_path, rt::IMAGE);
+
+                        rel_mapper.add_media(
+                            slide_index,
+                            media_index_in_slide,
+                            video_rid,
+                            media_rid,
+                            poster_rid,
+                        );
+                        break;
+                    }
+                }
+            }
+
+            // Add relationship for comments if this slide has comments
+            if !slide.comments().is_empty() {
+                let comments_rel_target = format!("../comments/comment{}.xml", slide_num);
+                let rid = temp_slide_part.relate_to(&comments_rel_target, rt::COMMENTS);
+                rel_mapper.add_comments(slide_index, rid);
+            }
+
             // Now generate slide XML with actual relationship IDs
             let slide_xml = slide.to_xml_with_rels(Some(slide_index), Some(&rel_mapper))?;
 
@@ -703,6 +836,23 @@ impl Package {
                 notes_part.relate_to("../notesMasters/notesMaster1.xml", rt::NOTES_MASTER);
 
                 self.opc.add_part(Box::new(notes_part));
+            }
+
+            // Create comments part if this slide has comments
+            if !slide.comments().is_empty() {
+                let comments_xml = generate_comments_xml(slide.comments());
+                let comments_uri = PackURI::new(format!("/ppt/comments/comment{}.xml", slide_num))
+                    .map_err(|e| {
+                        OoxmlError::InvalidUri(format!("comment{} URI: {}", slide_num, e))
+                    })?;
+
+                let comments_part = BlobPart::new(
+                    comments_uri,
+                    ct::PML_COMMENTS.to_string(),
+                    comments_xml.into_bytes(),
+                );
+
+                self.opc.add_part(Box::new(comments_part));
             }
 
             // Add relationship from presentation to this slide and track the ID
