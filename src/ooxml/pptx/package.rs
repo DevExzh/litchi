@@ -549,6 +549,7 @@ impl Package {
         use crate::ooxml::opc::part::{BlobPart, Part};
         use crate::ooxml::pptx::parts::CommentAuthor;
         use crate::ooxml::pptx::parts::{generate_comment_authors_xml, generate_comments_xml};
+        use crate::ooxml::pptx::template;
         use crate::ooxml::pptx::writer::relmap::RelationshipMapper;
 
         // Initialize relationship mapper
@@ -667,6 +668,175 @@ impl Package {
             self.opc.add_part(Box::new(authors_part));
         }
 
+        // Create chart parts and add to package
+        for (chart_idx, chart_parts) in &pres.charts {
+            // Create chart XML part
+            let chart_uri = PackURI::new(format!("/ppt/charts/chart{}.xml", chart_idx))
+                .map_err(|e| OoxmlError::InvalidUri(format!("chart{} URI: {}", chart_idx, e)))?;
+
+            let mut chart_part = BlobPart::new(
+                chart_uri,
+                ct::DML_CHART.to_string(),
+                chart_parts.chart_xml.as_bytes().to_vec(),
+            );
+
+            // Add relationship from chart to embedded Excel data
+            chart_part.relate_to(
+                &format!("../embeddings/Microsoft_Excel_Worksheet{}.xlsx", chart_idx),
+                rt::PACKAGE,
+            );
+
+            self.opc.add_part(Box::new(chart_part));
+
+            // Create embedded Excel workbook part
+            let excel_uri = PackURI::new(format!(
+                "/ppt/embeddings/Microsoft_Excel_Worksheet{}.xlsx",
+                chart_idx
+            ))
+            .map_err(|e| OoxmlError::InvalidUri(format!("excel{} URI: {}", chart_idx, e)))?;
+
+            let excel_part = BlobPart::new(
+                excel_uri,
+                ct::SML_SHEET.to_string(),
+                chart_parts.excel_data.clone(),
+            );
+
+            self.opc.add_part(Box::new(excel_part));
+        }
+
+        // Collect SmartArt shape positions from slides for drawing generation
+        let mut smartart_positions: std::collections::HashMap<u32, (i64, i64, i64, i64)> =
+            std::collections::HashMap::new();
+        for slide in &pres.slides {
+            for shape in &slide.shapes {
+                if let crate::ooxml::pptx::writer::shape::ShapeType::SmartArt {
+                    x,
+                    y,
+                    width,
+                    height,
+                    diagram_idx,
+                    ..
+                } = &shape.shape_type
+                {
+                    smartart_positions.insert(*diagram_idx, (*x, *y, *width, *height));
+                }
+            }
+        }
+
+        // Create SmartArt diagram parts and add to package
+        for (diagram_idx, smartart_parts) in &pres.smartarts {
+            // Get position/size for drawing generation (use defaults if not found)
+            let (x, y, width, height) = smartart_positions
+                .get(diagram_idx)
+                .copied()
+                .unwrap_or((0, 0, 5486400, 3657600)); // Default 6" x 4"
+
+            // Generate drawing XML with actual position/size
+            let drawing_xml = crate::ooxml::pptx::smartart::generate_smartart_drawing_xml(
+                &smartart_parts.smartart,
+                x,
+                y,
+                width,
+                height,
+            );
+
+            // Create diagram data XML part with relationship to drawing
+            let data_uri =
+                PackURI::new(format!("/ppt/diagrams/data{}.xml", diagram_idx)).map_err(|e| {
+                    OoxmlError::InvalidUri(format!("diagram data{} URI: {}", diagram_idx, e))
+                })?;
+
+            // Start with the generated data XML and attach the diagramDrawing relationship so we
+            // can embed a dataModelExt extLst referencing it (matches Apache POI / PowerPoint).
+            let mut data_xml = smartart_parts.data_xml.clone();
+
+            let mut data_part = BlobPart::new(
+                data_uri,
+                ct::DML_DIAGRAM_DATA.to_string(),
+                data_xml.clone().into_bytes(),
+            );
+
+            // Add relationship from data to drawing and capture its Id
+            let drawing_rel_id = data_part.relate_to(
+                &format!("drawing{}.xml", diagram_idx),
+                "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
+            );
+
+            // Inject extLst with dsp:dataModelExt referencing the drawing relationship, if possible.
+            // This mirrors the structure produced by PowerPoint and Apache POI.
+            if let Some(pos) = data_xml.rfind("</dgm:dataModel>") {
+                let ext = format!(
+                    concat!(
+                        "<dgm:extLst>",
+                        "<a:ext xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" ",
+                        "uri=\"http://schemas.microsoft.com/office/drawing/2008/diagram\">",
+                        "<dsp:dataModelExt xmlns:dsp=\"http://schemas.microsoft.com/office/drawing/2008/diagram\" ",
+                        "relId=\"{}\" ",
+                        "minVer=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\"/>",
+                        "</a:ext>",
+                        "</dgm:extLst>",
+                    ),
+                    drawing_rel_id,
+                );
+                data_xml.insert_str(pos, &ext);
+                data_part.set_blob(data_xml.into_bytes());
+            }
+
+            self.opc.add_part(Box::new(data_part));
+
+            // Create diagram drawing XML part
+            let drawing_uri = PackURI::new(format!("/ppt/diagrams/drawing{}.xml", diagram_idx))
+                .map_err(|e| {
+                    OoxmlError::InvalidUri(format!("diagram drawing{} URI: {}", diagram_idx, e))
+                })?;
+
+            let drawing_part = BlobPart::new(
+                drawing_uri,
+                ct::DML_DIAGRAM_DRAWING.to_string(),
+                drawing_xml.as_bytes().to_vec(),
+            );
+            self.opc.add_part(Box::new(drawing_part));
+
+            // Create diagram layout XML part
+            let layout_uri = PackURI::new(format!("/ppt/diagrams/layout{}.xml", diagram_idx))
+                .map_err(|e| {
+                    OoxmlError::InvalidUri(format!("diagram layout{} URI: {}", diagram_idx, e))
+                })?;
+
+            let layout_part = BlobPart::new(
+                layout_uri,
+                ct::DML_DIAGRAM_LAYOUT.to_string(),
+                smartart_parts.layout_xml.as_bytes().to_vec(),
+            );
+            self.opc.add_part(Box::new(layout_part));
+
+            // Create diagram quick style XML part
+            let style_uri = PackURI::new(format!("/ppt/diagrams/quickStyle{}.xml", diagram_idx))
+                .map_err(|e| {
+                    OoxmlError::InvalidUri(format!("diagram style{} URI: {}", diagram_idx, e))
+                })?;
+
+            let style_part = BlobPart::new(
+                style_uri,
+                ct::DML_DIAGRAM_STYLE.to_string(),
+                smartart_parts.style_xml.as_bytes().to_vec(),
+            );
+            self.opc.add_part(Box::new(style_part));
+
+            // Create diagram colors XML part
+            let colors_uri = PackURI::new(format!("/ppt/diagrams/colors{}.xml", diagram_idx))
+                .map_err(|e| {
+                    OoxmlError::InvalidUri(format!("diagram colors{} URI: {}", diagram_idx, e))
+                })?;
+
+            let colors_part = BlobPart::new(
+                colors_uri,
+                ct::DML_DIAGRAM_COLORS.to_string(),
+                smartart_parts.colors_xml.as_bytes().to_vec(),
+            );
+            self.opc.add_part(Box::new(colors_part));
+        }
+
         // Create presentation part and add relationships
         let pres_uri = PackURI::new("/ppt/presentation.xml")
             .map_err(|e| OoxmlError::InvalidUri(format!("presentation URI: {}", e)))?;
@@ -686,9 +856,11 @@ impl Package {
         temp_pres_part.relate_to("tableStyles.xml", rt::TABLE_STYLES);
         temp_pres_part.relate_to("viewProps.xml", rt::VIEW_PROPS);
         temp_pres_part.relate_to("presProps.xml", rt::PRES_PROPS);
+        temp_pres_part.relate_to("theme/theme1.xml", rt::THEME);
 
         // Add relationship to notesMaster (required when we have notesSlides)
-        temp_pres_part.relate_to("notesMasters/notesMaster1.xml", rt::NOTES_MASTER);
+        let _notes_master_rel_id =
+            temp_pres_part.relate_to("notesMasters/notesMaster1.xml", rt::NOTES_MASTER);
 
         // Add relationship to commentAuthors if there are comments
         if !all_comments.is_empty() {
@@ -805,6 +977,68 @@ impl Package {
                 rel_mapper.add_comments(slide_index, rid);
             }
 
+            // Add relationships for charts on this slide
+            // We need to scan the slide's shapes for Chart types and create relationships
+            for shape in &slide.shapes {
+                if let crate::ooxml::pptx::writer::shape::ShapeType::Chart { chart_idx, .. } =
+                    &shape.shape_type
+                {
+                    let chart_rel_target = format!("../charts/chart{}.xml", chart_idx);
+                    let rid = temp_slide_part.relate_to(&chart_rel_target, rt::CHART);
+                    rel_mapper.add_chart(slide_index, *chart_idx, rid);
+                }
+            }
+
+            // Add relationships for SmartArt diagrams on this slide
+            for shape in &slide.shapes {
+                if let crate::ooxml::pptx::writer::shape::ShapeType::SmartArt {
+                    diagram_idx, ..
+                } = &shape.shape_type
+                {
+                    // SmartArt requires 4 standard relationships plus an optional diagramDrawing
+                    // extension relationship used by PowerPoint/Apache POI for pre-rendered shapes.
+                    let data_rel_target = format!("../diagrams/data{}.xml", diagram_idx);
+                    let layout_rel_target = format!("../diagrams/layout{}.xml", diagram_idx);
+                    let style_rel_target = format!("../diagrams/quickStyle{}.xml", diagram_idx);
+                    let colors_rel_target = format!("../diagrams/colors{}.xml", diagram_idx);
+                    let drawing_rel_target = format!("../diagrams/drawing{}.xml", diagram_idx);
+
+                    let data_rid = temp_slide_part.relate_to(
+                        &data_rel_target,
+                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
+                    );
+                    let layout_rid = temp_slide_part.relate_to(
+                        &layout_rel_target,
+                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout",
+                    );
+                    let style_rid = temp_slide_part.relate_to(
+                        &style_rel_target,
+                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle",
+                    );
+                    let colors_rid = temp_slide_part.relate_to(
+                        &colors_rel_target,
+                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors",
+                    );
+
+                    // Slide-level relationship to the Microsoft-specific diagramDrawing part.
+                    // This matches the structure produced by PowerPoint and Apache POI and is
+                    // used by tools to locate the pre-rendered SmartArt shapes.
+                    let _drawing_rid = temp_slide_part.relate_to(
+                        &drawing_rel_target,
+                        "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
+                    );
+
+                    rel_mapper.add_smartart(
+                        slide_index,
+                        *diagram_idx,
+                        data_rid,
+                        layout_rid,
+                        style_rid,
+                        colors_rid,
+                    );
+                }
+            }
+
             // Now generate slide XML with actual relationship IDs
             let slide_xml = slide.to_xml_with_rels(Some(slide_index), Some(&rel_mapper))?;
 
@@ -861,8 +1095,53 @@ impl Package {
             slide_rel_ids.push(slide_rid);
         }
 
+        // Create custom handout master if one is set
+        // We need to get the relationship ID BEFORE generating the presentation XML
+        let handout_rel_id = if let Some(handout_master) = pres.handout_master() {
+            // Create theme2.xml for handout master (required - handout needs its own theme)
+            let theme2_uri = PackURI::new("/ppt/theme/theme2.xml")
+                .map_err(|e| OoxmlError::InvalidUri(format!("theme2 URI: {}", e)))?;
+            let theme2_part = BlobPart::new(
+                theme2_uri,
+                ct::OFC_THEME.to_string(),
+                template::default_theme_xml().as_bytes().to_vec(),
+            );
+            self.opc.add_part(Box::new(theme2_part));
+
+            let handout_uri = PackURI::new("/ppt/handoutMasters/handoutMaster1.xml")
+                .map_err(|e| OoxmlError::InvalidUri(format!("handoutMaster URI: {}", e)))?;
+
+            let mut handout_part = BlobPart::new(
+                handout_uri,
+                "application/vnd.openxmlformats-officedocument.presentationml.handoutMaster+xml"
+                    .to_string(),
+                handout_master.to_xml().into_bytes(),
+            );
+
+            // Add relationship from handoutMaster to its own theme (theme2.xml)
+            handout_part.relate_to("../theme/theme2.xml", rt::THEME);
+
+            // Add relationship from presentation to handoutMaster and capture the ID
+            let rel_id =
+                temp_pres_part.relate_to("handoutMasters/handoutMaster1.xml", rt::HANDOUT_MASTER);
+
+            self.opc.add_part(Box::new(handout_part));
+
+            // Note: presProps.xml with prnPr for handout layout is already added in Package::new()
+            // We don't add it again here to avoid duplicate parts which causes corruption
+
+            Some(rel_id)
+        } else {
+            None
+        };
+
         // Now generate presentation XML with actual relationship IDs
-        let pres_xml = pres.generate_presentation_xml_with_rels(Some(&slide_rel_ids))?;
+        // Note: notesMasterIdLst is NOT required for handout master (per python-pptx reference)
+        let pres_xml = pres.generate_presentation_xml_with_rels(
+            Some(&slide_rel_ids),
+            None, // notesMasterIdLst not needed
+            handout_rel_id.as_deref(),
+        )?;
         temp_pres_part.set_blob(pres_xml.into_bytes());
 
         // Add the presentation part to the package

@@ -140,21 +140,21 @@ This document tracks the implementation status of features across all supported 
 |---------|--------|------|-------|-------|
 | Slide manipulation | ✅ | ✅ | ✅ | Add, duplicate support |
 | Tables | ✅ | ✅ | ✅ | Full read/write support |
-| Charts | 🟡 | ✅ | ❌ | Read only (chart info) |
-| SmartArt | ❌ | ❌ | ❌ | Not implemented |
+| Charts | ✅ | ✅ | ✅ | Bar, Line, Pie, Area, Scatter, Doughnut |
+| SmartArt | ✅ | ✅ | ✅ | List, Process, Cycle, Hierarchy, etc. |
 | Audio/Video | ✅ | ✅ | ✅ | MP3, WAV, MP4, WMV, etc. |
-| Animations | ❌ | ❌ | ❌ | Not implemented |
+| Animations | ✅ | ✅ | ✅ | Fade, Fly, Wipe, Zoom, etc. |
 | Transitions | ✅ | ✅ | ✅ | 25+ transition types |
 | Comments | ✅ | ✅ | ✅ | Full read/write support |
 | Notes | ✅ | ✅ | ✅ | Speaker notes support |
-| Handout master | ❌ | ❌ | ❌ | Not implemented |
-| Custom slide shows | ❌ | ❌ | ❌ | Not implemented |
+| Handout master | ✅ | ✅ | ✅ | Layout, header/footer, backgrounds |
+| Custom slide shows | ✅ | ✅ | ✅ | Named slide subsets |
 | Hyperlinks | ✅ | ✅ | ✅ | Full hyperlink support |
 | Group shapes | ✅ | ✅ | ✅ | Nested shape groups |
 | Shape formatting | ✅ | ✅ | ✅ | Text format, fill colors |
 | Themes | ✅ | ✅ | ❌ | Read only |
 | Slide backgrounds | ✅ | ✅ | ✅ | Solid, gradient, pattern, picture |
-| Presentation protection | ❌ | ❌ | ❌ | Not implemented |
+| Presentation protection | ✅ | ✅ | ✅ | Read-only, structure, password |
 | Sections | ✅ | ✅ | ✅ | Slide organization groups |
 
 ### Metadata & Properties

@@ -56,27 +56,40 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+pub mod animations;
 pub mod backgrounds;
+pub mod customshow;
 pub mod format;
+pub mod handout;
 pub mod hyperlinks;
 pub mod media;
 pub mod package;
 pub mod parts;
 pub mod presentation;
+pub mod protection;
 pub mod sections;
 pub mod shapes;
 pub mod slide;
+pub mod smartart;
 pub mod template;
 pub mod transitions;
 pub mod writer;
 
+pub use animations::{
+    Animation, AnimationDirection, AnimationEffect, AnimationSequence, AnimationTrigger,
+};
 pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
+pub use customshow::{CustomShow, CustomShowList};
 pub use format::{ImageFormat, TextFormat};
+pub use handout::{HandoutHeaderFooter, HandoutLayout, HandoutMaster};
 pub use hyperlinks::Hyperlink;
 pub use media::{Media, MediaFormat, MediaType};
 pub use package::Package;
+pub use parts::{ChartData, ChartSeries, ChartType};
 pub use presentation::Presentation;
+pub use protection::{CryptoAlgorithm, PresentationProtection, ProtectionType, SlideProtection};
 pub use sections::{Section, SectionList, generate_section_id};
 pub use slide::{Slide, SlideLayout, SlideMaster};
+pub use smartart::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};
 pub use transitions::{SlideTransition, TransitionDirection, TransitionSpeed, TransitionType};
 pub use writer::{MutablePresentation, MutableShape, MutableSlide};

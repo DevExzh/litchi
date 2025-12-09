@@ -27,6 +27,11 @@ pub struct RelationshipMapper {
     media_ids: HashMap<(usize, usize), (String, String, String)>,
     /// Maps slide_index to comments relationship ID
     comments_ids: HashMap<usize, String>,
+    /// Maps (slide_index, chart_idx) to chart relationship ID
+    chart_ids: HashMap<(usize, u32), String>,
+    /// Maps (slide_index, diagram_idx) to SmartArt relationship IDs
+    /// (data_rel_id, layout_rel_id, style_rel_id, colors_rel_id)
+    smartart_ids: HashMap<(usize, u32), (String, String, String, String)>,
 }
 
 impl RelationshipMapper {
@@ -150,5 +155,67 @@ impl RelationshipMapper {
     #[allow(dead_code)] // Public API for future use
     pub fn get_comments_id(&self, slide_index: usize) -> Option<&str> {
         self.comments_ids.get(&slide_index).map(|s| s.as_str())
+    }
+
+    /// Add a chart relationship mapping for a specific slide.
+    ///
+    /// # Arguments
+    /// * `slide_index` - The index of the slide (0-based)
+    /// * `chart_idx` - The chart index (1-based, from presentation)
+    /// * `rel_id` - The relationship ID (e.g., "rId7")
+    pub fn add_chart(&mut self, slide_index: usize, chart_idx: u32, rel_id: String) {
+        self.chart_ids.insert((slide_index, chart_idx), rel_id);
+    }
+
+    /// Get the chart relationship ID for a specific slide and chart.
+    ///
+    /// # Arguments
+    /// * `slide_index` - The index of the slide (0-based)
+    /// * `chart_idx` - The chart index (1-based)
+    pub fn get_chart_id(&self, slide_index: usize, chart_idx: u32) -> Option<&str> {
+        self.chart_ids
+            .get(&(slide_index, chart_idx))
+            .map(|s| s.as_str())
+    }
+
+    /// Add SmartArt relationship mappings for a specific slide.
+    ///
+    /// # Arguments
+    /// * `slide_index` - The index of the slide (0-based)
+    /// * `diagram_idx` - The diagram index (1-based, from presentation)
+    /// * `data_rel_id` - The data relationship ID
+    /// * `layout_rel_id` - The layout relationship ID
+    /// * `style_rel_id` - The style relationship ID
+    /// * `colors_rel_id` - The colors relationship ID
+    pub fn add_smartart(
+        &mut self,
+        slide_index: usize,
+        diagram_idx: u32,
+        data_rel_id: String,
+        layout_rel_id: String,
+        style_rel_id: String,
+        colors_rel_id: String,
+    ) {
+        self.smartart_ids.insert(
+            (slide_index, diagram_idx),
+            (data_rel_id, layout_rel_id, style_rel_id, colors_rel_id),
+        );
+    }
+
+    /// Get the SmartArt relationship IDs for a specific slide and diagram.
+    ///
+    /// Returns (data_rel_id, layout_rel_id, style_rel_id, colors_rel_id).
+    ///
+    /// # Arguments
+    /// * `slide_index` - The index of the slide (0-based)
+    /// * `diagram_idx` - The diagram index (1-based)
+    pub fn get_smartart_ids(
+        &self,
+        slide_index: usize,
+        diagram_idx: u32,
+    ) -> Option<(&str, &str, &str, &str)> {
+        self.smartart_ids
+            .get(&(slide_index, diagram_idx))
+            .map(|(d, l, s, c)| (d.as_str(), l.as_str(), s.as_str(), c.as_str()))
     }
 }

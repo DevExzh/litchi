@@ -84,12 +84,14 @@ plist = { version = "1", optional = true } # Property list parser for iWork meta
 prost = { version = "0.14", features = ["derive"], optional = true } # Protocol Buffers implementation for iWork archive structures
 prost-types = { version = "0.14", optional = true } # Well-known Protocol Buffer types used by iWork
 quick-xml = { version = "0.38", optional = true } # High-performance XML parser for .docx, .xlsx, .pptx files
+rand = "0.9" # Cryptographically secure random numbers for salts in protection hashes
 rayon = "1.11" # Data parallelism library for parallel iterators and work-stealing
 roaring = "0" # Compressed bitmap data structure for efficient set operations
 rowan = { version = "0.16", optional = true } # Lossless syntax tree library for formula parsing (AST)
 ryu = "1.0" # Fast float-to-string conversion with minimal allocations
 serde = { version = "1", features = ["derive"] } # Serialization/deserialization framework
 serde-saphyr = "0" # YAML serialization support
+sha2 = "0.10" # SHA-512 hashing for OOXML password protection
 smallvec = "1.15" # Stack-allocated vectors for small collections to avoid heap allocations
 snap = { version = "1", optional = true } # Snappy compression used in iWork file formats (.pages, .numbers, .key)
 soapberry-zip = { path = "soapberry-zip", optional = true } # High-performance ZIP archive handling for modern Office formats
@@ -105,6 +107,7 @@ prost-build = { version = "0.14", optional = true }
 
 [dev-dependencies]
 clap = { version = "4", features = ["derive"] }
+proptest = "1.5"
 tempfile = "3"
 
 [profile.release]

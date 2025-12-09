@@ -14,6 +14,23 @@ fn escape_xml(s: &str) -> String {
         .replace('\'', "&apos;")
 }
 
+/// Optional relationship IDs for shapes that need external references.
+///
+/// This struct is used to pass relationship IDs to shapes during XML generation.
+/// Different shape types require different relationship IDs:
+/// - Pictures: single image relationship ID
+/// - Charts: single chart relationship ID
+/// - SmartArt: four relationship IDs (data, layout, style, colors)
+#[derive(Debug, Default, Clone)]
+pub struct ShapeRelIds<'a> {
+    /// Image relationship ID (for Picture shapes)
+    pub image_rel_id: Option<&'a str>,
+    /// Chart relationship ID (for Chart shapes)
+    pub chart_rel_id: Option<&'a str>,
+    /// SmartArt relationship IDs (data, layout, style, colors)
+    pub smartart_rel_ids: Option<(&'a str, &'a str, &'a str, &'a str)>,
+}
+
 /// A shape on a slide (text box, image, etc.).
 #[derive(Debug, Clone)]
 pub struct MutableShape {
@@ -83,6 +100,31 @@ pub(crate) enum ShapeType {
         height: i64,
         /// Child shapes within the group
         children: Vec<MutableShape>,
+    },
+    /// Chart graphic frame (embedded chart)
+    Chart {
+        x: i64,
+        y: i64,
+        width: i64,
+        height: i64,
+        /// Chart relationship ID (e.g., "rId3")
+        chart_rel_id: String,
+        /// Chart index (for naming chart1.xml, chart2.xml, etc.)
+        chart_idx: u32,
+    },
+    /// SmartArt/Diagram graphic frame
+    SmartArt {
+        x: i64,
+        y: i64,
+        width: i64,
+        height: i64,
+        /// Relationship IDs for the 4 required parts
+        data_rel_id: String,
+        layout_rel_id: String,
+        style_rel_id: String,
+        colors_rel_id: String,
+        /// Diagram index (for naming data1.xml, layout1.xml, etc.)
+        diagram_idx: u32,
     },
 }
 
@@ -332,8 +374,13 @@ impl MutableShape {
 
     /// Generate XML for this shape.
     ///
-    /// For pictures, the relationship ID is optional. If not provided, a placeholder will be used.
-    pub(crate) fn to_xml(&self, xml: &mut String, rel_id: Option<&str>) -> Result<()> {
+    /// # Arguments
+    /// * `xml` - The string buffer to write XML to
+    /// * `rel_ids` - Optional relationship IDs for shapes that need external references
+    ///
+    /// For pictures, charts, and SmartArt, the relationship IDs are used to reference
+    /// external parts. If not provided, placeholder values or stored values are used.
+    pub(crate) fn to_xml(&self, xml: &mut String, rel_ids: ShapeRelIds<'_>) -> Result<()> {
         match &self.shape_type {
             ShapeType::TextBox {
                 text,
@@ -518,7 +565,7 @@ impl MutableShape {
                 xml.push_str("</p:nvPicPr>");
 
                 xml.push_str("<p:blipFill>");
-                let rid = rel_id.unwrap_or("rIdImagePlaceholder");
+                let rid = rel_ids.image_rel_id.unwrap_or("rIdImagePlaceholder");
                 write!(xml, r#"<a:blip r:embed="{}"/>"#, rid)
                     .map_err(|e| OoxmlError::Xml(e.to_string()))?;
                 xml.push_str("<a:stretch><a:fillRect/></a:stretch>");
@@ -566,7 +613,106 @@ impl MutableShape {
                 height,
                 children,
             } => {
-                self.write_group_xml(xml, *x, *y, *width, *height, children, rel_id)?;
+                self.write_group_xml(xml, *x, *y, *width, *height, children, rel_ids.image_rel_id)?;
+            },
+            ShapeType::Chart {
+                x,
+                y,
+                width,
+                height,
+                chart_rel_id,
+                chart_idx,
+            } => {
+                // Use provided relationship ID if available, otherwise use stored one
+                let actual_rel_id = rel_ids.chart_rel_id.unwrap_or(chart_rel_id.as_str());
+
+                // Chart graphicFrame
+                xml.push_str("<p:graphicFrame>");
+                xml.push_str("<p:nvGraphicFramePr>");
+                write!(
+                    xml,
+                    r#"<p:cNvPr id="{}" name="Chart {}"/>"#,
+                    self.shape_id, chart_idx
+                )
+                .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                xml.push_str("<p:cNvGraphicFramePr/>");
+                xml.push_str("<p:nvPr/>");
+                xml.push_str("</p:nvGraphicFramePr>");
+
+                xml.push_str("<p:xfrm>");
+                write!(xml, r#"<a:off x="{}" y="{}"/>"#, x, y)
+                    .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                write!(xml, r#"<a:ext cx="{}" cy="{}"/>"#, width, height)
+                    .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                xml.push_str("</p:xfrm>");
+
+                xml.push_str(r#"<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">"#);
+                xml.push_str(r#"<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">"#);
+                write!(
+                    xml,
+                    r#"<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="{}"/>"#,
+                    actual_rel_id
+                )
+                .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                xml.push_str("</a:graphicData>");
+                xml.push_str("</a:graphic>");
+                xml.push_str("</p:graphicFrame>");
+            },
+            ShapeType::SmartArt {
+                x,
+                y,
+                width,
+                height,
+                data_rel_id,
+                layout_rel_id,
+                style_rel_id,
+                colors_rel_id,
+                diagram_idx,
+            } => {
+                // Use provided relationship IDs if available, otherwise use stored ones
+                let (actual_data_id, actual_layout_id, actual_style_id, actual_colors_id) =
+                    if let Some((d, l, s, c)) = rel_ids.smartart_rel_ids {
+                        (d, l, s, c)
+                    } else {
+                        (
+                            data_rel_id.as_str(),
+                            layout_rel_id.as_str(),
+                            style_rel_id.as_str(),
+                            colors_rel_id.as_str(),
+                        )
+                    };
+
+                // SmartArt graphicFrame
+                xml.push_str("<p:graphicFrame>");
+                xml.push_str("<p:nvGraphicFramePr>");
+                write!(
+                    xml,
+                    r#"<p:cNvPr id="{}" name="Diagram {}"/>"#,
+                    self.shape_id, diagram_idx
+                )
+                .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                xml.push_str("<p:cNvGraphicFramePr/>");
+                xml.push_str("<p:nvPr/>");
+                xml.push_str("</p:nvGraphicFramePr>");
+
+                xml.push_str("<p:xfrm>");
+                write!(xml, r#"<a:off x="{}" y="{}"/>"#, x, y)
+                    .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                write!(xml, r#"<a:ext cx="{}" cy="{}"/>"#, width, height)
+                    .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                xml.push_str("</p:xfrm>");
+
+                xml.push_str(r#"<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">"#);
+                xml.push_str(r#"<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/diagram">"#);
+                write!(
+                    xml,
+                    r#"<dgm:relIds xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:dm="{}" r:lo="{}" r:qs="{}" r:cs="{}"/>"#,
+                    actual_data_id, actual_layout_id, actual_style_id, actual_colors_id
+                )
+                .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                xml.push_str("</a:graphicData>");
+                xml.push_str("</a:graphic>");
+                xml.push_str("</p:graphicFrame>");
             },
         }
 
@@ -709,7 +855,7 @@ impl MutableShape {
         width: i64,
         height: i64,
         children: &[MutableShape],
-        rel_id: Option<&str>,
+        image_rel_id: Option<&str>,
     ) -> Result<()> {
         xml.push_str("<p:grpSp>");
 
@@ -741,8 +887,14 @@ impl MutableShape {
         xml.push_str("</p:grpSpPr>");
 
         // Write child shapes
+        // Note: Group children currently only support image relationship IDs
+        // Charts and SmartArt in groups would need additional handling
         for child in children {
-            child.to_xml(xml, rel_id)?;
+            let rel_ids = ShapeRelIds {
+                image_rel_id,
+                ..Default::default()
+            };
+            child.to_xml(xml, rel_ids)?;
         }
 
         xml.push_str("</p:grpSp>");

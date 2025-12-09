@@ -26,6 +26,7 @@ pub mod content_type {
         "application/vnd.openxmlformats-officedocument.drawingml.diagramLayout+xml";
     pub const DML_DIAGRAM_STYLE: &str =
         "application/vnd.openxmlformats-officedocument.drawingml.diagramStyle+xml";
+    pub const DML_DIAGRAM_DRAWING: &str = "application/vnd.ms-office.drawingml.diagramDrawing+xml";
 
     // Office common content types
     pub const OFC_CUSTOM_PROPERTIES: &str =

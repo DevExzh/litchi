@@ -1,5 +1,8 @@
 /// Slide types and implementation for PPTX presentations.
 use crate::ooxml::error::{OoxmlError, Result};
+use crate::ooxml::pptx::animations::{
+    Animation, AnimationEffect, AnimationSequence, AnimationTrigger,
+};
 use crate::ooxml::pptx::media::{Media, MediaFormat};
 use crate::ooxml::pptx::parts::Comment;
 use std::fmt::Write as FmtWrite;
@@ -36,6 +39,8 @@ pub struct MutableSlide {
     pub(crate) comments: Vec<Comment>,
     /// Media elements (audio/video) on the slide
     pub(crate) media: Vec<Media>,
+    /// Animations on the slide
+    pub(crate) animations: AnimationSequence,
     /// Whether the slide has been modified
     pub(crate) modified: bool,
 }
@@ -52,6 +57,7 @@ impl MutableSlide {
             background: None,
             comments: Vec::new(),
             media: Vec::new(),
+            animations: AnimationSequence::new(),
             modified: false,
         }
     }
@@ -617,6 +623,190 @@ impl MutableSlide {
         self.media.len()
     }
 
+    // ========================================================================
+    // Animations
+    // ========================================================================
+
+    /// Add an animation to a shape on the slide.
+    ///
+    /// # Arguments
+    /// * `shape_id` - ID of the shape to animate (must be an existing shape on the slide)
+    /// * `effect` - The animation effect type
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use litchi::ooxml::pptx::{MutablePresentation, AnimationEffect};
+    ///
+    /// let mut pres = MutablePresentation::new();
+    /// let slide = pres.add_slide().unwrap();
+    /// slide.add_text_box("Animated Text", 914400, 914400, 2743200, 914400);
+    /// slide.add_animation(3, AnimationEffect::Fade); // Shape ID 3 is the text box
+    /// ```
+    pub fn add_animation(&mut self, shape_id: u32, effect: AnimationEffect) {
+        let animation = Animation::new(shape_id, effect);
+        self.animations.add(animation);
+        self.modified = true;
+    }
+
+    /// Add an animation with custom settings.
+    ///
+    /// # Arguments
+    /// * `shape_id` - ID of the shape to animate
+    /// * `effect` - The animation effect type
+    /// * `trigger` - When to trigger the animation
+    /// * `duration_ms` - Duration in milliseconds
+    /// * `delay_ms` - Delay before starting in milliseconds
+    pub fn add_animation_with_options(
+        &mut self,
+        shape_id: u32,
+        effect: AnimationEffect,
+        trigger: AnimationTrigger,
+        duration_ms: u32,
+        delay_ms: u32,
+    ) {
+        let animation = Animation::new(shape_id, effect)
+            .with_trigger(trigger)
+            .with_duration(duration_ms)
+            .with_delay(delay_ms);
+        self.animations.add(animation);
+        self.modified = true;
+    }
+
+    /// Get the animations on this slide.
+    pub fn animations(&self) -> &AnimationSequence {
+        &self.animations
+    }
+
+    /// Get the number of animations on this slide.
+    pub fn animation_count(&self) -> usize {
+        self.animations.len()
+    }
+
+    /// Clear all animations from the slide.
+    pub fn clear_animations(&mut self) {
+        self.animations = AnimationSequence::new();
+        self.modified = true;
+    }
+
+    // ========================================================================
+    // Charts and SmartArt
+    // ========================================================================
+
+    /// Add a chart to the slide.
+    ///
+    /// This method registers the chart with the presentation and adds a chart
+    /// shape to the slide. The chart data will be embedded as an Excel workbook
+    /// when the presentation is saved.
+    ///
+    /// # Arguments
+    /// * `chart_data` - The chart data including type, series, and position
+    /// * `pres` - Mutable reference to the presentation (needed to register chart parts)
+    ///
+    /// # Returns
+    /// * `Ok(u32)` - The shape ID of the chart (can be used for animations)
+    /// * `Err` if chart registration fails
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::pptx::{MutablePresentation, ChartData, ChartSeries, ChartType};
+    ///
+    /// let mut pres = MutablePresentation::new();
+    /// let slide = pres.add_slide().unwrap();
+    ///
+    /// let chart = ChartData::new(ChartType::Bar, 914400, 914400, 4572000, 2743200)
+    ///     .with_title("Sales by Quarter")
+    ///     .add_series(
+    ///         ChartSeries::new("2024")
+    ///             .with_categories(vec!["Q1".into(), "Q2".into(), "Q3".into(), "Q4".into()])
+    ///             .with_values(vec![100.0, 150.0, 200.0, 175.0])
+    ///     );
+    ///
+    /// // Note: In practice, you'd need to pass &mut pres which requires different API design
+    /// // slide.add_chart(&chart, &mut pres)?;
+    /// ```
+    pub fn add_chart_shape(
+        &mut self,
+        chart_idx: u32,
+        x: i64,
+        y: i64,
+        width: i64,
+        height: i64,
+    ) -> u32 {
+        use super::shape::{MutableShape, ShapeType};
+
+        // IDs: 1=group, 2=title, 3+=user shapes
+        let shape_id = (self.shapes.len() + 3) as u32;
+
+        // Create chart shape with placeholder relationship ID
+        // The actual relationship ID will be assigned during save
+        let shape = MutableShape {
+            shape_id,
+            shape_type: ShapeType::Chart {
+                x,
+                y,
+                width,
+                height,
+                chart_rel_id: String::new(), // Will be set during save
+                chart_idx,
+            },
+        };
+
+        self.shapes.push(shape);
+        self.modified = true;
+        shape_id
+    }
+
+    /// Add a SmartArt diagram to the slide.
+    ///
+    /// This method registers the SmartArt with the presentation and adds a
+    /// diagram shape to the slide. The diagram parts will be written when
+    /// the presentation is saved.
+    ///
+    /// # Arguments
+    /// * `diagram_idx` - The diagram index from `pres.add_smartart_parts()`
+    /// * `x` - X position in EMUs
+    /// * `y` - Y position in EMUs
+    /// * `width` - Width in EMUs
+    /// * `height` - Height in EMUs
+    ///
+    /// # Returns
+    /// The shape ID of the SmartArt (can be used for animations)
+    pub fn add_smartart_shape(
+        &mut self,
+        diagram_idx: u32,
+        x: i64,
+        y: i64,
+        width: i64,
+        height: i64,
+    ) -> u32 {
+        use super::shape::{MutableShape, ShapeType};
+
+        let shape_id = (self.shapes.len() + 3) as u32;
+
+        // Create SmartArt shape with placeholder relationship IDs
+        // The actual relationship IDs will be assigned during save
+        let shape = MutableShape {
+            shape_id,
+            shape_type: ShapeType::SmartArt {
+                x,
+                y,
+                width,
+                height,
+                data_rel_id: String::new(),
+                layout_rel_id: String::new(),
+                style_rel_id: String::new(),
+                colors_rel_id: String::new(),
+                diagram_idx,
+            },
+        };
+
+        self.shapes.push(shape);
+        self.modified = true;
+        shape_id
+    }
+
     /// Collect all media from this slide.
     #[allow(dead_code)] // Will be used by package writer
     pub(crate) fn collect_media(&self) -> Vec<(&[u8], MediaFormat)> {
@@ -717,16 +907,41 @@ impl MutableSlide {
         // Write shapes with relationship IDs
         let mut image_counter = 0;
         for shape in &self.shapes {
-            // Check if this shape is an image and get its relationship ID
-            let rel_id = if shape.get_image_data().is_some() {
-                let rid = slide_index
-                    .and_then(|si| rel_mapper.and_then(|rm| rm.get_image_id(si, image_counter)));
-                image_counter += 1;
-                rid
-            } else {
-                None
+            use super::shape::{ShapeRelIds, ShapeType};
+
+            // Build relationship IDs based on shape type
+            let rel_ids = match &shape.shape_type {
+                ShapeType::Picture { .. } => {
+                    let rid = slide_index.and_then(|si| {
+                        rel_mapper.and_then(|rm| rm.get_image_id(si, image_counter))
+                    });
+                    image_counter += 1;
+                    ShapeRelIds {
+                        image_rel_id: rid,
+                        ..Default::default()
+                    }
+                },
+                ShapeType::Chart { chart_idx, .. } => {
+                    let rid = slide_index
+                        .and_then(|si| rel_mapper.and_then(|rm| rm.get_chart_id(si, *chart_idx)));
+                    ShapeRelIds {
+                        chart_rel_id: rid,
+                        ..Default::default()
+                    }
+                },
+                ShapeType::SmartArt { diagram_idx, .. } => {
+                    let rids = slide_index.and_then(|si| {
+                        rel_mapper.and_then(|rm| rm.get_smartart_ids(si, *diagram_idx))
+                    });
+                    ShapeRelIds {
+                        smartart_rel_ids: rids,
+                        ..Default::default()
+                    }
+                },
+                _ => ShapeRelIds::default(),
             };
-            shape.to_xml(&mut xml, rel_id)?;
+
+            shape.to_xml(&mut xml, rel_ids)?;
         }
 
         // Write media shapes (audio/video)
@@ -755,6 +970,11 @@ impl MutableSlide {
         // Add transition if present
         if let Some(ref transition) = self.transition {
             xml.push_str(&transition.to_xml()?);
+        }
+
+        // Add timing/animations if present
+        if !self.animations.is_empty() {
+            xml.push_str(&self.animations.to_xml());
         }
 
         xml.push_str("</p:sld>");

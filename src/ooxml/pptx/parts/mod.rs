@@ -8,7 +8,10 @@ pub mod presentation;
 pub mod slide;
 pub mod theme;
 
-pub use chart::{ChartInfo, ChartPart, ChartType};
+pub use chart::{
+    ChartData, ChartInfo, ChartPart, ChartSeries, ChartType, generate_chart_graphic_frame,
+    generate_chart_xml,
+};
 pub use comment::{
     Comment, CommentAuthor, CommentAuthorsPart, CommentsPart, generate_comment_authors_xml,
     generate_comments_xml,
