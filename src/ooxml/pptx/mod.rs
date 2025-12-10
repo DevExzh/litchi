@@ -87,7 +87,10 @@ pub use media::{Media, MediaFormat, MediaType};
 pub use package::Package;
 pub use parts::{ChartData, ChartSeries, ChartType};
 pub use presentation::Presentation;
-pub use protection::{CryptoAlgorithm, PresentationProtection, ProtectionType, SlideProtection};
+pub use protection::{
+    CryptoAlgorithm, OpenPasswordEncryption, PresentationProtection, ProtectionType,
+    SlideProtection,
+};
 pub use sections::{Section, SectionList, generate_section_id};
 pub use slide::{Slide, SlideLayout, SlideMaster};
 pub use smartart::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};

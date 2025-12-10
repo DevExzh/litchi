@@ -46,6 +46,9 @@ pub mod shared;
 pub mod xlsb;
 pub mod xlsx;
 
+#[cfg(feature = "ooxml_encryption")]
+pub mod crypto;
+
 // Re-export commonly used types from OPC layer
 pub use opc::{OpcPackage, PackURI};
 

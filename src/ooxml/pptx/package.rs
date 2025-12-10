@@ -534,6 +534,43 @@ impl Package {
         // Update core properties
         self.update_core_properties()?;
 
+        #[cfg(feature = "ooxml_encryption")]
+        #[allow(clippy::collapsible_if)]
+        {
+            if let Some(pres) = self.mutable_pres.as_ref() {
+                let prot = pres.protection();
+                if prot.open_password_protected {
+                    if let Some(password) = prot.open_password() {
+                        use crate::ooxml::crypto::{
+                            encrypt_ooxml_package_agile, encrypt_ooxml_package_standard_2007,
+                        };
+                        use crate::ooxml::opc::pkgwriter::PackageWriter;
+                        use crate::ooxml::pptx::OpenPasswordEncryption;
+
+                        let pkg_bytes = PackageWriter::to_bytes(&self.opc)?;
+
+                        let ole_bytes = match prot.open_password_encryption() {
+                            OpenPasswordEncryption::Standard2007 => {
+                                encrypt_ooxml_package_standard_2007(&pkg_bytes, password)?
+                            },
+                            OpenPasswordEncryption::Agile => {
+                                encrypt_ooxml_package_agile(&pkg_bytes, password)?
+                            },
+                        };
+
+                        std::fs::write(&path, ole_bytes).map_err(|e| {
+                            OoxmlError::IoError(std::io::Error::other(format!(
+                                "Failed to save encrypted package: {}",
+                                e
+                            )))
+                        })?;
+
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
         self.opc.save(path).map_err(|e| {
             OoxmlError::IoError(std::io::Error::other(format!(
                 "Failed to save package: {}",

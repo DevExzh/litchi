@@ -43,8 +43,8 @@ exclude = [
 ]
 
 [features]
-default = ["ole", "ooxml"]
-full = ["iwa", "odf", "ole", "ooxml", "rtf", "formula", "imgconv"]
+default = ["ole", "ooxml", "ooxml_encryption"]
+full = ["iwa", "odf", "ole", "ooxml", "ooxml_encryption", "rtf", "formula", "imgconv"]
 # Format support features
 iwa = [
     "dep:snap",
@@ -57,23 +57,27 @@ iwa = [
 odf = ["dep:soapberry-zip", "dep:quick-xml"]
 ole = ["dep:encoding_rs", "dep:bumpalo"]
 ooxml = ["dep:soapberry-zip", "dep:quick-xml", "dep:encoding_rs"]
+ooxml_encryption = ["ooxml", "ole", "dep:aes", "dep:cbc", "dep:hmac", "dep:sha1"]
 rtf = ["dep:bumpalo", "dep:crc-fast", "dep:encoding_rs"]
 # Additional functionality features
 formula = ["dep:rowan", "dep:bumpalo", "dep:quick-xml"]
 imgconv = ["dep:image"]
 
 [dependencies]
+aes = { version = "0.8", optional = true } # AES block cipher for OOXML file encryption
 atoi_simd = "0.17" # SIMD-optimized conversion of byte slices to integers
 base64 = "0.22" # Base64 encoding/decoding for embedded binary data in XML
 bitflags = { version = "2.10", features = ["std", "serde"] } # Bit flags for efficient flag combinations
 bumpalo = { version = "3", features = ["collections"], optional = true } # Fast bump allocator for temporary formula parsing data
 bytes = { version = "1", features = ["serde"] } # Efficient byte buffer operations with zero-copy slicing
+cbc = { version = "0.1", features = ["alloc"], optional = true } # CBC mode for AES-based OOXML encryption
 chrono = { version = "0", features = ["serde"] } # Date and time types for Office timestamps
 crc-fast = { version = "1.7", features = ["optimize_crc32_auto"], optional = true } # Fast CRC32 implementation for verifying file integrity
 encoding_rs = { version = "0.8", optional = true } # Used by both OLE (.doc, .xls, .ppt) and OOXML (.xlsb) formats for UTF-16LE decoding
 fast-float2 = "0.2" # Fast string-to-float conversion with correct rounding
 fixedbitset = "0.5" # Fixed-size bitset for efficient visited tracking with better cache locality
 flate2 = { version = "1", features = ["zlib-rs"], default-features = false } # Compression/decompression for Office file formats
+hmac = { version = "0.12", optional = true } # HMAC for Agile OOXML encryption integrity
 image = { version = "0.25", features = ["default-formats", "rayon"], optional = true } # Image format decoding/encoding for embedded media
 itoa = "1.0" # Fast integer-to-string conversion
 memchr = "2.7" # SIMD-accelerated string searching for fast byte pattern matching
@@ -91,6 +95,7 @@ rowan = { version = "0.16", optional = true } # Lossless syntax tree library for
 ryu = "1.0" # Fast float-to-string conversion with minimal allocations
 serde = { version = "1", features = ["derive"] } # Serialization/deserialization framework
 serde-saphyr = "0" # YAML serialization support
+sha1 = { version = "0.10", optional = true } # SHA-1 hashing for Standard 2007 and Agile OOXML encryption
 sha2 = "0.10" # SHA-512 hashing for OOXML password protection
 smallvec = "1.15" # Stack-allocated vectors for small collections to avoid heap allocations
 snap = { version = "1", optional = true } # Snappy compression used in iWork file formats (.pages, .numbers, .key)

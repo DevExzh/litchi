@@ -66,6 +66,16 @@ impl CryptoAlgorithm {
     }
 }
 
+/// Encryption mode used for open-password (file-level) protection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum OpenPasswordEncryption {
+    /// ECMA-376 Standard 2007 encryption (binary EncryptionInfo, AES-128/SHA1).
+    #[default]
+    Standard2007,
+    /// Agile OOXML encryption (XML EncryptionInfo, segmented AES-CBC + HMAC).
+    Agile,
+}
+
 /// Protection settings for a presentation.
 #[derive(Debug, Clone, Default)]
 pub struct PresentationProtection {
@@ -83,6 +93,9 @@ pub struct PresentationProtection {
     pub modify_algorithm: CryptoAlgorithm,
     /// Whether opening requires a password (handled by encryption, not here)
     pub open_password_protected: bool,
+    open_password: Option<String>,
+    /// Encryption mode for open-password protection
+    pub open_password_encryption: OpenPasswordEncryption,
     /// Prevent editing of individual slides
     pub protect_structure: bool,
     /// Prevent changing windows/views
@@ -187,14 +200,44 @@ impl PresentationProtection {
         self.modify_password_salt = None;
     }
 
+    /// Get the open-password encryption mode.
+    pub fn open_password_encryption(&self) -> OpenPasswordEncryption {
+        self.open_password_encryption
+    }
+
+    /// Set the open-password encryption mode (Standard 2007 vs Agile).
+    pub fn set_open_password_encryption(&mut self, mode: OpenPasswordEncryption) {
+        self.open_password_encryption = mode;
+    }
+
+    #[cfg(feature = "ooxml_encryption")]
+    pub fn set_open_password(&mut self, password: &str) -> Result<()> {
+        if password.is_empty() {
+            return Err(OoxmlError::InvalidFormat(
+                "open password cannot be empty".to_string(),
+            ));
+        }
+
+        self.open_password_protected = true;
+        self.open_password = Some(password.to_string());
+        Ok(())
+    }
+
+    #[cfg(not(feature = "ooxml_encryption"))]
     pub fn set_open_password(&mut self, _password: &str) -> Result<()> {
         Err(OoxmlError::Other(
-            "PPTX open-password protection (file encryption) is not implemented yet; only modify-password protection is currently supported.".to_string(),
+            "PPTX open-password protection requires the `ooxml_encryption` feature to be enabled"
+                .to_string(),
         ))
     }
 
     pub fn clear_open_password(&mut self) {
         self.open_password_protected = false;
+        self.open_password = None;
+    }
+
+    pub(crate) fn open_password(&self) -> Option<&str> {
+        self.open_password.as_deref()
     }
 
     /// Parse protection settings from presentation properties XML.
