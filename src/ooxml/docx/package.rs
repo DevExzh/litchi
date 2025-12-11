@@ -288,6 +288,14 @@ impl Package {
         })
     }
 
+    #[cfg(feature = "ooxml_encryption")]
+    pub fn open_with_password<P: AsRef<Path>>(path: P, password: &str) -> Result<Self> {
+        let data = std::fs::read(path.as_ref()).map_err(OoxmlError::Io)?;
+        let decrypted = crate::ooxml::crypto::decrypt_ooxml_if_encrypted(&data, password)?;
+        let opc = OpcPackage::from_bytes(&decrypted.package_bytes)?;
+        Self::from_opc_package(opc)
+    }
+
     /// Create a Package from an already-parsed OPC package.
     ///
     /// This is used for single-pass parsing where the OPC package has already
@@ -377,6 +385,18 @@ impl Package {
             properties: DocumentProperties::new(),
             custom_properties,
         })
+    }
+
+    #[cfg(feature = "ooxml_encryption")]
+    pub fn from_reader_with_password<R: Read + Seek>(
+        mut reader: R,
+        password: &str,
+    ) -> Result<Self> {
+        let mut data = Vec::new();
+        reader.read_to_end(&mut data).map_err(OoxmlError::Io)?;
+        let decrypted = crate::ooxml::crypto::decrypt_ooxml_if_encrypted(&data, password)?;
+        let opc = OpcPackage::from_bytes(&decrypted.package_bytes)?;
+        Self::from_opc_package(opc)
     }
 
     /// Get the main document for reading.

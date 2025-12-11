@@ -43,8 +43,18 @@ exclude = [
 ]
 
 [features]
-default = ["ole", "ooxml", "ooxml_encryption"]
-full = ["iwa", "odf", "ole", "ooxml", "ooxml_encryption", "rtf", "formula", "imgconv"]
+default = ["ole", "ooxml", "ooxml_encryption", "eval_engine"]
+full = [
+    "iwa",
+    "odf",
+    "ole",
+    "ooxml",
+    "ooxml_encryption",
+    "rtf",
+    "formula",
+    "imgconv",
+    "eval_engine",
+]
 # Format support features
 iwa = [
     "dep:snap",
@@ -62,6 +72,7 @@ rtf = ["dep:bumpalo", "dep:crc-fast", "dep:encoding_rs"]
 # Additional functionality features
 formula = ["dep:rowan", "dep:bumpalo", "dep:quick-xml"]
 imgconv = ["dep:image"]
+eval_engine = ["dep:statrs"]
 
 [dependencies]
 aes = { version = "0.8", optional = true } # AES block cipher for OOXML file encryption
@@ -100,6 +111,7 @@ sha2 = "0.10" # SHA-512 hashing for OOXML password protection
 smallvec = "1.15" # Stack-allocated vectors for small collections to avoid heap allocations
 snap = { version = "1", optional = true } # Snappy compression used in iWork file formats (.pages, .numbers, .key)
 soapberry-zip = { path = "soapberry-zip", optional = true } # High-performance ZIP archive handling for modern Office formats
+statrs = { version = "0.18", optional = true } # Statistics library for statistical functions
 thiserror = "2.0" # Convenient derive macros for error types
 xml-minifier = { path = "xml-minifier" }
 zerocopy = { version = "0.8", features = ["std"] } # Safe zero-cost type conversions between bytes and structured data

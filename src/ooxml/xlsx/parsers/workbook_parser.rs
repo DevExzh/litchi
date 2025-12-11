@@ -119,6 +119,9 @@ pub fn parse_sheet_xml(sheet_xml: &str) -> Result<Option<WorksheetInfo>> {
                 relationship_id,
                 sheet_id,
                 is_active: false, // Will be set later
+                print_area: None,
+                repeating_rows: None,
+                repeating_columns: None,
             }))
         },
         _ => Ok(None),

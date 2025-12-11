@@ -315,6 +315,7 @@ impl Workbook {
                                 crate::sheet::CellValue::Formula {
                                     formula,
                                     cached_value,
+                                    ..
                                 } => {
                                     // For CSV export, use cached value if available, otherwise show formula
                                     if let Some(cached) = cached_value {
@@ -370,6 +371,7 @@ impl Workbook {
                                 crate::sheet::CellValue::Formula {
                                     formula,
                                     cached_value,
+                                    ..
                                 } => {
                                     // For CSV export, use cached value if available, otherwise show formula
                                     if let Some(cached) = cached_value {
@@ -425,6 +427,7 @@ impl Workbook {
                                 crate::sheet::CellValue::Formula {
                                     formula,
                                     cached_value,
+                                    ..
                                 } => {
                                     // For CSV export, use cached value if available, otherwise show formula
                                     if let Some(cached) = cached_value {
@@ -479,6 +482,7 @@ impl Workbook {
                                 crate::sheet::CellValue::Formula {
                                     formula,
                                     cached_value,
+                                    ..
                                 } => {
                                     // For CSV export, use cached value if available, otherwise show formula
                                     if let Some(cached) = cached_value {

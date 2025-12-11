@@ -59,5 +59,5 @@ pub use writer::{
     AutoFilter as WriterAutoFilter, CellComment as WriterCellComment, ConditionalFormat,
     ConditionalFormatType, FreezePanes, HeaderFooter, Hyperlink as WriterHyperlink, Image,
     MutableSharedStrings, MutableWorkbookData, MutableWorksheet, NamedRange,
-    PageSetup as WriterPageSetup, SheetProtection, StylesBuilder, WorkbookProtection,
+    PageSetup as WriterPageSetup, RichTextRun, SheetProtection, StylesBuilder, WorkbookProtection,
 };

@@ -1,12 +1,19 @@
 use crate::ooxml::error::{OoxmlError, Result};
 use aes::Aes128;
-use aes::cipher::{BlockEncrypt, KeyInit, generic_array::GenericArray};
+use aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit, generic_array::GenericArray};
 use rand::TryRngCore;
 use rand::rngs::OsRng;
 use sha1::{Digest, Sha1};
 
 use super::ole_encrypted_package::build_ole_encrypted_package;
 use super::password_to_utf16le;
+
+#[derive(Debug, Clone, Copy)]
+struct Standard2007Verifier {
+    salt: [u8; 16],
+    encrypted_verifier: [u8; 16],
+    encrypted_verifier_hash: [u8; 32],
+}
 
 pub fn encrypt_ooxml_package_standard_2007(
     package_bytes: &[u8],
@@ -187,4 +194,187 @@ fn encrypt_package_stream(key: &[u8], data: &[u8]) -> Result<Vec<u8>> {
 
     buf.extend_from_slice(&padded);
     Ok(buf)
+}
+
+pub fn decrypt_ooxml_package_standard_2007(
+    encryption_info: &[u8],
+    encrypted_package: &[u8],
+    password: &str,
+) -> Result<Vec<u8>> {
+    if encryption_info.len() < 8 {
+        return Err(OoxmlError::InvalidFormat(
+            "EncryptionInfo stream too short for Standard 2007 header".to_string(),
+        ));
+    }
+
+    if encrypted_package.len() < 8 + 16 {
+        return Err(OoxmlError::InvalidFormat(
+            "EncryptedPackage stream too short for Standard 2007 payload".to_string(),
+        ));
+    }
+
+    let verifier = parse_encryption_info_standard2007(encryption_info)?;
+
+    let key = derive_standard2007_key(password, &verifier.salt, 50_000, 16)?;
+
+    verify_standard2007_password(&key, &verifier)?;
+
+    decrypt_package_stream(&key, encrypted_package)
+}
+
+fn parse_encryption_info_standard2007(info: &[u8]) -> Result<Standard2007Verifier> {
+    if info.len() < 8 + 4 {
+        return Err(OoxmlError::InvalidFormat(
+            "EncryptionInfo stream too short for Standard 2007 header".to_string(),
+        ));
+    }
+
+    let version_major = u16::from_le_bytes([info[0], info[1]]);
+    let version_minor = u16::from_le_bytes([info[2], info[3]]);
+    if version_major != 3 || version_minor != 2 {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "unsupported Standard 2007 EncryptionInfo version: {}.{}",
+            version_major, version_minor
+        )));
+    }
+
+    let header_size = u32::from_le_bytes([info[8], info[9], info[10], info[11]]) as usize;
+    let header_start = 12usize;
+    let header_end = header_start.checked_add(header_size).ok_or_else(|| {
+        OoxmlError::InvalidFormat("EncryptionInfo header size overflow".to_string())
+    })?;
+
+    let mut offset = header_end;
+    if info.len() < offset + 4 + 16 + 16 + 4 + 32 {
+        return Err(OoxmlError::InvalidFormat(
+            "EncryptionInfo stream too short for Standard 2007 verifier".to_string(),
+        ));
+    }
+
+    let salt_size = u32::from_le_bytes([
+        info[offset],
+        info[offset + 1],
+        info[offset + 2],
+        info[offset + 3],
+    ]);
+    offset += 4;
+
+    if salt_size != 16 {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "unexpected Standard 2007 salt size: {} (expected 16)",
+            salt_size
+        )));
+    }
+
+    let mut salt = [0u8; 16];
+    salt.copy_from_slice(&info[offset..offset + 16]);
+    offset += 16;
+
+    let mut encrypted_verifier = [0u8; 16];
+    encrypted_verifier.copy_from_slice(&info[offset..offset + 16]);
+    offset += 16;
+
+    let hash_size = u32::from_le_bytes([
+        info[offset],
+        info[offset + 1],
+        info[offset + 2],
+        info[offset + 3],
+    ]);
+    offset += 4;
+
+    if hash_size != 20 {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "unexpected Standard 2007 verifier hash size: {} (expected 20)",
+            hash_size
+        )));
+    }
+
+    let mut encrypted_verifier_hash = [0u8; 32];
+    encrypted_verifier_hash.copy_from_slice(&info[offset..offset + 32]);
+
+    Ok(Standard2007Verifier {
+        salt,
+        encrypted_verifier,
+        encrypted_verifier_hash,
+    })
+}
+
+fn verify_standard2007_password(key: &[u8], verifier: &Standard2007Verifier) -> Result<()> {
+    let cipher = Aes128::new_from_slice(key).map_err(|_| {
+        OoxmlError::InvalidFormat(
+            "invalid AES-128 key length for Standard 2007 password verification".to_string(),
+        )
+    })?;
+
+    let mut decrypted_verifier = verifier.encrypted_verifier;
+    let block = GenericArray::from_mut_slice(&mut decrypted_verifier);
+    cipher.decrypt_block(block);
+
+    let mut sha = Sha1::new();
+    sha.update(decrypted_verifier);
+    let verifier_hash = sha.finalize();
+
+    let mut decrypted_hash = verifier.encrypted_verifier_hash;
+    for chunk in decrypted_hash.chunks_mut(16) {
+        let block = GenericArray::from_mut_slice(chunk);
+        cipher.decrypt_block(block);
+    }
+
+    if decrypted_hash[..verifier_hash.len()] != verifier_hash[..] {
+        return Err(OoxmlError::InvalidFormat(
+            "incorrect password for Standard 2007 encrypted OOXML package".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+fn decrypt_package_stream(key: &[u8], encrypted: &[u8]) -> Result<Vec<u8>> {
+    let cipher = Aes128::new_from_slice(key).map_err(|_| {
+        OoxmlError::InvalidFormat("invalid AES-128 key length for package decryption".to_string())
+    })?;
+
+    if encrypted.len() < 8 + 16 {
+        return Err(OoxmlError::InvalidFormat(
+            "EncryptedPackage stream too short for Standard 2007 decryption".to_string(),
+        ));
+    }
+
+    let mut size_bytes = [0u8; 8];
+    size_bytes.copy_from_slice(&encrypted[..8]);
+    let stream_size = u64::from_le_bytes(size_bytes) as usize;
+
+    let mut data = encrypted[8..].to_vec();
+    if !data.len().is_multiple_of(16) {
+        return Err(OoxmlError::InvalidFormat(
+            "EncryptedPackage ciphertext length is not a multiple of 16 bytes".to_string(),
+        ));
+    }
+
+    for chunk in data.chunks_mut(16) {
+        let block = GenericArray::from_mut_slice(chunk);
+        cipher.decrypt_block(block);
+    }
+
+    if data.is_empty() {
+        return Err(OoxmlError::InvalidFormat(
+            "EncryptedPackage has no payload after decryption".to_string(),
+        ));
+    }
+
+    let pad_len = *data.last().unwrap() as usize;
+    if pad_len == 0 || pad_len > 16 || pad_len > data.len() {
+        return Err(OoxmlError::InvalidFormat(
+            "invalid PKCS7 padding in Standard 2007 EncryptedPackage".to_string(),
+        ));
+    }
+
+    let plain_len = data.len() - pad_len;
+    if plain_len < stream_size {
+        return Err(OoxmlError::InvalidFormat(
+            "decrypted stream smaller than declared StreamSize".to_string(),
+        ));
+    }
+
+    data.truncate(stream_size);
+    Ok(data)
 }

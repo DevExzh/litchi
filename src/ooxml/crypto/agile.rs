@@ -1,13 +1,15 @@
 use crate::ooxml::error::{OoxmlError, Result};
 use aes::Aes128;
 use aes::cipher::{
-    BlockEncryptMut, KeyIvInit,
+    BlockDecryptMut, BlockEncryptMut, KeyIvInit,
     block_padding::{NoPadding, Pkcs7},
 };
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use cbc::Encryptor as Aes128Cbc;
+use cbc::{Decryptor, Encryptor};
 use hmac::{Hmac, Mac};
+use quick_xml::Reader;
+use quick_xml::events::Event;
 use rand::TryRngCore;
 use rand::rngs::OsRng;
 use sha1::{Digest, Sha1};
@@ -32,7 +34,8 @@ const K_INTEGRITY_KEY_BLOCK: [u8; 8] = [0x5f, 0xb2, 0xad, 0x01, 0x0c, 0xb9, 0xe1
 const K_INTEGRITY_VALUE_BLOCK: [u8; 8] = [0xa0, 0x67, 0x7f, 0x02, 0xb2, 0x2c, 0x84, 0x33];
 
 type HmacSha1 = Hmac<Sha1>;
-type Aes128CbcEnc = Aes128Cbc<Aes128>;
+type Aes128CbcEnc = Encryptor<Aes128>;
+type Aes128CbcDec = Decryptor<Aes128>;
 
 pub fn encrypt_ooxml_package_agile(package_bytes: &[u8], password: &str) -> Result<Vec<u8>> {
     if package_bytes.is_empty() {
@@ -334,4 +337,565 @@ fn build_agile_encryption_info_xml(
         enc_hmac_val = enc_hmac_val_b64,
         spin = AGILE_SPIN_COUNT,
     )
+}
+
+#[derive(Debug)]
+struct AgileEncryptionInfo {
+    spin_count: u32,
+    key_salt: Vec<u8>,
+    verifier_salt: Vec<u8>,
+    encrypted_verifier: Vec<u8>,
+    encrypted_verifier_hash: Vec<u8>,
+    encrypted_key: Vec<u8>,
+    encrypted_hmac_key: Vec<u8>,
+    encrypted_hmac_value: Vec<u8>,
+}
+
+pub fn decrypt_ooxml_package_agile(
+    encryption_info: &[u8],
+    encrypted_package: &[u8],
+    password: &str,
+) -> Result<Vec<u8>> {
+    if encryption_info.len() < 8 {
+        return Err(OoxmlError::InvalidFormat(
+            "EncryptionInfo stream too short for Agile header".to_string(),
+        ));
+    }
+    if encrypted_package.len() < 8 {
+        return Err(OoxmlError::InvalidFormat(
+            "EncryptedPackage stream too short for Agile payload".to_string(),
+        ));
+    }
+
+    let major = u16::from_le_bytes([encryption_info[0], encryption_info[1]]);
+    let minor = u16::from_le_bytes([encryption_info[2], encryption_info[3]]);
+    if major != AGILE_ENCRYPTION_VERSION_MAJOR || minor != AGILE_ENCRYPTION_VERSION_MINOR {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "unsupported Agile EncryptionInfo version: {}.{}",
+            major, minor
+        )));
+    }
+
+    let xml_bytes = &encryption_info[8..];
+    let info = parse_agile_encryption_info(xml_bytes)?;
+
+    let content_key = derive_agile_content_key_and_verify(&info, password, encrypted_package)?;
+
+    decrypt_agile_package_stream(&content_key, &info.key_salt, encrypted_package)
+}
+
+fn parse_agile_encryption_info(xml_bytes: &[u8]) -> Result<AgileEncryptionInfo> {
+    let xml = std::str::from_utf8(xml_bytes).map_err(|e| {
+        OoxmlError::Xml(format!("invalid UTF-8 in Agile EncryptionInfo XML: {}", e))
+    })?;
+
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+
+    let mut spin_count = None;
+    let mut key_salt = None;
+    let mut verifier_salt = None;
+    let mut encrypted_verifier = None;
+    let mut encrypted_verifier_hash = None;
+    let mut encrypted_key = None;
+    let mut encrypted_hmac_key = None;
+    let mut encrypted_hmac_value = None;
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => match e.local_name().as_ref() {
+                b"keyData" => {
+                    let mut salt = None;
+                    let mut block_size = None;
+                    for attr in e.attributes().flatten() {
+                        match attr.key.local_name().as_ref() {
+                            b"saltValue" => {
+                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                                {
+                                    salt = Some(decode_b64_attr(&value, "keyData saltValue")?);
+                                }
+                            },
+                            b"blockSize" => {
+                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                                {
+                                    let v = parse_usize_attr(&value, "keyData blockSize")?;
+                                    block_size = Some(v);
+                                }
+                            },
+                            _ => {},
+                        }
+                    }
+                    let salt = salt.ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "missing keyData saltValue in Agile EncryptionInfo".to_string(),
+                        )
+                    })?;
+                    let block_size = block_size.ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "missing keyData blockSize in Agile EncryptionInfo".to_string(),
+                        )
+                    })?;
+                    if block_size != AGILE_BLOCK_SIZE {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "unsupported Agile keyData blockSize: {}",
+                            block_size
+                        )));
+                    }
+                    key_salt = Some(salt);
+                },
+                b"dataIntegrity" => {
+                    let mut enc_key = None;
+                    let mut enc_val = None;
+                    for attr in e.attributes().flatten() {
+                        match attr.key.local_name().as_ref() {
+                            b"encryptedHmacKey" => {
+                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                                {
+                                    enc_key = Some(decode_b64_attr(
+                                        &value,
+                                        "dataIntegrity encryptedHmacKey",
+                                    )?);
+                                }
+                            },
+                            b"encryptedHmacValue" => {
+                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                                {
+                                    enc_val = Some(decode_b64_attr(
+                                        &value,
+                                        "dataIntegrity encryptedHmacValue",
+                                    )?);
+                                }
+                            },
+                            _ => {},
+                        }
+                    }
+                    encrypted_hmac_key = enc_key;
+                    encrypted_hmac_value = enc_val;
+                },
+                b"encryptedKey" => {
+                    let mut salt = None;
+                    let mut spin = None;
+                    let mut block_size = None;
+                    let mut enc_ver = None;
+                    let mut enc_ver_hash = None;
+                    let mut enc_key_val = None;
+                    for attr in e.attributes().flatten() {
+                        match attr.key.local_name().as_ref() {
+                            b"saltValue" => {
+                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                                {
+                                    salt = Some(decode_b64_attr(&value, "encryptedKey saltValue")?);
+                                }
+                            },
+                            b"spinCount" => {
+                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                                {
+                                    spin = Some(parse_u32_attr(&value, "encryptedKey spinCount")?);
+                                }
+                            },
+                            b"blockSize" => {
+                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                                {
+                                    let v = parse_usize_attr(&value, "encryptedKey blockSize")?;
+                                    block_size = Some(v);
+                                }
+                            },
+                            b"encryptedVerifierHashInput" => {
+                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                                {
+                                    enc_ver = Some(decode_b64_attr(
+                                        &value,
+                                        "encryptedVerifierHashInput",
+                                    )?);
+                                }
+                            },
+                            b"encryptedVerifierHashValue" => {
+                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                                {
+                                    enc_ver_hash = Some(decode_b64_attr(
+                                        &value,
+                                        "encryptedVerifierHashValue",
+                                    )?);
+                                }
+                            },
+                            b"encryptedKeyValue" => {
+                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                                {
+                                    enc_key_val =
+                                        Some(decode_b64_attr(&value, "encryptedKeyValue")?);
+                                }
+                            },
+                            _ => {},
+                        }
+                    }
+                    let salt = salt.ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "missing encryptedKey saltValue in Agile EncryptionInfo".to_string(),
+                        )
+                    })?;
+                    let spin = spin.ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "missing encryptedKey spinCount in Agile EncryptionInfo".to_string(),
+                        )
+                    })?;
+                    let block_size = block_size.ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "missing encryptedKey blockSize in Agile EncryptionInfo".to_string(),
+                        )
+                    })?;
+                    if block_size != AGILE_BLOCK_SIZE {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "unsupported Agile encryptedKey blockSize: {}",
+                            block_size
+                        )));
+                    }
+                    let enc_ver = enc_ver.ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "missing encryptedVerifierHashInput in Agile EncryptionInfo"
+                                .to_string(),
+                        )
+                    })?;
+                    let enc_ver_hash = enc_ver_hash.ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "missing encryptedVerifierHashValue in Agile EncryptionInfo"
+                                .to_string(),
+                        )
+                    })?;
+                    let enc_key_val = enc_key_val.ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "missing encryptedKeyValue in Agile EncryptionInfo".to_string(),
+                        )
+                    })?;
+                    verifier_salt = Some(salt);
+                    encrypted_verifier = Some(enc_ver);
+                    encrypted_verifier_hash = Some(enc_ver_hash);
+                    encrypted_key = Some(enc_key_val);
+                    spin_count = Some(spin);
+                },
+                _ => {},
+            },
+            Ok(Event::Eof) => break,
+            Err(e) => {
+                return Err(OoxmlError::Xml(format!(
+                    "XML parsing error in Agile EncryptionInfo: {}",
+                    e
+                )));
+            },
+            _ => {},
+        }
+    }
+
+    let key_salt = key_salt.ok_or_else(|| {
+        OoxmlError::InvalidFormat("missing keyData in Agile EncryptionInfo".to_string())
+    })?;
+    let verifier_salt = verifier_salt.ok_or_else(|| {
+        OoxmlError::InvalidFormat(
+            "missing encryptedKey saltValue in Agile EncryptionInfo".to_string(),
+        )
+    })?;
+    let encrypted_verifier = encrypted_verifier.ok_or_else(|| {
+        OoxmlError::InvalidFormat(
+            "missing encryptedVerifierHashInput in Agile EncryptionInfo".to_string(),
+        )
+    })?;
+    let encrypted_verifier_hash = encrypted_verifier_hash.ok_or_else(|| {
+        OoxmlError::InvalidFormat(
+            "missing encryptedVerifierHashValue in Agile EncryptionInfo".to_string(),
+        )
+    })?;
+    let encrypted_key = encrypted_key.ok_or_else(|| {
+        OoxmlError::InvalidFormat("missing encryptedKeyValue in Agile EncryptionInfo".to_string())
+    })?;
+    let encrypted_hmac_key = encrypted_hmac_key.ok_or_else(|| {
+        OoxmlError::InvalidFormat(
+            "missing dataIntegrity encryptedHmacKey in Agile EncryptionInfo".to_string(),
+        )
+    })?;
+    let encrypted_hmac_value = encrypted_hmac_value.ok_or_else(|| {
+        OoxmlError::InvalidFormat(
+            "missing dataIntegrity encryptedHmacValue in Agile EncryptionInfo".to_string(),
+        )
+    })?;
+    let spin_count = spin_count.ok_or_else(|| {
+        OoxmlError::InvalidFormat(
+            "missing encryptedKey spinCount in Agile EncryptionInfo".to_string(),
+        )
+    })?;
+
+    Ok(AgileEncryptionInfo {
+        spin_count,
+        key_salt,
+        verifier_salt,
+        encrypted_verifier,
+        encrypted_verifier_hash,
+        encrypted_key,
+        encrypted_hmac_key,
+        encrypted_hmac_value,
+    })
+}
+
+fn derive_agile_content_key_and_verify(
+    info: &AgileEncryptionInfo,
+    password: &str,
+    encrypted_package: &[u8],
+) -> Result<Vec<u8>> {
+    let pw_hash = hash_password_agile(password, &info.verifier_salt, info.spin_count);
+
+    let verifier = decrypt_hash_input_agile(
+        &info.verifier_salt,
+        &pw_hash,
+        &K_VERIFIER_INPUT_BLOCK,
+        &info.encrypted_verifier,
+        AGILE_BLOCK_SIZE,
+    )?;
+    let verifier_hash = decrypt_hash_input_agile(
+        &info.verifier_salt,
+        &pw_hash,
+        &K_HASHED_VERIFIER_BLOCK,
+        &info.encrypted_verifier_hash,
+        AGILE_HASH_SIZE,
+    )?;
+
+    let mut sha = Sha1::new();
+    sha.update(&verifier);
+    let expected = sha.finalize().to_vec();
+    if verifier_hash.len() < expected.len() || verifier_hash[..expected.len()] != expected[..] {
+        return Err(OoxmlError::InvalidFormat(
+            "incorrect password for Agile encrypted OOXML package".to_string(),
+        ));
+    }
+
+    let content_key = decrypt_hash_input_agile(
+        &info.verifier_salt,
+        &pw_hash,
+        &K_CRYPTO_KEY_BLOCK,
+        &info.encrypted_key,
+        AGILE_KEY_BYTES,
+    )?;
+
+    let integrity_salt =
+        derive_agile_integrity_salt(&content_key, &info.key_salt, &info.encrypted_hmac_key)?;
+    verify_agile_integrity(
+        &content_key,
+        &info.key_salt,
+        &integrity_salt,
+        &info.encrypted_hmac_value,
+        encrypted_package,
+    )?;
+
+    Ok(content_key)
+}
+
+fn derive_agile_integrity_salt(
+    content_key: &[u8],
+    key_salt: &[u8],
+    encrypted_hmac_key: &[u8],
+) -> Result<Vec<u8>> {
+    if encrypted_hmac_key.is_empty() || !encrypted_hmac_key.len().is_multiple_of(AGILE_BLOCK_SIZE) {
+        return Err(OoxmlError::InvalidFormat(
+            "invalid Agile encryptedHmacKey length".to_string(),
+        ));
+    }
+
+    let iv = generate_iv_agile(key_salt, Some(&K_INTEGRITY_KEY_BLOCK), AGILE_BLOCK_SIZE);
+    let cipher = Aes128CbcDec::new_from_slices(content_key, &iv).map_err(|_| {
+        OoxmlError::InvalidFormat("invalid AES key/iv for Agile integrity key".into())
+    })?;
+    let decrypted = cipher
+        .decrypt_padded_vec_mut::<NoPadding>(encrypted_hmac_key)
+        .map_err(|_| {
+            OoxmlError::InvalidFormat(
+                "failed to decrypt Agile integrity salt from encryptedHmacKey".to_string(),
+            )
+        })?;
+    if decrypted.len() < AGILE_HASH_SIZE {
+        return Err(OoxmlError::InvalidFormat(
+            "Agile integrity salt shorter than hash size".to_string(),
+        ));
+    }
+    Ok(decrypted[..AGILE_HASH_SIZE].to_vec())
+}
+
+fn verify_agile_integrity(
+    content_key: &[u8],
+    key_salt: &[u8],
+    integrity_salt: &[u8],
+    encrypted_hmac_value: &[u8],
+    encrypted_package: &[u8],
+) -> Result<()> {
+    if encrypted_hmac_value.is_empty()
+        || !encrypted_hmac_value.len().is_multiple_of(AGILE_BLOCK_SIZE)
+    {
+        return Err(OoxmlError::InvalidFormat(
+            "invalid Agile encryptedHmacValue length".to_string(),
+        ));
+    }
+
+    let mut mac = HmacSha1::new_from_slice(integrity_salt)
+        .map_err(|e| OoxmlError::Other(format!("failed to init HMAC-SHA1: {e}")))?;
+    mac.update(encrypted_package);
+    let hmac = mac.finalize().into_bytes().to_vec();
+    let hmac_padded = pad_zero_to_block_multiple(&hmac, AGILE_BLOCK_SIZE);
+
+    let iv = generate_iv_agile(key_salt, Some(&K_INTEGRITY_VALUE_BLOCK), AGILE_BLOCK_SIZE);
+    let cipher = Aes128CbcEnc::new_from_slices(content_key, &iv).map_err(|_| {
+        OoxmlError::InvalidFormat("invalid AES key/iv for Agile integrity value".into())
+    })?;
+    let encrypted = cipher.encrypt_padded_vec_mut::<NoPadding>(&hmac_padded);
+
+    if encrypted != encrypted_hmac_value {
+        return Err(OoxmlError::InvalidFormat(
+            "Agile encrypted package integrity check failed".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+fn decrypt_hash_input_agile(
+    verifier_salt: &[u8],
+    pw_hash: &[u8],
+    block_key: &[u8],
+    encrypted: &[u8],
+    out_len: usize,
+) -> Result<Vec<u8>> {
+    if encrypted.is_empty() || !encrypted.len().is_multiple_of(AGILE_BLOCK_SIZE) {
+        return Err(OoxmlError::InvalidFormat(
+            "invalid Agile encrypted hashInput length".to_string(),
+        ));
+    }
+
+    let inter_key = generate_key_agile(pw_hash, block_key, AGILE_KEY_BYTES);
+    let iv = generate_iv_agile(verifier_salt, None, AGILE_BLOCK_SIZE);
+    let cipher = Aes128CbcDec::new_from_slices(&inter_key, &iv)
+        .map_err(|_| OoxmlError::InvalidFormat("invalid AES-128 key/iv".into()))?;
+    let decrypted = cipher
+        .decrypt_padded_vec_mut::<NoPadding>(encrypted)
+        .map_err(|_| {
+            OoxmlError::InvalidFormat("failed to decrypt Agile hashInput structure".to_string())
+        })?;
+    if decrypted.len() < out_len {
+        return Err(OoxmlError::InvalidFormat(
+            "decrypted Agile hashInput shorter than expected".to_string(),
+        ));
+    }
+    Ok(decrypted[..out_len].to_vec())
+}
+
+fn decrypt_agile_package_stream(
+    content_key: &[u8],
+    key_salt: &[u8],
+    encrypted: &[u8],
+) -> Result<Vec<u8>> {
+    if encrypted.len() < 8 {
+        return Err(OoxmlError::InvalidFormat(
+            "EncryptedPackage stream too short for Agile decryption".to_string(),
+        ));
+    }
+
+    let mut size_bytes = [0u8; 8];
+    size_bytes.copy_from_slice(&encrypted[..8]);
+    let stream_size = u64::from_le_bytes(size_bytes) as usize;
+    let ciphertext = &encrypted[8..];
+
+    if ciphertext.is_empty() || !ciphertext.len().is_multiple_of(AGILE_BLOCK_SIZE) {
+        return Err(OoxmlError::InvalidFormat(
+            "Agile EncryptedPackage ciphertext length is not a multiple of block size".to_string(),
+        ));
+    }
+
+    let mut plain = Vec::with_capacity(stream_size);
+
+    let full_segments = stream_size / AGILE_SEGMENT_SIZE;
+    let remainder = stream_size % AGILE_SEGMENT_SIZE;
+    let segment_count = if remainder == 0 {
+        full_segments
+    } else {
+        full_segments + 1
+    };
+    if segment_count == 0 {
+        return Err(OoxmlError::InvalidFormat(
+            "Agile EncryptedPackage has zero segments".to_string(),
+        ));
+    }
+
+    let mut offset = 0usize;
+
+    for (block_index, i) in (0_u32..).zip(0..segment_count) {
+        let is_last = i + 1 == segment_count;
+        let ct_len = if is_last {
+            ciphertext.len().checked_sub(offset).ok_or_else(|| {
+                OoxmlError::InvalidFormat(
+                    "Agile EncryptedPackage segment offset overflow".to_string(),
+                )
+            })?
+        } else {
+            AGILE_SEGMENT_SIZE
+        };
+        if ct_len == 0 || offset + ct_len > ciphertext.len() {
+            return Err(OoxmlError::InvalidFormat(
+                "Agile EncryptedPackage segment length invalid".to_string(),
+            ));
+        }
+        if ct_len % AGILE_BLOCK_SIZE != 0 {
+            return Err(OoxmlError::InvalidFormat(
+                "Agile EncryptedPackage segment not aligned to block size".to_string(),
+            ));
+        }
+
+        let block_key = block_index.to_le_bytes();
+        let iv = generate_iv_agile(key_salt, Some(&block_key), AGILE_BLOCK_SIZE);
+
+        let cipher = Aes128CbcDec::new_from_slices(content_key, &iv)
+            .map_err(|_| OoxmlError::InvalidFormat("invalid AES key/iv".into()))?;
+
+        let segment_ct = &ciphertext[offset..offset + ct_len];
+
+        if is_last {
+            let mut pt = cipher
+                .decrypt_padded_vec_mut::<Pkcs7>(segment_ct)
+                .map_err(|_| {
+                    OoxmlError::InvalidFormat(
+                        "invalid PKCS7 padding in Agile EncryptedPackage".to_string(),
+                    )
+                })?;
+            plain.append(&mut pt);
+        } else {
+            let mut pt = cipher
+                .decrypt_padded_vec_mut::<NoPadding>(segment_ct)
+                .map_err(|_| {
+                    OoxmlError::InvalidFormat("failed to decrypt Agile package segment".to_string())
+                })?;
+            plain.append(&mut pt);
+        }
+
+        offset += ct_len;
+    }
+
+    if plain.len() < stream_size {
+        return Err(OoxmlError::InvalidFormat(
+            "decrypted Agile package smaller than declared StreamSize".to_string(),
+        ));
+    }
+
+    plain.truncate(stream_size);
+    Ok(plain)
+}
+
+fn decode_b64_attr(value: &str, field: &str) -> Result<Vec<u8>> {
+    BASE64_STANDARD
+        .decode(value.as_bytes())
+        .map_err(|e| OoxmlError::InvalidFormat(format!("invalid base64 for {}: {}", field, e)))
+}
+
+fn parse_u32_attr(value: &str, field: &str) -> Result<u32> {
+    value.parse::<u32>().map_err(|e| {
+        OoxmlError::InvalidFormat(format!("invalid integer value for {}: {}", field, e))
+    })
+}
+
+fn parse_usize_attr(value: &str, field: &str) -> Result<usize> {
+    value.parse::<usize>().map_err(|e| {
+        OoxmlError::InvalidFormat(format!("invalid integer value for {}: {}", field, e))
+    })
 }

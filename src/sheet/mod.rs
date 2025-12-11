@@ -42,6 +42,8 @@
 //! - **Trait-based API**: `Workbook`, `Worksheet`, `Cell` traits for advanced use
 
 // Submodule declarations
+#[cfg(feature = "eval_engine")]
+pub mod eval;
 pub mod functions;
 pub mod text;
 pub mod traits;
@@ -50,6 +52,8 @@ mod workbook;
 mod workbook_types;
 
 // Re-exports
+#[cfg(feature = "eval_engine")]
+pub use eval::FormulaEvaluator;
 pub use functions::*;
 pub use traits::{Cell, CellIterator, RowIterator, WorkbookTrait, Worksheet, WorksheetIterator};
 pub use types::{CellValue, Result};

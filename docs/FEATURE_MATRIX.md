@@ -65,8 +65,8 @@ This document tracks the implementation status of features across all supported 
 | Workbook creation | ✅ | ✅ | ✅ | Full support |
 | Multiple worksheets | ✅ | ✅ | ✅ | Full support |
 | Cell values (basic) | ✅ | ✅ | ✅ | String, number, boolean, dates |
-| Cell formulas | ✅ | ✅ | ✅ | Formula writing, no evaluation |
-| Named ranges | ✅ | ✅ | ✅ | Full support with scope |
+| Cell formulas | ✅ | ✅ | ✅ | Formula strings; evaluation via `sheet::FormulaEvaluator` (see Formula evaluation row) |
+| Named ranges | 🟡 | ❌ | ✅ | Write-only defined names; workbook/sheet-scoped names not parsed on read |
 | Freeze panes | 🟡 | ❌ | ✅ | Write only |
 | Cell references | ✅ | ✅ | ✅ | A1 notation |
 | Shared strings | ✅ | ✅ | ✅ | Full support |
@@ -82,12 +82,12 @@ This document tracks the implementation status of features across all supported 
 | Fills | ✅ | ✅ | ✅ | Pattern and solid fills |
 | Number formats | ✅ | ✅ | ✅ | Custom formats |
 | Alignment | ✅ | ✅ | ✅ | Horizontal/vertical |
-| Rich text cells | ❌ | ❌ | ❌ | Not implemented |
+| Rich text cells | ✅ | ✅ | ✅ | Inline and shared rich text runs (`RichTextRun` support) |
 
 ### Advanced Features
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| Charts | 🟡 | ✅ | ❌ | ChartType parsing |
+| Charts | ❌ | ❌ | ❌ | Not implemented for XLSX (no chart parts) |
 | Pivot tables | ❌ | ❌ | ❌ | Not implemented |
 | Data validation | ✅ | ✅ | ✅ | Full validation support |
 | Conditional formatting | ✅ | ✅ | ✅ | Multiple format types |
@@ -100,8 +100,8 @@ This document tracks the implementation status of features across all supported 
 | Hidden rows/columns | ✅ | ✅ | ✅ | Full support |
 | Sheet protection | 🟡 | ❌ | ✅ | Write only |
 | Workbook protection | 🟡 | ❌ | ✅ | Write only |
-| Formula evaluation | ❌ | ❌ | N/A | Not implemented |
-| Array formulas | ❌ | ❌ | ❌ | Not implemented |
+| Formula evaluation | 🟡 | ✅ | N/A | MVP evaluator via `sheet::FormulaEvaluator` (limited Excel semantics) |
+| Array formulas | ✅ | ✅ | ✅ | Cell-level support for array ranges (read/write) |
 | Sparklines | ❌ | ❌ | ❌ | Not implemented |
 | Slicers | ❌ | ❌ | ❌ | Not implemented |
 
@@ -109,9 +109,9 @@ This document tracks the implementation status of features across all supported 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Page setup | ✅ | ✅ | ✅ | Orientation, paper size, scale |
-| Print area | ❌ | ❌ | ❌ | Not implemented |
+| Print area | ✅ | ✅ | ✅ | Mapped to `_xlnm.Print_Area` defined names (read/write) |
 | Headers/Footers | 🟡 | ❌ | ✅ | Write only |
-| Repeating rows/columns | ❌ | ❌ | ❌ | Not implemented |
+| Repeating rows/columns | ✅ | ✅ | ✅ | Print titles via `_xlnm.Print_Titles` (rows/cols) |
 
 ### Metadata & Properties
 | Feature | Status | Read | Write | Notes |

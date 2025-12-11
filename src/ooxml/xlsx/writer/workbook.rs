@@ -19,6 +19,21 @@ fn escape_xml(s: &str) -> String {
         .replace('\'', "&apos;")
 }
 
+/// Escape worksheet names for use in definedName references.
+///
+/// This doubles single quotes, e.g. "Bob's Sheet" -> "Bob''s Sheet".
+fn escape_sheet_name(name: &str) -> String {
+    let mut escaped = String::with_capacity(name.len());
+    for ch in name.chars() {
+        if ch == '\'' {
+            escaped.push_str("''");
+        } else {
+            escaped.push(ch);
+        }
+    }
+    escaped
+}
+
 /// Workbook protection configuration.
 #[derive(Debug, Clone)]
 pub struct WorkbookProtection {
@@ -142,6 +157,74 @@ impl MutableWorkbookData {
     /// Get all named ranges.
     pub fn named_ranges(&self) -> &[NamedRange] {
         &self.named_ranges
+    }
+
+    /// Synchronize worksheet print settings with internal defined names.
+    ///
+    /// This maps worksheet-level page setup (print area, repeating rows/columns)
+    /// to the Excel-reserved sheet-scoped defined names `_xlnm.Print_Area` and
+    /// `_xlnm.Print_Titles` in `workbook.xml`.
+    pub(crate) fn sync_print_settings_to_defined_names(&mut self) {
+        // Preserve all existing named ranges except the internal print-related
+        // ones for each sheet, which we rebuild from the current worksheet
+        // settings.
+        let mut new_ranges =
+            Vec::with_capacity(self.named_ranges.len() + self.worksheets.len() * 2);
+
+        for range in &self.named_ranges {
+            let is_internal_print_name = (range.name == "_xlnm.Print_Area"
+                || range.name == "_xlnm.Print_Titles")
+                && range.local_sheet_id.is_some();
+
+            if !is_internal_print_name {
+                new_ranges.push(range.clone());
+            }
+        }
+
+        // Rebuild per-sheet print area and print titles based on the
+        // MutableWorksheet settings.
+        for ws in &self.worksheets {
+            let sheet_id = ws.sheet_id();
+            let sheet_name = ws.name();
+            let escaped_sheet_name = escape_sheet_name(sheet_name);
+
+            // Print area -> _xlnm.Print_Area
+            if let Some(range) = ws.get_print_area() {
+                let reference = format!("'{}'!{}", escaped_sheet_name, range);
+                new_ranges.push(NamedRange {
+                    name: "_xlnm.Print_Area".to_string(),
+                    reference,
+                    comment: None,
+                    local_sheet_id: Some(sheet_id),
+                });
+            }
+
+            // Repeating rows/columns -> _xlnm.Print_Titles
+            let repeating_cols = ws.get_repeating_columns();
+            let repeating_rows = ws.get_repeating_rows();
+
+            if repeating_cols.is_some() || repeating_rows.is_some() {
+                let mut parts = Vec::new();
+
+                if let Some(cols) = repeating_cols {
+                    parts.push(format!("'{}'!{}", escaped_sheet_name, cols));
+                }
+                if let Some(rows) = repeating_rows {
+                    parts.push(format!("'{}'!{}", escaped_sheet_name, rows));
+                }
+
+                let reference = parts.join(",");
+                new_ranges.push(NamedRange {
+                    name: "_xlnm.Print_Titles".to_string(),
+                    reference,
+                    comment: None,
+                    local_sheet_id: Some(sheet_id),
+                });
+            }
+        }
+
+        self.named_ranges = new_ranges;
+        self.modified = true;
     }
 
     /// Check if the workbook has been modified.

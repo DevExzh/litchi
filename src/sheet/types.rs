@@ -26,6 +26,10 @@ pub enum CellValue {
         formula: String,
         /// Optional cached result value
         cached_value: Option<Box<CellValue>>,
+        /// Whether this formula is an array formula (CSE / dynamic array)
+        is_array: bool,
+        /// Optional referenced range for array formulas (e.g., "A1:C3")
+        array_range: Option<String>,
     },
 }
 

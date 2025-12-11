@@ -296,6 +296,14 @@ impl Package {
         })
     }
 
+    #[cfg(feature = "ooxml_encryption")]
+    pub fn open_with_password<P: AsRef<Path>>(path: P, password: &str) -> Result<Self> {
+        let data = std::fs::read(path.as_ref()).map_err(OoxmlError::Io)?;
+        let decrypted = crate::ooxml::crypto::decrypt_ooxml_if_encrypted(&data, password)?;
+        let opc = OpcPackage::from_bytes(&decrypted.package_bytes)?;
+        Self::from_opc_package(opc)
+    }
+
     /// Create a Package from an already-parsed OPC package.
     ///
     /// This is used for single-pass parsing where the OPC package has already

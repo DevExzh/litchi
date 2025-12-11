@@ -163,6 +163,7 @@ impl Workbook {
         workbook.load_workbook_info()?;
         workbook.load_shared_strings()?;
         workbook.load_styles()?;
+        workbook.load_print_settings()?;
 
         Ok(workbook)
     }
@@ -206,6 +207,172 @@ impl Workbook {
                 .map_err(|e| -> Box<dyn std::error::Error> { Box::new(e) })?;
         }
         Ok(())
+    }
+
+    /// Load worksheet print settings (print area, repeating rows/columns)
+    /// from workbook-level defined names.
+    fn load_print_settings(&mut self) -> SheetResult<()> {
+        use crate::ooxml::opc::PackURI as Uri;
+
+        let workbook_uri = Uri::new("/xl/workbook.xml")?;
+        let workbook_part = match self.package.get_part(&workbook_uri) {
+            Ok(part) => part,
+            Err(_) => return Ok(()),
+        };
+
+        let content = std::str::from_utf8(workbook_part.blob())?;
+
+        // Find the <definedNames> section if present.
+        let start = if let Some(pos) = content.find("<definedNames>") {
+            pos
+        } else {
+            return Ok(());
+        };
+
+        let end_rel = if let Some(pos) = content[start..].find("</definedNames>") {
+            pos
+        } else {
+            return Ok(());
+        };
+
+        let defined_names_xml = &content[start..start + end_rel + "</definedNames>".len()];
+
+        let mut pos = 0usize;
+        while let Some(rel) = defined_names_xml[pos..].find("<definedName ") {
+            let start_pos = pos + rel;
+            let after_start = &defined_names_xml[start_pos..];
+
+            // Find end of this definedName element (we assume well-formed XML)
+            let end_tag_rel = match after_start.find("</definedName>") {
+                Some(p) => p,
+                None => break,
+            };
+            let end_pos = start_pos + end_tag_rel + "</definedName>".len();
+            let dn_xml = &defined_names_xml[start_pos..end_pos];
+
+            Self::apply_defined_name_print_setting(dn_xml, &mut self.worksheets)?;
+
+            pos = end_pos;
+        }
+
+        Ok(())
+    }
+
+    /// Apply a single <definedName> element to worksheet print settings if it
+    /// represents _xlnm.Print_Area or _xlnm.Print_Titles.
+    fn apply_defined_name_print_setting(
+        dn_xml: &str,
+        worksheets: &mut [WorksheetInfo],
+    ) -> SheetResult<()> {
+        // Split into start tag and inner text.
+        let gt_pos = match dn_xml.find('>') {
+            Some(p) => p,
+            None => return Ok(()),
+        };
+
+        let (start_tag, inner) = dn_xml.split_at(gt_pos + 1);
+        let value_end = match inner.rfind("</definedName>") {
+            Some(p) => p,
+            None => return Ok(()),
+        };
+        let value_text = &inner[..value_end];
+
+        let name = Self::extract_defined_name_attr(start_tag, "name");
+        let local_sheet_id = Self::extract_defined_name_attr(start_tag, "localSheetId");
+
+        let (name, sheet_idx) = match (name, local_sheet_id) {
+            (Some(n), Some(sid)) => {
+                let idx: usize = match sid.parse::<u32>() {
+                    Ok(v) => v as usize,
+                    Err(_) => return Ok(()),
+                };
+                if idx >= worksheets.len() {
+                    return Ok(());
+                }
+                (n, idx)
+            },
+            _ => return Ok(()),
+        };
+
+        if name == "_xlnm.Print_Area" {
+            if let Some(range) = Self::parse_print_area(value_text) {
+                worksheets[sheet_idx].print_area = Some(range);
+            }
+        } else if name == "_xlnm.Print_Titles" {
+            let (rows, cols) = Self::parse_print_titles(value_text);
+            if let Some(r) = rows {
+                worksheets[sheet_idx].repeating_rows = Some(r);
+            }
+            if let Some(c) = cols {
+                worksheets[sheet_idx].repeating_columns = Some(c);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Extract a simple XML attribute value from a <definedName ...> start tag.
+    fn extract_defined_name_attr(tag: &str, attr: &str) -> Option<String> {
+        let pattern = format!("{}=\"", attr);
+        let start = tag.find(&pattern)? + pattern.len();
+        let tail = &tag[start..];
+        let end = tail.find('"')?;
+        Some(tail[..end].to_string())
+    }
+
+    /// Parse the print area reference from a defined name value.
+    ///
+    /// Values are typically of the form `'Sheet Name'!A1:D20` or a comma-
+    /// separated list of such references. We return the range part for the
+    /// first entry (e.g., `A1:D20`).
+    fn parse_print_area(value: &str) -> Option<String> {
+        let first = value.split(',').next()?.trim();
+        let bang = first.rfind('!')?;
+        let range = first[bang + 1..].trim();
+        if range.is_empty() {
+            None
+        } else {
+            Some(range.to_string())
+        }
+    }
+
+    /// Parse repeating rows/columns from a _xlnm.Print_Titles defined name
+    /// value. Returns (rows, columns) as raw range strings (e.g., "$1:$1",
+    /// "$A:$B").
+    fn parse_print_titles(value: &str) -> (Option<String>, Option<String>) {
+        let mut rows: Option<String> = None;
+        let mut cols: Option<String> = None;
+
+        for part in value.split(',') {
+            let part = part.trim();
+            let bang = match part.rfind('!') {
+                Some(p) => p,
+                None => continue,
+            };
+            let range = part[bang + 1..].trim();
+            if range.is_empty() {
+                continue;
+            }
+
+            // Skip leading '$' characters when deciding whether this is a
+            // row or column reference.
+            let mut chars = range.chars().skip_while(|c| *c == '$');
+            match chars.next() {
+                Some(ch) if ch.is_ascii_digit() => {
+                    if rows.is_none() {
+                        rows = Some(range.to_string());
+                    }
+                },
+                Some(ch) if ch.is_ascii_alphabetic() => {
+                    if cols.is_none() {
+                        cols = Some(range.to_string());
+                    }
+                },
+                _ => {},
+            }
+        }
+
+        (rows, cols)
     }
 
     /// Get a worksheet by index
@@ -285,12 +452,24 @@ impl Workbook {
         Self::new(package)
     }
 
+    #[cfg(feature = "ooxml_encryption")]
+    pub fn open_with_password<P: AsRef<std::path::Path>>(
+        path: P,
+        password: &str,
+    ) -> SheetResult<Self> {
+        let data = std::fs::read(path.as_ref())?;
+        let decrypted = crate::ooxml::crypto::decrypt_ooxml_if_encrypted(&data, password)?;
+        let package = OpcPackage::from_bytes(&decrypted.package_bytes)?;
+        Self::new(package)
+    }
+
     /// Get a mutable worksheet for writing and modification.
     ///
     /// # Arguments
     ///
     /// * `index` - Worksheet index (0-based)
     ///
+    // ... (rest of the code remains the same)
     /// # Examples
     ///
     /// ```rust,no_run
@@ -685,6 +864,9 @@ impl Workbook {
             "sharedStrings.xml",
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings",
         );
+
+        // Synchronize worksheet print settings with workbook-level defined names
+        data.sync_print_settings_to_defined_names();
 
         // Now generate workbook XML with actual relationship IDs
         let workbook_xml = data.generate_workbook_xml_with_rels(&worksheet_rel_ids)?;

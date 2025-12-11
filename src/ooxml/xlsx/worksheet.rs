@@ -12,6 +12,7 @@ use crate::sheet::{
     Worksheet as WorksheetTrait,
 };
 
+use super::RichTextRun;
 use super::cell::{Cell, CellIterator as XlsxCellIterator, RowIterator as XlsxRowIterator};
 use super::format::{CellBorder, CellFill, CellFont, CellFormat};
 
@@ -26,6 +27,9 @@ pub struct WorksheetInfo {
     pub sheet_id: u32,
     /// Whether this is the active sheet
     pub is_active: bool,
+    pub print_area: Option<String>,
+    pub repeating_rows: Option<String>,
+    pub repeating_columns: Option<String>,
 }
 
 /// Column information
@@ -146,6 +150,7 @@ pub struct Worksheet<'a> {
     page_setup: PageSetup,
     /// Auto-filter
     auto_filter: Option<AutoFilter>,
+    rich_text_cells: HashMap<(u32, u32), Vec<RichTextRun>>,
 }
 
 impl<'a> Worksheet<'a> {
@@ -166,6 +171,7 @@ impl<'a> Worksheet<'a> {
             conditional_formats: Vec::new(),
             page_setup: PageSetup::default(),
             auto_filter: None,
+            rich_text_cells: HashMap::new(),
         }
     }
 
@@ -275,7 +281,7 @@ impl<'a> Worksheet<'a> {
                         self.rows.insert(row_num, info);
                     }
 
-                    for (col_num, value, style_idx) in cells {
+                    for (col_num, value, style_idx, rich_runs) in cells {
                         min_col = min_col.min(col_num);
                         max_col = max_col.max(col_num);
 
@@ -289,6 +295,10 @@ impl<'a> Worksheet<'a> {
                                 .entry(row_num)
                                 .or_default()
                                 .insert(col_num, idx);
+                        }
+
+                        if let Some(runs) = rich_runs {
+                            self.rich_text_cells.insert((row_num, col_num), runs);
                         }
                     }
                 }
@@ -311,7 +321,13 @@ impl<'a> Worksheet<'a> {
     fn parse_row_xml(
         &self,
         row_content: &str,
-    ) -> SheetResult<Option<(u32, Option<RowInfo>, Vec<(u32, CellValue, Option<u32>)>)>> {
+    ) -> SheetResult<
+        Option<(
+            u32,
+            Option<RowInfo>,
+            Vec<(u32, CellValue, Option<u32>, Option<Vec<RichTextRun>>)>,
+        )>,
+    > {
         // Extract row number
         let row_num = if let Some(r_start) = row_content.find("r=\"") {
             let r_content = &row_content[r_start + 3..];
@@ -361,8 +377,10 @@ impl<'a> Worksheet<'a> {
             if let Some(c_end) = row_content[c_start_pos..].find("</c>") {
                 let c_content = &row_content[c_start_pos..c_start_pos + c_end + 4];
 
-                if let Some((col_num, value, style_idx)) = self.parse_cell_xml(c_content)? {
-                    cells.push((col_num, value, style_idx));
+                if let Some((col_num, value, style_idx, rich_runs)) =
+                    self.parse_cell_xml(c_content)?
+                {
+                    cells.push((col_num, value, style_idx, rich_runs));
                 }
 
                 pos = c_start_pos + c_end + 4;
@@ -375,10 +393,11 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Parse a single cell XML.
+    #[allow(clippy::type_complexity)] // TODO: Refactor the return type
     fn parse_cell_xml(
         &self,
         cell_content: &str,
-    ) -> SheetResult<Option<(u32, CellValue, Option<u32>)>> {
+    ) -> SheetResult<Option<(u32, CellValue, Option<u32>, Option<Vec<RichTextRun>>)>> {
         // Extract cell reference (e.g., "A1")
         let reference = if let Some(r_start) = cell_content.find("r=\"") {
             let r_content = &cell_content[r_start + 3..];
@@ -417,7 +436,51 @@ impl<'a> Worksheet<'a> {
             None
         };
 
-        // Extract value
+        // Inline strings: text is stored inside <is><t>...</t></is> instead of <v>.
+        if matches!(cell_type.as_deref(), Some("inlineStr")) || cell_content.contains("<is>") {
+            let text = Self::extract_inline_string_text(cell_content).unwrap_or_default();
+            let rich_runs = Self::extract_inline_rich_text_runs(cell_content);
+            return Ok(Some((
+                col_num,
+                CellValue::String(text),
+                style_idx,
+                rich_runs,
+            )));
+        }
+
+        // Extract formula text (if present) from <f>...</f> and capture
+        // array formula attributes when available.
+        let mut is_array_formula = false;
+        let mut array_ref: Option<String> = None;
+        let formula_text = if let Some(f_start) = cell_content.find("<f") {
+            let f_content = &cell_content[f_start..];
+            if let Some(gt_rel) = f_content.find('>') {
+                let tag_end = f_start + gt_rel + 1;
+                let f_tag = &cell_content[f_start..tag_end];
+
+                // Detect array formulas: <f t="array" ref="A1:C3">...
+                if f_tag.contains("t=\"array\"") {
+                    is_array_formula = true;
+                }
+                if let Some(r) = Self::extract_attribute(f_tag, "ref") {
+                    array_ref = Some(r);
+                }
+
+                let text_start = tag_end;
+                if let Some(end_rel) = cell_content[text_start..].find("</f>") {
+                    let raw = &cell_content[text_start..text_start + end_rel];
+                    Some(Self::unescape_xml(raw))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // Extract value from <v> for normal cells and cached formula results.
         let value = if let Some(v_start) = cell_content.find("<v>") {
             let v_start_pos = v_start + 3;
             cell_content[v_start_pos..]
@@ -427,7 +490,9 @@ impl<'a> Worksheet<'a> {
             None
         };
 
-        let cell_value = match (cell_type.as_deref(), value.as_deref()) {
+        // Base value used either as the direct cell value (non-formula) or as the
+        // cached result for formula cells.
+        let base_value = match (cell_type.as_deref(), value.as_deref()) {
             (Some("str"), Some(v)) => CellValue::String(v.to_string()),
             (Some("s"), Some(v)) => {
                 // Shared string reference - parse index and resolve later
@@ -451,7 +516,232 @@ impl<'a> Worksheet<'a> {
             _ => CellValue::Empty,
         };
 
-        Ok(Some((col_num, cell_value, style_idx)))
+        let cell_value = if let Some(formula) = formula_text {
+            // For formula cells, wrap the parsed formula together with the cached
+            // value (if any). A missing <v> is represented as None.
+            let cached_value = match base_value {
+                CellValue::Empty => None,
+                other => Some(Box::new(other)),
+            };
+            CellValue::Formula {
+                formula,
+                cached_value,
+                is_array: is_array_formula,
+                array_range: array_ref,
+            }
+        } else {
+            base_value
+        };
+
+        Ok(Some((col_num, cell_value, style_idx, None)))
+    }
+
+    /// Unescape a minimal set of XML entities in text content.
+    fn unescape_xml(s: &str) -> String {
+        s.replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&amp;", "&")
+            .replace("&quot;", "\"")
+            .replace("&apos;", "'")
+    }
+
+    /// Extract concatenated text from an inline string cell (<is> ... </is>).
+    fn extract_inline_string_text(cell_content: &str) -> Option<String> {
+        let bytes = cell_content.as_bytes();
+        let mut result = String::new();
+        let mut search_start = 0;
+
+        // If there is an <is> element, start after it to avoid matching any
+        // unrelated <t> elements (e.g., inside formulas).
+        if let Some(is_start) = cell_content.find("<is") {
+            let after_is = &bytes[is_start..];
+            if let Some(gt_rel) = memchr::memchr(b'>', after_is) {
+                search_start = is_start + gt_rel + 1;
+            }
+        }
+
+        // Concatenate text from all <t> elements within the inline string.
+        while let Some(rel_pos) = memchr::memmem::find(&bytes[search_start..], b"<t") {
+            let t_pos = search_start + rel_pos;
+            let after_t = &bytes[t_pos..];
+            let gt_rel = match memchr::memchr(b'>', after_t) {
+                Some(p) => p,
+                None => break,
+            };
+            let text_start = t_pos + gt_rel + 1;
+
+            let after_text = &bytes[text_start..];
+            if let Some(end_rel) = memchr::memmem::find(after_text, b"</t>") {
+                let text_end = text_start + end_rel;
+                result.push_str(&cell_content[text_start..text_end]);
+                search_start = text_end + 4; // len("</t>")
+            } else {
+                break;
+            }
+        }
+
+        if result.is_empty() {
+            None
+        } else {
+            Some(result)
+        }
+    }
+
+    fn extract_inline_rich_text_runs(cell_content: &str) -> Option<Vec<RichTextRun>> {
+        let bytes = cell_content.as_bytes();
+        let mut search_start = 0;
+
+        if let Some(is_start) = cell_content.find("<is") {
+            let after_is = &bytes[is_start..];
+            if let Some(gt_rel) = memchr::memchr(b'>', after_is) {
+                search_start = is_start + gt_rel + 1;
+            }
+        }
+
+        let mut runs: Vec<RichTextRun> = Vec::new();
+        let mut pos = search_start;
+        let slice = &bytes;
+
+        while let Some(rel) = memchr::memmem::find(&slice[pos..], b"<r") {
+            let r_pos = pos + rel;
+            let next = slice.get(r_pos + 2).copied();
+            if !matches!(next, Some(b'>') | Some(b' ')) {
+                pos = r_pos + 2;
+                continue;
+            }
+
+            let after_r = &slice[r_pos..];
+            let gt_rel = match memchr::memchr(b'>', after_r) {
+                Some(p) => p,
+                None => break,
+            };
+            let inner_start = r_pos + gt_rel + 1;
+            let after_inner = &slice[inner_start..];
+            let end_rel = match memchr::memmem::find(after_inner, b"</r>") {
+                Some(p) => p,
+                None => break,
+            };
+            let inner_end = inner_start + end_rel;
+            let run_inner = &cell_content[inner_start..inner_end];
+
+            if let Some(run) = Self::parse_rich_text_run(run_inner) {
+                runs.push(run);
+            }
+
+            pos = inner_end + 4; // len("</r>")
+        }
+
+        if runs.is_empty() {
+            // Fallback: treat entire inline string as single run if we have text but no <r>.
+            if let Some(text) = Self::extract_inline_string_text(cell_content)
+                && !text.is_empty()
+            {
+                runs.push(RichTextRun {
+                    text,
+                    font_name: None,
+                    font_size: None,
+                    bold: false,
+                    italic: false,
+                    underline: false,
+                    color: None,
+                });
+            }
+        }
+
+        if runs.is_empty() { None } else { Some(runs) }
+    }
+
+    fn parse_rich_text_run(content: &str) -> Option<RichTextRun> {
+        let bytes = content.as_bytes();
+        let mut text = String::new();
+        let mut search_start = 0;
+
+        while let Some(rel_pos) = memchr::memmem::find(&bytes[search_start..], b"<t") {
+            let t_pos = search_start + rel_pos;
+            let after_t = &bytes[t_pos..];
+            let gt_rel = match memchr::memchr(b'>', after_t) {
+                Some(p) => p,
+                None => break,
+            };
+            let text_start = t_pos + gt_rel + 1;
+
+            let after_text = &bytes[text_start..];
+            if let Some(end_rel) = memchr::memmem::find(after_text, b"</t>") {
+                let text_end = text_start + end_rel;
+                text.push_str(&content[text_start..text_end]);
+                search_start = text_end + 4;
+            } else {
+                break;
+            }
+        }
+
+        if text.is_empty() {
+            return None;
+        }
+
+        let mut font_name: Option<String> = None;
+        let mut font_size: Option<f64> = None;
+        let mut bold = false;
+        let mut italic = false;
+        let mut underline = false;
+        let mut color: Option<String> = None;
+
+        if let Some(rpr_start) = content.find("<rPr") {
+            let rpr_bytes = &bytes[rpr_start..];
+            if let Some(rpr_end_rel) = memchr::memmem::find(rpr_bytes, b"</rPr>") {
+                let rpr_end = rpr_start + rpr_end_rel + "</rPr>".len();
+                let rpr_content = &content[rpr_start..rpr_end];
+
+                if let Some(pos) = rpr_content.find("<rFont")
+                    && let Some(val_pos) = rpr_content[pos..].find("val=\"")
+                {
+                    let start = pos + val_pos + 5;
+                    if let Some(end_rel) = rpr_content[start..].find('"') {
+                        font_name = Some(rpr_content[start..start + end_rel].to_string());
+                    }
+                }
+
+                if let Some(pos) = rpr_content.find("<sz")
+                    && let Some(val_pos) = rpr_content[pos..].find("val=\"")
+                {
+                    let start = pos + val_pos + 5;
+                    if let Some(end_rel) = rpr_content[start..].find('"')
+                        && let Ok(sz) = rpr_content[start..start + end_rel].parse::<f64>()
+                    {
+                        font_size = Some(sz);
+                    }
+                }
+
+                if rpr_content.contains("<b/") || rpr_content.contains("<b ") {
+                    bold = true;
+                }
+                if rpr_content.contains("<i/") || rpr_content.contains("<i ") {
+                    italic = true;
+                }
+                if rpr_content.contains("<u/") || rpr_content.contains("<u ") {
+                    underline = true;
+                }
+
+                if let Some(pos) = rpr_content.find("<color")
+                    && let Some(rgb_pos) = rpr_content[pos..].find("rgb=\"")
+                {
+                    let start = pos + rgb_pos + 5;
+                    if let Some(end_rel) = rpr_content[start..].find('"') {
+                        color = Some(rpr_content[start..start + end_rel].to_string());
+                    }
+                }
+            }
+        }
+
+        Some(RichTextRun {
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            underline,
+            color,
+        })
     }
 
     /// Parse merged cells from XML.
@@ -687,6 +977,21 @@ impl<'a> Worksheet<'a> {
                     return CellValue::String(shared_string.to_string());
                 }
                 CellValue::Error("Invalid shared string reference".to_string())
+            },
+            CellValue::Formula {
+                formula,
+                cached_value,
+                is_array,
+                array_range,
+            } => {
+                let resolved_cached =
+                    cached_value.map(|boxed| Box::new(self.resolve_shared_string(*boxed)));
+                CellValue::Formula {
+                    formula,
+                    cached_value: resolved_cached,
+                    is_array,
+                    array_range,
+                }
             },
             other => other,
         }
@@ -1298,6 +1603,57 @@ impl<'a> Worksheet<'a> {
         self.auto_filter.as_ref()
     }
 
+    pub fn get_print_area(&self) -> Option<&str> {
+        self.info.print_area.as_deref()
+    }
+
+    pub fn get_repeating_rows(&self) -> Option<&str> {
+        self.info.repeating_rows.as_deref()
+    }
+
+    pub fn get_repeating_columns(&self) -> Option<&str> {
+        self.info.repeating_columns.as_deref()
+    }
+
+    pub fn get_rich_text_cell(&self, row: u32, column: u32) -> Option<&[RichTextRun]> {
+        if let Some(runs) = self.rich_text_cells.get(&(row, column)) {
+            return Some(runs.as_slice());
+        }
+
+        // Fallback: check if this cell (or its cached formula value) references a
+        // shared string with rich text runs in the sharedStrings table.
+        if let Some(row_data) = self.cells.get(&row)
+            && let Some(raw) = row_data.get(&column)
+        {
+            // Helper to check a CellValue for a shared string reference.
+            fn from_shared_string<'a>(
+                workbook: &'a Workbook,
+                value: &CellValue,
+            ) -> Option<&'a [RichTextRun]> {
+                if let CellValue::String(s) = value
+                    && let Some(index_str) = s.strip_prefix("SHARED_STRING_")
+                    && let Ok(index) = atoi_simd::parse(index_str.as_bytes())
+                {
+                    return workbook.shared_strings().rich_text_runs(index);
+                }
+                None
+            }
+
+            if let Some(runs) = from_shared_string(self.workbook, raw) {
+                return Some(runs);
+            }
+
+            if let CellValue::Formula { cached_value, .. } = raw
+                && let Some(cached) = cached_value.as_deref()
+                && let Some(runs) = from_shared_string(self.workbook, cached)
+            {
+                return Some(runs);
+            }
+        }
+
+        None
+    }
+
     // Previously TODO: Apache POI worksheet-level features - NOW IMPLEMENTED:
     // ✅ Cell formatting (reading): get_cell_style(), get_cell_format()
     // ✅ Cell types (advanced): get_cell_type() via CellValue enum
@@ -1408,6 +1764,26 @@ impl<'a> WorksheetTrait for Worksheet<'a> {
     fn cell_value(&self, row: u32, column: u32) -> SheetResult<Cow<'_, CellValue>> {
         // XLSX values need shared string resolution, so we return owned
         Ok(Cow::Owned(self.get_cell_value(row, column)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Worksheet;
+
+    #[test]
+    fn extract_inline_string_single_t() {
+        let xml = r#"<c r=\"A1\" t=\"inlineStr\"><is><t>Hello</t></is></c>"#;
+        let text = Worksheet::extract_inline_string_text(xml).unwrap();
+        assert_eq!(text, "Hello");
+    }
+
+    #[test]
+    fn extract_inline_string_multiple_runs() {
+        let xml =
+            r#"<c r=\"A1\" t=\"inlineStr\"><is><r><t>Hello </t></r><r><t>World</t></r></is></c>"#;
+        let text = Worksheet::extract_inline_string_text(xml).unwrap();
+        assert_eq!(text, "Hello World");
     }
 }
 

@@ -8,7 +8,7 @@ pub mod workbook;
 // Re-export main types
 pub use sheet::{
     AutoFilter, CellComment, ConditionalFormat, ConditionalFormatType, FreezePanes, HeaderFooter,
-    Hyperlink, Image, MutableWorksheet, NamedRange, PageSetup, SheetProtection,
+    Hyperlink, Image, MutableWorksheet, NamedRange, PageSetup, RichTextRun, SheetProtection,
 };
 pub use strings::MutableSharedStrings;
 pub use styles::StylesBuilder;

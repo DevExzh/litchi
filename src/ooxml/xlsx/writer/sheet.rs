@@ -152,6 +152,25 @@ pub struct Image {
     pub description: Option<String>,
 }
 
+/// Rich text run for a cell.
+#[derive(Debug, Clone)]
+pub struct RichTextRun {
+    /// Text content for this run
+    pub text: String,
+    /// Font name (optional)
+    pub font_name: Option<String>,
+    /// Font size in points (optional)
+    pub font_size: Option<f64>,
+    /// Bold
+    pub bold: bool,
+    /// Italic
+    pub italic: bool,
+    /// Underline
+    pub underline: bool,
+    /// Text color as ARGB hex (e.g., "FF0000FF")
+    pub color: Option<String>,
+}
+
 /// Conditional formatting rule.
 #[derive(Debug, Clone)]
 pub struct ConditionalFormat {
@@ -268,6 +287,8 @@ pub struct MutableWorksheet {
     row_outline_levels: HashMap<u32, u8>,
     /// Column outline levels (col -> level)
     column_outline_levels: HashMap<u32, u8>,
+    /// Rich text runs per cell (row, col)
+    rich_text_cells: HashMap<(u32, u32), Vec<RichTextRun>>,
     /// Whether the worksheet has been modified
     modified: bool,
 }
@@ -305,6 +326,7 @@ impl MutableWorksheet {
             images: Vec::new(),
             row_outline_levels: HashMap::new(),
             column_outline_levels: HashMap::new(),
+            rich_text_cells: HashMap::new(),
             modified: false,
         }
     }
@@ -336,6 +358,45 @@ impl MutableWorksheet {
         self.modified = true;
     }
 
+    /// Set a rich text cell composed of multiple formatted runs.
+    ///
+    /// This also sets the plain string value for the cell by concatenating all
+    /// runs, so generic consumers see the combined text via the unified
+    /// `CellValue::String` API.
+    pub fn set_rich_text_cell(&mut self, row: u32, col: u32, runs: Vec<RichTextRun>) {
+        let row_idx = row.saturating_sub(1);
+        let col_idx = col.saturating_sub(1);
+
+        // Build plain text for the cell value
+        let mut plain = String::new();
+        for run in &runs {
+            plain.push_str(&run.text);
+        }
+
+        self.cells
+            .insert((row_idx, col_idx), CellValue::String(plain));
+        self.rich_text_cells.insert((row_idx, col_idx), runs);
+        self.modified = true;
+    }
+
+    /// Get rich text runs for a cell, if present.
+    pub fn rich_text_cell(&self, row: u32, col: u32) -> Option<&[RichTextRun]> {
+        let row_idx = row.saturating_sub(1);
+        let col_idx = col.saturating_sub(1);
+        self.rich_text_cells
+            .get(&(row_idx, col_idx))
+            .map(|runs| runs.as_slice())
+    }
+
+    /// Clear rich text formatting for a cell (leaves plain value intact).
+    pub fn clear_rich_text_cell(&mut self, row: u32, col: u32) {
+        let row_idx = row.saturating_sub(1);
+        let col_idx = col.saturating_sub(1);
+        if self.rich_text_cells.remove(&(row_idx, col_idx)).is_some() {
+            self.modified = true;
+        }
+    }
+
     /// Set a cell formula.
     ///
     /// # Arguments
@@ -348,6 +409,8 @@ impl MutableWorksheet {
             CellValue::Formula {
                 formula: formula.to_string(),
                 cached_value: None,
+                is_array: false,
+                array_range: None,
             },
         );
         self.modified = true;
@@ -367,8 +430,61 @@ impl MutableWorksheet {
             CellValue::Formula {
                 formula: formula.to_string(),
                 cached_value: Some(Box::new(cached_value.into())),
+                is_array: false,
+                array_range: None,
             },
         );
+        self.modified = true;
+    }
+
+    /// Set an array formula over a rectangular range.
+    ///
+    /// # Arguments
+    /// * `start_row`, `start_col` - Top-left cell (1-based)
+    /// * `end_row`, `end_col` - Bottom-right cell (1-based)
+    /// * `formula` - Formula expression (without leading '=')
+    pub fn set_array_formula(
+        &mut self,
+        start_row: u32,
+        start_col: u32,
+        end_row: u32,
+        end_col: u32,
+        formula: &str,
+    ) {
+        if start_row == 0 || start_col == 0 || end_row < start_row || end_col < start_col {
+            return;
+        }
+
+        let top_row = start_row.saturating_sub(1);
+        let left_col = start_col.saturating_sub(1);
+
+        let start_ref = format!("{}{}", Self::column_to_letters(start_col), start_row);
+        let end_ref = format!("{}{}", Self::column_to_letters(end_col), end_row);
+        let range_ref = format!("{}:{}", start_ref, end_ref);
+
+        self.cells.insert(
+            (top_row, left_col),
+            CellValue::Formula {
+                formula: formula.to_string(),
+                cached_value: None,
+                is_array: true,
+                array_range: Some(range_ref),
+            },
+        );
+
+        // Ensure all cells in the target range exist so that Excel treats
+        // them as part of the array region when it recalculates.
+        for r in start_row..=end_row {
+            for c in start_col..=end_col {
+                let r_idx = r.saturating_sub(1);
+                let c_idx = c.saturating_sub(1);
+                if r_idx == top_row && c_idx == left_col {
+                    continue;
+                }
+                self.cells.entry((r_idx, c_idx)).or_insert(CellValue::Empty);
+            }
+        }
+
         self.modified = true;
     }
 
@@ -1750,11 +1866,96 @@ impl MutableWorksheet {
                 let cell_ref = format!("{}{}", Self::column_to_letters(col_num + 1), row_num + 1);
                 // Get the style index for this cell (if any)
                 let style_index = style_indices.get(&(row_num, col_num)).copied();
-                self.write_cell(xml, &cell_ref, value, shared_strings, style_index)?;
+                if let Some(runs) = self.rich_text_cells.get(&(row_num, col_num)) {
+                    self.write_rich_text_cell(xml, &cell_ref, runs, style_index)?;
+                } else {
+                    self.write_cell(xml, &cell_ref, value, shared_strings, style_index)?;
+                }
             }
 
             xml.push_str("</row>");
         }
+
+        Ok(())
+    }
+
+    /// Write a rich text cell to XML as an inline string.
+    fn write_rich_text_cell(
+        &self,
+        xml: &mut String,
+        cell_ref: &str,
+        runs: &[RichTextRun],
+        style_index: Option<usize>,
+    ) -> SheetResult<()> {
+        if runs.is_empty() {
+            // Fallback: treat as empty cell
+            return Ok(());
+        }
+
+        let style_attr = if let Some(idx) = style_index {
+            format!(r#" s="{}""#, idx)
+        } else {
+            String::new()
+        };
+
+        write!(
+            xml,
+            r#"<c r="{}"{} t="inlineStr"><is>"#,
+            cell_ref, style_attr
+        )
+        .map_err(|e| format!("XML write error: {}", e))?;
+
+        for run in runs {
+            xml.push_str("<r>");
+
+            // Run properties
+            let has_rpr = run.font_name.is_some()
+                || run.font_size.is_some()
+                || run.bold
+                || run.italic
+                || run.underline
+                || run.color.is_some();
+
+            if has_rpr {
+                xml.push_str("<rPr>");
+
+                if let Some(ref name) = run.font_name {
+                    write!(xml, "<rFont val=\"{}\"/>", escape_xml(name))
+                        .map_err(|e| format!("XML write error: {}", e))?;
+                }
+                if let Some(size) = run.font_size {
+                    write!(xml, "<sz val=\"{}\"/>", size)
+                        .map_err(|e| format!("XML write error: {}", e))?;
+                }
+                if run.bold {
+                    xml.push_str("<b/>");
+                }
+                if run.italic {
+                    xml.push_str("<i/>");
+                }
+                if run.underline {
+                    xml.push_str("<u/>");
+                }
+                if let Some(ref color) = run.color {
+                    write!(xml, "<color rgb=\"{}\"/>", escape_xml(color))
+                        .map_err(|e| format!("XML write error: {}", e))?;
+                }
+
+                xml.push_str("</rPr>");
+            }
+
+            // Text content; use xml:space="preserve" to keep leading/trailing spaces
+            write!(
+                xml,
+                "<t xml:space=\"preserve\">{}</t>",
+                escape_xml(&run.text)
+            )
+            .map_err(|e| format!("XML write error: {}", e))?;
+
+            xml.push_str("</r>");
+        }
+
+        xml.push_str("</is></c>");
 
         Ok(())
     }
@@ -1833,10 +2034,27 @@ impl MutableWorksheet {
             CellValue::Formula {
                 formula,
                 cached_value,
+                is_array,
+                array_range,
             } => {
                 xml.push_str(&format!(r#"<c r="{}"{}>"#, cell_ref, style_attr));
-                write!(xml, "<f>{}</f>", escape_xml(formula))
-                    .map_err(|e| format!("XML write error: {}", e))?;
+                if *is_array {
+                    if let Some(r) = array_range {
+                        write!(
+                            xml,
+                            "<f t=\"array\" ref=\"{}\">{}</f>",
+                            escape_xml(r),
+                            escape_xml(formula),
+                        )
+                        .map_err(|e| format!("XML write error: {}", e))?;
+                    } else {
+                        write!(xml, "<f t=\"array\">{}</f>", escape_xml(formula))
+                            .map_err(|e| format!("XML write error: {}", e))?;
+                    }
+                } else {
+                    write!(xml, "<f>{}</f>", escape_xml(formula))
+                        .map_err(|e| format!("XML write error: {}", e))?;
+                }
 
                 if let Some(cached) = cached_value {
                     match &**cached {
@@ -2534,6 +2752,46 @@ mod tests {
 
         assert_eq!(ws.cell_count(), 3);
         assert!(matches!(ws.cell_value(1, 1), Some(CellValue::String(_))));
+    }
+
+    #[test]
+    fn rich_text_cell_generates_inline_string() {
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+
+        ws.set_rich_text_cell(
+            1,
+            1,
+            vec![
+                RichTextRun {
+                    text: "Hello ".to_string(),
+                    font_name: None,
+                    font_size: None,
+                    bold: false,
+                    italic: false,
+                    underline: false,
+                    color: None,
+                },
+                RichTextRun {
+                    text: "World".to_string(),
+                    font_name: Some("Calibri".to_string()),
+                    font_size: Some(11.0),
+                    bold: true,
+                    italic: false,
+                    underline: false,
+                    color: Some("FF0000FF".to_string()),
+                },
+            ],
+        );
+
+        let mut shared_strings = MutableSharedStrings::new();
+        let styles: HashMap<(u32, u32), usize> = HashMap::new();
+
+        let xml = ws.to_xml(&mut shared_strings, &styles).unwrap();
+
+        assert!(xml.contains("t=\"inlineStr\""));
+        assert!(xml.contains("<is>"));
+        assert!(xml.contains("Hello "));
+        assert!(xml.contains("World"));
     }
 
     #[test]

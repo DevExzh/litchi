@@ -1,3 +1,4 @@
+use crate::ole::OleFile;
 use crate::ole::writer::OleWriter;
 use crate::ooxml::error::{OoxmlError, Result};
 
@@ -82,6 +83,25 @@ pub(crate) fn build_ole_encrypted_package(
         .map_err(|e| OoxmlError::Other(format!("failed to write OLE container: {e}")))?;
 
     Ok(cursor.into_inner())
+}
+
+pub(crate) fn parse_ole_encrypted_package(bytes: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
+    use std::io::Cursor;
+
+    let cursor = Cursor::new(bytes);
+    let mut ole = OleFile::open(cursor).map_err(|e| {
+        OoxmlError::InvalidFormat(format!("invalid OLE container for encrypted OOXML: {}", e))
+    })?;
+
+    let encryption_info = ole.open_stream(&["EncryptionInfo"]).map_err(|e| {
+        OoxmlError::InvalidFormat(format!("failed to read EncryptionInfo stream: {}", e))
+    })?;
+
+    let encrypted_package = ole.open_stream(&["EncryptedPackage"]).map_err(|e| {
+        OoxmlError::InvalidFormat(format!("failed to read EncryptedPackage stream: {}", e))
+    })?;
+
+    Ok((encryption_info, encrypted_package))
 }
 
 fn write_unicode_lpp4(buf: &mut Vec<u8>, s: &str) {
