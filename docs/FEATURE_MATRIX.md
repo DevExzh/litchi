@@ -49,6 +49,24 @@ This document tracks the implementation status of features across all supported 
 | Document variables | ✅ | ✅ | ❌ | Read only |
 | Themes | ✅ | ✅ | ✅ | Color schemes and themes |
 | Watermarks | 🟡 | ❌ | ✅ | Write only |
+| Equations (OMML) | ❌ | ❌ | ❌ | Office Math (`m:oMath`) equations |
+| Embedded objects (OLE) | ❌ | ❌ | ❌ | Embedded files and OLE packages |
+| Embedded files/attachments | ❌ | ❌ | ❌ | Embedded packages and attachments |
+| Charts | ❌ | ❌ | ❌ | Embedded chart parts (`/word/charts/`) |
+| SmartArt | ❌ | ❌ | ❌ | Diagram parts (`/word/diagrams/`) |
+| Text boxes (DrawingML) | ❌ | ❌ | ❌ | VML/DrawingML text boxes |
+| WordArt | ❌ | ❌ | ❌ | DrawingML text effects |
+| Embedded fonts | ❌ | ❌ | ❌ | Font embedding parts |
+| Digital signatures | ❌ | ❌ | ❌ | OOXML package signatures |
+| Encryption / password-protected DOCX | ❌ | ❌ | ❌ | OOXML agile encryption wrapper |
+| IRM / Rights management | ❌ | ❌ | ❌ | Information Rights Management |
+| Ribbon customization (RibbonX) | ❌ | ❌ | ❌ | Custom UI parts |
+| Web extensions / Office Add-ins | ❌ | ❌ | ❌ | Office add-in extension parts |
+| Mail merge | ❌ | ❌ | ❌ | Data sources and merge fields |
+| Citations/Bibliography | ❌ | ❌ | ❌ | Bibliography sources and fields |
+| Index / Table of authorities | ❌ | ❌ | ❌ | Index/TOA fields and structure |
+| AltChunk (HTML import) | ❌ | ❌ | ❌ | `w:altChunk` external content |
+| Macros (DOCM) | N/A | N/A | N/A | Macro-enabled documents use `.docm` |
 
 ### Metadata & Properties
 | Feature | Status | Read | Write | Notes |
@@ -104,6 +122,18 @@ This document tracks the implementation status of features across all supported 
 | Array formulas | ✅ | ✅ | ✅ | Cell-level support for array ranges (read/write) |
 | Sparklines | ❌ | ❌ | ❌ | Not implemented |
 | Slicers | ❌ | ❌ | ❌ | Not implemented |
+| Tables (structured) | ❌ | ❌ | ❌ | ListObject tables and table styles |
+| Sort | ❌ | ❌ | ❌ | Multi-key sort state |
+| Structured references | ❌ | ❌ | ❌ | Table formulas using structured refs |
+| Shapes/Drawing objects | ❌ | ❌ | ❌ | DrawingML shapes, text boxes, connectors |
+| External links | ❌ | ❌ | ❌ | Linked workbooks and external refs |
+| Data connections / Query tables | ❌ | ❌ | ❌ | External data connections |
+| Threaded comments | ❌ | ❌ | ❌ | Modern comment threads (`threadedComments`) |
+| Pivot charts | ❌ | ❌ | ❌ | Charts bound to pivot caches |
+| Timeline controls | ❌ | ❌ | ❌ | Timeline slicers |
+| Workbook/worksheet views | ❌ | ❌ | ❌ | Custom views and sheet views |
+| Page breaks | ❌ | ❌ | ❌ | Manual/automatic page breaks |
+| VBA macros (XLSM) | N/A | N/A | N/A | Macro-enabled workbooks use `.xlsm` |
 
 ### Page & Print Setup
 | Feature | Status | Read | Write | Notes |
@@ -156,6 +186,14 @@ This document tracks the implementation status of features across all supported 
 | Slide backgrounds | ✅ | ✅ | ✅ | Solid, gradient, pattern, picture |
 | Presentation protection | ✅ | ✅ | ✅ | Read-only, structure, password |
 | Sections | ✅ | ✅ | ✅ | Slide organization groups |
+| Slide timings | ❌ | ❌ | ❌ | Rehearsal timings and per-slide timing |
+| Action settings | ❌ | ❌ | ❌ | Click/hover actions and navigation |
+| Embedded OLE objects | ❌ | ❌ | ❌ | Embedded Excel/Word objects |
+| Embedded fonts | ❌ | ❌ | ❌ | Font embedding parts |
+| Digital signatures | ❌ | ❌ | ❌ | OOXML package signatures |
+| Encryption / password-protected PPTX | ❌ | ❌ | ❌ | OOXML agile encryption wrapper |
+| Ink annotations | ❌ | ❌ | ❌ | Pen/ink strokes |
+| Macros (PPTM) | N/A | N/A | N/A | Macro-enabled presentations use `.pptm` |
 
 ### Metadata & Properties
 | Feature | Status | Read | Write | Notes |
@@ -176,6 +214,14 @@ This document tracks the implementation status of features across all supported 
 | Sections | ✅ | ✅ | ✅ | Section parsing |
 | Styles | ✅ | ✅ | ✅ | StyleSheet generation |
 | Font tables | ✅ | ✅ | ✅ | Font table generation |
+| Headers/Footers | ❌ | ❌ | ❌ | Header/footer ranges and linkage |
+| Footnotes/Endnotes | ❌ | ❌ | ❌ | Footnote/endnote references and text |
+| Numbering/Lists | ❌ | ❌ | ❌ | List structures and numbering formats |
+| Hyperlinks | ❌ | ❌ | ❌ | HYPERLINK fields and destinations |
+| Images | ❌ | ❌ | ❌ | Inline/floating pictures and blips |
+| Drawings/Shapes | ❌ | ❌ | ❌ | OfficeArt/Escher drawing objects |
+| Comments | ❌ | ❌ | ❌ | Annotation ranges and author data |
+| Track changes | ❌ | ❌ | ❌ | Revision marks and authors |
 
 ### Internal Structures
 | Feature | Status | Read | Write | Notes |
@@ -194,6 +240,11 @@ This document tracks the implementation status of features across all supported 
 | MTEF formulas | ✅ | ✅ | ❌ | MathType equation extraction |
 | OLE metadata | ✅ | ✅ | ✅ | CompObj, Ole streams |
 | Summary info | ✅ | ✅ | ✅ | Document metadata |
+
+| Document protection / encryption | ❌ | ❌ | ❌ | Password protection and encryption |
+| VBA macros | ❌ | ❌ | ❌ | `VBA` storages and code modules |
+| Embedded objects (OLE) | ❌ | ❌ | ❌ | Embedded files and OLE packages |
+| Digital signatures | ❌ | ❌ | ❌ | Signature streams and metadata |
 
 ## Excel Spreadsheets (XLS) - Legacy BIFF Format
 
@@ -227,6 +278,16 @@ This document tracks the implementation status of features across all supported 
 | BOUNDSHEET records | ✅ | ✅ | ✅ | Sheet metadata |
 | RK/MulRK records | ✅ | ✅ | ✅ | Compressed numbers |
 | LABELSST records | ✅ | ✅ | ✅ | String references |
+| Merged cells | ❌ | ❌ | ❌ | MERGECELLS records (BIFF8) |
+| Hyperlinks | ❌ | ❌ | ❌ | HLINK records |
+| Comments/Notes | ❌ | ❌ | ❌ | NOTE/OBJ records |
+| Images/Drawing objects | ❌ | ❌ | ❌ | OfficeArt (Escher) drawing records |
+| Charts | ❌ | ❌ | ❌ | Chart sheets and embedded charts |
+| Pivot tables | ❌ | ❌ | ❌ | PivotCache/PivotTable records |
+| Auto-filter/Sort | ❌ | ❌ | ❌ | Filter/sort records |
+| Sheet protection | ❌ | ❌ | ❌ | PROTECT/PASSWORD records |
+| Encryption / password-protected XLS | ❌ | ❌ | ❌ | File-level encryption |
+| VBA macros | ❌ | ❌ | ❌ | `VBA` storage in OLE container |
 
 ## Excel Spreadsheets (XLSB) - Binary OOXML Format
 
@@ -251,12 +312,19 @@ This document tracks the implementation status of features across all supported 
 ### Advanced Features
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| Merged cells | ✅ | ✅ | ✅ | Full support |
+| Merged cells | ✅ | ✅ | ❌ | Read only |
 | Hyperlinks | ✅ | ✅ | ✅ | With locations and tooltips |
 | Named ranges | ✅ | ✅ | ❌ | Read only |
 | Comments | ✅ | ✅ | ✅ | Full support |
 | Data validation | 🟡 | ✅ | ❌ | Read only |
 | Column information | ✅ | ✅ | ✅ | Widths, hidden columns |
+| Conditional formatting | ❌ | ❌ | ❌ | Differential formatting rules |
+| Pivot tables | ❌ | ❌ | ❌ | Pivot caches and pivot tables |
+| Charts | ❌ | ❌ | ❌ | Charts in binary OOXML |
+| Tables (structured) | ❌ | ❌ | ❌ | ListObject tables |
+| External links | ❌ | ❌ | ❌ | Linked workbooks and refs |
+| Encryption / password-protected XLSB | ❌ | ❌ | ❌ | OOXML agile encryption wrapper |
+| VBA macros | ❌ | ❌ | ❌ | VBA project storage (macro-enabled XLSB) |
 
 ### Record Types (100+ supported)
 | Feature | Status | Read | Write | Notes |
@@ -299,6 +367,16 @@ This document tracks the implementation status of features across all supported 
 | Hyperlinks | ✅ | ✅ | ✅ | URL and slide navigation |
 | Notes | ✅ | ✅ | ✅ | Speaker notes support |
 | Image extraction | ✅ | ✅ | ❌ | Pictures stream parsing |
+| Animations | ❌ | ❌ | ❌ | Build steps and timing |
+| Transitions | ❌ | ❌ | ❌ | Slide transitions and settings |
+| Tables | ❌ | ❌ | ❌ | Table shapes |
+| Charts | ❌ | ❌ | ❌ | Embedded charts |
+| Audio/Video | ❌ | ❌ | ❌ | Embedded or linked media |
+| Comments | ❌ | ❌ | ❌ | Comments/annotations |
+| Slide timings | ❌ | ❌ | ❌ | Rehearsal and per-slide timing |
+| Custom slide shows | ❌ | ❌ | ❌ | Named slide subsets |
+| Encryption / password-protected PPT | ❌ | ❌ | ❌ | OLE encryption wrappers |
+| VBA macros | ❌ | ❌ | ❌ | `VBA` storage in OLE container |
 
 ### Escher (Office Drawing) Records
 | Feature | Status | Read | Write | Notes |
@@ -340,6 +418,17 @@ This document tracks the implementation status of features across all supported 
 | Track changes | ✅ | ✅ | ❌ | Read only |
 | Fields | ✅ | ✅ | ❌ | Date, time, page number |
 | Drawings/Frames | ✅ | ✅ | ❌ | Shape and image extraction |
+| Headers/Footers | ❌ | ❌ | ❌ | Page header/footer styles and content |
+| Page styles / Page layout | ❌ | ❌ | ❌ | Page size, margins, columns |
+| Images | ❌ | ❌ | ❌ | Embedded images and frames |
+| Footnotes/Endnotes (write) | ❌ | ❌ | ❌ | ODT supports full CRUD |
+| Table of contents / Index | ❌ | ❌ | ❌ | TOC/index generation and fields |
+| Equations (MathML) | ❌ | ❌ | ❌ | ODF math formulas (MathML) |
+| Embedded objects | ❌ | ❌ | ❌ | OLE objects and embedded content |
+| Forms | ❌ | ❌ | ❌ | Form controls and fields |
+| Digital signatures | ❌ | ❌ | ❌ | Package signatures |
+| Encryption / password-protected ODT | ❌ | ❌ | ❌ | ODF encryption |
+| Macros | ❌ | ❌ | ❌ | OpenDocument scripting |
 
 ### Package & Metadata
 | Feature | Status | Read | Write | Notes |
@@ -389,6 +478,19 @@ This document tracks the implementation status of features across all supported 
 | Repeated cells/rows | ✅ | ✅ | ❌ | Expansion support |
 | Insert/delete rows/cols | 🟡 | ❌ | ✅ | MutableSpreadsheet |
 | Metadata | ✅ | ✅ | ✅ | Full support |
+| Cell formatting (full) | ❌ | ❌ | ❌ | Styles, number formats, alignment |
+| Conditional formatting | ❌ | ❌ | ❌ | Cell/range rules |
+| Data validation | ❌ | ❌ | ❌ | Validity constraints |
+| Charts | ❌ | ❌ | ❌ | Embedded chart objects |
+| Images/Drawing objects | ❌ | ❌ | ❌ | Shapes, images, frames |
+| Comments/Annotations | ❌ | ❌ | ❌ | Cell comments |
+| Hyperlinks | ❌ | ❌ | ❌ | Cell/range hyperlinks |
+| Auto-filter/Sort | ❌ | ❌ | ❌ | Filtering and sorting state |
+| Named ranges | ❌ | ❌ | ❌ | Defined expressions/ranges |
+| Pivot tables (DataPilot) | ❌ | ❌ | ❌ | DataPilot structures |
+| Sheet protection | ❌ | ❌ | ❌ | Sheet/table protection |
+| Encryption / password-protected ODS | ❌ | ❌ | ❌ | ODF encryption |
+| Macros | ❌ | ❌ | ❌ | OpenDocument scripting |
 
 ## OpenDocument Presentation (ODP)
 
@@ -406,6 +508,10 @@ This document tracks the implementation status of features across all supported 
 | Rectangles | ✅ | ✅ | ✅ | Basic shapes |
 | Ellipses | ✅ | ✅ | ✅ | Basic shapes |
 | Images | ✅ | ✅ | ✅ | Embedded images |
+| Lines/Connectors | ❌ | ❌ | ❌ | Connectors and lines |
+| Tables | ❌ | ❌ | ❌ | Table shapes |
+| Charts | ❌ | ❌ | ❌ | Embedded chart objects |
+| Audio/Video | ❌ | ❌ | ❌ | Embedded or linked media |
 
 ### Layouts & Masters
 | Feature | Status | Read | Write | Notes |
@@ -413,6 +519,15 @@ This document tracks the implementation status of features across all supported 
 | Slide layouts | ✅ | ✅ | ✅ | Layout support |
 | Master pages | ✅ | ✅ | ❌ | Read only |
 | Style parsing | ✅ | ✅ | ✅ | Presentation styles |
+| Animations | ❌ | ❌ | ❌ | Build steps and timing |
+| Transitions | ❌ | ❌ | ❌ | Slide transitions |
+| Notes | ❌ | ❌ | ❌ | Speaker notes |
+| Comments | ❌ | ❌ | ❌ | Slide annotations |
+| Hyperlinks | ❌ | ❌ | ❌ | Action links and URLs |
+| Custom slide shows | ❌ | ❌ | ❌ | Named slide subsets |
+| Sections | ❌ | ❌ | ❌ | Slide grouping |
+| Encryption / password-protected ODP | ❌ | ❌ | ❌ | ODF encryption |
+| Macros | ❌ | ❌ | ❌ | OpenDocument scripting |
 
 ### Metadata
 | Feature | Status | Read | Write | Notes |
@@ -467,6 +582,15 @@ This document tracks the implementation status of features across all supported 
 | Styles | ✅ | ✅ | ✅ | Stylesheet support |
 | Document info | ✅ | ✅ | ✅ | Title, author, etc. |
 | Compressed RTF | ✅ | ✅ | ✅ | Compression/decompression |
+| Headers/Footers | ❌ | ❌ | ❌ | Page header/footer styles and content |
+| Footnotes/Endnotes | ❌ | ❌ | ❌ | Footnote and endnote destinations |
+| Hyperlinks | ❌ | ❌ | ❌ | Hyperlink fields |
+| Track changes | ❌ | ❌ | ❌ | Revision marks |
+| Embedded objects (OLE) | ❌ | ❌ | ❌ | OLE packages and embeddings |
+| Equations | ❌ | ❌ | ❌ | EQ fields and embedded equation objects |
+| Embedded fonts | ❌ | ❌ | ❌ | Font embedding parts |
+| Digital signatures | ❌ | ❌ | ❌ | Package signatures |
+| Encryption / password-protected RTF | N/A | N/A | N/A | RTF does not define standard file encryption |
 
 ## Apple iWork Formats (Pages, Keynote, Numbers)
 
@@ -489,6 +613,14 @@ This document tracks the implementation status of features across all supported 
 | Text styles | ✅ | ✅ | ❌ | Paragraph/character styles |
 | Floating drawables | ✅ | ✅ | ❌ | Images and shapes |
 | Headers/Footers | ✅ | ✅ | ❌ | Extraction support |
+| Tables | ❌ | ❌ | ❌ | Tables and table styling |
+| Charts | ❌ | ❌ | ❌ | Chart objects |
+| Comments | ❌ | ❌ | ❌ | Comments/annotations |
+| Track changes | ❌ | ❌ | ❌ | Revisions and change tracking |
+| Hyperlinks | ❌ | ❌ | ❌ | Link targets and URLs |
+| Footnotes/Endnotes | ❌ | ❌ | ❌ | Notes and references |
+| Export settings | ❌ | ❌ | ❌ | PDF/Word export options |
+| Encryption / password protection | ❌ | ❌ | ❌ | Password-protected iWork documents |
 
 ### Keynote (.key)
 | Feature | Status | Read | Write | Notes |
@@ -499,6 +631,14 @@ This document tracks the implementation status of features across all supported 
 | Slide transitions | ✅ | ✅ | ❌ | Transition types |
 | Speaker notes | ✅ | ✅ | ❌ | Notes extraction |
 | Multimedia refs | ✅ | ✅ | ❌ | Media references |
+| Tables | ❌ | ❌ | ❌ | Table objects |
+| Charts | ❌ | ❌ | ❌ | Charts and chart styling |
+| Hyperlinks/Actions | ❌ | ❌ | ❌ | Slide navigation actions |
+| Comments | ❌ | ❌ | ❌ | Comments/annotations |
+| Themes | ❌ | ❌ | ❌ | Theme definitions |
+| Slide timings | ❌ | ❌ | ❌ | Per-slide timing |
+| Presenter tools | ❌ | ❌ | ❌ | Presenter notes and settings |
+| Encryption / password protection | ❌ | ❌ | ❌ | Password-protected iWork presentations |
 
 ### Numbers (.numbers)
 | Feature | Status | Read | Write | Notes |
@@ -509,6 +649,15 @@ This document tracks the implementation status of features across all supported 
 | Formulas | ✅ | ✅ | ❌ | Formula extraction |
 | CSV export | ✅ | ✅ | ❌ | Table to CSV |
 | Cell formatting | ✅ | ✅ | ❌ | Format information |
+| Charts | ❌ | ❌ | ❌ | Charts and chart styling |
+| Pivot tables | ❌ | ❌ | ❌ | Analytics/pivot-like summaries |
+| Conditional highlighting | ❌ | ❌ | ❌ | Rules-based cell highlighting |
+| Data filters/sort | ❌ | ❌ | ❌ | Filtering and sorting |
+| Named ranges | ❌ | ❌ | ❌ | Named references |
+| Comments | ❌ | ❌ | ❌ | Cell comments |
+| Hyperlinks | ❌ | ❌ | ❌ | Cell hyperlinks |
+| Protection | ❌ | ❌ | ❌ | Sheet/table protection |
+| Encryption / password protection | ❌ | ❌ | ❌ | Password-protected iWork spreadsheets |
 
 ### Media & Assets
 | Feature | Status | Read | Write | Notes |
