@@ -33,6 +33,7 @@
 pub mod cell;
 pub mod format;
 pub mod parsers;
+pub mod pivot;
 pub mod shared_strings;
 pub mod styles;
 pub mod template;

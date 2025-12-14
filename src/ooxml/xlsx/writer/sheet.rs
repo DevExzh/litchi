@@ -1635,12 +1635,14 @@ impl MutableWorksheet {
         style_indices: &HashMap<(u32, u32), usize>,
         hyperlink_rel_ids: &HashMap<String, String>,
         vml_rel_id: Option<&str>,
+        pivot_table_rel_ids: Option<&[String]>,
     ) -> SheetResult<String> {
         self.to_xml_internal(
             shared_strings,
             style_indices,
             Some(hyperlink_rel_ids),
             vml_rel_id,
+            pivot_table_rel_ids,
         )
     }
 
@@ -1654,7 +1656,7 @@ impl MutableWorksheet {
         shared_strings: &mut MutableSharedStrings,
         style_indices: &HashMap<(u32, u32), usize>,
     ) -> SheetResult<String> {
-        self.to_xml_internal(shared_strings, style_indices, None, None)
+        self.to_xml_internal(shared_strings, style_indices, None, None, None)
     }
 
     /// Internal method for XML serialization with optional hyperlink relationship IDs.
@@ -1664,10 +1666,11 @@ impl MutableWorksheet {
         style_indices: &HashMap<(u32, u32), usize>,
         hyperlink_rel_ids: Option<&HashMap<String, String>>,
         vml_rel_id: Option<&str>,
+        pivot_table_rel_ids: Option<&[String]>,
     ) -> SheetResult<String> {
         let mut xml = String::with_capacity(4096);
         xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
-        xml.push_str(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">"#);
+        xml.push_str(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="x14ac xr xr2 xr3" xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac" xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision" xmlns:xr2="http://schemas.microsoft.com/office/spreadsheetml/2015/revision2" xmlns:xr3="http://schemas.microsoft.com/office/spreadsheetml/2016/revision3" xr:uid="{00000000-0000-0000-0000-000000000000}">"#);
 
         // Write sheetPr (sheet properties) if needed - must come BEFORE dimension per OOXML spec
         if self.tab_color.is_some() {
@@ -1691,10 +1694,15 @@ impl MutableWorksheet {
                 escape_xml(&max_ref)
             )
             .map_err(|e| format!("XML write error: {}", e))?;
+        } else {
+            xml.push_str(r#"<dimension ref="A1"/>"#);
         }
 
         // Write sheet views (including freeze panes if set)
         xml.push_str("<sheetViews><sheetView workbookViewId=\"0\"");
+        if self.is_active() {
+            xml.push_str(" tabSelected=\"1\"");
+        }
 
         // Add freeze panes if configured
         if let Some(ref freeze) = self.freeze_panes {
@@ -1738,12 +1746,18 @@ impl MutableWorksheet {
         xml.push_str("<sheetFormatPr defaultRowHeight=\"15\"/>");
 
         // Write column information (widths and hidden columns)
-        self.write_cols(&mut xml)?;
+        let has_pivots = pivot_table_rel_ids
+            .map(|ids| !ids.is_empty())
+            .unwrap_or(false);
+        self.write_cols(&mut xml, has_pivots)?;
 
         // Write sheet data
         xml.push_str("<sheetData>");
         self.write_sheet_data(&mut xml, shared_strings, style_indices)?;
         xml.push_str("</sheetData>");
+
+        // Match Excel's worksheet structure
+        xml.push_str(r#"<phoneticPr fontId="1" type="noConversion"/>"#);
 
         // Write sheet protection if configured (must come right after sheetData per OOXML spec)
         if self.protection.is_some() {
@@ -1804,8 +1818,8 @@ impl MutableWorksheet {
         }
 
         // Write legacyDrawing reference for comments (VML)
-        if let Some(vml_rid) = vml_rel_id {
-            write!(xml, r#"<legacyDrawing r:id="{}"/>"#, vml_rid)
+        if let Some(vml_rel_id) = vml_rel_id {
+            write!(xml, r#"<legacyDrawing r:id="{}"/>"#, vml_rel_id)
                 .map_err(|e| format!("XML write error: {}", e))?;
         }
 
@@ -2086,12 +2100,27 @@ impl MutableWorksheet {
     }
 
     /// Write column information (widths and hidden state).
-    fn write_cols(&self, xml: &mut String) -> SheetResult<()> {
+    fn write_cols(&self, xml: &mut String, force: bool) -> SheetResult<()> {
         if self.column_widths.is_empty() && self.hidden_columns.is_empty() {
+            if !force {
+                return Ok(());
+            }
+            xml.push_str("<cols>");
+            // Minimal valid column definitions to match Excel's pivot sheet structure.
+            // Only required attributes are emitted.
+            for col in 1..=7u32 {
+                write!(
+                    xml,
+                    r#"<col min="{}" max="{}" width="10" bestFit="1" customWidth="1"/>"#,
+                    col, col
+                )
+                .map_err(|e| format!("XML write error: {}", e))?;
+            }
+            xml.push_str("</cols>");
             return Ok(());
         }
 
-        // Collect all columns that have custom width or are hidden
+        // Determine the set of columns that need a <col> entry.
         let mut cols_to_write: std::collections::BTreeSet<u32> = std::collections::BTreeSet::new();
         cols_to_write.extend(self.column_widths.keys());
         cols_to_write.extend(&self.hidden_columns);

@@ -92,6 +92,12 @@ pub mod content_type {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml";
     pub const SML_SHARED_STRINGS: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml";
+    pub const SML_PIVOT_CACHE_DEFINITION: &str =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml";
+    pub const SML_PIVOT_CACHE_RECORDS: &str =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml";
+    pub const SML_PIVOT_TABLE: &str =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml";
 
     // Excel Binary File Format content types
     pub const XLSB_BIN: &str = "application/vnd.ms-excel.sheet.binary.macroEnabled.main";
@@ -206,6 +212,12 @@ pub mod relationship_type {
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
     pub const WEB_SETTINGS: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings";
+    pub const PIVOT_CACHE_DEFINITION: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition";
+    pub const PIVOT_CACHE_RECORDS: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords";
+    pub const PIVOT_TABLE: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable";
 
     // Images and media
     pub const IMAGE: &str =

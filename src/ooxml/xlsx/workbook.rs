@@ -5,6 +5,11 @@
 
 use crate::ooxml::common::DocumentProperties;
 use crate::ooxml::opc::{OpcPackage, PackURI};
+use crate::ooxml::pivot::PivotTable;
+use crate::ooxml::xlsx::writer::workbook::{
+    generate_pivot_cache_definition_xml, generate_pivot_cache_records_xml,
+    generate_pivot_table_definition_xml, render_pivot_table_sheet_cells,
+};
 use crate::ooxml::xlsx::writer::{MutableWorkbookData, MutableWorksheet};
 use crate::ooxml::xlsx::{SharedStrings, Styles};
 use crate::sheet::{
@@ -492,11 +497,22 @@ impl Workbook {
         self.mutable_data.as_mut().unwrap().worksheet_mut(index)
     }
 
-    /// Add a new worksheet to the workbook.
+    /// Add a pivot table to the workbook (writer).
+    ///
+    /// This wires the pivot cache/table into the save pipeline; when you call
+    /// `save`, the necessary parts and relationships will be created.
+    pub fn add_pivot_table(&mut self, pivot: PivotTable) -> SheetResult<()> {
+        if self.mutable_data.is_none() {
+            self.mutable_data = Some(MutableWorkbookData::new());
+        }
+
+        self.mutable_data.as_mut().unwrap().add_pivot_table(pivot)
+    }
+
+    /// Add a new worksheet.
     ///
     /// # Arguments
-    ///
-    /// * `name` - Name for the new worksheet
+    /// * `name` - The name of the new worksheet
     ///
     /// # Examples
     ///
@@ -504,9 +520,7 @@ impl Workbook {
     /// use litchi::ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
-    /// wb.add_worksheet("Data");
-    /// wb.add_worksheet("Summary");
-    ///
+    /// wb.add_worksheet("Sheet2");
     /// wb.save("output.xlsx")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -700,6 +714,96 @@ impl Workbook {
         // Track worksheet relationship IDs for workbook.xml generation
         let mut worksheet_rel_ids: Vec<String> = Vec::new();
 
+        // Track pivot cache relationship IDs for workbook.xml
+        let mut pivot_cache_rel_ids: Vec<(u32, String)> = Vec::new();
+        // Track pivot table targets per worksheet (for worksheet rels)
+        let mut pivot_table_targets_per_sheet: Vec<Vec<String>> =
+            vec![Vec::new(); data.worksheets.len()];
+
+        // Pre-create pivot cache and pivot table parts so worksheets can relate to them
+        for (idx, pivot) in data.pivot_tables.iter().enumerate() {
+            let cache_id = (idx as u32) + 1;
+
+            // pivotCacheRecords part (materialized from source range)
+            let records_uri =
+                PackURI::new(format!("/xl/pivotCache/pivotCacheRecords{}.xml", cache_id))?;
+            let (records_xml, record_count, field_stats) =
+                generate_pivot_cache_records_xml(pivot, &data.worksheets)?;
+            let records_part = BlobPart::new(
+                records_uri,
+                ct::SML_PIVOT_CACHE_RECORDS.to_string(),
+                records_xml.into_bytes(),
+            );
+            self.package.add_part(Box::new(records_part));
+
+            // pivotCacheDefinition part
+            let cache_def_uri = PackURI::new(format!(
+                "/xl/pivotCache/pivotCacheDefinition{}.xml",
+                cache_id
+            ))?;
+            let mut cache_def_part = BlobPart::new(
+                cache_def_uri,
+                ct::SML_PIVOT_CACHE_DEFINITION.to_string(),
+                Vec::new(),
+            );
+            let records_rel_id = cache_def_part.relate_to(
+                &format!("pivotCacheRecords{}.xml", cache_id),
+                rt::PIVOT_CACHE_RECORDS,
+            );
+            let cache_def_xml = generate_pivot_cache_definition_xml(
+                pivot,
+                Some(records_rel_id.as_str()),
+                record_count,
+                &field_stats,
+            )?;
+            cache_def_part.set_blob(cache_def_xml.into_bytes());
+            self.package.add_part(Box::new(cache_def_part));
+
+            // workbook -> pivotCacheDefinition rel
+            let cache_rel_id = temp_wb_part.relate_to(
+                &format!("pivotCache/pivotCacheDefinition{}.xml", cache_id),
+                rt::PIVOT_CACHE_DEFINITION,
+            );
+            pivot_cache_rel_ids.push((cache_id, cache_rel_id.clone()));
+
+            // pivotTableDefinition part
+            let table_idx = cache_id; // align ids for predictability
+            let pivot_table_uri =
+                PackURI::new(format!("/xl/pivotTables/pivotTable{}.xml", table_idx))?;
+            let mut pivot_table_part =
+                BlobPart::new(pivot_table_uri, ct::SML_PIVOT_TABLE.to_string(), Vec::new());
+
+            // pivotTable -> pivotCacheDefinition rel
+            let _pt_cache_rel_id = pivot_table_part.relate_to(
+                &format!("../pivotCache/pivotCacheDefinition{}.xml", cache_id),
+                rt::PIVOT_CACHE_DEFINITION,
+            );
+
+            // Serialize pivotTable XML
+            let pivot_table_xml =
+                generate_pivot_table_definition_xml(pivot, cache_id, &field_stats)?;
+            pivot_table_part.set_blob(pivot_table_xml.into_bytes());
+            self.package.add_part(Box::new(pivot_table_part));
+
+            // Record worksheet target for later worksheet rel creation
+            let sheet_idx = pivot.dest_sheet_index;
+            if let Some(list) = pivot_table_targets_per_sheet.get_mut(sheet_idx) {
+                list.push(format!("../pivotTables/pivotTable{}.xml", table_idx));
+            } else {
+                return Err(format!(
+                    "Pivot table destination sheet index {} out of bounds",
+                    sheet_idx
+                )
+                .into());
+            }
+        }
+
+        // Materialize the pivot output into destination worksheet cells.
+        // This ensures Excel shows the pivot table content immediately on open.
+        for pivot in data.pivot_tables.iter() {
+            render_pivot_table_sheet_cells(pivot, &mut data.worksheets)?;
+        }
+
         // Update worksheet parts and create relationships
         // IMPORTANT: Create relationships for ALL worksheets, not just modified ones
         for (index, ws) in data.worksheets.iter().enumerate() {
@@ -829,12 +933,21 @@ impl Workbook {
                 );
             }
 
+            let mut pivot_table_rel_ids: Vec<String> = Vec::new();
+            if let Some(targets) = pivot_table_targets_per_sheet.get(index) {
+                for target in targets {
+                    let rid = ws_part.relate_to(target, rt::PIVOT_TABLE);
+                    pivot_table_rel_ids.push(rid);
+                }
+            }
+
             // Now generate worksheet XML with proper hyperlink relationship IDs and VML reference
             let ws_xml = ws.to_xml_with_hyperlink_rels(
                 &mut data.shared_strings,
                 &style_indices,
                 &hyperlink_rel_ids,
                 vml_rel_id.as_deref(),
+                Some(&pivot_table_rel_ids),
             )?;
             ws_part.set_blob(ws_xml.into_bytes());
 
@@ -869,7 +982,8 @@ impl Workbook {
         data.sync_print_settings_to_defined_names();
 
         // Now generate workbook XML with actual relationship IDs
-        let workbook_xml = data.generate_workbook_xml_with_rels(&worksheet_rel_ids)?;
+        let workbook_xml =
+            data.generate_workbook_xml_with_rels(&worksheet_rel_ids, &pivot_cache_rel_ids)?;
         temp_wb_part.set_blob(workbook_xml.into_bytes());
 
         // Add the workbook part to the package
@@ -1317,6 +1431,18 @@ impl Workbook {
     /// Check if the workbook is protected.
     pub fn is_workbook_protected(&self) -> bool {
         self.mutable_data.as_ref().is_some_and(|d| d.is_protected())
+    }
+
+    pub fn pivot_tables(&self) -> SheetResult<Vec<PivotTable>> {
+        crate::ooxml::xlsx::pivot::read_pivot_tables(self.package())
+    }
+
+    pub fn pivot_tables_on_sheet(&self, sheet_name: &str) -> SheetResult<Vec<PivotTable>> {
+        let all = self.pivot_tables()?;
+        Ok(all
+            .into_iter()
+            .filter(|t| t.sheet_name == sheet_name)
+            .collect())
     }
 
     // ===== Worksheet-level Writing Features =====

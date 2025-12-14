@@ -41,6 +41,7 @@ pub mod metadata;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub mod opc;
+pub mod pivot;
 pub mod pptx;
 pub mod shared;
 pub mod xlsb;
