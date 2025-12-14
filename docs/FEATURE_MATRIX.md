@@ -120,7 +120,7 @@ This document tracks the implementation status of features across all supported 
 | Workbook protection | 🟡 | ❌ | ✅ | Write only |
 | Formula evaluation | 🟡 | ✅ | N/A | MVP evaluator via `sheet::FormulaEvaluator` (limited Excel semantics) |
 | Array formulas | ✅ | ✅ | ✅ | Cell-level support for array ranges (read/write) |
-| Sparklines | ❌ | ❌ | ❌ | Not implemented |
+| Sparklines | 🟡 | ❌ | ✅ | Write only |
 | Slicers | ❌ | ❌ | ❌ | Not implemented |
 | Tables (structured) | ❌ | ❌ | ❌ | ListObject tables and table styles |
 | Sort | ❌ | ❌ | ❌ | Multi-key sort state |

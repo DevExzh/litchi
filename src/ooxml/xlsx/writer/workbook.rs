@@ -646,7 +646,7 @@ impl MutableWorkbookData {
 
         xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
 
-        xml.push_str(r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="x15 xr xr6 xr10 xr2" xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision" xmlns:xr6="http://schemas.microsoft.com/office/spreadsheetml/2016/revision6" xmlns:xr10="http://schemas.microsoft.com/office/spreadsheetml/2016/revision10" xmlns:xr2="http://schemas.microsoft.com/office/spreadsheetml/2015/revision2">"#);
+        xml.push_str(r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">"#);
 
         // Add fileVersion (recommended by Excel for compatibility)
         xml.push_str(
@@ -655,10 +655,6 @@ impl MutableWorkbookData {
 
         // Add workbookPr (required by Excel)
         xml.push_str(r#"<workbookPr defaultThemeVersion="166925" hidePivotFieldList="0"/>"#);
-
-        // Match Excel's compatibility blocks
-        xml.push_str(r#"<mc:AlternateContent><mc:Choice Requires="x15"><absPath xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/ac" url=""/></mc:Choice></mc:AlternateContent>"#);
-        xml.push_str(r#"<xr:revisionPtr coauthVersionLast="0" coauthVersionMax="0" documentId="{00000000-0000-0000-0000-000000000000}" revIDLastSave="0" uidLastSave="{00000000-0000-0000-0000-000000000000}"/>"#);
 
         // Write workbook protection if configured (must come after workbookPr per OOXML spec)
         if let Some(ref protection) = self.protection {
@@ -753,12 +749,6 @@ impl MutableWorkbookData {
             }
             xml.push_str("</pivotCaches>");
         }
-
-        // Match Excel workbook extensions
-        xml.push_str(r#"<extLst>"#);
-        xml.push_str(r#"<ext uri="{140A7094-0E35-4892-8432-C4D2E57EDEB5}"><x15:workbookPr chartTrackingRefBase="1"/></ext>"#);
-        xml.push_str(r#"<ext uri="{B58B0392-4F1F-4190-BB64-5DF3571DCE5F}"><calcFeatures xmlns="http://schemas.microsoft.com/office/spreadsheetml/2018/calcfeatures"><feature name="f1"/><feature name="f2"/><feature name="f3"/><feature name="f4"/><feature name="f5"/><feature name="f6"/></calcFeatures></ext>"#);
-        xml.push_str(r#"</extLst>"#);
 
         xml.push_str("</workbook>");
 

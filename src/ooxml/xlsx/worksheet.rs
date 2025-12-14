@@ -15,6 +15,7 @@ use crate::sheet::{
 use super::RichTextRun;
 use super::cell::{Cell, CellIterator as XlsxCellIterator, RowIterator as XlsxRowIterator};
 use super::format::{CellBorder, CellFill, CellFont, CellFormat};
+use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
 
 /// Information about a worksheet
 #[derive(Debug, Clone)]
@@ -151,6 +152,7 @@ pub struct Worksheet<'a> {
     /// Auto-filter
     auto_filter: Option<AutoFilter>,
     rich_text_cells: HashMap<(u32, u32), Vec<RichTextRun>>,
+    sparkline_groups: Vec<SparklineGroup>,
 }
 
 impl<'a> Worksheet<'a> {
@@ -172,6 +174,7 @@ impl<'a> Worksheet<'a> {
             page_setup: PageSetup::default(),
             auto_filter: None,
             rich_text_cells: HashMap::new(),
+            sparkline_groups: Vec::new(),
         }
     }
 
@@ -256,7 +259,13 @@ impl<'a> Worksheet<'a> {
             self.parse_auto_filter(af_content)?;
         }
 
+        self.sparkline_groups = parse_sparkline_groups_from_worksheet_xml(content)?;
+
         Ok(())
+    }
+
+    pub fn sparkline_groups(&self) -> &[SparklineGroup] {
+        &self.sparkline_groups
     }
 
     /// Parse sheetData content.

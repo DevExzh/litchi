@@ -1,5 +1,7 @@
+use crate::ooxml::xlsx::sparkline::{SparklineGroup, write_sparkline_groups_ext};
 /// Writer module for creating and modifying Excel worksheets.
 use crate::sheet::{CellValue, Result as SheetResult};
+use rand::Rng;
 use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
 
@@ -18,6 +20,34 @@ fn escape_xml(s: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
+}
+
+fn generate_guid_braced() -> String {
+    let mut bytes = [0u8; 16];
+    let mut rng = rand::rng();
+    rng.fill(&mut bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+    format!(
+        "{{{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}}}",
+        bytes[0],
+        bytes[1],
+        bytes[2],
+        bytes[3],
+        bytes[4],
+        bytes[5],
+        bytes[6],
+        bytes[7],
+        bytes[8],
+        bytes[9],
+        bytes[10],
+        bytes[11],
+        bytes[12],
+        bytes[13],
+        bytes[14],
+        bytes[15]
+    )
 }
 
 /// Freeze panes configuration.
@@ -289,6 +319,7 @@ pub struct MutableWorksheet {
     column_outline_levels: HashMap<u32, u8>,
     /// Rich text runs per cell (row, col)
     rich_text_cells: HashMap<(u32, u32), Vec<RichTextRun>>,
+    sparkline_groups: Vec<SparklineGroup>,
     /// Whether the worksheet has been modified
     modified: bool,
 }
@@ -327,8 +358,60 @@ impl MutableWorksheet {
             row_outline_levels: HashMap::new(),
             column_outline_levels: HashMap::new(),
             rich_text_cells: HashMap::new(),
+            sparkline_groups: Vec::new(),
             modified: false,
         }
+    }
+
+    pub fn sparkline_groups(&self) -> &[SparklineGroup] {
+        &self.sparkline_groups
+    }
+
+    pub fn add_sparkline_group(&mut self, group: SparklineGroup) {
+        fn parse_a1_cell_ref(s: &str) -> Option<(u32, u32)> {
+            let s = s.trim();
+            if s.is_empty() {
+                return None;
+            }
+
+            let mut col: u32 = 0;
+            let mut saw_letter = false;
+            let mut i = 0usize;
+            for (idx, ch) in s.char_indices() {
+                if ch.is_ascii_alphabetic() {
+                    saw_letter = true;
+                    col = col * 26 + (ch.to_ascii_uppercase() as u32 - 'A' as u32 + 1);
+                    i = idx + ch.len_utf8();
+                } else {
+                    break;
+                }
+            }
+            if !saw_letter {
+                return None;
+            }
+            if col == 0 {
+                return None;
+            }
+            let col0 = col - 1;
+
+            let row_str = s.get(i..)?;
+            let row1: u32 = row_str.parse().ok()?;
+            if row1 == 0 {
+                return None;
+            }
+            Some((row1 - 1, col0))
+        }
+
+        for sp in &group.sparklines {
+            if let Some((r, c)) = parse_a1_cell_ref(&sp.location) {
+                self.cells.remove(&(r, c));
+                self.cell_formats.remove(&(r, c));
+                self.rich_text_cells.remove(&(r, c));
+            }
+        }
+
+        self.sparkline_groups.push(group);
+        self.modified = true;
     }
 
     /// Get the worksheet name.
@@ -1670,7 +1753,13 @@ impl MutableWorksheet {
     ) -> SheetResult<String> {
         let mut xml = String::with_capacity(4096);
         xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
-        xml.push_str(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="x14ac xr xr2 xr3" xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac" xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision" xmlns:xr2="http://schemas.microsoft.com/office/spreadsheetml/2015/revision2" xmlns:xr3="http://schemas.microsoft.com/office/spreadsheetml/2016/revision3" xr:uid="{00000000-0000-0000-0000-000000000000}">"#);
+        let xr_uid = generate_guid_braced();
+        write!(
+            xml,
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="x14ac xr xr2 xr3" xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac" xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision" xmlns:xr2="http://schemas.microsoft.com/office/spreadsheetml/2015/revision2" xmlns:xr3="http://schemas.microsoft.com/office/spreadsheetml/2016/revision3" xr:uid="{}">"#,
+            xr_uid
+        )
+        .map_err(|e| format!("XML write error: {}", e))?;
 
         // Write sheetPr (sheet properties) if needed - must come BEFORE dimension per OOXML spec
         if self.tab_color.is_some() {
@@ -1757,7 +1846,7 @@ impl MutableWorksheet {
         xml.push_str("</sheetData>");
 
         // Match Excel's worksheet structure
-        xml.push_str(r#"<phoneticPr fontId="1" type="noConversion"/>"#);
+        xml.push_str(r#"<phoneticPr fontId="0" type="noConversion"/>"#);
 
         // Write sheet protection if configured (must come right after sheetData per OOXML spec)
         if self.protection.is_some() {
@@ -1823,6 +1912,12 @@ impl MutableWorksheet {
                 .map_err(|e| format!("XML write error: {}", e))?;
         }
 
+        if !self.sparkline_groups.is_empty() {
+            xml.push_str("<extLst>");
+            write_sparkline_groups_ext(&mut xml, &self.sparkline_groups)?;
+            xml.push_str("</extLst>");
+        }
+
         xml.push_str("</worksheet>");
 
         Ok(xml)
@@ -1844,7 +1939,6 @@ impl MutableWorksheet {
             return Ok(());
         }
 
-        // Group cells by row
         let mut rows: HashMap<u32, Vec<(u32, &CellValue)>> = HashMap::new();
         for (&(row, col), value) in &self.cells {
             rows.entry(row).or_default().push((col, value));

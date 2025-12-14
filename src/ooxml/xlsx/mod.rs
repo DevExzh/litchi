@@ -35,6 +35,7 @@ pub mod format;
 pub mod parsers;
 pub mod pivot;
 pub mod shared_strings;
+pub mod sparkline;
 pub mod styles;
 pub mod template;
 pub mod workbook;
@@ -49,6 +50,10 @@ pub use format::{
     CellFormat, Chart, ChartType, DataValidation, DataValidationOperator, DataValidationType,
 };
 pub use shared_strings::SharedStrings;
+pub use sparkline::{
+    Sparkline, SparklineAxisMinMax, SparklineColor, SparklineDisplayEmptyCellsAs, SparklineGroup,
+    SparklineGroupColors, SparklineGroupOptions, SparklineType,
+};
 pub use styles::{Alignment, Border, BorderStyle, CellStyle, Fill, Font, NumberFormat, Styles};
 pub use workbook::Workbook;
 pub use worksheet::{
