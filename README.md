@@ -102,6 +102,9 @@ pkg.save("output.pptx")?;
 
 ## Installation
 
+> [!NOTE]
+> The library on the crates.io is just a placeholder right now (contains only read-only functionalities), if you want to use it, please use the development version.
+
 Add to your `Cargo.toml`:
 
 ```toml
@@ -114,27 +117,38 @@ litchi = { git = "https://github.com/DevExzh/litchi.git" }
 
 ### Optional Features
 
-By default, only Microsoft Office formats are enabled (`ole` and `ooxml` features). Enable additional features as needed:
+By default, Microsoft Office format support is enabled (`ole`, `ooxml`), along with `ooxml_encryption` and `eval_engine`. Enable additional features as needed:
 
 ```toml
 [dependencies]
 # Enable all features
-litchi = { version = "0.0.1", features = ["odf", "iwa", "formula", "imgconv"] }
+litchi = { version = "0.0.1", features = ["full"] }
 
 # Or enable specific features
 litchi = { version = "0.0.1", features = ["odf"] }  # OpenDocument support
 litchi = { version = "0.0.1", features = ["iwa"] }  # Apple iWork support
+litchi = { version = "0.0.1", features = ["rtf"] }  # RTF support
 litchi = { version = "0.0.1", features = ["formula"] }  # Formula parsing and LaTeX conversion
 litchi = { version = "0.0.1", features = ["imgconv"] }  # Image conversion support
 ```
 
+**Note about `iwa`:** iWork files are essentially bundles of serialized Protocol Buffer messages, so enabling `iwa` requires a system `protoc` installation (used by `prost-build`).
+
+- **Linux (Debian/Ubuntu)**: install `protobuf-compiler`
+- **macOS**: install `protobuf` (e.g. via Homebrew)
+- **Windows**: install `protobuf` (e.g. via Winget)
+
 **Available Features:**
+- `full` - Enable all supported formats and functionality
 - `ole` (default) - Legacy Office formats (.doc, .xls, .ppt)
 - `ooxml` (default) - Modern Office formats (.docx, .xlsx, .pptx)
+- `ooxml_encryption` (default) - OOXML encryption/decryption support
 - `odf` - OpenDocument formats (.odt, .ods, .odp)
 - `iwa` - Apple iWork formats (.pages, .numbers, .key)
+- `rtf` - Rich Text Format (.rtf)
 - `formula` - MathType and Office MathML to LaTeX conversion
 - `imgconv` - Image format conversion (EMF, WMF, PICT to PNG/JPEG/WebP)
+- `eval_engine` (default) - Spreadsheet formula evaluation engine
 
 ## Documentation
 
