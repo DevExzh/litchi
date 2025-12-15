@@ -946,7 +946,7 @@ impl MutableWorksheet {
             xml.push_str(r#"<rPr><sz val="9"/><color indexed="81"/><rFont val="Tahoma"/><charset val="1"/></rPr>"#);
             write!(
                 xml,
-                "<t xml:space=\"preserve\">\n{}</t>",
+                "<t xml:space=\"preserve\">{}</t>",
                 escape_xml(&comment.text)
             )
             .map_err(|e| format!("XML write error: {}", e))?;
@@ -2066,20 +2066,12 @@ impl MutableWorksheet {
                 .map_err(|e| format!("XML write error: {}", e))?;
             },
             CellValue::Int(i) => {
-                write!(
-                    xml,
-                    r#"<c r="{}"{}>  <v>{}</v></c>"#,
-                    cell_ref, style_attr, i
-                )
-                .map_err(|e| format!("XML write error: {}", e))?;
+                write!(xml, r#"<c r="{}"{}><v>{}</v></c>"#, cell_ref, style_attr, i)
+                    .map_err(|e| format!("XML write error: {}", e))?;
             },
             CellValue::Float(f) => {
-                write!(
-                    xml,
-                    r#"<c r="{}"{}>  <v>{}</v></c>"#,
-                    cell_ref, style_attr, f
-                )
-                .map_err(|e| format!("XML write error: {}", e))?;
+                write!(xml, r#"<c r="{}"{}><v>{}</v></c>"#, cell_ref, style_attr, f)
+                    .map_err(|e| format!("XML write error: {}", e))?;
             },
             CellValue::Bool(b) => {
                 write!(
@@ -2092,12 +2084,8 @@ impl MutableWorksheet {
                 .map_err(|e| format!("XML write error: {}", e))?;
             },
             CellValue::DateTime(d) => {
-                write!(
-                    xml,
-                    r#"<c r="{}"{}>  <v>{}</v></c>"#,
-                    cell_ref, style_attr, d
-                )
-                .map_err(|e| format!("XML write error: {}", e))?;
+                write!(xml, r#"<c r="{}"{}><v>{}</v></c>"#, cell_ref, style_attr, d)
+                    .map_err(|e| format!("XML write error: {}", e))?;
             },
             CellValue::Error(e) => {
                 write!(

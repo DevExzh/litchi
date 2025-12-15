@@ -201,11 +201,9 @@ impl ContentTypesItem {
         let mut xml = String::with_capacity(4096);
 
         xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
-        xml.push('\n');
         xml.push_str(
             r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">"#,
         );
-        xml.push('\n');
 
         // Write Default elements (sorted by extension)
         let mut exts: Vec<_> = self.defaults.keys().collect();
@@ -213,11 +211,10 @@ impl ContentTypesItem {
         for ext in exts {
             let content_type = &self.defaults[ext];
             xml.push_str(&format!(
-                r#"  <Default Extension="{}" ContentType="{}"/>"#,
+                r#"<Default Extension="{}" ContentType="{}"/>"#,
                 escape_xml(ext),
                 escape_xml(content_type)
             ));
-            xml.push('\n');
         }
 
         // Write Override elements (sorted by partname)
@@ -226,11 +223,10 @@ impl ContentTypesItem {
         for partname in partnames {
             let content_type = &self.overrides[partname];
             xml.push_str(&format!(
-                r#"  <Override PartName="{}" ContentType="{}"/>"#,
+                r#"<Override PartName="{}" ContentType="{}"/>"#,
                 escape_xml(partname),
                 escape_xml(content_type)
             ));
-            xml.push('\n');
         }
 
         xml.push_str("</Types>");

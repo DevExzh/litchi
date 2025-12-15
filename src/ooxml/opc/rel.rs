@@ -295,11 +295,9 @@ impl Relationships {
         let mut xml = String::with_capacity(1024);
 
         xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
-        xml.push('\n');
         xml.push_str(
             r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#,
         );
-        xml.push('\n');
 
         // Sort relationships by rId for consistent output
         let mut rels: Vec<&Relationship> = self.rels.values().collect();
@@ -313,13 +311,12 @@ impl Relationships {
             };
 
             xml.push_str(&format!(
-                r#"  <Relationship Id="{}" Type="{}" Target="{}"{}/>"#,
+                r#"<Relationship Id="{}" Type="{}" Target="{}"{}/>"#,
                 escape_xml(rel.r_id()),
                 escape_xml(rel.reltype()),
                 escape_xml(rel.target_ref()),
                 target_mode
             ));
-            xml.push('\n');
         }
 
         xml.push_str("</Relationships>");
