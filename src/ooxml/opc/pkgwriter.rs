@@ -2,7 +2,7 @@
 //!
 //! This module provides functionality to serialize and write OPC packages to disk,
 //! including writing the [Content_Types].xml, relationships, and all parts.
-
+use crate::common::xml::escape_xml;
 use crate::ooxml::opc::constants::content_type as ct;
 use crate::ooxml::opc::error::Result;
 use crate::ooxml::opc::package::OpcPackage;
@@ -214,8 +214,8 @@ impl ContentTypesItem {
             let content_type = &self.defaults[ext];
             xml.push_str(&format!(
                 r#"  <Default Extension="{}" ContentType="{}"/>"#,
-                Self::escape_xml(ext),
-                Self::escape_xml(content_type)
+                escape_xml(ext),
+                escape_xml(content_type)
             ));
             xml.push('\n');
         }
@@ -227,8 +227,8 @@ impl ContentTypesItem {
             let content_type = &self.overrides[partname];
             xml.push_str(&format!(
                 r#"  <Override PartName="{}" ContentType="{}"/>"#,
-                Self::escape_xml(partname),
-                Self::escape_xml(content_type)
+                escape_xml(partname),
+                escape_xml(content_type)
             ));
             xml.push('\n');
         }
@@ -236,16 +236,6 @@ impl ContentTypesItem {
         xml.push_str("</Types>");
 
         xml
-    }
-
-    /// Escape XML special characters.
-    #[inline]
-    fn escape_xml(s: &str) -> String {
-        s.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('"', "&quot;")
-            .replace('\'', "&apos;")
     }
 }
 
@@ -267,11 +257,5 @@ mod tests {
 
         assert!(xml.contains(r#"<Default Extension="png" ContentType="image/png"/>"#));
         assert!(xml.contains(r#"<Override PartName="/word/document.xml""#));
-    }
-
-    #[test]
-    fn test_xml_escaping() {
-        let escaped = ContentTypesItem::escape_xml(r#"<foo & "bar">"#);
-        assert_eq!(escaped, "&lt;foo &amp; &quot;bar&quot;&gt;");
     }
 }

@@ -3,22 +3,11 @@
 //! Handout masters define the layout for printed handouts that show
 //! multiple slides per page.
 
+use crate::common::id::generate_guid_braced;
 use crate::ooxml::error::{OoxmlError, Result};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicU32, Ordering};
-
-/// Global counter for generating unique field IDs
-static FIELD_ID_COUNTER: AtomicU32 = AtomicU32::new(0);
-
-/// Generate a pseudo-UUID for field IDs.
-/// Format: {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}
-fn generate_field_id() -> String {
-    let counter = FIELD_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
-    // Use a fixed base with incrementing counter to ensure uniqueness
-    format!("{{00000000-0000-0000-0000-{:012X}}}", counter)
-}
 
 /// Number of slides per handout page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -261,7 +250,7 @@ impl HandoutMaster {
         // Date placeholder (top right) - with field for auto date
         xml.push_str(&format!(
             r#"<p:sp><p:nvSpPr><p:cNvPr id="3" name="Date Placeholder 2"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="dt" sz="quarter" idx="1"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="3884613" y="0"/><a:ext cx="2971800" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0"/><a:lstStyle><a:lvl1pPr algn="r"><a:defRPr sz="1200"/></a:lvl1pPr></a:lstStyle><a:p><a:fld id="{}" type="datetime1"><a:rPr lang="en-US"/><a:pPr/><a:t>1/1/2000</a:t></a:fld><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>"#,
-            generate_field_id()
+            generate_guid_braced()
         ));
 
         // Footer placeholder (bottom left)
@@ -270,7 +259,7 @@ impl HandoutMaster {
         // Slide number placeholder (bottom right) - with field
         xml.push_str(&format!(
             r#"<p:sp><p:nvSpPr><p:cNvPr id="5" name="Slide Number Placeholder 4"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="sldNum" sz="quarter" idx="3"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="3884613" y="8685213"/><a:ext cx="2971800" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0" anchor="b"/><a:lstStyle><a:lvl1pPr algn="r"><a:defRPr sz="1200"/></a:lvl1pPr></a:lstStyle><a:p><a:fld id="{}" type="slidenum"><a:rPr lang="en-US"/><a:pPr/><a:t>‹#›</a:t></a:fld><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>"#,
-            generate_field_id()
+            generate_guid_braced()
         ));
 
         xml.push_str("</p:spTree>");

@@ -6,6 +6,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
+use crate::common::xml::unescape_xml;
 use crate::ooxml::opc::PackURI;
 use crate::sheet::{
     Cell as CellTrait, CellIterator, CellValue, Result as SheetResult, RowIterator,
@@ -478,7 +479,7 @@ impl<'a> Worksheet<'a> {
                 let text_start = tag_end;
                 if let Some(end_rel) = cell_content[text_start..].find("</f>") {
                     let raw = &cell_content[text_start..text_start + end_rel];
-                    Some(Self::unescape_xml(raw))
+                    Some(unescape_xml(raw))
                 } else {
                     None
                 }
@@ -543,15 +544,6 @@ impl<'a> Worksheet<'a> {
         };
 
         Ok(Some((col_num, cell_value, style_idx, None)))
-    }
-
-    /// Unescape a minimal set of XML entities in text content.
-    fn unescape_xml(s: &str) -> String {
-        s.replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&amp;", "&")
-            .replace("&quot;", "\"")
-            .replace("&apos;", "'")
     }
 
     /// Extract concatenated text from an inline string cell (<is> ... </is>).

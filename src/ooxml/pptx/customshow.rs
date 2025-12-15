@@ -2,7 +2,7 @@
 //!
 //! Custom slide shows allow defining named subsets of slides that can be
 //! presented independently of the full presentation.
-
+use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -232,15 +232,6 @@ impl CustomShowList {
 
         xml
     }
-}
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]

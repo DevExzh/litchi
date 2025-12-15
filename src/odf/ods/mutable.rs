@@ -3,7 +3,7 @@
 //! This module provides a mutable wrapper around ODS spreadsheets that allows
 //! for in-place modification of sheets, rows, and cells.
 
-use crate::common::{Metadata, Result};
+use crate::common::{Metadata, Result, xml::escape_xml};
 use crate::odf::core::{OdfStructure, PackageWriter};
 use crate::odf::ods::{Cell, CellValue, Row, Sheet, Spreadsheet};
 use std::path::Path;
@@ -308,7 +308,7 @@ impl MutableSpreadsheet {
         let mut body = String::new();
 
         for sheet in &self.sheets {
-            let escaped_name = Self::escape_xml(&sheet.name);
+            let escaped_name = escape_xml(&sheet.name);
             body.push_str(&xml_minifier::minified_xml_format!(
                 r#"<table:table table:name="{}">"#,
                 escaped_name
@@ -324,14 +324,14 @@ impl MutableSpreadsheet {
                 for cell in &row.cells {
                     match &cell.value {
                         CellValue::Text(_) => {
-                            let escaped_text = Self::escape_xml(&cell.text);
+                            let escaped_text = escape_xml(&cell.text);
                             body.push_str(&xml_minifier::minified_xml_format!(
                                 r#"<table:table-cell office:value-type="string"><text:p>{}</text:p></table:table-cell>"#,
                                 escaped_text
                             ));
                         },
                         CellValue::Number(f) => {
-                            let escaped_text = Self::escape_xml(&cell.text);
+                            let escaped_text = escape_xml(&cell.text);
                             body.push_str(&xml_minifier::minified_xml_format!(
                                 r#"<table:table-cell office:value-type="float" office:value="{}"><text:p>{}</text:p></table:table-cell>"#,
                                 f,
@@ -345,7 +345,7 @@ impl MutableSpreadsheet {
                         },
                         _ => {
                             // Handle other types similarly
-                            let escaped_text = Self::escape_xml(&cell.text);
+                            let escaped_text = escape_xml(&cell.text);
                             body.push_str(&xml_minifier::minified_xml_format!(
                                 r#"<table:table-cell office:value-type="string"><text:p>{}</text:p></table:table-cell>"#,
                                 escaped_text
@@ -372,14 +372,6 @@ impl MutableSpreadsheet {
             r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"><office:meta><meta:generator>Litchi/0.0.1</meta:generator><dc:date>{}</dc:date></office:meta></office:document-meta>"#,
             now
         )
-    }
-
-    fn escape_xml(text: &str) -> String {
-        text.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('"', "&quot;")
-            .replace('\'', "&apos;")
     }
 
     /// Save the modified spreadsheet.

@@ -1,18 +1,12 @@
-/// Shape types and implementation for PPTX presentations.
+//! Shape types and implementation for PPTX presentations.
+use crate::common::xml::escape_xml;
+use crate::ooxml::drawings::blip::write_a_blip_embed;
+use crate::ooxml::drawings::fill::write_a_stretch_fill_rect;
 use crate::ooxml::error::{OoxmlError, Result};
 use std::fmt::Write as FmtWrite;
 
 // Import shared format types
 pub use super::super::format::{ImageFormat, TextFormat};
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
 
 /// Optional relationship IDs for shapes that need external references.
 ///
@@ -566,9 +560,8 @@ impl MutableShape {
 
                 xml.push_str("<p:blipFill>");
                 let rid = rel_ids.image_rel_id.unwrap_or("rIdImagePlaceholder");
-                write!(xml, r#"<a:blip r:embed="{}"/>"#, rid)
-                    .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                xml.push_str("<a:stretch><a:fillRect/></a:stretch>");
+                write_a_blip_embed(xml, rid, false).map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                write_a_stretch_fill_rect(xml);
                 xml.push_str("</p:blipFill>");
 
                 xml.push_str("<p:spPr>");

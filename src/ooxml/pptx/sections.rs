@@ -3,6 +3,7 @@
 //! Sections are used to organize slides into logical groups within a presentation.
 //! This module provides both reading and writing support for sections.
 
+use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -200,37 +201,6 @@ impl SectionList {
 
         Ok(xml)
     }
-}
-
-/// Generate a new GUID-like section ID.
-///
-/// Creates a pseudo-random ID in GUID format: `{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}`
-pub fn generate_section_id() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    // Use timestamp and a simple hash for pseudo-randomness
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-
-    format!(
-        "{{{:08X}-{:04X}-{:04X}-{:04X}-{:012X}}}",
-        (now & 0xFFFFFFFF) as u32,
-        ((now >> 32) & 0xFFFF) as u16,
-        ((now >> 48) & 0xFFFF) as u16,
-        ((now >> 64) & 0xFFFF) as u16,
-        (now >> 80) & 0xFFFFFFFFFFFF
-    )
-}
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]

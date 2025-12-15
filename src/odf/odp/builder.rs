@@ -2,7 +2,7 @@
 //!
 //! This module provides a builder pattern for creating new ODP presentations from scratch.
 
-use crate::common::{Metadata, Result};
+use crate::common::{Metadata, Result, xml::escape_xml};
 use crate::odf::core::{OdfStructure, PackageWriter};
 use crate::odf::odp::Slide;
 use std::path::Path;
@@ -175,20 +175,20 @@ impl PresentationBuilder {
           </draw:text-box>
         </draw:frame>
 "#,
-                        Self::escape_xml(name),
+                        escape_xml(name),
                         style_name,
                         x,
                         y,
                         width,
                         height,
-                        Self::escape_xml(&shape.text)
+                        escape_xml(&shape.text)
                     )
                 } else {
                     // Empty frame
                     format!(
                         r#"        <draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"/>
 "#,
-                        Self::escape_xml(name),
+                        escape_xml(name),
                         style_name,
                         x,
                         y,
@@ -204,7 +204,7 @@ impl PresentationBuilder {
           <draw:image/>
         </draw:frame>
 "#,
-                    Self::escape_xml(name),
+                    escape_xml(name),
                     style_name,
                     x,
                     y,
@@ -219,7 +219,7 @@ impl PresentationBuilder {
                 format!(
                     r#"        <draw:line draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x1="{}" svg:y1="{}" svg:x2="{}" svg:y2="{}"/>
 "#,
-                    Self::escape_xml(name),
+                    escape_xml(name),
                     style_name,
                     x,
                     y,
@@ -237,13 +237,13 @@ impl PresentationBuilder {
           </draw:text-box>
         </draw:frame>
 "#,
-                        Self::escape_xml(name),
+                        escape_xml(name),
                         style_name,
                         x,
                         y,
                         width,
                         height,
-                        Self::escape_xml(&shape.text)
+                        escape_xml(&shape.text)
                     )
                 } else {
                     String::new() // Skip unsupported shapes without text
@@ -272,7 +272,7 @@ impl PresentationBuilder {
           </draw:text-box>
         </draw:frame>
 "#,
-                    Self::escape_xml(title)
+                    escape_xml(title)
                 ));
             }
 
@@ -291,7 +291,7 @@ impl PresentationBuilder {
         </draw:frame>
 "#,
                     y_position,
-                    Self::escape_xml(&slide.text)
+                    escape_xml(&slide.text)
                 ));
             }
 
@@ -365,16 +365,13 @@ impl PresentationBuilder {
 
         // Add optional metadata fields
         if let Some(ref title) = self.metadata.title {
-            meta.push_str(&format!(
-                "    <dc:title>{}</dc:title>\n",
-                Self::escape_xml(title)
-            ));
+            meta.push_str(&format!("    <dc:title>{}</dc:title>\n", escape_xml(title)));
         }
 
         if let Some(ref author) = self.metadata.author {
             meta.push_str(&format!(
                 "    <dc:creator>{}</dc:creator>\n",
-                Self::escape_xml(author)
+                escape_xml(author)
             ));
         }
 
@@ -382,15 +379,6 @@ impl PresentationBuilder {
         meta.push_str("</office:document-meta>\n");
 
         meta
-    }
-
-    /// Escape XML special characters
-    fn escape_xml(text: &str) -> String {
-        text.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('"', "&quot;")
-            .replace('\'', "&apos;")
     }
 
     /// Build the presentation and return as bytes

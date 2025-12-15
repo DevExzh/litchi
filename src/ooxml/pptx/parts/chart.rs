@@ -1,6 +1,8 @@
-/// Chart parts for PowerPoint presentations.
-///
-/// This module provides types for working with charts in PPTX files.
+//! Chart parts for PowerPoint presentations.
+//!
+//! This module provides types for working with charts in PPTX files.
+
+use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::opc::part::Part;
 use quick_xml::Reader;
@@ -539,15 +541,6 @@ fn write_series(xml: &mut String, series: &ChartSeries, idx: u32, is_pie: bool) 
     }
 
     xml.push_str("</c:ser>");
-}
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 /// Generate graphic frame XML for embedding a chart on a slide.

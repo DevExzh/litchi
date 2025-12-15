@@ -9,6 +9,8 @@ use std::io::Write;
 use zerocopy::IntoBytes;
 use zerocopy_derive::*;
 
+use crate::common::unit::ppt_master_i64_to_emu_i32;
+
 use super::text_format::Paragraph;
 
 // =============================================================================
@@ -291,11 +293,10 @@ impl NotesContainerBuilder {
         };
         // Position in EMUs (typical notes body position)
         // Convert from master units (1/576 inch) to EMUs (914400 per inch)
-        let master_to_emu = |m: i64| -> i32 { (m * 914400 / 576) as i32 };
-        notes_shape.x = master_to_emu(685);
-        notes_shape.y = master_to_emu(3686);
-        notes_shape.width = master_to_emu(4801);
-        notes_shape.height = master_to_emu(3172);
+        notes_shape.x = ppt_master_i64_to_emu_i32(685);
+        notes_shape.y = ppt_master_i64_to_emu_i32(3686);
+        notes_shape.width = ppt_master_i64_to_emu_i32(4801);
+        notes_shape.height = ppt_master_i64_to_emu_i32(3172);
         notes_shape.fill_color = None; // No fill for text box
         notes_shape.line_color = None; // No line
 

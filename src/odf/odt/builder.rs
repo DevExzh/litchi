@@ -2,7 +2,7 @@
 //!
 //! This module provides a builder pattern for creating new ODT documents from scratch.
 
-use crate::common::{Metadata, Result};
+use crate::common::{Metadata, Result, xml::escape_xml};
 use crate::odf::core::PackageWriter;
 use crate::odf::elements::table::Table;
 use crate::odf::elements::text::{Heading, List, ListItem, Paragraph, Span};
@@ -437,37 +437,34 @@ impl DocumentBuilder {
 
         // Add optional metadata fields
         if let Some(ref title) = self.metadata.title {
-            meta.push_str(&format!(
-                "    <dc:title>{}</dc:title>\n",
-                Self::escape_xml(title)
-            ));
+            meta.push_str(&format!("    <dc:title>{}</dc:title>\n", escape_xml(title)));
         }
 
         if let Some(ref author) = self.metadata.author {
             meta.push_str(&format!(
                 "    <dc:creator>{}</dc:creator>\n",
-                Self::escape_xml(author)
+                escape_xml(author)
             ));
         }
 
         if let Some(ref subject) = self.metadata.subject {
             meta.push_str(&format!(
                 "    <dc:subject>{}</dc:subject>\n",
-                Self::escape_xml(subject)
+                escape_xml(subject)
             ));
         }
 
         if let Some(ref description) = self.metadata.description {
             meta.push_str(&format!(
                 "    <dc:description>{}</dc:description>\n",
-                Self::escape_xml(description)
+                escape_xml(description)
             ));
         }
 
         if let Some(ref keywords) = self.metadata.keywords {
             meta.push_str(&format!(
                 "    <meta:keyword>{}</meta:keyword>\n",
-                Self::escape_xml(keywords)
+                escape_xml(keywords)
             ));
         }
 
@@ -475,15 +472,6 @@ impl DocumentBuilder {
         meta.push_str("</office:document-meta>\n");
 
         meta
-    }
-
-    /// Escape XML special characters
-    fn escape_xml(text: &str) -> String {
-        text.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('"', "&quot;")
-            .replace('\'', "&apos;")
     }
 
     /// Generate styles.xml with list styles

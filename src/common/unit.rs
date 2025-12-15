@@ -9,6 +9,78 @@ use std::cmp::Ordering;
 use std::fmt;
 use std::str::FromStr;
 
+pub const EMUS_PER_INCH: i64 = 914_400;
+pub const EMUS_PER_CM: i64 = 360_000;
+pub const EMUS_PER_MM: i64 = 36_000;
+pub const EMUS_PER_PT: i64 = 12_700;
+pub const EMUS_PER_TWIP: i64 = 635;
+pub const PPT_MASTER_UNITS_PER_INCH: i64 = 576;
+
+#[inline]
+pub fn pt_to_emu_f64(pt: f64) -> i64 {
+    (pt * EMUS_PER_PT as f64) as i64
+}
+
+#[inline]
+pub fn pt_to_emu_i32(pt: i32) -> i32 {
+    pt.saturating_mul(EMUS_PER_PT as i32)
+}
+
+#[inline]
+pub fn pt_f32_to_emu_u32(pt: f32) -> u32 {
+    (pt * EMUS_PER_PT as f32) as u32
+}
+
+#[inline]
+pub fn emu_to_pt_f64(emu: i64) -> f64 {
+    emu as f64 / EMUS_PER_PT as f64
+}
+
+#[inline]
+pub fn px_to_emu(px: u32, dpi: u32) -> i64 {
+    ((px as f64) * EMUS_PER_INCH as f64 / dpi as f64) as i64
+}
+
+#[inline]
+pub fn emu_to_px(emu: i64, dpi: u32) -> u32 {
+    ((emu as f64) * dpi as f64 / EMUS_PER_INCH as f64) as u32
+}
+
+#[inline]
+pub fn px_to_emu_96(px: u32) -> i64 {
+    px_to_emu(px, 96)
+}
+
+#[inline]
+pub fn emu_to_px_96(emu: i64) -> u32 {
+    emu_to_px(emu, 96)
+}
+
+#[inline]
+pub fn twip_to_emu_i64(twips: i64) -> i64 {
+    twips.saturating_mul(EMUS_PER_TWIP)
+}
+
+#[inline]
+pub fn emu_to_twip_i64(emu: i64) -> i64 {
+    (emu as f64 / EMUS_PER_TWIP as f64).round() as i64
+}
+
+#[inline]
+pub fn emu_u32_to_ppt_master_u32(emu: u32) -> u32 {
+    ((emu as u64 * PPT_MASTER_UNITS_PER_INCH as u64) / EMUS_PER_INCH as u64) as u32
+}
+
+#[inline]
+pub fn emu_i32_to_ppt_master_i16_round(emu: i32) -> i16 {
+    ((emu as f64) * PPT_MASTER_UNITS_PER_INCH as f64 / EMUS_PER_INCH as f64).round() as i16
+}
+
+#[inline]
+pub fn ppt_master_i64_to_emu_i32(master: i64) -> i32 {
+    ((master * EMUS_PER_INCH) / PPT_MASTER_UNITS_PER_INCH) as i32
+}
+
 /// Supported length units
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LengthUnit {

@@ -1,3 +1,4 @@
+use crate::common::unit::{emu_to_pt_f64, emu_to_px_96};
 /// Image reading support for DOCX documents.
 ///
 /// This module provides structures and functions for extracting images from Word documents.
@@ -127,25 +128,25 @@ impl InlineImage {
     /// Get the width in pixels (assuming 96 DPI).
     #[inline]
     pub fn width_px(&self) -> u32 {
-        ((self.width_emu as f64) * 96.0 / 914400.0) as u32
+        emu_to_px_96(self.width_emu)
     }
 
     /// Get the height in pixels (assuming 96 DPI).
     #[inline]
     pub fn height_px(&self) -> u32 {
-        ((self.height_emu as f64) * 96.0 / 914400.0) as u32
+        emu_to_px_96(self.height_emu)
     }
 
     /// Get the width in points.
     #[inline]
     pub fn width_pt(&self) -> f64 {
-        (self.width_emu as f64) / 12700.0
+        emu_to_pt_f64(self.width_emu)
     }
 
     /// Get the height in points.
     #[inline]
     pub fn height_pt(&self) -> f64 {
-        (self.height_emu as f64) / 12700.0
+        emu_to_pt_f64(self.height_emu)
     }
 
     /// Get the image description/alt text.

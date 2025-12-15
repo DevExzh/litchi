@@ -1,8 +1,7 @@
+use crate::ooxml::drawings::blip::find_first_blip_embed;
 /// Picture (image) shape implementation.
 use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::pptx::shapes::base::BaseShape;
-use quick_xml::Reader;
-use quick_xml::events::Event;
 
 /// A picture (image) shape in a presentation.
 ///
@@ -51,38 +50,8 @@ impl Picture {
     /// // Use r_id to get the image from the package
     /// ```
     pub fn image_r_id(&self) -> Result<String> {
-        let mut reader = Reader::from_reader(self.base.xml_bytes());
-        reader.config_mut().trim_text(true);
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
-                    // Look for <a:blip r:embed="rId..."/>
-                    if e.local_name().as_ref() == b"blip" {
-                        for attr in e.attributes().flatten() {
-                            let key = attr.key.as_ref();
-                            // Check for r:embed attribute
-                            if key == b"r:embed"
-                                || (key.starts_with(b"r:")
-                                    && attr.key.local_name().as_ref() == b"embed")
-                                || attr.key.local_name().as_ref() == b"embed"
-                            {
-                                let rid = std::str::from_utf8(&attr.value)
-                                    .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                                return Ok(rid.to_string());
-                            }
-                        }
-                    }
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
-        Err(OoxmlError::PartNotFound(
-            "Image relationship not found".to_string(),
-        ))
+        find_first_blip_embed(self.base.xml_bytes())?
+            .ok_or_else(|| OoxmlError::PartNotFound("Image relationship not found".to_string()))
     }
 
     /// Get the image filename from the embedded relationship.

@@ -76,6 +76,7 @@ eval_engine = ["dep:statrs"]
 
 [dependencies]
 aes = { version = "0.8", optional = true } # AES block cipher for OOXML file encryption
+aho-corasick = "1.1" # Fast string searching for fast byte pattern matching
 atoi_simd = "0.17" # SIMD-optimized conversion of byte slices to integers
 base64 = "0.22" # Base64 encoding/decoding for embedded binary data in XML
 bitflags = { version = "2.10", features = ["std", "serde"] } # Bit flags for efficient flag combinations

@@ -3,6 +3,7 @@
 //! SmartArt graphics are represented as diagrams in OOXML. This module provides
 //! read support for extracting diagram information from presentations.
 
+use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -498,15 +499,6 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
     xml.push_str("</dgm:dataModel>");
 
     xml
-}
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 /// Generate SmartArt layout XML.

@@ -1,3 +1,4 @@
+use crate::common::xml::escape_xml;
 /// Comment writer support for DOCX documents.
 use crate::ooxml::error::Result;
 use std::fmt::Write as FmtWrite;
@@ -120,16 +121,6 @@ impl MutableComment {
 
         Ok(xml)
     }
-}
-
-/// Escape XML special characters.
-#[allow(dead_code)]
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]

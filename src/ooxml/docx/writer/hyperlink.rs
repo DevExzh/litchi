@@ -1,17 +1,10 @@
+//! Hyperlink support for DOCX documents.
+
 use super::field::MutableField;
 use super::run::MutableRun;
-/// Hyperlink support for DOCX documents.
+use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
 use std::fmt::Write as FmtWrite;
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
 
 /// Elements that can appear in a hyperlink.
 #[derive(Debug)]

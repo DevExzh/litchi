@@ -58,6 +58,7 @@ use super::shape_style::{ArrowStyle, FillStyle, LineStyleConfig, ShadowStyle, Sh
 use super::shapes::ShapeKind;
 use super::spec::{BinaryTagData, ColorScheme, Ppt10Tag, SlideLayoutType, slide_flags};
 use super::text_format::{FontEntity, Paragraph};
+use crate::common::unit::pt_to_emu_i32;
 use crate::ole::writer::OleWriter;
 use std::collections::HashMap;
 
@@ -593,14 +594,13 @@ impl PptWriter {
             .get_mut(slide)
             .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
 
-        // Convert points to EMUs (1 point = 12700 EMUs)
         let shape = WritableShape {
             properties: ShapeProperties {
                 shape_type: ShapeType::TextBox,
-                x: x * 12700,
-                y: y * 12700,
-                width: width * 12700,
-                height: height * 12700,
+                x: pt_to_emu_i32(x),
+                y: pt_to_emu_i32(y),
+                width: pt_to_emu_i32(width),
+                height: pt_to_emu_i32(height),
                 text: Some(text.to_string()),
                 alignment: TextAlignment::Left,
                 ..Default::default()
@@ -638,10 +638,10 @@ impl PptWriter {
         let shape = WritableShape {
             properties: ShapeProperties {
                 shape_type: ShapeType::TextBox,
-                x: x * 12700,
-                y: y * 12700,
-                width: width * 12700,
-                height: height * 12700,
+                x: pt_to_emu_i32(x),
+                y: pt_to_emu_i32(y),
+                width: pt_to_emu_i32(width),
+                height: pt_to_emu_i32(height),
                 text: None,
                 paragraphs: Some(paragraphs),
                 alignment: TextAlignment::Left,
@@ -714,10 +714,10 @@ impl PptWriter {
         let shape = WritableShape {
             properties: ShapeProperties {
                 shape_type: ShapeType::Line,
-                x: x * 12700,
-                y: y * 12700,
-                width: width * 12700,
-                height: height * 12700,
+                x: pt_to_emu_i32(x),
+                y: pt_to_emu_i32(y),
+                width: pt_to_emu_i32(width),
+                height: pt_to_emu_i32(height),
                 fill: Some(FillStyle::none()),
                 line: Some(LineStyleConfig::default_line()),
                 flip_h: x2 < x1,
@@ -761,10 +761,10 @@ impl PptWriter {
         let shape = WritableShape {
             properties: ShapeProperties {
                 shape_type: ShapeType::Line,
-                x: x * 12700,
-                y: y * 12700,
-                width: width * 12700,
-                height: height * 12700,
+                x: pt_to_emu_i32(x),
+                y: pt_to_emu_i32(y),
+                width: pt_to_emu_i32(width),
+                height: pt_to_emu_i32(height),
                 fill: Some(FillStyle::none()),
                 line: Some(line_style),
                 flip_h: x2 < x1,
@@ -795,10 +795,10 @@ impl PptWriter {
         let shape = WritableShape {
             properties: ShapeProperties {
                 shape_type,
-                x: x * 12700,
-                y: y * 12700,
-                width: width * 12700,
-                height: height * 12700,
+                x: pt_to_emu_i32(x),
+                y: pt_to_emu_i32(y),
+                width: pt_to_emu_i32(width),
+                height: pt_to_emu_i32(height),
                 ..Default::default()
             },
         };
@@ -835,10 +835,10 @@ impl PptWriter {
         let shape = WritableShape {
             properties: ShapeProperties {
                 shape_type,
-                x: x * 12700,
-                y: y * 12700,
-                width: width * 12700,
-                height: height * 12700,
+                x: pt_to_emu_i32(x),
+                y: pt_to_emu_i32(y),
+                width: pt_to_emu_i32(width),
+                height: pt_to_emu_i32(height),
                 fill: Some(style.fill),
                 line: Some(style.line),
                 shadow: Some(style.shadow),
@@ -878,10 +878,10 @@ impl PptWriter {
         let shape = WritableShape {
             properties: ShapeProperties {
                 shape_type: ShapeType::Picture,
-                x: x * 12700,
-                y: y * 12700,
-                width: width * 12700,
-                height: height * 12700,
+                x: pt_to_emu_i32(x),
+                y: pt_to_emu_i32(y),
+                width: pt_to_emu_i32(width),
+                height: pt_to_emu_i32(height),
                 picture_index: Some(blip_index),
                 fill: Some(FillStyle::picture(blip_index)),
                 ..Default::default()
@@ -914,10 +914,10 @@ impl PptWriter {
         let shape = WritableShape {
             properties: ShapeProperties {
                 shape_type: ShapeType::Picture,
-                x: x * 12700,
-                y: y * 12700,
-                width: width * 12700,
-                height: height * 12700,
+                x: pt_to_emu_i32(x),
+                y: pt_to_emu_i32(y),
+                width: pt_to_emu_i32(width),
+                height: pt_to_emu_i32(height),
                 picture_index: Some(blip_index),
                 fill: Some(FillStyle::picture(blip_index)),
                 ..Default::default()

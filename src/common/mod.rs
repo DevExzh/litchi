@@ -15,8 +15,12 @@ pub mod simd;
 pub mod style;
 /// Common unit conversion utilities (length units used across all formats)
 pub mod unit;
+/// XML utilities
+pub mod xml;
 /// Shared byte slice for zero-copy element storage across formats
 pub mod xml_slice;
+// ID generation utilities
+pub mod id;
 
 // Re-exports for convenience
 pub use detection::{FileFormat, detect_file_format, detect_file_format_from_bytes};

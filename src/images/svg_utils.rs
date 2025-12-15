@@ -102,47 +102,6 @@ pub fn color_hex(c: u32) -> String {
     s
 }
 
-/// Escape XML special characters by writing directly to a buffer.
-///
-/// This is more efficient than building a new string with replacements.
-///
-/// # Arguments
-/// * `buf` - Output buffer
-/// * `text` - Text to escape
-///
-/// # Examples
-///
-/// ```
-/// use litchi::images::svg_utils::write_xml_escaped;
-///
-/// let mut buf = String::new();
-/// write_xml_escaped(&mut buf, "Hello <world> & \"friends\"");
-/// assert_eq!(buf, "Hello &lt;world&gt; &amp; &quot;friends&quot;");
-/// ```
-#[inline]
-pub fn write_xml_escaped(buf: &mut String, text: &str) {
-    for c in text.chars() {
-        match c {
-            '<' => buf.push_str("&lt;"),
-            '>' => buf.push_str("&gt;"),
-            '&' => buf.push_str("&amp;"),
-            '"' => buf.push_str("&quot;"),
-            '\'' => buf.push_str("&apos;"),
-            _ => buf.push(c),
-        }
-    }
-}
-
-/// Escape XML special characters and return as a new string.
-///
-/// **Note**: For better performance, prefer using `write_xml_escaped` directly.
-#[inline]
-pub fn escape_xml(text: &str) -> String {
-    let mut s = String::with_capacity(text.len() + 10);
-    write_xml_escaped(&mut s, text);
-    s
-}
-
 /// Write SVG stroke attributes for a pen directly to a buffer.
 ///
 /// # Arguments

@@ -1,4 +1,5 @@
-/// Run types and implementation for DOCX documents.
+//! Run types and implementation for DOCX documents.
+use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
 use std::fmt::Write as FmtWrite;
 
@@ -6,15 +7,6 @@ use std::fmt::Write as FmtWrite;
 pub use super::super::format::UnderlineStyle;
 // Import section types for PageNumberFormat
 use super::section::PageNumberFormat;
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
 
 /// Run content type.
 #[derive(Debug, Clone)]

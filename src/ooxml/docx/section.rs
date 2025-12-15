@@ -1,3 +1,6 @@
+use crate::common::unit::{
+    EMUS_PER_CM, EMUS_PER_INCH, EMUS_PER_PT, EMUS_PER_TWIP, emu_to_twip_i64,
+};
 /// Section - document section with page setup and layout properties.
 use crate::ooxml::docx::enums::{WdOrientation, WdSectionStart};
 use crate::ooxml::error::Result;
@@ -15,49 +18,49 @@ impl Emu {
     /// Create from inches.
     #[inline]
     pub const fn from_inches(inches: f64) -> Self {
-        Self((inches * 914_400.0) as i64)
+        Self((inches * EMUS_PER_INCH as f64) as i64)
     }
 
     /// Create from centimeters.
     #[inline]
     pub const fn from_cm(cm: f64) -> Self {
-        Self((cm * 360_000.0) as i64)
+        Self((cm * EMUS_PER_CM as f64) as i64)
     }
 
     /// Create from points (1/72 of an inch).
     #[inline]
     pub const fn from_pt(pt: f64) -> Self {
-        Self((pt * 12_700.0) as i64)
+        Self((pt * EMUS_PER_PT as f64) as i64)
     }
 
     /// Create from twips (1/20 of a point, 1/1440 of an inch).
     #[inline]
     pub const fn from_twips(twips: i64) -> Self {
-        Self(twips * 635)
+        Self(twips * EMUS_PER_TWIP)
     }
 
     /// Convert to inches.
     #[inline]
     pub fn to_inches(self) -> f64 {
-        self.0 as f64 / 914_400.0
+        self.0 as f64 / EMUS_PER_INCH as f64
     }
 
     /// Convert to centimeters.
     #[inline]
     pub fn to_cm(self) -> f64 {
-        self.0 as f64 / 360_000.0
+        self.0 as f64 / EMUS_PER_CM as f64
     }
 
     /// Convert to points.
     #[inline]
     pub fn to_pt(self) -> f64 {
-        self.0 as f64 / 12_700.0
+        self.0 as f64 / EMUS_PER_PT as f64
     }
 
     /// Convert to twips.
     #[inline]
     pub fn to_twips(self) -> i64 {
-        self.0 / 635
+        emu_to_twip_i64(self.0)
     }
 }
 

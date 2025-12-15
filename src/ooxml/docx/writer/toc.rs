@@ -1,6 +1,7 @@
-/// Table of Contents support for DOCX documents.
-///
-/// A TOC is implemented using a complex field with switches to control its behavior.
+//! Table of Contents support for DOCX documents.
+//!
+//! A TOC is implemented using a complex field with switches to control its behavior.
+use crate::common::xml::escape_xml;
 use crate::ooxml::error::Result;
 use std::fmt::Write as FmtWrite;
 
@@ -256,15 +257,6 @@ impl Default for TableOfContents {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]

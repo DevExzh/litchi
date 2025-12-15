@@ -3,7 +3,7 @@
 //! This module provides a mutable wrapper around ODP presentations that allows
 //! for in-place modification of slides, shapes, and content.
 
-use crate::common::{Metadata, Result};
+use crate::common::{Metadata, Result, xml::escape_xml};
 use crate::odf::core::{OdfStructure, PackageWriter};
 use crate::odf::odp::{Presentation, Shape, Slide};
 use std::path::Path;
@@ -400,7 +400,7 @@ impl MutablePresentation {
 
             // Add title frame if title exists
             if let Some(ref title) = slide.title {
-                let escaped_title = Self::escape_xml(title);
+                let escaped_title = escape_xml(title);
                 body.push_str(&xml_minifier::minified_xml_format!(
                     r#"<draw:frame draw:style-name="gr1" draw:text-style-name="P1" draw:layer="layout" svg:width="25.199cm" svg:height="3.506cm" svg:x="1.4cm" svg:y="0.962cm"><draw:text-box><text:p text:style-name="P1">{}</text:p></draw:text-box></draw:frame>"#,
                     escaped_title
@@ -414,7 +414,7 @@ impl MutablePresentation {
                 } else {
                     "2.0cm"
                 };
-                let escaped_text = Self::escape_xml(&slide.text);
+                let escaped_text = escape_xml(&slide.text);
                 body.push_str(&xml_minifier::minified_xml_format!(
                     r#"<draw:frame draw:style-name="gr2" draw:text-style-name="P2" draw:layer="layout" svg:width="25.199cm" svg:height="10cm" svg:x="1.4cm" svg:y="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
                     y_position,
@@ -437,8 +437,8 @@ impl MutablePresentation {
                 match shape.shape_type {
                     ShapeType::TextBox | ShapeType::AutoShape | ShapeType::Placeholder => {
                         if shape.has_text() {
-                            let escaped_name = Self::escape_xml(name);
-                            let escaped_shape_text = Self::escape_xml(&shape.text);
+                            let escaped_name = escape_xml(name);
+                            let escaped_shape_text = escape_xml(&shape.text);
                             body.push_str(&xml_minifier::minified_xml_format!(
                                 r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
                                 escaped_name,
@@ -471,7 +471,7 @@ impl MutablePresentation {
 
         // Add optional metadata fields
         if let Some(ref title) = self.metadata.title {
-            let escaped_title = Self::escape_xml(title);
+            let escaped_title = escape_xml(title);
             meta_fields.push_str(&xml_minifier::minified_xml_format!(
                 r#"<dc:title>{}</dc:title>"#,
                 escaped_title
@@ -479,7 +479,7 @@ impl MutablePresentation {
         }
 
         if let Some(ref author) = self.metadata.author {
-            let escaped_author = Self::escape_xml(author);
+            let escaped_author = escape_xml(author);
             meta_fields.push_str(&xml_minifier::minified_xml_format!(
                 r#"<dc:creator>{}</dc:creator>"#,
                 escaped_author
@@ -491,15 +491,6 @@ impl MutablePresentation {
             now,
             meta_fields
         )
-    }
-
-    /// Escape XML special characters.
-    fn escape_xml(text: &str) -> String {
-        text.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('"', "&quot;")
-            .replace('\'', "&apos;")
     }
 
     /// Save the modified presentation to a file.

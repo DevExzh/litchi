@@ -1,6 +1,7 @@
-/// Watermark support for DOCX documents.
-///
-/// Based on Apache POI's XWPFHeaderFooterPolicy watermark implementation.
+//! Watermark support for DOCX documents.
+//!
+//! Based on Apache POI's XWPFHeaderFooterPolicy watermark implementation.
+use crate::common::xml::escape_xml;
 use crate::ooxml::error::Result;
 
 /// A watermark for a Word document.
@@ -161,15 +162,6 @@ impl Watermark {
 
         Ok(xml)
     }
-}
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]

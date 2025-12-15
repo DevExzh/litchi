@@ -7,6 +7,8 @@
 
 // Shape styling structures don't need zerocopy for now
 
+use crate::common::unit::{EMUS_PER_PT, pt_f32_to_emu_u32};
+
 // =============================================================================
 // Escher Property IDs for Shape Styling (MS-ODRAW 2.3)
 // =============================================================================
@@ -554,7 +556,7 @@ impl LineStyleConfig {
     pub fn default_line() -> Self {
         Self {
             color: ShapeColor::scheme_line(),
-            width: 12700, // 1pt in EMUs
+            width: EMUS_PER_PT as u32,
             style: LineStyle::Simple,
             dash: LineDashStyle::Solid,
             cap: LineCapStyle::Round,
@@ -574,7 +576,7 @@ impl LineStyleConfig {
     pub fn with_color_and_width(color: ShapeColor, width_pt: f32) -> Self {
         Self {
             color,
-            width: (width_pt * 12700.0) as u32, // Convert points to EMUs
+            width: pt_f32_to_emu_u32(width_pt),
             style: LineStyle::Simple,
             dash: LineDashStyle::Solid,
             cap: LineCapStyle::Round,
@@ -592,7 +594,7 @@ impl LineStyleConfig {
 
     /// Set width in points
     pub fn width_pt(mut self, points: f32) -> Self {
-        self.width = (points * 12700.0) as u32;
+        self.width = pt_f32_to_emu_u32(points);
         self
     }
 

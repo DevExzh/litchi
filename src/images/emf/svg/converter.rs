@@ -14,9 +14,10 @@ use super::{
     state::{DeviceContext, RenderState},
 };
 use crate::common::error::Result;
+use crate::common::xml::escape::escape_xml;
 use crate::images::emf::parser::EmfParser;
 use crate::images::emf::records::*;
-use crate::images::svg_utils::{write_num, write_xml_escaped};
+use crate::images::svg_utils::write_num;
 use std::fmt::Write;
 use zerocopy::FromBytes;
 
@@ -566,7 +567,7 @@ impl<'a> EmfSvgConverter<'a> {
                 svg.push_str("\" ");
                 svg.push_str(&state.dc.font.to_svg_attrs());
                 svg.push('>');
-                write_xml_escaped(&mut svg, &text);
+                svg.push_str(&escape_xml(&text));
                 svg.push_str("</text>");
                 Ok(Some(vec![svg]))
             } else {

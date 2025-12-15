@@ -24,6 +24,8 @@ use super::tx_style::{
     TX_MASTER_STYLE_QUARTER_BODY, TX_MASTER_STYLE_TITLE, tx_style_instance,
 };
 
+use crate::common::unit::emu_u32_to_ppt_master_u32;
+
 /// Error type for PPT operations
 pub type PptError = std::io::Error;
 
@@ -355,14 +357,8 @@ pub fn create_document_atom(
     let mut builder = RecordBuilder::new(0x01, 0, record_type::DOCUMENT_ATOM);
     let mut data = Vec::with_capacity(40);
 
-    // Convert EMU dimensions to PPT master units (576 units per inch,
-    // 914_400 EMUs per inch => 1 master unit = 914_400 / 576 EMUs).
-    fn emu_to_master_units(emu: u32) -> u32 {
-        ((emu as u64 * 576) / 914_400) as u32
-    }
-
-    let slide_w_mu = emu_to_master_units(slide_size_x_master);
-    let slide_h_mu = emu_to_master_units(slide_size_y_master);
+    let slide_w_mu = emu_u32_to_ppt_master_u32(slide_size_x_master);
+    let slide_h_mu = emu_u32_to_ppt_master_u32(slide_size_y_master);
 
     // slideSize (width, height)
     data.extend_from_slice(&slide_w_mu.to_le_bytes());

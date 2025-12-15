@@ -1,9 +1,9 @@
+//! Unified metadata representation for Word documents.
+//!
+//! This module provides a unified interface for document metadata
+//! that works with both OLE (.doc) and OOXML (.docx) formats.
 use crate::common::Result;
 use chrono::{DateTime, Utc};
-/// Unified metadata representation for Word documents.
-///
-/// This module provides a unified interface for document metadata
-/// that works with both OLE (.doc) and OOXML (.docx) formats.
 use serde::{Deserialize, Serialize};
 
 /// Unified document metadata structure.

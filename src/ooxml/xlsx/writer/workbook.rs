@@ -1,4 +1,5 @@
-/// Workbook data structure for XLSX.
+//! Workbook data structure for XLSX.
+use crate::common::xml::escape_xml;
 use crate::ooxml::pivot::{PivotDataField, PivotFieldRole, PivotTable, PivotValueFunction};
 use crate::ooxml::xlsx::Cell;
 use crate::sheet::CellValue;
@@ -13,15 +14,6 @@ use super::styles::StylesBuilder;
 
 /// Type alias for cell position to style index mapping.
 type CellStyleMap = HashMap<(u32, u32), usize>;
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
 
 pub(crate) fn render_pivot_table_sheet_cells(
     pivot: &WritablePivotTable,

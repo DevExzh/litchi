@@ -1,4 +1,5 @@
 /// Slide types and implementation for PPTX presentations.
+use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::pptx::animations::{
     Animation, AnimationEffect, AnimationSequence, AnimationTrigger,
@@ -10,15 +11,6 @@ use std::fmt::Write as FmtWrite;
 // Import shared format types
 use super::super::format::ImageFormat;
 use super::shape::MutableShape;
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
 
 /// A mutable slide in a presentation.
 #[derive(Debug, Clone)]

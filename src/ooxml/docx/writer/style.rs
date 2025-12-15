@@ -1,6 +1,7 @@
-/// Style writer support for DOCX documents.
-///
-/// This module provides functionality for creating and writing document styles.
+//! Style writer support for DOCX documents.
+//!
+//! This module provides functionality for creating and writing document styles.
+use crate::common::xml::escape_xml;
 use crate::ooxml::docx::enums::WdStyleType;
 use crate::ooxml::error::Result;
 use std::fmt::Write as FmtWrite;
@@ -596,15 +597,6 @@ impl MutableStyle {
         style.set_font_size(Some(20)); // 10pt (half-points)
         style
     }
-}
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 /// Generate a complete styles.xml document from a list of styles.

@@ -2,7 +2,7 @@
 //!
 //! This module provides a builder pattern for creating new ODS spreadsheets from scratch.
 
-use crate::common::{Metadata, Result};
+use crate::common::{Metadata, Result, xml::escape_xml};
 use crate::odf::core::{OdfStructure, PackageWriter};
 use crate::odf::ods::{Cell, CellValue, Row, Sheet};
 use std::path::Path;
@@ -495,7 +495,7 @@ impl SpreadsheetBuilder {
             body.push_str(&format!(
                 r#"      <table:table table:name="{}" table:style-name="ta1">
 "#,
-                Self::escape_xml(&sheet.name)
+                escape_xml(&sheet.name)
             ));
 
             // Add column definitions
@@ -517,7 +517,7 @@ impl SpreadsheetBuilder {
             <text:p>{}</text:p>
           </table:table-cell>
 "#,
-                                Self::escape_xml(&cell.text)
+                                escape_xml(&cell.text)
                             ));
                         },
                         CellValue::Number(f) => {
@@ -527,7 +527,7 @@ impl SpreadsheetBuilder {
           </table:table-cell>
 "#,
                                 f,
-                                Self::escape_xml(&cell.text)
+                                escape_xml(&cell.text)
                             ));
                         },
                         CellValue::Currency(f, currency) => {
@@ -537,8 +537,8 @@ impl SpreadsheetBuilder {
           </table:table-cell>
 "#,
                                 f,
-                                Self::escape_xml(currency),
-                                Self::escape_xml(&cell.text)
+                                escape_xml(currency),
+                                escape_xml(&cell.text)
                             ));
                         },
                         CellValue::Percentage(f) => {
@@ -548,7 +548,7 @@ impl SpreadsheetBuilder {
           </table:table-cell>
 "#,
                                 f,
-                                Self::escape_xml(&cell.text)
+                                escape_xml(&cell.text)
                             ));
                         },
                         CellValue::Date(d) => {
@@ -558,7 +558,7 @@ impl SpreadsheetBuilder {
           </table:table-cell>
 "#,
                                 d,
-                                Self::escape_xml(&cell.text)
+                                escape_xml(&cell.text)
                             ));
                         },
                         CellValue::Time(t) => {
@@ -568,7 +568,7 @@ impl SpreadsheetBuilder {
           </table:table-cell>
 "#,
                                 t,
-                                Self::escape_xml(&cell.text)
+                                escape_xml(&cell.text)
                             ));
                         },
                         CellValue::Boolean(b) => {
@@ -578,7 +578,7 @@ impl SpreadsheetBuilder {
           </table:table-cell>
 "#,
                                 b,
-                                Self::escape_xml(&cell.text)
+                                escape_xml(&cell.text)
                             ));
                         },
                         CellValue::Empty => {
@@ -658,16 +658,13 @@ impl SpreadsheetBuilder {
 
         // Add optional metadata fields
         if let Some(ref title) = self.metadata.title {
-            meta.push_str(&format!(
-                "    <dc:title>{}</dc:title>\n",
-                Self::escape_xml(title)
-            ));
+            meta.push_str(&format!("    <dc:title>{}</dc:title>\n", escape_xml(title)));
         }
 
         if let Some(ref author) = self.metadata.author {
             meta.push_str(&format!(
                 "    <dc:creator>{}</dc:creator>\n",
-                Self::escape_xml(author)
+                escape_xml(author)
             ));
         }
 
@@ -675,15 +672,6 @@ impl SpreadsheetBuilder {
         meta.push_str("</office:document-meta>\n");
 
         meta
-    }
-
-    /// Escape XML special characters
-    fn escape_xml(text: &str) -> String {
-        text.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('"', "&quot;")
-            .replace('\'', "&apos;")
     }
 
     /// Build the spreadsheet and return as bytes

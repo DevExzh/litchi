@@ -4,6 +4,7 @@
 //! in PowerPoint presentations. The generated files are valid Excel workbooks
 //! that PowerPoint can read to display chart data.
 
+use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::pptx::parts::chart::ChartData;
 
@@ -227,15 +228,6 @@ fn column_letter(col: usize) -> String {
     }
 
     result
-}
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]

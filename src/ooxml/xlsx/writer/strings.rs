@@ -1,16 +1,8 @@
-/// Shared strings table for XLSX workbooks.
+//! Shared strings table for XLSX workbooks.
+use crate::common::xml::escape_xml;
 use crate::sheet::Result as SheetResult;
 use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
 
 /// Mutable shared strings table.
 ///

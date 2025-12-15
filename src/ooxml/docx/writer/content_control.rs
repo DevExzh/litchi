@@ -1,3 +1,4 @@
+use crate::common::xml::escape_xml;
 /// Content control writer support for DOCX documents.
 ///
 /// Content controls are structured document regions that can contain text, dates,
@@ -299,15 +300,6 @@ impl MutableContentControl {
     pub(crate) fn to_xml_end() -> &'static str {
         "</w:sdtContent></w:sdt>"
     }
-}
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]

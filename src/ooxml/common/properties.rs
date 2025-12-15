@@ -3,6 +3,7 @@
 //! This module provides document metadata properties that are shared across
 //! DOCX, XLSX, and PPTX formats.
 
+use crate::common::xml::escape_xml;
 use chrono::{DateTime, Utc};
 
 /// Document core properties (metadata).
@@ -180,15 +181,6 @@ impl DocumentProperties {
         xml.push_str("</cp:coreProperties>");
         xml
     }
-}
-
-/// Escape XML special characters.
-fn escape_xml(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]

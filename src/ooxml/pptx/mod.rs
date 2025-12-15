@@ -91,7 +91,7 @@ pub use protection::{
     CryptoAlgorithm, OpenPasswordEncryption, PresentationProtection, ProtectionType,
     SlideProtection,
 };
-pub use sections::{Section, SectionList, generate_section_id};
+pub use sections::{Section, SectionList};
 pub use slide::{Slide, SlideLayout, SlideMaster};
 pub use smartart::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};
 pub use transitions::{SlideTransition, TransitionDirection, TransitionSpeed, TransitionType};

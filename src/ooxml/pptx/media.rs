@@ -2,7 +2,7 @@
 //!
 //! This module provides types for embedding and referencing audio and video
 //! content in PowerPoint presentations.
-
+use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
 use std::fmt::Write as FmtWrite;
 
@@ -376,15 +376,6 @@ impl Media {
 
         Ok(xml)
     }
-}
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]

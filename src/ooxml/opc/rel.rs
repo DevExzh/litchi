@@ -1,9 +1,11 @@
+//! Relationship-related objects for OPC packages.
+//!
+//! This module provides types for managing relationships between parts in an OPC package,
+//! including internal and external relationships.
+
+use crate::common::xml::escape_xml;
 use crate::ooxml::opc::error::{OpcError, Result};
 use crate::ooxml::opc::packuri::PackURI;
-/// Relationship-related objects for OPC packages.
-///
-/// This module provides types for managing relationships between parts in an OPC package,
-/// including internal and external relationships.
 use std::collections::HashMap;
 
 /// A single relationship from a source part to a target.
@@ -312,9 +314,9 @@ impl Relationships {
 
             xml.push_str(&format!(
                 r#"  <Relationship Id="{}" Type="{}" Target="{}"{}/>"#,
-                Self::escape_xml(rel.r_id()),
-                Self::escape_xml(rel.reltype()),
-                Self::escape_xml(rel.target_ref()),
+                escape_xml(rel.r_id()),
+                escape_xml(rel.reltype()),
+                escape_xml(rel.target_ref()),
                 target_mode
             ));
             xml.push('\n');
@@ -323,16 +325,6 @@ impl Relationships {
         xml.push_str("</Relationships>");
 
         xml
-    }
-
-    /// Escape XML special characters.
-    #[inline]
-    fn escape_xml(s: &str) -> String {
-        s.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('"', "&quot;")
-            .replace('\'', "&apos;")
     }
 }
 

@@ -1,18 +1,11 @@
-/// Image support for DOCX documents.
+//! Image support for DOCX documents.
+use crate::common::unit::{EMUS_PER_INCH, pt_to_emu_f64, px_to_emu_96};
+use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
 use std::fmt::Write as FmtWrite;
 
 // Import shared format types
 pub use super::super::format::ImageFormat;
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
 
 /// A mutable inline image in a document.
 ///
@@ -73,18 +66,18 @@ impl MutableInlineImage {
 
     /// Convert image dimensions from pixels to EMUs (assuming 96 DPI).
     pub fn px_to_emu(px: u32) -> i64 {
-        ((px as f64) * 914400.0 / 96.0) as i64
+        px_to_emu_96(px)
     }
 
     /// Convert image dimensions from points to EMUs.
     pub fn pt_to_emu(pt: f64) -> i64 {
-        (pt * 12700.0) as i64
+        pt_to_emu_f64(pt)
     }
 
     /// Serialize the inline image to XML.
     pub(crate) fn to_xml(&self, xml: &mut String, r_id: &str) -> Result<()> {
-        let width = self.width_emu.unwrap_or(914400);
-        let height = self.height_emu.unwrap_or(914400);
+        let width = self.width_emu.unwrap_or(EMUS_PER_INCH);
+        let height = self.height_emu.unwrap_or(EMUS_PER_INCH);
         let desc = escape_xml(&self.description);
 
         write!(

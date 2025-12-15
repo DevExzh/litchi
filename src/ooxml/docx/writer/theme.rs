@@ -1,7 +1,8 @@
-/// Theme writer support for DOCX documents.
-///
-/// Themes define the color scheme, fonts, and effects used in a document.
-/// Based on Apache POI's XWPFTheme implementation.
+//! Theme writer support for DOCX documents.
+//!
+//! Themes define the color scheme, fonts, and effects used in a document.
+//! Based on Apache POI's XWPFTheme implementation.
+use crate::common::xml::escape_xml;
 use crate::ooxml::error::Result;
 use std::fmt::Write as FmtWrite;
 
@@ -277,15 +278,6 @@ impl Default for ColorScheme {
     fn default() -> Self {
         Self::office()
     }
-}
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]

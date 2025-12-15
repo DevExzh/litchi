@@ -1,7 +1,10 @@
+use crate::common::{id::generate_guid_braced, xml::escape::escape_xml};
+use crate::ooxml::drawings::blip::write_a_blip_embed_rid_num;
+use crate::ooxml::drawings::ext::write_a16_creation_id_extlst;
+use crate::ooxml::drawings::fill::write_a_stretch_fill_rect;
 use crate::ooxml::xlsx::sparkline::{SparklineGroup, write_sparkline_groups_ext};
 /// Writer module for creating and modifying Excel worksheets.
 use crate::sheet::{CellValue, Result as SheetResult};
-use rand::Rng;
 use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
 
@@ -10,45 +13,9 @@ pub use super::super::format::{
     CellBorder, CellBorderLineStyle, CellBorderSide, CellFill, CellFillPatternType, CellFont,
     CellFormat, Chart, ChartType, DataValidation, DataValidationOperator, DataValidationType,
 };
+
 // Import from other writer modules
 use super::strings::MutableSharedStrings;
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
-
-fn generate_guid_braced() -> String {
-    let mut bytes = [0u8; 16];
-    let mut rng = rand::rng();
-    rng.fill(&mut bytes);
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-
-    format!(
-        "{{{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}}}",
-        bytes[0],
-        bytes[1],
-        bytes[2],
-        bytes[3],
-        bytes[4],
-        bytes[5],
-        bytes[6],
-        bytes[7],
-        bytes[8],
-        bytes[9],
-        bytes[10],
-        bytes[11],
-        bytes[12],
-        bytes[13],
-        bytes[14],
-        bytes[15]
-    )
-}
 
 /// Freeze panes configuration.
 ///
@@ -1011,7 +978,9 @@ impl MutableWorksheet {
         xml.push_str(
             r#"<o:shapelayout v:ext="edit"><o:idmap v:ext="edit" data="1"/></o:shapelayout>"#,
         );
-        xml.push_str(r#"<v:shapetype id="_x0000_t202" coordsize="21600,21600" o:spt="202" path="m,l,21600r21600,l21600,xe">"#);
+        xml.push_str(
+            r#"<v:shapetype id="_x0000_t202" coordsize="21600,21600" o:spt="202" path="m,l,21600r21600,l21600,xe">"#,
+        );
         xml.push_str(
             r#"<v:stroke joinstyle="miter"/><v:path gradientshapeok="t" o:connecttype="rect"/>"#,
         );
@@ -1166,20 +1135,21 @@ impl MutableWorksheet {
             .map_err(|e| format!("XML write error: {}", e))?;
 
             if image.description.is_some() {
-                write!(xml, r#"<a:extLst><a:ext uri="{{FF2B5EF4-FFF2-40B4-BE49-F238E27FC236}}"><a16:creationId xmlns:a16="http://schemas.microsoft.com/office/drawing/2014/main" id="{{00000000-0008-0000-0000-000002000000}}"/></a:ext></a:extLst>"#)
+                let creation_id = generate_guid_braced();
+                write_a16_creation_id_extlst(&mut xml, &creation_id)
                     .map_err(|e| format!("XML write error: {}", e))?;
             }
 
             xml.push_str("</xdr:cNvPr>");
 
-            write!(
-                xml,
-                r#"<xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId{}"/>"#,
-                idx + 1
-            )
-            .map_err(|e| format!("XML write error: {}", e))?;
-
-            xml.push_str("<a:stretch><a:fillRect/></a:stretch></xdr:blipFill>");
+            xml.push_str(
+                r#"<xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>"#,
+            );
+            xml.push_str("<xdr:blipFill>");
+            write_a_blip_embed_rid_num(&mut xml, (idx + 1) as u32, true)
+                .map_err(|e| format!("XML write error: {}", e))?;
+            write_a_stretch_fill_rect(&mut xml);
+            xml.push_str("</xdr:blipFill>");
 
             // Shape properties
             xml.push_str(
@@ -1845,9 +1815,6 @@ impl MutableWorksheet {
         self.write_sheet_data(&mut xml, shared_strings, style_indices)?;
         xml.push_str("</sheetData>");
 
-        // Match Excel's worksheet structure
-        xml.push_str(r#"<phoneticPr fontId="0" type="noConversion"/>"#);
-
         // Write sheet protection if configured (must come right after sheetData per OOXML spec)
         if self.protection.is_some() {
             self.write_sheet_protection(&mut xml)?;
@@ -1877,6 +1844,9 @@ impl MutableWorksheet {
 
             xml.push_str("</mergeCells>");
         }
+
+        // Match Excel's worksheet structure: phoneticPr comes after mergeCells.
+        xml.push_str(r#"<phoneticPr fontId="0" type="noConversion"/>"#);
 
         // Write conditional formatting
         if !self.conditional_formats.is_empty() {
@@ -2923,5 +2893,50 @@ mod tests {
         assert_eq!(MutableWorksheet::column_to_letters(26), "Z");
         assert_eq!(MutableWorksheet::column_to_letters(27), "AA");
         assert_eq!(MutableWorksheet::column_to_letters(702), "ZZ");
+    }
+
+    #[test]
+    fn phonetic_pr_is_after_merge_cells() {
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+        ws.set_cell_value(1, 1, "A");
+        ws.merge_cells(1, 1, 1, 2);
+
+        let mut shared_strings = MutableSharedStrings::new();
+        let styles: HashMap<(u32, u32), usize> = HashMap::new();
+        let xml = ws.to_xml(&mut shared_strings, &styles).unwrap();
+
+        let merge = xml.find("<mergeCells").unwrap();
+        let phonetic = xml.find("<phoneticPr").unwrap();
+        assert!(merge < phonetic);
+    }
+
+    #[test]
+    fn phonetic_pr_is_after_sheet_protection() {
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+        ws.set_cell_value(1, 1, "A");
+        ws.protect_sheet(Some("secret"));
+
+        let mut shared_strings = MutableSharedStrings::new();
+        let styles: HashMap<(u32, u32), usize> = HashMap::new();
+        let xml = ws.to_xml(&mut shared_strings, &styles).unwrap();
+
+        let protection = xml.find("<sheetProtection").unwrap();
+        let phonetic = xml.find("<phoneticPr").unwrap();
+        assert!(protection < phonetic);
+    }
+
+    #[test]
+    fn phonetic_pr_is_after_auto_filter() {
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+        ws.set_cell_value(1, 1, "A");
+        ws.set_auto_filter("A1:A10");
+
+        let mut shared_strings = MutableSharedStrings::new();
+        let styles: HashMap<(u32, u32), usize> = HashMap::new();
+        let xml = ws.to_xml(&mut shared_strings, &styles).unwrap();
+
+        let filter = xml.find("<autoFilter").unwrap();
+        let phonetic = xml.find("<phoneticPr").unwrap();
+        assert!(filter < phonetic);
     }
 }

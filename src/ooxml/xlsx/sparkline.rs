@@ -1,6 +1,9 @@
+use crate::common::{
+    id::generate_guid_braced,
+    xml::{escape_xml, unescape_xml},
+};
 use crate::sheet::Result as SheetResult;
 use memchr;
-use rand::Rng;
 use ryu::Buffer as RyuBuffer;
 use std::fmt::Write as FmtWrite;
 
@@ -140,35 +143,6 @@ impl Default for SparklineGroupOptions {
             line_weight: None,
         }
     }
-}
-
-fn generate_guid_braced() -> String {
-    let mut bytes = [0u8; 16];
-    let mut rng = rand::rng();
-    rng.fill(&mut bytes);
-    // RFC4122 v4
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-
-    format!(
-        "{{{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}}}",
-        bytes[0],
-        bytes[1],
-        bytes[2],
-        bytes[3],
-        bytes[4],
-        bytes[5],
-        bytes[6],
-        bytes[7],
-        bytes[8],
-        bytes[9],
-        bytes[10],
-        bytes[11],
-        bytes[12],
-        bytes[13],
-        bytes[14],
-        bytes[15]
-    )
 }
 
 impl SparklineType {
@@ -722,20 +696,4 @@ fn extract_child_rgb(xml: &str, tag: &str) -> Option<String> {
     let gt_rel = after_open.find('>')?;
     let open_tag = &after_open[..gt_rel + 1];
     extract_attribute(open_tag, "rgb")
-}
-
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
-
-fn unescape_xml(s: &str) -> String {
-    s.replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&amp;", "&")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
 }

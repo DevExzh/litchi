@@ -5,7 +5,7 @@
 //!
 //! Uses soapberry-zip for high-performance ZIP writing.
 
-use crate::common::{Error, Result};
+use crate::common::{Error, Result, xml::escape_xml};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 /// Builder for creating ODF packages (ZIP archives)
@@ -153,22 +153,13 @@ impl PackageWriter {
             manifest.push_str(&format!(
                 r#"  <manifest:file-entry manifest:full-path="{}" manifest:media-type="{}"/>
 "#,
-                Self::escape_xml(&entry.full_path),
-                Self::escape_xml(&entry.media_type)
+                escape_xml(&entry.full_path),
+                escape_xml(&entry.media_type)
             ));
         }
 
         manifest.push_str("</manifest:manifest>\n");
         manifest
-    }
-
-    /// Escape XML special characters
-    fn escape_xml(text: &str) -> String {
-        text.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('"', "&quot;")
-            .replace('\'', "&apos;")
     }
 
     /// Guess media type from file path

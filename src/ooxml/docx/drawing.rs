@@ -1,3 +1,4 @@
+use crate::common::unit::{EMUS_PER_INCH, emu_to_pt_f64, emu_to_px_96};
 /// Drawing objects support for DOCX documents.
 ///
 /// This module provides structures and functions for extracting drawing objects
@@ -286,25 +287,25 @@ impl DrawingObject {
     /// Get the width in pixels (assuming 96 DPI).
     #[inline]
     pub fn width_px(&self) -> u32 {
-        ((self.width_emu as f64) * 96.0 / 914400.0) as u32
+        emu_to_px_96(self.width_emu)
     }
 
     /// Get the height in pixels (assuming 96 DPI).
     #[inline]
     pub fn height_px(&self) -> u32 {
-        ((self.height_emu as f64) * 96.0 / 914400.0) as u32
+        emu_to_px_96(self.height_emu)
     }
 
     /// Get the width in points.
     #[inline]
     pub fn width_pt(&self) -> f64 {
-        (self.width_emu as f64) / 12700.0
+        emu_to_pt_f64(self.width_emu)
     }
 
     /// Get the height in points.
     #[inline]
     pub fn height_pt(&self) -> f64 {
-        (self.height_emu as f64) / 12700.0
+        emu_to_pt_f64(self.height_emu)
     }
 
     /// Get the shape type.
@@ -383,8 +384,8 @@ pub(crate) fn parse_drawing_objects(xml_bytes: &[u8]) -> Result<SmallVec<[Drawin
     let mut in_text_content = false;
 
     // Drawing attributes being built
-    let mut width_emu: i64 = 914400; // Default 1 inch
-    let mut height_emu: i64 = 914400;
+    let mut width_emu: i64 = EMUS_PER_INCH; // Default 1 inch
+    let mut height_emu: i64 = EMUS_PER_INCH;
     let mut x_emu: i64 = 0;
     let mut y_emu: i64 = 0;
     let mut description = String::new();
@@ -403,8 +404,8 @@ pub(crate) fn parse_drawing_objects(xml_bytes: &[u8]) -> Result<SmallVec<[Drawin
                     b"drawing" => {
                         in_drawing = true;
                         // Reset state for new drawing
-                        width_emu = 914400;
-                        height_emu = 914400;
+                        width_emu = EMUS_PER_INCH;
+                        height_emu = EMUS_PER_INCH;
                         x_emu = 0;
                         y_emu = 0;
                         description.clear();

@@ -1,4 +1,5 @@
-/// Paragraph types and implementation for DOCX documents.
+//! Paragraph types and implementation for DOCX documents.
+use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
 use std::fmt::Write as FmtWrite;
 
@@ -10,15 +11,6 @@ use super::field::MutableField;
 use super::hyperlink::MutableHyperlink;
 use super::image::MutableInlineImage;
 use super::run::MutableRun;
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
 
 /// Elements that can appear in a paragraph.
 #[derive(Debug)]

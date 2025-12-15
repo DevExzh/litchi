@@ -403,8 +403,8 @@ impl MutablePresentation {
     /// pres.add_section("Introduction", vec![256, 257]);
     /// ```
     pub fn add_section(&mut self, name: impl Into<String>, slide_ids: Vec<u32>) {
-        let section = Section::new(name, crate::ooxml::pptx::sections::generate_section_id())
-            .with_slides(slide_ids);
+        let section =
+            Section::new(name, crate::common::id::generate_guid_braced()).with_slides(slide_ids);
         self.sections.add_section(section);
         self.modified = true;
     }

@@ -3,7 +3,7 @@
 //! This module provides a mutable wrapper around ODT documents that allows
 //! for in-place modification of content, styles, and metadata.
 
-use crate::common::{Metadata, Result};
+use crate::common::{Metadata, Result, xml::escape_xml};
 use crate::odf::core::{OdfStructure, PackageWriter};
 use crate::odf::elements::table::Table;
 use crate::odf::elements::text::Paragraph;
@@ -488,7 +488,7 @@ impl MutableDocument {
 
         // Add optional metadata fields
         if let Some(ref title) = self.metadata.title {
-            let escaped_title = Self::escape_xml(title);
+            let escaped_title = escape_xml(title);
             meta_fields.push_str(&xml_minifier::minified_xml_format!(
                 r#"<dc:title>{}</dc:title>"#,
                 escaped_title
@@ -496,7 +496,7 @@ impl MutableDocument {
         }
 
         if let Some(ref author) = self.metadata.author {
-            let escaped_author = Self::escape_xml(author);
+            let escaped_author = escape_xml(author);
             meta_fields.push_str(&xml_minifier::minified_xml_format!(
                 r#"<dc:creator>{}</dc:creator>"#,
                 escaped_author
@@ -504,7 +504,7 @@ impl MutableDocument {
         }
 
         if let Some(ref subject) = self.metadata.subject {
-            let escaped_subject = Self::escape_xml(subject);
+            let escaped_subject = escape_xml(subject);
             meta_fields.push_str(&xml_minifier::minified_xml_format!(
                 r#"<dc:subject>{}</dc:subject>"#,
                 escaped_subject
@@ -512,7 +512,7 @@ impl MutableDocument {
         }
 
         if let Some(ref description) = self.metadata.description {
-            let escaped_description = Self::escape_xml(description);
+            let escaped_description = escape_xml(description);
             meta_fields.push_str(&xml_minifier::minified_xml_format!(
                 r#"<dc:description>{}</dc:description>"#,
                 escaped_description
@@ -520,7 +520,7 @@ impl MutableDocument {
         }
 
         if let Some(ref keywords) = self.metadata.keywords {
-            let escaped_keywords = Self::escape_xml(keywords);
+            let escaped_keywords = escape_xml(keywords);
             meta_fields.push_str(&xml_minifier::minified_xml_format!(
                 r#"<meta:keyword>{}</meta:keyword>"#,
                 escaped_keywords
@@ -532,15 +532,6 @@ impl MutableDocument {
             now,
             meta_fields
         )
-    }
-
-    /// Escape XML special characters.
-    fn escape_xml(text: &str) -> String {
-        text.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('"', "&quot;")
-            .replace('\'', "&apos;")
     }
 
     /// Save the modified document to a file.

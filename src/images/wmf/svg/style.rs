@@ -9,7 +9,7 @@ use crate::images::svg_utils::{write_color_hex, write_num};
 
 // Re-export commonly used functions from svg_utils for backward compatibility
 #[allow(unused_imports)]
-pub use crate::images::svg_utils::{color_hex, escape_xml, fmt_num, write_xml_escaped};
+pub use crate::images::svg_utils::{color_hex, fmt_num};
 
 /// Generate fill attribute (only if non-default)
 pub fn fill_attr(brush: &Brush, poly_fill_mode: u16) -> Option<String> {

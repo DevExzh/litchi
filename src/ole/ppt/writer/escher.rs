@@ -10,6 +10,8 @@ use std::io::Write;
 use zerocopy::IntoBytes;
 use zerocopy_derive::*;
 
+use crate::common::unit::emu_i32_to_ppt_master_i16_round;
+
 /// Error type for PPT operations
 pub type PptError = std::io::Error;
 
@@ -1020,13 +1022,6 @@ pub fn create_dg_container_with_shapes(
     container.build()
 }
 
-/// Convert EMU to master units (1/576 inch)
-/// EMU = 914400 per inch, Master = 576 per inch
-/// master = emu * 576 / 914400 = emu / 1588.0
-fn emu_to_master(emu: i32) -> i16 {
-    (emu as f64 / 1588.0).round() as i16
-}
-
 /// Create a user shape SpContainer
 fn create_user_shape_container(shape_id: u32, shape: &UserShapeData) -> Result<Vec<u8>, PptError> {
     let mut container = EscherBuilder::new(header_version::CONTAINER, 0, record_type::SP_CONTAINER);
@@ -1062,10 +1057,10 @@ fn create_user_shape_container(shape_id: u32, shape: &UserShapeData) -> Result<V
     // ClientAnchor with position/size (8-byte short format for PPT top-level shapes)
     // POI uses: flag(y1), col1(x1), dx1(x2), row1(y2) - all shorts in master units
     let mut anchor = EscherBuilder::new(header_version::SIMPLE, 0, record_type::CLIENT_ANCHOR);
-    let x1 = emu_to_master(shape.x);
-    let y1 = emu_to_master(shape.y);
-    let x2 = emu_to_master(shape.x + shape.width);
-    let y2 = emu_to_master(shape.y + shape.height);
+    let x1 = emu_i32_to_ppt_master_i16_round(shape.x);
+    let y1 = emu_i32_to_ppt_master_i16_round(shape.y);
+    let x2 = emu_i32_to_ppt_master_i16_round(shape.x + shape.width);
+    let y2 = emu_i32_to_ppt_master_i16_round(shape.y + shape.height);
     // Short record format: 8 bytes (4 shorts)
     anchor.add_data(&y1.to_le_bytes()); // flag/top
     anchor.add_data(&x1.to_le_bytes()); // col1/left

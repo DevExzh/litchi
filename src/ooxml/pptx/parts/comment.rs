@@ -1,6 +1,8 @@
-/// Comment parts for PowerPoint presentations.
-///
-/// This module provides types for working with comments in PPTX files.
+//! Comment parts for PowerPoint presentations.
+//!
+//! This module provides types for working with comments in PPTX files.
+
+use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::opc::part::Part;
 use quick_xml::Reader;
@@ -123,15 +125,6 @@ impl Comment {
 
         xml
     }
-}
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 /// Generate comments part XML.

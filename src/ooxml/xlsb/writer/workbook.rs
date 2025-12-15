@@ -2,7 +2,7 @@
 //!
 //! This module provides functionality to create complete XLSB files with multiple worksheets,
 //! shared strings, styles, and advanced features.
-
+use crate::common::xml::escape_xml;
 use crate::ooxml::opc::constants::relationship_type as rel;
 use crate::ooxml::opc::part::Part;
 use crate::ooxml::opc::{BlobPart, OpcPackage, PackURI};
@@ -672,15 +672,6 @@ impl XlsbWorkbookWriter {
 
         Ok(())
     }
-}
-
-/// Escape XML special characters
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 /// Format Unix timestamp as W3CDTF (ISO 8601)

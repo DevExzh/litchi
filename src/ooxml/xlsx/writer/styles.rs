@@ -4,21 +4,13 @@
 //! all the formatting information (fonts, fills, borders, number formats, and
 //! cell formats) used in an Excel workbook.
 
+use crate::common::xml::escape_xml;
 use crate::ooxml::xlsx::format::{
     CellBorder, CellBorderSide, CellFill, CellFillPatternType, CellFont, CellFormat,
 };
 use crate::sheet::Result as SheetResult;
 use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
-
-/// Escape XML special characters.
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
 
 /// Builder for generating styles.xml content.
 ///

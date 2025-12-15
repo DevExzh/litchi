@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::common::unit::{EMUS_PER_CM, EMUS_PER_INCH};
+
 /// Length measurement with units.
 ///
 /// Represents a measurement value used for dimensions, positions, etc.
@@ -56,7 +58,7 @@ impl Length {
     #[inline]
     pub fn from_inches(inches: f64) -> Self {
         Self {
-            emus: (inches * 914400.0) as i64,
+            emus: (inches * EMUS_PER_INCH as f64) as i64,
         }
     }
 
@@ -72,7 +74,7 @@ impl Length {
     #[inline]
     pub fn from_cm(cm: f64) -> Self {
         Self {
-            emus: (cm * 360000.0) as i64,
+            emus: (cm * EMUS_PER_CM as f64) as i64,
         }
     }
 
@@ -85,13 +87,13 @@ impl Length {
     /// Convert to inches.
     #[inline]
     pub fn inches(&self) -> f64 {
-        self.emus as f64 / 914400.0
+        self.emus as f64 / EMUS_PER_INCH as f64
     }
 
     /// Convert to centimeters.
     #[inline]
     pub fn cm(&self) -> f64 {
-        self.emus as f64 / 360000.0
+        self.emus as f64 / EMUS_PER_CM as f64
     }
 
     /// Convert to points (1/72 inch).
