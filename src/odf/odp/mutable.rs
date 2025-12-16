@@ -389,7 +389,23 @@ impl MutablePresentation {
 
     /// Generate content.xml from the current mutable state.
     fn generate_content_xml(&self) -> String {
-        let mut body = String::new();
+        let shape_count = self.slides.iter().map(|s| s.shapes.len()).sum::<usize>();
+        let mut estimated = 256usize;
+        estimated += self.slides.len() * 128;
+        estimated += shape_count * 192;
+        estimated += self
+            .slides
+            .iter()
+            .map(|s| s.text.len() + s.title.as_ref().map(|t| t.len()).unwrap_or(0))
+            .sum::<usize>();
+        estimated += self
+            .slides
+            .iter()
+            .flat_map(|s| s.shapes.iter())
+            .map(|sh| sh.text.len() + sh.name.as_ref().map(|n| n.len()).unwrap_or(0))
+            .sum::<usize>();
+
+        let mut body = String::with_capacity(estimated);
 
         for (i, slide) in self.slides.iter().enumerate() {
             let page_num = i + 1;
@@ -467,7 +483,23 @@ impl MutablePresentation {
     /// Generate meta.xml with current metadata.
     fn generate_meta_xml(&self) -> String {
         let now = chrono::Utc::now().to_rfc3339();
-        let mut meta_fields = String::new();
+        let mut estimated = 64usize;
+        estimated += self.metadata.title.as_ref().map(|s| s.len()).unwrap_or(0);
+        estimated += self.metadata.author.as_ref().map(|s| s.len()).unwrap_or(0);
+        estimated += self.metadata.subject.as_ref().map(|s| s.len()).unwrap_or(0);
+        estimated += self
+            .metadata
+            .description
+            .as_ref()
+            .map(|s| s.len())
+            .unwrap_or(0);
+        estimated += self
+            .metadata
+            .keywords
+            .as_ref()
+            .map(|s| s.len())
+            .unwrap_or(0);
+        let mut meta_fields = String::with_capacity(estimated);
 
         // Add optional metadata fields
         if let Some(ref title) = self.metadata.title {

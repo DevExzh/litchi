@@ -459,7 +459,17 @@ impl MutableDocument {
 
     /// Generate content.xml from the current mutable state.
     fn generate_content_xml(&self) -> String {
-        let mut body = String::new();
+        let mut estimated = 256usize;
+        estimated += self.elements.len() * 96;
+        estimated += self
+            .elements
+            .iter()
+            .map(|e| match e {
+                DocumentElement::Paragraph(p) => p.text().map(|t| t.len()).unwrap_or(0),
+                DocumentElement::Table(_) => 256,
+            })
+            .sum::<usize>();
+        let mut body = String::with_capacity(estimated);
 
         // Add elements in their insertion order (paragraphs and tables mixed)
         for element in &self.elements {
@@ -484,7 +494,23 @@ impl MutableDocument {
     /// Generate meta.xml with current metadata.
     fn generate_meta_xml(&self) -> String {
         let now = chrono::Utc::now().to_rfc3339();
-        let mut meta_fields = String::new();
+        let mut estimated = 64usize;
+        estimated += self.metadata.title.as_ref().map(|s| s.len()).unwrap_or(0);
+        estimated += self.metadata.author.as_ref().map(|s| s.len()).unwrap_or(0);
+        estimated += self.metadata.subject.as_ref().map(|s| s.len()).unwrap_or(0);
+        estimated += self
+            .metadata
+            .description
+            .as_ref()
+            .map(|s| s.len())
+            .unwrap_or(0);
+        estimated += self
+            .metadata
+            .keywords
+            .as_ref()
+            .map(|s| s.len())
+            .unwrap_or(0);
+        let mut meta_fields = String::with_capacity(estimated);
 
         // Add optional metadata fields
         if let Some(ref title) = self.metadata.title {

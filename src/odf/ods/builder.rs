@@ -487,111 +487,149 @@ impl SpreadsheetBuilder {
         Ok(self)
     }
 
+    fn sheet_max_cols(sheet: &Sheet) -> usize {
+        sheet.rows.iter().map(|r| r.cells.len()).max().unwrap_or(0)
+    }
+
+    fn has_formulas(&self) -> bool {
+        self.sheets
+            .iter()
+            .flat_map(|s| s.rows.iter())
+            .flat_map(|r| r.cells.iter())
+            .any(|c| c.formula.is_some())
+    }
+
+    fn push_table_start(out: &mut String, name: &str) {
+        out.push_str(&format!(
+            r#"<table:table table:name="{}">"#,
+            escape_xml(name)
+        ));
+    }
+
+    fn push_table_columns(out: &mut String, max_cols: usize) {
+        if max_cols <= 1 {
+            out.push_str("<table:table-column/>");
+        } else {
+            out.push_str(&format!(
+                r#"<table:table-column table:number-columns-repeated="{}"/>"#,
+                max_cols
+            ));
+        }
+    }
+
+    fn push_cell(out: &mut String, cell: &Cell) {
+        let formula_attr = cell
+            .formula
+            .as_deref()
+            .map(|f| format!(" table:formula=\"{}\"", escape_xml(f)))
+            .unwrap_or_default();
+
+        match &cell.value {
+            CellValue::Text(_) => {
+                out.push_str(&format!(
+                    r#"<table:table-cell{} office:value-type="string"><text:p>{}</text:p></table:table-cell>"#,
+                    formula_attr,
+                    escape_xml(&cell.text)
+                ));
+            },
+            CellValue::Number(f) => {
+                out.push_str(&format!(
+                    r#"<table:table-cell{} office:value-type="float" office:value="{}"><text:p>{}</text:p></table:table-cell>"#,
+                    formula_attr,
+                    f,
+                    escape_xml(&cell.text)
+                ));
+            },
+            CellValue::Currency(f, currency) => {
+                out.push_str(&format!(
+                    r#"<table:table-cell{} office:value-type="currency" office:value="{}" office:currency="{}"><text:p>{}</text:p></table:table-cell>"#,
+                    formula_attr,
+                    f,
+                    escape_xml(currency),
+                    escape_xml(&cell.text)
+                ));
+            },
+            CellValue::Percentage(f) => {
+                out.push_str(&format!(
+                    r#"<table:table-cell{} office:value-type="percentage" office:value="{}"><text:p>{}</text:p></table:table-cell>"#,
+                    formula_attr,
+                    f,
+                    escape_xml(&cell.text)
+                ));
+            },
+            CellValue::Date(d) => {
+                out.push_str(&format!(
+                    r#"<table:table-cell{} office:value-type="date" office:date-value="{}"><text:p>{}</text:p></table:table-cell>"#,
+                    formula_attr,
+                    escape_xml(d),
+                    escape_xml(&cell.text)
+                ));
+            },
+            CellValue::Time(t) => {
+                out.push_str(&format!(
+                    r#"<table:table-cell{} office:value-type="time" office:time-value="{}"><text:p>{}</text:p></table:table-cell>"#,
+                    formula_attr,
+                    escape_xml(t),
+                    escape_xml(&cell.text)
+                ));
+            },
+            CellValue::Boolean(b) => {
+                out.push_str(&format!(
+                    r#"<table:table-cell{} office:value-type="boolean" office:boolean-value="{}"><text:p>{}</text:p></table:table-cell>"#,
+                    formula_attr,
+                    b,
+                    escape_xml(&cell.text)
+                ));
+            },
+            CellValue::Empty => {
+                if cell.formula.is_some() {
+                    out.push_str(&format!(
+                        r#"<table:table-cell{} office:value-type="float" office:value="0"><text:p>0</text:p></table:table-cell>"#,
+                        formula_attr
+                    ));
+                } else {
+                    out.push_str("<table:table-cell/>");
+                }
+            },
+        }
+    }
+
     /// Generate the content.xml body for spreadsheet
     fn generate_content_body(&self) -> String {
-        let mut body = String::new();
+        let mut cell_count = 0usize;
+        for sheet in &self.sheets {
+            for row in &sheet.rows {
+                cell_count += row.cells.len();
+            }
+        }
+
+        let mut estimated = 256usize;
+        estimated += self.sheets.len() * 96;
+        estimated += cell_count * 96;
+        estimated += self.sheets.iter().map(|s| s.name.len()).sum::<usize>();
+        estimated += self
+            .sheets
+            .iter()
+            .flat_map(|s| s.rows.iter())
+            .flat_map(|r| r.cells.iter())
+            .map(|c| c.text.len())
+            .sum::<usize>();
+
+        let mut body = String::with_capacity(estimated);
 
         for sheet in &self.sheets {
-            body.push_str(&format!(
-                r#"      <table:table table:name="{}" table:style-name="ta1">
-"#,
-                escape_xml(&sheet.name)
-            ));
+            Self::push_table_start(&mut body, &sheet.name);
+            Self::push_table_columns(&mut body, Self::sheet_max_cols(sheet));
 
-            // Add column definitions
-            body.push_str(
-                r#"        <table:table-column table:style-name="co1" table:default-cell-style-name="Default"/>
-"#,
-            );
-
-            // Add rows
             for row in &sheet.rows {
-                body.push_str("        <table:table-row>\n");
-
-                // Add cells
+                body.push_str("<table:table-row>");
                 for cell in &row.cells {
-                    match &cell.value {
-                        CellValue::Text(_) => {
-                            body.push_str(&format!(
-                                r#"          <table:table-cell office:value-type="string">
-            <text:p>{}</text:p>
-          </table:table-cell>
-"#,
-                                escape_xml(&cell.text)
-                            ));
-                        },
-                        CellValue::Number(f) => {
-                            body.push_str(&format!(
-                                r#"          <table:table-cell office:value-type="float" office:value="{}">
-            <text:p>{}</text:p>
-          </table:table-cell>
-"#,
-                                f,
-                                escape_xml(&cell.text)
-                            ));
-                        },
-                        CellValue::Currency(f, currency) => {
-                            body.push_str(&format!(
-                                r#"          <table:table-cell office:value-type="currency" office:value="{}" office:currency="{}">
-            <text:p>{}</text:p>
-          </table:table-cell>
-"#,
-                                f,
-                                escape_xml(currency),
-                                escape_xml(&cell.text)
-                            ));
-                        },
-                        CellValue::Percentage(f) => {
-                            body.push_str(&format!(
-                                r#"          <table:table-cell office:value-type="percentage" office:value="{}">
-            <text:p>{}</text:p>
-          </table:table-cell>
-"#,
-                                f,
-                                escape_xml(&cell.text)
-                            ));
-                        },
-                        CellValue::Date(d) => {
-                            body.push_str(&format!(
-                                r#"          <table:table-cell office:value-type="date" office:date-value="{}">
-            <text:p>{}</text:p>
-          </table:table-cell>
-"#,
-                                d,
-                                escape_xml(&cell.text)
-                            ));
-                        },
-                        CellValue::Time(t) => {
-                            body.push_str(&format!(
-                                r#"          <table:table-cell office:value-type="time" office:time-value="{}">
-            <text:p>{}</text:p>
-          </table:table-cell>
-"#,
-                                t,
-                                escape_xml(&cell.text)
-                            ));
-                        },
-                        CellValue::Boolean(b) => {
-                            body.push_str(&format!(
-                                r#"          <table:table-cell office:value-type="boolean" office:boolean-value="{}">
-            <text:p>{}</text:p>
-          </table:table-cell>
-"#,
-                                b,
-                                escape_xml(&cell.text)
-                            ));
-                        },
-                        CellValue::Empty => {
-                            // Empty cell
-                            body.push_str("          <table:table-cell/>\n");
-                        },
-                    }
+                    Self::push_cell(&mut body, cell);
                 }
-
-                body.push_str("        </table:table-row>\n");
+                body.push_str("</table:table-row>");
             }
 
-            body.push_str("      </table:table>\n");
+            body.push_str("</table:table>");
         }
 
         body
@@ -601,75 +639,44 @@ impl SpreadsheetBuilder {
     fn generate_content_xml(&self) -> String {
         let body = self.generate_content_body();
 
-        format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?>
-<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
-                          xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
-                          xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
-                          xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
-                          xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
-                          xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
-                          xmlns:xlink="http://www.w3.org/1999/xlink"
-                          xmlns:dc="http://purl.org/dc/elements/1.1/"
-                          xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"
-                          xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0"
-                          xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
-                          xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"
-                          xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0"
-                          xmlns:math="http://www.w3.org/1998/Math/MathML"
-                          xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0"
-                          xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0"
-                          xmlns:ooo="http://openoffice.org/2004/office"
-                          xmlns:ooow="http://openoffice.org/2004/writer"
-                          xmlns:oooc="http://openoffice.org/2004/calc"
-                          xmlns:dom="http://www.w3.org/2001/xml-events"
-                          office:version="1.3">
-  <office:scripts/>
-  <office:font-face-decls/>
-  <office:automatic-styles/>
-  <office:body>
-    <office:spreadsheet>
-{}    </office:spreadsheet>
-  </office:body>
-</office:document-content>
-"#,
-            body
-        )
+        let of_ns = if self.has_formulas() {
+            " xmlns:of=\"urn:oasis:names:tc:opendocument:xmlns:of:1.2\""
+        } else {
+            ""
+        };
+
+        let mut out = String::with_capacity(body.len() + 256);
+        out.push_str(
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0""#,
+        );
+        out.push_str(of_ns);
+        out.push_str(
+            r#" office:version="1.3"><office:font-face-decls/><office:automatic-styles/><office:body><office:spreadsheet>"#,
+        );
+        out.push_str(&body);
+        out.push_str(r#"</office:spreadsheet></office:body></office:document-content>"#);
+        out
     }
 
-    /// Generate meta.xml with metadata
     fn generate_meta_xml(&self) -> String {
         let now = chrono::Utc::now().to_rfc3339();
 
         let mut meta = format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?>
-<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
-                       xmlns:xlink="http://www.w3.org/1999/xlink"
-                       xmlns:dc="http://purl.org/dc/elements/1.1/"
-                       xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"
-                       office:version="1.3">
-  <office:meta>
-    <meta:generator>Litchi/0.0.1</meta:generator>
-    <meta:creation-date>{}</meta:creation-date>
-    <dc:date>{}</dc:date>
-"#,
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"><office:meta><meta:generator>Litchi/0.0.1</meta:generator><meta:creation-date>{}</meta:creation-date><dc:date>{}</dc:date>"#,
             now, now
         );
 
         // Add optional metadata fields
         if let Some(ref title) = self.metadata.title {
-            meta.push_str(&format!("    <dc:title>{}</dc:title>\n", escape_xml(title)));
+            meta.push_str(&format!("<dc:title>{}</dc:title>", escape_xml(title)));
         }
 
         if let Some(ref author) = self.metadata.author {
-            meta.push_str(&format!(
-                "    <dc:creator>{}</dc:creator>\n",
-                escape_xml(author)
-            ));
+            meta.push_str(&format!("<dc:creator>{}</dc:creator>", escape_xml(author)));
         }
 
-        meta.push_str("  </office:meta>\n");
-        meta.push_str("</office:document-meta>\n");
+        meta.push_str("</office:meta>");
+        meta.push_str("</office:document-meta>");
 
         meta
     }

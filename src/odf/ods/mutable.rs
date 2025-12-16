@@ -37,6 +37,106 @@ pub struct MutableSpreadsheet {
 }
 
 impl MutableSpreadsheet {
+    fn sheet_max_cols(sheet: &Sheet) -> usize {
+        sheet.rows.iter().map(|r| r.cells.len()).max().unwrap_or(0)
+    }
+
+    fn has_formulas(&self) -> bool {
+        self.sheets
+            .iter()
+            .flat_map(|s| s.rows.iter())
+            .flat_map(|r| r.cells.iter())
+            .any(|c| c.formula.is_some())
+    }
+
+    fn push_table_columns(out: &mut String, max_cols: usize) {
+        if max_cols <= 1 {
+            out.push_str("<table:table-column/>");
+        } else {
+            out.push_str(&format!(
+                r#"<table:table-column table:number-columns-repeated="{}"/>"#,
+                max_cols
+            ));
+        }
+    }
+
+    fn push_cell(out: &mut String, cell: &Cell) {
+        let formula_attr = cell
+            .formula
+            .as_deref()
+            .map(|f| format!(" table:formula=\"{}\"", escape_xml(f)))
+            .unwrap_or_default();
+
+        match &cell.value {
+            CellValue::Text(_) => {
+                out.push_str(&format!(
+                    r#"<table:table-cell{} office:value-type="string"><text:p>{}</text:p></table:table-cell>"#,
+                    formula_attr,
+                    escape_xml(&cell.text)
+                ));
+            },
+            CellValue::Number(f) => {
+                out.push_str(&format!(
+                    r#"<table:table-cell{} office:value-type="float" office:value="{}"><text:p>{}</text:p></table:table-cell>"#,
+                    formula_attr,
+                    f,
+                    escape_xml(&cell.text)
+                ));
+            },
+            CellValue::Currency(f, currency) => {
+                out.push_str(&format!(
+                    r#"<table:table-cell{} office:value-type="currency" office:value="{}" office:currency="{}"><text:p>{}</text:p></table:table-cell>"#,
+                    formula_attr,
+                    f,
+                    escape_xml(currency),
+                    escape_xml(&cell.text)
+                ));
+            },
+            CellValue::Percentage(f) => {
+                out.push_str(&format!(
+                    r#"<table:table-cell{} office:value-type="percentage" office:value="{}"><text:p>{}</text:p></table:table-cell>"#,
+                    formula_attr,
+                    f,
+                    escape_xml(&cell.text)
+                ));
+            },
+            CellValue::Date(d) => {
+                out.push_str(&format!(
+                    r#"<table:table-cell{} office:value-type="date" office:date-value="{}"><text:p>{}</text:p></table:table-cell>"#,
+                    formula_attr,
+                    escape_xml(d),
+                    escape_xml(&cell.text)
+                ));
+            },
+            CellValue::Time(t) => {
+                out.push_str(&format!(
+                    r#"<table:table-cell{} office:value-type="time" office:time-value="{}"><text:p>{}</text:p></table:table-cell>"#,
+                    formula_attr,
+                    escape_xml(t),
+                    escape_xml(&cell.text)
+                ));
+            },
+            CellValue::Boolean(b) => {
+                out.push_str(&format!(
+                    r#"<table:table-cell{} office:value-type="boolean" office:boolean-value="{}"><text:p>{}</text:p></table:table-cell>"#,
+                    formula_attr,
+                    b,
+                    escape_xml(&cell.text)
+                ));
+            },
+            CellValue::Empty => {
+                if cell.formula.is_some() {
+                    out.push_str(&format!(
+                        r#"<table:table-cell{} office:value-type="float" office:value="0"><text:p>0</text:p></table:table-cell>"#,
+                        formula_attr
+                    ));
+                } else {
+                    out.push_str("<table:table-cell/>");
+                }
+            },
+        }
+    }
+
     /// Create a mutable spreadsheet from an existing Spreadsheet.
     ///
     /// # Examples
@@ -309,66 +409,43 @@ impl MutableSpreadsheet {
 
         for sheet in &self.sheets {
             let escaped_name = escape_xml(&sheet.name);
-            body.push_str(&xml_minifier::minified_xml_format!(
-                r#"<table:table table:name="{}">"#,
-                escaped_name
-            ));
+            body.push_str(&format!(r#"<table:table table:name="{}">"#, escaped_name));
 
-            body.push_str(xml_minifier::minified_xml_str!(
-                r#"<table:table-column table:style-name="co1"/>"#
-            ));
+            Self::push_table_columns(&mut body, Self::sheet_max_cols(sheet));
 
             for row in &sheet.rows {
                 body.push_str("<table:table-row>");
-
                 for cell in &row.cells {
-                    match &cell.value {
-                        CellValue::Text(_) => {
-                            let escaped_text = escape_xml(&cell.text);
-                            body.push_str(&xml_minifier::minified_xml_format!(
-                                r#"<table:table-cell office:value-type="string"><text:p>{}</text:p></table:table-cell>"#,
-                                escaped_text
-                            ));
-                        },
-                        CellValue::Number(f) => {
-                            let escaped_text = escape_xml(&cell.text);
-                            body.push_str(&xml_minifier::minified_xml_format!(
-                                r#"<table:table-cell office:value-type="float" office:value="{}"><text:p>{}</text:p></table:table-cell>"#,
-                                f,
-                                escaped_text
-                            ));
-                        },
-                        CellValue::Empty => {
-                            body.push_str(xml_minifier::minified_xml_str!(
-                                r#"<table:table-cell/>"#
-                            ));
-                        },
-                        _ => {
-                            // Handle other types similarly
-                            let escaped_text = escape_xml(&cell.text);
-                            body.push_str(&xml_minifier::minified_xml_format!(
-                                r#"<table:table-cell office:value-type="string"><text:p>{}</text:p></table:table-cell>"#,
-                                escaped_text
-                            ));
-                        },
-                    }
+                    Self::push_cell(&mut body, cell);
                 }
-
                 body.push_str("</table:table-row>");
             }
 
             body.push_str("</table:table>");
         }
 
-        xml_minifier::minified_xml_format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles/><office:body><office:spreadsheet>{}</office:spreadsheet></office:body></office:document-content>"#,
-            body
-        )
+        let of_ns = if self.has_formulas() {
+            " xmlns:of=\"urn:oasis:names:tc:opendocument:xmlns:of:1.2\""
+        } else {
+            ""
+        };
+
+        let mut out = String::with_capacity(body.len() + 256);
+        out.push_str(
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0""#,
+        );
+        out.push_str(of_ns);
+        out.push_str(
+            r#" office:version="1.3"><office:font-face-decls/><office:automatic-styles/><office:body><office:spreadsheet>"#,
+        );
+        out.push_str(&body);
+        out.push_str(r#"</office:spreadsheet></office:body></office:document-content>"#);
+        out
     }
 
     fn generate_meta_xml(&self) -> String {
         let now = chrono::Utc::now().to_rfc3339();
-        xml_minifier::minified_xml_format!(
+        format!(
             r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"><office:meta><meta:generator>Litchi/0.0.1</meta:generator><dc:date>{}</dc:date></office:meta></office:document-meta>"#,
             now
         )

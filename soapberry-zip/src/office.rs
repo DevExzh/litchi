@@ -310,17 +310,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
 
     /// Write a file without compression (stored).
     pub fn write_stored(&mut self, name: &str, data: &[u8]) -> Result<(), Error> {
-        let (mut entry, config) = self
-            .archive
-            .new_file(name)
-            .compression_method(CompressionMethod::Store)
-            .start()?;
-
-        let mut writer = config.wrap(&mut entry);
-        writer.write_all(data)?;
-        let (_, desc) = writer.finish()?;
-        entry.finish(desc)?;
-        Ok(())
+        self.archive.write_stored_file(name, data)
     }
 
     /// Write a file with Deflate compression.

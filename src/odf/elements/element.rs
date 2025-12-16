@@ -306,16 +306,46 @@ impl Element {
 
     /// Serialize element to XML string
     pub fn to_xml_string(&self) -> String {
-        let mut xml = String::new();
+        let mut xml = String::with_capacity(self.estimated_xml_len());
         self.write_xml(&mut xml, 0);
         xml
     }
 
+    fn estimated_xml_len(&self) -> usize {
+        let mut len = 0usize;
+
+        len += 1 + self.tag_name.len();
+
+        for (key, value) in &self.attributes {
+            len += 1 + key.len();
+            len += 2;
+            len += value.len() + 8;
+            len += 1;
+        }
+
+        if self.children.is_empty() && self.text_content.is_empty() {
+            len += 3;
+            return len;
+        }
+
+        len += 1;
+
+        if !self.text_content.is_empty() {
+            len += self.text_content.len() + 8;
+        }
+
+        for child in &self.children {
+            len += child.estimated_xml_len();
+        }
+
+        len += 3 + self.tag_name.len() + 1;
+        len
+    }
+
     fn write_xml(&self, output: &mut String, indent: usize) {
-        let indent_str = "  ".repeat(indent);
+        let _ = indent;
 
         // Opening tag
-        output.push_str(&indent_str);
         output.push('<');
         output.push_str(&self.tag_name);
 
@@ -358,15 +388,10 @@ impl Element {
 
             // Child elements
             for child in &self.children {
-                output.push('\n');
                 child.write_xml(output, indent + 1);
             }
 
             // Closing tag
-            if !self.children.is_empty() {
-                output.push('\n');
-                output.push_str(&indent_str);
-            }
             output.push_str("</");
             output.push_str(&self.tag_name);
             output.push('>');

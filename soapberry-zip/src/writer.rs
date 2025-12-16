@@ -535,6 +535,69 @@ impl<W> ZipArchiveWriter<W>
 where
     W: Write,
 {
+    pub fn write_stored_file(&mut self, name: &str, data: &[u8]) -> Result<(), Error> {
+        let file_path = ZipFilePath::from_str(name.trim_end_matches('/'));
+
+        if file_path.len() > u16::MAX as usize {
+            return Err(Error::from(ErrorKind::InvalidInput {
+                msg: "file name too long".to_string(),
+            }));
+        }
+
+        let local_header_offset = self.writer.count();
+        let mut flags = 0u16;
+        if file_path.needs_utf8_encoding() {
+            flags |= FLAG_UTF8_ENCODING;
+        }
+
+        let name_bytes = file_path.as_ref().as_bytes();
+        let name_len = name_bytes.len() as u16;
+        self.file_names.extend_from_slice(name_bytes);
+
+        let crc32 = crc::crc32(data);
+        let size_u64 = data.len() as u64;
+        if size_u64 >= ZIP64_THRESHOLD_FILE_SIZE {
+            return Err(Error::from(ErrorKind::InvalidInput {
+                msg: "stored file too large".to_string(),
+            }));
+        }
+
+        let header = ZipLocalFileHeaderFixed {
+            signature: ZipLocalFileHeaderFixed::SIGNATURE,
+            version_needed: 20,
+            flags,
+            compression_method: CompressionMethod::Store.as_id(),
+            last_mod_time: 0,
+            last_mod_date: 0,
+            crc32,
+            compressed_size: size_u64 as u32,
+            uncompressed_size: size_u64 as u32,
+            file_name_len: file_path.len() as u16,
+            extra_field_len: 0,
+        };
+
+        header.write(&mut self.writer)?;
+        self.writer.write_all(file_path.as_ref().as_bytes())?;
+        self.writer.write_all(data)?;
+
+        let mut file_header = FileHeader {
+            name_len,
+            compression_method: CompressionMethod::Store,
+            local_header_offset,
+            compressed_size: size_u64,
+            uncompressed_size: size_u64,
+            crc: crc32,
+            flags,
+            modification_time: None,
+            unix_permissions: None,
+            extra_fields: ExtraFieldsContainer::new(),
+        };
+        file_header.finalize_extra_fields()?;
+        self.files.push(file_header);
+
+        Ok(())
+    }
+
     /// Writes a local file header with filtered extra fields.
     fn write_local_header(
         &mut self,

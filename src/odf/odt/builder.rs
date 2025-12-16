@@ -344,11 +344,23 @@ impl DocumentBuilder {
 
     /// Generate the content.xml body
     fn generate_content_body(&self) -> String {
-        let mut body = String::new();
+        let mut estimated = 256usize;
+        estimated += self.elements.len() * 96;
+        estimated += self
+            .elements
+            .iter()
+            .map(|e| match e {
+                DocumentElement::Paragraph(p) => p.text().map(|t| t.len()).unwrap_or(0),
+                DocumentElement::Heading(h) => h.text().map(|t| t.len()).unwrap_or(0),
+                DocumentElement::Table(_) => 256,
+                DocumentElement::List(_) => 256,
+            })
+            .sum::<usize>();
+
+        let mut body = String::with_capacity(estimated);
 
         // Add all elements in order they were added
         for element in &self.elements {
-            body.push_str("      ");
             match element {
                 DocumentElement::Paragraph(para) => {
                     let elem: crate::odf::elements::element::Element = para.clone().into();
@@ -367,7 +379,6 @@ impl DocumentBuilder {
                     body.push_str(&elem.to_xml_string());
                 },
             }
-            body.push('\n');
         }
 
         body
@@ -378,40 +389,7 @@ impl DocumentBuilder {
         let body = self.generate_content_body();
 
         format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?>
-<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
-                          xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
-                          xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
-                          xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
-                          xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
-                          xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
-                          xmlns:xlink="http://www.w3.org/1999/xlink"
-                          xmlns:dc="http://purl.org/dc/elements/1.1/"
-                          xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"
-                          xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0"
-                          xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
-                          xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"
-                          xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0"
-                          xmlns:math="http://www.w3.org/1998/Math/MathML"
-                          xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0"
-                          xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0"
-                          xmlns:ooo="http://openoffice.org/2004/office"
-                          xmlns:ooow="http://openoffice.org/2004/writer"
-                          xmlns:oooc="http://openoffice.org/2004/calc"
-                          xmlns:dom="http://www.w3.org/2001/xml-events"
-                          xmlns:xforms="http://www.w3.org/2002/xforms"
-                          xmlns:xsd="http://www.w3.org/2001/XMLSchema"
-                          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                          office:version="1.3">
-  <office:scripts/>
-  <office:font-face-decls/>
-  <office:automatic-styles/>
-  <office:body>
-    <office:text>
-{}    </office:text>
-  </office:body>
-</office:document-content>
-"#,
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:math="http://www.w3.org/1998/Math/MathML" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:ooo="http://openoffice.org/2004/office" xmlns:ooow="http://openoffice.org/2004/writer" xmlns:oooc="http://openoffice.org/2004/calc" xmlns:dom="http://www.w3.org/2001/xml-events" xmlns:xforms="http://www.w3.org/2002/xforms" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles/><office:body><office:text>{}</office:text></office:body></office:document-content>"#,
             body
         )
     }
@@ -421,104 +399,46 @@ impl DocumentBuilder {
         let now = chrono::Utc::now().to_rfc3339();
 
         let mut meta = format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?>
-<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
-                       xmlns:xlink="http://www.w3.org/1999/xlink"
-                       xmlns:dc="http://purl.org/dc/elements/1.1/"
-                       xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"
-                       office:version="1.3">
-  <office:meta>
-    <meta:generator>Litchi/0.0.1</meta:generator>
-    <meta:creation-date>{}</meta:creation-date>
-    <dc:date>{}</dc:date>
-"#,
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"><office:meta><meta:generator>Litchi/0.0.1</meta:generator><meta:creation-date>{}</meta:creation-date><dc:date>{}</dc:date>"#,
             now, now
         );
 
         // Add optional metadata fields
         if let Some(ref title) = self.metadata.title {
-            meta.push_str(&format!("    <dc:title>{}</dc:title>\n", escape_xml(title)));
+            meta.push_str(&format!("<dc:title>{}</dc:title>", escape_xml(title)));
         }
 
         if let Some(ref author) = self.metadata.author {
-            meta.push_str(&format!(
-                "    <dc:creator>{}</dc:creator>\n",
-                escape_xml(author)
-            ));
+            meta.push_str(&format!("<dc:creator>{}</dc:creator>", escape_xml(author)));
         }
 
         if let Some(ref subject) = self.metadata.subject {
-            meta.push_str(&format!(
-                "    <dc:subject>{}</dc:subject>\n",
-                escape_xml(subject)
-            ));
+            meta.push_str(&format!("<dc:subject>{}</dc:subject>", escape_xml(subject)));
         }
 
         if let Some(ref description) = self.metadata.description {
             meta.push_str(&format!(
-                "    <dc:description>{}</dc:description>\n",
+                "<dc:description>{}</dc:description>",
                 escape_xml(description)
             ));
         }
 
         if let Some(ref keywords) = self.metadata.keywords {
             meta.push_str(&format!(
-                "    <meta:keyword>{}</meta:keyword>\n",
+                "<meta:keyword>{}</meta:keyword>",
                 escape_xml(keywords)
             ));
         }
 
-        meta.push_str("  </office:meta>\n");
-        meta.push_str("</office:document-meta>\n");
+        meta.push_str("</office:meta>");
+        meta.push_str("</office:document-meta>");
 
         meta
     }
 
     /// Generate styles.xml with list styles
     fn generate_styles_xml(&self) -> String {
-        r#"<?xml version="1.0" encoding="UTF-8"?>
-<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
-                         xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
-                         xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
-                         xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
-                         xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
-                         xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
-                         xmlns:xlink="http://www.w3.org/1999/xlink"
-                         xmlns:dc="http://purl.org/dc/elements/1.1/"
-                         xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"
-                         xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0"
-                         xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
-                         xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"
-                         xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0"
-                         xmlns:math="http://www.w3.org/1998/Math/MathML"
-                         xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0"
-                         xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0"
-                         office:version="1.3">
-  <office:font-face-decls/>
-  <office:styles>
-    <!-- Numbered list style -->
-    <text:list-style style:name="L1">
-      <text:list-level-style-number text:level="1" text:style-name="Numbering_20_Symbols" style:num-format="1">
-        <style:list-level-properties text:list-level-position-and-space-mode="label-alignment">
-          <style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="1.27cm" fo:text-indent="-0.635cm" fo:margin-left="1.27cm"/>
-        </style:list-level-properties>
-      </text:list-level-style-number>
-      <text:list-level-style-number text:level="2" text:style-name="Numbering_20_Symbols" style:num-format="1">
-        <style:list-level-properties text:list-level-position-and-space-mode="label-alignment">
-          <style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="1.905cm" fo:text-indent="-0.635cm" fo:margin-left="1.905cm"/>
-        </style:list-level-properties>
-      </text:list-level-style-number>
-      <text:list-level-style-number text:level="3" text:style-name="Numbering_20_Symbols" style:num-format="1">
-        <style:list-level-properties text:list-level-position-and-space-mode="label-alignment">
-          <style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="2.54cm" fo:text-indent="-0.635cm" fo:margin-left="2.54cm"/>
-        </style:list-level-properties>
-      </text:list-level-style-number>
-    </text:list-style>
-  </office:styles>
-  <office:automatic-styles/>
-  <office:master-styles/>
-</office:document-styles>
-"#.to_string()
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:math="http://www.w3.org/1998/Math/MathML" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" office:version="1.3"><office:font-face-decls/><office:styles><!-- Numbered list style --><text:list-style style:name="L1"><text:list-level-style-number text:level="1" text:style-name="Numbering_20_Symbols" style:num-format="1"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="1.27cm" fo:text-indent="-0.635cm" fo:margin-left="1.27cm"/></style:list-level-properties></text:list-level-style-number><text:list-level-style-number text:level="2" text:style-name="Numbering_20_Symbols" style:num-format="1"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="1.905cm" fo:text-indent="-0.635cm" fo:margin-left="1.905cm"/></style:list-level-properties></text:list-level-style-number><text:list-level-style-number text:level="3" text:style-name="Numbering_20_Symbols" style:num-format="1"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="2.54cm" fo:text-indent="-0.635cm" fo:margin-left="2.54cm"/></style:list-level-properties></text:list-level-style-number></text:list-style></office:styles><office:automatic-styles/><office:master-styles/></office:document-styles>"#.to_string()
     }
 
     /// Build the document and return as bytes

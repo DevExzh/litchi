@@ -295,21 +295,27 @@ impl<'a> FormulaParser<'a> {
 
     /// Parse identifier, cell reference, or function
     fn parse_identifier_or_ref(&mut self) -> Result<Token> {
-        // Try to parse as cell reference first
-        if (self.peek() == Some(b'.') || self.peek() == Some(b'$') || self.peek_is_letter())
-            && let Ok(cell_ref) = self.try_parse_cell_ref()
-        {
-            // Check if it's a range
-            self.skip_whitespace();
-            if self.peek() == Some(b':') {
-                self.advance();
-                let end = self.try_parse_cell_ref()?;
-                return Ok(Token::RangeRef(RangeRef {
-                    start: cell_ref,
-                    end,
-                }));
+        // Try to parse as cell reference first.
+        // IMPORTANT: This parse is speculative; if it fails, we must rewind so that
+        // the same input can be parsed as a function/name instead.
+        if self.peek() == Some(b'.') || self.peek() == Some(b'$') || self.peek_is_letter() {
+            let start_pos = self.position;
+            if let Ok(cell_ref) = self.try_parse_cell_ref() {
+                // Check if it's a range
+                self.skip_whitespace();
+                if self.peek() == Some(b':') {
+                    self.advance();
+                    let end = self.try_parse_cell_ref()?;
+                    return Ok(Token::RangeRef(RangeRef {
+                        start: cell_ref,
+                        end,
+                    }));
+                }
+                return Ok(Token::CellRef(cell_ref));
             }
-            return Ok(Token::CellRef(cell_ref));
+
+            // Rewind: not a valid cell ref (e.g., "SUM(" should be a function)
+            self.position = start_pos;
         }
 
         // Try to parse as function or named range

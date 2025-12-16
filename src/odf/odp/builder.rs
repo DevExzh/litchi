@@ -169,12 +169,7 @@ impl PresentationBuilder {
                 // Text box or auto shape with text content
                 if shape.has_text() {
                     format!(
-                        r#"        <draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}">
-          <draw:text-box>
-            <text:p text:style-name="P2">{}</text:p>
-          </draw:text-box>
-        </draw:frame>
-"#,
+                        r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
                         escape_xml(name),
                         style_name,
                         x,
@@ -186,8 +181,7 @@ impl PresentationBuilder {
                 } else {
                     // Empty frame
                     format!(
-                        r#"        <draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"/>
-"#,
+                        r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"/>"#,
                         escape_xml(name),
                         style_name,
                         x,
@@ -200,10 +194,7 @@ impl PresentationBuilder {
             ShapeType::Picture => {
                 // Image frame (basic support - would need actual image path)
                 format!(
-                    r#"        <draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}">
-          <draw:image/>
-        </draw:frame>
-"#,
+                    r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><draw:image/></draw:frame>"#,
                     escape_xml(name),
                     style_name,
                     x,
@@ -217,8 +208,7 @@ impl PresentationBuilder {
                 let x2 = shape.width.as_deref().unwrap_or("12cm");
                 let y2 = shape.height.as_deref().unwrap_or("8cm");
                 format!(
-                    r#"        <draw:line draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x1="{}" svg:y1="{}" svg:x2="{}" svg:y2="{}"/>
-"#,
+                    r#"<draw:line draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x1="{}" svg:y1="{}" svg:x2="{}" svg:y2="{}"/>"#,
                     escape_xml(name),
                     style_name,
                     x,
@@ -231,12 +221,7 @@ impl PresentationBuilder {
                 // Generic shape or unsupported - render as text frame if it has text
                 if shape.has_text() {
                     format!(
-                        r#"        <draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}">
-          <draw:text-box>
-            <text:p text:style-name="P2">{}</text:p>
-          </draw:text-box>
-        </draw:frame>
-"#,
+                        r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
                         escape_xml(name),
                         style_name,
                         x,
@@ -254,24 +239,34 @@ impl PresentationBuilder {
 
     /// Generate the content.xml body for presentation
     fn generate_content_body(&self) -> String {
-        let mut body = String::new();
+        let shape_count = self.slides.iter().map(|s| s.shapes.len()).sum::<usize>();
+        let mut estimated = 256usize;
+        estimated += self.slides.len() * 128;
+        estimated += shape_count * 192;
+        estimated += self
+            .slides
+            .iter()
+            .map(|s| s.text.len() + s.title.as_ref().map(|t| t.len()).unwrap_or(0))
+            .sum::<usize>();
+        estimated += self
+            .slides
+            .iter()
+            .flat_map(|s| s.shapes.iter())
+            .map(|sh| sh.text.len() + sh.name.as_ref().map(|n| n.len()).unwrap_or(0))
+            .sum::<usize>();
+
+        let mut body = String::with_capacity(estimated);
 
         for (i, slide) in self.slides.iter().enumerate() {
             body.push_str(&format!(
-                r#"      <draw:page draw:name="page{}" draw:style-name="dp1" draw:master-page-name="Default">
-"#,
+                r#"<draw:page draw:name="page{}" draw:style-name="dp1" draw:master-page-name="Default">"#,
                 i + 1
             ));
 
             // Add title frame if title exists
             if let Some(ref title) = slide.title {
                 body.push_str(&format!(
-                    r#"        <draw:frame draw:style-name="gr1" draw:text-style-name="P1" draw:layer="layout" svg:width="25.199cm" svg:height="3.506cm" svg:x="1.4cm" svg:y="0.962cm">
-          <draw:text-box>
-            <text:p text:style-name="P1">{}</text:p>
-          </draw:text-box>
-        </draw:frame>
-"#,
+                    r#"<draw:frame draw:style-name="gr1" draw:text-style-name="P1" draw:layer="layout" svg:width="25.199cm" svg:height="3.506cm" svg:x="1.4cm" svg:y="0.962cm"><draw:text-box><text:p text:style-name="P1">{}</text:p></draw:text-box></draw:frame>"#,
                     escape_xml(title)
                 ));
             }
@@ -284,12 +279,7 @@ impl PresentationBuilder {
                     "2.0cm"
                 };
                 body.push_str(&format!(
-                    r#"        <draw:frame draw:style-name="gr2" draw:text-style-name="P2" draw:layer="layout" svg:width="25.199cm" svg:height="10cm" svg:x="1.4cm" svg:y="{}">
-          <draw:text-box>
-            <text:p text:style-name="P2">{}</text:p>
-          </draw:text-box>
-        </draw:frame>
-"#,
+                    r#"<draw:frame draw:style-name="gr2" draw:text-style-name="P2" draw:layer="layout" svg:width="25.199cm" svg:height="10cm" svg:x="1.4cm" svg:y="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
                     y_position,
                     escape_xml(&slide.text)
                 ));
@@ -300,7 +290,7 @@ impl PresentationBuilder {
                 body.push_str(&Self::generate_shape_xml(shape, shape_idx));
             }
 
-            body.push_str("      </draw:page>\n");
+            body.push_str("</draw:page>");
         }
 
         body
@@ -311,35 +301,7 @@ impl PresentationBuilder {
         let body = self.generate_content_body();
 
         format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?>
-<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
-                          xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
-                          xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
-                          xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
-                          xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
-                          xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
-                          xmlns:xlink="http://www.w3.org/1999/xlink"
-                          xmlns:dc="http://purl.org/dc/elements/1.1/"
-                          xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"
-                          xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0"
-                          xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0"
-                          xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
-                          xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"
-                          xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0"
-                          xmlns:math="http://www.w3.org/1998/Math/MathML"
-                          xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0"
-                          xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0"
-                          xmlns:ooo="http://openoffice.org/2004/office"
-                          office:version="1.3">
-  <office:scripts/>
-  <office:font-face-decls/>
-  <office:automatic-styles/>
-  <office:body>
-    <office:presentation>
-{}    </office:presentation>
-  </office:body>
-</office:document-content>
-"#,
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:math="http://www.w3.org/1998/Math/MathML" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:ooo="http://openoffice.org/2004/office" office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles/><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
             body
         )
     }
@@ -349,34 +311,21 @@ impl PresentationBuilder {
         let now = chrono::Utc::now().to_rfc3339();
 
         let mut meta = format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?>
-<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
-                       xmlns:xlink="http://www.w3.org/1999/xlink"
-                       xmlns:dc="http://purl.org/dc/elements/1.1/"
-                       xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"
-                       office:version="1.3">
-  <office:meta>
-    <meta:generator>Litchi/0.0.1</meta:generator>
-    <meta:creation-date>{}</meta:creation-date>
-    <dc:date>{}</dc:date>
-"#,
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"><office:meta><meta:generator>Litchi/0.0.1</meta:generator><meta:creation-date>{}</meta:creation-date><dc:date>{}</dc:date>"#,
             now, now
         );
 
         // Add optional metadata fields
         if let Some(ref title) = self.metadata.title {
-            meta.push_str(&format!("    <dc:title>{}</dc:title>\n", escape_xml(title)));
+            meta.push_str(&format!("<dc:title>{}</dc:title>", escape_xml(title)));
         }
 
         if let Some(ref author) = self.metadata.author {
-            meta.push_str(&format!(
-                "    <dc:creator>{}</dc:creator>\n",
-                escape_xml(author)
-            ));
+            meta.push_str(&format!("<dc:creator>{}</dc:creator>", escape_xml(author)));
         }
 
-        meta.push_str("  </office:meta>\n");
-        meta.push_str("</office:document-meta>\n");
+        meta.push_str("</office:meta>");
+        meta.push_str("</office:document-meta>");
 
         meta
     }
