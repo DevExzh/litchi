@@ -23,7 +23,7 @@
 /// # Example
 ///
 /// ```rust,no_run
-/// use litchi::doc::Package;
+/// use litchi::ole::doc::Package;
 ///
 /// // Open a document
 /// let package = Package::open("document.doc")?;

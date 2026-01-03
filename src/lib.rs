@@ -58,7 +58,7 @@
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create a new empty document
-//! let pkg = Package::new()?;
+//! let mut pkg = Package::new()?;
 //!
 //! // Save the document
 //! pkg.save("new_document.docx")?;
@@ -102,7 +102,7 @@
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create a new empty presentation
-//! let pkg = Package::new()?;
+//! let mut pkg = Package::new()?;
 //!
 //! // Save the presentation
 //! pkg.save("new_presentation.pptx")?;
@@ -123,7 +123,7 @@
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create a new empty workbook
-//! let workbook = Workbook::create()?;
+//! let mut workbook = Workbook::create()?;
 //!
 //! // Save the workbook
 //! workbook.save("new_workbook.xlsx")?;

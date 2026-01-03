@@ -30,7 +30,7 @@ type ParsedMtefData = (
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::doc::Package;
+/// use litchi::ole::doc::Package;
 ///
 /// let mut pkg = Package::open("document.doc")?;
 /// let doc = pkg.document()?;
@@ -359,7 +359,7 @@ impl Document {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::doc::Package;
+    /// use litchi::ole::doc::Package;
     ///
     /// let mut pkg = Package::open("document.doc")?;
     /// let doc = pkg.document()?;
