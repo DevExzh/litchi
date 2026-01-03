@@ -333,7 +333,7 @@ pub fn wide_str(buf: &[u8], str_len: &mut usize) -> XlsbResult<String> {
     *str_len = 4 + len * 2;
     let utf16_data = &buf[4..*str_len];
 
-    // Convert UTF-16LE to UTF-8 using encoding_rs like calamine
+    // Convert UTF-16LE to UTF-8 using encoding_rs
     use encoding_rs::UTF_16LE;
     Ok(UTF_16LE.decode(utf16_data).0.into_owned())
 }
@@ -358,7 +358,7 @@ pub fn wide_str_with_len(buf: &[u8]) -> XlsbResult<(String, usize)> {
     let consumed = 4 + len * 2;
     let utf16_data = &buf[4..consumed];
 
-    // Convert UTF-16LE to UTF-8 using encoding_rs like calamine
+    // Convert UTF-16LE to UTF-8 using encoding_rs
     use encoding_rs::UTF_16LE;
     Ok((UTF_16LE.decode(utf16_data).0.into_owned(), consumed))
 }

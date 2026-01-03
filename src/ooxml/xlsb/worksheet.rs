@@ -4,7 +4,7 @@ use crate::ooxml::xlsb::cell::XlsbCell;
 use crate::ooxml::xlsb::comments::Comment;
 use crate::ooxml::xlsb::hyperlinks::Hyperlink;
 use crate::ooxml::xlsb::merged_cells::MergedCell;
-use crate::sheet::{Cell as SheetCell, CellIterator, CellValue, RowIterator, Worksheet};
+use crate::sheet::{Cell as SheetCell, CellIterator, CellValue, Result, RowIterator, Worksheet};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
@@ -99,11 +99,7 @@ impl Worksheet for XlsbWorksheet {
         }
     }
 
-    fn cell(
-        &self,
-        row: u32,
-        column: u32,
-    ) -> Result<Box<dyn SheetCell + '_>, Box<dyn std::error::Error>> {
+    fn cell(&self, row: u32, column: u32) -> Result<Box<dyn SheetCell + '_>> {
         match self.cells.get(&(row, column)) {
             Some(cell) => Ok(Box::new(cell.clone())),
             None => {
@@ -114,11 +110,9 @@ impl Worksheet for XlsbWorksheet {
         }
     }
 
-    fn cell_by_coordinate(
-        &self,
-        coordinate: &str,
-    ) -> Result<Box<dyn SheetCell + '_>, Box<dyn std::error::Error>> {
-        let (row, col) = crate::ooxml::xlsb::utils::parse_cell_reference(coordinate)?;
+    fn cell_by_coordinate(&self, coordinate: &str) -> Result<Box<dyn SheetCell + '_>> {
+        let (row, col) = crate::ooxml::xlsb::utils::parse_cell_reference(coordinate)
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
         self.cell(row, col)
     }
 
@@ -136,7 +130,7 @@ impl Worksheet for XlsbWorksheet {
         })
     }
 
-    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>, Box<dyn std::error::Error>> {
+    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>> {
         let row_idx = row_idx as u32;
         let mut row_data = Vec::new();
 
@@ -150,11 +144,7 @@ impl Worksheet for XlsbWorksheet {
         Ok(Cow::Owned(row_data))
     }
 
-    fn cell_value(
-        &self,
-        row: u32,
-        column: u32,
-    ) -> Result<Cow<'_, CellValue>, Box<dyn std::error::Error>> {
+    fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
         match self.cells.get(&(row, column)) {
             Some(cell) => Ok(Cow::Borrowed(cell.value())),
             None => Ok(Cow::Borrowed(CellValue::EMPTY)),
@@ -169,7 +159,7 @@ struct XlsbCellIterator<'a> {
 }
 
 impl<'a> CellIterator<'a> for XlsbCellIterator<'a> {
-    fn next(&mut self) -> Option<Result<Box<dyn SheetCell + 'a>, Box<dyn std::error::Error>>> {
+    fn next(&mut self) -> Option<Result<Box<dyn SheetCell + 'a>>> {
         if self.index >= self.cells.len() {
             None
         } else {
@@ -187,7 +177,7 @@ struct XlsbRowIterator<'a> {
 }
 
 impl<'a> RowIterator<'a> for XlsbRowIterator<'a> {
-    fn next(&mut self) -> Option<Result<Cow<'a, [CellValue]>, Box<dyn std::error::Error>>> {
+    fn next(&mut self) -> Option<Result<Cow<'a, [CellValue]>>> {
         if self.current_row >= self.worksheet.row_count() {
             None
         } else {

@@ -121,10 +121,16 @@ impl ContentTypeMap {
                                 let attr = attr?;
                                 match attr.key.as_ref() {
                                     b"Extension" => {
-                                        extension = Some(attr.unescape_value()?.to_string());
+                                        extension = Some(
+                                            attr.decode_and_unescape_value(reader.decoder())?
+                                                .to_string(),
+                                        );
                                     },
                                     b"ContentType" => {
-                                        content_type = Some(attr.unescape_value()?.to_string());
+                                        content_type = Some(
+                                            attr.decode_and_unescape_value(reader.decoder())?
+                                                .to_string(),
+                                        );
                                     },
                                     _ => {},
                                 }
@@ -143,10 +149,16 @@ impl ContentTypeMap {
                                 let attr = attr?;
                                 match attr.key.as_ref() {
                                     b"PartName" => {
-                                        partname = Some(attr.unescape_value()?.to_string());
+                                        partname = Some(
+                                            attr.decode_and_unescape_value(reader.decoder())?
+                                                .to_string(),
+                                        );
                                     },
                                     b"ContentType" => {
-                                        content_type = Some(attr.unescape_value()?.to_string());
+                                        content_type = Some(
+                                            attr.decode_and_unescape_value(reader.decoder())?
+                                                .to_string(),
+                                        );
                                     },
                                     _ => {},
                                 }
@@ -277,10 +289,29 @@ impl PackageReader {
                         for attr in e.attributes() {
                             let attr = attr?;
                             match attr.key.as_ref() {
-                                b"Id" => r_id = Some(attr.unescape_value()?.to_string()),
-                                b"Type" => reltype = Some(attr.unescape_value()?.to_string()),
-                                b"Target" => target_ref = Some(attr.unescape_value()?.to_string()),
-                                b"TargetMode" => target_mode = attr.unescape_value()?.to_string(),
+                                b"Id" => {
+                                    r_id = Some(
+                                        attr.decode_and_unescape_value(reader.decoder())?
+                                            .to_string(),
+                                    )
+                                },
+                                b"Type" => {
+                                    reltype = Some(
+                                        attr.decode_and_unescape_value(reader.decoder())?
+                                            .to_string(),
+                                    )
+                                },
+                                b"Target" => {
+                                    target_ref = Some(
+                                        attr.decode_and_unescape_value(reader.decoder())?
+                                            .to_string(),
+                                    )
+                                },
+                                b"TargetMode" => {
+                                    target_mode = attr
+                                        .decode_and_unescape_value(reader.decoder())?
+                                        .to_string()
+                                },
                                 _ => {},
                             }
                         }

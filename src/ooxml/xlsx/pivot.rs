@@ -11,7 +11,7 @@ pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
     let workbook_part = package.get_part(&workbook_uri)?;
     let workbook_xml = std::str::from_utf8(workbook_part.blob())?;
 
-    let (worksheets, _) = workbook_parser::parse_workbook_xml(workbook_xml)?;
+    let (worksheets, _, _) = workbook_parser::parse_workbook_xml(workbook_xml)?;
 
     if worksheets.is_empty() {
         return Ok(Vec::new());

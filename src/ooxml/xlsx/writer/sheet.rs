@@ -606,7 +606,10 @@ impl MutableWorksheet {
 
     /// Get a cell value.
     pub fn cell_value(&self, row: u32, col: u32) -> Option<&CellValue> {
-        self.cells.get(&(row, col))
+        if row == 0 || col == 0 {
+            return None;
+        }
+        self.cells.get(&(row - 1, col - 1))
     }
 
     /// Clear a cell.

@@ -8,7 +8,7 @@ use crate::ole::xls::records::{
     SharedStringTable, XlsEncoding,
 };
 use crate::ole::xls::worksheet::XlsWorksheet;
-use crate::sheet::{Worksheet as SheetTrait, WorksheetIterator};
+use crate::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
@@ -263,8 +263,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     }
 }
 
-impl<R: Read + Seek + std::fmt::Debug> crate::sheet::WorkbookTrait for XlsWorkbook<R> {
-    fn active_worksheet(&self) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
+impl<R: Read + Seek + std::fmt::Debug + Send + Sync> crate::sheet::WorkbookTrait
+    for XlsWorkbook<R>
+{
+    fn active_worksheet(&self) -> Result<Box<dyn SheetTrait + '_>> {
         if self.worksheets.is_empty() {
             return Err(Box::new(XlsError::WorksheetNotFound(
                 "No worksheets found".to_string(),
@@ -279,10 +281,7 @@ impl<R: Read + Seek + std::fmt::Debug> crate::sheet::WorkbookTrait for XlsWorkbo
         &self.worksheet_names
     }
 
-    fn worksheet_by_name(
-        &self,
-        name: &str,
-    ) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
+    fn worksheet_by_name(&self, name: &str) -> Result<Box<dyn SheetTrait + '_>> {
         for worksheet in &self.worksheets {
             if worksheet.name() == name {
                 // Return reference instead of clone - zero-copy!
@@ -292,10 +291,7 @@ impl<R: Read + Seek + std::fmt::Debug> crate::sheet::WorkbookTrait for XlsWorkbo
         Err(Box::new(XlsError::WorksheetNotFound(name.to_string())))
     }
 
-    fn worksheet_by_index(
-        &self,
-        index: usize,
-    ) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
+    fn worksheet_by_index(&self, index: usize) -> Result<Box<dyn SheetTrait + '_>> {
         if index >= self.worksheets.len() {
             return Err(Box::new(XlsError::WorksheetNotFound(format!(
                 "Index {} out of bounds",
@@ -320,6 +316,10 @@ impl<R: Read + Seek + std::fmt::Debug> crate::sheet::WorkbookTrait for XlsWorkbo
     fn active_sheet_index(&self) -> usize {
         0 // Default to first sheet
     }
+
+    fn is_1904_date_system(&self) -> bool {
+        self.is_1904_date_system
+    }
 }
 
 /// Worksheet iterator for XLS workbooks
@@ -329,7 +329,7 @@ struct XlsWorksheetIterator<'a> {
 }
 
 impl<'a> WorksheetIterator<'a> for XlsWorksheetIterator<'a> {
-    fn next(&mut self) -> Option<Result<Box<dyn SheetTrait + 'a>, Box<dyn std::error::Error>>> {
+    fn next(&mut self) -> Option<Result<Box<dyn SheetTrait + 'a>>> {
         if self.index >= self.worksheets.len() {
             None
         } else {

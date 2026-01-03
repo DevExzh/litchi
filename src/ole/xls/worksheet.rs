@@ -2,7 +2,7 @@
 
 use crate::ole::xls::cell::XlsCell;
 use crate::ole::xls::error::XlsError;
-use crate::sheet::{Cell as SheetCell, CellIterator, CellValue, RowIterator, Worksheet};
+use crate::sheet::{Cell as SheetCell, CellIterator, CellValue, Result, RowIterator, Worksheet};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -94,11 +94,7 @@ impl Worksheet for XlsWorksheet {
         }
     }
 
-    fn cell(
-        &self,
-        row: u32,
-        column: u32,
-    ) -> Result<Box<dyn SheetCell + '_>, Box<dyn std::error::Error>> {
+    fn cell(&self, row: u32, column: u32) -> Result<Box<dyn SheetCell + '_>> {
         match self.cells.get(&(row, column)) {
             // Return reference instead of clone - zero-copy!
             Some(cell) => Ok(Box::new(cell)),
@@ -110,12 +106,12 @@ impl Worksheet for XlsWorksheet {
         }
     }
 
-    fn cell_by_coordinate(
-        &self,
-        coordinate: &str,
-    ) -> Result<Box<dyn SheetCell + '_>, Box<dyn std::error::Error>> {
-        let (row, col) = crate::ole::xls::utils::parse_cell_reference(coordinate)
-            .ok_or_else(|| XlsError::InvalidCellReference(coordinate.to_string()))?;
+    fn cell_by_coordinate(&self, coordinate: &str) -> Result<Box<dyn SheetCell + '_>> {
+        let (row, col) =
+            crate::ole::xls::utils::parse_cell_reference(coordinate).ok_or_else(|| {
+                Box::new(XlsError::InvalidCellReference(coordinate.to_string()))
+                    as Box<dyn std::error::Error + Send + Sync>
+            })?;
         self.cell(row, col)
     }
 
@@ -133,7 +129,7 @@ impl Worksheet for XlsWorksheet {
         })
     }
 
-    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>, Box<dyn std::error::Error>> {
+    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>> {
         let row_idx = row_idx as u32;
         let mut row_data = Vec::new();
 
@@ -148,11 +144,7 @@ impl Worksheet for XlsWorksheet {
         Ok(Cow::Owned(row_data))
     }
 
-    fn cell_value(
-        &self,
-        row: u32,
-        column: u32,
-    ) -> Result<Cow<'_, CellValue>, Box<dyn std::error::Error>> {
+    fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
         match self.cells.get(&(row, column)) {
             Some(cell) => Ok(Cow::Borrowed(cell.value())),
             None => Ok(Cow::Borrowed(CellValue::EMPTY)),
@@ -178,18 +170,11 @@ impl Worksheet for &XlsWorksheet {
         (*self).dimensions()
     }
 
-    fn cell(
-        &self,
-        row: u32,
-        column: u32,
-    ) -> Result<Box<dyn SheetCell + '_>, Box<dyn std::error::Error>> {
+    fn cell(&self, row: u32, column: u32) -> Result<Box<dyn SheetCell + '_>> {
         (*self).cell(row, column)
     }
 
-    fn cell_by_coordinate(
-        &self,
-        coordinate: &str,
-    ) -> Result<Box<dyn SheetCell + '_>, Box<dyn std::error::Error>> {
+    fn cell_by_coordinate(&self, coordinate: &str) -> Result<Box<dyn SheetCell + '_>> {
         (*self).cell_by_coordinate(coordinate)
     }
 
@@ -201,15 +186,11 @@ impl Worksheet for &XlsWorksheet {
         (*self).rows()
     }
 
-    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>, Box<dyn std::error::Error>> {
+    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>> {
         (*self).row(row_idx)
     }
 
-    fn cell_value(
-        &self,
-        row: u32,
-        column: u32,
-    ) -> Result<Cow<'_, CellValue>, Box<dyn std::error::Error>> {
+    fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
         (*self).cell_value(row, column)
     }
 }
@@ -221,7 +202,7 @@ struct XlsCellIterator<'a> {
 }
 
 impl<'a> CellIterator<'a> for XlsCellIterator<'a> {
-    fn next(&mut self) -> Option<Result<Box<dyn SheetCell + 'a>, Box<dyn std::error::Error>>> {
+    fn next(&mut self) -> Option<Result<Box<dyn SheetCell + 'a>>> {
         if self.index >= self.cells.len() {
             None
         } else {
@@ -240,7 +221,7 @@ struct XlsRowIterator<'a> {
 }
 
 impl<'a> RowIterator<'a> for XlsRowIterator<'a> {
-    fn next(&mut self) -> Option<Result<Cow<'a, [CellValue]>, Box<dyn std::error::Error>>> {
+    fn next(&mut self) -> Option<Result<Cow<'a, [CellValue]>>> {
         if self.current_row >= self.worksheet.row_count() {
             None
         } else {

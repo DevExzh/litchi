@@ -17,7 +17,7 @@ use std::sync::Arc;
 /// Parts are the fundamental units of content in an OPC package. Each part
 /// has a unique partname (PackURI), a content type, and may have relationships
 /// to other parts.
-pub trait Part {
+pub trait Part: Send + Sync {
     /// Get the partname of this part.
     fn partname(&self) -> &PackURI;
 
@@ -288,7 +288,7 @@ impl XmlPart {
                         for attr in e.attributes() {
                             let attr = attr?;
                             let key = std::str::from_utf8(attr.key.as_ref())?;
-                            let value = attr.unescape_value()?;
+                            let value = attr.decode_and_unescape_value(reader.decoder())?;
                             attrs.insert(key.to_string(), value.to_string());
                         }
                         results.push(attrs);
@@ -359,7 +359,11 @@ impl PartFactory {
     ///
     /// # Returns
     /// A boxed Part trait object
-    pub fn load(partname: PackURI, content_type: String, blob: Vec<u8>) -> Result<Box<dyn Part>> {
+    pub fn load(
+        partname: PackURI,
+        content_type: String,
+        blob: Vec<u8>,
+    ) -> Result<Box<dyn Part + Send + Sync>> {
         // Determine if this is an XML part based on content type
         if Self::is_xml_content_type(&content_type) {
             Ok(Box::new(XmlPart::load(partname, content_type, blob)))

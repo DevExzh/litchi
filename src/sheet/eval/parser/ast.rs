@@ -33,9 +33,14 @@ pub enum Expr {
     /// Literal value (number, string, boolean).
     Literal(CellValue),
     /// Single-cell reference.
-    Reference { sheet: String, row: u32, col: u32 },
+    Reference {
+        sheet: String,
+        row: u32,
+        col: u32,
+    },
     /// Rectangular range reference.
     Range(RangeRef),
+    Name(String),
     /// Unary minus (e.g., -A1, -1).
     UnaryMinus(Box<Expr>),
     /// Binary arithmetic operation.
@@ -45,5 +50,8 @@ pub enum Expr {
         right: Box<Expr>,
     },
     /// Function call, e.g. SUM(A1:B3).
-    FunctionCall { name: String, args: Vec<Expr> },
+    FunctionCall {
+        name: String,
+        args: Vec<Expr>,
+    },
 }

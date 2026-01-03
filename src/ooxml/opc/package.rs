@@ -25,9 +25,9 @@ pub struct OpcPackage {
     rels: Relationships,
 
     /// All parts in the package, indexed by partname
-    /// Using Box<dyn Part> for trait objects to allow different part types
+    /// Using Box<dyn Part + Send + Sync> for trait objects to allow different part types
     /// PackURI keys avoid string allocations compared to String keys
-    parts: HashMap<PackURI, Box<dyn Part>>,
+    parts: HashMap<PackURI, Box<dyn Part + Send + Sync>>,
 }
 
 impl std::fmt::Debug for OpcPackage {
@@ -104,7 +104,8 @@ impl OpcPackage {
         let sparts = pkg_reader.take_sparts();
 
         // Pre-allocate with known capacity to avoid reallocations
-        let mut parts_map: HashMap<PackURI, Box<dyn Part>> = HashMap::with_capacity(sparts.len());
+        let mut parts_map: HashMap<PackURI, Box<dyn Part + Send + Sync>> =
+            HashMap::with_capacity(sparts.len());
 
         // Create all parts - move data instead of cloning
         for spart in sparts {
@@ -190,7 +191,7 @@ impl OpcPackage {
     ///
     /// # Arguments
     /// * `part` - The part to add
-    pub fn add_part(&mut self, part: Box<dyn Part>) {
+    pub fn add_part(&mut self, part: Box<dyn Part + Send + Sync>) {
         let partname = part.partname().clone();
         self.parts.insert(partname, part);
     }

@@ -2,10 +2,95 @@ use crate::sheet::{CellValue, Result};
 
 use super::super::parser::Expr;
 use super::criteria::{Criteria, matches_criteria, parse_criteria};
-use super::{EngineCtx, FlatRange, flatten_range_expr, to_number, to_text};
+use super::{EvalCtx, FlatRange, flatten_range_expr, to_number, to_text};
 
-pub(crate) fn eval_sumif<C: EngineCtx + ?Sized>(
-    ctx: &C,
+#[derive(Clone, Copy)]
+enum Extremum {
+    Min,
+    Max,
+}
+
+async fn minmax_ifs(
+    ctx: EvalCtx<'_>,
+    current_sheet: &str,
+    args: &[Expr],
+    func_name: &str,
+    extremum: Extremum,
+) -> Result<CellValue> {
+    if args.len() < 3 || args.len().is_multiple_of(2) {
+        return Ok(CellValue::Error(format!(
+            "{func_name} expects 3 or more arguments ({func_name_lower} range, criteria_range1, criteria1, ...)",
+            func_name_lower = func_name.to_lowercase()
+        )));
+    }
+
+    let target_range = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
+
+    let mut crit_ranges: Vec<FlatRange> = Vec::new();
+    let mut crits: Vec<Criteria> = Vec::new();
+
+    let mut i = 1;
+    while i + 1 < args.len() {
+        let r = flatten_range_expr(ctx, current_sheet, &args[i]).await?;
+        if r.rows != target_range.rows || r.cols != target_range.cols {
+            return Ok(CellValue::Error(format!(
+                "{func_name} criteria ranges must have the same size as the target range"
+            )));
+        }
+        let crit_val = super::evaluate_expression(ctx, current_sheet, &args[i + 1]).await?;
+        let crit_str = to_text(&crit_val);
+        let c = match parse_criteria(&crit_str) {
+            Some(c) => c,
+            None => {
+                return Ok(CellValue::Error(format!(
+                    "{func_name} received an invalid criteria"
+                )));
+            },
+        };
+        crit_ranges.push(r);
+        crits.push(c);
+        i += 2;
+    }
+
+    let mut best: Option<f64> = None;
+    for idx in 0..target_range.values.len() {
+        let mut ok = true;
+        for (r, c) in crit_ranges.iter().zip(crits.iter()) {
+            if !matches_criteria(&r.values[idx], c) {
+                ok = false;
+                break;
+            }
+        }
+        if ok && let Some(value) = to_number(&target_range.values[idx]) {
+            best = Some(match (best, extremum) {
+                (Some(current), Extremum::Min) => current.min(value),
+                (Some(current), Extremum::Max) => current.max(value),
+                (None, _) => value,
+            });
+        }
+    }
+
+    Ok(CellValue::Float(best.unwrap_or(0.0)))
+}
+
+pub(crate) async fn eval_minifs(
+    ctx: EvalCtx<'_>,
+    current_sheet: &str,
+    args: &[Expr],
+) -> Result<CellValue> {
+    minmax_ifs(ctx, current_sheet, args, "MINIFS", Extremum::Min).await
+}
+
+pub(crate) async fn eval_maxifs(
+    ctx: EvalCtx<'_>,
+    current_sheet: &str,
+    args: &[Expr],
+) -> Result<CellValue> {
+    minmax_ifs(ctx, current_sheet, args, "MAXIFS", Extremum::Max).await
+}
+
+pub(crate) async fn eval_sumif(
+    ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
@@ -15,8 +100,8 @@ pub(crate) fn eval_sumif<C: EngineCtx + ?Sized>(
         ));
     }
 
-    let range = flatten_range_expr(ctx, current_sheet, &args[0])?;
-    let crit_val = super::evaluate_expression(ctx, current_sheet, &args[1])?;
+    let range = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
+    let crit_val = super::evaluate_expression(ctx, current_sheet, &args[1]).await?;
     let crit_str = to_text(&crit_val);
     let criteria = match parse_criteria(&crit_str) {
         Some(c) => c,
@@ -26,7 +111,7 @@ pub(crate) fn eval_sumif<C: EngineCtx + ?Sized>(
     };
 
     let sum_range = if args.len() == 3 {
-        let sr = flatten_range_expr(ctx, current_sheet, &args[2])?;
+        let sr = flatten_range_expr(ctx, current_sheet, &args[2]).await?;
         if sr.rows != range.rows || sr.cols != range.cols {
             return Ok(CellValue::Error(
                 "SUMIF range and sum_range must have the same size".to_string(),
@@ -53,8 +138,8 @@ pub(crate) fn eval_sumif<C: EngineCtx + ?Sized>(
     Ok(CellValue::Float(total))
 }
 
-pub(crate) fn eval_countif<C: EngineCtx + ?Sized>(
-    ctx: &C,
+pub(crate) async fn eval_countif(
+    ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
@@ -64,8 +149,8 @@ pub(crate) fn eval_countif<C: EngineCtx + ?Sized>(
         ));
     }
 
-    let range = flatten_range_expr(ctx, current_sheet, &args[0])?;
-    let crit_val = super::evaluate_expression(ctx, current_sheet, &args[1])?;
+    let range = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
+    let crit_val = super::evaluate_expression(ctx, current_sheet, &args[1]).await?;
     let crit_str = to_text(&crit_val);
     let criteria = match parse_criteria(&crit_str) {
         Some(c) => c,
@@ -84,8 +169,8 @@ pub(crate) fn eval_countif<C: EngineCtx + ?Sized>(
     Ok(CellValue::Int(count))
 }
 
-pub(crate) fn eval_averageif<C: EngineCtx + ?Sized>(
-    ctx: &C,
+pub(crate) async fn eval_averageif(
+    ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
@@ -95,8 +180,8 @@ pub(crate) fn eval_averageif<C: EngineCtx + ?Sized>(
         ));
     }
 
-    let range = flatten_range_expr(ctx, current_sheet, &args[0])?;
-    let crit_val = super::evaluate_expression(ctx, current_sheet, &args[1])?;
+    let range = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
+    let crit_val = super::evaluate_expression(ctx, current_sheet, &args[1]).await?;
     let crit_str = to_text(&crit_val);
     let criteria = match parse_criteria(&crit_str) {
         Some(c) => c,
@@ -106,7 +191,7 @@ pub(crate) fn eval_averageif<C: EngineCtx + ?Sized>(
     };
 
     let avg_range = if args.len() == 3 {
-        let ar = flatten_range_expr(ctx, current_sheet, &args[2])?;
+        let ar = flatten_range_expr(ctx, current_sheet, &args[2]).await?;
         if ar.rows != range.rows || ar.cols != range.cols {
             return Ok(CellValue::Error(
                 "AVERAGEIF range and average_range must have the same size".to_string(),
@@ -142,8 +227,8 @@ pub(crate) fn eval_averageif<C: EngineCtx + ?Sized>(
     Ok(CellValue::Float(total / count as f64))
 }
 
-pub(crate) fn eval_sumifs<C: EngineCtx + ?Sized>(
-    ctx: &C,
+pub(crate) async fn eval_sumifs(
+    ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
@@ -154,20 +239,20 @@ pub(crate) fn eval_sumifs<C: EngineCtx + ?Sized>(
         ));
     }
 
-    let sum_range = flatten_range_expr(ctx, current_sheet, &args[0])?;
+    let sum_range = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
 
     let mut crit_ranges: Vec<FlatRange> = Vec::new();
     let mut crits: Vec<Criteria> = Vec::new();
 
     let mut i = 1;
     while i + 1 < args.len() {
-        let r = flatten_range_expr(ctx, current_sheet, &args[i])?;
+        let r = flatten_range_expr(ctx, current_sheet, &args[i]).await?;
         if r.rows != sum_range.rows || r.cols != sum_range.cols {
             return Ok(CellValue::Error(
                 "SUMIFS criteria ranges must have the same size as sum_range".to_string(),
             ));
         }
-        let crit_val = super::evaluate_expression(ctx, current_sheet, &args[i + 1])?;
+        let crit_val = super::evaluate_expression(ctx, current_sheet, &args[i + 1]).await?;
         let crit_str = to_text(&crit_val);
         let c = match parse_criteria(&crit_str) {
             Some(c) => c,
@@ -197,8 +282,8 @@ pub(crate) fn eval_sumifs<C: EngineCtx + ?Sized>(
     Ok(CellValue::Float(total))
 }
 
-pub(crate) fn eval_countifs<C: EngineCtx + ?Sized>(
-    ctx: &C,
+pub(crate) async fn eval_countifs(
+    ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
@@ -209,7 +294,7 @@ pub(crate) fn eval_countifs<C: EngineCtx + ?Sized>(
         ));
     }
 
-    let first_range = flatten_range_expr(ctx, current_sheet, &args[0])?;
+    let first_range = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
     let mut crit_ranges: Vec<FlatRange> = Vec::new();
     let mut crits: Vec<Criteria> = Vec::new();
 
@@ -218,14 +303,14 @@ pub(crate) fn eval_countifs<C: EngineCtx + ?Sized>(
         let r = if i == 0 {
             first_range.clone()
         } else {
-            flatten_range_expr(ctx, current_sheet, &args[i])?
+            flatten_range_expr(ctx, current_sheet, &args[i]).await?
         };
         if r.rows != first_range.rows || r.cols != first_range.cols {
             return Ok(CellValue::Error(
                 "COUNTIFS criteria ranges must all have the same size".to_string(),
             ));
         }
-        let crit_val = super::evaluate_expression(ctx, current_sheet, &args[i + 1])?;
+        let crit_val = super::evaluate_expression(ctx, current_sheet, &args[i + 1]).await?;
         let crit_str = to_text(&crit_val);
         let c = match parse_criteria(&crit_str) {
             Some(c) => c,
@@ -255,8 +340,8 @@ pub(crate) fn eval_countifs<C: EngineCtx + ?Sized>(
     Ok(CellValue::Int(count))
 }
 
-pub(crate) fn eval_averageifs<C: EngineCtx + ?Sized>(
-    ctx: &C,
+pub(crate) async fn eval_averageifs(
+    ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
@@ -266,19 +351,19 @@ pub(crate) fn eval_averageifs<C: EngineCtx + ?Sized>(
         ));
     }
 
-    let avg_range = flatten_range_expr(ctx, current_sheet, &args[0])?;
+    let avg_range = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
     let mut crit_ranges: Vec<FlatRange> = Vec::new();
     let mut crits: Vec<Criteria> = Vec::new();
 
     let mut i = 1;
     while i + 1 < args.len() {
-        let r = flatten_range_expr(ctx, current_sheet, &args[i])?;
+        let r = flatten_range_expr(ctx, current_sheet, &args[i]).await?;
         if r.rows != avg_range.rows || r.cols != avg_range.cols {
             return Ok(CellValue::Error(
                 "AVERAGEIFS criteria ranges must have the same size as average_range".to_string(),
             ));
         }
-        let crit_val = super::evaluate_expression(ctx, current_sheet, &args[i + 1])?;
+        let crit_val = super::evaluate_expression(ctx, current_sheet, &args[i + 1]).await?;
         let crit_str = to_text(&crit_val);
         let c = match parse_criteria(&crit_str) {
             Some(c) => c,

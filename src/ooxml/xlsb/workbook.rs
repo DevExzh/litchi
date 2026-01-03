@@ -4,7 +4,7 @@ use crate::ooxml::opc::OpcPackage;
 use crate::ooxml::xlsb::error::XlsbResult;
 use crate::ooxml::xlsb::records::{XlsbRecordIter, record_types};
 use crate::ooxml::xlsb::worksheet::XlsbWorksheet;
-use crate::sheet::{Worksheet as SheetTrait, WorksheetIterator};
+use crate::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
 use std::io::{BufReader, Cursor, Read, Seek};
 
 /// XLSB workbook implementation
@@ -213,7 +213,7 @@ impl crate::sheet::WorkbookTrait for XlsbWorkbook {
         0
     }
 
-    fn active_worksheet(&self) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
+    fn active_worksheet(&self) -> Result<Box<dyn SheetTrait + '_>> {
         self.worksheet_by_index(0)
     }
 
@@ -226,24 +226,20 @@ impl crate::sheet::WorkbookTrait for XlsbWorkbook {
         &self.worksheet_names
     }
 
-    fn worksheet_by_index(
-        &self,
-        index: usize,
-    ) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
+    fn worksheet_by_index(&self, index: usize) -> Result<Box<dyn SheetTrait + '_>> {
         let worksheet = self.get_worksheet(index)?;
         Ok(Box::new(worksheet))
     }
 
-    fn worksheet_by_name(
-        &self,
-        name: &str,
-    ) -> Result<Box<dyn SheetTrait + '_>, Box<dyn std::error::Error>> {
+    fn worksheet_by_name(&self, name: &str) -> Result<Box<dyn SheetTrait + '_>> {
         for (i, ws_name) in self.worksheet_names.iter().enumerate() {
             if ws_name == name {
                 return self.worksheet_by_index(i);
             }
         }
-        Err(format!("Worksheet '{}' not found", name).into())
+        Err(Box::new(crate::ooxml::error::OoxmlError::InvalidFormat(
+            format!("Worksheet '{}' not found", name),
+        )))
     }
 
     fn worksheets<'a>(&'a self) -> Box<dyn WorksheetIterator<'a> + 'a> {
@@ -251,6 +247,10 @@ impl crate::sheet::WorkbookTrait for XlsbWorkbook {
             workbook: self,
             index: 0,
         })
+    }
+
+    fn is_1904_date_system(&self) -> bool {
+        self.is_1904
     }
 }
 
@@ -260,7 +260,7 @@ pub struct XlsbWorksheetIterator<'a> {
 }
 
 impl<'a> WorksheetIterator<'a> for XlsbWorksheetIterator<'a> {
-    fn next(&mut self) -> Option<Result<Box<dyn SheetTrait + 'a>, Box<dyn std::error::Error>>> {
+    fn next(&mut self) -> Option<Result<Box<dyn SheetTrait + 'a>>> {
         if self.index < self.workbook.worksheet_names.len() {
             match self.workbook.get_worksheet(self.index) {
                 Ok(worksheet) => {

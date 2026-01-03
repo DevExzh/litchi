@@ -338,17 +338,7 @@ impl MutableXlsbWorksheet {
         if self.cells.is_empty() {
             None
         } else {
-            let mut min_row = u32::MAX;
-            let mut min_col = u32::MAX;
-            for (r, c) in self.cells.keys() {
-                if *r < min_row {
-                    min_row = *r;
-                }
-                if *c < min_col {
-                    min_col = *c;
-                }
-            }
-            Some((min_row, min_col, self.max_row, self.max_col))
+            Some((0, 0, self.max_row, self.max_col))
         }
     }
 

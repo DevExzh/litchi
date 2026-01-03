@@ -358,16 +358,6 @@ impl<'a> ExprParser<'a> {
             return Some(Expr::Literal(lit));
         }
 
-        // Range reference
-        if let Some(range) = parse_range_reference(self.current_sheet, &atom) {
-            return Some(Expr::Range(range));
-        }
-
-        // Single-cell reference
-        if let Some((sheet, row, col)) = parse_single_cell_reference(self.current_sheet, &atom) {
-            return Some(Expr::Reference { sheet, row, col });
-        }
-
         // Function call: NAME(expr, expr, ...)
         if matches!(self.peek(), Some(Token::LParen)) {
             let name = atom.to_uppercase();
@@ -399,6 +389,31 @@ impl<'a> ExprParser<'a> {
             return Some(Expr::FunctionCall { name, args });
         }
 
-        None
+        // Range reference
+        if let Some(range) = parse_range_reference(self.current_sheet, &atom) {
+            return Some(Expr::Range(range));
+        }
+
+        // Single-cell reference
+        if let Some((sheet, row, col)) = parse_single_cell_reference(self.current_sheet, &atom) {
+            return Some(Expr::Reference { sheet, row, col });
+        }
+
+        Some(Expr::Name(atom))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_expression, tokenize};
+
+    #[test]
+    fn parses_function_with_range_arguments() {
+        let expr = parse_expression("Sheet1", "SUMXMY2(A1:A2,B1:B2)");
+        assert!(
+            expr.is_some(),
+            "parser failed on SUMXMY2 with ranges; tokens: {:?}",
+            tokenize("SUMXMY2(A1:A2,B1:B2)")
+        );
     }
 }

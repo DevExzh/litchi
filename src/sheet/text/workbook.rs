@@ -204,4 +204,8 @@ impl WorkbookTrait for TextWorkbook {
     fn active_sheet_index(&self) -> usize {
         0
     }
+
+    fn is_1904_date_system(&self) -> bool {
+        false
+    }
 }

@@ -5,7 +5,7 @@ use std::borrow::Cow;
 use std::fmt::Debug;
 
 /// Represents an individual cell in a worksheet.
-pub trait Cell {
+pub trait Cell: Send + Sync {
     /// Get the row number (1-based).
     fn row(&self) -> u32;
 
@@ -47,7 +47,7 @@ pub trait RowIterator<'a> {
 }
 
 /// Represents a worksheet (sheet) in a workbook.
-pub trait Worksheet {
+pub trait Worksheet: Send + Sync {
     /// Get the worksheet name.
     fn name(&self) -> &str;
 
@@ -96,7 +96,7 @@ pub trait WorksheetIterator<'a> {
 ///
 /// **Note**: This is the low-level trait API. For high-level usage, use the
 /// unified `Workbook` struct from `crate::sheet::Workbook`.
-pub trait WorkbookTrait: Debug {
+pub trait WorkbookTrait: Debug + Send + Sync {
     /// Get the active worksheet.
     fn active_worksheet(&self) -> Result<Box<dyn Worksheet + '_>>;
 
@@ -120,4 +120,11 @@ pub trait WorkbookTrait: Debug {
 
     /// Get the index of the active worksheet.
     fn active_sheet_index(&self) -> usize;
+
+    /// Returns true if the workbook uses the 1904 date system (Mac).
+    ///
+    /// Implementations should report the correct setting based on workbook metadata.
+    fn is_1904_date_system(&self) -> bool {
+        false
+    }
 }

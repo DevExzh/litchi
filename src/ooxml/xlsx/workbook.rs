@@ -39,6 +39,8 @@ pub struct Workbook {
     mutable_data: Option<MutableWorkbookData>,
     /// Document properties (metadata)
     properties: DocumentProperties,
+    /// Whether the workbook uses the 1904 date system
+    is_1904_date_system: bool,
 }
 
 impl Workbook {
@@ -163,6 +165,7 @@ impl Workbook {
             styles: Styles::new(),
             mutable_data: Some(MutableWorkbookData::new()),
             properties: DocumentProperties::new(),
+            is_1904_date_system: false,
         };
 
         workbook.load_workbook_info()?;
@@ -182,12 +185,14 @@ impl Workbook {
         let content = std::str::from_utf8(workbook_part.blob())?;
 
         // Extract sheets from workbook.xml
-        let (worksheets, active_sheet_index) = workbook_parser::parse_workbook_xml(content)?;
+        let (worksheets, active_sheet_index, uses_1904_date_system) =
+            workbook_parser::parse_workbook_xml(content)?;
 
         // Cache worksheet names for zero-copy returns
         self.worksheet_names = worksheets.iter().map(|ws| ws.name.clone()).collect();
         self.worksheets = worksheets;
         self.active_sheet_index = active_sheet_index;
+        self.is_1904_date_system = uses_1904_date_system;
 
         Ok(())
     }
@@ -209,7 +214,7 @@ impl Workbook {
         if let Ok(styles_part) = self.package.get_part(&styles_uri) {
             let content = std::str::from_utf8(styles_part.blob())?;
             self.styles = Styles::parse(content)
-                .map_err(|e| -> Box<dyn std::error::Error> { Box::new(e) })?;
+                .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
         }
         Ok(())
     }
@@ -447,6 +452,10 @@ impl WorkbookTrait for Workbook {
 
     fn active_sheet_index(&self) -> usize {
         self.active_sheet_index
+    }
+
+    fn is_1904_date_system(&self) -> bool {
+        self.is_1904_date_system
     }
 }
 

@@ -3,7 +3,7 @@
 //! This module provides functionality to parse Microsoft Excel files
 //! in the legacy binary format (.xls files), which are OLE2-based files.
 //! The implementation is based on the BIFF (Binary Interchange File Format)
-//! specification and draws inspiration from xlrd and calamine libraries.
+//! specification and draws inspiration from other spreadsheet libraries.
 
 /// Error types for XLS parsing
 mod error;

@@ -180,8 +180,8 @@ impl<W: Write> RecordWriter<W> {
         // Try to encode as integer first
         if value == value.floor() && value >= i32::MIN as f64 && value <= i32::MAX as f64 {
             let int_val = value as i32;
-            // Check if can be divided by 100
-            if int_val % 100 == 0 {
+            // Use the /100 encoding only when the magnitude is large enough to benefit
+            if int_val % 100 == 0 && int_val.abs() >= 10_000 {
                 let div_val = int_val / 100;
                 return ((div_val as u32) << 2) | 0x03; // Integer / 100
             }

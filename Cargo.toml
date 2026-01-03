@@ -72,7 +72,14 @@ rtf = ["dep:bumpalo", "dep:crc-fast", "dep:encoding_rs"]
 # Additional functionality features
 formula = ["dep:rowan", "dep:bumpalo", "dep:quick-xml"]
 imgconv = ["dep:image"]
-eval_engine = ["dep:statrs"]
+eval_engine = ["dep:statrs", "dep:num-complex"]
+eval_engine_web_functions = [
+    "eval_engine",
+    "dep:urlencoding",
+    "dep:reqwest",
+    "dep:sxd-document",
+    "dep:sxd-xpath",
+]
 
 [dependencies]
 aes = { version = "0.8", optional = true } # AES block cipher for OOXML file encryption
@@ -93,6 +100,7 @@ hmac = { version = "0.12", optional = true } # HMAC for Agile OOXML encryption i
 image = { version = "0.25", features = ["default-formats", "rayon"], optional = true } # Image format decoding/encoding for embedded media
 itoa = "1.0" # Fast integer-to-string conversion
 memchr = "2.7" # SIMD-accelerated string searching for fast byte pattern matching
+num-complex = { version = "0.4", optional = true } # Complex number arithmetic for engineering functions
 once_cell = "1" # Lazy statics and one-time initialization for global state
 parking_lot = { version = "0.12", features = ["hardware-lock-elision"] } # Lock-free synchronization primitives for concurrent programming
 phf = { version = "0.13", features = ["macros"] } # Perfect hash functions for compile-time static maps
@@ -102,6 +110,7 @@ prost-types = { version = "0.14", optional = true } # Well-known Protocol Buffer
 quick-xml = { version = "0.38", optional = true } # High-performance XML parser for .docx, .xlsx, .pptx files
 rand = "0.9" # Cryptographically secure random numbers for salts in protection hashes
 rayon = "1.11" # Data parallelism library for parallel iterators and work-stealing
+reqwest = { version = "0.12", features = ["json"], optional = true }
 roaring = "0" # Compressed bitmap data structure for efficient set operations
 rowan = { version = "0.16", optional = true } # Lossless syntax tree library for formula parsing (AST)
 ryu = "1.0" # Fast float-to-string conversion with minimal allocations
@@ -113,7 +122,11 @@ smallvec = "1.15" # Stack-allocated vectors for small collections to avoid heap 
 snap = { version = "1", optional = true } # Snappy compression used in iWork file formats (.pages, .numbers, .key)
 soapberry-zip = { path = "soapberry-zip", optional = true } # High-performance ZIP archive handling for modern Office formats
 statrs = { version = "0.18", optional = true } # Statistics library for statistical functions
+sxd-document = { version = "0.3", optional = true }
+sxd-xpath = { version = "0.4", optional = true }
 thiserror = "2.0" # Convenient derive macros for error types
+tokio = { version = "1", features = ["full"] }
+urlencoding = { version = "2.1", optional = true }
 xml-minifier = { path = "xml-minifier" }
 zerocopy = { version = "0.8", features = ["std"] } # Safe zero-cost type conversions between bytes and structured data
 zerocopy-derive = "0.8" # Derive macros for zerocopy traits

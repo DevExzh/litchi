@@ -14,12 +14,26 @@ use crate::sheet::Result;
 // Performance: Pre-allocate typical capacity for worksheets
 const INITIAL_SHEETS_CAPACITY: usize = 16;
 
-/// Parse workbook.xml content to extract sheet information and active sheet.
-pub fn parse_workbook_xml(content: &str) -> Result<(Vec<WorksheetInfo>, usize)> {
+/// Parse workbook.xml content to extract sheet information, active sheet, and date system.
+pub fn parse_workbook_xml(content: &str) -> Result<(Vec<WorksheetInfo>, usize, bool)> {
     let mut sheets = Vec::with_capacity(INITIAL_SHEETS_CAPACITY);
     let mut active_sheet_id = 0;
+    let mut uses_1904_date_system = false;
 
     let bytes = content.as_bytes();
+
+    // Detect workbook properties (for date1904 flag)
+    if let Some(workbook_pr_start) = memchr::memmem::find(bytes, b"<workbookPr")
+        && let Some(workbook_pr_end_rel) = memchr::memchr(b'>', &bytes[workbook_pr_start..])
+            .or_else(|| {
+                // Handle self-closing tags split across chunks
+                memchr::memmem::find(&bytes[workbook_pr_start..], b"/>").map(|rel| rel + 1) // include '/' so slicing works
+            })
+    {
+        let workbook_pr_end = workbook_pr_start + workbook_pr_end_rel;
+        let workbook_pr_content = &content[workbook_pr_start..=workbook_pr_end];
+        uses_1904_date_system = extract_date1904_flag(workbook_pr_content);
+    }
 
     // Look for <sheets> section - optimized search
     if let Some(sheets_start) = memchr::memmem::find(bytes, b"<sheets>")
@@ -52,7 +66,7 @@ pub fn parse_workbook_xml(content: &str) -> Result<(Vec<WorksheetInfo>, usize)> 
     }
 
     let final_active_sheet_index = active_sheet_id.min(sheets.len().saturating_sub(1));
-    Ok((sheets, final_active_sheet_index))
+    Ok((sheets, final_active_sheet_index, uses_1904_date_system))
 }
 
 /// Parse the sheets section to extract individual sheet information.
@@ -126,4 +140,19 @@ pub fn parse_sheet_xml(sheet_xml: &str) -> Result<Option<WorksheetInfo>> {
         },
         _ => Ok(None),
     }
+}
+
+fn extract_date1904_flag(fragment: &str) -> bool {
+    if let Some(attr_start) = memchr::memmem::find(fragment.as_bytes(), b"date1904=\"") {
+        let value_start = attr_start + 9;
+        let bytes = fragment.as_bytes();
+        if value_start < bytes.len()
+            && let Some(quote_end_rel) = memchr::memchr(b'"', &bytes[value_start..])
+        {
+            let value = &fragment[value_start..value_start + quote_end_rel];
+            return value.eq_ignore_ascii_case("1") || value.eq_ignore_ascii_case("true");
+        }
+    }
+
+    false
 }

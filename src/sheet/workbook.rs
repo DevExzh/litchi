@@ -64,8 +64,8 @@ impl Workbook {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         // Read file into memory and use smart detection for single-pass parsing
         // This is faster than the old approach of detecting first then parsing again
-        let bytes =
-            std::fs::read(path.as_ref()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let bytes = std::fs::read(path.as_ref())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
         Self::from_bytes(bytes)
     }
 
@@ -93,8 +93,9 @@ impl Workbook {
         // Use smart detection to parse only once
         use crate::common::detection::{DetectedFormat, detect_format_smart};
 
-        let detected = detect_format_smart(bytes)
-            .ok_or_else(|| Box::new(Error::NotOfficeFile) as Box<dyn std::error::Error>)?;
+        let detected = detect_format_smart(bytes).ok_or_else(|| {
+            Box::new(Error::NotOfficeFile) as Box<dyn std::error::Error + Send + Sync>
+        })?;
 
         // Open with appropriate implementation and extract metadata
         let (inner, metadata) = match detected {
@@ -102,7 +103,7 @@ impl Workbook {
             DetectedFormat::Numbers(data) => {
                 let doc = crate::iwa::numbers::NumbersDocument::from_bytes(&data).map_err(|e| {
                     Box::new(Error::ParseError(format!("Failed to parse Numbers: {}", e)))
-                        as Box<dyn std::error::Error>
+                        as Box<dyn std::error::Error + Send + Sync>
                 })?;
 
                 // Extract metadata from Numbers bundle
@@ -121,7 +122,7 @@ impl Workbook {
 
                 // Create XLS workbook directly from the parsed OLE file
                 let xls = crate::ole::xls::XlsWorkbook::from_ole_file(ole_file_for_metadata)
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
                 (WorkbookImpl::XlsMem(xls), metadata)
             },
 
@@ -143,14 +144,14 @@ impl Workbook {
 
                 // Create XLSB workbook directly from the parsed OPC package
                 let xlsb = crate::ooxml::xlsb::XlsbWorkbook::from_opc_package(opc_package)
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
                 (WorkbookImpl::Xlsb(xlsb), metadata)
             },
 
             #[cfg(feature = "odf")]
             DetectedFormat::Ods(data) => {
                 let ods = crate::odf::Spreadsheet::from_bytes(data)
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
                 let metadata = ods.metadata().unwrap_or_default();
                 (WorkbookImpl::Ods(std::cell::RefCell::new(ods)), metadata)
             },
@@ -158,9 +159,9 @@ impl Workbook {
             // Handle mismatched formats
             #[allow(unreachable_patterns)]
             _ => {
-                return Err(Box::new(Error::InvalidFormat(
-                    "Detected format is not a workbook format or feature not enabled".to_string(),
-                )) as Box<dyn std::error::Error>);
+                return Err(
+                    Box::new(Error::NotOfficeFile) as Box<dyn std::error::Error + Send + Sync>
+                );
             },
         };
 
@@ -190,7 +191,7 @@ impl Workbook {
             WorkbookImpl::Numbers(doc) => {
                 let sheets = doc.sheets().map_err(|e| {
                     Box::new(Error::ParseError(format!("Failed to get sheets: {}", e)))
-                        as Box<dyn std::error::Error>
+                        as Box<dyn std::error::Error + Send + Sync>
                 })?;
                 Ok(sheets.iter().map(|s| s.name.clone()).collect())
             },
@@ -211,14 +212,14 @@ impl Workbook {
                 let mut ods = ods_ref.borrow_mut();
                 let sheets = ods
                     .sheets()
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
                 Ok(sheets.iter().map(|s| s.name.clone()).collect())
             },
 
             #[cfg(any(feature = "ole", feature = "ooxml"))]
             WorkbookImpl::Other => Err(Box::new(Error::ParseError(
                 "Unsupported workbook type in this build".to_string(),
-            )) as Box<dyn std::error::Error>),
+            )) as Box<dyn std::error::Error + Send + Sync>),
         }
     }
 
@@ -239,7 +240,7 @@ impl Workbook {
             WorkbookImpl::Numbers(doc) => {
                 let sheets = doc
                     .sheets()
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
                 Ok(sheets.len())
             },
             #[cfg(feature = "ooxml")]
@@ -255,13 +256,13 @@ impl Workbook {
                 let mut ods = ods_ref.borrow_mut();
                 let count = ods
                     .sheet_count()
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
                 Ok(count)
             },
             #[cfg(any(feature = "ole", feature = "ooxml"))]
             WorkbookImpl::Other => Err(Box::new(Error::ParseError(
                 "Unsupported workbook type in this build".to_string(),
-            )) as Box<dyn std::error::Error>),
+            )) as Box<dyn std::error::Error + Send + Sync>),
         }
     }
 
@@ -284,7 +285,7 @@ impl Workbook {
                 Box::new(Error::ParseError(format!(
                     "Failed to extract text from Numbers: {}",
                     e
-                ))) as Box<dyn std::error::Error>
+                ))) as Box<dyn std::error::Error + Send + Sync>
             }),
 
             #[cfg(feature = "ooxml")]
@@ -515,13 +516,13 @@ impl Workbook {
             WorkbookImpl::Ods(ods_ref) => {
                 let mut ods = ods_ref.borrow_mut();
                 ods.text()
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
             },
 
             #[cfg(any(feature = "ole", feature = "ooxml"))]
             WorkbookImpl::Other => Err(Box::new(Error::ParseError(
                 "Unsupported workbook type in this build".to_string(),
-            )) as Box<dyn std::error::Error>),
+            )) as Box<dyn std::error::Error + Send + Sync>),
         }
     }
 

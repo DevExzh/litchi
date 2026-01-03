@@ -36,7 +36,7 @@ impl NumberFormat {
 
 /// Check if a format code represents a date/time format.
 ///
-/// This function uses the same logic as calamine's `detect_custom_number_format`.
+/// This function uses the same logic as the internal `detect_custom_number_format`.
 pub fn is_date_format(format: &str) -> bool {
     let mut escaped = false;
     let mut is_quote = false;

@@ -9,8 +9,7 @@ use std::collections::HashMap;
 use crate::common::xml::unescape_xml;
 use crate::ooxml::opc::PackURI;
 use crate::sheet::{
-    Cell as CellTrait, CellIterator, CellValue, Result as SheetResult, RowIterator,
-    Worksheet as WorksheetTrait,
+    Cell as CellTrait, CellIterator, CellValue, Result, RowIterator, Worksheet as WorksheetTrait,
 };
 
 use super::RichTextRun;
@@ -180,7 +179,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Load worksheet data from the XML.
-    pub fn load_data(&mut self) -> SheetResult<()> {
+    pub fn load_data(&mut self) -> Result<()> {
         // Get the worksheet part using the relationship ID
         let worksheet_uri =
             PackURI::new(format!("/xl/worksheets/sheet{}.xml", self.info.sheet_id))?;
@@ -195,7 +194,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Parse worksheet XML to extract cell data.
-    fn parse_worksheet_xml(&mut self, content: &str) -> SheetResult<()> {
+    fn parse_worksheet_xml(&mut self, content: &str) -> Result<()> {
         // Parse sheetData section (cells)
         if let Some(sheet_data_start) = content.find("<sheetData>")
             && let Some(sheet_data_end) = content[sheet_data_start..].find("</sheetData>")
@@ -270,7 +269,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Parse sheetData content.
-    fn parse_sheet_data(&mut self, sheet_data: &str) -> SheetResult<()> {
+    fn parse_sheet_data(&mut self, sheet_data: &str) -> Result<()> {
         let mut pos = 0;
         let mut min_row = u32::MAX;
         let mut max_row = 0;
@@ -331,7 +330,7 @@ impl<'a> Worksheet<'a> {
     fn parse_row_xml(
         &self,
         row_content: &str,
-    ) -> SheetResult<
+    ) -> Result<
         Option<(
             u32,
             Option<RowInfo>,
@@ -407,7 +406,7 @@ impl<'a> Worksheet<'a> {
     fn parse_cell_xml(
         &self,
         cell_content: &str,
-    ) -> SheetResult<Option<(u32, CellValue, Option<u32>, Option<Vec<RichTextRun>>)>> {
+    ) -> Result<Option<(u32, CellValue, Option<u32>, Option<Vec<RichTextRun>>)>> {
         // Extract cell reference (e.g., "A1")
         let reference = if let Some(r_start) = cell_content.find("r=\"") {
             let r_content = &cell_content[r_start + 3..];
@@ -746,7 +745,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Parse merged cells from XML.
-    fn parse_merged_cells(&mut self, content: &str) -> SheetResult<()> {
+    fn parse_merged_cells(&mut self, content: &str) -> Result<()> {
         let mut pos = 0;
         while let Some(merge_start) = content[pos..].find("<mergeCell ") {
             let merge_start_pos = pos + merge_start;
@@ -780,7 +779,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Parse hyperlinks from XML.
-    fn parse_hyperlinks(&mut self, content: &str) -> SheetResult<()> {
+    fn parse_hyperlinks(&mut self, content: &str) -> Result<()> {
         let mut pos = 0;
         while let Some(hyperlink_start) = content[pos..].find("<hyperlink ") {
             let hyperlink_start_pos = pos + hyperlink_start;
@@ -812,7 +811,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Parse column information from XML.
-    fn parse_columns(&mut self, content: &str) -> SheetResult<()> {
+    fn parse_columns(&mut self, content: &str) -> Result<()> {
         let mut pos = 0;
         while let Some(col_start) = content[pos..].find("<col ") {
             let col_start_pos = pos + col_start;
@@ -848,7 +847,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Parse data validations from XML.
-    fn parse_data_validations(&mut self, content: &str) -> SheetResult<()> {
+    fn parse_data_validations(&mut self, content: &str) -> Result<()> {
         let mut pos = 0;
         while let Some(dv_start) = content[pos..].find("<dataValidation ") {
             let dv_start_pos = pos + dv_start;
@@ -882,7 +881,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Parse conditional formatting from XML.
-    fn parse_conditional_formatting(&mut self, content: &str) -> SheetResult<()> {
+    fn parse_conditional_formatting(&mut self, content: &str) -> Result<()> {
         // Extract sqref attribute for the range
         let range = Self::extract_attribute(content, "sqref");
 
@@ -916,7 +915,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Parse page setup from XML.
-    fn parse_page_setup(&mut self, content: &str) -> SheetResult<()> {
+    fn parse_page_setup(&mut self, content: &str) -> Result<()> {
         let paper_size =
             Self::extract_attribute(content, "paperSize").and_then(|s| s.parse::<u32>().ok());
         let landscape = content.contains("orientation=\"landscape\"");
@@ -938,7 +937,7 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Parse auto-filter from XML.
-    fn parse_auto_filter(&mut self, content: &str) -> SheetResult<()> {
+    fn parse_auto_filter(&mut self, content: &str) -> Result<()> {
         if let Some(range) = Self::extract_attribute(content, "ref") {
             self.auto_filter = Some(AutoFilter { range });
         }
@@ -1018,7 +1017,7 @@ impl<'a> Worksheet<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn column_values(&self, column: u32) -> SheetResult<Vec<CellValue>> {
+    pub fn column_values(&self, column: u32) -> Result<Vec<CellValue>> {
         let mut values = Vec::new();
 
         if let Some((min_row, _, max_row, _)) = self.dimensions {
@@ -1050,7 +1049,7 @@ impl<'a> Worksheet<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn row_values(&self, row: u32) -> SheetResult<Vec<CellValue>> {
+    pub fn row_values(&self, row: u32) -> Result<Vec<CellValue>> {
         let mut values = Vec::new();
 
         if let Some((_, min_col, _, max_col)) = self.dimensions {
@@ -1094,7 +1093,7 @@ impl<'a> Worksheet<'a> {
         start_col: u32,
         end_row: u32,
         end_col: u32,
-    ) -> SheetResult<Vec<Vec<CellValue>>> {
+    ) -> Result<Vec<Vec<CellValue>>> {
         let mut result = Vec::new();
 
         for row in start_row..=end_row {
@@ -1131,7 +1130,7 @@ impl<'a> Worksheet<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn find_text(&self, query: &str) -> SheetResult<Vec<(u32, u32)>> {
+    pub fn find_text(&self, query: &str) -> Result<Vec<(u32, u32)>> {
         let mut matches = Vec::new();
 
         for (&row, row_data) in &self.cells {
@@ -1702,13 +1701,15 @@ impl<'a> WorksheetTrait for Worksheet<'a> {
         self.dimensions
     }
 
-    fn cell(&self, row: u32, column: u32) -> SheetResult<Box<dyn CellTrait + '_>> {
-        let value = self.get_cell_value(row, column);
-        let cell = Cell::new(row, column, value);
-        Ok(Box::new(cell))
+    fn cell(&self, row: u32, column: u32) -> Result<Box<dyn CellTrait + '_>> {
+        let value = self
+            .cell_value(row, column)
+            .unwrap_or(Cow::Borrowed(CellValue::EMPTY))
+            .into_owned();
+        Ok(Box::new(Cell::new(row, column, value)))
     }
 
-    fn cell_by_coordinate(&self, coordinate: &str) -> SheetResult<Box<dyn CellTrait + '_>> {
+    fn cell_by_coordinate(&self, coordinate: &str) -> Result<Box<dyn CellTrait + '_>> {
         let (col, row) = Cell::reference_to_coords(coordinate)?;
         self.cell(row, col)
     }
@@ -1742,27 +1743,24 @@ impl<'a> WorksheetTrait for Worksheet<'a> {
         Box::new(XlsxRowIterator::new(rows))
     }
 
-    fn row(&self, row_idx: usize) -> SheetResult<Cow<'_, [CellValue]>> {
+    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>> {
         if let Some((min_row, min_col, max_col)) =
             self.dimensions.map(|(mr, mc, _, mc2)| (mr, mc, mc2))
         {
-            let row_num = min_row + row_idx as u32;
-            if row_num > self.dimensions.unwrap().2 {
-                return Ok(Cow::Owned(Vec::new()));
+            let mut row_data = Vec::new();
+            let row_num = row_idx as u32 + min_row;
+
+            for col in min_col..=max_col {
+                row_data.push(self.get_cell_value(row_num, col));
             }
 
-            let mut row_data = Vec::new();
-            for col in min_col..=max_col {
-                let value = self.get_cell_value(row_num, col).clone();
-                row_data.push(value);
-            }
             Ok(Cow::Owned(row_data))
         } else {
-            Ok(Cow::Owned(Vec::new()))
+            Ok(Cow::Borrowed(&[]))
         }
     }
 
-    fn cell_value(&self, row: u32, column: u32) -> SheetResult<Cow<'_, CellValue>> {
+    fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
         // XLSX values need shared string resolution, so we return owned
         Ok(Cow::Owned(self.get_cell_value(row, column)))
     }
@@ -1807,23 +1805,19 @@ impl<'a> WorksheetIterator<'a> {
 }
 
 impl<'a> crate::sheet::WorksheetIterator<'a> for WorksheetIterator<'a> {
-    fn next(&mut self) -> Option<SheetResult<Box<dyn WorksheetTrait + 'a>>> {
+    fn next(&mut self) -> Option<Result<Box<dyn WorksheetTrait + 'a>>> {
         if self.index >= self.worksheets.len() {
             return None;
         }
-
         let info = &self.worksheets[self.index];
-        let mut worksheet = Worksheet::new(self.workbook, info.clone());
-
-        match worksheet.load_data() {
-            Ok(_) => {
-                self.index += 1;
-                Some(Ok(Box::new(worksheet) as Box<dyn WorksheetTrait + 'a>))
-            },
-            Err(e) => {
-                self.index += 1;
-                Some(Err(e))
-            },
+        let mut ws = Worksheet::new(self.workbook, info.clone());
+        self.index += 1;
+        if ws.load_data().is_ok() {
+            Some(Ok(Box::new(ws)))
+        } else {
+            // If failed to load, return an error or skip?
+            // The trait expects Option<Result<...>>.
+            Some(Err("Failed to load worksheet".into()))
         }
     }
 }
