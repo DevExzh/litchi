@@ -6,6 +6,7 @@ use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
 use quick_xml::Reader;
 use quick_xml::events::Event;
+use std::collections::HashMap;
 
 /// A custom slide show definition.
 #[derive(Debug, Clone)]
@@ -181,28 +182,32 @@ impl CustomShowList {
 
     /// Generate custom shows XML.
     ///
-    /// Note: This generates XML with slide IDs as relationship IDs, which is incorrect.
-    /// Use `to_xml_with_rel_map` instead when you have the slide ID to relationship ID mapping.
+    /// This is a convenience wrapper that emits a best-effort mapping by treating
+    /// numeric slide IDs as their corresponding `rId` values (e.g. slide 5 → `rId5`).
+    /// For full fidelity, prefer [`to_xml_with_rel_map`] and pass the workbook's
+    /// actual slide relationship map.
     pub fn to_xml(&self) -> String {
-        // Return empty if no custom shows - this avoids corruption
-        // Full support requires relationship ID mapping
         if self.is_empty() {
             return String::new();
         }
 
-        // Without a proper slide ID to relationship ID mapping, we cannot
-        // generate valid custom show XML. Return empty to avoid corruption.
-        String::new()
+        let mut fallback_map = HashMap::new();
+        for show in &self.shows {
+            for slide_id in &show.slide_ids {
+                fallback_map
+                    .entry(*slide_id)
+                    .or_insert_with(|| format!("rId{slide_id}"));
+            }
+        }
+
+        self.to_xml_with_rel_map(&fallback_map)
     }
 
     /// Generate custom shows XML with proper relationship ID mapping.
     ///
     /// # Arguments
     /// * `slide_id_to_rel_id` - Mapping from slide ID (e.g., 256) to relationship ID (e.g., "rId6")
-    pub fn to_xml_with_rel_map(
-        &self,
-        slide_id_to_rel_id: &std::collections::HashMap<u32, String>,
-    ) -> String {
+    pub fn to_xml_with_rel_map(&self, slide_id_to_rel_id: &HashMap<u32, String>) -> String {
         if self.is_empty() {
             return String::new();
         }

@@ -411,7 +411,9 @@ impl Paragraph {
                                     }
                                     omml_content.push_str("=\"");
                                     omml_content.push_str(
-                                        &attr.unescape_value().unwrap_or(Cow::Borrowed("")),
+                                        &attr
+                                            .decode_and_unescape_value(reader.decoder())
+                                            .unwrap_or(Cow::Borrowed("")),
                                     );
                                     omml_content.push('"');
                                 }
@@ -456,8 +458,11 @@ impl Paragraph {
                                     omml_content.push_str(std::str::from_utf8(key_bytes).unwrap());
                                 }
                                 omml_content.push_str("=\"");
-                                omml_content
-                                    .push_str(&attr.unescape_value().unwrap_or(Cow::Borrowed("")));
+                                omml_content.push_str(
+                                    &attr
+                                        .decode_and_unescape_value(reader.decoder())
+                                        .unwrap_or(Cow::Borrowed("")),
+                                );
                                 omml_content.push('"');
                             }
                         }
@@ -1036,7 +1041,9 @@ impl Run {
                     } else if in_r_pr && name.as_ref() == b"rFonts" {
                         for attr in e.attributes().flatten() {
                             if attr.key.as_ref() == b"ascii" {
-                                let value = attr.unescape_value().unwrap_or(Cow::Borrowed(""));
+                                let value = attr
+                                    .decode_and_unescape_value(reader.decoder())
+                                    .unwrap_or(Cow::Borrowed(""));
                                 return Ok(Some(value.to_string()));
                             }
                         }
@@ -1133,8 +1140,11 @@ impl Run {
                             if key_str.starts_with("m:") || !key_str.contains(':') {
                                 omml_content.push_str(key_str);
                                 omml_content.push_str("=\"");
-                                omml_content
-                                    .push_str(&attr.unescape_value().unwrap_or(Cow::Borrowed("")));
+                                omml_content.push_str(
+                                    &attr
+                                        .decode_and_unescape_value(reader.decoder())
+                                        .unwrap_or(Cow::Borrowed("")),
+                                );
                                 omml_content.push('"');
                             }
                         }
@@ -1189,7 +1199,9 @@ impl Run {
                                     omml_content.push_str("=\"");
                                     // Use Cow to avoid allocation when possible
                                     omml_content.push_str(
-                                        &attr.unescape_value().unwrap_or(Cow::Borrowed("")),
+                                        &attr
+                                            .decode_and_unescape_value(reader.decoder())
+                                            .unwrap_or(Cow::Borrowed("")),
                                     );
                                     omml_content.push('"');
                                 }
@@ -1247,7 +1259,9 @@ impl Run {
                                     }
                                     omml_content.push_str("=\"");
                                     omml_content.push_str(
-                                        &attr.unescape_value().unwrap_or(Cow::Borrowed("")),
+                                        &attr
+                                            .decode_and_unescape_value(reader.decoder())
+                                            .unwrap_or(Cow::Borrowed("")),
                                     );
                                     omml_content.push('"');
                                 }
