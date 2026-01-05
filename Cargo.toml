@@ -110,7 +110,7 @@ prost-types = { version = "0.14", optional = true } # Well-known Protocol Buffer
 quick-xml = { version = "0.38", optional = true } # High-performance XML parser for .docx, .xlsx, .pptx files
 rand = "0.9" # Cryptographically secure random numbers for salts in protection hashes
 rayon = "1.11" # Data parallelism library for parallel iterators and work-stealing
-reqwest = { version = "0.12", features = ["json"], optional = true }
+reqwest = { version = "0.13", features = ["json"], optional = true }
 roaring = "0" # Compressed bitmap data structure for efficient set operations
 rowan = { version = "0.16", optional = true } # Lossless syntax tree library for formula parsing (AST)
 ryu = "1.0" # Fast float-to-string conversion with minimal allocations
