@@ -31,9 +31,6 @@ updates:
     # PR configuration
     assignees:
       - "DevExzh"
-    labels:
-      - "dependencies"
-      - "rust"
     # Allow only minor and patch version updates (no major breaking changes)
     ignore:
       - dependency-name: "*"
@@ -54,9 +51,6 @@ updates:
       include: "scope"
     assignees:
       - "DevExzh"
-    labels:
-      - "dependencies"
-      - "github-actions"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
