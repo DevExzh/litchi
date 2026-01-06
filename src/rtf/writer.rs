@@ -648,6 +648,168 @@ impl<W: Write> RtfWriter<W> {
     pub fn flush(&mut self) -> io::Result<()> {
         self.writer.flush()
     }
+
+    /// Write a header or footer
+    pub fn write_header_footer(&mut self, hf: &HeaderFooter) -> io::Result<()> {
+        self.write_str("{")?;
+
+        // Write header/footer type control word
+        match hf.header_type {
+            HeaderFooterType::Header => self.write_control_word("header", None)?,
+            HeaderFooterType::HeaderFirst => self.write_control_word("headerf", None)?,
+            HeaderFooterType::HeaderLeft => self.write_control_word("headerl", None)?,
+            HeaderFooterType::HeaderRight => self.write_control_word("headerr", None)?,
+            HeaderFooterType::Footer => self.write_control_word("footer", None)?,
+            HeaderFooterType::FooterFirst => self.write_control_word("footerf", None)?,
+            HeaderFooterType::FooterLeft => self.write_control_word("footerl", None)?,
+            HeaderFooterType::FooterRight => self.write_control_word("footerr", None)?,
+        }
+
+        // Write paragraphs
+        for para in &hf.paragraphs {
+            self.write_str(" {")?;
+            self.write_formatting(&para.formatting)?;
+            self.write_paragraph_properties(&para.paragraph)?;
+            self.write_text(para.text.as_ref())?;
+            self.write_str("}")?;
+            self.write_control_word("par", None)?;
+        }
+
+        self.write_str("}")?;
+        Ok(())
+    }
+
+    /// Write a footnote or endnote
+    pub fn write_note(&mut self, note: &Note) -> io::Result<()> {
+        self.write_str("{")?;
+
+        // Write note type control word
+        if note.is_footnote {
+            self.write_control_word("footnote", None)?;
+        } else {
+            self.write_control_word("endnote", None)?;
+        }
+
+        // Write reference number/marker
+        if !note.reference.is_empty()
+            && let Ok(num) = note.reference.parse::<i32>()
+        {
+            self.write_control_word("chftn", Some(num))?;
+        }
+
+        // Write note content
+        self.write_str(" {")?;
+        self.write_formatting(&note.formatting)?;
+        self.write_text(note.content.as_ref())?;
+        self.write_str("}")?;
+
+        self.write_str("}")?;
+        Ok(())
+    }
+
+    /// Write a hyperlink field
+    pub fn write_hyperlink(&mut self, url: &str, display_text: &str) -> io::Result<()> {
+        self.write_str("{\\field")?;
+
+        // Field instruction
+        self.write_str("{\\*\\fldinst{HYPERLINK \"")?;
+        self.write_text(url)?;
+        self.write_str("\"}}")?;
+
+        // Field result (display text)
+        self.write_str("{\\fldrslt{")?;
+        self.write_control_word("ul", None)?; // Underline hyperlinks by default
+        self.write_control_word("cf", Some(1))?; // Blue color for hyperlinks
+        self.write_text(display_text)?;
+        self.write_str("}}}")?;
+
+        Ok(())
+    }
+
+    /// Write a field (generic)
+    pub fn write_field(&mut self, field: &Field) -> io::Result<()> {
+        self.write_str("{\\field")?;
+
+        // Field instruction
+        self.write_str("{\\*\\fldinst{")?;
+        self.write_text(field.instruction.as_ref())?;
+        self.write_str("}}")?;
+
+        // Field result
+        if !field.result.is_empty() {
+            self.write_str("{\\fldrslt{")?;
+            self.write_text(field.result.as_ref())?;
+            self.write_str("}}")?;
+        }
+
+        self.write_str("}")?;
+        Ok(())
+    }
+
+    /// Write a revision mark (track changes)
+    pub fn write_revision(&mut self, revision: &Revision) -> io::Result<()> {
+        self.write_str("{")?;
+
+        // Write revision type control word
+        match revision.revision_type {
+            RevisionType::Insertion => {
+                self.write_control_word("revised", None)?;
+                self.write_control_word("revauth", Some(revision.id))?;
+                if !revision.author.is_empty() {
+                    // Write author in annotation
+                    self.write_str("{\\*\\atnauthor ")?;
+                    self.write_text(revision.author.as_ref())?;
+                    self.write_str("}")?;
+                }
+            },
+            RevisionType::Deletion => {
+                self.write_control_word("deleted", None)?;
+                self.write_control_word("revauthdel", Some(revision.id))?;
+            },
+            RevisionType::FormatChange => {
+                self.write_control_word("revprop", None)?;
+            },
+            RevisionType::MovedFrom => {
+                self.write_control_word("movedfrom", None)?;
+            },
+            RevisionType::MovedTo => {
+                self.write_control_word("movedto", None)?;
+            },
+        }
+
+        // Write content
+        self.write_text(revision.content.as_ref())?;
+
+        self.write_str("}")?;
+        Ok(())
+    }
+
+    /// Write a section with headers and footers
+    pub fn write_section(&mut self, section: &Section) -> io::Result<()> {
+        // Write section properties
+        self.write_control_word("sectd", None)?;
+
+        // Page size
+        self.write_control_word("pgwsxn", Some(section.properties.page_width))?;
+        self.write_control_word("pghsxn", Some(section.properties.page_height))?;
+
+        // Margins
+        self.write_control_word("marglsxn", Some(section.properties.margin_left))?;
+        self.write_control_word("margrsxn", Some(section.properties.margin_right))?;
+        self.write_control_word("margtsxn", Some(section.properties.margin_top))?;
+        self.write_control_word("margbsxn", Some(section.properties.margin_bottom))?;
+
+        // Header/footer distance
+        self.write_control_word("headery", Some(section.properties.header_distance))?;
+        self.write_control_word("footery", Some(section.properties.footer_distance))?;
+
+        // Write all headers and footers for this section
+        for hf in &section.headers_footers {
+            self.write_header_footer(hf)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

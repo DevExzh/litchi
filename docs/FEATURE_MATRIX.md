@@ -575,17 +575,17 @@ This document tracks the implementation status of features across all supported 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Pictures | ✅ | ✅ | ✅ | EMF, WMF, JPEG, PNG, etc. |
-| Fields | ✅ | ✅ | ❌ | Field parsing |
+| Fields | ✅ | ✅ | ✅ | Field parsing and writing |
 | Bookmarks | ✅ | ✅ | ❌ | Bookmark table |
 | Annotations | ✅ | ✅ | ❌ | Comments and revisions |
 | Shapes | ✅ | ✅ | ❌ | Geometry, fills, gradients |
 | Styles | ✅ | ✅ | ✅ | Stylesheet support |
 | Document info | ✅ | ✅ | ✅ | Title, author, etc. |
 | Compressed RTF | ✅ | ✅ | ✅ | Compression/decompression |
-| Headers/Footers | ❌ | ❌ | ❌ | Page header/footer styles and content |
-| Footnotes/Endnotes | ❌ | ❌ | ❌ | Footnote and endnote destinations |
-| Hyperlinks | ❌ | ❌ | ❌ | Hyperlink fields |
-| Track changes | ❌ | ❌ | ❌ | Revision marks |
+| Headers/Footers | ✅ | ✅ | ✅ | Page header/footer styles and content |
+| Footnotes/Endnotes | ✅ | ✅ | ✅ | Footnote and endnote destinations |
+| Hyperlinks | ✅ | ✅ | ✅ | Hyperlink fields |
+| Track changes | ✅ | ✅ | ✅ | Revision marks |
 | Embedded objects (OLE) | ❌ | ❌ | ❌ | OLE packages and embeddings |
 | Equations | ❌ | ❌ | ❌ | EQ fields and embedded equation objects |
 | Embedded fonts | ❌ | ❌ | ❌ | Font embedding parts |

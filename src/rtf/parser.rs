@@ -34,6 +34,17 @@ enum Destination {
     FieldInstruction,
     /// Field result
     FieldResult,
+    /// Header content
+    Header,
+    /// Footer content
+    Footer,
+    /// Footnote content
+    Footnote,
+    /// Endnote content
+    Endnote,
+    /// Revision/track changes
+    #[allow(dead_code)]
+    Revision,
     /// Other destinations - should be skipped
     Other,
 }
@@ -117,6 +128,17 @@ pub struct Parser<'a> {
     info: super::info::DocumentInfo<'a>,
     /// Annotations
     annotations: Vec<super::annotation::Annotation<'a>>,
+    /// Footnotes and endnotes
+    notes: Vec<super::section::Note<'a>>,
+    /// Track changes/revisions
+    revisions: Vec<super::annotation::Revision<'a>>,
+    /// Current header/footer being parsed
+    #[allow(dead_code)]
+    current_header_footer: Option<super::section::HeaderFooter<'a>>,
+    /// Current note being parsed (content buffer)
+    current_note_buffer: SmallVec<[u8; 256]>,
+    /// Current header/footer type being parsed
+    current_hf_type: Option<super::section::HeaderFooterType>,
 }
 
 impl<'a> Parser<'a> {
@@ -145,6 +167,11 @@ impl<'a> Parser<'a> {
             stylesheet: super::stylesheet::StyleSheet::new(),
             info: super::info::DocumentInfo::new(),
             annotations: Vec::new(),
+            notes: Vec::new(),
+            revisions: Vec::new(),
+            current_header_footer: None,
+            current_note_buffer: SmallVec::new(),
+            current_hf_type: None,
         }
     }
 
@@ -186,6 +213,8 @@ impl<'a> Parser<'a> {
             stylesheet: self.stylesheet,
             info: self.info,
             annotations: self.annotations,
+            notes: self.notes,
+            revisions: self.revisions,
         })
     }
 
@@ -295,6 +324,104 @@ impl<'a> Parser<'a> {
                     // Parse field group
                     self.parse_field()?;
                     self.skip_until_close_brace()?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::Header) => {
+                    self.pos += 1;
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::Header;
+                    }
+                    self.current_hf_type = Some(super::section::HeaderFooterType::Header);
+                    self.parse_header_footer_content()?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::HeaderFirst) => {
+                    self.pos += 1;
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::Header;
+                    }
+                    self.current_hf_type = Some(super::section::HeaderFooterType::HeaderFirst);
+                    self.parse_header_footer_content()?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::HeaderLeft) => {
+                    self.pos += 1;
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::Header;
+                    }
+                    self.current_hf_type = Some(super::section::HeaderFooterType::HeaderLeft);
+                    self.parse_header_footer_content()?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::HeaderRight) => {
+                    self.pos += 1;
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::Header;
+                    }
+                    self.current_hf_type = Some(super::section::HeaderFooterType::HeaderRight);
+                    self.parse_header_footer_content()?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::Footer) => {
+                    self.pos += 1;
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::Footer;
+                    }
+                    self.current_hf_type = Some(super::section::HeaderFooterType::Footer);
+                    self.parse_header_footer_content()?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::FooterFirst) => {
+                    self.pos += 1;
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::Footer;
+                    }
+                    self.current_hf_type = Some(super::section::HeaderFooterType::FooterFirst);
+                    self.parse_header_footer_content()?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::FooterLeft) => {
+                    self.pos += 1;
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::Footer;
+                    }
+                    self.current_hf_type = Some(super::section::HeaderFooterType::FooterLeft);
+                    self.parse_header_footer_content()?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::FooterRight) => {
+                    self.pos += 1;
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::Footer;
+                    }
+                    self.current_hf_type = Some(super::section::HeaderFooterType::FooterRight);
+                    self.parse_header_footer_content()?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::Footnote) => {
+                    self.pos += 1;
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::Footnote;
+                    }
+                    self.parse_note(true)?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::Endnote) => {
+                    self.pos += 1;
+                    if let Some(state) = self.states.last_mut() {
+                        state.destination = Destination::Endnote;
+                    }
+                    self.parse_note(false)?;
                     self.states.pop();
                     return Ok(());
                 },
@@ -1109,6 +1236,154 @@ impl<'a> Parser<'a> {
 
         Ok(())
     }
+
+    /// Parse header or footer content.
+    fn parse_header_footer_content(&mut self) -> RtfResult<()> {
+        let hf_type = self
+            .current_hf_type
+            .ok_or_else(|| RtfError::MalformedDocument("Header/footer type not set".to_string()))?;
+
+        let mut hf = super::section::HeaderFooter::new(hf_type);
+        let mut text_buffer = SmallVec::<[u8; 256]>::new();
+        let default_state = State::default();
+
+        while self.pos < self.tokens.len() {
+            match &self.tokens[self.pos] {
+                Token::CloseBrace => {
+                    if !text_buffer.is_empty() {
+                        if let Ok(text) = std::str::from_utf8(&text_buffer) {
+                            let state = self.current_state().ok().unwrap_or(&default_state);
+                            let text_alloc = self.arena.alloc_str(text);
+                            let para = super::section::HeaderFooterParagraph::new(
+                                Cow::Borrowed(text_alloc),
+                                state.formatting,
+                                state.paragraph,
+                            );
+                            hf.add_paragraph(para);
+                        }
+                        text_buffer.clear();
+                    }
+                    self.pos += 1;
+                    break;
+                },
+                Token::OpenBrace => {
+                    if !text_buffer.is_empty() {
+                        if let Ok(text) = std::str::from_utf8(&text_buffer) {
+                            let state = self.current_state().ok().unwrap_or(&default_state);
+                            let text_alloc = self.arena.alloc_str(text);
+                            let para = super::section::HeaderFooterParagraph::new(
+                                Cow::Borrowed(text_alloc),
+                                state.formatting,
+                                state.paragraph,
+                            );
+                            hf.add_paragraph(para);
+                        }
+                        text_buffer.clear();
+                    }
+                    self.parse_group()?;
+                },
+                Token::Control(ControlWord::Par | ControlWord::Line) => {
+                    self.pos += 1;
+                    if !text_buffer.is_empty() {
+                        if let Ok(text) = std::str::from_utf8(&text_buffer) {
+                            let state = self.current_state().ok().unwrap_or(&default_state);
+                            let text_alloc = self.arena.alloc_str(text);
+                            let para = super::section::HeaderFooterParagraph::new(
+                                Cow::Borrowed(text_alloc),
+                                state.formatting,
+                                state.paragraph,
+                            );
+                            hf.add_paragraph(para);
+                        }
+                        text_buffer.clear();
+                    }
+                },
+                Token::Control(ControlWord::Tab) => {
+                    self.pos += 1;
+                    text_buffer.push(b'\t');
+                },
+                Token::Control(control) => {
+                    self.pos += 1;
+                    self.apply_control_word(control)?;
+                },
+                Token::Text(text) => {
+                    self.pos += 1;
+                    text_buffer.extend_from_slice(text.as_bytes());
+                },
+                _ => {
+                    self.pos += 1;
+                },
+            }
+        }
+
+        // Add header/footer to the current section or create a new section
+        if let Some(section) = self.sections.last_mut() {
+            section.add_header_footer(hf);
+        } else {
+            let mut section = super::section::Section::new();
+            section.add_header_footer(hf);
+            self.sections.push(section);
+        }
+
+        self.current_hf_type = None;
+        Ok(())
+    }
+
+    /// Parse footnote or endnote content.
+    fn parse_note(&mut self, is_footnote: bool) -> RtfResult<()> {
+        self.current_note_buffer.clear();
+        let mut reference = String::from(if is_footnote { "1" } else { "i" });
+
+        while self.pos < self.tokens.len() {
+            match &self.tokens[self.pos] {
+                Token::CloseBrace => {
+                    self.pos += 1;
+                    break;
+                },
+                Token::OpenBrace => {
+                    self.parse_group()?;
+                },
+                Token::Control(ControlWord::FootnoteNumber(n)) => {
+                    self.pos += 1;
+                    reference = n.to_string();
+                },
+                Token::Control(ControlWord::Tab) => {
+                    self.pos += 1;
+                    self.current_note_buffer.push(b'\t');
+                },
+                Token::Control(control) => {
+                    self.pos += 1;
+                    self.apply_control_word(control)?;
+                },
+                Token::Text(text) => {
+                    self.pos += 1;
+                    self.current_note_buffer.extend_from_slice(text.as_bytes());
+                },
+                _ => {
+                    self.pos += 1;
+                },
+            }
+        }
+
+        if !self.current_note_buffer.is_empty()
+            && let Ok(content) = std::str::from_utf8(&self.current_note_buffer)
+        {
+            let content_alloc = self.arena.alloc_str(content);
+            let mut note = if is_footnote {
+                super::section::Note::footnote(Cow::Owned(reference), Cow::Borrowed(content_alloc))
+            } else {
+                super::section::Note::endnote(Cow::Owned(reference), Cow::Borrowed(content_alloc))
+            };
+
+            if let Ok(state) = self.current_state() {
+                note.formatting = state.formatting;
+            }
+
+            self.notes.push(note);
+        }
+
+        Ok(())
+    }
 }
 
 /// Parsed RTF document.
@@ -1147,4 +1422,8 @@ pub struct ParsedDocument<'a> {
     pub info: super::info::DocumentInfo<'a>,
     /// Annotations
     pub annotations: Vec<super::annotation::Annotation<'a>>,
+    /// Footnotes and endnotes
+    pub notes: Vec<super::section::Note<'a>>,
+    /// Track changes/revisions
+    pub revisions: Vec<super::annotation::Revision<'a>>,
 }

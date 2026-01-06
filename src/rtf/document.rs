@@ -43,6 +43,10 @@ pub struct RtfDocument<'a> {
     info: super::info::DocumentInfo<'a>,
     /// Annotations
     annotations: Vec<super::annotation::Annotation<'a>>,
+    /// Footnotes and endnotes
+    notes: Vec<super::section::Note<'a>>,
+    /// Track changes/revisions
+    revisions: Vec<super::annotation::Revision<'a>>,
 }
 
 impl<'a> RtfDocument<'a> {
@@ -190,6 +194,8 @@ impl<'a> RtfDocument<'a> {
             stylesheet: Self::convert_stylesheet_to_owned(parsed.stylesheet),
             info: Self::convert_info_to_owned(parsed.info),
             annotations: Self::convert_annotations_to_owned(parsed.annotations),
+            notes: Self::convert_notes_to_owned(parsed.notes),
+            revisions: Self::convert_revisions_to_owned(parsed.revisions),
         })
     }
 
@@ -591,6 +597,57 @@ impl<'a> RtfDocument<'a> {
     ) -> Vec<super::annotation::Annotation<'static>> {
         // TODO: Implement proper conversion when annotation parsing is fully implemented
         Vec::new()
+    }
+
+    /// Convert notes to owned
+    fn convert_notes_to_owned(
+        notes: Vec<super::section::Note<'_>>,
+    ) -> Vec<super::section::Note<'static>> {
+        notes
+            .into_iter()
+            .map(|note| super::section::Note {
+                is_footnote: note.is_footnote,
+                reference: Cow::Owned(note.reference.into_owned()),
+                content: Cow::Owned(note.content.into_owned()),
+                formatting: note.formatting,
+            })
+            .collect()
+    }
+
+    /// Convert revisions to owned
+    fn convert_revisions_to_owned(
+        revisions: Vec<super::annotation::Revision<'_>>,
+    ) -> Vec<super::annotation::Revision<'static>> {
+        revisions
+            .into_iter()
+            .map(|rev| super::annotation::Revision {
+                revision_type: rev.revision_type,
+                author: Cow::Owned(rev.author.into_owned()),
+                date: rev.date.map(|d| Cow::Owned(d.into_owned())),
+                id: rev.id,
+                content: Cow::Owned(rev.content.into_owned()),
+            })
+            .collect()
+    }
+
+    /// Get all footnotes and endnotes in the document.
+    pub fn notes(&self) -> &[super::section::Note<'_>] {
+        &self.notes
+    }
+
+    /// Get all footnotes in the document.
+    pub fn footnotes(&self) -> Vec<&super::section::Note<'_>> {
+        self.notes.iter().filter(|n| n.is_footnote).collect()
+    }
+
+    /// Get all endnotes in the document.
+    pub fn endnotes(&self) -> Vec<&super::section::Note<'_>> {
+        self.notes.iter().filter(|n| !n.is_footnote).collect()
+    }
+
+    /// Get all track changes/revisions in the document.
+    pub fn revisions(&self) -> &[super::annotation::Revision<'_>] {
+        &self.revisions
     }
 }
 
