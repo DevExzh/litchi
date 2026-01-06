@@ -38,6 +38,35 @@ pub struct MutableRun {
     pub(crate) properties: RunProperties,
 }
 
+#[cfg(feature = "fonts")]
+use crate::fonts::CollectGlyphs;
+#[cfg(feature = "fonts")]
+use roaring::RoaringBitmap;
+#[cfg(feature = "fonts")]
+use std::collections::HashMap;
+
+#[cfg(feature = "fonts")]
+impl CollectGlyphs for MutableRun {
+    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
+        let mut glyphs = HashMap::new();
+        if let RunContent::Text(text) = &self.content
+            && !text.is_empty()
+        {
+            // Use font name from properties or default to "Calibri" (common Office default)
+            let font_name = self
+                .properties
+                .font_name
+                .clone()
+                .unwrap_or_else(|| "Calibri".to_string());
+            let bitmap = glyphs.entry(font_name).or_insert_with(RoaringBitmap::new);
+            for c in text.chars() {
+                bitmap.insert(c as u32);
+            }
+        }
+        glyphs
+    }
+}
+
 impl MutableRun {
     pub(crate) fn new() -> Self {
         Self {

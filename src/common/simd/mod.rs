@@ -98,3 +98,4 @@
 
 pub mod cmp;
 pub mod fmt;
+pub mod xor;

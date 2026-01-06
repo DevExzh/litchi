@@ -193,6 +193,10 @@ impl ContentTypesItem {
                 | ("gif", "image/gif")
                 | ("emf", "image/x-emf")
                 | ("wmf", "image/x-wmf")
+                | (
+                    "odttf",
+                    "application/vnd.openxmlformats-officedocument.obfuscatedFont"
+                )
         )
     }
 

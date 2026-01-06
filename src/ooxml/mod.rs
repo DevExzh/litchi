@@ -50,6 +50,9 @@ pub mod xlsx;
 #[cfg(feature = "ooxml_encryption")]
 pub mod crypto;
 
+#[cfg(feature = "fonts")]
+pub mod fonts;
+
 // Re-export commonly used types from OPC layer
 pub use opc::{OpcPackage, PackURI};
 

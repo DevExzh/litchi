@@ -58,6 +58,95 @@ pub struct DocumentProtection {
     pub salt: Option<String>,
 }
 
+#[cfg(feature = "fonts")]
+use crate::fonts::CollectGlyphs;
+#[cfg(feature = "fonts")]
+use roaring::RoaringBitmap;
+#[cfg(feature = "fonts")]
+use std::collections::HashMap;
+
+#[cfg(feature = "fonts")]
+impl CollectGlyphs for MutableDocument {
+    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
+        let mut glyphs = HashMap::new();
+
+        // Collect from body elements
+        for element in &self.body.elements {
+            let element_glyphs = match element {
+                BodyElement::Paragraph(p) => p.collect_glyphs(),
+                BodyElement::Table(t) => t.collect_glyphs(),
+            };
+            for (font, bitmap) in element_glyphs {
+                *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+            }
+        }
+
+        // Collect from headers
+        if let Some(headers) = &self.header {
+            for p in headers {
+                for (font, bitmap) in p.collect_glyphs() {
+                    *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+                }
+            }
+        }
+
+        // Collect from footers
+        if let Some(footers) = &self.footer {
+            for p in footers {
+                for (font, bitmap) in p.collect_glyphs() {
+                    *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+                }
+            }
+        }
+
+        // Collect from footnotes/endnotes
+        for note in self.footnotes.iter().chain(self.endnotes.iter()) {
+            for p in &note.paragraphs {
+                for (font, bitmap) in p.collect_glyphs() {
+                    *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+                }
+            }
+        }
+
+        glyphs
+    }
+}
+
+#[cfg(feature = "fonts")]
+impl CollectGlyphs for MutableParagraph {
+    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
+        let mut glyphs = HashMap::new();
+        for element in &self.elements {
+            let element_glyphs = match element {
+                ParagraphElement::Run(r) => r.collect_glyphs(),
+                ParagraphElement::Hyperlink(h) => h.collect_glyphs(),
+                _ => continue,
+            };
+            for (font, bitmap) in element_glyphs {
+                *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+            }
+        }
+        glyphs
+    }
+}
+
+#[cfg(feature = "fonts")]
+impl CollectGlyphs for MutableTable {
+    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
+        let mut glyphs = HashMap::new();
+        for row in &self.rows {
+            for cell in &row.cells {
+                for p in &cell.paragraphs {
+                    for (font, bitmap) in p.collect_glyphs() {
+                        *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+                    }
+                }
+            }
+        }
+        glyphs
+    }
+}
+
 impl MutableDocument {
     /// Create a new empty mutable document.
     pub fn new() -> Self {

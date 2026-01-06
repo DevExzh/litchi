@@ -196,6 +196,8 @@ pub mod relationship_type {
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments";
     pub const ENDNOTES: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes";
+    pub const FONT: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font";
     pub const FONT_TABLE: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable";
     pub const FOOTER: &str =

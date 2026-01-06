@@ -271,6 +271,15 @@ pub mod odf;
 #[cfg(feature = "rtf")]
 pub mod rtf;
 
+/// Shared font embedding and subsetting module
+///
+/// Provides functionality for font discovery, loading, and subsetting
+/// to reduce the size of embedded fonts in documents.
+///
+/// **Note**: This requires the `fonts` feature to be enabled.
+#[cfg(feature = "fonts")]
+pub mod fonts;
+
 // Re-export high-level APIs
 pub use common::{Error, Result};
 

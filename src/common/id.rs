@@ -1,15 +1,25 @@
 use crate::common::simd::fmt::hex_encode_to_string;
 use rand::Rng;
 
-/// Generate a random GUID in the form {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}
-pub fn generate_guid_braced() -> String {
+/// Generate a random RFC4122 v4 GUID as raw 16 bytes
+pub fn generate_guid_bytes() -> [u8; 16] {
     let mut bytes = [0u8; 16];
     let mut rng = rand::rng();
     rng.fill(&mut bytes);
     // RFC4122 v4
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    bytes
+}
 
+/// Generate a random GUID in the form {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}
+pub fn generate_guid_braced() -> String {
+    let bytes = generate_guid_bytes();
+    format_guid_braced(&bytes)
+}
+
+/// Format raw GUID bytes as a braced string {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}
+pub fn format_guid_braced(bytes: &[u8; 16]) -> String {
     let mut out = String::with_capacity(38);
     out.push('{');
     hex_encode_to_string(&bytes[0..4], &mut out, false);

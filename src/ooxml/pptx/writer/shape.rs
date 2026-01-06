@@ -122,6 +122,50 @@ pub(crate) enum ShapeType {
     },
 }
 
+#[cfg(feature = "fonts")]
+use crate::fonts::CollectGlyphs;
+#[cfg(feature = "fonts")]
+use roaring::RoaringBitmap;
+#[cfg(feature = "fonts")]
+use std::collections::HashMap;
+
+#[cfg(feature = "fonts")]
+impl CollectGlyphs for MutableShape {
+    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
+        let mut glyphs = HashMap::new();
+        match &self.shape_type {
+            ShapeType::TextBox { text, format, .. } => {
+                let font_name = format.font.clone().unwrap_or_else(|| "Calibri".to_string());
+                let bitmap = glyphs.entry(font_name).or_insert_with(RoaringBitmap::new);
+                for c in text.chars() {
+                    bitmap.insert(c as u32);
+                }
+            },
+            ShapeType::Table { data, .. } => {
+                // Table cells currently only support plain strings in PPTX writer
+                let font_name = "Calibri".to_string(); // Default font for tables
+                let bitmap = glyphs.entry(font_name).or_insert_with(RoaringBitmap::new);
+                for row in data {
+                    for cell_text in row {
+                        for c in cell_text.chars() {
+                            bitmap.insert(c as u32);
+                        }
+                    }
+                }
+            },
+            ShapeType::GroupShape { children, .. } => {
+                for child in children {
+                    for (font, bitmap) in child.collect_glyphs() {
+                        *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+                    }
+                }
+            },
+            _ => {},
+        }
+        glyphs
+    }
+}
+
 impl MutableShape {
     /// Create a new text box shape.
     pub(crate) fn new_text_box(

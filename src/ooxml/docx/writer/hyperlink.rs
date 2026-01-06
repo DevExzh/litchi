@@ -30,6 +30,44 @@ pub struct MutableHyperlink {
     pub(crate) tooltip: Option<String>,
 }
 
+#[cfg(feature = "fonts")]
+use crate::fonts::CollectGlyphs;
+#[cfg(feature = "fonts")]
+use roaring::RoaringBitmap;
+#[cfg(feature = "fonts")]
+use std::collections::HashMap;
+
+#[cfg(feature = "fonts")]
+impl CollectGlyphs for MutableHyperlink {
+    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
+        let mut glyphs = HashMap::new();
+
+        // Collect from elements (runs)
+        for element in &self.elements {
+            if let HyperlinkElement::Run(run) = element {
+                for (font, bitmap) in run.collect_glyphs() {
+                    *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+                }
+            }
+        }
+
+        // Collect from fallback text if no elements
+        if self.elements.is_empty()
+            && let Some(text) = &self.text
+        {
+            // Hyperlink style usually defaults to Calibri in Word,
+            // but here we just use the default font name for fallback text.
+            let font_name = "Calibri".to_string();
+            let bitmap = glyphs.entry(font_name).or_insert_with(RoaringBitmap::new);
+            for c in text.chars() {
+                bitmap.insert(c as u32);
+            }
+        }
+
+        glyphs
+    }
+}
+
 impl MutableHyperlink {
     /// Create a new hyperlink to a URL.
     pub fn new(url: impl Into<String>, text: impl Into<String>) -> Self {

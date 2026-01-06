@@ -55,6 +55,106 @@ pub struct Package {
     properties: DocumentProperties,
 }
 
+#[cfg(feature = "fonts")]
+use crate::fonts::CollectGlyphs;
+#[cfg(feature = "fonts")]
+use crate::ooxml::fonts::{EmbedFonts, embed_fonts_in_package};
+#[cfg(feature = "fonts")]
+use roaring::RoaringBitmap;
+#[cfg(feature = "fonts")]
+use std::collections::HashMap;
+
+#[cfg(feature = "fonts")]
+impl CollectGlyphs for Package {
+    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
+        if let Some(pres) = &self.mutable_pres {
+            pres.collect_glyphs()
+        } else {
+            HashMap::new()
+        }
+    }
+}
+
+#[cfg(feature = "fonts")]
+impl EmbedFonts for Package {
+    fn embed_fonts(&mut self) -> Result<()> {
+        let glyphs = self.collect_glyphs();
+        let pres_uri = PackURI::new("/ppt/presentation.xml")
+            .map_err(|e| OoxmlError::Other(format!("Invalid presentation URI: {}", e)))?;
+
+        // Embed fonts and get relationship IDs with fontKey
+        let embedded_fonts =
+            embed_fonts_in_package(glyphs, &mut self.opc, "/ppt/fonts", &pres_uri)?;
+
+        if embedded_fonts.is_empty() {
+            return Ok(());
+        }
+
+        // Update presentation.xml content with embedded font references
+        if let Ok(pres_part) = self.opc.get_part_mut(&pres_uri) {
+            let xml_content = std::str::from_utf8(pres_part.blob())
+                .map_err(|e| OoxmlError::Other(format!("Invalid presentation.xml: {}", e)))?;
+
+            let mut updated_xml = xml_content.to_string();
+
+            // Prepare the embedded font list XML
+            let mut font_list_xml = String::new();
+            font_list_xml.push_str("<p:embeddedFontLst>");
+            for (font_name, info) in embedded_fonts {
+                font_list_xml.push_str("<p:embeddedFont>");
+
+                // Build <p:font> element with properties (required for Office recognition)
+                let mut font_xml = format!("<p:font typeface=\"{}\"", font_name);
+
+                if let Some(ref props) = info.properties {
+                    if let Some(ref panose) = props.panose {
+                        font_xml.push_str(&format!(" panose=\"{}\"", panose));
+                    }
+                    if let Some(ref charset) = props.charset {
+                        font_xml.push_str(&format!(" charset=\"{}\"", charset));
+                    }
+                    // pitchFamily combines pitch and family
+                    if let (Some(pitch), Some(family)) = (&props.pitch, &props.family) {
+                        let pitch_val = match pitch.as_str() {
+                            "variable" => 2,
+                            "fixed" => 1,
+                            _ => 0,
+                        };
+                        let family_val = match family.as_str() {
+                            "roman" => 1,
+                            "swiss" => 2,
+                            "modern" => 3,
+                            "script" => 4,
+                            "decorative" => 5,
+                            _ => 0,
+                        };
+                        let pitch_family = (family_val << 4) | pitch_val;
+                        font_xml.push_str(&format!(" pitchFamily=\"{}\"", pitch_family));
+                    }
+                }
+
+                font_xml.push_str("/>");
+                font_list_xml.push_str(&font_xml);
+
+                font_list_xml.push_str(&format!("<p:regular r:id=\"{}\"/>", info.relationship_id));
+                font_list_xml.push_str("</p:embeddedFont>");
+            }
+            font_list_xml.push_str("</p:embeddedFontLst>");
+
+            // Insert before <p:extLst> or </p:presentation>
+            if let Some(pos) = updated_xml.find("<p:extLst>") {
+                updated_xml.insert_str(pos, &font_list_xml);
+            } else if let Some(pos) = updated_xml.rfind("</p:presentation>") {
+                updated_xml.insert_str(pos, &font_list_xml);
+            }
+
+            pres_part.set_blob(updated_xml.into_bytes());
+        }
+
+        Ok(())
+    }
+}
+
 impl Package {
     /// Create a new empty .pptx package.
     ///
@@ -541,6 +641,12 @@ impl Package {
 
         // Update core properties
         self.update_core_properties()?;
+
+        // Embed fonts if feature enabled and requested in options
+        #[cfg(feature = "fonts")]
+        {
+            self.embed_fonts()?;
+        }
 
         #[cfg(feature = "ooxml_encryption")]
         #[allow(clippy::collapsible_if)]

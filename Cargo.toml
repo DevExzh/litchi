@@ -54,6 +54,7 @@ full = [
     "formula",
     "imgconv",
     "eval_engine",
+    "fonts",
 ]
 # Format support features
 iwa = [
@@ -72,6 +73,7 @@ rtf = ["dep:bumpalo", "dep:crc-fast", "dep:encoding_rs"]
 # Additional functionality features
 formula = ["dep:rowan", "dep:bumpalo", "dep:quick-xml"]
 imgconv = ["dep:image"]
+fonts = ["dep:allsorts", "dep:font-kit"]
 eval_engine = ["dep:statrs", "dep:num-complex"]
 eval_engine_web_functions = [
     "eval_engine",
@@ -84,6 +86,7 @@ eval_engine_web_functions = [
 [dependencies]
 aes = { version = "0.8", optional = true } # AES block cipher for OOXML file encryption
 aho-corasick = "1.1" # Fast string searching for fast byte pattern matching
+allsorts = { version = "0.16", optional = true } # Font subsetting and layout
 atoi_simd = "0.17" # SIMD-optimized conversion of byte slices to integers
 base64 = "0.22" # Base64 encoding/decoding for embedded binary data in XML
 bitflags = { version = "2.10", features = ["std", "serde"] } # Bit flags for efficient flag combinations
@@ -96,6 +99,7 @@ encoding_rs = { version = "0.8", optional = true } # Used by both OLE (.doc, .xl
 fast-float2 = "0.2" # Fast string-to-float conversion with correct rounding
 fixedbitset = "0.5" # Fixed-size bitset for efficient visited tracking with better cache locality
 flate2 = { version = "1", features = ["zlib-rs"], default-features = false } # Compression/decompression for Office file formats
+font-kit = { version = "0.14", optional = true } # Font discovery and loading
 hmac = { version = "0.12", optional = true } # HMAC for Agile OOXML encryption integrity
 image = { version = "0.25", features = ["default-formats", "rayon"], optional = true } # Image format decoding/encoding for embedded media
 itoa = "1.0" # Fast integer-to-string conversion

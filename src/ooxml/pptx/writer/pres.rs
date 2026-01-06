@@ -86,6 +86,24 @@ pub struct MutablePresentation {
     pub(crate) next_smartart_idx: u32,
 }
 
+#[cfg(feature = "fonts")]
+use crate::fonts::CollectGlyphs;
+#[cfg(feature = "fonts")]
+use roaring::RoaringBitmap;
+
+#[cfg(feature = "fonts")]
+impl CollectGlyphs for MutablePresentation {
+    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
+        let mut glyphs = HashMap::new();
+        for slide in &self.slides {
+            for (font, bitmap) in slide.collect_glyphs() {
+                *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+            }
+        }
+        glyphs
+    }
+}
+
 impl MutablePresentation {
     /// Create a new empty presentation with default dimensions.
     ///

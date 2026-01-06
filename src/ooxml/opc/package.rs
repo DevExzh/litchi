@@ -15,6 +15,15 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;
 
+/// Options for saving an OPC package.
+#[derive(Debug, Clone, Default)]
+pub struct SaveOptions {
+    /// Whether to embed fonts used in the document.
+    pub embed_fonts: bool,
+    /// Whether to subset fonts (only embed used glyphs).
+    pub subset_fonts: bool,
+}
+
 /// Main API class for working with OPC packages.
 ///
 /// OpcPackage represents an Open Packaging Convention package in memory,
@@ -28,6 +37,9 @@ pub struct OpcPackage {
     /// Using Box<dyn Part + Send + Sync> for trait objects to allow different part types
     /// PackURI keys avoid string allocations compared to String keys
     parts: HashMap<PackURI, Box<dyn Part + Send + Sync>>,
+
+    /// Save preferences
+    save_options: SaveOptions,
 }
 
 impl std::fmt::Debug for OpcPackage {
@@ -35,6 +47,7 @@ impl std::fmt::Debug for OpcPackage {
         f.debug_struct("OpcPackage")
             .field("rels", &self.rels)
             .field("parts_count", &self.parts.len())
+            .field("save_options", &self.save_options)
             .finish()
     }
 }
@@ -45,7 +58,25 @@ impl OpcPackage {
         Self {
             rels: Relationships::new(PACKAGE_URI.to_string()),
             parts: HashMap::new(),
+            save_options: SaveOptions::default(),
         }
+    }
+
+    /// Set save options for the package.
+    pub fn set_save_options(&mut self, options: SaveOptions) {
+        self.save_options = options;
+    }
+
+    /// Get current save options.
+    pub fn save_options(&self) -> &SaveOptions {
+        &self.save_options
+    }
+
+    /// Configure font embedding.
+    pub fn with_font_embedding(&mut self, embed: bool, subset: bool) -> &mut Self {
+        self.save_options.embed_fonts = embed;
+        self.save_options.subset_fonts = subset;
+        self
     }
 
     /// Open an OPC package from a file.

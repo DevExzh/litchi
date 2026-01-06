@@ -37,6 +37,49 @@ pub struct MutableSlide {
     pub(crate) modified: bool,
 }
 
+#[cfg(feature = "fonts")]
+use crate::fonts::CollectGlyphs;
+#[cfg(feature = "fonts")]
+use roaring::RoaringBitmap;
+#[cfg(feature = "fonts")]
+use std::collections::HashMap;
+
+#[cfg(feature = "fonts")]
+impl CollectGlyphs for MutableSlide {
+    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
+        let mut glyphs = HashMap::new();
+
+        // Collect from title
+        if let Some(title) = &self.title {
+            let bitmap = glyphs
+                .entry("Calibri".to_string())
+                .or_insert_with(RoaringBitmap::new);
+            for c in title.chars() {
+                bitmap.insert(c as u32);
+            }
+        }
+
+        // Collect from shapes
+        for shape in &self.shapes {
+            for (font, bitmap) in shape.collect_glyphs() {
+                *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+            }
+        }
+
+        // Collect from notes
+        if let Some(notes) = &self.notes {
+            let bitmap = glyphs
+                .entry("Calibri".to_string())
+                .or_insert_with(RoaringBitmap::new);
+            for c in notes.chars() {
+                bitmap.insert(c as u32);
+            }
+        }
+
+        glyphs
+    }
+}
+
 impl MutableSlide {
     /// Create a new empty slide.
     pub(crate) fn new(slide_id: u32) -> Self {
@@ -166,12 +209,21 @@ impl MutableSlide {
     }
 
     /// Add a text box to the slide.
-    pub fn add_text_box(&mut self, text: &str, x: i64, y: i64, width: i64, height: i64) {
+    /// Returns a mutable reference to the shape for setting format properties.
+    pub fn add_text_box(
+        &mut self,
+        text: &str,
+        x: i64,
+        y: i64,
+        width: i64,
+        height: i64,
+    ) -> &mut MutableShape {
         // IDs: 1=group, 2=title, 3+=user shapes
         let shape_id = (self.shapes.len() + 3) as u32;
         let shape = MutableShape::new_text_box(shape_id, text.to_string(), x, y, width, height);
         self.shapes.push(shape);
         self.modified = true;
+        self.shapes.last_mut().unwrap()
     }
 
     /// Add a rectangle to the slide.

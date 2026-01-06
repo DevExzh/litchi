@@ -59,6 +59,132 @@ pub struct Package {
     custom_properties: CustomProperties,
 }
 
+#[cfg(feature = "fonts")]
+use crate::fonts::CollectGlyphs;
+#[cfg(feature = "fonts")]
+use crate::ooxml::fonts::{EmbedFonts, embed_fonts_in_package};
+#[cfg(feature = "fonts")]
+use roaring::RoaringBitmap;
+#[cfg(feature = "fonts")]
+use std::collections::HashMap;
+
+#[cfg(feature = "fonts")]
+impl CollectGlyphs for Package {
+    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
+        if let Some(doc) = &self.mutable_doc {
+            doc.collect_glyphs()
+        } else if let Ok(_doc) = self.document() {
+            // For now, only mutable documents support scanning as they are in-memory.
+            // Future enhancement: parse document.xml part directly for glyphs.
+            HashMap::new()
+        } else {
+            HashMap::new()
+        }
+    }
+}
+
+#[cfg(feature = "fonts")]
+impl EmbedFonts for Package {
+    fn embed_fonts(&mut self) -> Result<()> {
+        let glyphs = self.collect_glyphs();
+        let font_table_uri = PackURI::new("/word/fontTable.xml")
+            .map_err(|e| OoxmlError::Other(format!("Invalid fontTable URI: {}", e)))?;
+
+        // Embed fonts and get relationship IDs with fontKey
+        let embedded_fonts =
+            embed_fonts_in_package(glyphs, &mut self.opc, "/word/fonts", &font_table_uri)?;
+
+        if embedded_fonts.is_empty() {
+            return Ok(());
+        }
+
+        // Update settings.xml to include embedTrueTypeFonts flag
+        let settings_uri = PackURI::new("/word/settings.xml")
+            .map_err(|e| OoxmlError::Other(format!("Invalid settings URI: {}", e)))?;
+
+        if let Ok(settings_part) = self.opc.get_part_mut(&settings_uri) {
+            let xml_content = std::str::from_utf8(settings_part.blob())
+                .map_err(|e| OoxmlError::Other(format!("Invalid settings.xml: {}", e)))?;
+
+            // Check if embedTrueTypeFonts already exists
+            if !xml_content.contains("<w:embedTrueTypeFonts") {
+                let mut updated_xml = xml_content.to_string();
+
+                // Insert after <w:settings> opening tag or before </w:settings>
+                if let Some(pos) = updated_xml.find("</w:settings>") {
+                    updated_xml.insert_str(pos, "<w:embedTrueTypeFonts/>");
+                    settings_part.set_blob(updated_xml.into_bytes());
+                }
+            }
+        }
+
+        // Update fontTable.xml content with embedded font references
+        if let Ok(font_table_part) = self.opc.get_part_mut(&font_table_uri) {
+            let xml_content = std::str::from_utf8(font_table_part.blob())
+                .map_err(|e| OoxmlError::Other(format!("Invalid fontTable.xml: {}", e)))?;
+
+            let mut updated_xml = xml_content.to_string();
+
+            for (font_name, info) in embedded_fonts {
+                // Find the <w:font w:name="Font Name"> element
+                let search_pattern = format!("w:name=\"{}\"", font_name);
+                if let Some(pos) = updated_xml.find(&search_pattern) {
+                    // Find the closing tag of this font entry or the next property
+                    if let Some(font_end_pos) = updated_xml[pos..].find("</w:font>") {
+                        let absolute_end_pos = pos + font_end_pos;
+                        // Include w:fontKey attribute (GUID) - required for Office to recognize embedded fonts
+                        let embed_xml = format!(
+                            "<w:embedRegular r:id=\"{}\" w:fontKey=\"{}\"/>",
+                            info.relationship_id, info.font_key
+                        );
+                        // Insert before </w:font>
+                        updated_xml.insert_str(absolute_end_pos, &embed_xml);
+                    }
+                } else {
+                    // Font not in table, append new entry before </w:fonts>
+                    if let Some(fonts_end_pos) = updated_xml.rfind("</w:fonts>") {
+                        let mut new_font_xml = format!("<w:font w:name=\"{}\">", font_name);
+
+                        // Add font properties if available (required for Office recognition)
+                        if let Some(ref props) = info.properties {
+                            if let Some(ref panose) = props.panose {
+                                new_font_xml
+                                    .push_str(&format!("<w:panose1 w:val=\"{}\"/>", panose));
+                            }
+                            if let Some(ref charset) = props.charset {
+                                new_font_xml
+                                    .push_str(&format!("<w:charset w:val=\"{}\"/>", charset));
+                            }
+                            if let Some(ref family) = props.family {
+                                new_font_xml.push_str(&format!("<w:family w:val=\"{}\"/>", family));
+                            }
+                            if let Some(ref pitch) = props.pitch {
+                                new_font_xml.push_str(&format!("<w:pitch w:val=\"{}\"/>", pitch));
+                            }
+                            if let Some(ref sig) = props.sig {
+                                new_font_xml.push_str(&format!(
+                                    "<w:sig w:usb0=\"{}\" w:usb1=\"{}\" w:usb2=\"{}\" w:usb3=\"{}\" w:csb0=\"{}\" w:csb1=\"{}\"/>",
+                                    sig.0, sig.1, sig.2, sig.3, sig.4, sig.5
+                                ));
+                            }
+                        }
+
+                        new_font_xml.push_str(&format!(
+                            "<w:embedRegular r:id=\"{}\" w:fontKey=\"{}\"/></w:font>",
+                            info.relationship_id, info.font_key
+                        ));
+                        updated_xml.insert_str(fonts_end_pos, &new_font_xml);
+                    }
+                }
+            }
+
+            font_table_part.set_blob(updated_xml.into_bytes());
+        }
+
+        Ok(())
+    }
+}
+
 impl Package {
     /// Create a new empty .docx package.
     ///
@@ -759,6 +885,12 @@ impl Package {
 
         // Update custom properties
         self.update_custom_properties()?;
+
+        // Embed fonts if feature enabled and requested in options
+        #[cfg(feature = "fonts")]
+        {
+            self.embed_fonts()?;
+        }
 
         self.opc.save(path).map_err(|e| {
             OoxmlError::IoError(std::io::Error::other(format!(
