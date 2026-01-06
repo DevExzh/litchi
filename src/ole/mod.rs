@@ -31,6 +31,13 @@ pub mod sprm;
 /// Complete SPRM operation definitions based on Apache POI.
 pub mod sprm_operations;
 
+/// Shared OfficeArt (Escher) functionality for Office binary formats
+///
+/// Escher is Microsoft's drawing layer format used across Office applications
+/// (DOC, XLS, PPT) for shapes, connectors, and graphical elements.
+/// This module provides shared zero-copy parsing and writing utilities.
+pub mod escher;
+
 /// Legacy Word document (.doc) reader
 ///
 /// This module provides functionality to parse Microsoft Word documents

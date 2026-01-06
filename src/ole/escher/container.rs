@@ -6,8 +6,7 @@
 //! - Iterator-based: Functional composition
 //! - Zero-copy: Borrows from parent data
 
-use super::record::EscherRecord;
-use crate::ole::ppt::package::Result;
+use super::record::{EscherRecord, Result};
 
 /// Iterator over child records in an Escher container.
 ///
@@ -36,17 +35,14 @@ impl<'data> Iterator for EscherChildIterator<'data> {
     type Item = Result<EscherRecord<'data>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // Check if we've reached the end
         if self.offset + 8 > self.data.len() {
             return None;
         }
 
-        // Try to parse next record
         match EscherRecord::parse(self.data, self.offset) {
             Ok((record, consumed)) => {
                 self.offset += consumed;
 
-                // Stop if no progress (prevent infinite loop)
                 if consumed == 0 {
                     return None;
                 }
@@ -54,10 +50,8 @@ impl<'data> Iterator for EscherChildIterator<'data> {
                 Some(Ok(record))
             },
             Err(e) => {
-                // Move past this position to avoid infinite loop
                 self.offset += 1;
 
-                // Only return error if we had enough data for a header
                 if self.offset + 7 < self.data.len() {
                     Some(Err(e))
                 } else {
@@ -68,7 +62,6 @@ impl<'data> Iterator for EscherChildIterator<'data> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        // Estimate: average record is ~20 bytes (header + small data)
         let remaining = self.data.len().saturating_sub(self.offset);
         let est_count = remaining / 20;
         (0, Some(est_count))
@@ -164,12 +157,10 @@ impl<'data> EscherContainer<'data> {
         results: &mut Vec<EscherRecord<'data>>,
     ) {
         for child in self.children().flatten() {
-            // Add if matches
             if child.record_type == record_type {
                 results.push(child.clone());
             }
 
-            // Recurse if container
             if child.is_container() {
                 let container = EscherContainer::new(child);
                 container.find_recursive_impl(record_type, results);
@@ -185,18 +176,9 @@ mod tests {
 
     #[test]
     fn test_child_iterator() {
-        // Create test data with two records
         let data = vec![
-            // First record (Sp atom)
-            0x02, 0x00, // version=2, instance=0
-            0x0A, 0xF0, // record type = 0xF00A (Sp)
-            0x04, 0x00, 0x00, 0x00, // length = 4
-            0x01, 0x02, 0x03, 0x04, // data
-            // Second record (Opt atom)
-            0x03, 0x00, // version=3, instance=0
-            0x0B, 0xF0, // record type = 0xF00B (Opt)
-            0x02, 0x00, 0x00, 0x00, // length = 2
-            0x05, 0x06, // data
+            0x02, 0x00, 0x0A, 0xF0, 0x04, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x03, 0x00,
+            0x0B, 0xF0, 0x02, 0x00, 0x00, 0x00, 0x05, 0x06,
         ];
 
         let iter = EscherChildIterator::new(&data);

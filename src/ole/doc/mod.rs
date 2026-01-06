@@ -52,6 +52,7 @@ pub mod document;
 pub mod package;
 pub mod paragraph;
 pub mod parts;
+pub mod shapes;
 pub mod table;
 
 /// DOC file writing
@@ -60,5 +61,6 @@ pub mod writer;
 pub use document::Document;
 pub use package::Package;
 pub use paragraph::{Paragraph, Run};
+pub use shapes::DocShape;
 pub use table::{Cell, Row, Table};
 pub use writer::{CharacterFormatting, DocWriteError, DocWriter, ParagraphFormatting};

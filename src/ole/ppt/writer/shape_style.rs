@@ -334,13 +334,13 @@ impl ShapeColor {
         Self::scheme(2)
     }
 
-    /// Convert to BGR format for PPT (PowerPoint stores BlueGreenRed, not RGB)
+    /// Convert to RGB format for PPT (PowerPoint uses RedGreenBlue format)
     pub fn to_rgbx(&self) -> u32 {
         if self.use_scheme {
             0x0800_0000 | (self.scheme_index as u32)
         } else {
-            // PPT uses BGR: Blue in byte 0, Green in byte 1, Red in byte 2
-            (self.b as u32) | ((self.g as u32) << 8) | ((self.r as u32) << 16)
+            // PPT uses RGB: Red in byte 0, Green in byte 1, Blue in byte 2
+            (self.r as u32) | ((self.g as u32) << 8) | ((self.b as u32) << 16)
         }
     }
 }

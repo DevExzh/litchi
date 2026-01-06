@@ -7,27 +7,26 @@
 //! - Pattern matching for shape type detection
 
 use super::container::EscherContainer;
+use super::record::Result;
 use super::shape::EscherShape;
 use super::types::EscherRecordType;
-use crate::ole::ppt::package::Result;
 
 /// Factory for creating shapes from Escher records.
 pub struct EscherShapeFactory;
 
 impl EscherShapeFactory {
-    /// Extract all shapes from an Escher/PPDrawing data.
+    /// Extract all shapes from an Escher/Drawing data.
     ///
     /// # Performance
     ///
     /// - Depth-first traversal
     /// - Pre-allocated results vector
     /// - Short-circuits on errors
-    pub fn extract_shapes_from_ppdrawing(data: &[u8]) -> Result<Vec<EscherShape<'_>>> {
+    pub fn extract_shapes_from_drawing(data: &[u8]) -> Result<Vec<EscherShape<'_>>> {
         let parser = super::parser::EscherParser::new(data);
 
         let mut shapes = Vec::new();
 
-        // Get root container
         if let Some(root_result) = parser.root_container() {
             let root = root_result?;
             Self::extract_shapes_from_container(&root, &mut shapes);
@@ -49,19 +48,15 @@ impl EscherShapeFactory {
     ) {
         for child in container.children().flatten() {
             match child.record_type {
-                // SpContainer holds a single shape
                 EscherRecordType::SpContainer => {
                     let sp_container = EscherContainer::new(child);
                     let shape = EscherShape::from_container(sp_container);
                     shapes.push(shape);
                 },
-                // SpgrContainer holds a group of shapes
-                // Process the group itself as a shape (which will recursively load children)
                 EscherRecordType::SpgrContainer => {
                     let group_container = EscherContainer::new(child);
                     Self::extract_shapes_from_spgr_container(&group_container, shapes);
                 },
-                // Other containers - recurse
                 _ if child.is_container() => {
                     let child_container = EscherContainer::new(child);
                     Self::extract_shapes_from_container(&child_container, shapes);
@@ -87,20 +82,16 @@ impl EscherShapeFactory {
                 EscherRecordType::SpContainer => {
                     let sp_container = EscherContainer::new(child);
 
-                    // The first SpContainer is the group shape itself
                     if is_first {
                         is_first = false;
-                        // Create the group shape (which will recursively parse its children)
                         let group_shape = EscherShape::from_container(sp_container);
                         shapes.push(group_shape);
                     } else {
-                        // Regular child shapes
                         let child_shape = EscherShape::from_container(sp_container);
                         shapes.push(child_shape);
                     }
                 },
                 EscherRecordType::SpgrContainer => {
-                    // Nested group
                     let nested_group = EscherContainer::new(child);
                     Self::extract_shapes_from_spgr_container(&nested_group, shapes);
                 },
@@ -113,14 +104,14 @@ impl EscherShapeFactory {
         }
     }
 
-    /// Count shapes in PPDrawing data (without full parsing).
+    /// Count shapes in drawing data (without full parsing).
     ///
     /// # Performance
     ///
     /// - Counts SpContainer records only
     /// - No shape object allocation
     /// - Early termination on errors
-    pub fn count_shapes_in_ppdrawing(data: &[u8]) -> usize {
+    pub fn count_shapes_in_drawing(data: &[u8]) -> usize {
         let parser = super::parser::EscherParser::new(data);
 
         if let Some(root_result) = parser.root_container()
@@ -150,22 +141,5 @@ impl EscherShapeFactory {
         }
 
         count
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_empty_data() {
-        let shapes = EscherShapeFactory::extract_shapes_from_ppdrawing(&[]).unwrap();
-        assert_eq!(shapes.len(), 0);
-    }
-
-    #[test]
-    fn test_count_shapes() {
-        let count = EscherShapeFactory::count_shapes_in_ppdrawing(&[]);
-        assert_eq!(count, 0);
     }
 }

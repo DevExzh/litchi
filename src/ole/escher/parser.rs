@@ -7,29 +7,28 @@
 //! - Efficient: Single-pass with minimal allocations
 
 use super::container::{EscherChildIterator, EscherContainer};
-use super::record::EscherRecord;
+use super::record::{EscherRecord, Result};
 use super::types::EscherRecordType;
-use crate::ole::ppt::package::Result;
 
-/// Escher parser for extracting shapes and text from PPDrawing records.
+/// Escher parser for extracting shapes and text from drawing records.
 pub struct EscherParser<'data> {
-    /// The raw PPDrawing/Escher data
+    /// The raw Escher/Drawing data
     data: &'data [u8],
 }
 
 impl<'data> EscherParser<'data> {
-    /// Create a new Escher parser from PPDrawing data.
+    /// Create a new Escher parser from drawing data.
     #[inline]
     pub fn new(data: &'data [u8]) -> Self {
         Self { data }
     }
 
-    /// Get the root DgContainer (Drawing Container).
+    /// Get the root container (typically DgContainer or DggContainer).
     ///
     /// # Performance
     ///
     /// - Parses only first record
-    /// - Returns None if not a DgContainer
+    /// - Returns None if not a container
     pub fn root_container(&self) -> Option<Result<EscherContainer<'data>>> {
         if self.data.len() < 8 {
             return None;
@@ -58,7 +57,6 @@ impl<'data> EscherParser<'data> {
     pub fn find_all_shapes(&self) -> Result<Vec<EscherRecord<'data>>> {
         let mut shapes = Vec::new();
 
-        // Parse root container
         if let Some(root_result) = self.root_container() {
             let root = root_result?;
             shapes.extend(root.find_recursive(EscherRecordType::SpContainer));
@@ -76,7 +74,6 @@ impl<'data> EscherParser<'data> {
     pub fn find_all_textboxes(&self) -> Result<Vec<EscherRecord<'data>>> {
         let mut textboxes = Vec::new();
 
-        // Parse root container
         if let Some(root_result) = self.root_container() {
             let root = root_result?;
             textboxes.extend(root.find_recursive(EscherRecordType::ClientTextbox));
@@ -93,10 +90,7 @@ mod tests {
     #[test]
     fn test_parser_creation() {
         let data = vec![
-            0x0F, 0x00, // version=0xF (container), instance=0
-            0x02, 0xF0, // record type = 0xF002 (DgContainer)
-            0x04, 0x00, 0x00, 0x00, // length = 4
-            0x01, 0x02, 0x03, 0x04, // data
+            0x0F, 0x00, 0x02, 0xF0, 0x04, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04,
         ];
 
         let parser = EscherParser::new(&data);

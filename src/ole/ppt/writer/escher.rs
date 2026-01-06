@@ -1,11 +1,7 @@
-//! Escher (Office Drawing) record generation for PPT files
+//! PPT-specific Escher (Office Drawing) record generation.
 //!
-//! Escher is the binary format for drawing objects (shapes, connectors, pictures)
-//! shared across Office applications.
-//!
-//! Based on Microsoft's "[MS-ODRAW]" specification and Apache POI's EscherRecord classes.
+//! Re-exports shared Escher writer functionality and adds PPT-specific extensions.
 
-use bitflags::bitflags;
 use std::io::Write;
 use zerocopy::IntoBytes;
 use zerocopy_derive::*;
@@ -15,89 +11,9 @@ use crate::common::unit::emu_i32_to_ppt_master_i16_round;
 /// Error type for PPT operations
 pub type PptError = std::io::Error;
 
-// =============================================================================
-// Escher Record Types (MS-ODRAW 2.1.1)
-// =============================================================================
-
-/// Escher record types
-pub mod record_type {
-    /// Drawing group container
-    pub const DGG_CONTAINER: u16 = 0xF000;
-    /// BLIP store container
-    pub const BSTORE_CONTAINER: u16 = 0xF001;
-    /// Drawing container
-    pub const DG_CONTAINER: u16 = 0xF002;
-    /// Shape group container
-    pub const SPGR_CONTAINER: u16 = 0xF003;
-    /// Shape container
-    pub const SP_CONTAINER: u16 = 0xF004;
-    /// Drawing group record
-    pub const DGG: u16 = 0xF006;
-    /// Drawing record
-    pub const DG: u16 = 0xF008;
-    /// Shape group coordinates
-    pub const SPGR: u16 = 0xF009;
-    /// Shape record
-    pub const SP: u16 = 0xF00A;
-    /// Property table
-    pub const OPT: u16 = 0xF00B;
-    /// Client anchor
-    pub const CLIENT_ANCHOR: u16 = 0xF010;
-    /// Client data
-    pub const CLIENT_DATA: u16 = 0xF011;
-    /// Split menu colors
-    pub const SPLIT_MENU_COLORS: u16 = 0xF11E;
-}
-
-// =============================================================================
-// Shape Types (MS-ODRAW 2.4.6)
-// =============================================================================
-
-/// Shape types (MSOSPT values)
-pub mod shape_type {
-    pub const NOT_PRIMITIVE: u16 = 0;
-    pub const RECTANGLE: u16 = 1;
-    pub const ROUND_RECTANGLE: u16 = 2;
-    pub const ELLIPSE: u16 = 3;
-    pub const DIAMOND: u16 = 4;
-    pub const LINE: u16 = 20;
-    pub const TEXT_BOX: u16 = 202;
-}
-
-// =============================================================================
-// Shape Flags (MS-ODRAW 2.2.40)
-// =============================================================================
-
-bitflags! {
-    /// Shape flags for EscherSpRecord (MS-ODRAW 2.2.40)
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct ShapeFlags: u32 {
-        /// Shape is a group
-        const GROUP = 0x0001;
-        /// Shape is a child of a group
-        const CHILD = 0x0002;
-        /// Shape is the topmost group (patriarch)
-        const PATRIARCH = 0x0004;
-        /// Shape has been deleted
-        const DELETED = 0x0008;
-        /// Shape is an OLE object
-        const OLE_SHAPE = 0x0010;
-        /// Shape has a valid master
-        const HAVE_MASTER = 0x0020;
-        /// Shape is flipped horizontally
-        const FLIP_H = 0x0040;
-        /// Shape is flipped vertically
-        const FLIP_V = 0x0080;
-        /// Shape is a connector
-        const CONNECTOR = 0x0100;
-        /// Shape has an anchor
-        const HAVE_ANCHOR = 0x0200;
-        /// Shape is a background shape
-        const BACKGROUND = 0x0400;
-        /// Shape has a shape type property
-        const HAVE_SPT = 0x0800;
-    }
-}
+// Re-export shared Escher writer functionality
+pub use crate::ole::escher::writer::{EscherProperty, EscherRecordHeader, EscherSpData};
+pub use crate::ole::escher::writer::{ShapeFlags, record_type, shape_type};
 
 // =============================================================================
 // Property IDs (MS-ODRAW 2.3.1)
@@ -129,8 +45,9 @@ pub mod prop_id {
     pub const FILL_BLIP: u16 = 0x4186;
     pub const FILL_WIDTH: u16 = 0x0187; // fillWidth for pattern fills
     pub const FILL_HEIGHT: u16 = 0x0188; // fillHeight for pattern fills
-    pub const FILL_ANGLE: u16 = 0x018A; // fillAngle for gradients (degrees * 65536)
-    pub const FILL_FOCUS: u16 = 0x018B; // fillFocus for gradients (-100 to 100)
+    pub const FILL_ANGLE: u16 = 0x0189; // fillAngle for gradients (degrees * 65536)
+    pub const FILL_FOCUS: u16 = 0x018A; // fillFocus for gradients (-100 to 100)
+    pub const FILL_SHADE_TYPE: u16 = 0x018C; // fillShadeType (0=linear, 1=gamma, etc.)
     pub const FILL_RECT_RIGHT: u16 = 0x0193; // fillRectRight per MS-ODRAW
     pub const FILL_RECT_BOTTOM: u16 = 0x0194; // fillRectBottom per MS-ODRAW
     pub const NO_FILL_HIT_TEST: u16 = 0x01BF;
@@ -166,25 +83,12 @@ pub mod prop_id {
 }
 
 // =============================================================================
-// Property Values (scheme colors, etc.)
+// PPT-Specific Property Values
 // =============================================================================
 
-/// Common property values
-pub mod prop_value {
-    /// Scheme color flag (OR with scheme index)
-    pub const SCHEME_COLOR: u32 = 0x0800_0000;
-
-    /// Scheme color indices
-    pub const SCHEME_FILL: u32 = SCHEME_COLOR | 0x04;
-    pub const SCHEME_FILL_BACK: u32 = SCHEME_COLOR;
-    pub const SCHEME_LINE: u32 = SCHEME_COLOR | 0x01;
-    pub const SCHEME_SHADOW: u32 = SCHEME_COLOR | 0x02;
-
-    /// Line style boolean properties
-    pub const LINE_STYLE_DEFAULT: u32 = 0x0010_0010;
-
-    /// Shape boolean properties
-    pub const SHAPE_BOOL_DEFAULT: u32 = 0x0008_0008;
+/// PPT-specific property values (extends shared prop_value)
+pub mod ppt_prop_value {
+    pub use crate::ole::escher::writer::prop_value::*;
 
     /// Background fill color
     pub const BG_FILL_COLOR: u32 = 134_217_728; // 0x0800_0000
@@ -228,15 +132,15 @@ pub struct SplitMenuColors {
 
 impl SplitMenuColors {
     pub const DEFAULT: Self = Self {
-        fill_color: prop_value::SCHEME_FILL,
-        line_color: prop_value::SCHEME_LINE,
-        shadow_color: prop_value::SCHEME_SHADOW,
+        fill_color: crate::ole::escher::writer::prop_value::SCHEME_FILL,
+        line_color: crate::ole::escher::writer::prop_value::SCHEME_LINE,
+        shadow_color: crate::ole::escher::writer::prop_value::SCHEME_SHADOW,
         color_3d: 0x1000_00F7,
     };
 }
 
 // =============================================================================
-// Escher Record Header (MS-ODRAW 2.2.1)
+// Header Version Constants
 // =============================================================================
 
 /// Escher record header versions
@@ -247,35 +151,6 @@ pub mod header_version {
     pub const SP: u8 = 0x02;
     pub const OPT: u8 = 0x03;
     pub const DG: u8 = 0x00; // instance is drawing_id
-}
-
-/// Raw Escher record header (8 bytes) - zerocopy compatible
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
-#[repr(C, packed)]
-pub struct EscherRecordHeader {
-    /// Version (4 bits) | Instance (12 bits)
-    pub ver_inst: u16,
-    /// Record type
-    pub rec_type: u16,
-    /// Record length (not including header)
-    pub length: u32,
-}
-
-impl EscherRecordHeader {
-    /// Create a new header with version, instance, type, and length
-    pub const fn new(version: u8, instance: u16, rec_type: u16, length: u32) -> Self {
-        let ver_inst = (version as u16 & 0x0F) | ((instance & 0x0FFF) << 4);
-        Self {
-            ver_inst,
-            rec_type,
-            length,
-        }
-    }
-
-    /// Create a container header
-    pub const fn container(rec_type: u16, length: u32) -> Self {
-        Self::new(header_version::CONTAINER, 0, rec_type, length)
-    }
 }
 
 /// Escher record header (8 bytes) - builder-friendly version
@@ -333,7 +208,7 @@ impl FileIdCluster {
     pub const fn reserved() -> Self {
         Self {
             dgid: 0,
-            cspid_cur: prop_value::RESERVED_CSPID_CUR,
+            cspid_cur: ppt_prop_value::RESERVED_CSPID_CUR,
         }
     }
 }
@@ -399,31 +274,10 @@ impl EscherSpgrData {
 }
 
 // =============================================================================
-// Shape (EscherSp) - MS-ODRAW 2.2.40
+// PPT-Specific EscherSpData Extensions
 // =============================================================================
 
-/// Shape record data
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
-#[repr(C)]
-pub struct EscherSpData {
-    /// Shape ID
-    pub spid: u32,
-    /// Shape flags
-    pub flags: u32,
-}
-
 impl EscherSpData {
-    pub const fn new(spid: u32, flags: u32) -> Self {
-        Self { spid, flags }
-    }
-
-    pub const fn with_flags(spid: u32, flags: ShapeFlags) -> Self {
-        Self {
-            spid,
-            flags: flags.bits(),
-        }
-    }
-
     pub const fn group_patriarch(spid: u32) -> Self {
         Self {
             spid,
@@ -439,48 +293,33 @@ impl EscherSpData {
     }
 }
 
-// =============================================================================
-// Property Entry (EscherOpt) - MS-ODRAW 2.3.1
-// =============================================================================
-
-/// Single property entry (6 bytes)
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
-#[repr(C, packed)]
-pub struct EscherProperty {
-    /// Property ID (with flags in high bits)
-    pub prop_id: u16,
-    /// Property value
-    pub value: u32,
-}
-
-impl EscherProperty {
-    pub const fn new(prop_id: u16, value: u32) -> Self {
-        Self { prop_id, value }
-    }
-}
+// Re-use EscherProperty from shared module
 
 /// Default drawing group properties (8 properties = 48 bytes)
 pub const DGG_DEFAULT_PROPERTIES: [EscherProperty; 8] = [
-    EscherProperty::new(prop_id::FILL_COLOR, prop_value::SCHEME_FILL),
-    EscherProperty::new(prop_id::FILL_BACK_COLOR, prop_value::SCHEME_FILL_BACK),
+    EscherProperty::new(prop_id::FILL_COLOR, ppt_prop_value::SCHEME_FILL),
+    EscherProperty::new(prop_id::FILL_BACK_COLOR, ppt_prop_value::SCHEME_FILL_BACK),
     EscherProperty::new(prop_id::FILL_BLIP, 0),
-    EscherProperty::new(prop_id::NO_FILL_HIT_TEST, prop_value::LINE_STYLE_DEFAULT),
-    EscherProperty::new(prop_id::LINE_COLOR, prop_value::SCHEME_LINE),
+    EscherProperty::new(
+        prop_id::NO_FILL_HIT_TEST,
+        ppt_prop_value::LINE_STYLE_DEFAULT,
+    ),
+    EscherProperty::new(prop_id::LINE_COLOR, ppt_prop_value::SCHEME_LINE),
     EscherProperty::new(prop_id::LINE_BLIP, 0),
-    EscherProperty::new(prop_id::SHAPE_BOOL, prop_value::SHAPE_BOOL_DEFAULT),
-    EscherProperty::new(prop_id::SHADOW_COLOR, prop_value::SCHEME_SHADOW),
+    EscherProperty::new(prop_id::SHAPE_BOOL, ppt_prop_value::SHAPE_BOOL_DEFAULT),
+    EscherProperty::new(prop_id::SHADOW_COLOR, ppt_prop_value::SCHEME_SHADOW),
 ];
 
 /// Background shape properties (8 properties = 48 bytes)
 pub const BG_SHAPE_PROPERTIES: [EscherProperty; 8] = [
-    EscherProperty::new(prop_id::FILL_COLOR, prop_value::BG_FILL_COLOR),
-    EscherProperty::new(prop_id::FILL_BACK_COLOR, prop_value::BG_FILL_BACK_COLOR),
-    EscherProperty::new(prop_id::FILL_RECT_RIGHT, prop_value::SLIDE_WIDTH_EMU),
-    EscherProperty::new(prop_id::FILL_RECT_BOTTOM, prop_value::SLIDE_HEIGHT_EMU),
-    EscherProperty::new(prop_id::NO_FILL_HIT_TEST, prop_value::NO_FILL_HIT_TEST),
-    EscherProperty::new(prop_id::LINE_STYLE_BOOL, prop_value::NO_LINE_DRAW_DASH),
-    EscherProperty::new(prop_id::BW_MODE, prop_value::BW_MODE_AUTO),
-    EscherProperty::new(prop_id::BACKGROUND_SHAPE, prop_value::BACKGROUND_SHAPE),
+    EscherProperty::new(prop_id::FILL_COLOR, ppt_prop_value::BG_FILL_COLOR),
+    EscherProperty::new(prop_id::FILL_BACK_COLOR, ppt_prop_value::BG_FILL_BACK_COLOR),
+    EscherProperty::new(prop_id::FILL_RECT_RIGHT, ppt_prop_value::SLIDE_WIDTH_EMU),
+    EscherProperty::new(prop_id::FILL_RECT_BOTTOM, ppt_prop_value::SLIDE_HEIGHT_EMU),
+    EscherProperty::new(prop_id::NO_FILL_HIT_TEST, ppt_prop_value::NO_FILL_HIT_TEST),
+    EscherProperty::new(prop_id::LINE_STYLE_BOOL, ppt_prop_value::NO_LINE_DRAW_DASH),
+    EscherProperty::new(prop_id::BW_MODE, ppt_prop_value::BW_MODE_AUTO),
+    EscherProperty::new(prop_id::BACKGROUND_SHAPE, ppt_prop_value::BACKGROUND_SHAPE),
 ];
 
 // =============================================================================
@@ -594,8 +433,9 @@ pub fn create_dgg_container(
 
     // spidMax: Calculate based on highest drawing ID * 1024 + shapes in that drawing
     let max_slide_shapes = slide_shape_counts.iter().max().copied().unwrap_or(2);
-    let spid_max = if drawing_count == 1 && master_shapes == prop_value::POI_MASTER_SHAPE_COUNT {
-        prop_value::POI_SPID_MAX
+    let spid_max = if drawing_count == 1 && master_shapes == ppt_prop_value::POI_MASTER_SHAPE_COUNT
+    {
+        ppt_prop_value::POI_SPID_MAX
     } else {
         drawing_count * 1024 + max_slide_shapes
     };
@@ -680,8 +520,9 @@ pub fn create_dgg_container_with_blips(
 
     // spidMax: Calculate based on highest drawing ID * 1024 + shapes in that drawing
     let max_slide_shapes = slide_shape_counts.iter().max().copied().unwrap_or(2);
-    let spid_max = if drawing_count == 1 && master_shapes == prop_value::POI_MASTER_SHAPE_COUNT {
-        prop_value::POI_SPID_MAX
+    let spid_max = if drawing_count == 1 && master_shapes == ppt_prop_value::POI_MASTER_SHAPE_COUNT
+    {
+        ppt_prop_value::POI_SPID_MAX
     } else {
         drawing_count * 1024 + max_slide_shapes
     };
@@ -907,8 +748,18 @@ pub struct UserShapeData {
     pub hyperlink_jump: u8,
     /// Hyperlink type (for InteractiveInfoAtom)
     pub hyperlink_type: u8,
-    /// Picture BLIP index (1-based, for picture shapes)
+    /// Picture BLIP index (for picture frames)
     pub picture_index: Option<u32>,
+    /// Shadow color (RGB format)
+    pub shadow_color: Option<u32>,
+    /// Shadow X offset in EMUs
+    pub shadow_offset_x: Option<i32>,
+    /// Shadow Y offset in EMUs
+    pub shadow_offset_y: Option<i32>,
+    /// Shadow opacity (0-65536)
+    pub shadow_opacity: Option<u32>,
+    /// Shadow type
+    pub shadow_type: Option<u32>,
 }
 
 impl Default for UserShapeData {
@@ -924,8 +775,8 @@ impl Default for UserShapeData {
             fill_opacity: None,
             fill_back_color: None,
             fill_angle: None,
-            line_color: Some(0x000000), // Black line by default
-            line_width: Some(12700),    // 1pt
+            line_color: None,
+            line_width: None,
             line_dash_style: None,
             line_start_arrow: None,
             line_end_arrow: None,
@@ -940,7 +791,12 @@ impl Default for UserShapeData {
             hyperlink_action: 4, // ACTION_HYPERLINK
             hyperlink_jump: 0,   // JUMP_NONE
             hyperlink_type: 8,   // LINK_Url
-            picture_index: None, // Not a picture by default
+            picture_index: None,
+            shadow_color: None,
+            shadow_offset_x: None,
+            shadow_offset_y: None,
+            shadow_opacity: None,
+            shadow_type: None,
         }
     }
 }
@@ -1185,7 +1041,7 @@ fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
 
     // Fill properties
     if let Some(fill_color) = shape.fill_color {
-        // Fill type (0=solid, 4=shade/gradient)
+        // Fill type (0=solid, 4=shade/gradient) - MUST be first
         if let Some(fill_type) = shape.fill_type {
             props.push(EscherProperty::new(prop_id::FILL_TYPE, fill_type));
         }
@@ -1193,21 +1049,19 @@ fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
         // Fill color
         props.push(EscherProperty::new(prop_id::FILL_COLOR, fill_color));
 
-        // Fill opacity
-        if let Some(opacity) = shape.fill_opacity {
-            props.push(EscherProperty::new(prop_id::FILL_OPACITY, opacity));
-        }
-
-        // Back color (for gradients)
+        // Back color (for gradients) - before angle
         if let Some(back_color) = shape.fill_back_color {
             props.push(EscherProperty::new(prop_id::FILL_BACK_COLOR, back_color));
-        } else {
-            props.push(EscherProperty::new(prop_id::FILL_BACK_COLOR, 0x0800_0000)); // scheme bg
         }
 
-        // Gradient angle (for gradient fills)
+        // Gradient angle (for gradient fills) - MUST be before opacity
         if let Some(angle) = shape.fill_angle {
             props.push(EscherProperty::new(prop_id::FILL_ANGLE, angle as u32));
+        }
+
+        // Fill opacity (after angle)
+        if let Some(opacity) = shape.fill_opacity {
+            props.push(EscherProperty::new(prop_id::FILL_OPACITY, opacity));
         }
 
         // Fill boolean: filled = true (0x00010001 per POI)
@@ -1250,12 +1104,32 @@ fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
     }
 
     // Shadow properties
-    props.push(EscherProperty::new(prop_id::SHADOW_COLOR, 0x0800_0002)); // scheme shadow
     if shape.has_shadow {
-        // Enable shadow: offset and boolean
-        props.push(EscherProperty::new(prop_id::SHADOW_OFFSET_X, 25400)); // 2pt offset
-        props.push(EscherProperty::new(prop_id::SHADOW_OFFSET_Y, 25400));
+        // Shadow type
+        if let Some(shadow_type) = shape.shadow_type {
+            props.push(EscherProperty::new(prop_id::SHADOW_TYPE, shadow_type));
+        }
+
+        // Shadow color
+        let shadow_color = shape.shadow_color.unwrap_or(0x0800_0002); // default: scheme shadow
+        props.push(EscherProperty::new(prop_id::SHADOW_COLOR, shadow_color));
+
+        // Shadow offsets
+        let offset_x = shape.shadow_offset_x.unwrap_or(25400) as u32; // default: 2pt
+        let offset_y = shape.shadow_offset_y.unwrap_or(25400) as u32; // default: 2pt
+        props.push(EscherProperty::new(prop_id::SHADOW_OFFSET_X, offset_x));
+        props.push(EscherProperty::new(prop_id::SHADOW_OFFSET_Y, offset_y));
+
+        // Shadow opacity
+        if let Some(opacity) = shape.shadow_opacity {
+            props.push(EscherProperty::new(prop_id::SHADOW_OPACITY, opacity));
+        }
+
+        // Enable shadow boolean
         props.push(EscherProperty::new(prop_id::SHADOW_BOOL, 0x0003_0003)); // shadow on
+    } else {
+        // No shadow - still set scheme color for consistency
+        props.push(EscherProperty::new(prop_id::SHADOW_COLOR, 0x0800_0002));
     }
 
     props

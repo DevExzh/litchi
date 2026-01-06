@@ -358,7 +358,10 @@ fn convert_shape_to_escher(
             let back_color = fill.back_color.as_ref().map(|c| c.to_rgbx());
 
             // Gradient angle (degrees * 65536)
-            let angle = fill.gradient_angle.map(|a| (a as i32) * 65536);
+            // Per Apache POI HSLFFill.java: "Zero degrees represents a vertical vector from bottom to top"
+            // Standard: 0° = horizontal right, 90° = vertical up
+            // PPT format: 0° = vertical up, so we need: PPT_angle = 90 - user_angle
+            let angle = fill.gradient_angle.map(|a| ((90 - a) as i32) * 65536);
 
             (color, fill_type, opacity, back_color, angle)
         });
@@ -395,8 +398,25 @@ fn convert_shape_to_escher(
             }
         });
 
-    // Check for shadow
-    let has_shadow = props.shadow.as_ref().is_some_and(|s| s.enabled);
+    // Extract shadow properties from ShadowStyle
+    let (has_shadow, shadow_color, shadow_offset_x, shadow_offset_y, shadow_opacity, shadow_type) =
+        props
+            .shadow
+            .as_ref()
+            .map_or((false, None, None, None, None, None), |shadow| {
+                if !shadow.enabled {
+                    (false, None, None, None, None, None)
+                } else {
+                    (
+                        true,
+                        Some(shadow.color.to_rgbx()),
+                        Some(shadow.offset_x),
+                        Some(shadow.offset_y),
+                        Some(((shadow.opacity as u32) * 65536) / 100),
+                        Some(shadow.shadow_type as u32),
+                    )
+                }
+            });
 
     // Get text content - prefer paragraphs with formatting
     let paragraphs = props.paragraphs.clone();
@@ -434,6 +454,11 @@ fn convert_shape_to_escher(
         hyperlink_jump: get_hyperlink_info(props.hyperlink_id, hyperlinks).1,
         hyperlink_type: get_hyperlink_info(props.hyperlink_id, hyperlinks).2,
         picture_index: props.picture_index,
+        shadow_color,
+        shadow_offset_x,
+        shadow_offset_y,
+        shadow_opacity,
+        shadow_type,
     }
 }
 

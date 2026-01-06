@@ -108,9 +108,7 @@ impl<'doc> Slide<'doc> {
 
         // Extract Escher shapes from PPDrawing data
         let escher_shapes =
-            super::super::escher::EscherShapeFactory::extract_shapes_from_ppdrawing(
-                &ppdrawing.data,
-            )?;
+            super::super::escher::EscherShapeFactory::extract_shapes_from_drawing(&ppdrawing.data)?;
 
         // Convert Escher shapes to ShapeEnum with full property extraction
         let shapes: Vec<ShapeEnum<'static>> = escher_shapes

@@ -1,38 +1,14 @@
-//! Escher (Office Drawing) record parsing module.
+//! PPT-specific Escher (Office Drawing) functionality.
 //!
-//! Escher is Microsoft's drawing layer format used across Office applications.
-//! It contains shapes, text boxes, images, and other graphical elements.
-//!
-//! # Architecture
-//!
-//! - Zero-copy parsing with lifetime-based borrowing
-//! - Iterator-based container traversal
-//! - Lazy shape evaluation
-//! - Minimal allocations
-//!
-//! # Performance
-//!
-//! - Direct byte slice access (no intermediate buffers)
-//! - Pre-allocated capacity estimation
-//! - Functional iterator chains
-//! - Efficient bit manipulation
+//! This module re-exports the shared Escher functionality and adds
+//! PPT-specific extensions where needed.
 
-pub mod container;
-pub mod parser;
-pub mod properties;
-pub mod record;
-pub mod shape;
-pub mod shape_factory;
-pub mod text;
-pub mod types;
-
-pub use container::EscherContainer;
-pub use parser::EscherParser;
-pub use properties::{
-    EscherArrayProperty, EscherProperties, EscherPropertyId, EscherPropertyValue, ShapeAnchor,
+// Re-export shared Escher functionality
+pub use crate::ole::escher::{
+    EscherArrayProperty, EscherContainer, EscherParser, EscherProperties, EscherPropertyId,
+    EscherPropertyValue, EscherRecord, EscherRecordType, EscherShape, EscherShapeFactory,
+    EscherShapeType, ShapeAnchor, extract_text_from_escher,
 };
-pub use record::EscherRecord;
-pub use shape::{EscherShape, EscherShapeType};
-pub use shape_factory::EscherShapeFactory;
-pub use text::extract_text_from_escher;
-pub use types::EscherRecordType;
+
+// Re-export text extraction for backwards compatibility
+pub use crate::ole::escher::text::extract_text_from_textbox;

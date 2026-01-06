@@ -1,3 +1,7 @@
+//! Escher record type definitions.
+//!
+//! Based on Microsoft Office Drawing (MS-ODRAW) specification and Apache POI.
+
 /// Escher record types.
 ///
 /// Based on Microsoft Office Drawing specification and Apache POI implementation.
@@ -162,11 +166,5 @@ impl From<u16> for EscherRecordType {
             0xF122 => Self::TertiaryOpt,
             _ => Self::Unknown,
         }
-    }
-}
-
-impl From<EscherRecordType> for u16 {
-    fn from(record_type: EscherRecordType) -> Self {
-        record_type as u16
     }
 }

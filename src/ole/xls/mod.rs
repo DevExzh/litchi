@@ -20,6 +20,9 @@ mod worksheet;
 /// Cell value parsing and representation
 mod cell;
 
+/// Shape extraction
+pub mod shapes;
+
 /// Shared parsing utilities
 mod utils;
 
@@ -28,6 +31,7 @@ pub mod writer;
 
 pub use cell::XlsCell;
 pub use error::{XlsError, XlsResult};
+pub use shapes::XlsShape;
 pub use workbook::XlsWorkbook;
 pub use worksheet::XlsWorksheet;
 pub use writer::XlsWriter;
