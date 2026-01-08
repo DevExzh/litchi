@@ -138,6 +138,10 @@ litchi = { version = "0.0.1", features = ["imgconv"] }  # Image conversion suppo
 - **macOS**: install `protobuf` (e.g. via Homebrew)
 - **Windows**: install `protobuf` (e.g. via Winget)
 
+**Note about `fonts`:** Font embedding depends on `font-kit`, so enabling it requires a system `fontconfig` installation (used by `font-kit`).
+
+- **Linux (Debian/Ubuntu)**: install `pkg-config libfreetype6-dev libfontconfig1-dev`
+
 **Available Features:**
 - `full` - Enable all supported formats and functionality
 - `ole` (default) - Legacy Office formats (.doc, .xls, .ppt)
@@ -146,6 +150,7 @@ litchi = { version = "0.0.1", features = ["imgconv"] }  # Image conversion suppo
 - `odf` - OpenDocument formats (.odt, .ods, .odp)
 - `iwa` - Apple iWork formats (.pages, .numbers, .key)
 - `rtf` - Rich Text Format (.rtf)
+- `fonts` - Font embedding support
 - `formula` - MathType and Office MathML to LaTeX conversion
 - `imgconv` - Image format conversion (EMF, WMF, PICT to PNG/JPEG/WebP)
 - `eval_engine` (default) - Spreadsheet formula evaluation engine
