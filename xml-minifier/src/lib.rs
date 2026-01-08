@@ -152,56 +152,56 @@ pub fn minified_xml(input: TokenStream) -> TokenStream {
 pub fn minified_xml_format(input: TokenStream) -> TokenStream {
     // Parse the input tokens
     let tokens: Vec<TokenTree> = input.into_iter().collect();
-    
+
     if tokens.is_empty() {
         panic!("minified_xml_format! requires at least a format string");
     }
-    
+
     // Extract the format string (first argument)
     let format_str_literal = &tokens[0];
     let TokenTree::Literal(lit) = format_str_literal else {
         panic!("First argument must be a string literal");
     };
-    
+
     let template = literal_to_string(lit.to_string());
-    
+
     // Replace format placeholders with temporary markers before minification
     // This prevents the XML parser from being confused by {} characters
     let (template_with_markers, placeholder_map) = replace_placeholders_with_markers(&template);
-    
+
     // Minify the XML template
     let minified = minify_xml(&template_with_markers)
         .unwrap_or_else(|e| panic!("Failed to minify XML template: {}", e));
-    
+
     // Restore the placeholders
     let minified_with_placeholders = restore_placeholders_from_markers(&minified, &placeholder_map);
-    
+
     // Parse the remaining arguments
     let args = if tokens.len() > 1 {
         // Skip the first token (format string) and the comma
         let mut arg_tokens = Vec::new();
         let mut i = 1;
-        
+
         // Skip comma after format string
         if let Some(TokenTree::Punct(p)) = tokens.get(i)
             && p.as_char() == ','
         {
             i += 1;
         }
-        
+
         while i < tokens.len() {
             arg_tokens.push(tokens[i].clone());
             i += 1;
         }
-        
+
         TokenStream::from_iter(arg_tokens)
     } else {
         TokenStream::new()
     };
-    
+
     // Parse the minified template to find format placeholders and static parts
     let parts = parse_format_string(&minified_with_placeholders);
-    
+
     // Generate optimized code
     generate_format_code(&parts, args)
 }
@@ -212,7 +212,7 @@ fn replace_placeholders_with_markers(template: &str) -> (String, Vec<String>) {
     let mut result = String::with_capacity(template.len());
     let mut placeholders = Vec::new();
     let mut chars = template.chars().peekable();
-    
+
     while let Some(ch) = chars.next() {
         if ch == '{' {
             // Check for escaped brace {{
@@ -221,26 +221,26 @@ fn replace_placeholders_with_markers(template: &str) -> (String, Vec<String>) {
                 result.push_str("{{");
                 continue;
             }
-            
+
             // Parse the placeholder content
             let mut placeholder_content = String::new();
             placeholder_content.push('{');
-            
+
             loop {
                 match chars.next() {
                     Some('}') => {
                         placeholder_content.push('}');
                         break;
-                    }
+                    },
                     Some(ch) => placeholder_content.push(ch),
                     None => {
                         // Unclosed placeholder, just add what we have
                         result.push_str(&placeholder_content);
                         return (result, placeholders);
-                    }
+                    },
                 }
             }
-            
+
             // Create a unique marker
             let marker = format!("__PLACEHOLDER_{}__", placeholders.len());
             placeholders.push(placeholder_content);
@@ -257,20 +257,20 @@ fn replace_placeholders_with_markers(template: &str) -> (String, Vec<String>) {
             result.push(ch);
         }
     }
-    
+
     (result, placeholders)
 }
 
 /// Restore the original placeholders from markers
 fn restore_placeholders_from_markers(minified: &str, placeholders: &[String]) -> String {
     let mut result = minified.to_string();
-    
+
     // Replace markers back with original placeholders
     for (idx, placeholder) in placeholders.iter().enumerate() {
         let marker = format!("__PLACEHOLDER_{}__", idx);
         result = result.replace(&marker, placeholder);
     }
-    
+
     result
 }
 
@@ -299,7 +299,7 @@ fn parse_format_string(template: &str) -> Vec<FormatPart> {
     let mut parts = Vec::new();
     let mut current_static = String::new();
     let mut chars = template.chars().peekable();
-    
+
     while let Some(ch) = chars.next() {
         if ch == '{' {
             // Check for escaped brace {{
@@ -308,13 +308,13 @@ fn parse_format_string(template: &str) -> Vec<FormatPart> {
                 current_static.push('{');
                 continue;
             }
-            
+
             // Save any accumulated static text
             if !current_static.is_empty() {
                 parts.push(FormatPart::Static(current_static.clone()));
                 current_static.clear();
             }
-            
+
             // Parse the placeholder content
             let mut placeholder_content = String::new();
             loop {
@@ -324,18 +324,20 @@ fn parse_format_string(template: &str) -> Vec<FormatPart> {
                     None => panic!("Unclosed format placeholder in template"),
                 }
             }
-            
+
             // Determine placeholder type
             let placeholder = if placeholder_content.is_empty() {
                 PlaceholderType::NextPositional
             } else if placeholder_content.chars().all(|c| c.is_ascii_digit()) {
                 PlaceholderType::Positional(
-                    placeholder_content.parse().expect("Invalid positional index")
+                    placeholder_content
+                        .parse()
+                        .expect("Invalid positional index"),
                 )
             } else {
                 PlaceholderType::Named(placeholder_content)
             };
-            
+
             parts.push(FormatPart::Placeholder(placeholder));
         } else if ch == '}' {
             // Check for escaped brace }}
@@ -349,26 +351,26 @@ fn parse_format_string(template: &str) -> Vec<FormatPart> {
             current_static.push(ch);
         }
     }
-    
+
     // Add any remaining static text
     if !current_static.is_empty() {
         parts.push(FormatPart::Static(current_static));
     }
-    
+
     parts
 }
 
 /// Generate optimized formatting code
 fn generate_format_code(parts: &[FormatPart], args: TokenStream) -> TokenStream {
     use proc_macro::TokenTree as TT;
-    
+
     // Parse arguments into positional and named
     let mut positional_args = Vec::new();
     let mut named_args = std::collections::HashMap::new();
-    
+
     let arg_tokens: Vec<TT> = args.into_iter().collect();
     let mut i = 0;
-    
+
     while i < arg_tokens.len() {
         // Check if this is a named argument (ident = value)
         if let Some(TT::Ident(name)) = arg_tokens.get(i)
@@ -379,7 +381,7 @@ fn generate_format_code(parts: &[FormatPart], args: TokenStream) -> TokenStream 
             let name_str = name.to_string();
             let mut value_tokens = Vec::new();
             i += 2; // Skip name and =
-            
+
             // Collect value tokens until comma or end
             while i < arg_tokens.len() {
                 if let TT::Punct(p) = &arg_tokens[i]
@@ -391,11 +393,11 @@ fn generate_format_code(parts: &[FormatPart], args: TokenStream) -> TokenStream 
                 value_tokens.push(arg_tokens[i].clone());
                 i += 1;
             }
-            
+
             named_args.insert(name_str, value_tokens);
             continue;
         }
-        
+
         // Positional argument
         let mut value_tokens = Vec::new();
         while i < arg_tokens.len() {
@@ -408,33 +410,34 @@ fn generate_format_code(parts: &[FormatPart], args: TokenStream) -> TokenStream 
             value_tokens.push(arg_tokens[i].clone());
             i += 1;
         }
-        
+
         if !value_tokens.is_empty() {
             positional_args.push(value_tokens);
         }
     }
-    
+
     // Calculate static size
-    let static_size: usize = parts.iter()
+    let static_size: usize = parts
+        .iter()
         .filter_map(|p| match p {
             FormatPart::Static(s) => Some(s.len()),
             _ => None,
         })
         .sum();
-    
+
     // Generate code to build the string - build it as a string to avoid ToTokens issues
     let mut code = format!(
         "{{ let mut __result = ::std::string::String::with_capacity({} + 32);",
         static_size
     );
-    
+
     let mut next_positional_idx = 0;
-    
+
     for part in parts {
         match part {
             FormatPart::Static(text) => {
                 code.push_str(&format!("__result.push_str({:?});", text));
-            }
+            },
             FormatPart::Placeholder(placeholder) => {
                 let arg_tokens = match placeholder {
                     PlaceholderType::NextPositional => {
@@ -444,39 +447,40 @@ fn generate_format_code(parts: &[FormatPart], args: TokenStream) -> TokenStream 
                         } else {
                             panic!("Not enough positional arguments");
                         }
-                    }
+                    },
                     PlaceholderType::Positional(idx) => {
                         if let Some(arg) = positional_args.get(*idx) {
                             arg
                         } else {
                             panic!("Positional argument {} not found", idx);
                         }
-                    }
+                    },
                     PlaceholderType::Named(name) => {
                         if let Some(arg) = named_args.get(name) {
                             arg
                         } else {
                             panic!("Named argument '{}' not found", name);
                         }
-                    }
+                    },
                 };
-                
+
                 // Convert the token trees to a string representation
-                let arg_str: String = arg_tokens.iter()
+                let arg_str: String = arg_tokens
+                    .iter()
                     .map(|tt| tt.to_string())
                     .collect::<Vec<_>>()
                     .join("");
-                
+
                 code.push_str(&format!(
                     "{{ use ::std::fmt::Write; let _ = write!(&mut __result, \"{{}}\", {}); }}",
                     arg_str
                 ));
-            }
+            },
         }
     }
-    
+
     code.push_str("__result }");
-    
+
     // Parse the generated code string back into a TokenStream
     code.parse().expect("Failed to parse generated code")
 }
@@ -593,7 +597,7 @@ fn minify_xml(xml: &str) -> Result<String, Box<dyn std::error::Error>> {
                     write_attributes(&mut output, &start_tag)?;
                     output.push(b'>');
                 }
-                
+
                 // Now write the empty tag
                 output.push(b'<');
                 output.extend_from_slice(e.name().as_ref());
@@ -616,7 +620,7 @@ fn minify_xml(xml: &str) -> Result<String, Box<dyn std::error::Error>> {
                             write_attributes(&mut output, &buffered_tag)?;
                             output.push(b'>');
                         }
-                        
+
                         // Now write the collapsed tag
                         output.push(b'<');
                         output.extend_from_slice(start_tag.name().as_ref());
@@ -627,7 +631,7 @@ fn minify_xml(xml: &str) -> Result<String, Box<dyn std::error::Error>> {
                         // Flush all buffered tags
                         let mut all_tags = std::mem::take(&mut tag_stack);
                         all_tags.push(start_tag);
-                        
+
                         for buffered_tag in all_tags {
                             output.push(b'<');
                             output.extend_from_slice(buffered_tag.name().as_ref());
@@ -675,7 +679,7 @@ fn minify_xml(xml: &str) -> Result<String, Box<dyn std::error::Error>> {
                         write_attributes(&mut output, &start_tag)?;
                         output.push(b'>');
                     }
-                    
+
                     output.extend_from_slice(trimmed);
                 }
             },
@@ -920,19 +924,28 @@ mod tests {
 
         // Verify comment removal
         assert!(!minified.contains("<!--"), "Comments should be removed");
-        
+
         // Verify XML declaration preserved
-        assert!(minified.contains("<?xml"), "XML declaration should be preserved");
-        
+        assert!(
+            minified.contains("<?xml"),
+            "XML declaration should be preserved"
+        );
+
         // Verify empty tag collapse
         assert!(minified.contains("<empty/>"), "Empty tags should collapse");
-        
+
         // Verify CDATA preservation
-        assert!(minified.contains("<![CDATA[Some <data> here]]>"), "CDATA should be preserved");
-        
+        assert!(
+            minified.contains("<![CDATA[Some <data> here]]>"),
+            "CDATA should be preserved"
+        );
+
         // Verify text content preserved
-        assert!(minified.contains("Some text content"), "Text content should be preserved");
-        
+        assert!(
+            minified.contains("Some text content"),
+            "Text content should be preserved"
+        );
+
         // Verify whitespace removal between tags
         assert!(!minified.contains("\n"), "Newlines should be removed");
     }
@@ -949,16 +962,25 @@ mod tests {
         let parts = parse_format_string("hello {}");
         assert_eq!(parts.len(), 2);
         assert!(matches!(parts[0], FormatPart::Static(ref s) if s == "hello "));
-        assert!(matches!(parts[1], FormatPart::Placeholder(PlaceholderType::NextPositional)));
+        assert!(matches!(
+            parts[1],
+            FormatPart::Placeholder(PlaceholderType::NextPositional)
+        ));
     }
 
     #[test]
     fn test_parse_format_string_indexed_placeholder() {
         let parts = parse_format_string("{0} and {1}");
         assert_eq!(parts.len(), 3);
-        assert!(matches!(parts[0], FormatPart::Placeholder(PlaceholderType::Positional(0))));
+        assert!(matches!(
+            parts[0],
+            FormatPart::Placeholder(PlaceholderType::Positional(0))
+        ));
         assert!(matches!(parts[1], FormatPart::Static(ref s) if s == " and "));
-        assert!(matches!(parts[2], FormatPart::Placeholder(PlaceholderType::Positional(1))));
+        assert!(matches!(
+            parts[2],
+            FormatPart::Placeholder(PlaceholderType::Positional(1))
+        ));
     }
 
     #[test]
@@ -966,7 +988,9 @@ mod tests {
         let parts = parse_format_string("Hello {name}!");
         assert_eq!(parts.len(), 3);
         assert!(matches!(parts[0], FormatPart::Static(ref s) if s == "Hello "));
-        assert!(matches!(parts[1], FormatPart::Placeholder(PlaceholderType::Named(ref n)) if n == "name"));
+        assert!(
+            matches!(parts[1], FormatPart::Placeholder(PlaceholderType::Named(ref n)) if n == "name")
+        );
         assert!(matches!(parts[2], FormatPart::Static(ref s) if s == "!"));
     }
 
@@ -975,7 +999,10 @@ mod tests {
         let parts = parse_format_string("{{escaped}} and {} normal");
         assert_eq!(parts.len(), 3);
         assert!(matches!(parts[0], FormatPart::Static(ref s) if s == "{escaped} and "));
-        assert!(matches!(parts[1], FormatPart::Placeholder(PlaceholderType::NextPositional)));
+        assert!(matches!(
+            parts[1],
+            FormatPart::Placeholder(PlaceholderType::NextPositional)
+        ));
         assert!(matches!(parts[2], FormatPart::Static(ref s) if s == " normal"));
     }
 
@@ -984,9 +1011,14 @@ mod tests {
         let parts = parse_format_string("<root><name>{}</name><age>{age}</age></root>");
         assert_eq!(parts.len(), 5);
         assert!(matches!(parts[0], FormatPart::Static(ref s) if s == "<root><name>"));
-        assert!(matches!(parts[1], FormatPart::Placeholder(PlaceholderType::NextPositional)));
+        assert!(matches!(
+            parts[1],
+            FormatPart::Placeholder(PlaceholderType::NextPositional)
+        ));
         assert!(matches!(parts[2], FormatPart::Static(ref s) if s == "</name><age>"));
-        assert!(matches!(parts[3], FormatPart::Placeholder(PlaceholderType::Named(ref n)) if n == "age"));
+        assert!(
+            matches!(parts[3], FormatPart::Placeholder(PlaceholderType::Named(ref n)) if n == "age")
+        );
         assert!(matches!(parts[4], FormatPart::Static(ref s) if s == "</age></root>"));
     }
 
@@ -999,8 +1031,12 @@ mod tests {
 
     #[test]
     fn test_replace_placeholders_with_markers_multiple() {
-        let (result, placeholders) = replace_placeholders_with_markers("<root><a>{}</a><b>{name}</b></root>");
-        assert_eq!(result, "<root><a>__PLACEHOLDER_0__</a><b>__PLACEHOLDER_1__</b></root>");
+        let (result, placeholders) =
+            replace_placeholders_with_markers("<root><a>{}</a><b>{name}</b></root>");
+        assert_eq!(
+            result,
+            "<root><a>__PLACEHOLDER_0__</a><b>__PLACEHOLDER_1__</b></root>"
+        );
         assert_eq!(placeholders, vec!["{}", "{name}"]);
     }
 
@@ -1016,7 +1052,7 @@ mod tests {
         let placeholders = vec![String::from("{}"), String::from("{name}")];
         let result = restore_placeholders_from_markers(
             "<root><a>__PLACEHOLDER_0__</a><b>__PLACEHOLDER_1__</b></root>",
-            &placeholders
+            &placeholders,
         );
         assert_eq!(result, "<root><a>{}</a><b>{name}</b></root>");
     }
@@ -1033,13 +1069,19 @@ mod tests {
             </root>
         "#;
         let minified = minify_xml(input).unwrap();
-        assert_eq!(minified, "<root><level1><level2><level3>text</level3></level2></level1></root>");
+        assert_eq!(
+            minified,
+            "<root><level1><level2><level3>text</level3></level2></level1></root>"
+        );
     }
 
     #[test]
     fn test_minify_xml_siblings() {
         let input = r#"<root><child1>a</child1><child2>b</child2><child3>c</child3></root>"#;
         let minified = minify_xml(input).unwrap();
-        assert_eq!(minified, "<root><child1>a</child1><child2>b</child2><child3>c</child3></root>");
+        assert_eq!(
+            minified,
+            "<root><child1>a</child1><child2>b</child2><child3>c</child3></root>"
+        );
     }
 }
