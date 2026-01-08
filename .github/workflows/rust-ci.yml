@@ -1,0 +1,52 @@
+name: Rust Code Quality CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  check-and-clippy:
+    name: cargo check + clippy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install protobuf compiler
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: protobuf-compiler
+          version: 1.0
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-sort
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-sort
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Check Cargo.toml sorting
+        run: cargo sort --check
+
+      - name: Check if code is compilable
+        run: cargo check
+
+      - name: Check if code adheres to best practices
+        run: cargo clippy --all-features -- -D warnings
