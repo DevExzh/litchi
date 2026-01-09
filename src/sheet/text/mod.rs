@@ -40,6 +40,7 @@
 //! ```
 
 pub mod cell;
+pub mod formats;
 pub mod iterators;
 pub mod parser;
 pub mod workbook;

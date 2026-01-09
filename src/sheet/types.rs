@@ -52,66 +52,95 @@ impl CellValue {
             _ => None,
         }
     }
+
+    /// Infer cell value type from string representation.
+    ///
+    /// This function attempts to parse the string in order:
+    /// 1. Empty string -> Empty
+    /// 2. Integer -> Int
+    /// 3. Float -> Float  
+    /// 4. Boolean keywords (TRUE/FALSE/1/0/YES/NO/ON/OFF) -> Bool
+    /// 5. Everything else -> String
+    pub fn infer_from_str<S: AsRef<str>>(s: S) -> Self {
+        let s = s.as_ref();
+        if s.is_empty() {
+            return Self::Empty;
+        }
+
+        if let Ok(i) = s.parse::<i64>() {
+            return Self::Int(i);
+        }
+
+        if let Ok(f) = fast_float2::parse(s) {
+            return Self::Float(f);
+        }
+
+        match s.to_uppercase().as_str() {
+            "TRUE" | "1" | "YES" | "ON" => Self::Bool(true),
+            "FALSE" | "0" | "NO" | "OFF" => Self::Bool(false),
+            _ => Self::String(s.to_string()),
+        }
+    }
 }
 
 // Implement From for convenient cell value creation
 
 impl From<bool> for CellValue {
     fn from(b: bool) -> Self {
-        CellValue::Bool(b)
+        Self::Bool(b)
     }
 }
 
 impl From<i32> for CellValue {
     fn from(i: i32) -> Self {
-        CellValue::Int(i as i64)
+        Self::Int(i as i64)
     }
 }
 
 impl From<i64> for CellValue {
     fn from(i: i64) -> Self {
-        CellValue::Int(i)
+        Self::Int(i)
     }
 }
 
 impl From<u32> for CellValue {
     fn from(i: u32) -> Self {
-        CellValue::Int(i as i64)
+        Self::Int(i as i64)
     }
 }
 
 impl From<usize> for CellValue {
     fn from(i: usize) -> Self {
-        CellValue::Int(i as i64)
+        Self::Int(i as i64)
     }
 }
 
 impl From<f32> for CellValue {
     fn from(f: f32) -> Self {
-        CellValue::Float(f as f64)
+        Self::Float(f as f64)
     }
 }
 
 impl From<f64> for CellValue {
     fn from(f: f64) -> Self {
-        CellValue::Float(f)
+        Self::Float(f)
     }
 }
 
 impl From<String> for CellValue {
     fn from(s: String) -> Self {
-        CellValue::String(s)
+        Self::String(s)
     }
 }
 
 impl From<&str> for CellValue {
     fn from(s: &str) -> Self {
-        CellValue::String(s.to_string())
+        Self::String(s.to_string())
     }
 }
 
 impl From<&String> for CellValue {
     fn from(s: &String) -> Self {
-        CellValue::String(s.clone())
+        Self::String(s.clone())
     }
 }

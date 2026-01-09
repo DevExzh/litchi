@@ -5,6 +5,7 @@
 
 // Submodule declarations
 pub mod binary;
+pub mod bom;
 pub mod detection;
 #[cfg(any(feature = "ole", feature = "rtf"))]
 pub mod encoding;
@@ -23,6 +24,9 @@ pub mod xml_slice;
 pub mod id;
 
 // Re-exports for convenience
+pub use bom::{
+    BomKind, UTF8_BOM, UTF16_BE_BOM, UTF16_LE_BOM, UTF32_BE_BOM, UTF32_LE_BOM, strip_bom, write_bom,
+};
 pub use detection::{FileFormat, detect_file_format, detect_file_format_from_bytes};
 pub use error::{Error, Result};
 pub use metadata::Metadata;

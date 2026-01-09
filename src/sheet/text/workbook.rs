@@ -1,10 +1,11 @@
 //! Workbook implementation for text-based formats
 
 use std::fs::File;
-use std::io::{BufReader, Read, Seek};
+use std::io::{BufReader, Read, Seek, Write};
 use std::path::Path;
 
 use super::iterators::TextWorksheetIterator;
+use crate::common::{BomKind, strip_bom, write_bom};
 use crate::sheet::{CellValue, Result as SheetResult, WorkbookTrait, Worksheet, WorksheetIterator};
 
 /// Configuration for parsing text-based spreadsheet files
@@ -24,6 +25,10 @@ pub struct TextConfig {
     pub max_line_length: usize,
     /// Buffer size for reading
     pub buffer_size: usize,
+    /// Whether to auto-strip a BOM on read
+    pub strip_bom: bool,
+    /// Optional BOM to write when exporting
+    pub write_bom: Option<BomKind>,
 }
 
 impl Default for TextConfig {
@@ -36,6 +41,8 @@ impl Default for TextConfig {
             has_headers: true,            // Assume first row is headers
             max_line_length: 1024 * 1024, // 1MB max line length
             buffer_size: 8192,            // 8KB buffer
+            strip_bom: true,
+            write_bom: None,
         }
     }
 }
@@ -88,6 +95,18 @@ impl TextConfig {
         self
     }
 
+    /// Enable or disable BOM stripping when reading.
+    pub fn with_strip_bom(mut self, strip: bool) -> Self {
+        self.strip_bom = strip;
+        self
+    }
+
+    /// Set a BOM to emit when writing (None to disable).
+    pub fn with_write_bom(mut self, bom: Option<BomKind>) -> Self {
+        self.write_bom = bom;
+        self
+    }
+
     /// Create TSV (tab-separated) configuration
     pub fn tsv() -> Self {
         Self::new().with_delimiter(b'\t')
@@ -110,6 +129,7 @@ pub struct TextWorkbook {
     data: Vec<Vec<CellValue>>,
     config: TextConfig,
     worksheet_name: String,
+    detected_bom: Option<BomKind>,
 }
 
 impl TextWorkbook {
@@ -127,6 +147,13 @@ impl TextWorkbook {
 
     /// Create a text workbook from any reader with configuration
     pub fn from_reader<R: Read + Seek>(reader: &mut R, config: TextConfig) -> SheetResult<Self> {
+        let mut detected_bom = None;
+        if config.strip_bom
+            && let Some((kind, _len)) = strip_bom(reader)?
+        {
+            detected_bom = Some(kind);
+        }
+
         let mut parser = super::parser::TextParser::new(reader, config.clone());
         let mut data = Vec::new();
 
@@ -140,6 +167,7 @@ impl TextWorkbook {
             data,
             config,
             worksheet_name,
+            detected_bom,
         })
     }
 
@@ -162,6 +190,86 @@ impl TextWorkbook {
     /// Set the worksheet name
     pub fn set_worksheet_name(&mut self, name: String) {
         self.worksheet_name = name;
+    }
+
+    /// Set the internal data directly (used by format-specific parsers)
+    pub fn set_data(&mut self, data: Vec<Vec<CellValue>>) {
+        self.data = data;
+    }
+
+    /// Returns the BOM detected during reading, if any.
+    pub fn detected_bom(&self) -> Option<BomKind> {
+        self.detected_bom
+    }
+
+    /// Write the workbook back out using the current configuration.
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> SheetResult<()> {
+        if let Some(bom) = self.config.write_bom {
+            write_bom(writer, bom)?;
+        }
+
+        let delimiter = self.config.delimiter;
+        let quote = self.config.quote;
+
+        for (row_idx, row) in self.data.iter().enumerate() {
+            for (col_idx, cell) in row.iter().enumerate() {
+                if col_idx > 0 {
+                    writer.write_all(&[delimiter])?;
+                }
+                let mut needs_quote = false;
+                let mut field = match cell {
+                    CellValue::Empty => String::new(),
+                    CellValue::Bool(b) => {
+                        needs_quote = true;
+                        if *b {
+                            "TRUE".to_string()
+                        } else {
+                            "FALSE".to_string()
+                        }
+                    },
+                    CellValue::Int(i) => i.to_string(),
+                    CellValue::Float(f) => f.to_string(),
+                    CellValue::DateTime(dt) => {
+                        needs_quote = true;
+                        dt.to_string()
+                    },
+                    CellValue::String(s) => {
+                        if s.contains(char::from(delimiter))
+                            || s.contains('\n')
+                            || s.contains('\r')
+                            || s.contains(char::from(quote))
+                        {
+                            needs_quote = true;
+                        }
+                        s.clone()
+                    },
+                    CellValue::Error(err) => {
+                        needs_quote = true;
+                        err.clone()
+                    },
+                    CellValue::Formula { formula, .. } => {
+                        needs_quote = true;
+                        format!("={}", formula)
+                    },
+                };
+
+                if needs_quote {
+                    field = field.replace(char::from(quote), &format!("{0}{0}", char::from(quote)));
+                    let mut quoted = String::with_capacity(field.len() + 2);
+                    quoted.push(char::from(quote));
+                    quoted.push_str(&field);
+                    quoted.push(char::from(quote));
+                    field = quoted;
+                }
+
+                writer.write_all(field.as_bytes())?;
+            }
+            if row_idx + 1 < self.data.len() {
+                writer.write_all(b"\n")?;
+            }
+        }
+
+        Ok(())
     }
 }
 

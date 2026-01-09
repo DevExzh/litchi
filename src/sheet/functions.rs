@@ -177,3 +177,80 @@ pub fn open_text_workbook_from_bytes_with_config(
     let workbook = crate::sheet::text::TextWorkbook::from_bytes(bytes, config)?;
     Ok(Box::new(workbook))
 }
+
+/// Open a SYLK (Symbolic Link) workbook from a file path.
+pub fn open_sylk_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn WorkbookTrait>> {
+    use std::fs::File;
+    let mut file = File::open(path)?;
+    let data = crate::sheet::text::formats::read_sylk(&mut file, Default::default())?;
+    let mut workbook = crate::sheet::text::TextWorkbook::from_bytes(
+        &[],
+        crate::sheet::text::TextConfig::default(),
+    )?;
+    workbook.set_data(data);
+    Ok(Box::new(workbook))
+}
+
+/// Open a SYLK workbook from bytes.
+pub fn open_sylk_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
+    let mut cursor = std::io::Cursor::new(bytes);
+    let data = crate::sheet::text::formats::read_sylk(&mut cursor, Default::default())?;
+    let mut workbook = crate::sheet::text::TextWorkbook::from_bytes(
+        &[],
+        crate::sheet::text::TextConfig::default(),
+    )?;
+    workbook.set_data(data);
+    Ok(Box::new(workbook))
+}
+
+/// Open a DIF (Data Interchange Format) workbook from a file path.
+pub fn open_dif_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn WorkbookTrait>> {
+    use std::fs::File;
+    let mut file = File::open(path)?;
+    let data = crate::sheet::text::formats::read_dif(&mut file, Default::default())?;
+    let mut workbook = crate::sheet::text::TextWorkbook::from_bytes(
+        &[],
+        crate::sheet::text::TextConfig::default(),
+    )?;
+    workbook.set_data(data);
+    Ok(Box::new(workbook))
+}
+
+/// Open a DIF workbook from bytes.
+pub fn open_dif_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
+    let mut cursor = std::io::Cursor::new(bytes);
+    let data = crate::sheet::text::formats::read_dif(&mut cursor, Default::default())?;
+    let mut workbook = crate::sheet::text::TextWorkbook::from_bytes(
+        &[],
+        crate::sheet::text::TextConfig::default(),
+    )?;
+    workbook.set_data(data);
+    Ok(Box::new(workbook))
+}
+
+/// Open a fixed-width PRN workbook from a file path.
+pub fn open_fixed_width_workbook<P: AsRef<std::path::Path>>(
+    path: P,
+) -> Result<Box<dyn WorkbookTrait>> {
+    use std::fs::File;
+    let mut file = File::open(path)?;
+    let data = crate::sheet::text::formats::read_fixed_width(&mut file, Default::default())?;
+    let mut workbook = crate::sheet::text::TextWorkbook::from_bytes(
+        &[],
+        crate::sheet::text::TextConfig::default(),
+    )?;
+    workbook.set_data(data);
+    Ok(Box::new(workbook))
+}
+
+/// Open a fixed-width PRN workbook from bytes.
+pub fn open_fixed_width_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
+    let mut cursor = std::io::Cursor::new(bytes);
+    let data = crate::sheet::text::formats::read_fixed_width(&mut cursor, Default::default())?;
+    let mut workbook = crate::sheet::text::TextWorkbook::from_bytes(
+        &[],
+        crate::sheet::text::TextConfig::default(),
+    )?;
+    workbook.set_data(data);
+    Ok(Box::new(workbook))
+}
