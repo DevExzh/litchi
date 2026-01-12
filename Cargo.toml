@@ -111,7 +111,7 @@ phf = { version = "0.13", features = ["macros"] } # Perfect hash functions for c
 plist = { version = "1", optional = true } # Property list parser for iWork metadata and indexes
 prost = { version = "0.14", features = ["derive"], optional = true } # Protocol Buffers implementation for iWork archive structures
 prost-types = { version = "0.14", optional = true } # Well-known Protocol Buffer types used by iWork
-quick-xml = { version = "0.38", optional = true } # High-performance XML parser for .docx, .xlsx, .pptx files
+quick-xml = { version = "0.39", optional = true } # High-performance XML parser for .docx, .xlsx, .pptx files
 rand = "0.9" # Cryptographically secure random numbers for salts in protection hashes
 rayon = "1.11" # Data parallelism library for parallel iterators and work-stealing
 reqwest = { version = "0.13", features = ["json"], optional = true }
