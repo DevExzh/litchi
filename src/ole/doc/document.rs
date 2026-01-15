@@ -464,6 +464,43 @@ impl Document {
         &self.fib
     }
 
+    /// Get image binary data for an embedded image.
+    ///
+    /// This method extracts the image data from the WordDocument stream.
+    /// The data is returned as a `Cow` to minimize copying when possible.
+    ///
+    /// # Arguments
+    ///
+    /// * `image` - Reference to an Image obtained from `Run::image()`
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// for para in doc.paragraphs()? {
+    ///     for run in para.runs()? {
+    ///         if let Some(img) = run.image() {
+    ///             let data = doc.image_data(img)?;
+    ///             let pic_type = img.picture_type(&doc.word_document())?;
+    ///             // Process image data...
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub fn image_data(
+        &self,
+        image: &super::image::Image,
+    ) -> std::result::Result<std::borrow::Cow<'_, [u8]>, super::image::ImageError> {
+        image.data(&self.word_document)
+    }
+
+    /// Get a reference to the WordDocument stream.
+    ///
+    /// This is useful for low-level image operations.
+    #[inline]
+    pub fn word_document(&self) -> &[u8] {
+        &self.word_document
+    }
+
     /// Get all paragraphs in the document.
     ///
     /// Returns a vector of `Paragraph` objects representing paragraphs
@@ -523,15 +560,19 @@ impl Document {
         Ok(all_paragraphs)
     }
 
+    // fn has_picture(&self, picture_offset: u32) -> bool {}
+
     /// Convert extracted paragraph data to Paragraph objects.
     ///
     /// This is a helper method used by paragraphs() to convert the raw extracted
-    /// paragraph data into high-level Paragraph objects with formula matching.
+    /// paragraph data into high-level Paragraph objects with formula and image support.
     fn convert_to_paragraphs(
         &self,
         extracted_paras: Vec<ExtractedParagraph>,
         output: &mut Vec<Paragraph>,
     ) {
+        use super::image::extract_image;
+
         // Pre-allocate run vectors based on estimated size
         let mut object_name_buffer = String::with_capacity(32);
 
@@ -539,7 +580,7 @@ impl Document {
             // Pre-allocate run storage
             let mut run_objects = Vec::with_capacity(runs.len());
 
-            // Create runs for the paragraph, checking for MTEF formulas and OLE2 objects
+            // Create runs for the paragraph, checking for MTEF formulas, images, and OLE2 objects
             for (text, props) in runs {
                 // Primary matching: Use pic_offset to find MTEF data (most reliable)
                 if let Some(pic_offset) = props.pic_offset {
@@ -571,7 +612,13 @@ impl Document {
                     continue;
                 }
 
-                // Regular run without formula
+                // Check for embedded images
+                if let Ok(Some(image)) = extract_image(&self.word_document, &text, &props) {
+                    run_objects.push(Run::with_image(text, props, image));
+                    continue;
+                }
+
+                // Regular run without formula or image
                 run_objects.push(Run::new(text, props));
             }
 
