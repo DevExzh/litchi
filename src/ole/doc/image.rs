@@ -181,7 +181,8 @@ pub fn has_picture(
     if props.is_spec && !props.is_obj && !props.is_ole2 && !props.is_data {
         // Image should be in its own run, or in a run with the end-of-special marker
         if "\u{0001}" == text || "\u{0001}\u{0015}" == text {
-            return is_block_contains_image(data_buff, props.pic_offset.unwrap_or(0));
+            let pic_offset = props.pic_offset.unwrap_or(0);
+            return is_block_contains_image(data_buff, pic_offset);
         }
     }
     Ok(false)
@@ -271,15 +272,51 @@ impl Image {
     ///
     /// This method extracts and optionally decompresses the image data.
     /// Use `Document::image_data()` for a higher-level API.
-    pub fn data<'a>(&self, word_document: &'a [u8]) -> Result<Cow<'a, [u8]>, ImageError> {
-        // TODO: Implement proper image data extraction based on pic_offset
-        // For now, return a slice starting at pic_offset
-        if (self.pic_offset as usize) >= word_document.len() {
+    ///
+    /// PICF structure (based on [MS-DOC] and Apache POI):
+    /// - Offset 0x00 (4 bytes): lcb - total length of picture data including header
+    /// - Offset 0x04 (2 bytes): cbHeader - size of PICF header
+    /// - Offset 0x06 (2 bytes): mfpMm - metafile mapping mode
+    /// - Offset 0x0E (1 byte): block type (0x08 = image)
+    /// - After header: actual picture content (may include BLIP container)
+    pub fn data<'a>(&self, data_stream: &'a [u8]) -> Result<Cow<'a, [u8]>, ImageError> {
+        let offset = self.pic_offset as usize;
+
+        if offset + 6 >= data_stream.len() {
             return Err(ImageError::InvalidPicOffset(self.pic_offset));
         }
 
-        let raw_data = &word_document[self.pic_offset as usize..];
-        decompress_image_content(raw_data)
+        // Read PICF structure
+        // lcb: total length including header (4 bytes at offset 0)
+        let lcb = u32::from_le_bytes([
+            data_stream[offset],
+            data_stream[offset + 1],
+            data_stream[offset + 2],
+            data_stream[offset + 3],
+        ]) as usize;
+
+        // cbHeader: header size (2 bytes at offset 4)
+        let cb_header = u16::from_le_bytes([data_stream[offset + 4], data_stream[offset + 5]]) as usize;
+
+
+        // Validate sizes
+        if cb_header < 0x44 {
+            // Minimum PICF header size
+            return Err(ImageError::InvalidPicOffset(self.pic_offset));
+        }
+
+        // Picture content starts after the header
+        let content_start = offset + cb_header;
+        let content_end = offset + lcb;
+
+        if content_start >= data_stream.len() || content_end > data_stream.len() {
+            return Err(ImageError::InvalidPicOffset(self.pic_offset));
+        }
+
+        let raw_content = &data_stream[content_start..content_end];
+
+        // Try to decompress if compressed, otherwise extract PNG/JPEG directly
+        decompress_image_content(raw_content)
     }
 
     /// Detect the picture type from the image data.

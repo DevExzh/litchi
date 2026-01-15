@@ -51,6 +51,9 @@ pub struct Document {
     /// Used during initialization for TextExtractor and ChpBinTable parsing
     #[allow(dead_code)] // False positive: used during initialization via parse_chp_bin_table
     word_document: Vec<u8>,
+    /// The Data stream - contains embedded objects, pictures, etc.
+    /// According to Apache POI, pictures are stored here, not in WordDocument stream.
+    data_stream: Option<Vec<u8>>,
     /// The table stream (0Table or 1Table) - contains formatting and structure
     table_stream: Vec<u8>,
     /// Text extractor - holds the extracted document text
@@ -107,6 +110,10 @@ impl Document {
             .open_stream(&[table_stream_name])
             .map_err(|_| DocError::StreamNotFound(table_stream_name.to_string()))?;
 
+        // Read the Data stream (optional - contains embedded pictures and objects)
+        // According to Apache POI, pictures are stored in Data stream, not WordDocument stream
+        let data_stream = ole.open_stream(&["Data"]).ok();
+
         // Create text extractor
         let text_extractor = TextExtractor::new(&fib, &word_document, &table_stream)?;
 
@@ -129,6 +136,7 @@ impl Document {
         Ok(Self {
             fib,
             word_document,
+            data_stream,
             table_stream,
             text_extractor,
             chp_bin_table,
@@ -490,7 +498,9 @@ impl Document {
         &self,
         image: &super::image::Image,
     ) -> std::result::Result<std::borrow::Cow<'_, [u8]>, super::image::ImageError> {
-        image.data(&self.word_document)
+        // Use the appropriate stream based on pic_offset
+        let stream = self.get_picture_stream(Some(image.pic_offset()));
+        image.data(stream)
     }
 
     /// Get a reference to the WordDocument stream.
@@ -499,6 +509,31 @@ impl Document {
     #[inline]
     pub fn word_document(&self) -> &[u8] {
         &self.word_document
+    }
+
+    /// Get the appropriate stream for picture data based on pic_offset.
+    ///
+    /// According to Apache POI's PicturesTable.getData():
+    /// - If Data stream exists and pic_offset < data_stream.len(), use Data stream
+    /// - Otherwise use WordDocument stream
+    ///
+    /// This is because pictures are typically stored in the Data stream,
+    /// not the WordDocument stream.
+    fn get_picture_stream(&self, pic_offset: Option<u32>) -> &[u8] {
+        if let (Some(data_stream), Some(offset)) = (&self.data_stream, pic_offset) {
+            if (offset as usize) < data_stream.len() {
+                return data_stream;
+            }
+        }
+        &self.word_document
+    }
+
+    /// Get a reference to the Data stream (if available).
+    ///
+    /// The Data stream contains embedded pictures and OLE objects.
+    #[inline]
+    pub fn data_stream(&self) -> Option<&[u8]> {
+        self.data_stream.as_deref()
     }
 
     /// Get all paragraphs in the document.
@@ -613,7 +648,9 @@ impl Document {
                 }
 
                 // Check for embedded images
-                if let Ok(Some(image)) = extract_image(&self.word_document, &text, &props) {
+                // According to Apache POI, pictures are stored in Data stream if available
+                let picture_stream = self.get_picture_stream(props.pic_offset);
+                if let Ok(Some(image)) = extract_image(picture_stream, &text, &props) {
                     run_objects.push(Run::with_image(text, props, image));
                     continue;
                 }
