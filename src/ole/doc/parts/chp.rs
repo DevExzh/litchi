@@ -203,7 +203,7 @@ impl CharacterProperties {
             // Operation 0x06: sprmCFData - Data flag
             0x06 => {
                 // Data field flag
-                debug_assert!(sprm.size == 2);
+                debug_assert_eq!(sprm.size, 2);
                 if let Some(val) = sprm.operand_byte() {
                     chp.is_data = val != 0;
                 }
