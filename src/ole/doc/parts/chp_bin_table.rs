@@ -13,7 +13,6 @@ use super::chp::CharacterProperties;
 use super::fkp::ChpxFkp;
 use super::piece_table::PieceTable;
 use crate::common::binary::read_u32_le;
-use crate::ole::sprm::parse_sprms;
 
 /// A character run with properties.
 ///
@@ -184,50 +183,17 @@ impl ChpBinTable {
 
     /// Parse CHPX data (grpprl) into CharacterProperties.
     ///
-    /// Inlined for better performance in the hot loop.
+    /// Delegates to CharacterProperties::from_sprm for consistent behavior
+    /// with the full SPRM parser (handles is_spec, is_obj, is_data flags correctly).
     #[inline]
     fn parse_chpx(grpprl: &[u8]) -> CharacterProperties {
         if grpprl.is_empty() {
             return CharacterProperties::default();
         }
 
-        // Parse SPRMs (always 2-byte opcodes per Apache POI)
-        let sprms = parse_sprms(grpprl);
-        let mut props = CharacterProperties::default();
-
-        for sprm in &sprms {
-            match sprm.opcode {
-                0x0835 | 0x0085 => {
-                    // Bold
-                    props.is_bold = Some(sprm.operand_byte().unwrap_or(0) != 0);
-                },
-                0x0836 | 0x0086 => {
-                    // Italic
-                    props.is_italic = Some(sprm.operand_byte().unwrap_or(0) != 0);
-                },
-                0x4A43 | 0x0043 => {
-                    // Font size
-                    props.font_size = sprm.operand_word();
-                },
-                0x080A => {
-                    // OLE2 object flag (SPRM_FOLE2)
-                    let operand = sprm.operand_byte().unwrap_or(0);
-                    props.is_ole2 = operand != 0;
-                },
-                0x6A03 => {
-                    // Picture location (sprmCPicLocation)
-                    // This is the FILE character position (fc) of the picture/object data
-                    props.pic_offset = sprm.operand_dword();
-                },
-                0x680E => {
-                    // Object location/pic offset (SPRM_OBJLOCATION)
-                    props.pic_offset = sprm.operand_dword();
-                },
-                _ => {},
-            }
-        }
-
-        props
+        // Use the complete SPRM parser from CharacterProperties
+        // This ensures all flags (is_spec, is_obj, is_data, etc.) are set correctly
+        CharacterProperties::from_sprm(grpprl).unwrap_or_default()
     }
 
     /// Get all character runs.

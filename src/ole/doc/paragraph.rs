@@ -158,6 +158,11 @@ impl Paragraph {
 ///     if let Some(formula_ast) = run.mtef_formula_ast()? {
 ///         println!("MTEF formula AST with {} nodes", formula_ast.len());
 ///     }
+///
+///     // Check for embedded images
+///     if let Some(img) = run.image() {
+///         println!("Image at offset: {}", img.pic_offset());
+///     }
 /// }
 /// ```
 #[derive(Debug, Clone)]
@@ -173,6 +178,8 @@ pub struct Run {
     /// Parsed MTEF formula AST placeholder (when formula feature is disabled)
     #[cfg(not(feature = "formula"))]
     mtef_formula_ast: Option<Arc<Vec<()>>>,
+    /// Embedded image (metadata only, data loaded lazily via Document::image_data)
+    image: Option<super::image::Image>,
 }
 
 impl Run {
@@ -182,6 +189,7 @@ impl Run {
             text,
             properties,
             mtef_formula_ast: None,
+            image: None,
         }
     }
 
@@ -196,6 +204,7 @@ impl Run {
             text,
             properties,
             mtef_formula_ast: Some(mtef_ast),
+            image: None,
         }
     }
 
@@ -210,6 +219,21 @@ impl Run {
             text,
             properties,
             mtef_formula_ast: None,
+            image: None,
+        }
+    }
+
+    /// Create a new Run with an embedded image.
+    pub(crate) fn with_image(
+        text: String,
+        properties: CharacterProperties,
+        image: super::image::Image,
+    ) -> Self {
+        Self {
+            text,
+            properties,
+            mtef_formula_ast: None,
+            image: Some(image),
         }
     }
 
@@ -381,6 +405,55 @@ impl Run {
     /// Check if this run is an OLE2 embedded object (like an equation or image).
     pub fn is_ole_object(&self) -> bool {
         self.properties.is_ole2
+    }
+
+    /// Check if this run contains special content that should not be displayed as text.
+    ///
+    /// When `is_spec` is true, the text contains special control characters representing
+    /// embedded objects (pictures, OLE objects), footnotes, field markers, etc.
+    /// These characters should not be displayed as regular text.
+    ///
+    /// Special characters include:
+    /// - `\u{01}` (0x01): Picture or OLE object placeholder
+    /// - `\u{03}` (0x03): Footnote/endnote separator
+    /// - `\u{04}` (0x04): Footnote/endnote terminator
+    /// - `\u{05}` (0x05): Annotation reference
+    /// - `\u{13}` (0x13): Field begin
+    /// - `\u{14}` (0x14): Field separator
+    /// - `\u{15}` (0x15): Field end
+    pub fn is_special_content(&self) -> bool {
+        if !self.properties.is_spec {
+            return false;
+        }
+
+        // Check if text contains only special control characters
+        self.text.chars().all(|c| {
+            matches!(
+                c,
+                '\u{01}' | '\u{03}' | '\u{04}' | '\u{05}' | '\u{13}' | '\u{14}' | '\u{15}'
+            )
+        })
+    }
+
+    /// Check if this run contains an embedded image.
+    pub fn has_image(&self) -> bool {
+        self.image.is_some()
+    }
+
+    /// Get the embedded image if this run contains one.
+    ///
+    /// Returns the image metadata. Use `Document::image_data()` to get the actual binary data.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// if let Some(img) = run.image() {
+    ///     let data = doc.image_data(img)?;
+    ///     // Process image data...
+    /// }
+    /// ```
+    pub fn image(&self) -> Option<&super::image::Image> {
+        self.image.as_ref()
     }
 }
 
