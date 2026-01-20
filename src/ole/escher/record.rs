@@ -24,7 +24,7 @@ use zerocopy::{
 pub type Result<T> = std::io::Result<T>;
 
 /// An Escher record with zero-copy data access.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct EscherRecord<'data> {
     /// Record type
     pub record_type: EscherRecordType,
@@ -38,6 +38,16 @@ pub struct EscherRecord<'data> {
     pub length: u32,
     /// Record data (zero-copy borrow)
     pub data: &'data [u8],
+}
+
+impl core::fmt::Debug for EscherRecord<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "EscherRecord {{ record_type: {:?}, record_type_raw: {}, version: {}, instance: {}, length: {} }}",
+            self.record_type, self.record_type_raw, self.version, self.instance, self.length,
+        )
+    }
 }
 
 impl<'data> EscherRecord<'data> {

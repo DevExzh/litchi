@@ -60,7 +60,7 @@ pub mod table;
 pub mod writer;
 
 pub use document::Document;
-pub use image::{Image, ImageError, PictureType};
+pub use image::{Image, ImageError};
 pub use package::Package;
 pub use paragraph::{Paragraph, Run};
 pub use shapes::DocShape;

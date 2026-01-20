@@ -494,13 +494,17 @@ impl Document {
     ///     }
     /// }
     /// ```
+    #[cfg(feature = "imgconv")]
     pub fn image_data(
         &self,
         image: &super::image::Image,
-    ) -> std::result::Result<std::borrow::Cow<'_, [u8]>, super::image::ImageError> {
+    ) -> std::result::Result<crate::images::ExtractedImage<'_>, super::image::ImageError> {
         // Use the appropriate stream based on pic_offset
-        let stream = self.get_picture_stream(Some(image.pic_offset()));
-        image.data(stream)
+        let data_stream = self.get_data_stream(image.pic_offset()).ok_or(
+            super::image::ImageError::InvalidPicOffset(image.pic_offset()),
+        )?;
+        let word_document = self.word_document();
+        image.data(data_stream, word_document)
     }
 
     /// Get a reference to the WordDocument stream.
@@ -519,13 +523,13 @@ impl Document {
     ///
     /// This is because pictures are typically stored in the Data stream,
     /// not the WordDocument stream.
-    fn get_picture_stream(&self, pic_offset: Option<u32>) -> &[u8] {
-        if let (Some(data_stream), Some(offset)) = (&self.data_stream, pic_offset) {
-            if (offset as usize) < data_stream.len() {
-                return data_stream;
-            }
+    fn get_data_stream(&self, offset: u32) -> Option<&[u8]> {
+        if let Some(data_stream) = &self.data_stream
+            && (offset as usize) < data_stream.len()
+        {
+            return Some(data_stream.as_slice());
         }
-        &self.word_document
+        None
     }
 
     /// Get a reference to the Data stream (if available).
@@ -649,8 +653,10 @@ impl Document {
 
                 // Check for embedded images
                 // According to Apache POI, pictures are stored in Data stream if available
-                let picture_stream = self.get_picture_stream(props.pic_offset);
-                if let Ok(Some(image)) = extract_image(picture_stream, &text, &props) {
+                if let Some(pic_offset) = props.pic_offset
+                    && let Some(data_stream) = self.get_data_stream(pic_offset)
+                    && let Ok(Some(image)) = extract_image(data_stream, &text, &props)
+                {
                     run_objects.push(Run::with_image(text, props, image));
                     continue;
                 }

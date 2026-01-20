@@ -407,34 +407,6 @@ impl Run {
         self.properties.is_ole2
     }
 
-    /// Check if this run contains special content that should not be displayed as text.
-    ///
-    /// When `is_spec` is true, the text contains special control characters representing
-    /// embedded objects (pictures, OLE objects), footnotes, field markers, etc.
-    /// These characters should not be displayed as regular text.
-    ///
-    /// Special characters include:
-    /// - `\u{01}` (0x01): Picture or OLE object placeholder
-    /// - `\u{03}` (0x03): Footnote/endnote separator
-    /// - `\u{04}` (0x04): Footnote/endnote terminator
-    /// - `\u{05}` (0x05): Annotation reference
-    /// - `\u{13}` (0x13): Field begin
-    /// - `\u{14}` (0x14): Field separator
-    /// - `\u{15}` (0x15): Field end
-    pub fn is_special_content(&self) -> bool {
-        if !self.properties.is_spec {
-            return false;
-        }
-
-        // Check if text contains only special control characters
-        self.text.chars().all(|c| {
-            matches!(
-                c,
-                '\u{01}' | '\u{03}' | '\u{04}' | '\u{05}' | '\u{13}' | '\u{14}' | '\u{15}'
-            )
-        })
-    }
-
     /// Check if this run contains an embedded image.
     pub fn has_image(&self) -> bool {
         self.image.is_some()

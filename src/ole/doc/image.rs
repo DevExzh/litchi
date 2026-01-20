@@ -1,107 +1,7 @@
-use std::borrow::Cow;
-use std::io::Read;
-
 use super::parts::chp::CharacterProperties;
 
 const BLOCK_TYPE_OFFSET: usize = 0xE;
 const MM_MODE_TYPE_OFFSET: usize = 0x6;
-
-/// Compressed image signature: 0xFE 0x78 0xDA (zlib best compression)
-const COMPRESSED1: [u8; 3] = [0xFE, 0x78, 0xDA];
-
-/// Compressed image signature: 0xFE 0x78 0x9C (zlib default compression)
-const COMPRESSED2: [u8; 3] = [0xFE, 0x78, 0x9C];
-
-/// PNG file signature
-const PNG_SIGNATURE: [u8; 8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
-
-/// Picture type enumeration
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum PictureType {
-    #[default]
-    Unknown,
-    Emf,
-    Wmf,
-    Pict,
-    Jpeg,
-    Png,
-    Bmp,
-    Tiff,
-}
-
-impl PictureType {
-    /// Get MIME type for this picture type
-    pub const fn mime_type(&self) -> &'static str {
-        match self {
-            PictureType::Unknown => "image/unknown",
-            PictureType::Emf => "image/x-emf",
-            PictureType::Wmf => "image/x-wmf",
-            PictureType::Pict => "image/x-pict",
-            PictureType::Jpeg => "image/jpeg",
-            PictureType::Png => "image/png",
-            PictureType::Bmp => "image/bmp",
-            PictureType::Tiff => "image/tiff",
-        }
-    }
-
-    /// Get file extension for this picture type
-    pub const fn extension(&self) -> &'static str {
-        match self {
-            PictureType::Unknown => "",
-            PictureType::Emf => "emf",
-            PictureType::Wmf => "wmf",
-            PictureType::Pict => "pict",
-            PictureType::Jpeg => "jpg",
-            PictureType::Png => "png",
-            PictureType::Bmp => "bmp",
-            PictureType::Tiff => "tiff",
-        }
-    }
-
-    /// Detect picture type from raw content bytes
-    pub fn detect_from_content(data: &[u8]) -> Self {
-        if data.len() < 8 {
-            return PictureType::Unknown;
-        }
-
-        // PNG signature
-        if data.starts_with(&PNG_SIGNATURE) {
-            return PictureType::Png;
-        }
-
-        // JPEG signature
-        if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
-            return PictureType::Jpeg;
-        }
-
-        // BMP signature
-        if data.starts_with(b"BM") {
-            return PictureType::Bmp;
-        }
-
-        // TIFF signature (little-endian and big-endian)
-        if data.starts_with(&[0x49, 0x49, 0x2A, 0x00])
-            || data.starts_with(&[0x4D, 0x4D, 0x00, 0x2A])
-        {
-            return PictureType::Tiff;
-        }
-
-        // EMF signature
-        if data.len() >= 44 && data[40..44] == [0x20, 0x45, 0x4D, 0x46] {
-            return PictureType::Emf;
-        }
-
-        // WMF signature (Aldus Placeable Metafile or standard)
-        if data.len() >= 4
-            && ((data[0..2] == [0xD7, 0xCD] && data[2..4] == [0xC6, 0x9A])
-                || data[0..4] == [0x01, 0x00, 0x09, 0x00])
-        {
-            return PictureType::Wmf;
-        }
-
-        PictureType::Unknown
-    }
-}
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy)]
@@ -113,7 +13,7 @@ pub enum BlockType {
     HorizontalLine = 0xE,
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum ImageError {
     #[error("Invalid picture offset: {0}")]
     InvalidPicOffset(u32),
@@ -123,6 +23,12 @@ pub enum ImageError {
     NoPicture,
     #[error("Decompression failed: {0}")]
     DecompressionFailed(String),
+
+    #[error("Failed to decode Escher record: {0}")]
+    DecodeEscherRecordFailed(std::io::Error),
+
+    #[error("Failed to extract image from container: {0}")]
+    ExtractImageFailed(crate::Error),
 }
 
 impl TryFrom<u8> for BlockType {
@@ -188,56 +94,115 @@ pub fn has_picture(
     Ok(false)
 }
 
-/// Check if data matches a signature at a given offset
-fn match_signature(data: &[u8], signature: &[u8], offset: usize) -> bool {
-    if offset >= data.len() {
-        return false;
-    }
-    let end = (offset + signature.len()).min(data.len());
-    data[offset..end] == signature[..end - offset]
+/// Picture fields structure
+///
+/// Based on Apache Poi's `fillFields` method in `PICFAbstractType.java`
+///
+/// The fields ordered as they appear in the PICF structure.
+/// Total size: 0x44 (68) bytes
+#[derive(Debug, Clone, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
+#[repr(C)]
+pub struct PictureFields {
+    /// Total length of picture data including header (offset 0x00)
+    pub lcb: i32,
+    /// Size of PICF header (offset 0x04)
+    pub cb_header: i16,
+    /// Metafile mapping mode (offset 0x06)
+    pub mm: i16,
+    /// Horizontal extent (offset 0x08)
+    pub x_ext: i16,
+    /// Vertical extent (offset 0x0A)
+    pub y_ext: i16,
+    /// HMF swap value (offset 0x0C)
+    pub sw_hmf: i16,
+    /// GRF flags (offset 0x0E)
+    pub grf: i32,
+    /// Padding (offset 0x12)
+    pub padding: i32,
+    /// Presentation manager metafile mapping mode (offset 0x16)
+    pub mm_pm: i16,
+    /// Padding 2 (offset 0x18)
+    pub padding2: i32,
+    /// Horizontal goal (offset 0x1C)
+    pub dxa_goal: i16,
+    /// Vertical goal (offset 0x1E)
+    pub dya_goal: i16,
+    /// Horizontal scaling factor (offset 0x20)
+    pub mx: i16,
+    /// Vertical scaling factor (offset 0x22)
+    pub my: i16,
+    /// Reserved horizontal value 1 (offset 0x24)
+    pub dxa_reserved1: i16,
+    /// Reserved vertical value 1 (offset 0x26)
+    pub dya_reserved1: i16,
+    /// Reserved horizontal value 2 (offset 0x28)
+    pub dxa_reserved2: i16,
+    /// Reserved vertical value 2 (offset 0x2A)
+    pub dya_reserved2: i16,
+    /// Reserved flag (offset 0x2C)
+    pub f_reserved: u8,
+    /// Bits per pixel (offset 0x2D)
+    pub bpp: u8,
+    /// Top border (offset 0x2E)
+    pub brc_top80: [u8; 4],
+    /// Left border (offset 0x32)
+    pub brc_left80: [u8; 4],
+    /// Bottom border (offset 0x36)
+    pub brc_bottom80: [u8; 4],
+    /// Right border (offset 0x3A)
+    pub brc_right80: [u8; 4],
+    /// Reserved horizontal value 3 (offset 0x3E)
+    pub dxa_reserved3: i16,
+    /// Reserved vertical value 3 (offset 0x40)
+    pub dya_reserved3: i16,
+    /// Number of properties (offset 0x42)
+    pub c_props: i16,
 }
 
-/// Extract PNG data from raw content, removing any prefix headers
-fn extract_png(raw_content: &[u8]) -> Cow<'_, [u8]> {
-    if let Some(pos) = raw_content
-        .windows(PNG_SIGNATURE.len())
-        .position(|window| window == PNG_SIGNATURE)
-    {
-        if pos == 0 {
-            Cow::Borrowed(raw_content)
-        } else {
-            Cow::Borrowed(&raw_content[pos..])
-        }
-    } else {
-        Cow::Borrowed(raw_content)
-    }
-}
+impl PictureFields {
+    const SIZE: usize = 0
+        + 4
+        + 2
+        + 2
+        + 2
+        + 2
+        + 2
+        + 4
+        + 4
+        + 2
+        + 4
+        + 2
+        + 2
+        + 2
+        + 2
+        + 2
+        + 2
+        + 2
+        + 2
+        + 1
+        + 1
+        + 4
+        + 4
+        + 4
+        + 4
+        + 2
+        + 2
+        + 2;
+    /// Try to parse PictureFields from raw bytes
+    ///
+    /// # Arguments
+    /// * `data` - Raw byte slice
+    /// * `offset` - Starting offset within the data
+    ///
+    /// # Returns
+    /// * `Some(PictureFields)` if parsing succeeds
+    /// * `None` if data is too short
+    pub fn try_parse(data: &[u8], offset: usize) -> Option<Self> {
+        use zerocopy::FromBytes;
 
-/// Decompress image content if it's compressed
-fn decompress_image_content(raw_content: &[u8]) -> Result<Cow<'_, [u8]>, ImageError> {
-    // Check for compression signatures at offset 32
-    if match_signature(raw_content, &COMPRESSED1, 32)
-        || match_signature(raw_content, &COMPRESSED2, 32)
-    {
-        if raw_content.len() <= 33 {
-            return Err(ImageError::DecompressionFailed(
-                "Insufficient data for decompression".into(),
-            ));
-        }
-
-        let compressed_data = &raw_content[33..];
-        let mut decoder = flate2::read::ZlibDecoder::new(compressed_data);
-        let mut decompressed = Vec::new();
-
-        match decoder.read_to_end(&mut decompressed) {
-            Ok(_) => Ok(Cow::Owned(decompressed)),
-            Err(e) => Err(ImageError::DecompressionFailed(format!(
-                "Possibly corrupt compression: {}",
-                e
-            ))),
-        }
-    } else {
-        Ok(extract_png(raw_content))
+        let slice = data.get(offset..)?;
+        let (fields, _) = Self::read_from_prefix(slice).ok()?;
+        Some(fields)
     }
 }
 
@@ -273,70 +238,65 @@ impl Image {
     /// This method extracts and optionally decompresses the image data.
     /// Use `Document::image_data()` for a higher-level API.
     ///
-    /// PICF structure (based on [MS-DOC] and Apache POI):
-    /// - Offset 0x00 (4 bytes): lcb - total length of picture data including header
-    /// - Offset 0x04 (2 bytes): cbHeader - size of PICF header
-    /// - Offset 0x06 (2 bytes): mfpMm - metafile mapping mode
-    /// - Offset 0x0E (1 byte): block type (0x08 = image)
     /// - After header: actual picture content (may include BLIP container)
-    pub fn data<'a>(&self, data_stream: &'a [u8]) -> Result<Cow<'a, [u8]>, ImageError> {
-        let offset = self.pic_offset as usize;
+    ///
+    /// Logics is copied from Apache Poi's `PICFAndOfficeArtData` method in `PICFAndOfficeArtData.java`
+    #[cfg(feature = "imgconv")]
+    pub fn data(
+        &self,
+        data_stream: &[u8],
+        word_document: &[u8],
+    ) -> Result<crate::images::ExtractedImage<'static>, ImageError> {
+        use crate::{images::ImageExtractor, ole::escher::EscherRecord};
 
-        if offset + 6 >= data_stream.len() {
-            return Err(ImageError::InvalidPicOffset(self.pic_offset));
+        let mut offset = self.pic_offset as usize;
+
+        let pic_fields = PictureFields::try_parse(data_stream, offset)
+            .ok_or(ImageError::InvalidPicOffset(self.pic_offset))?;
+
+        offset += PictureFields::SIZE;
+
+        // Handle picture name if mm == 0x66
+        if pic_fields.mm == 0x66 {
+            let cch_pic_name = u8::from_le_bytes([data_stream[offset]]);
+            offset += 1;
+            offset += cch_pic_name as usize;
         }
 
-        // Read PICF structure
-        // lcb: total length including header (4 bytes at offset 0)
-        let lcb = u32::from_le_bytes([
-            data_stream[offset],
-            data_stream[offset + 1],
-            data_stream[offset + 2],
-            data_stream[offset + 3],
-        ]) as usize;
+        // Parse the first Escher record (usually SpContainer or BStoreContainer)
+        let (_, record_size) = EscherRecord::parse(data_stream, offset)
+            .map_err(ImageError::DecodeEscherRecordFailed)?;
+        offset += record_size;
 
-        // cbHeader: header size (2 bytes at offset 4)
-        let cb_header = u16::from_le_bytes([data_stream[offset + 4], data_stream[offset + 5]]) as usize;
+        // Continue parsing remaining records looking for BSE or BLIP
+        while (offset - self.pic_offset as usize) < pic_fields.lcb as usize {
+            let (next_record, next_record_size) = match EscherRecord::parse(data_stream, offset) {
+                Ok(r) => r,
+                Err(_) => break,
+            };
 
+            // Check if this is a BSE (0xF007) or BLIP record (0xF018-0xF117)
+            if next_record.record_type_raw != 0xF007
+                && (next_record.record_type_raw < 0xF018 || next_record.record_type_raw > 0xF117)
+            {
+                break;
+            }
+            offset += next_record_size;
 
-        // Validate sizes
-        if cb_header < 0x44 {
-            // Minimum PICF header size
-            return Err(ImageError::InvalidPicOffset(self.pic_offset));
+            // Try to extract image from this record
+            // Pass data_stream for delay-loaded BLIPs
+            match ImageExtractor::extract_from_escher_record_with_stream(
+                &next_record,
+                Some(word_document),
+            ) {
+                Ok(img) => return Ok(img),
+                Err(_) => {
+                    // TODO: log this error?
+                },
+            }
         }
 
-        // Picture content starts after the header
-        let content_start = offset + cb_header;
-        let content_end = offset + lcb;
-
-        if content_start >= data_stream.len() || content_end > data_stream.len() {
-            return Err(ImageError::InvalidPicOffset(self.pic_offset));
-        }
-
-        let raw_content = &data_stream[content_start..content_end];
-
-        // Try to decompress if compressed, otherwise extract PNG/JPEG directly
-        decompress_image_content(raw_content)
-    }
-
-    /// Detect the picture type from the image data.
-    pub fn picture_type(&self, word_document: &[u8]) -> Result<PictureType, ImageError> {
-        let data = self.data(word_document)?;
-        Ok(PictureType::detect_from_content(&data))
-    }
-
-    /// Suggest a filename based on offset and detected type.
-    pub fn suggest_filename(&self, word_document: &[u8]) -> String {
-        let ext = self
-            .picture_type(word_document)
-            .map(|t| t.extension())
-            .unwrap_or("");
-
-        if ext.is_empty() {
-            format!("{:x}", self.pic_offset)
-        } else {
-            format!("{:x}.{}", self.pic_offset, ext)
-        }
+        Err(ImageError::NoPicture)
     }
 }
 
