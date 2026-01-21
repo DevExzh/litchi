@@ -238,6 +238,11 @@ impl ImageExtractor {
             }
             &stream[offset..]
         } else {
+            if bse_record.data.len() <= 36 {
+                return Err(crate::common::error::Error::ParseError(
+                    "BSE record data is too short for embedded BLIP".into(),
+                ));
+            }
             &bse_record.data[36..]
         };
 
