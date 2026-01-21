@@ -963,5 +963,53 @@ impl Document {
 
 #[cfg(test)]
 mod tests {
-    // Tests will be added as implementation progresses
+    #[cfg(feature = "imgconv")]
+    use super::super::{Image, ImageError, Package};
+    #[cfg(feature = "imgconv")]
+    use std::path::Path;
+
+    #[cfg(feature = "imgconv")]
+    #[test]
+    fn test_extract_png_image_from_doc() {
+        let base = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let doc_path = base.join("test-data").join("pixel-img.doc");
+        let png_path = base.join("test-data").join("pixel-img.png");
+        let expected = std::fs::read(&png_path).expect("read expected png");
+
+        let mut pkg = Package::open(&doc_path).expect("open doc");
+        let doc = pkg.document().expect("load document");
+
+        let mut images = Vec::new();
+        for para in doc.paragraphs().expect("paragraphs") {
+            for run in para.runs().expect("runs") {
+                if let Some(img) = run.image() {
+                    images.push(*img);
+                }
+            }
+        }
+
+        assert_eq!(images.len(), 1, "expected exactly one embedded image");
+
+        let extracted = doc.image_data(&images[0]).expect("extract image");
+        assert_eq!(extracted.extension(), "png");
+
+        let data = extracted.decompressed_data().expect("decompress");
+        const PNG_SIGNATURE: [u8; 8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        assert!(data.as_ref().starts_with(&PNG_SIGNATURE));
+        assert_eq!(data.as_ref(), expected.as_slice());
+    }
+
+    #[cfg(feature = "imgconv")]
+    #[test]
+    fn test_image_data_with_invalid_offset() {
+        let base = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let doc_path = base.join("test-data").join("pixel-img.doc");
+
+        let mut pkg = Package::open(&doc_path).expect("open doc");
+        let doc = pkg.document().expect("load document");
+
+        let img = Image::new(u32::MAX);
+        let err = doc.image_data(&img).expect_err("expected invalid offset");
+        assert!(matches!(err, ImageError::InvalidPicOffset(_)));
+    }
 }

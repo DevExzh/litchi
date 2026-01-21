@@ -294,3 +294,118 @@ pub fn extract_image(
         .ok_or(ImageError::NoPicture)
         .map(Some)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ole::doc::parts::chp::CharacterProperties;
+
+    fn make_props(pic_offset: Option<u32>) -> CharacterProperties {
+        CharacterProperties {
+            is_spec: true,
+            pic_offset,
+            ..Default::default()
+        }
+    }
+
+    fn make_data(block_type: u8, mm_mode: u8) -> Vec<u8> {
+        let mut data = vec![0u8; 0x20];
+        data[MM_MODE_TYPE_OFFSET] = mm_mode;
+        data[BLOCK_TYPE_OFFSET] = block_type;
+        data
+    }
+
+    #[test]
+    fn test_has_picture_returns_true_for_valid_image_block() {
+        let data = make_data(BlockType::Image as u8, 0x00);
+        let props = make_props(Some(0));
+
+        let has = has_picture(&data, "\u{0001}", &props).unwrap();
+        assert!(has);
+    }
+
+    #[test]
+    fn test_has_picture_with_end_of_special_marker() {
+        let data = make_data(BlockType::ImageWord2000 as u8, 0x64);
+        let props = make_props(Some(0));
+
+        let has = has_picture(&data, "\u{0001}\u{0015}", &props).unwrap();
+        assert!(has);
+    }
+
+    #[test]
+    fn test_has_picture_returns_false_for_wrong_text() {
+        let data = make_data(BlockType::Image as u8, 0x00);
+        let props = make_props(Some(0));
+
+        let has = has_picture(&data, "not-special", &props).unwrap();
+        assert!(!has);
+    }
+
+    #[test]
+    fn test_has_picture_returns_false_when_not_spec() {
+        let data = make_data(BlockType::Image as u8, 0x00);
+        let mut props = make_props(Some(0));
+        props.is_spec = false;
+
+        let has = has_picture(&data, "\u{0001}", &props).unwrap();
+        assert!(!has);
+    }
+
+    #[test]
+    fn test_has_picture_returns_false_when_is_obj() {
+        let data = make_data(BlockType::Image as u8, 0x00);
+        let mut props = make_props(Some(0));
+        props.is_obj = true;
+
+        let has = has_picture(&data, "\u{0001}", &props).unwrap();
+        assert!(!has);
+    }
+
+    #[test]
+    fn test_has_picture_returns_error_for_invalid_offset() {
+        let data = vec![0u8; 4];
+        let props = make_props(Some(10));
+
+        let err = has_picture(&data, "\u{0001}", &props).unwrap_err();
+        assert!(matches!(err, ImageError::InvalidPicOffset(10)));
+    }
+
+    #[test]
+    fn test_extract_image_returns_none_when_no_picture() {
+        let data = make_data(BlockType::Image as u8, 0x00);
+        let mut props = make_props(Some(0));
+        props.is_spec = false;
+
+        let extracted = extract_image(&data, "\u{0001}", &props).unwrap();
+        assert!(extracted.is_none());
+    }
+
+    #[test]
+    fn test_block_type_conversion() {
+        assert!(matches!(
+            BlockType::try_from(0x08).unwrap(),
+            BlockType::Image
+        ));
+        assert!(matches!(
+            BlockType::try_from(0x00).unwrap(),
+            BlockType::ImageWord2000
+        ));
+        assert!(matches!(
+            BlockType::try_from(0x0A).unwrap(),
+            BlockType::ImagePastedFromClipboard
+        ));
+        assert!(matches!(
+            BlockType::try_from(0x02).unwrap(),
+            BlockType::ImagePastedFromClipboardWord2000
+        ));
+        assert!(matches!(
+            BlockType::try_from(0x0E).unwrap(),
+            BlockType::HorizontalLine
+        ));
+        assert!(matches!(
+            BlockType::try_from(0xFF),
+            Err(ImageError::InvalidBlockType(0xFF))
+        ));
+    }
+}
