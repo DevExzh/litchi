@@ -1,4 +1,5 @@
 use super::parts::chp::CharacterProperties;
+use zerocopy_derive::{FromBytes, Immutable, KnownLayout};
 
 const BLOCK_TYPE_OFFSET: usize = 0xE;
 const MM_MODE_TYPE_OFFSET: usize = 0x6;
@@ -71,7 +72,8 @@ fn is_picture_recognized(block_type: BlockType, mm_mode_type: u8) -> bool {
     )
 }
 
-fn is_block_contains_image(data_buff: &[u8], pic_offset: u32) -> Result<bool, ImageError> {
+/// Check whether a block contains an image.
+fn does_block_contain_image(data_buff: &[u8], pic_offset: u32) -> Result<bool, ImageError> {
     Ok(is_picture_recognized(
         get_block_type(data_buff, pic_offset)?,
         get_mm_mode_type(data_buff, pic_offset)?,
@@ -88,7 +90,7 @@ pub fn has_picture(
         // Image should be in its own run, or in a run with the end-of-special marker
         if "\u{0001}" == text || "\u{0001}\u{0015}" == text {
             let pic_offset = props.pic_offset.unwrap_or(0);
-            return is_block_contains_image(data_buff, pic_offset);
+            return does_block_contain_image(data_buff, pic_offset);
         }
     }
     Ok(false)
@@ -100,8 +102,8 @@ pub fn has_picture(
 ///
 /// The fields ordered as they appear in the PICF structure.
 /// Total size: 0x44 (68) bytes
-#[derive(Debug, Clone, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
-#[repr(C)]
+#[derive(Debug, Clone, FromBytes, Immutable, KnownLayout)]
+#[repr(C, packed)]
 pub struct PictureFields {
     /// Total length of picture data including header (offset 0x00)
     pub lcb: i32,
@@ -160,34 +162,6 @@ pub struct PictureFields {
 }
 
 impl PictureFields {
-    const SIZE: usize = 0
-        + 4
-        + 2
-        + 2
-        + 2
-        + 2
-        + 2
-        + 4
-        + 4
-        + 2
-        + 4
-        + 2
-        + 2
-        + 2
-        + 2
-        + 2
-        + 2
-        + 2
-        + 2
-        + 1
-        + 1
-        + 4
-        + 4
-        + 4
-        + 4
-        + 2
-        + 2
-        + 2;
     /// Try to parse PictureFields from raw bytes
     ///
     /// # Arguments
@@ -205,6 +179,10 @@ impl PictureFields {
         Some(fields)
     }
 }
+
+const _: () = {
+    assert!(std::mem::size_of::<PictureFields>() == 0x44);
+};
 
 // ============================================================================
 // Image struct - metadata only, data loaded lazily
@@ -254,7 +232,7 @@ impl Image {
         let pic_fields = PictureFields::try_parse(data_stream, offset)
             .ok_or(ImageError::InvalidPicOffset(self.pic_offset))?;
 
-        offset += PictureFields::SIZE;
+        offset += std::mem::size_of::<PictureFields>();
 
         // Handle picture name if mm == 0x66
         if pic_fields.mm == 0x66 {
