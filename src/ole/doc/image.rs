@@ -236,7 +236,10 @@ impl Image {
 
         // Handle picture name if mm == 0x66
         if pic_fields.mm == 0x66 {
-            let cch_pic_name = u8::from_le_bytes([data_stream[offset]]);
+            let cch_pic_name = match data_stream.get(offset) {
+                Some(&b) => b,
+                None => return Err(ImageError::InvalidPicOffset(self.pic_offset)),
+            };
             offset += 1;
             offset += cch_pic_name as usize;
         }
