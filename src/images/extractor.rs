@@ -305,7 +305,7 @@ impl ImageExtractor {
             EscherRecordType::BSE => {
                 let bse = BlipStoreEntry::parse(record.data)?;
                 let name = bse.name.as_ref().map(|n| n.to_string());
-                let blip = Self::blip_from_bse(&bse, &record, delay_stream)?;
+                let blip = Self::blip_from_bse(&bse, record, delay_stream)?;
                 Ok(ExtractedImage::new(blip, name, 0))
             },
             _ => Err(crate::common::error::Error::ParseError(format!(
