@@ -2,7 +2,9 @@ use crate::common::{id::generate_guid_braced, xml::escape::escape_xml};
 use crate::ooxml::drawings::blip::write_a_blip_embed_rid_num;
 use crate::ooxml::drawings::ext::write_a16_creation_id_extlst;
 use crate::ooxml::drawings::fill::write_a_stretch_fill_rect;
+use crate::ooxml::xlsx::sort::{SortCondition, SortState};
 use crate::ooxml::xlsx::sparkline::{SparklineGroup, write_sparkline_groups_ext};
+use crate::ooxml::xlsx::views::SheetView;
 /// Writer module for creating and modifying Excel worksheets.
 use crate::sheet::{CellValue, Result as SheetResult};
 use std::collections::HashMap;
@@ -72,11 +74,26 @@ pub struct HeaderFooter {
     pub footer_right: Option<String>,
 }
 
+/// Manual page break definition.
+#[derive(Debug, Clone)]
+pub struct PageBreak {
+    /// Row or column index (1-based) where the break occurs.
+    pub id: u32,
+    /// Minimum span index (0-based).
+    pub min: u32,
+    /// Maximum span index (0-based).
+    pub max: u32,
+    /// Whether the break is manual.
+    pub manual: bool,
+}
+
 /// Auto-filter configuration.
 #[derive(Debug, Clone)]
 pub struct AutoFilter {
     /// Range for the auto-filter (e.g., "A1:D10")
     pub range: String,
+    /// Optional sort state associated with the auto-filter.
+    pub sort_state: Option<SortState>,
 }
 
 /// Sheet protection configuration.
@@ -270,6 +287,12 @@ pub struct MutableWorksheet {
     repeating_columns: Option<String>,
     /// Auto-filter configuration
     auto_filter: Option<AutoFilter>,
+    /// Sheet view settings
+    sheet_view: Option<SheetView>,
+    /// Manual row page breaks
+    row_breaks: Vec<PageBreak>,
+    /// Manual column page breaks
+    col_breaks: Vec<PageBreak>,
     /// Sheet protection configuration
     protection: Option<SheetProtection>,
     /// Hyperlinks by cell reference
@@ -317,6 +340,9 @@ impl MutableWorksheet {
             repeating_rows: None,
             repeating_columns: None,
             auto_filter: None,
+            sheet_view: None,
+            row_breaks: Vec::new(),
+            col_breaks: Vec::new(),
             protection: None,
             hyperlinks: Vec::new(),
             comments: Vec::new(),
@@ -1459,8 +1485,30 @@ impl MutableWorksheet {
     pub fn set_auto_filter(&mut self, range: &str) {
         self.auto_filter = Some(AutoFilter {
             range: range.to_string(),
+            sort_state: None,
         });
         self.modified = true;
+    }
+
+    /// Set the auto-filter sort state.
+    pub fn set_auto_filter_sort_state(&mut self, sort_state: SortState) {
+        if let Some(ref mut filter) = self.auto_filter {
+            filter.sort_state = Some(sort_state);
+        } else {
+            self.auto_filter = Some(AutoFilter {
+                range: sort_state.ref_range.clone(),
+                sort_state: Some(sort_state),
+            });
+        }
+        self.modified = true;
+    }
+
+    /// Clear auto-filter sort state.
+    pub fn clear_auto_filter_sort_state(&mut self) {
+        if let Some(ref mut filter) = self.auto_filter {
+            filter.sort_state = None;
+            self.modified = true;
+        }
     }
 
     /// Remove the auto-filter.
@@ -1472,6 +1520,67 @@ impl MutableWorksheet {
     /// Get the auto-filter configuration.
     pub fn get_auto_filter(&self) -> Option<&AutoFilter> {
         self.auto_filter.as_ref()
+    }
+
+    // ===== Sheet Views =====
+
+    /// Set sheet view settings.
+    pub fn set_sheet_view(&mut self, view: SheetView) {
+        self.sheet_view = Some(view);
+        self.modified = true;
+    }
+
+    /// Clear sheet view settings.
+    pub fn clear_sheet_view(&mut self) {
+        self.sheet_view = None;
+        self.modified = true;
+    }
+
+    /// Get sheet view settings.
+    pub fn sheet_view(&self) -> Option<&SheetView> {
+        self.sheet_view.as_ref()
+    }
+
+    // ===== Page Breaks =====
+
+    /// Add a manual row page break.
+    pub fn add_row_break(&mut self, row: u32, min_col: u32, max_col: u32) {
+        if row == 0 {
+            return;
+        }
+        let break_entry = PageBreak {
+            id: row,
+            min: min_col,
+            max: max_col,
+            manual: true,
+        };
+        self.row_breaks.push(break_entry);
+        self.modified = true;
+    }
+
+    /// Add a manual column page break.
+    pub fn add_column_break(&mut self, col: u32, min_row: u32, max_row: u32) {
+        if col == 0 {
+            return;
+        }
+        let break_entry = PageBreak {
+            id: col,
+            min: min_row,
+            max: max_row,
+            manual: true,
+        };
+        self.col_breaks.push(break_entry);
+        self.modified = true;
+    }
+
+    /// Get all row page breaks.
+    pub fn row_breaks(&self) -> &[PageBreak] {
+        &self.row_breaks
+    }
+
+    /// Get all column page breaks.
+    pub fn column_breaks(&self) -> &[PageBreak] {
+        &self.col_breaks
     }
 
     // ===== Sheet Protection =====
@@ -1765,6 +1874,9 @@ impl MutableWorksheet {
         if self.is_active() {
             xml.push_str(" tabSelected=\"1\"");
         }
+        if let Some(ref view) = self.sheet_view {
+            self.write_sheet_view_attributes(&mut xml, view)?;
+        }
 
         // Add freeze panes if configured
         if let Some(ref freeze) = self.freeze_panes {
@@ -1877,6 +1989,11 @@ impl MutableWorksheet {
         // Write header and footer if configured
         if self.header_footer.is_some() {
             self.write_header_footer(&mut xml)?;
+        }
+
+        // Write manual page breaks
+        if !self.row_breaks.is_empty() || !self.col_breaks.is_empty() {
+            self.write_page_breaks(&mut xml)?;
         }
 
         // Write legacyDrawing reference for comments (VML)
@@ -2748,10 +2865,169 @@ impl MutableWorksheet {
     /// Write auto-filter section.
     fn write_auto_filter(&self, xml: &mut String) -> SheetResult<()> {
         if let Some(ref filter) = self.auto_filter {
-            write!(xml, r#"<autoFilter ref="{}"/>"#, escape_xml(&filter.range))
+            if let Some(ref sort_state) = filter.sort_state {
+                write!(xml, r#"<autoFilter ref="{}">"#, escape_xml(&filter.range))
+                    .map_err(|e| format!("XML write error: {}", e))?;
+                self.write_sort_state(xml, sort_state)?;
+                xml.push_str("</autoFilter>");
+            } else {
+                write!(xml, r#"<autoFilter ref="{}"/>"#, escape_xml(&filter.range))
+                    .map_err(|e| format!("XML write error: {}", e))?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Write sort state for auto-filter.
+    fn write_sort_state(&self, xml: &mut String, sort_state: &SortState) -> SheetResult<()> {
+        write!(
+            xml,
+            r#"<sortState ref="{}">"#,
+            escape_xml(&sort_state.ref_range)
+        )
+        .map_err(|e| format!("XML write error: {}", e))?;
+
+        if let Some(v) = sort_state.column_sort {
+            write!(xml, r#" columnSort="{}""#, if v { 1 } else { 0 })
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(v) = sort_state.case_sensitive {
+            write!(xml, r#" caseSensitive="{}""#, if v { 1 } else { 0 })
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(method) = sort_state.sort_method {
+            write!(xml, r#" sortMethod="{}""#, method.as_str())
                 .map_err(|e| format!("XML write error: {}", e))?;
         }
 
+        if sort_state.conditions.is_empty() {
+            xml.push_str("/>");
+            return Ok(());
+        }
+
+        xml.push('>');
+        for condition in &sort_state.conditions {
+            self.write_sort_condition(xml, condition)?;
+        }
+        xml.push_str("</sortState>");
+        Ok(())
+    }
+
+    fn write_sort_condition(&self, xml: &mut String, condition: &SortCondition) -> SheetResult<()> {
+        write!(
+            xml,
+            r#"<sortCondition ref="{}""#,
+            escape_xml(&condition.ref_range)
+        )
+        .map_err(|e| format!("XML write error: {}", e))?;
+
+        if let Some(v) = condition.descending {
+            write!(xml, r#" descending="{}""#, if v { 1 } else { 0 })
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(sort_by) = condition.sort_by {
+            write!(xml, r#" sortBy="{}""#, sort_by.as_str())
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(ref list) = condition.custom_list {
+            write!(xml, r#" customList="{}""#, escape_xml(list))
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(dxf_id) = condition.dxf_id {
+            write!(xml, r#" dxfId="{}""#, dxf_id).map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(ref icon_set) = condition.icon_set {
+            write!(xml, r#" iconSet="{}""#, escape_xml(icon_set))
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(icon_id) = condition.icon_id {
+            write!(xml, r#" iconId="{}""#, icon_id)
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+
+        xml.push_str("/>");
+        Ok(())
+    }
+
+    fn write_sheet_view_attributes(&self, xml: &mut String, view: &SheetView) -> SheetResult<()> {
+        if let Some(v) = view.show_formulas {
+            write!(xml, r#" showFormulas="{}""#, if v { 1 } else { 0 })
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(v) = view.show_grid_lines {
+            write!(xml, r#" showGridLines="{}""#, if v { 1 } else { 0 })
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(v) = view.show_row_col_headers {
+            write!(xml, r#" showRowColHeaders="{}""#, if v { 1 } else { 0 })
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(v) = view.show_zeros {
+            write!(xml, r#" showZeros="{}""#, if v { 1 } else { 0 })
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(v) = view.right_to_left {
+            write!(xml, r#" rightToLeft="{}""#, if v { 1 } else { 0 })
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(view_type) = view.view_type {
+            write!(xml, r#" view="{}""#, view_type.as_str())
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(ref cell) = view.top_left_cell {
+            write!(xml, r#" topLeftCell="{}""#, escape_xml(cell))
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(scale) = view.zoom_scale {
+            write!(xml, r#" zoomScale="{}""#, scale)
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(scale) = view.zoom_scale_normal {
+            write!(xml, r#" zoomScaleNormal="{}""#, scale)
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        Ok(())
+    }
+
+    fn write_page_breaks(&self, xml: &mut String) -> SheetResult<()> {
+        if !self.row_breaks.is_empty() {
+            self.write_break_list(xml, "rowBreaks", &self.row_breaks)?;
+        }
+        if !self.col_breaks.is_empty() {
+            self.write_break_list(xml, "colBreaks", &self.col_breaks)?;
+        }
+        Ok(())
+    }
+
+    fn write_break_list(
+        &self,
+        xml: &mut String,
+        tag: &str,
+        breaks: &[PageBreak],
+    ) -> SheetResult<()> {
+        write!(
+            xml,
+            r#"<{} count="{}" manualBreakCount="{}">"#,
+            tag,
+            breaks.len(),
+            breaks.len()
+        )
+        .map_err(|e| format!("XML write error: {}", e))?;
+
+        for brk in breaks {
+            write!(
+                xml,
+                r#"<brk id="{}" min="{}" max="{}" man="{}"/>"#,
+                brk.id,
+                brk.min,
+                brk.max,
+                if brk.manual { 1 } else { 0 }
+            )
+            .map_err(|e| format!("XML write error: {}", e))?;
+        }
+
+        write!(xml, "</{}>", tag).map_err(|e| format!("XML write error: {}", e))?;
         Ok(())
     }
 

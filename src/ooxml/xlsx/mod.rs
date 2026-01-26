@@ -35,9 +35,11 @@ pub mod format;
 pub mod parsers;
 pub mod pivot;
 pub mod shared_strings;
+pub mod sort;
 pub mod sparkline;
 pub mod styles;
 pub mod template;
+pub mod views;
 pub mod workbook;
 pub mod worksheet;
 pub mod writer;
@@ -50,20 +52,23 @@ pub use format::{
     CellFormat, Chart, ChartType, DataValidation, DataValidationOperator, DataValidationType,
 };
 pub use shared_strings::SharedStrings;
+pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use sparkline::{
     Sparkline, SparklineAxisMinMax, SparklineColor, SparklineDisplayEmptyCellsAs, SparklineGroup,
     SparklineGroupColors, SparklineGroupOptions, SparklineType,
 };
 pub use styles::{Alignment, Border, BorderStyle, CellStyle, Fill, Font, NumberFormat, Styles};
+pub use views::{SheetView, SheetViewType};
 pub use workbook::Workbook;
 pub use worksheet::{
     AutoFilter, ColumnInfo, Comment, ConditionalFormatRule, DataValidationRule, Hyperlink,
-    PageSetup, RowInfo, Worksheet, WorksheetInfo,
+    PageBreak, PageSetup, RowInfo, Worksheet, WorksheetInfo,
 };
 // Re-export writer types
 pub use writer::{
     AutoFilter as WriterAutoFilter, CellComment as WriterCellComment, ConditionalFormat,
     ConditionalFormatType, FreezePanes, HeaderFooter, Hyperlink as WriterHyperlink, Image,
     MutableSharedStrings, MutableWorkbookData, MutableWorksheet, NamedRange,
-    PageSetup as WriterPageSetup, RichTextRun, SheetProtection, StylesBuilder, WorkbookProtection,
+    PageBreak as WriterPageBreak, PageSetup as WriterPageSetup, RichTextRun, SheetProtection,
+    StylesBuilder, WorkbookProtection,
 };

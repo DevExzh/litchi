@@ -15,7 +15,9 @@ use crate::sheet::{
 use super::RichTextRun;
 use super::cell::{Cell, CellIterator as XlsxCellIterator, RowIterator as XlsxRowIterator};
 use super::format::{CellBorder, CellFill, CellFont, CellFormat};
+use super::sort::{SortBy, SortCondition, SortMethod, SortState};
 use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
+use super::views::{SheetView, SheetViewType};
 
 /// Information about a worksheet
 #[derive(Debug, Clone)]
@@ -53,6 +55,21 @@ pub struct RowInfo {
     pub hidden: bool,
     /// Custom height set
     pub custom_height: bool,
+}
+
+/// Manual page break definition.
+///
+/// Excel stores page breaks as row/column break entries with an id and span.
+#[derive(Debug, Clone)]
+pub struct PageBreak {
+    /// Row or column index (1-based) where the break occurs.
+    pub id: u32,
+    /// Minimum span index (0-based).
+    pub min: u32,
+    /// Maximum span index (0-based).
+    pub max: u32,
+    /// Whether the break is manual.
+    pub manual: bool,
 }
 
 /// Hyperlink information
@@ -119,6 +136,8 @@ pub struct PageSetup {
 pub struct AutoFilter {
     /// Range (e.g., "A1:D10")
     pub range: String,
+    /// Optional sort state associated with the auto-filter.
+    pub sort_state: Option<SortState>,
 }
 
 /// Concrete implementation of the Worksheet trait for Excel files.
@@ -151,6 +170,12 @@ pub struct Worksheet<'a> {
     page_setup: PageSetup,
     /// Auto-filter
     auto_filter: Option<AutoFilter>,
+    /// Sheet view settings
+    sheet_view: Option<SheetView>,
+    /// Manual row page breaks
+    row_breaks: Vec<PageBreak>,
+    /// Manual column page breaks
+    col_breaks: Vec<PageBreak>,
     rich_text_cells: HashMap<(u32, u32), Vec<RichTextRun>>,
     sparkline_groups: Vec<SparklineGroup>,
 }
@@ -173,6 +198,9 @@ impl<'a> Worksheet<'a> {
             conditional_formats: Vec::new(),
             page_setup: PageSetup::default(),
             auto_filter: None,
+            sheet_view: None,
+            row_breaks: Vec::new(),
+            col_breaks: Vec::new(),
             rich_text_cells: HashMap::new(),
             sparkline_groups: Vec::new(),
         }
@@ -252,11 +280,36 @@ impl<'a> Worksheet<'a> {
         }
 
         // Parse auto-filter
-        if let Some(af_start) = content.find("<autoFilter ")
-            && let Some(af_end) = content[af_start..].find("/>")
+        if let Some(af_start) = content.find("<autoFilter ") {
+            if let Some(af_end) = content[af_start..].find("</autoFilter>") {
+                let af_content = &content[af_start..af_start + af_end + 13];
+                self.parse_auto_filter(af_content)?;
+            } else if let Some(af_end) = content[af_start..].find("/>") {
+                let af_content = &content[af_start..af_start + af_end + 2];
+                self.parse_auto_filter(af_content)?;
+            }
+        }
+
+        // Parse sheet views
+        if let Some(views_start) = content.find("<sheetViews")
+            && let Some(views_end) = content[views_start..].find("</sheetViews>")
         {
-            let af_content = &content[af_start..af_start + af_end + 2];
-            self.parse_auto_filter(af_content)?;
+            let views_content = &content[views_start..views_start + views_end + 13];
+            self.parse_sheet_views(views_content)?;
+        }
+
+        // Parse manual page breaks
+        if let Some(rb_start) = content.find("<rowBreaks")
+            && let Some(rb_end) = content[rb_start..].find("</rowBreaks>")
+        {
+            let rb_content = &content[rb_start..rb_start + rb_end + 12];
+            self.parse_row_breaks(rb_content)?;
+        }
+        if let Some(cb_start) = content.find("<colBreaks")
+            && let Some(cb_end) = content[cb_start..].find("</colBreaks>")
+        {
+            let cb_content = &content[cb_start..cb_start + cb_end + 12];
+            self.parse_col_breaks(cb_content)?;
         }
 
         self.sparkline_groups = parse_sparkline_groups_from_worksheet_xml(content)?;
@@ -938,10 +991,177 @@ impl<'a> Worksheet<'a> {
 
     /// Parse auto-filter from XML.
     fn parse_auto_filter(&mut self, content: &str) -> Result<()> {
-        if let Some(range) = Self::extract_attribute(content, "ref") {
-            self.auto_filter = Some(AutoFilter { range });
+        let range = Self::extract_attribute(content, "ref");
+        let sort_state = if let Some(ss_start) = content.find("<sortState") {
+            if let Some(ss_end) = content[ss_start..].find("</sortState>") {
+                let ss_content = &content[ss_start..ss_start + ss_end + 12];
+                Self::parse_sort_state(ss_content, range.as_deref())
+            } else if let Some(ss_end) = content[ss_start..].find("/>") {
+                let ss_content = &content[ss_start..ss_start + ss_end + 2];
+                Self::parse_sort_state(ss_content, range.as_deref())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        if let Some(range) = range {
+            self.auto_filter = Some(AutoFilter { range, sort_state });
         }
         Ok(())
+    }
+
+    /// Parse sort state from XML.
+    fn parse_sort_state(content: &str, fallback_ref: Option<&str>) -> Option<SortState> {
+        let tag_end = content.find('>').unwrap_or(content.len());
+        let tag = &content[..tag_end];
+        let ref_range =
+            Self::extract_attribute(tag, "ref").or_else(|| fallback_ref.map(|v| v.to_string()))?;
+        let column_sort = Self::extract_attribute(tag, "columnSort")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"));
+        let case_sensitive = Self::extract_attribute(tag, "caseSensitive")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"));
+        let sort_method = Self::extract_attribute(tag, "sortMethod")
+            .as_deref()
+            .and_then(SortMethod::parse);
+
+        let mut conditions = Vec::new();
+        let mut pos = 0;
+        while let Some(cond_start) = content[pos..].find("<sortCondition ") {
+            let cond_start_pos = pos + cond_start;
+            if let Some(cond_end) = content[cond_start_pos..].find("/>") {
+                let cond_tag = &content[cond_start_pos..cond_start_pos + cond_end + 2];
+                if let Some(condition) = Self::parse_sort_condition(cond_tag) {
+                    conditions.push(condition);
+                }
+                pos = cond_start_pos + cond_end + 2;
+            } else {
+                break;
+            }
+        }
+
+        Some(SortState {
+            ref_range,
+            column_sort,
+            case_sensitive,
+            sort_method,
+            conditions,
+        })
+    }
+
+    fn parse_sort_condition(tag: &str) -> Option<SortCondition> {
+        let ref_range = Self::extract_attribute(tag, "ref")?;
+        let descending = Self::extract_attribute(tag, "descending")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"));
+        let sort_by = Self::extract_attribute(tag, "sortBy")
+            .as_deref()
+            .and_then(SortBy::parse);
+        let custom_list = Self::extract_attribute(tag, "customList");
+        let dxf_id = Self::extract_attribute(tag, "dxfId").and_then(|v| v.parse::<u32>().ok());
+        let icon_set = Self::extract_attribute(tag, "iconSet");
+        let icon_id = Self::extract_attribute(tag, "iconId").and_then(|v| v.parse::<u32>().ok());
+
+        Some(SortCondition {
+            ref_range,
+            descending,
+            sort_by,
+            custom_list,
+            dxf_id,
+            icon_set,
+            icon_id,
+        })
+    }
+
+    /// Parse sheet views from XML.
+    fn parse_sheet_views(&mut self, content: &str) -> Result<()> {
+        if let Some(view_start) = content.find("<sheetView ")
+            && let Some(view_end) = content[view_start..].find('>')
+        {
+            let view_tag = &content[view_start..view_start + view_end + 1];
+            self.sheet_view = Some(Self::parse_sheet_view_tag(view_tag));
+        }
+        Ok(())
+    }
+
+    /// Parse the <sheetView> tag into a SheetView struct.
+    fn parse_sheet_view_tag(tag: &str) -> SheetView {
+        let show_formulas = Self::extract_attribute(tag, "showFormulas")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"));
+        let show_grid_lines = Self::extract_attribute(tag, "showGridLines")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"));
+        let show_row_col_headers = Self::extract_attribute(tag, "showRowColHeaders")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"));
+        let show_zeros = Self::extract_attribute(tag, "showZeros")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"));
+        let right_to_left = Self::extract_attribute(tag, "rightToLeft")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"));
+        let view_type = Self::extract_attribute(tag, "view")
+            .as_deref()
+            .and_then(SheetViewType::parse);
+        let top_left_cell = Self::extract_attribute(tag, "topLeftCell");
+        let zoom_scale =
+            Self::extract_attribute(tag, "zoomScale").and_then(|v| v.parse::<u16>().ok());
+        let zoom_scale_normal =
+            Self::extract_attribute(tag, "zoomScaleNormal").and_then(|v| v.parse::<u16>().ok());
+
+        SheetView {
+            show_formulas,
+            show_grid_lines,
+            show_row_col_headers,
+            show_zeros,
+            right_to_left,
+            view_type,
+            top_left_cell,
+            zoom_scale,
+            zoom_scale_normal,
+        }
+    }
+
+    /// Parse row page breaks from XML.
+    fn parse_row_breaks(&mut self, content: &str) -> Result<()> {
+        self.row_breaks = Self::parse_breaks(content);
+        Ok(())
+    }
+
+    /// Parse column page breaks from XML.
+    fn parse_col_breaks(&mut self, content: &str) -> Result<()> {
+        self.col_breaks = Self::parse_breaks(content);
+        Ok(())
+    }
+
+    /// Parse <brk> entries from a rowBreaks/colBreaks XML fragment.
+    fn parse_breaks(content: &str) -> Vec<PageBreak> {
+        let mut breaks = Vec::new();
+        let mut pos = 0;
+        while let Some(brk_start) = content[pos..].find("<brk ") {
+            let brk_start_pos = pos + brk_start;
+            if let Some(brk_end) = content[brk_start_pos..].find("/>") {
+                let brk_tag = &content[brk_start_pos..brk_start_pos + brk_end + 2];
+                let id = Self::extract_attribute(brk_tag, "id").and_then(|s| s.parse().ok());
+                if let Some(id) = id {
+                    let min = Self::extract_attribute(brk_tag, "min")
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(0);
+                    let max = Self::extract_attribute(brk_tag, "max")
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(16383);
+                    let manual = Self::extract_attribute(brk_tag, "man")
+                        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                        .unwrap_or(true);
+                    breaks.push(PageBreak {
+                        id,
+                        min,
+                        max,
+                        manual,
+                    });
+                }
+                pos = brk_start_pos + brk_end + 2;
+            } else {
+                break;
+            }
+        }
+        breaks
     }
 
     /// Helper method to extract attribute value from XML tag.
@@ -1105,6 +1325,21 @@ impl<'a> Worksheet<'a> {
         }
 
         Ok(result)
+    }
+
+    /// Get manual row page breaks.
+    pub fn row_breaks(&self) -> &[PageBreak] {
+        &self.row_breaks
+    }
+
+    /// Get manual column page breaks.
+    pub fn col_breaks(&self) -> &[PageBreak] {
+        &self.col_breaks
+    }
+
+    /// Get worksheet view settings, if present.
+    pub fn sheet_view(&self) -> Option<&SheetView> {
+        self.sheet_view.as_ref()
     }
 
     /// Find cells containing specific text.

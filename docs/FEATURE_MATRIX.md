@@ -123,7 +123,7 @@ This document tracks the implementation status of features across all supported 
 | Sparklines | 🟡 | ❌ | ✅ | Write only |
 | Slicers | ❌ | ❌ | ❌ | Not implemented |
 | Tables (structured) | ❌ | ❌ | ❌ | ListObject tables and table styles |
-| Sort | ❌ | ❌ | ❌ | Multi-key sort state |
+| Sort | 🟡 | ✅ | ✅ | Auto-filter sort state (multi-key) |
 | Structured references | ❌ | ❌ | ❌ | Table formulas using structured refs |
 | Shapes/Drawing objects | ❌ | ❌ | ❌ | DrawingML shapes, text boxes, connectors |
 | External links | ❌ | ❌ | ❌ | Linked workbooks and external refs |
@@ -240,7 +240,6 @@ This document tracks the implementation status of features across all supported 
 | MTEF formulas | ✅ | ✅ | ❌ | MathType equation extraction |
 | OLE metadata | ✅ | ✅ | ✅ | CompObj, Ole streams |
 | Summary info | ✅ | ✅ | ✅ | Document metadata |
-
 | Document protection / encryption | ❌ | ❌ | ❌ | Password protection and encryption |
 | VBA macros | ❌ | ❌ | ❌ | `VBA` storages and code modules |
 | Embedded objects (OLE) | ❌ | ❌ | ❌ | Embedded files and OLE packages |
