@@ -38,6 +38,7 @@ pub mod shared_strings;
 pub mod sort;
 pub mod sparkline;
 pub mod styles;
+pub mod table;
 pub mod template;
 pub mod views;
 pub mod workbook;
@@ -58,6 +59,7 @@ pub use sparkline::{
     SparklineGroupColors, SparklineGroupOptions, SparklineType,
 };
 pub use styles::{Alignment, Border, BorderStyle, CellStyle, Fill, Font, NumberFormat, Styles};
+pub use table::{Table, TableColumn, TableFormula, TableStyleInfo, TableType, TotalsRowFunction};
 pub use views::{SheetView, SheetViewType};
 pub use workbook::Workbook;
 pub use worksheet::{

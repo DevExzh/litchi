@@ -884,6 +884,29 @@ impl Workbook {
                 }
             }
 
+            // Generate and add table XML files if present and track relationship IDs
+            let mut table_rel_ids: Vec<String> = Vec::new();
+            for table in ws.tables().iter() {
+                use crate::ooxml::xlsx::writer::table::serialize_table;
+
+                let table_xml = serialize_table(table)?;
+                let table_uri = PackURI::new(format!("/xl/tables/table{}.xml", table.id))?;
+                let table_part = BlobPart::new(
+                    table_uri,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"
+                        .to_string(),
+                    table_xml.into_bytes(),
+                );
+                self.package.add_part(Box::new(table_part));
+
+                // Add relationship from worksheet to table and capture the ID
+                let rel_id = ws_part.relate_to(
+                    &format!("../tables/table{}.xml", table.id),
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/table",
+                );
+                table_rel_ids.push(rel_id);
+            }
+
             // Generate and add drawing XML for images if present
             if let Some(drawing_xml) = ws.generate_drawing_xml()? {
                 let drawing_uri =
@@ -957,6 +980,7 @@ impl Workbook {
                 &hyperlink_rel_ids,
                 vml_rel_id.as_deref(),
                 Some(&pivot_table_rel_ids),
+                Some(&table_rel_ids),
             )?;
             ws_part.set_blob(ws_xml.into_bytes());
 

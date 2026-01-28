@@ -310,66 +310,156 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
         _current_sheet: &str,
         name: &str,
     ) -> Result<Option<ResolvedName>> {
-        let (table_name, rest) = match name.split_once('[') {
-            Some(v) => v,
-            None => {
-                let norm = name.to_uppercase();
-                return Ok(self.tables.get(&norm).map(|t| {
-                    ResolvedName::Range(RangeRef {
-                        sheet: t.sheet.clone(),
-                        start_row: t.start_row,
-                        start_col: t.start_col,
-                        end_row: t.end_row,
-                        end_col: t.end_col,
-                    })
-                }));
-            },
+        use self::parser::StructuredReference;
+
+        let structured_ref = match parser::parse_structured_reference(name) {
+            Some(r) => r,
+            None => return Ok(None),
         };
 
-        let table_norm = table_name.trim().to_uppercase();
-        let table = match self.tables.get(&table_norm) {
+        let table_name = match &structured_ref {
+            StructuredReference::WholeTable { table_name }
+            | StructuredReference::DataOnly { table_name }
+            | StructuredReference::Headers { table_name }
+            | StructuredReference::Totals { table_name }
+            | StructuredReference::All { table_name }
+            | StructuredReference::ThisRow { table_name }
+            | StructuredReference::Column { table_name, .. }
+            | StructuredReference::ColumnThisRow { table_name, .. }
+            | StructuredReference::ColumnRange { table_name, .. }
+            | StructuredReference::HeaderColumn { table_name, .. }
+            | StructuredReference::TotalsColumn { table_name, .. } => table_name,
+        };
+
+        let table = match self.tables.get(&table_name.to_uppercase()) {
             Some(t) => t,
             None => return Ok(None),
         };
 
-        let spec = rest.trim_end_matches(']').trim();
-        let spec = spec.trim_matches(|c| c == '[' || c == ']');
-        let last = spec.split(',').next_back().unwrap_or("").trim();
-        let last = last.trim_matches(|c| c == '[' || c == ']');
-        let last_norm = last.to_uppercase();
-
-        let mut out = RangeRef {
-            sheet: table.sheet.clone(),
-            start_row: table.start_row,
-            start_col: table.start_col,
-            end_row: table.end_row,
-            end_col: table.end_col,
+        let range = match structured_ref {
+            StructuredReference::WholeTable { .. } | StructuredReference::All { .. } => RangeRef {
+                sheet: table.sheet.clone(),
+                start_row: table.start_row,
+                start_col: table.start_col,
+                end_row: table.end_row,
+                end_col: table.end_col,
+            },
+            StructuredReference::DataOnly { .. } => {
+                let mut range = RangeRef {
+                    sheet: table.sheet.clone(),
+                    start_row: table.start_row,
+                    start_col: table.start_col,
+                    end_row: table.end_row,
+                    end_col: table.end_col,
+                };
+                if range.start_row < range.end_row {
+                    range.start_row += 1;
+                }
+                range
+            },
+            StructuredReference::Headers { .. } => RangeRef {
+                sheet: table.sheet.clone(),
+                start_row: table.start_row,
+                start_col: table.start_col,
+                end_row: table.start_row,
+                end_col: table.end_col,
+            },
+            StructuredReference::Totals { .. } => RangeRef {
+                sheet: table.sheet.clone(),
+                start_row: table.end_row,
+                start_col: table.start_col,
+                end_row: table.end_row,
+                end_col: table.end_col,
+            },
+            StructuredReference::ThisRow { .. } => {
+                return Err("[@] this row references require row context".into());
+            },
+            StructuredReference::Column { column_name, .. } => {
+                let col = table
+                    .headers
+                    .get(&column_name.to_uppercase())
+                    .copied()
+                    .ok_or_else(|| format!("Column '{}' not found in table", column_name))?;
+                let mut range = RangeRef {
+                    sheet: table.sheet.clone(),
+                    start_row: table.start_row,
+                    start_col: col,
+                    end_row: table.end_row,
+                    end_col: col,
+                };
+                if range.start_row < range.end_row {
+                    range.start_row += 1;
+                }
+                range
+            },
+            StructuredReference::ColumnThisRow { column_name, .. } => {
+                let _col = table
+                    .headers
+                    .get(&column_name.to_uppercase())
+                    .copied()
+                    .ok_or_else(|| format!("Column '{}' not found in table", column_name))?;
+                return Err(
+                    format!("[@{}] this row references require row context", column_name).into(),
+                );
+            },
+            StructuredReference::ColumnRange {
+                start_column,
+                end_column,
+                ..
+            } => {
+                let start_col = table
+                    .headers
+                    .get(&start_column.to_uppercase())
+                    .copied()
+                    .ok_or_else(|| format!("Column '{}' not found in table", start_column))?;
+                let end_col = table
+                    .headers
+                    .get(&end_column.to_uppercase())
+                    .copied()
+                    .ok_or_else(|| format!("Column '{}' not found in table", end_column))?;
+                let mut range = RangeRef {
+                    sheet: table.sheet.clone(),
+                    start_row: table.start_row,
+                    start_col,
+                    end_row: table.end_row,
+                    end_col,
+                };
+                if range.start_row < range.end_row {
+                    range.start_row += 1;
+                }
+                range
+            },
+            StructuredReference::HeaderColumn { column_name, .. } => {
+                let col = table
+                    .headers
+                    .get(&column_name.to_uppercase())
+                    .copied()
+                    .ok_or_else(|| format!("Column '{}' not found in table", column_name))?;
+                RangeRef {
+                    sheet: table.sheet.clone(),
+                    start_row: table.start_row,
+                    start_col: col,
+                    end_row: table.start_row,
+                    end_col: col,
+                }
+            },
+            StructuredReference::TotalsColumn { column_name, .. } => {
+                let col = table
+                    .headers
+                    .get(&column_name.to_uppercase())
+                    .copied()
+                    .ok_or_else(|| format!("Column '{}' not found in table", column_name))?;
+                RangeRef {
+                    sheet: table.sheet.clone(),
+                    start_row: table.end_row,
+                    start_col: col,
+                    end_row: table.end_row,
+                    end_col: col,
+                }
+            },
         };
 
-        match last_norm.as_str() {
-            "#ALL" => {},
-            "#DATA" => {
-                if out.start_row < out.end_row {
-                    out.start_row += 1;
-                }
-            },
-            "#HEADERS" => {
-                out.end_row = out.start_row;
-            },
-            _ => {
-                if let Some(col) = table.headers.get(&last_norm).copied() {
-                    out.start_col = col;
-                    out.end_col = col;
-                    if out.start_row < out.end_row {
-                        out.start_row += 1;
-                    }
-                } else {
-                    return Ok(None);
-                }
-            },
-        }
-
-        Ok(Some(ResolvedName::Range(out)))
+        Ok(Some(ResolvedName::Range(range)))
     }
 
     /// Evaluate a single cell in the given worksheet.

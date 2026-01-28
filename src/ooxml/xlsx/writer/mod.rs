@@ -3,6 +3,7 @@
 pub mod sheet;
 pub mod strings;
 pub mod styles;
+pub mod table;
 pub mod workbook;
 
 // Re-export main types

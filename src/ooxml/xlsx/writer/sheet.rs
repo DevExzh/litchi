@@ -4,6 +4,7 @@ use crate::ooxml::drawings::ext::write_a16_creation_id_extlst;
 use crate::ooxml::drawings::fill::write_a_stretch_fill_rect;
 use crate::ooxml::xlsx::sort::{SortCondition, SortState};
 use crate::ooxml::xlsx::sparkline::{SparklineGroup, write_sparkline_groups_ext};
+use crate::ooxml::xlsx::table::Table;
 use crate::ooxml::xlsx::views::SheetView;
 /// Writer module for creating and modifying Excel worksheets.
 use crate::sheet::{CellValue, Result as SheetResult};
@@ -310,6 +311,8 @@ pub struct MutableWorksheet {
     /// Rich text runs per cell (row, col)
     rich_text_cells: HashMap<(u32, u32), Vec<RichTextRun>>,
     sparkline_groups: Vec<SparklineGroup>,
+    /// Tables in this worksheet
+    tables: Vec<Table>,
     /// Whether the worksheet has been modified
     modified: bool,
 }
@@ -352,6 +355,7 @@ impl MutableWorksheet {
             column_outline_levels: HashMap::new(),
             rich_text_cells: HashMap::new(),
             sparkline_groups: Vec::new(),
+            tables: Vec::new(),
             modified: false,
         }
     }
@@ -1583,6 +1587,54 @@ impl MutableWorksheet {
         &self.col_breaks
     }
 
+    // ===== Tables =====
+
+    /// Add a table to the worksheet.
+    ///
+    /// Tables provide structured references and enhanced formatting.
+    /// Table names must be unique within the workbook and cannot contain spaces.
+    pub fn add_table(&mut self, table: Table) {
+        self.tables.push(table);
+        self.modified = true;
+    }
+
+    /// Get all tables in the worksheet.
+    pub fn tables(&self) -> &[Table] {
+        &self.tables
+    }
+
+    /// Get a mutable reference to all tables.
+    pub fn tables_mut(&mut self) -> &mut Vec<Table> {
+        &mut self.tables
+    }
+
+    /// Find a table by name.
+    pub fn find_table(&self, name: &str) -> Option<&Table> {
+        self.tables
+            .iter()
+            .find(|t| t.name == name || t.display_name == name)
+    }
+
+    /// Find a table by range.
+    pub fn find_table_by_range(&self, range: &str) -> Option<&Table> {
+        self.tables.iter().find(|t| t.ref_range == range)
+    }
+
+    /// Remove a table by name.
+    pub fn remove_table(&mut self, name: &str) -> bool {
+        if let Some(pos) = self
+            .tables
+            .iter()
+            .position(|t| t.name == name || t.display_name == name)
+        {
+            self.tables.remove(pos);
+            self.modified = true;
+            true
+        } else {
+            false
+        }
+    }
+
     // ===== Sheet Protection =====
 
     /// Protect the worksheet with optional password.
@@ -1801,6 +1853,7 @@ impl MutableWorksheet {
         hyperlink_rel_ids: &HashMap<String, String>,
         vml_rel_id: Option<&str>,
         pivot_table_rel_ids: Option<&[String]>,
+        table_rel_ids: Option<&[String]>,
     ) -> SheetResult<String> {
         self.to_xml_internal(
             shared_strings,
@@ -1808,6 +1861,7 @@ impl MutableWorksheet {
             Some(hyperlink_rel_ids),
             vml_rel_id,
             pivot_table_rel_ids,
+            table_rel_ids,
         )
     }
 
@@ -1821,7 +1875,7 @@ impl MutableWorksheet {
         shared_strings: &mut MutableSharedStrings,
         style_indices: &HashMap<(u32, u32), usize>,
     ) -> SheetResult<String> {
-        self.to_xml_internal(shared_strings, style_indices, None, None, None)
+        self.to_xml_internal(shared_strings, style_indices, None, None, None, None)
     }
 
     /// Internal method for XML serialization with optional hyperlink relationship IDs.
@@ -1832,6 +1886,7 @@ impl MutableWorksheet {
         hyperlink_rel_ids: Option<&HashMap<String, String>>,
         vml_rel_id: Option<&str>,
         pivot_table_rel_ids: Option<&[String]>,
+        table_rel_ids: Option<&[String]>,
     ) -> SheetResult<String> {
         let mut xml = String::with_capacity(4096);
         xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
@@ -2000,6 +2055,17 @@ impl MutableWorksheet {
         if let Some(vml_rel_id) = vml_rel_id {
             write!(xml, r#"<legacyDrawing r:id="{}"/>"#, vml_rel_id)
                 .map_err(|e| format!("XML write error: {}", e))?;
+        }
+
+        // Write tableParts if tables are present
+        if let Some(table_rels) = table_rel_ids.filter(|rels| !rels.is_empty()) {
+            write!(xml, r#"<tableParts count=\"{}\">"#, table_rels.len())
+                .map_err(|e| format!("XML write error: {}", e))?;
+            for rel_id in table_rels {
+                write!(xml, r#"<tablePart r:id=\"{}\"/>"#, rel_id)
+                    .map_err(|e| format!("XML write error: {}", e))?;
+            }
+            xml.push_str("</tableParts>");
         }
 
         if !self.sparkline_groups.is_empty() {

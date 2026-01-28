@@ -9,8 +9,9 @@ pub mod ast;
 pub mod expr;
 pub mod literal;
 pub mod reference;
+pub mod structured_ref;
 
 pub use ast::{BinaryOp, Expr, RangeRef};
 pub use expr::parse_expression;
-pub use literal::parse_literal;
 pub use reference::{parse_range_reference, parse_single_cell_reference};
+pub use structured_ref::{StructuredReference, parse_structured_reference};

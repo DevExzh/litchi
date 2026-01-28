@@ -122,9 +122,9 @@ This document tracks the implementation status of features across all supported 
 | Array formulas | ✅ | ✅ | ✅ | Cell-level support for array ranges (read/write) |
 | Sparklines | 🟡 | ❌ | ✅ | Write only |
 | Slicers | ❌ | ❌ | ❌ | Not implemented |
-| Tables (structured) | ❌ | ❌ | ❌ | ListObject tables and table styles |
+| Tables (structured) | 🟡 | ❌ | ✅ | Table creation, columns, totals rows, styles (write only) |
 | Sort | 🟡 | ✅ | ✅ | Auto-filter sort state (multi-key) |
-| Structured references | ❌ | ❌ | ❌ | Table formulas using structured refs |
+| Structured references | ❌ | ❌ | ❌ | Table formulas using structured refs (planned) |
 | Shapes/Drawing objects | ❌ | ❌ | ❌ | DrawingML shapes, text boxes, connectors |
 | External links | ❌ | ❌ | ❌ | Linked workbooks and external refs |
 | Data connections / Query tables | ❌ | ❌ | ❌ | External data connections |
