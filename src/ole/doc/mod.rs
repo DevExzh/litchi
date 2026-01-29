@@ -49,6 +49,7 @@
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub mod document;
+pub mod image;
 pub mod package;
 pub mod paragraph;
 pub mod parts;
@@ -59,6 +60,7 @@ pub mod table;
 pub mod writer;
 
 pub use document::Document;
+pub use image::{Image, ImageError};
 pub use package::Package;
 pub use paragraph::{Paragraph, Run};
 pub use shapes::DocShape;

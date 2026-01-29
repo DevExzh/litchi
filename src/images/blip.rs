@@ -8,8 +8,14 @@
 // - [MS-ODRAW] 2.2.23: OfficeArtBlip records
 // - https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-odraw/5dc1b9ed-818c-436f-8a4f-905a7ebb1ba9
 
-use crate::common::binary::{read_u16_le, read_u32_le};
-use crate::common::error::{Error, Result};
+use crate::{
+    common::binary::{read_u16_le, read_u32_le},
+    ole::escher::EscherRecord,
+};
+use crate::{
+    common::error::{Error, Result},
+    ole::escher::EscherRecordType,
+};
 use std::borrow::Cow;
 use std::io::Read;
 
@@ -477,6 +483,30 @@ impl<'data> Blip<'data> {
             BlipType::Jpeg | BlipType::Png | BlipType::Dib | BlipType::Tiff => {
                 Ok(Self::Bitmap(BitmapBlip::parse(data)?))
             },
+        }
+    }
+
+    pub fn try_from_escher_record(blip_record: &EscherRecord) -> Result<Self> {
+        // Reconstruct full BLIP record
+        match blip_record.record_type {
+            EscherRecordType::BlipEmf
+            | EscherRecordType::BlipWmf
+            | EscherRecordType::BlipPict
+            | EscherRecordType::BlipJpeg
+            | EscherRecordType::BlipPng
+            | EscherRecordType::BlipDib
+            | EscherRecordType::BlipTiff => {
+                // Reconstruct full BLIP record
+                let mut full_data = Vec::with_capacity(8 + blip_record.data.len());
+                let ver_inst = (blip_record.instance << 4) | (blip_record.version as u16);
+                full_data.extend_from_slice(&ver_inst.to_le_bytes());
+                full_data.extend_from_slice(&blip_record.record_type_raw.to_le_bytes());
+                full_data.extend_from_slice(&blip_record.length.to_le_bytes());
+                full_data.extend_from_slice(blip_record.data);
+
+                Blip::parse(&full_data).map(|blip| blip.into_owned())
+            },
+            _ => Err(Error::ParseError("Not a BLIP record".into())),
         }
     }
 

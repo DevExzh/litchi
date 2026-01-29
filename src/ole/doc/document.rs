@@ -51,6 +51,9 @@ pub struct Document {
     /// Used during initialization for TextExtractor and ChpBinTable parsing
     #[allow(dead_code)] // False positive: used during initialization via parse_chp_bin_table
     word_document: Vec<u8>,
+    /// The Data stream - contains embedded objects, pictures, etc.
+    /// According to Apache POI, pictures are stored here, not in WordDocument stream.
+    data_stream: Option<Vec<u8>>,
     /// The table stream (0Table or 1Table) - contains formatting and structure
     table_stream: Vec<u8>,
     /// Text extractor - holds the extracted document text
@@ -107,6 +110,10 @@ impl Document {
             .open_stream(&[table_stream_name])
             .map_err(|_| DocError::StreamNotFound(table_stream_name.to_string()))?;
 
+        // Read the Data stream (optional - contains embedded pictures and objects)
+        // According to Apache POI, pictures are stored in Data stream, not WordDocument stream
+        let data_stream = ole.open_stream(&["Data"]).ok();
+
         // Create text extractor
         let text_extractor = TextExtractor::new(&fib, &word_document, &table_stream)?;
 
@@ -129,6 +136,7 @@ impl Document {
         Ok(Self {
             fib,
             word_document,
+            data_stream,
             table_stream,
             text_extractor,
             chp_bin_table,
@@ -464,6 +472,74 @@ impl Document {
         &self.fib
     }
 
+    /// Get image binary data for an embedded image.
+    ///
+    /// This method extracts the image data from the WordDocument stream.
+    /// The data is returned as a `Cow` to minimize copying when possible.
+    ///
+    /// # Arguments
+    ///
+    /// * `image` - Reference to an Image obtained from `Run::image()`
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// for para in doc.paragraphs()? {
+    ///     for run in para.runs()? {
+    ///         if let Some(img) = run.image() {
+    ///             let data = doc.image_data(img)?;
+    ///             let pic_type = img.picture_type(&doc.word_document())?;
+    ///             // Process image data...
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    #[cfg(feature = "imgconv")]
+    pub fn image_data(
+        &self,
+        image: &super::image::Image,
+    ) -> std::result::Result<crate::images::ExtractedImage<'_>, super::image::ImageError> {
+        // Use the appropriate stream based on pic_offset
+        let data_stream = self.get_data_stream(image.pic_offset()).ok_or(
+            super::image::ImageError::InvalidPicOffset(image.pic_offset()),
+        )?;
+        let word_document = self.word_document();
+        image.data(data_stream, word_document)
+    }
+
+    /// Get a reference to the WordDocument stream.
+    ///
+    /// This is useful for low-level image operations.
+    #[inline]
+    pub fn word_document(&self) -> &[u8] {
+        &self.word_document
+    }
+
+    /// Get the appropriate stream for picture data based on pic_offset.
+    ///
+    /// According to Apache POI's PicturesTable.getData():
+    /// - If Data stream exists and pic_offset < data_stream.len(), use Data stream
+    /// - Otherwise use WordDocument stream
+    ///
+    /// This is because pictures are typically stored in the Data stream,
+    /// not the WordDocument stream.
+    fn get_data_stream(&self, offset: u32) -> Option<&[u8]> {
+        if let Some(data_stream) = &self.data_stream
+            && (offset as usize) < data_stream.len()
+        {
+            return Some(data_stream.as_slice());
+        }
+        None
+    }
+
+    /// Get a reference to the Data stream (if available).
+    ///
+    /// The Data stream contains embedded pictures and OLE objects.
+    #[inline]
+    pub fn data_stream(&self) -> Option<&[u8]> {
+        self.data_stream.as_deref()
+    }
+
     /// Get all paragraphs in the document.
     ///
     /// Returns a vector of `Paragraph` objects representing paragraphs
@@ -523,15 +599,19 @@ impl Document {
         Ok(all_paragraphs)
     }
 
+    // fn has_picture(&self, picture_offset: u32) -> bool {}
+
     /// Convert extracted paragraph data to Paragraph objects.
     ///
     /// This is a helper method used by paragraphs() to convert the raw extracted
-    /// paragraph data into high-level Paragraph objects with formula matching.
+    /// paragraph data into high-level Paragraph objects with formula and image support.
     fn convert_to_paragraphs(
         &self,
         extracted_paras: Vec<ExtractedParagraph>,
         output: &mut Vec<Paragraph>,
     ) {
+        use super::image::extract_image;
+
         // Pre-allocate run vectors based on estimated size
         let mut object_name_buffer = String::with_capacity(32);
 
@@ -539,7 +619,7 @@ impl Document {
             // Pre-allocate run storage
             let mut run_objects = Vec::with_capacity(runs.len());
 
-            // Create runs for the paragraph, checking for MTEF formulas and OLE2 objects
+            // Create runs for the paragraph, checking for MTEF formulas, images, and OLE2 objects
             for (text, props) in runs {
                 // Primary matching: Use pic_offset to find MTEF data (most reliable)
                 if let Some(pic_offset) = props.pic_offset {
@@ -571,7 +651,17 @@ impl Document {
                     continue;
                 }
 
-                // Regular run without formula
+                // Check for embedded images
+                // According to Apache POI, pictures are stored in Data stream if available
+                if let Some(pic_offset) = props.pic_offset
+                    && let Some(data_stream) = self.get_data_stream(pic_offset)
+                    && let Ok(Some(image)) = extract_image(data_stream, &text, &props)
+                {
+                    run_objects.push(Run::with_image(text, props, image));
+                    continue;
+                }
+
+                // Regular run without formula or image
                 run_objects.push(Run::new(text, props));
             }
 
@@ -873,5 +963,53 @@ impl Document {
 
 #[cfg(test)]
 mod tests {
-    // Tests will be added as implementation progresses
+    #[cfg(feature = "imgconv")]
+    use super::super::{Image, ImageError, Package};
+    #[cfg(feature = "imgconv")]
+    use std::path::Path;
+
+    #[cfg(feature = "imgconv")]
+    #[test]
+    fn test_extract_png_image_from_doc() {
+        let base = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let doc_path = base.join("test-data").join("pixel-img.doc");
+        let png_path = base.join("test-data").join("pixel-img.png");
+        let expected = std::fs::read(&png_path).expect("read expected png");
+
+        let mut pkg = Package::open(&doc_path).expect("open doc");
+        let doc = pkg.document().expect("load document");
+
+        let mut images = Vec::new();
+        for para in doc.paragraphs().expect("paragraphs") {
+            for run in para.runs().expect("runs") {
+                if let Some(img) = run.image() {
+                    images.push(*img);
+                }
+            }
+        }
+
+        assert_eq!(images.len(), 1, "expected exactly one embedded image");
+
+        let extracted = doc.image_data(&images[0]).expect("extract image");
+        assert_eq!(extracted.extension(), "png");
+
+        let data = extracted.decompressed_data().expect("decompress");
+        const PNG_SIGNATURE: [u8; 8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        assert!(data.as_ref().starts_with(&PNG_SIGNATURE));
+        assert_eq!(data.as_ref(), expected.as_slice());
+    }
+
+    #[cfg(feature = "imgconv")]
+    #[test]
+    fn test_image_data_with_invalid_offset() {
+        let base = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let doc_path = base.join("test-data").join("pixel-img.doc");
+
+        let mut pkg = Package::open(&doc_path).expect("open doc");
+        let doc = pkg.document().expect("load document");
+
+        let img = Image::new(u32::MAX);
+        let err = doc.image_data(&img).expect_err("expected invalid offset");
+        assert!(matches!(err, ImageError::InvalidPicOffset(_)));
+    }
 }

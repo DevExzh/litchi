@@ -5,6 +5,7 @@
 
 use crate::common::error::Result;
 use crate::images::{Blip, BlipStore, BlipStoreEntry};
+use crate::ole::escher::EscherRecord;
 use crate::ole::ppt::escher::{EscherContainer, EscherParser, EscherRecordType};
 use std::borrow::Cow;
 
@@ -208,6 +209,112 @@ impl ImageExtractor {
         Ok(store)
     }
 
+    /// Extract BLIP from BSE record, handling both embedded and delay-loaded cases.
+    ///
+    /// # Arguments
+    /// * `bse` - Parsed BSE record
+    /// * `record_data` - Raw BSE record data (without Escher header)
+    /// * `delay_stream` - Optional data stream for delay-loaded BLIPs
+    ///
+    /// # Returns
+    /// Owned BLIP data
+    fn blip_from_bse(
+        bse: &BlipStoreEntry<'_>,
+        bse_record: &EscherRecord<'_>,
+        delay_stream: Option<&[u8]>,
+    ) -> Result<Blip<'static>> {
+        let is_in_delayed_stream = bse.is_delay_loaded() && bse_record.length <= 36;
+        let blip_data = if is_in_delayed_stream {
+            let stream = delay_stream.ok_or_else(|| {
+                crate::common::error::Error::ParseError(
+                    "BSE record is delay-loaded but no data stream was provided".into(),
+                )
+            })?;
+            let offset = bse.offset as usize;
+            if offset >= stream.len() {
+                return Err(crate::common::error::Error::ParseError(
+                    "BSE delay stream offset is out of bounds".into(),
+                ));
+            }
+            &stream[offset..]
+        } else {
+            if bse_record.data.len() <= 36 {
+                return Err(crate::common::error::Error::ParseError(
+                    "BSE record data is too short for embedded BLIP".into(),
+                ));
+            }
+            &bse_record.data[36..]
+        };
+
+        if blip_data.len() < 8 {
+            return Err(crate::common::error::Error::ParseError(
+                "Insufficient data for BLIP".into(),
+            ));
+        }
+
+        Blip::parse(blip_data).map(|b| b.into_owned())
+    }
+
+    /// Extract image from a single Escher record
+    ///
+    /// This method handles both BSE (0xF007) and BLIP type records directly.
+    /// For BSE records, it extracts the embedded BLIP data.
+    /// For BLIP records (0xF01A-0xF029), it parses the image directly.
+    ///
+    /// # Arguments
+    /// * `record` - An Escher record that is either BSE or a BLIP type
+    ///
+    /// # Returns
+    /// ExtractedImage if the record contains valid image data
+    pub fn extract_from_escher_record(
+        record: &EscherRecord<'_>,
+    ) -> Result<ExtractedImage<'static>> {
+        Self::extract_from_escher_record_with_stream(record, None)
+    }
+
+    /// Extract image from a single Escher record with optional data stream.
+    ///
+    /// This method handles both BSE (0xF007) and BLIP type records directly.
+    /// For BSE records with delay-loaded BLIPs (offset != 0), the delay_stream
+    /// parameter must be provided to locate the BLIP data.
+    ///
+    /// # Arguments
+    /// * `record` - An Escher record that is either BSE or a BLIP type
+    /// * `delay_stream` - Optional main stream for delay-loaded BLIPs
+    ///
+    /// # Returns
+    /// ExtractedImage if the record contains valid image data
+    pub fn extract_from_escher_record_with_stream(
+        record: &EscherRecord<'_>,
+        delay_stream: Option<&[u8]>,
+    ) -> Result<ExtractedImage<'static>> {
+        match record.record_type {
+            // BLIP type records - parse directly
+            EscherRecordType::BlipEmf
+            | EscherRecordType::BlipWmf
+            | EscherRecordType::BlipPict
+            | EscherRecordType::BlipJpeg
+            | EscherRecordType::BlipPng
+            | EscherRecordType::BlipDib
+            | EscherRecordType::BlipTiff => {
+                let blip = Blip::try_from_escher_record(record)?;
+                Ok(ExtractedImage::new(blip, None, 0))
+            },
+
+            // BSE record - extract embedded or delay-loaded BLIP
+            EscherRecordType::BSE => {
+                let bse = BlipStoreEntry::parse(record.data)?;
+                let name = bse.name.as_ref().map(|n| n.to_string());
+                let blip = Self::blip_from_bse(&bse, record, delay_stream)?;
+                Ok(ExtractedImage::new(blip, name, 0))
+            },
+            _ => Err(crate::common::error::Error::ParseError(format!(
+                "Record type 0x{:04X} is not a supported image record",
+                record.record_type_raw
+            ))),
+        }
+    }
+
     /// Extract all BLIPs from Escher drawing data
     ///
     /// This extracts actual BLIP records (image data) from the drawing layer.
@@ -362,20 +469,38 @@ impl ImageExtractor {
     pub fn extract_from_container(
         container: &EscherContainer,
     ) -> Result<Vec<ExtractedImage<'static>>> {
+        Self::extract_from_container_with_stream(container, None)
+    }
+
+    /// Extract images from a specific Escher container with optional data stream.
+    ///
+    /// # Arguments
+    /// * `container` - The Escher container to extract from
+    /// * `delay_stream` - Optional data stream for delay-loaded BLIPs
+    pub fn extract_from_container_with_stream(
+        container: &EscherContainer,
+        delay_stream: Option<&[u8]>,
+    ) -> Result<Vec<ExtractedImage<'static>>> {
         let mut images = Vec::new();
         let mut index = 0;
 
         // Recursively search for BLIP records
-        Self::extract_from_container_recursive(container, &mut images, &mut index)?;
+        Self::extract_from_container_recursive_with_stream(
+            container,
+            &mut images,
+            &mut index,
+            delay_stream,
+        )?;
 
         Ok(images)
     }
 
-    /// Recursively extract BLIPs from a container and its children
-    fn extract_from_container_recursive(
+    /// Recursively extract BLIPs from a container with optional data stream.
+    fn extract_from_container_recursive_with_stream(
         container: &EscherContainer,
         images: &mut Vec<ExtractedImage<'static>>,
         index: &mut usize,
+        delay_stream: Option<&[u8]>,
     ) -> Result<()> {
         // Check if this container has BLIP records
         for child_result in container.children() {
@@ -383,18 +508,8 @@ impl ImageExtractor {
                 Ok(c) => c,
                 Err(_) => continue, // Skip invalid records
             };
-            let is_blip = matches!(
-                child.record_type,
-                EscherRecordType::BlipEmf
-                    | EscherRecordType::BlipWmf
-                    | EscherRecordType::BlipPict
-                    | EscherRecordType::BlipJpeg
-                    | EscherRecordType::BlipPng
-                    | EscherRecordType::BlipDib
-                    | EscherRecordType::BlipTiff
-            );
 
-            if is_blip {
+            if child.record_type.is_blip() {
                 // Reconstruct full BLIP record
                 let mut full_data = Vec::with_capacity(8 + child.data.len());
                 let ver_inst = (child.instance << 4) | (child.version as u16);
@@ -412,7 +527,31 @@ impl ImageExtractor {
             } else if child.is_container() {
                 // Recurse into child containers
                 let child_container = EscherContainer::new(child);
-                Self::extract_from_container_recursive(&child_container, images, index)?;
+                Self::extract_from_container_recursive_with_stream(
+                    &child_container,
+                    images,
+                    index,
+                    delay_stream,
+                )?;
+            } else if child.record_type == EscherRecordType::BSE {
+                // BSE records can contain embedded or delay-loaded BLIP data
+                match BlipStoreEntry::parse(child.data) {
+                    Ok(bse) => {
+                        let name = bse.name.as_ref().map(|n| n.to_string());
+                        match Self::blip_from_bse(&bse, &child, delay_stream) {
+                            Ok(blip) => {
+                                images.push(ExtractedImage::new(blip, name, *index));
+                                *index += 1;
+                            },
+                            Err(_) => {
+                                continue;
+                            },
+                        }
+                    },
+                    Err(_) => {
+                        continue;
+                    },
+                }
             }
         }
 

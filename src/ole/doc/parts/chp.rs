@@ -54,6 +54,8 @@ pub struct CharacterProperties {
     pub is_obj: bool,
     /// Special character flag (fSpec)
     pub is_spec: bool,
+    /// Data flag (fData) - if true, pic_offset points to NilPICFAndBinData, not picture
+    pub is_data: bool,
     /// Picture offset for embedded objects (fc in Data stream)
     pub pic_offset: Option<u32>,
     /// Object offset (fcObj)
@@ -201,6 +203,10 @@ impl CharacterProperties {
             // Operation 0x06: sprmCFData - Data flag
             0x06 => {
                 // Data field flag
+                debug_assert_eq!(sprm.size, 2);
+                if let Some(val) = sprm.operand_byte() {
+                    chp.is_data = val != 0;
+                }
             },
             // Operation 0x07: sprmCIdslRMark - Revision mark ID
             0x07 => {

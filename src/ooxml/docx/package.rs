@@ -8,7 +8,7 @@ use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::opc::OpcPackage;
 use crate::ooxml::opc::constants::content_type as ct;
 use crate::ooxml::opc::packuri::PackURI;
-use std::io::{Read, Seek};
+use std::io::{Read, Seek, Write};
 use std::path::Path;
 
 /// A Word (.docx) package.
@@ -632,6 +632,35 @@ impl Package {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)?;
+        self.to_stream(&mut file)
+    }
+
+    /// Save the package to a stream.
+    ///
+    /// Writes the complete Word document including all parts, relationships,
+    /// and content types to a writer stream.
+    ///
+    /// # Arguments
+    /// * `writer` - A writer that implements Write + Seek
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::docx::Package;
+    /// use std::io::Cursor;
+    ///
+    /// let mut pkg = Package::new()?;
+    /// // Modify document...
+    /// let mut cursor = Cursor::new(Vec::new());
+    /// pkg.to_stream(&mut cursor)?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn to_stream<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
         use crate::ooxml::docx::writer::relmap::RelationshipMapper;
         use crate::ooxml::opc::constants::relationship_type as rt;
 
@@ -892,7 +921,7 @@ impl Package {
             self.embed_fonts()?;
         }
 
-        self.opc.save(path).map_err(|e| {
+        self.opc.to_stream(writer).map_err(|e| {
             OoxmlError::IoError(std::io::Error::other(format!(
                 "Failed to save package: {}",
                 e
