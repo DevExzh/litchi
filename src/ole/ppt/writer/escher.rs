@@ -1027,11 +1027,11 @@ fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
     let mut props = Vec::with_capacity(16);
 
     // Picture shapes have special handling - BLIP reference only, no fill/line
-    if shape.picture_index.is_some() {
+    if let Some(picture_index) = shape.picture_index {
         // PROTECTION__LOCKAGAINSTGROUPING (0x007F) = 0x800080 per POI
         props.push(EscherProperty::new(0x007F, 0x0080_0080));
         // BLIP__BLIPTODISPLAY (0x4104) - with isBlipId flag (0x4000 + 0x0104)
-        props.push(EscherProperty::new(0x4104, shape.picture_index.unwrap()));
+        props.push(EscherProperty::new(0x4104, picture_index));
         // No fill for pictures (picture IS the fill)
         props.push(EscherProperty::new(prop_id::NO_FILL_HIT_TEST, 0x0010_0000));
         // No line for pictures
