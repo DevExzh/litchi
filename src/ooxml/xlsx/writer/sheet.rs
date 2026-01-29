@@ -14,8 +14,11 @@ use std::fmt::Write as FmtWrite;
 // Import shared formatting types
 pub use super::super::format::{
     CellBorder, CellBorderLineStyle, CellBorderSide, CellFill, CellFillPatternType, CellFont,
-    CellFormat, Chart, ChartType, DataValidation, DataValidationOperator, DataValidationType,
+    CellFormat, DataValidation, DataValidationOperator, DataValidationType,
 };
+
+// Import chart types
+pub use super::super::chart::{ChartAnchor, WorksheetChart};
 
 // Import from other writer modules
 use super::strings::MutableSharedStrings;
@@ -255,7 +258,7 @@ pub struct MutableWorksheet {
     /// Merged cell ranges (start_row, start_col, end_row, end_col)
     merged_cells: Vec<(u32, u32, u32, u32)>,
     /// Charts in this worksheet
-    charts: Vec<Chart>,
+    charts: Vec<WorksheetChart>,
     /// Data validation rules
     validations: Vec<DataValidation>,
     /// Column widths (col -> width in characters)
@@ -590,22 +593,52 @@ impl MutableWorksheet {
     }
 
     /// Add a chart to the worksheet.
-    pub fn add_chart(
-        &mut self,
-        chart_type: ChartType,
-        title: &str,
-        data_range: &str,
-        position: (u32, u32, u32, u32),
-        show_legend: bool,
-    ) {
-        self.charts.push(Chart {
-            chart_type,
-            title: Some(title.to_string()),
-            data_range: data_range.to_string(),
-            position,
-            show_legend,
-        });
+    ///
+    /// # Arguments
+    ///
+    /// * `chart` - The WorksheetChart to add with its positioning
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let chart = WorksheetChart::bar_chart(
+    ///     "Sales Data",
+    ///     "Sheet1!$A$2:$A$10",
+    ///     "Sheet1!$B$2:$B$10",
+    ///     ChartAnchor::new(1, 1, 7, 14),
+    /// )?;
+    /// worksheet.add_chart(chart);
+    /// ```
+    pub fn add_chart(&mut self, chart: WorksheetChart) {
+        self.charts.push(chart);
         self.modified = true;
+    }
+
+    /// Get the charts in this worksheet.
+    pub fn charts(&self) -> &[WorksheetChart] {
+        &self.charts
+    }
+
+    /// Get a mutable reference to the charts in this worksheet.
+    pub fn charts_mut(&mut self) -> &mut Vec<WorksheetChart> {
+        self.modified = true;
+        &mut self.charts
+    }
+
+    /// Remove all charts from the worksheet.
+    pub fn clear_charts(&mut self) {
+        self.charts.clear();
+        self.modified = true;
+    }
+
+    /// Remove a chart at the specified index.
+    pub fn remove_chart(&mut self, index: usize) -> Option<WorksheetChart> {
+        if index < self.charts.len() {
+            self.modified = true;
+            Some(self.charts.remove(index))
+        } else {
+            None
+        }
     }
 
     /// Add data validation to a cell range.
@@ -1121,11 +1154,11 @@ impl MutableWorksheet {
         &self.images
     }
 
-    /// Generate drawing XML for images.
+    /// Generate drawing XML for images and charts.
     ///
     /// This generates the xl/drawings/drawing{N}.xml file content.
     pub fn generate_drawing_xml(&self) -> SheetResult<Option<String>> {
-        if self.images.is_empty() {
+        if self.images.is_empty() && self.charts.is_empty() {
             return Ok(None);
         }
 
@@ -1190,6 +1223,58 @@ impl MutableWorksheet {
             );
             xml.push_str(r#"<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic>"#);
 
+            xml.push_str("<xdr:clientData/></xdr:twoCellAnchor>");
+        }
+
+        // Add charts
+        let image_count = self.images.len();
+        for (idx, chart) in self.charts.iter().enumerate() {
+            let anchor = &chart.anchor;
+            let chart_id = image_count + idx + 1;
+
+            // Two-cell anchor for chart
+            xml.push_str("<xdr:twoCellAnchor>");
+
+            // From position
+            write!(
+                xml,
+                "<xdr:from><xdr:col>{}</xdr:col><xdr:colOff>{}</xdr:colOff><xdr:row>{}</xdr:row><xdr:rowOff>{}</xdr:rowOff></xdr:from>",
+                anchor.from_col,
+                anchor.from_col_offset,
+                anchor.from_row,
+                anchor.from_row_offset
+            )
+            .map_err(|e| format!("XML write error: {}", e))?;
+
+            // To position
+            write!(
+                xml,
+                "<xdr:to><xdr:col>{}</xdr:col><xdr:colOff>{}</xdr:colOff><xdr:row>{}</xdr:row><xdr:rowOff>{}</xdr:rowOff></xdr:to>",
+                anchor.to_col,
+                anchor.to_col_offset,
+                anchor.to_row,
+                anchor.to_row_offset
+            )
+            .map_err(|e| format!("XML write error: {}", e))?;
+
+            // Graphic frame for chart
+            write!(
+                xml,
+                r#"<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="{}" name="Chart {}"/>"#,
+                chart_id,
+                idx + 1
+            )
+            .map_err(|e| format!("XML write error: {}", e))?;
+
+            xml.push_str(r#"<xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>"#);
+            xml.push_str(r#"<xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>"#);
+            xml.push_str(r#"<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">"#);
+
+            // Chart reference - rel ID will be set when writing the actual drawing part
+            write!(xml, r#"<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rId{}"/>"#, chart_id)
+                .map_err(|e| format!("XML write error: {}", e))?;
+
+            xml.push_str("</a:graphicData></a:graphic></xdr:graphicFrame>");
             xml.push_str("<xdr:clientData/></xdr:twoCellAnchor>");
         }
 
@@ -2049,6 +2134,11 @@ impl MutableWorksheet {
         // Write manual page breaks
         if !self.row_breaks.is_empty() || !self.col_breaks.is_empty() {
             self.write_page_breaks(&mut xml)?;
+        }
+
+        // Write drawing reference for charts and images
+        if !self.charts.is_empty() || !self.images.is_empty() {
+            xml.push_str(r#"<drawing r:id="rId1"/>"#);
         }
 
         // Write legacyDrawing reference for comments (VML)

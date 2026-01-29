@@ -956,6 +956,30 @@ impl Workbook {
                     );
                 }
 
+                // Add chart parts and create relationships
+                for (idx, chart) in ws.charts().iter().enumerate() {
+                    let chart_id = ws.sheet_id() * 1000 + (ws.images().len() + idx) as u32;
+                    let chart_uri = PackURI::new(format!("/xl/charts/chart{}.xml", chart_id))?;
+
+                    // Generate chart XML
+                    let chart_xml = crate::ooxml::xlsx::chart::generate_chart_xml(&chart.chart)
+                        .map_err(|e| format!("Failed to generate chart XML: {}", e))?;
+
+                    let chart_part = BlobPart::new(
+                        chart_uri.clone(),
+                        "application/vnd.openxmlformats-officedocument.drawingml.chart+xml"
+                            .to_string(),
+                        chart_xml,
+                    );
+                    self.package.add_part(Box::new(chart_part));
+
+                    // Add relationship from drawing to chart
+                    drawing_part.relate_to(
+                        &format!("../charts/chart{}.xml", chart_id),
+                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
+                    );
+                }
+
                 self.package.add_part(Box::new(drawing_part));
 
                 // Add relationship from worksheet to drawing

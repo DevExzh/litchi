@@ -35,6 +35,7 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 pub mod api;
+pub mod charts;
 pub mod common;
 pub mod custom_properties;
 pub mod docx;

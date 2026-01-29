@@ -31,6 +31,7 @@
 //! ```
 
 pub mod cell;
+pub mod chart;
 pub mod format;
 pub mod parsers;
 pub mod pivot;
@@ -47,10 +48,11 @@ pub mod writer;
 
 // Re-export main types for convenience
 pub use cell::Cell;
+pub use chart::{ChartAnchor, WorksheetChart};
 // Re-export shared formatting types
 pub use format::{
     CellBorder, CellBorderLineStyle, CellBorderSide, CellFill, CellFillPatternType, CellFont,
-    CellFormat, Chart, ChartType, DataValidation, DataValidationOperator, DataValidationType,
+    CellFormat, DataValidation, DataValidationOperator, DataValidationType,
 };
 pub use shared_strings::SharedStrings;
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};
