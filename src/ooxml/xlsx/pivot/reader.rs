@@ -6,6 +6,8 @@ use crate::ooxml::pivot::{
 use crate::ooxml::xlsx::parsers::workbook_parser;
 use crate::sheet::Result as SheetResult;
 
+use super::cache::{PivotCacheDefinition, PivotCacheField, SharedItem};
+
 pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
     let workbook_uri = PackURI::new("/xl/workbook.xml")?;
     let workbook_part = package.get_part(&workbook_uri)?;
@@ -79,6 +81,202 @@ fn parse_pivot_table_definition(xml: &str, sheet_name: &str) -> SheetResult<Opti
         filter_fields,
         data_fields,
     }))
+}
+
+pub fn read_pivot_table_definition(xml: &str) -> SheetResult<Option<PivotTable>> {
+    parse_pivot_table_definition(xml, "")
+}
+
+pub fn read_pivot_cache_definition(xml: &str) -> SheetResult<Option<PivotCacheDefinition>> {
+    let mut cache_def = PivotCacheDefinition::default();
+
+    let root_start = match xml.find("<pivotCacheDefinition") {
+        Some(s) => s,
+        None => return Ok(None),
+    };
+    let root_after = &xml[root_start..];
+    let root_end = match root_after.find('>') {
+        Some(e) => e,
+        None => return Ok(None),
+    };
+    let root_tag = &xml[root_start..root_start + root_end + 1];
+
+    if let Some(id) = extract_attr(root_tag, "id") {
+        cache_def.id = Some(id);
+    }
+    if let Some(val) = extract_attr(root_tag, "invalid") {
+        cache_def.invalid = val == "1" || val.to_lowercase() == "true";
+    }
+    if let Some(val) = extract_attr(root_tag, "saveData") {
+        cache_def.save_data = val == "1" || val.to_lowercase() == "true";
+    }
+    if let Some(val) = extract_attr(root_tag, "refreshOnLoad") {
+        cache_def.refresh_on_load = val == "1" || val.to_lowercase() == "true";
+    }
+    if let Some(val) = extract_attr(root_tag, "backgroundQuery") {
+        cache_def.background_query = val == "1" || val.to_lowercase() == "true";
+    }
+
+    if let Some(ws_source_start) = xml.find("<worksheetSource") {
+        let ws_source_after = &xml[ws_source_start..];
+        if let Some(ws_source_end) = ws_source_after.find("/>") {
+            let ws_source_tag = &xml[ws_source_start..ws_source_start + ws_source_end + 2];
+            cache_def.source_worksheet = extract_attr(ws_source_tag, "sheet");
+            cache_def.source_ref = extract_attr(ws_source_tag, "ref");
+            cache_def.source_name = extract_attr(ws_source_tag, "name");
+        }
+    }
+
+    cache_def.cache_fields = parse_cache_fields(xml);
+
+    Ok(Some(cache_def))
+}
+
+fn parse_cache_fields(xml: &str) -> Vec<PivotCacheField> {
+    let mut fields = Vec::new();
+
+    let start = match xml.find("<cacheFields") {
+        Some(s) => s,
+        None => return fields,
+    };
+
+    let end_rel = match xml[start..].find("</cacheFields>") {
+        Some(e) => e,
+        None => return fields,
+    };
+
+    let section = &xml[start..start + end_rel];
+    let mut pos = 0;
+
+    while let Some(rel) = section[pos..].find("<cacheField") {
+        let field_start = pos + rel;
+        let field_after = &section[field_start..];
+
+        let field_end = match field_after.find("</cacheField>") {
+            Some(e) => field_start + e + 13,
+            None => match field_after.find("/>") {
+                Some(e) => field_start + e + 2,
+                None => break,
+            },
+        };
+
+        let field_xml = &section[field_start..field_end];
+        if let Some(field) = parse_cache_field(field_xml) {
+            fields.push(field);
+        }
+
+        pos = field_end;
+    }
+
+    fields
+}
+
+fn parse_cache_field(xml: &str) -> Option<PivotCacheField> {
+    let tag_end = xml.find('>')?;
+    let tag = &xml[..tag_end + 1];
+
+    let name = extract_attr(tag, "name")?;
+    let database_field = extract_attr(tag, "databaseField")
+        .map(|val| val == "1" || val.to_lowercase() == "true")
+        .unwrap_or(true);
+    let caption = extract_attr(tag, "caption");
+    let num_fmt_id = extract_attr(tag, "numFmtId").and_then(|val| val.parse().ok());
+    let shared_items = parse_shared_items(xml);
+
+    Some(PivotCacheField {
+        name,
+        database_field,
+        caption,
+        num_fmt_id,
+        shared_items,
+        ..Default::default()
+    })
+}
+
+fn parse_shared_items(xml: &str) -> Vec<SharedItem> {
+    let mut items = Vec::new();
+
+    let start = match xml.find("<sharedItems") {
+        Some(s) => s,
+        None => return items,
+    };
+
+    let end = match xml[start..].find("</sharedItems>") {
+        Some(e) => start + e,
+        None => return items,
+    };
+
+    let section = &xml[start..end];
+
+    let mut pos = 0;
+    while pos < section.len() {
+        if let Some(m_pos) = section[pos..].find("<m") {
+            items.push(SharedItem::Missing);
+            pos += m_pos + 1;
+        } else if let Some(n_pos) = section[pos..].find("<n ") {
+            let n_start = pos + n_pos;
+            if let Some(n_end) = section[n_start..].find("/>") {
+                let n_tag = &section[n_start..n_start + n_end + 2];
+                if let Some(v_str) = extract_attr(n_tag, "v")
+                    && let Ok(v) = v_str.parse::<f64>()
+                {
+                    items.push(SharedItem::Number(v));
+                }
+                pos = n_start + n_end + 2;
+            } else {
+                break;
+            }
+        } else if let Some(s_pos) = section[pos..].find("<s ") {
+            let s_start = pos + s_pos;
+            if let Some(s_end) = section[s_start..].find("/>") {
+                let s_tag = &section[s_start..s_start + s_end + 2];
+                if let Some(v) = extract_attr(s_tag, "v") {
+                    items.push(SharedItem::String(v));
+                }
+                pos = s_start + s_end + 2;
+            } else {
+                break;
+            }
+        } else if let Some(b_pos) = section[pos..].find("<b ") {
+            let b_start = pos + b_pos;
+            if let Some(b_end) = section[b_start..].find("/>") {
+                let b_tag = &section[b_start..b_start + b_end + 2];
+                if let Some(v_str) = extract_attr(b_tag, "v") {
+                    let v = v_str == "1" || v_str.to_lowercase() == "true";
+                    items.push(SharedItem::Boolean(v));
+                }
+                pos = b_start + b_end + 2;
+            } else {
+                break;
+            }
+        } else if let Some(e_pos) = section[pos..].find("<e ") {
+            let e_start = pos + e_pos;
+            if let Some(e_end) = section[e_start..].find("/>") {
+                let e_tag = &section[e_start..e_start + e_end + 2];
+                if let Some(v) = extract_attr(e_tag, "v") {
+                    items.push(SharedItem::Error(v));
+                }
+                pos = e_start + e_end + 2;
+            } else {
+                break;
+            }
+        } else if let Some(d_pos) = section[pos..].find("<d ") {
+            let d_start = pos + d_pos;
+            if let Some(d_end) = section[d_start..].find("/>") {
+                let d_tag = &section[d_start..d_start + d_end + 2];
+                if let Some(v) = extract_attr(d_tag, "v") {
+                    items.push(SharedItem::DateTime(v));
+                }
+                pos = d_start + d_end + 2;
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    items
 }
 
 fn extract_pivot_table_root_attrs(xml: &str) -> Option<(String, u32)> {
