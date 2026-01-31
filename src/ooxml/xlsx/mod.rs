@@ -41,6 +41,7 @@ pub mod sparkline;
 pub mod styles;
 pub mod table;
 pub mod template;
+pub mod threaded_comments;
 pub mod views;
 pub mod workbook;
 pub mod worksheet;
@@ -83,4 +84,9 @@ pub use writer::{
     MutableSharedStrings, MutableWorkbookData, MutableWorksheet, NamedRange,
     PageBreak as WriterPageBreak, PageSetup as WriterPageSetup, RichTextRun, SheetProtection,
     StylesBuilder, WorkbookProtection,
+};
+// Re-export threaded comments types
+pub use threaded_comments::{
+    Mention, Person, PersonList, ThreadedComment, ThreadedComments, read_persons,
+    read_threaded_comments, write_persons, write_threaded_comments,
 };

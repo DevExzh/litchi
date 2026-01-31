@@ -518,6 +518,63 @@ impl Workbook {
         self.mutable_data.as_mut().unwrap().add_pivot_table(pivot)
     }
 
+    /// Read the person list from the workbook.
+    ///
+    /// Persons are used in threaded comments to identify comment authors.
+    /// Returns `None` if no person list is present in the workbook.
+    pub fn persons(&self) -> SheetResult<Option<crate::ooxml::xlsx::PersonList>> {
+        crate::ooxml::xlsx::read_persons(self.package())
+    }
+
+    /// Read threaded comments for a specific worksheet by index.
+    ///
+    /// Threaded comments are the modern comment format in Excel with support for
+    /// conversation threads, @mentions, and timestamps.
+    ///
+    /// # Arguments
+    /// * `sheet_index` - Zero-based worksheet index
+    ///
+    /// Returns `None` if the worksheet has no threaded comments.
+    pub fn threaded_comments(
+        &self,
+        sheet_index: usize,
+    ) -> SheetResult<Option<crate::ooxml::xlsx::ThreadedComments>> {
+        let ws_info = self
+            .worksheets
+            .get(sheet_index)
+            .ok_or("Worksheet index out of bounds")?;
+
+        let workbook_uri = PackURI::new("/xl/workbook.xml")?;
+        let workbook_part = self.package().get_part(&workbook_uri)?;
+        let workbook_rels = workbook_part.rels();
+
+        let rel = workbook_rels
+            .get(ws_info.relationship_id.as_str())
+            .ok_or("Worksheet relationship not found")?;
+
+        let worksheet_uri = rel.target_partname()?;
+        crate::ooxml::xlsx::read_threaded_comments(self.package(), &worksheet_uri)
+    }
+
+    /// Read threaded comments for a worksheet by name.
+    ///
+    /// # Arguments
+    /// * `sheet_name` - Name of the worksheet
+    ///
+    /// Returns `None` if the worksheet has no threaded comments.
+    pub fn threaded_comments_by_name(
+        &self,
+        sheet_name: &str,
+    ) -> SheetResult<Option<crate::ooxml::xlsx::ThreadedComments>> {
+        let sheet_index = self
+            .worksheets
+            .iter()
+            .position(|ws| ws.name == sheet_name)
+            .ok_or_else(|| format!("Worksheet '{}' not found", sheet_name))?;
+
+        self.threaded_comments(sheet_index)
+    }
+
     /// Add a new worksheet.
     ///
     /// # Arguments
@@ -642,6 +699,39 @@ impl Workbook {
         &mut self.properties
     }
 
+    /// Set the person list for threaded comments.
+    ///
+    /// Persons are used to identify authors of threaded comments.
+    ///
+    /// # Arguments
+    /// * `person_list` - List of persons who can author comments
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::xlsx::{Workbook, Person, PersonList};
+    ///
+    /// let mut wb = Workbook::create()?;
+    /// let mut person_list = PersonList::default();
+    /// person_list.persons.push(Person {
+    ///     display_name: "John Doe".to_string(),
+    ///     id: "{11111111-2222-3333-4444-555555555555}".to_string(),
+    ///     user_id: None,
+    ///     provider_id: None,
+    /// });
+    /// wb.set_person_list(person_list);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn set_person_list(&mut self, person_list: crate::ooxml::xlsx::PersonList) {
+        if self.mutable_data.is_none() {
+            self.mutable_data = Some(MutableWorkbookData::new());
+        }
+
+        if let Some(ref mut data) = self.mutable_data {
+            data.person_list = Some(person_list);
+        }
+    }
+
     /// Save the workbook to a file.
     ///
     /// Writes the complete Excel workbook including all worksheets, styles,
@@ -684,6 +774,89 @@ impl Workbook {
 
         self.package.save(path)?;
         Ok(())
+    }
+
+    /// Generate metadata.xml for threaded comments support.
+    fn generate_metadata_xml() -> String {
+        xml_minifier::minified_xml!("resources/metadata.xml").to_string()
+    }
+
+    /// Generate bridge comments.xml for threaded comments backwards compatibility.
+    fn generate_bridge_comments_xml(
+        threaded_comments: &crate::ooxml::xlsx::ThreadedComments,
+    ) -> String {
+        use crate::common::xml::escape::escape_xml;
+        use std::collections::HashMap;
+
+        let mut xml = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
+        xml.push_str(
+            "<comments xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">",
+        );
+
+        // Build author list and comment grouping
+        let mut authors = Vec::new();
+        let mut author_map: HashMap<String, usize> = HashMap::new();
+        let mut comments_by_cell: HashMap<String, Vec<&crate::ooxml::xlsx::ThreadedComment>> =
+            HashMap::new();
+
+        // Group comments by cell
+        for comment in &threaded_comments.comments {
+            if let Some(ref cell_ref) = comment.cell_ref {
+                comments_by_cell
+                    .entry(cell_ref.clone())
+                    .or_default()
+                    .push(comment);
+            }
+        }
+
+        // Build authors list with tc={id} entries
+        for cell_comments in comments_by_cell.values() {
+            for comment in cell_comments {
+                if !author_map.contains_key(&comment.id) {
+                    let author_entry = format!("tc={}", comment.id);
+                    author_map.insert(comment.id.clone(), authors.len());
+                    authors.push(author_entry);
+                }
+            }
+        }
+
+        // Write authors
+        xml.push_str("<authors>");
+        for author in &authors {
+            xml.push_str(&format!("<author>{}</author>", escape_xml(author)));
+        }
+        xml.push_str("</authors>");
+
+        // Write comment list
+        xml.push_str("<commentList>");
+        for (cell_ref, cell_comments) in comments_by_cell {
+            if let Some(first_comment) = cell_comments.first() {
+                let author_id = author_map.get(&first_comment.id).unwrap_or(&0);
+
+                // Build combined text from all comments in thread
+                let mut combined_text = String::new();
+                for (i, comment) in cell_comments.iter().enumerate() {
+                    if i > 0 {
+                        combined_text.push_str("\nReply:\n    ");
+                    } else {
+                        combined_text.push_str("Comment:\n    ");
+                    }
+                    if let Some(ref text) = comment.text {
+                        combined_text.push_str(text);
+                    }
+                }
+
+                xml.push_str(&format!(
+                    "<comment ref=\"{}\" authorId=\"{}\"><text><r><t>{}</t></r></text></comment>",
+                    escape_xml(&cell_ref),
+                    author_id,
+                    escape_xml(&combined_text)
+                ));
+            }
+        }
+        xml.push_str("</commentList>");
+        xml.push_str("</comments>");
+        xml
     }
 
     /// Update workbook parts with modified data.
@@ -813,6 +986,44 @@ impl Workbook {
             render_pivot_table_sheet_cells(pivot, &mut data.worksheets)?;
         }
 
+        // Write person list and metadata if present (for threaded comments)
+        let has_threaded_comments = data
+            .worksheets
+            .iter()
+            .any(|ws| !ws.threaded_comments().is_empty());
+
+        if let Some(person_list) = data.person_list.as_ref()
+            && !person_list.persons.is_empty()
+        {
+            let persons_xml = crate::ooxml::xlsx::write_persons(person_list)?;
+            let persons_uri = PackURI::new("/xl/persons/person.xml")?;
+            let persons_part = BlobPart::new(
+                persons_uri,
+                ct::SML_PERSONS.to_string(),
+                persons_xml.into_bytes(),
+            );
+            self.package.add_part(Box::new(persons_part));
+
+            // Add relationship from workbook to persons part
+            temp_wb_part.relate_to("persons/person.xml", rt::PERSONS);
+        }
+
+        // Write metadata.xml if there are threaded comments
+        if has_threaded_comments {
+            let metadata_xml = Self::generate_metadata_xml();
+            // ...
+            let metadata_uri = PackURI::new("/xl/metadata.xml")?;
+            let metadata_part = BlobPart::new(
+                metadata_uri,
+                ct::SML_SHEET_METADATA.to_string(),
+                metadata_xml.into_bytes(),
+            );
+            self.package.add_part(Box::new(metadata_part));
+
+            // Create relationship from workbook to metadata
+            temp_wb_part.relate_to("metadata.xml", rt::SHEET_METADATA);
+        }
+
         // Update worksheet parts and create relationships
         // IMPORTANT: Create relationships for ALL worksheets, not just modified ones
         for (index, ws) in data.worksheets.iter().enumerate() {
@@ -840,6 +1051,46 @@ impl Workbook {
                 self.package.add_part(Box::new(comments_part));
 
                 // Add relationship from worksheet to comments
+                ws_part.relate_to(
+                    &format!("../comments{}.xml", ws.sheet_id()),
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
+                );
+            }
+
+            // Generate and add threaded comments if present
+            if !ws.threaded_comments().is_empty() {
+                let threaded_comments = crate::ooxml::xlsx::ThreadedComments {
+                    comments: ws.threaded_comments().to_vec(),
+                };
+                let tc_xml = crate::ooxml::xlsx::write_threaded_comments(&threaded_comments)?;
+                let tc_uri = PackURI::new(format!(
+                    "/xl/threadedComments/threadedComment{}.xml",
+                    ws.sheet_id()
+                ))?;
+                let tc_part = BlobPart::new(
+                    tc_uri,
+                    ct::SML_THREADED_COMMENTS.to_string(),
+                    tc_xml.into_bytes(),
+                );
+                self.package.add_part(Box::new(tc_part));
+
+                // Add relationship from worksheet to threaded comments
+                ws_part.relate_to(
+                    &format!("../threadedComments/threadedComment{}.xml", ws.sheet_id()),
+                    rt::THREADED_COMMENTS,
+                );
+
+                // Generate bridge comments.xml for backwards compatibility
+                let bridge_xml = Self::generate_bridge_comments_xml(&threaded_comments);
+                let bridge_uri = PackURI::new(format!("/xl/comments{}.xml", ws.sheet_id()))?;
+                let bridge_part = BlobPart::new(
+                    bridge_uri,
+                    ct::SML_COMMENTS.to_string(),
+                    bridge_xml.into_bytes(),
+                );
+                self.package.add_part(Box::new(bridge_part));
+
+                // Add relationship from worksheet to bridge comments
                 ws_part.relate_to(
                     &format!("../comments{}.xml", ws.sheet_id()),
                     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",

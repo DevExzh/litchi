@@ -128,7 +128,7 @@ This document tracks the implementation status of features across all supported 
 | Shapes/Drawing objects | ❌ | ❌ | ❌ | DrawingML shapes, text boxes, connectors |
 | External links | ❌ | ❌ | ❌ | Linked workbooks and external refs |
 | Data connections / Query tables | ❌ | ❌ | ❌ | External data connections |
-| Threaded comments | ❌ | ❌ | ❌ | Modern comment threads (`threadedComments`) |
+| Threaded comments | ✅ | ✅ | ✅ | Modern comment threads with @mentions, replies, and resolution status |
 | Pivot charts | ❌ | ❌ | ❌ | Charts bound to pivot caches |
 | Timeline controls | ❌ | ❌ | ❌ | Timeline slicers |
 | Workbook/worksheet views | ❌ | ❌ | ❌ | Custom views and sheet views |

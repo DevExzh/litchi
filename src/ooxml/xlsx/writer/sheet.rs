@@ -316,6 +316,8 @@ pub struct MutableWorksheet {
     sparkline_groups: Vec<SparklineGroup>,
     /// Tables in this worksheet
     tables: Vec<Table>,
+    /// Threaded comments for this worksheet
+    threaded_comments: Vec<crate::ooxml::xlsx::ThreadedComment>,
     /// Whether the worksheet has been modified
     modified: bool,
 }
@@ -359,6 +361,7 @@ impl MutableWorksheet {
             rich_text_cells: HashMap::new(),
             sparkline_groups: Vec::new(),
             tables: Vec::new(),
+            threaded_comments: Vec::new(),
             modified: false,
         }
     }
@@ -952,6 +955,56 @@ impl MutableWorksheet {
         &self.comments
     }
 
+    /// Add a threaded comment to a cell.
+    ///
+    /// Threaded comments support conversation threads, @mentions, and timestamps.
+    ///
+    /// # Arguments
+    /// * `comment` - The threaded comment to add
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi::ooxml::xlsx::{Workbook, ThreadedComment};
+    ///
+    /// let mut wb = Workbook::create()?;
+    /// let mut ws = wb.worksheet_mut(0)?;
+    ///
+    /// let comment = ThreadedComment {
+    ///     cell_ref: Some("A1".to_string()),
+    ///     id: "comment-guid-1".to_string(),
+    ///     person_id: "person-guid-1".to_string(),
+    ///     text: Some("This is a threaded comment".to_string()),
+    ///     ..Default::default()
+    /// };
+    /// ws.add_threaded_comment(comment);
+    ///
+    /// wb.save("output.xlsx")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn add_threaded_comment(&mut self, comment: crate::ooxml::xlsx::ThreadedComment) {
+        self.threaded_comments.push(comment);
+        self.modified = true;
+    }
+
+    /// Get all threaded comments in the worksheet.
+    pub fn threaded_comments(&self) -> &[crate::ooxml::xlsx::ThreadedComment] {
+        &self.threaded_comments
+    }
+
+    /// Remove all threaded comments for a specific cell.
+    ///
+    /// # Arguments
+    /// * `cell_ref` - Cell reference (e.g., "A1")
+    pub fn remove_threaded_comments(&mut self, cell_ref: &str) {
+        let initial_len = self.threaded_comments.len();
+        self.threaded_comments
+            .retain(|c| c.cell_ref.as_deref() != Some(cell_ref));
+        if self.threaded_comments.len() < initial_len {
+            self.modified = true;
+        }
+    }
+
     /// Generate comments.xml content.
     ///
     /// This generates the XML for all cell comments in the worksheet.
@@ -1031,7 +1084,8 @@ impl MutableWorksheet {
     ///
     /// This generates the VML drawing file that displays comment indicators in cells.
     pub fn generate_vml_drawing_xml(&self) -> SheetResult<Option<String>> {
-        if self.comments.is_empty() {
+        // Generate VML for both legacy comments and threaded comments
+        if self.comments.is_empty() && self.threaded_comments.is_empty() {
             return Ok(None);
         }
 
@@ -1052,9 +1106,39 @@ impl MutableWorksheet {
         );
         xml.push_str(r#"</v:shapetype>"#);
 
-        // Generate a shape for each comment
-        for (idx, comment) in self.comments.iter().enumerate() {
-            let shape_id = idx + 1024; // Start from 1024 to avoid conflicts
+        // Helper function to parse cell reference like "A1" -> (row, col) 0-indexed
+        fn parse_cell_ref(s: &str) -> Option<(u32, u32)> {
+            let s = s.trim();
+            if s.is_empty() {
+                return None;
+            }
+            let mut col: u32 = 0;
+            let mut i = 0usize;
+            for (idx, ch) in s.char_indices() {
+                if ch.is_ascii_alphabetic() {
+                    col = col * 26 + (ch.to_ascii_uppercase() as u32 - 'A' as u32 + 1);
+                    i = idx + ch.len_utf8();
+                } else {
+                    break;
+                }
+            }
+            if col == 0 {
+                return None;
+            }
+            let row_str = s.get(i..)?;
+            let row1: u32 = row_str.parse().ok()?;
+            if row1 == 0 {
+                return None;
+            }
+            Some((row1 - 1, col - 1))
+        }
+
+        let mut shape_idx = 0;
+
+        // Generate a shape for each legacy comment
+        for comment in self.comments.iter() {
+            let shape_id = shape_idx + 1024; // Start from 1024 to avoid conflicts
+            shape_idx += 1;
 
             write!(
                 xml,
@@ -1070,7 +1154,7 @@ impl MutableWorksheet {
             write!(
                 xml,
                 "margin-left:{:.0}pt;margin-top:{:.0}pt;width:108pt;height:59.25pt;z-index:{};visibility:hidden\" ",
-                margin_left, margin_top, idx + 1
+                margin_left, margin_top, shape_idx
             )
             .map_err(|e| format!("XML write error: {}", e))?;
 
@@ -1094,6 +1178,59 @@ impl MutableWorksheet {
                 .map_err(|e| format!("XML write error: {}", e))?;
             xml.push_str("</x:ClientData>");
             xml.push_str("</v:shape>");
+        }
+
+        // Generate a shape for each threaded comment
+        for comment in self.threaded_comments.iter() {
+            if let Some(ref cell_ref) = comment.cell_ref {
+                // Parse cell reference to get row/col
+                if let Some((row, col)) = parse_cell_ref(cell_ref) {
+                    let shape_id = shape_idx + 1024;
+                    shape_idx += 1;
+
+                    write!(
+                        xml,
+                        "<v:shape id=\"_x0000_s{}\" type=\"#_x0000_t202\" style=\"position:absolute;",
+                        shape_id
+                    )
+                    .map_err(|e| format!("XML write error: {}", e))?;
+
+                    // Position the comment indicator
+                    let margin_left = 48.0 + (col as f64) * 63.0;
+                    let margin_top = 12.0 + (row as f64) * 15.75;
+
+                    write!(
+                        xml,
+                        "margin-left:{:.0}pt;margin-top:{:.0}pt;width:108pt;height:59.25pt;z-index:{};visibility:hidden\" ",
+                        margin_left, margin_top, shape_idx
+                    )
+                    .map_err(|e| format!("XML write error: {}", e))?;
+
+                    write!(
+                        xml,
+                        "fillcolor=\"#ECFAD4\" strokecolor=\"#edeaa1\" o:insetmode=\"auto\">"
+                    )
+                    .map_err(|e| format!("XML write error: {}", e))?;
+
+                    xml.push_str("<v:fill color2=\"#BEFF82\" type=\"gradient\" angle=\"-180\"><o:fill type=\"gradientUnscaled\" v:ext=\"view\"/></v:fill>");
+                    xml.push_str(r#"<v:shadow on="t" obscured="t"/>"#);
+                    xml.push_str(r#"<v:path o:connecttype="none"/>"#);
+                    xml.push_str(r#"<v:textbox style="mso-direction-alt:auto"><div style="text-align:left"></div></v:textbox>"#);
+                    write!(
+                        xml,
+                        r#"<x:ClientData ObjectType="Note"><x:MoveWithCells/><x:SizeWithCells/><x:Anchor>{}, 15, {}, 0, {}, 15, {}, 4</x:Anchor>"#,
+                        col + 1, row, col + 3, row + 3
+                    )
+                    .map_err(|e| format!("XML write error: {}", e))?;
+                    xml.push_str("<x:AutoFill>False</x:AutoFill>");
+                    write!(xml, "<x:Row>{}</x:Row>", row)
+                        .map_err(|e| format!("XML write error: {}", e))?;
+                    write!(xml, "<x:Column>{}</x:Column>", col)
+                        .map_err(|e| format!("XML write error: {}", e))?;
+                    xml.push_str("</x:ClientData>");
+                    xml.push_str("</v:shape>");
+                }
+            }
         }
 
         xml.push_str("</xml>");
@@ -2220,6 +2357,7 @@ impl MutableWorksheet {
                 let cell_ref = format!("{}{}", Self::column_to_letters(col_num + 1), row_num + 1);
                 // Get the style index for this cell (if any)
                 let style_index = style_indices.get(&(row_num, col_num)).copied();
+
                 if let Some(runs) = self.rich_text_cells.get(&(row_num, col_num)) {
                     self.write_rich_text_cell(xml, &cell_ref, runs, style_index)?;
                 } else {
@@ -2254,7 +2392,7 @@ impl MutableWorksheet {
 
         write!(
             xml,
-            r#"<c r="{}"{} t="inlineStr"><is>"#,
+            r#"<c r="{}"{}  t="inlineStr"><is>"#,
             cell_ref, style_attr
         )
         .map_err(|e| format!("XML write error: {}", e))?;
@@ -2336,7 +2474,7 @@ impl MutableWorksheet {
                 let string_index = shared_strings.add_string(s);
                 write!(
                     xml,
-                    r#"<c r="{}"{} t="s"><v>{}</v></c>"#,
+                    r#"<c r="{}"{}  t="s"><v>{}</v></c>"#,
                     cell_ref, style_attr, string_index
                 )
                 .map_err(|e| format!("XML write error: {}", e))?;
@@ -2352,7 +2490,7 @@ impl MutableWorksheet {
             CellValue::Bool(b) => {
                 write!(
                     xml,
-                    r#"<c r="{}"{} t="b"><v>{}</v></c>"#,
+                    r#"<c r="{}"{}  t="b"><v>{}</v></c>"#,
                     cell_ref,
                     style_attr,
                     if *b { "1" } else { "0" }
@@ -2366,7 +2504,7 @@ impl MutableWorksheet {
             CellValue::Error(e) => {
                 write!(
                     xml,
-                    r#"<c r="{}"{} t="e"><v>{}</v></c>"#,
+                    r#"<c r="{}"{}  t="e"><v>{}</v></c>"#,
                     cell_ref,
                     style_attr,
                     escape_xml(e)

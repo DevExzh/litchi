@@ -380,6 +380,8 @@ pub struct MutableWorkbookData {
     /// Whether the workbook has been modified
     pub modified: bool,
     pub pivot_tables: Vec<WritablePivotTable>,
+    /// Person list for threaded comments
+    pub person_list: Option<crate::ooxml::xlsx::PersonList>,
 }
 
 impl MutableWorkbookData {
@@ -394,6 +396,7 @@ impl MutableWorkbookData {
             calculation_mode: "auto".to_string(),
             modified: false,
             pivot_tables: Vec::new(),
+            person_list: None,
         };
 
         // Add a default worksheet

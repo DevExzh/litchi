@@ -98,6 +98,12 @@ pub mod content_type {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml";
     pub const SML_PIVOT_TABLE: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml";
+    pub const SML_COMMENTS: &str =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml";
+    pub const SML_THREADED_COMMENTS: &str = "application/vnd.ms-excel.threadedcomments+xml";
+    pub const SML_PERSONS: &str = "application/vnd.ms-excel.person+xml";
+    pub const SML_SHEET_METADATA: &str =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml";
 
     // Excel Binary File Format content types
     pub const XLSB_BIN: &str = "application/vnd.ms-excel.sheet.binary.macroEnabled.main";
@@ -220,6 +226,11 @@ pub mod relationship_type {
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords";
     pub const PIVOT_TABLE: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable";
+    pub const THREADED_COMMENTS: &str =
+        "http://schemas.microsoft.com/office/2017/10/relationships/threadedComment";
+    pub const PERSONS: &str = "http://schemas.microsoft.com/office/2017/10/relationships/person";
+    pub const SHEET_METADATA: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata";
 
     // Images and media
     pub const IMAGE: &str =
