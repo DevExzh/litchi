@@ -184,6 +184,30 @@ pub enum PptRecordType {
     AnimationInfo = 4116,
     /// Animation info atom record
     AnimationInfoAtom = 4081,
+    /// Build list record
+    BuildList = 2000,
+    /// Build atom record
+    BuildAtom = 2001,
+    /// Chart build record
+    ChartBuild = 2010,
+    /// Diagram build record
+    DiagramBuild = 2011,
+    /// Paragraph build record
+    ParaBuild = 2012,
+    /// Sound collection container
+    SoundCollection = 2020,
+    /// Sound collection atom
+    SoundCollectionAtom = 2021,
+    /// Sound record
+    Sound = 2022,
+    /// Sound data record
+    SoundData = 2023,
+    /// Time node record
+    TimeNode = 4114,
+    /// Time property list record
+    TimePropertyList = 4115,
+    /// Time behavior record
+    TimeBehavior = 4112,
     /// Comment 2000 record
     Comment2000 = 12000,
     /// Comment 2000 atom record
@@ -235,6 +259,14 @@ impl From<u16> for PptRecordType {
             4087 => PptRecordType::DateTimeMCAtom,
             4116 => PptRecordType::AnimationInfo,
             4081 => PptRecordType::AnimationInfoAtom,
+            2000 => PptRecordType::BuildList,
+            2001 => PptRecordType::BuildAtom,
+            2010 => PptRecordType::ChartBuild,
+            2011 => PptRecordType::DiagramBuild,
+            2012 => PptRecordType::ParaBuild,
+            4114 => PptRecordType::TimeNode,
+            4115 => PptRecordType::TimePropertyList,
+            4112 => PptRecordType::TimeBehavior,
             12000 => PptRecordType::Comment2000,
             12001 => PptRecordType::Comment2000Atom,
             _ => PptRecordType::Unknown,

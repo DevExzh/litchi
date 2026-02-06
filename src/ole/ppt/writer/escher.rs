@@ -750,6 +750,8 @@ pub struct UserShapeData {
     pub hyperlink_type: u8,
     /// Picture BLIP index (for picture frames)
     pub picture_index: Option<u32>,
+    /// Animation info for this shape
+    pub animation_info: Option<crate::ole::ppt::animation::AnimationInfo>,
     /// Shadow color (RGB format)
     pub shadow_color: Option<u32>,
     /// Shadow X offset in EMUs
@@ -792,6 +794,7 @@ impl Default for UserShapeData {
             hyperlink_jump: 0,   // JUMP_NONE
             hyperlink_type: 8,   // LINK_Url
             picture_index: None,
+            animation_info: None,
             shadow_color: None,
             shadow_offset_x: None,
             shadow_offset_y: None,
@@ -924,9 +927,13 @@ fn create_user_shape_container(shape_id: u32, shape: &UserShapeData) -> Result<V
     anchor.add_data(&y2.to_le_bytes()); // row1/bottom
     container.add_data(&anchor.build()?);
 
-    // ClientData with OEPlaceholderAtom for placeholders OR InteractiveInfo for hyperlinks
+    // ClientData with animation, placeholders, or hyperlinks
     // MUST come BEFORE ClientTextbox per POI (addChildBefore(clientData, EscherTextboxRecord.RECORD_ID))
-    if let Some(placeholder_type) = shape.placeholder_type {
+    if let Some(ref animation_info) = shape.animation_info {
+        // Animation takes priority - write AnimationInfo to ClientData
+        let client_data = build_client_data_with_animation(animation_info)?;
+        container.add_data(&client_data);
+    } else if let Some(placeholder_type) = shape.placeholder_type {
         let client_data = build_client_data_with_placeholder(placeholder_type)?;
         container.add_data(&client_data);
     } else if let Some(hyperlink_id) = shape.hyperlink_id {
@@ -996,6 +1003,26 @@ fn build_client_data_with_hyperlink(
         EscherBuilder::new(header_version::CONTAINER, 0, record_type::CLIENT_DATA);
     client_data.add_data(&info_container);
 
+    client_data.build()
+}
+
+/// Build ClientData record with AnimationInfo.
+///
+/// Per LibreOffice reference files, animation sounds only need AnimationInfo in ClientData.
+/// InteractiveInfo with action=6 (MEDIA) is for movie/media objects, NOT animation sounds.
+/// The reference `sound.ppt` has AnimationInfo WITHOUT InteractiveInfo in its ClientData.
+fn build_client_data_with_animation(
+    animation_info: &crate::ole::ppt::animation::AnimationInfo,
+) -> Result<Vec<u8>, PptError> {
+    use crate::ole::ppt::animation::writer::write_animation_info;
+
+    // Write AnimationInfo container (contains AnimationInfoAtom with soundRef)
+    let (animation_bytes, _sound_ref) = write_animation_info(animation_info);
+
+    // ClientData Escher record (0xF011) wrapping AnimationInfo only
+    let mut client_data =
+        EscherBuilder::new(header_version::CONTAINER, 0, record_type::CLIENT_DATA);
+    client_data.add_data(&animation_bytes);
     client_data.build()
 }
 

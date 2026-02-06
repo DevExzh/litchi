@@ -59,6 +59,7 @@ use super::shapes::ShapeKind;
 use super::spec::{BinaryTagData, ColorScheme, Ppt10Tag, SlideLayoutType, slide_flags};
 use super::text_format::{FontEntity, Paragraph};
 use crate::common::unit::pt_to_emu_i32;
+use crate::ole::ppt::animation::AnimationInfo;
 use crate::ole::writer::OleWriter;
 use std::collections::HashMap;
 
@@ -274,6 +275,8 @@ pub struct ShapeProperties {
 struct WritableShape {
     /// Shape properties
     properties: ShapeProperties,
+    /// Animation info for this shape
+    animation_info: Option<AnimationInfo>,
 }
 
 impl Default for ShapeProperties {
@@ -454,6 +457,7 @@ fn convert_shape_to_escher(
         hyperlink_jump: get_hyperlink_info(props.hyperlink_id, hyperlinks).1,
         hyperlink_type: get_hyperlink_info(props.hyperlink_id, hyperlinks).2,
         picture_index: props.picture_index,
+        animation_info: shape.animation_info.clone(),
         shadow_color,
         shadow_offset_x,
         shadow_offset_y,
@@ -630,6 +634,7 @@ impl PptWriter {
                 alignment: TextAlignment::Left,
                 ..Default::default()
             },
+            animation_info: None,
         };
 
         slide_data.shapes.push(shape);
@@ -673,6 +678,7 @@ impl PptWriter {
                 fill: Some(FillStyle::none()),
                 ..Default::default()
             },
+            animation_info: None,
         };
 
         slide_data.shapes.push(shape);
@@ -749,6 +755,7 @@ impl PptWriter {
                 flip_v: y2 < y1,
                 ..Default::default()
             },
+            animation_info: None,
         };
 
         slide_data.shapes.push(shape);
@@ -796,6 +803,7 @@ impl PptWriter {
                 flip_v: y2 < y1,
                 ..Default::default()
             },
+            animation_info: None,
         };
 
         slide_data.shapes.push(shape);
@@ -826,6 +834,7 @@ impl PptWriter {
                 height: pt_to_emu_i32(height),
                 ..Default::default()
             },
+            animation_info: None,
         };
 
         slide_data.shapes.push(shape);
@@ -869,6 +878,7 @@ impl PptWriter {
                 shadow: Some(style.shadow),
                 ..Default::default()
             },
+            animation_info: None,
         };
 
         slide_data.shapes.push(shape);
@@ -911,6 +921,7 @@ impl PptWriter {
                 fill: Some(FillStyle::picture(blip_index)),
                 ..Default::default()
             },
+            animation_info: None,
         };
 
         slide_data.shapes.push(shape);
@@ -947,6 +958,7 @@ impl PptWriter {
                 fill: Some(FillStyle::picture(blip_index)),
                 ..Default::default()
             },
+            animation_info: None,
         };
 
         slide_data.shapes.push(shape);
@@ -1020,6 +1032,35 @@ impl PptWriter {
             .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
 
         slide_data.notes_page = Some(notes_page);
+        Ok(())
+    }
+
+    /// Set animation for a specific shape
+    ///
+    /// # Arguments
+    ///
+    /// * `slide` - Slide index
+    /// * `shape_index` - Shape index on the slide (0-based)
+    /// * `animation` - Animation info to attach to the shape
+    pub fn set_shape_animation(
+        &mut self,
+        slide: usize,
+        shape_index: usize,
+        animation: AnimationInfo,
+    ) -> Result<(), PptWriteError> {
+        let slide_data = self
+            .slides
+            .get_mut(slide)
+            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+
+        let shape = slide_data.shapes.get_mut(shape_index).ok_or_else(|| {
+            PptWriteError::InvalidData(format!(
+                "Shape {} does not exist on slide {}",
+                shape_index, slide
+            ))
+        })?;
+
+        shape.animation_info = Some(animation);
         Ok(())
     }
 
@@ -1169,6 +1210,46 @@ impl PptWriter {
         let ex_obj_list = self.hyperlinks.build_ex_obj_list()?;
         if !ex_obj_list.is_empty() {
             doc_container.write_child(&ex_obj_list);
+        }
+
+        // 2.5.3) SoundCollection with embedded WAV data
+        // Collect all sound IDs referenced by animations
+        let mut sound_ids = std::collections::HashSet::new();
+        for slide in &self.slides {
+            for shape in &slide.shapes {
+                if let Some(ref anim_info) = shape.animation_info
+                    && let Some(ref build_list) = anim_info.build_list
+                {
+                    for build in &build_list.builds {
+                        if let Some(ref sound) = build.sound {
+                            sound_ids.insert(sound.sound_ref);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Build SoundCollection with actual WAV data and get ID→ref mapping
+        let (sound_collection, sound_id_mapping) = super::build_sound_collection(&sound_ids)?;
+        if !sound_collection.is_empty() {
+            doc_container.write_child(&sound_collection);
+        }
+
+        // Remap soundRef in animations to match CString instance 2 in SoundCollection
+        for slide in &mut self.slides {
+            for shape in &mut slide.shapes {
+                if let Some(ref mut anim_info) = shape.animation_info
+                    && let Some(ref mut build_list) = anim_info.build_list
+                {
+                    for build in &mut build_list.builds {
+                        if let Some(ref mut sound) = build.sound
+                            && let Some(&mapped_ref) = sound_id_mapping.get(&sound.sound_ref)
+                        {
+                            sound.sound_ref = mapped_ref;
+                        }
+                    }
+                }
+            }
         }
 
         // 2.6) EndDocument
@@ -1415,6 +1496,45 @@ impl PptWriter {
         let ex_obj_list = self.hyperlinks.build_ex_obj_list()?;
         if !ex_obj_list.is_empty() {
             doc_container.write_child(&ex_obj_list);
+        }
+
+        // SoundCollection with embedded WAV data
+        let mut sound_ids = std::collections::HashSet::new();
+        for slide in &self.slides {
+            for shape in &slide.shapes {
+                if let Some(ref anim_info) = shape.animation_info
+                    && let Some(ref build_list) = anim_info.build_list
+                {
+                    for build in &build_list.builds {
+                        if let Some(ref sound) = build.sound {
+                            sound_ids.insert(sound.sound_ref);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Build SoundCollection with actual WAV data and get ID→ref mapping
+        let (sound_collection, sound_id_mapping) = super::build_sound_collection(&sound_ids)?;
+        if !sound_collection.is_empty() {
+            doc_container.write_child(&sound_collection);
+        }
+
+        // Remap soundRef in animations to match CString instance 2 in SoundCollection
+        for slide in &mut self.slides {
+            for shape in &mut slide.shapes {
+                if let Some(ref mut anim_info) = shape.animation_info
+                    && let Some(ref mut build_list) = anim_info.build_list
+                {
+                    for build in &mut build_list.builds {
+                        if let Some(ref mut sound) = build.sound
+                            && let Some(&mapped_ref) = sound_id_mapping.get(&sound.sound_ref)
+                        {
+                            sound.sound_ref = mapped_ref;
+                        }
+                    }
+                }
+            }
         }
 
         let end_doc = create_end_document()?;

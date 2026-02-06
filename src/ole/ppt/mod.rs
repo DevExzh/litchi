@@ -99,3 +99,7 @@ pub use text_run::{TextRun, TextRunExtractor, TextRunFormatting};
 
 // Re-export writer types
 pub use writer::{PptWriteError, PptWriter, ShapeProperties, ShapeType, TextAlignment};
+
+// Animation and transition support
+pub mod animation;
+pub mod transition;

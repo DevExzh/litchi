@@ -57,6 +57,9 @@ pub mod hyperlink;
 /// Notes slide support
 pub mod notes;
 
+/// Sound collection for animations
+mod sound_collection;
+
 // Re-export public types from core
 pub use core::{PptWriteError, PptWriter, ShapeProperties, ShapeType, TextAlignment};
 
@@ -69,4 +72,5 @@ pub use persist::{PersistPtrBuilder, UserEditAtom};
 pub use records::{RecordBuilder, RecordHeader};
 pub use shape_style::{FillStyle, LineStyleConfig, ShadowStyle, ShapeColor, ShapeStyle};
 pub use shapes::{Shape, ShapeCollection, ShapeKind};
+pub use sound_collection::build_sound_collection;
 pub use text_format::{FontEntity, FontStyle, Paragraph, TextAlign, TextColor, TextRun};
