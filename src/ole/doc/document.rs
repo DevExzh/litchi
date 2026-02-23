@@ -1,10 +1,17 @@
 use super::super::OleFile;
 /// Document - the main API for working with Word document content.
+use super::footnote::Footnote;
+use super::header_footer::HeaderFooter;
+use super::hyperlink::Hyperlink;
 use super::package::{DocError, Result};
 use super::paragraph::{Paragraph, Run};
 use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::FieldsTable;
+use super::parts::footnotes::{EndnotesTable, FootnotesTable};
+use super::parts::headers::HeadersTable;
+use super::parts::hyperlinks::HyperlinksTable;
+use super::parts::numbering::ListTables;
 use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
 use super::parts::text::TextExtractor;
 use super::table::Table;
@@ -61,8 +68,18 @@ pub struct Document {
     /// Character property bin table - parsed once and shared across all paragraph extractors
     chp_bin_table: Option<ChpBinTable>,
     /// Fields table - contains field information (embedded equations, hyperlinks, etc.)
-    #[allow(dead_code)] // Stored for future field extraction features
+    /// Used during initialization for hyperlink extraction; exposed via `fields_table()` accessor.
     fields_table: Option<FieldsTable>,
+    /// Headers and footers table
+    headers_table: Option<HeadersTable>,
+    /// Footnotes table
+    footnotes_table: Option<FootnotesTable>,
+    /// Endnotes table
+    endnotes_table: Option<EndnotesTable>,
+    /// Hyperlinks table
+    hyperlinks_table: Option<HyperlinksTable>,
+    /// List/numbering tables
+    list_tables: Option<ListTables>,
     /// Extracted MTEF data from OLE streams (stream_name -> mtef_data)
     #[allow(dead_code)] // Stored for debugging and raw access
     mtef_data: std::collections::HashMap<String, Vec<u8>>,
@@ -117,8 +134,26 @@ impl Document {
         // Create text extractor
         let text_extractor = TextExtractor::new(&fib, &word_document, &table_stream)?;
 
-        // Parse fields table to identify embedded equations
+        // Parse fields table to identify embedded equations and hyperlinks
         let fields_table = FieldsTable::parse(&fib, &table_stream).ok();
+
+        // Parse headers/footers table
+        let headers_table = HeadersTable::parse(&fib, &table_stream).ok();
+
+        // Parse footnotes and endnotes tables
+        let footnotes_table = FootnotesTable::parse(&fib, &table_stream).ok();
+        let endnotes_table = EndnotesTable::parse(&fib, &table_stream).ok();
+
+        // Parse hyperlinks from fields table
+        let hyperlinks_table = fields_table.as_ref().and_then(|ft| {
+            HyperlinksTable::from_fields(ft, |start, end| {
+                Ok(text_extractor.text_at_range(start, end).to_string())
+            })
+            .ok()
+        });
+
+        // Parse list/numbering tables
+        let list_tables = ListTables::parse(&fib, &table_stream).ok();
 
         // Extract MTEF data from OLE streams
         let mtef_data = Self::extract_mtef_data(ole)?;
@@ -141,6 +176,11 @@ impl Document {
             text_extractor,
             chp_bin_table,
             fields_table,
+            headers_table,
+            footnotes_table,
+            endnotes_table,
+            hyperlinks_table,
+            list_tables,
             mtef_data,
             #[cfg(feature = "formula")]
             formula_arenas,
@@ -470,6 +510,275 @@ impl Document {
     #[inline]
     pub fn fib(&self) -> &FileInformationBlock {
         &self.fib
+    }
+
+    /// Get access to the fields table (if parsed).
+    ///
+    /// Contains information about all fields in the main document,
+    /// including embedded objects and hyperlinks.
+    #[inline]
+    pub fn fields_table(&self) -> Option<&FieldsTable> {
+        self.fields_table.as_ref()
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Headers / Footers
+    // ──────────────────────────────────────────────────────────────────
+
+    /// Get all headers and footers in the document.
+    ///
+    /// Each section can have up to six stories: first-page header/footer,
+    /// even-page header/footer, and odd-page (default) header/footer.
+    /// Empty stories (where start_cp == end_cp) are omitted.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// for hf in doc.headers_footers()? {
+    ///     println!("{:?}: {}", hf.header_footer_type, hf.text());
+    /// }
+    /// ```
+    pub fn headers_footers(&self) -> Result<Vec<HeaderFooter>> {
+        let table = match &self.headers_table {
+            Some(t) => t,
+            None => return Ok(Vec::new()),
+        };
+
+        let mut result = Vec::new();
+        for story in table.stories() {
+            if story.is_empty() {
+                continue;
+            }
+
+            let text = self
+                .text_extractor
+                .text_at_range(story.start_cp, story.end_cp)
+                .to_string();
+
+            // Extract paragraphs for this header/footer range
+            let paragraphs = self.extract_paragraphs_for_range(story.start_cp, story.end_cp)?;
+
+            let mut hf = HeaderFooter::new(story.story_type, text);
+            hf.paragraphs = paragraphs;
+            result.push(hf);
+        }
+
+        Ok(result)
+    }
+
+    /// Get only headers (filtering out footers).
+    pub fn headers(&self) -> Result<Vec<HeaderFooter>> {
+        Ok(self
+            .headers_footers()?
+            .into_iter()
+            .filter(|hf| hf.is_header())
+            .collect())
+    }
+
+    /// Get only footers (filtering out headers).
+    pub fn footers(&self) -> Result<Vec<HeaderFooter>> {
+        Ok(self
+            .headers_footers()?
+            .into_iter()
+            .filter(|hf| hf.is_footer())
+            .collect())
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Footnotes / Endnotes
+    // ──────────────────────────────────────────────────────────────────
+
+    /// Get all footnotes in the document.
+    ///
+    /// Each footnote contains its reference position in the main document,
+    /// the footnote number, and the footnote text with paragraphs.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// for note in doc.footnotes()? {
+    ///     println!("Footnote {}: {}", note.number, note.text());
+    /// }
+    /// ```
+    pub fn footnotes(&self) -> Result<Vec<Footnote>> {
+        let table = match &self.footnotes_table {
+            Some(t) => t,
+            None => return Ok(Vec::new()),
+        };
+
+        let mut result = Vec::with_capacity(table.count());
+        for reference in table.references() {
+            let text = self
+                .text_extractor
+                .text_at_range(reference.text_start_cp, reference.text_end_cp)
+                .to_string();
+
+            let paragraphs =
+                self.extract_paragraphs_for_range(reference.text_start_cp, reference.text_end_cp)?;
+
+            let mut note = Footnote::new(reference.ref_cp, reference.descriptor.number, text);
+            note.paragraphs = paragraphs;
+            result.push(note);
+        }
+
+        Ok(result)
+    }
+
+    /// Get all endnotes in the document.
+    ///
+    /// Endnotes share the same structure as footnotes but are placed
+    /// at the end of the document or section.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// for note in doc.endnotes()? {
+    ///     println!("Endnote {}: {}", note.number, note.text());
+    /// }
+    /// ```
+    pub fn endnotes(&self) -> Result<Vec<Footnote>> {
+        let table = match &self.endnotes_table {
+            Some(t) => t,
+            None => return Ok(Vec::new()),
+        };
+
+        let mut result = Vec::with_capacity(table.count());
+        for reference in table.references() {
+            let text = self
+                .text_extractor
+                .text_at_range(reference.text_start_cp, reference.text_end_cp)
+                .to_string();
+
+            let paragraphs =
+                self.extract_paragraphs_for_range(reference.text_start_cp, reference.text_end_cp)?;
+
+            let mut note = Footnote::new(reference.ref_cp, reference.descriptor.number, text);
+            note.paragraphs = paragraphs;
+            result.push(note);
+        }
+
+        Ok(result)
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Hyperlinks
+    // ──────────────────────────────────────────────────────────────────
+
+    /// Get all hyperlinks in the document.
+    ///
+    /// Hyperlinks are extracted from HYPERLINK fields in the main document.
+    /// Each hyperlink includes the destination URL/path, display text, and type.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// for link in doc.hyperlinks()? {
+    ///     println!("{} -> {}", link.display_text(), link.destination());
+    /// }
+    /// ```
+    pub fn hyperlinks(&self) -> Result<Vec<Hyperlink>> {
+        let table = match &self.hyperlinks_table {
+            Some(t) => t,
+            None => return Ok(Vec::new()),
+        };
+
+        Ok(table
+            .hyperlinks()
+            .iter()
+            .map(Hyperlink::from_internal)
+            .collect())
+    }
+
+    /// Find hyperlinks at a specific character position in the document.
+    pub fn hyperlinks_at_position(&self, cp: u32) -> Vec<Hyperlink> {
+        match &self.hyperlinks_table {
+            Some(t) => t
+                .find_at_position(cp)
+                .into_iter()
+                .map(Hyperlink::from_internal)
+                .collect(),
+            None => Vec::new(),
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Numbering / Lists
+    // ──────────────────────────────────────────────────────────────────
+
+    /// Get the list tables (list definitions and overrides).
+    ///
+    /// Use this to look up list formatting for individual paragraphs
+    /// via their `list_format_override` and `list_level` properties.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// if let Some(tables) = doc.list_tables() {
+    ///     for para in doc.paragraphs()? {
+    ///         if let Some(info) = doc.paragraph_list_info(&para) {
+    ///             println!("Level {}: {:?}", info.level, info.number_format);
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub fn list_tables(&self) -> Option<&ListTables> {
+        self.list_tables.as_ref()
+    }
+
+    /// Get list/numbering information for a specific paragraph.
+    ///
+    /// Returns `Some(ListInfo)` if the paragraph is part of a list,
+    /// `None` otherwise.
+    pub fn paragraph_list_info(
+        &self,
+        paragraph: &Paragraph,
+    ) -> Option<super::parts::numbering::ListLevel> {
+        let props = paragraph.properties();
+        let lfo_index = props.list_format_override?;
+        if lfo_index <= 0 {
+            return None;
+        }
+
+        let tables = self.list_tables.as_ref()?;
+
+        // LFO index is 1-based in paragraph properties
+        let lfo = tables.overrides().get((lfo_index - 1) as usize)?;
+
+        // Look up the list structure by list_id
+        let list = tables.find_structure(lfo.list_id)?;
+
+        // Get the specific level
+        let level = props.list_level.unwrap_or(0);
+        list.level(level).cloned()
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Internal helpers for subdocument extraction
+    // ──────────────────────────────────────────────────────────────────
+
+    /// Extract paragraphs for a specific character position range.
+    ///
+    /// Used internally to get paragraphs for subdocuments like
+    /// headers, footers, footnotes, and endnotes.
+    fn extract_paragraphs_for_range(&self, start_cp: u32, end_cp: u32) -> Result<Vec<Paragraph>> {
+        if start_cp >= end_cp {
+            return Ok(Vec::new());
+        }
+
+        let text = Arc::new(self.text()?);
+
+        let para_extractor = ParagraphExtractor::new_with_range(
+            &self.fib,
+            &self.table_stream,
+            Arc::clone(&text),
+            self.chp_bin_table.as_ref(),
+            (start_cp, end_cp),
+        )?;
+
+        let extracted = para_extractor.extract_paragraphs()?;
+        let mut paragraphs = Vec::with_capacity(extracted.len());
+        self.convert_to_paragraphs(extracted, &mut paragraphs);
+        Ok(paragraphs)
     }
 
     /// Get image binary data for an embedded image.

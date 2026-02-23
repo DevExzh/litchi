@@ -34,46 +34,35 @@ pub fn generate_single_entry_bin_table(start_fc: u32, end_fc: u32, page_number: 
     bte
 }
 
-/// Generate a bin table (PLCF of FKP page numbers) - legacy API
+/// Generate a bin table from multi-page FKP results.
+///
+/// Takes the FC ranges from [`FkpPages`] and associates each with a page number.
 ///
 /// # Arguments
 ///
-/// * `fkp_positions` - Vector of (fc, page_number) tuples where:
-///   - fc: file offset (FC)
-///   - page_number: Page number in WordDocument stream (byte offset / 512)
+/// * `ranges` - FC ranges from `FkpPages::ranges`: `(fc_first, fc_last)` per page
+/// * `first_page_number` - Page number of the first FKP page in the WordDocument stream
 ///
 /// # Returns
 ///
-/// Bin table as bytes (PLCF structure)
-pub fn generate_bin_table(fkp_positions: Vec<(u32, u32)>) -> Vec<u8> {
-    let mut bte = Vec::new();
+/// Bin table as bytes: `(n+1) × 4` FCs followed by `n × 4` page numbers.
+pub fn generate_bin_table_from_pages(ranges: &[(u32, u32)], first_page_number: u32) -> Vec<u8> {
+    let n = ranges.len();
+    // Size: (n+1)*4 FCs + n*4 PNs
+    let mut bte = Vec::with_capacity((n + 1) * 4 + n * 4);
 
-    // PLCF structure based on Apache POI's PlexOfCps.toByteArray():
-    // For n properties:
-    // - Array of n+1 FCs (file offsets) - 4 bytes each
-    // - Array of n data structures (page numbers for bin table) - 4 bytes each
-    //
-    // For 0 properties (empty bin table):
-    // - Just 1 FC (the ending offset = 0) - 4 bytes total
-
-    if fkp_positions.is_empty() {
-        // Empty bin table - just one FC set to 0 (POI line 99-101, 117)
-        bte.extend_from_slice(&0u32.to_le_bytes());
-        return bte;
+    // Write (n+1) FCs: one start FC per page + final end FC
+    for (fc_first, _) in ranges {
+        bte.extend_from_slice(&fc_first.to_le_bytes());
+    }
+    // Final FC = end of last page
+    if let Some((_, fc_last)) = ranges.last() {
+        bte.extend_from_slice(&fc_last.to_le_bytes());
     }
 
-    // Write n FCs (starting offsets)
-    for (fc, _) in &fkp_positions {
-        bte.extend_from_slice(&fc.to_le_bytes());
-    }
-
-    // Write the final FC (ending offset) - POI line 117
-    if let Some((last_fc, _)) = fkp_positions.last() {
-        bte.extend_from_slice(&last_fc.to_le_bytes());
-    }
-
-    // Write n page numbers (PNs) - POI line 114
-    for (_, pn) in &fkp_positions {
+    // Write n page numbers (contiguous from first_page_number)
+    for i in 0..n {
+        let pn = first_page_number + i as u32;
         bte.extend_from_slice(&pn.to_le_bytes());
     }
 

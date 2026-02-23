@@ -21,6 +21,10 @@ pub fn generate_dop(facing_pages: bool, doc_grpf_ihdt: u8) -> Vec<u8> {
     format_flags |= 0x20; // fpc default 1
     dop[0x00] = format_flags;
 
+    // NOTE: grpfIhdt is a SECTION property (SEPX sprmSGprfIhdt), NOT a DOP field.
+    // The DOP does NOT have a grpfIhdt field. Header/footer presence is controlled
+    // exclusively by the SEPX's sprmSGprfIhdt SPRM.
+
     // docinfo5 (offset 0x19A, 2 bytes): set fIncludeHeader (0x1000) / fIncludeFooter (0x2000)
     // Derive from section-level grpfIhdt bits:
     // 0x01=HeaderEven, 0x02=HeaderOdd, 0x10=HeaderFirst; 0x04=FooterEven, 0x08=FooterOdd, 0x20=FooterFirst

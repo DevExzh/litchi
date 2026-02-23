@@ -16,9 +16,10 @@
 /// Error type for DOC operations
 pub type DocError = std::io::Error;
 
-/// FIB version for Word 2007+ (LibreOffice also uses this)
-/// CRITICAL: Modern Word prefers 0x0101 over 0x00C1!
-const FIB_VERSION: u16 = 0x0101;
+/// FIB base version for backward compatibility
+/// Per MS-DOC spec: FibBase.nFib SHOULD be 0x00C1.
+/// The actual format version (0x0101) goes in FibRgCswNew.nFibNew.
+const FIB_BASE_VERSION: u16 = 0x00C1;
 
 /// Product version
 const PRODUCT_VERSION: u16 = 0x0000;
@@ -77,6 +78,27 @@ pub struct FibBuilder {
     /// Headers/Footers PLCF (PlcfHdd) offset and size (in 1Table)
     fc_plcfhdd: u32,
     lcb_plcfhdd: u32,
+    /// Footnote reference PLCF (PlcffndRef) offset and size
+    fc_plcffnd_ref: u32,
+    lcb_plcffnd_ref: u32,
+    /// Footnote text PLCF (PlcffndTxt) offset and size
+    fc_plcffnd_txt: u32,
+    lcb_plcffnd_txt: u32,
+    /// Endnote reference PLCF (PlcfendRef) offset and size
+    fc_plcfend_ref: u32,
+    lcb_plcfend_ref: u32,
+    /// Endnote text PLCF (PlcfendTxt) offset and size
+    fc_plcfend_txt: u32,
+    lcb_plcfend_txt: u32,
+    /// List table (PlfLst) offset and size
+    fc_plflst: u32,
+    lcb_plflst: u32,
+    /// List format override table (PlfLfo) offset and size
+    fc_plflfo: u32,
+    lcb_plflfo: u32,
+    /// Main document field table (PlcfFldMom) offset and size
+    fc_plcffld_mom: u32,
+    lcb_plcffld_mom: u32,
 
     // FibBase fields that need to be set (Apache POI line 906-914)
     fc_min: u32, // Start of text in WordDocument stream
@@ -119,6 +141,20 @@ impl FibBuilder {
             lcb_sttbfffn: 0,
             fc_plcfhdd: 0,
             lcb_plcfhdd: 0,
+            fc_plcffnd_ref: 0,
+            lcb_plcffnd_ref: 0,
+            fc_plcffnd_txt: 0,
+            lcb_plcffnd_txt: 0,
+            fc_plcfend_ref: 0,
+            lcb_plcfend_ref: 0,
+            fc_plcfend_txt: 0,
+            lcb_plcfend_txt: 0,
+            fc_plflst: 0,
+            lcb_plflst: 0,
+            fc_plflfo: 0,
+            lcb_plflfo: 0,
+            fc_plcffld_mom: 0,
+            lcb_plcffld_mom: 0,
             fc_min: 0,
             fc_mac: 0,
             cb_mac: 0,
@@ -190,6 +226,58 @@ impl FibBuilder {
         self.header_length = length;
     }
 
+    /// Set ccpFtn (footnote subdocument character count)
+    pub fn set_ccp_ftn(&mut self, length: u32) {
+        self.footnote_length = length;
+    }
+
+    /// Set ccpEdn (endnote subdocument character count)
+    pub fn set_ccp_edn(&mut self, length: u32) {
+        self.endnote_length = length;
+    }
+
+    /// Set footnote reference PLCF (PlcffndRef) offset and size
+    pub fn set_plcffnd_ref(&mut self, offset: u32, size: u32) {
+        self.fc_plcffnd_ref = offset;
+        self.lcb_plcffnd_ref = size;
+    }
+
+    /// Set footnote text PLCF (PlcffndTxt) offset and size
+    pub fn set_plcffnd_txt(&mut self, offset: u32, size: u32) {
+        self.fc_plcffnd_txt = offset;
+        self.lcb_plcffnd_txt = size;
+    }
+
+    /// Set endnote reference PLCF (PlcfendRef) offset and size
+    pub fn set_plcfend_ref(&mut self, offset: u32, size: u32) {
+        self.fc_plcfend_ref = offset;
+        self.lcb_plcfend_ref = size;
+    }
+
+    /// Set endnote text PLCF (PlcfendTxt) offset and size
+    pub fn set_plcfend_txt(&mut self, offset: u32, size: u32) {
+        self.fc_plcfend_txt = offset;
+        self.lcb_plcfend_txt = size;
+    }
+
+    /// Set list table (PlfLst) offset and size
+    pub fn set_plflst(&mut self, offset: u32, size: u32) {
+        self.fc_plflst = offset;
+        self.lcb_plflst = size;
+    }
+
+    /// Set list format override table (PlfLfo) offset and size
+    pub fn set_plflfo(&mut self, offset: u32, size: u32) {
+        self.fc_plflfo = offset;
+        self.lcb_plflfo = size;
+    }
+
+    /// Set main document field table (PlcfFldMom) offset and size
+    pub fn set_plcffld_mom(&mut self, offset: u32, size: u32) {
+        self.fc_plcffld_mom = offset;
+        self.lcb_plcffld_mom = size;
+    }
+
     /// Set FibBase fields (Apache POI line 906-914)
     pub fn set_base_fields(&mut self, fc_min: u32, fc_mac: u32, cb_mac: u32) {
         self.fc_min = fc_min;
@@ -203,38 +291,48 @@ impl FibBuilder {
     ///
     /// FIB structure as a byte vector
     ///
-    /// Size depends on version:
-    /// - Word 97-2003 (nFib 0x00C1): ~898 bytes (93 pairs)
-    /// - Word 2007+ (nFib 0x0101): ~1242 bytes (136 pairs)
+    /// Layout: Word 2002 format (nFibNew 0x0101) with 136 FibRgFcLcb pairs.
+    /// FibBase.nFib is always 0x00C1 per spec; actual version in FibRgCswNew.nFibNew.
     pub fn generate(&self) -> Result<Vec<u8>, DocError> {
-        // Word 2007+ format requires larger FIB
-        // 32 (base) + 30 (RgW) + 90 (RgLw) + 1090 (RgFcLcb) = 1242 bytes
-        let mut fib = vec![0u8; 1242];
+        // Word 2002 format (nFibNew 0x0101) FIB layout:
+        //   32 (base) + 2 (csw) + 28 (RgW) + 2 (cslw) + 88 (RgLw)
+        //   + 2 (cbRgFcLcb) + 1088 (RgFcLcb: 136 pairs * 8)
+        //   + 2 (cswNew) + 2 (nFibNew) + 2 (reserved) = 1248 bytes
+        //
+        // cbRgFcLcb=136 (0x0088) matches nFibNew=0x0101 (Word 2002) per MS-DOC spec.
+        // cswNew MUST be 0x0002 when nFib >= 0x00D1.
+        const FIB_SIZE: usize = 32 + 2 + 28 + 2 + 88 + 2 + (136 * 8) + 2 + 2 + 2;
+        let mut fib = vec![0u8; FIB_SIZE];
 
         // Base FIB (32 bytes)
         self.write_base(&mut fib)?;
 
-        // csw (count of shorts in FibRgW)
-        fib[32] = 0x0E; // 14 shorts
-        fib[33] = 0x00;
+        // csw (count of shorts in FibRgW) = 14
+        fib[32..34].copy_from_slice(&0x000Eu16.to_le_bytes());
 
         // FibRgW (28 bytes starting at offset 34)
         self.write_fibrgw(&mut fib[34..])?;
 
-        // cslw (count of longs in FibRgLw)
-        fib[62] = 0x16; // 22 longs
-        fib[63] = 0x00;
+        // cslw (count of longs in FibRgLw) = 22
+        fib[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
 
         // FibRgLw (88 bytes starting at offset 64)
         self.write_fibrglw(&mut fib[64..])?;
 
-        // cbRgFcLcb (count of file character position and byte count pairs)
-        // CRITICAL: Word 2007+ format uses 0x88 (136 pairs) instead of 0x5D (93 pairs)
-        fib[152] = 0x88; // 136 pairs for Word 2007+
-        fib[153] = 0x00;
+        // cbRgFcLcb (count of fc/lcb pairs) = 0x88 (136) for Word 2002
+        fib[152..154].copy_from_slice(&0x0088u16.to_le_bytes());
 
-        // FibRgFcLcb97 (744 bytes starting at offset 154)
+        // FibRgFcLcb (1088 bytes starting at offset 154)
         self.write_fibrgfclcb(&mut fib[154..])?;
+
+        // cswNew section at offset 154 + 1088 = 1242
+        // cswNew MUST be 0x0002 for nFib >= 0x00D1
+        let csw_new_offset = 154 + 136 * 8; // 1242
+        fib[csw_new_offset..csw_new_offset + 2].copy_from_slice(&0x0002u16.to_le_bytes());
+        // nFibNew = 0x0101 (Word 2002 format, matches cbRgFcLcb=136)
+        fib[csw_new_offset + 2..csw_new_offset + 4].copy_from_slice(&0x0101u16.to_le_bytes());
+        // One reserved short (cswNew=2 means 2 shorts total: nFibNew + 1 reserved)
+        // Already zero-initialized
 
         Ok(fib)
     }
@@ -243,8 +341,9 @@ impl FibBuilder {
         // Word document magic number
         fib[0..2].copy_from_slice(&0xA5ECu16.to_le_bytes());
 
-        // FIB version
-        fib[2..4].copy_from_slice(&FIB_VERSION.to_le_bytes());
+        // FIB version - MUST be 0x00C1 per MS-DOC spec
+        // Actual version (0x0101) is in FibRgCswNew.nFibNew
+        fib[2..4].copy_from_slice(&FIB_BASE_VERSION.to_le_bytes());
 
         // Product version
         fib[4..6].copy_from_slice(&PRODUCT_VERSION.to_le_bytes());
@@ -261,10 +360,12 @@ impl FibBuilder {
         // - fWhichTblStm = 1 (0x0200) => use 1Table
         // - fExtChar = 1 (0x1000)     => required by spec
         // - fComplex = 1 (0x0004)     => we use CLX piece table
+        // - cQuickSaves = 0xF (0x00F0) => MUST be 0xF when nFib >= 0x00D9
         let mut flags: u16 = 0;
         flags |= 0x0200; // fWhichTblStm
         flags |= 0x1000; // fExtChar
         flags |= 0x0004; // fComplex
+        flags |= 0x00F0; // cQuickSaves = 0xF (required for nFib >= 0x00D9)
         fib[10..12].copy_from_slice(&flags.to_le_bytes());
 
         // Encrypted flag (nFibBack)
@@ -385,12 +486,25 @@ impl FibBuilder {
         };
 
         // Field indices from Apache POI's FIBFieldHandler.java
-        const STTBFFFN: usize = 15; // Font table
+        // Each field occupies 8 bytes (fc: u32 + lcb: u32) starting at buf[0]
+        const PLCFFNDREF: usize = 2; // Footnote reference PLCF
+        const PLCFFNDTXT: usize = 3; // Footnote text PLCF
         const PLCFHDD: usize = 11; // Headers/Footers PLCF
+        const STTBFFFN: usize = 15; // Font table
+        const PLCFFLDMOM: usize = 16; // Main document field table
+        const PLCFENDREF: usize = 46; // Endnote reference PLCF
+        const PLCFENDTXT: usize = 47; // Endnote text PLCF
+        const PLFLST: usize = 73; // List table (PlfLst)
+        const PLFLFO: usize = 74; // List format override table (PlfLfo)
 
         // Write field offsets and sizes
         set_field(buf, STSHF, self.fc_stshf, self.lcb_stshf);
+        set_field(buf, PLCFFNDREF, self.fc_plcffnd_ref, self.lcb_plcffnd_ref);
+        set_field(buf, PLCFFNDTXT, self.fc_plcffnd_txt, self.lcb_plcffnd_txt);
+        set_field(buf, PLCFENDREF, self.fc_plcfend_ref, self.lcb_plcfend_ref);
+        set_field(buf, PLCFENDTXT, self.fc_plcfend_txt, self.lcb_plcfend_txt);
         set_field(buf, PLCFSED, self.fc_plcfsed, self.lcb_plcfsed);
+        set_field(buf, PLCFHDD, self.fc_plcfhdd, self.lcb_plcfhdd);
         set_field(
             buf,
             PLCFBTECHPX,
@@ -403,8 +517,10 @@ impl FibBuilder {
             self.fc_plcfbte_papx,
             self.lcb_plcfbte_papx,
         );
-        set_field(buf, STTBFFFN, self.fc_sttbfffn, self.lcb_sttbfffn); // Font table (POI line 900-903)
-        set_field(buf, PLCFHDD, self.fc_plcfhdd, self.lcb_plcfhdd); // Headers/Footers PLCF
+        set_field(buf, STTBFFFN, self.fc_sttbfffn, self.lcb_sttbfffn);
+        set_field(buf, PLCFFLDMOM, self.fc_plcffld_mom, self.lcb_plcffld_mom);
+        set_field(buf, PLFLST, self.fc_plflst, self.lcb_plflst);
+        set_field(buf, PLFLFO, self.fc_plflfo, self.lcb_plflfo);
         set_field(buf, DOP, self.fc_dop, self.lcb_dop);
         set_field(buf, CLX, self.fc_clx, self.lcb_clx);
 
@@ -428,15 +544,21 @@ mod tests {
         fib.set_main_text(0, 1000);
 
         let fib_bytes = fib.generate().unwrap();
-        assert_eq!(fib_bytes.len(), 1242);
+        assert_eq!(fib_bytes.len(), 1248);
 
         // Check magic number
         assert_eq!(u16::from_le_bytes([fib_bytes[0], fib_bytes[1]]), 0xA5EC);
 
-        // Check FIB version
+        // Check FIB base version (must be 0x00C1, actual version in nFibNew)
         assert_eq!(
             u16::from_le_bytes([fib_bytes[2], fib_bytes[3]]),
-            FIB_VERSION
+            FIB_BASE_VERSION
+        );
+
+        // Check nFibNew = 0x0101 (Word 2002, matches cbRgFcLcb=136) at offset 1244
+        assert_eq!(
+            u16::from_le_bytes([fib_bytes[1244], fib_bytes[1245]]),
+            0x0101
         );
     }
 }

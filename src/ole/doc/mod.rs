@@ -49,6 +49,9 @@
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub mod document;
+pub mod footnote;
+pub mod header_footer;
+pub mod hyperlink;
 pub mod image;
 pub mod package;
 pub mod paragraph;
@@ -60,9 +63,13 @@ pub mod table;
 pub mod writer;
 
 pub use document::Document;
+pub use footnote::{Endnote, Footnote};
+pub use header_footer::HeaderFooter;
+pub use hyperlink::Hyperlink;
 pub use image::{Image, ImageError};
 pub use package::Package;
 pub use paragraph::{Paragraph, Run};
+pub use parts::numbering::{ListLevel, ListTables, NumberFormat};
 pub use shapes::DocShape;
 pub use table::{Cell, Row, Table};
 pub use writer::{CharacterFormatting, DocWriteError, DocWriter, ParagraphFormatting};

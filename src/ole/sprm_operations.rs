@@ -790,9 +790,9 @@ pub const SPRM_T_JC90: u16 = 0x5442;
 /// sprmSBkc - Break code (operation 0x00)
 pub const SPRM_S_BKC: u16 = 0x3000;
 
-/// sprmSFTitlePage - Title page (operation 0x0A)
-/// Note: Some older tables list 0x3001; MS-DOC/LibreOffice indicate 0x300A (operation 0x0A)
-pub const SPRM_S_F_TITLE_PAGE: u16 = 0x300A;
+/// sprmSFTitlePage - Title page (ispmd=0x09, sgc=4(section), spra=1(1-byte))
+/// Encodes to: 001_100_0_000001001 = 0x3009
+pub const SPRM_S_F_TITLE_PAGE: u16 = 0x3009;
 
 /// sprmSCcolumns - Number of columns (operation 0x02)
 pub const SPRM_S_C_COLUMNS: u16 = 0x3002;
@@ -800,9 +800,10 @@ pub const SPRM_S_C_COLUMNS: u16 = 0x3002;
 /// sprmSDxaColumns - Column width (operation 0x03)
 pub const SPRM_S_DXA_COLUMNS: u16 = 0x9003;
 
-/// sprmSGprfIhdt - Header/Footer presence mask in section (operation 0x14)
-/// Bits specify which header/footer stories exist for this section.
-pub const SPRM_S_GPRF_IHDT: u16 = 0x3014;
+/// sprmSGprfIhdt - Header/Footer presence mask in section (ispmd=0x0E, sgc=4(section), spra=1(1-byte))
+/// Bits: 0x01=EvenHdr, 0x02=OddHdr, 0x04=EvenFtr, 0x08=OddFtr, 0x10=FirstHdr, 0x20=FirstFtr
+/// Encodes to: 001_100_0_000001110 = 0x300E
+pub const SPRM_S_GPRF_IHDT: u16 = 0x300E;
 
 /// Extract SPRM type from opcode (bits 10-12).
 ///

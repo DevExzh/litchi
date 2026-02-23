@@ -39,10 +39,26 @@ pub mod font_table;
 /// OLE metadata streams (CompObj, Ole)
 pub mod ole_metadata;
 
+/// Headers and footers writer
+pub mod headers;
+
+/// Footnotes and endnotes writer
+pub mod footnotes;
+
+/// Hyperlinks writer
+pub mod hyperlinks;
+
+/// List numbering writer
+pub mod numbering;
+
 // Re-export public types
 pub use core::{CharacterFormatting, DocWriteError, DocWriter, ParagraphFormatting};
 pub use fib::FibBuilder;
 pub use fkp::{ChpxFkpBuilder, PapxFkpBuilder};
+pub use footnotes::{EndnotesWriter, FootnoteEntry, FootnotesWriter};
+pub use headers::{HeaderFooterEntry, HeaderFooterType, HeadersWriter};
+pub use hyperlinks::{HyperlinkEntry, HyperlinkType, HyperlinksWriter};
+pub use numbering::{ListFormatOverride, ListLevel, ListStructure, NumberFormat, NumberingWriter};
 pub use piece_table::{Piece, PieceTableBuilder};
 pub use sprm::SprmBuilder;
 pub use tap::{TableCell, TableRow, TapBuilder};

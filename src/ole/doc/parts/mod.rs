@@ -7,11 +7,16 @@
 /// - Character and paragraph properties
 /// - Style definitions
 /// - Table structures
+/// - Headers/footers, footnotes/endnotes, hyperlinks, numbering/lists
 pub mod chp;
 pub mod chp_bin_table;
 pub mod fib;
 pub mod fields;
 pub mod fkp;
+pub mod footnotes;
+pub mod headers;
+pub mod hyperlinks;
+pub mod numbering;
 pub mod pap;
 pub mod paragraph_extractor;
 pub mod piece_table;

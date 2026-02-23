@@ -73,6 +73,8 @@
 
 use super::fib::FibBuilder;
 use super::font_table::FontTableBuilder;
+use super::footnotes::FootnoteEntry;
+use super::numbering::{ListFormatOverride, ListStructure, NumberingWriter};
 use super::piece_table::{Piece, PieceTableBuilder};
 use crate::ole::sprm_operations::*;
 use crate::ole::writer::OleWriter;
@@ -195,7 +197,10 @@ pub struct ParagraphFormatting {
     pub mirror_indents: Option<bool>,
     /// Line spacing descriptor
     pub line_spacing: Option<LineSpacing>,
-    // TODO: tabs, borders, shading, numbering
+    /// List level index (0-based, used with `ilfo` to associate paragraph with a list)
+    pub ilvl: Option<u8>,
+    /// List format override index (1-based index into PlfLfo; 0 = no list)
+    pub ilfo: Option<u16>,
 }
 
 /// Represents a text run with formatting
@@ -260,6 +265,12 @@ pub struct DocWriter {
     footer_even: Option<String>,
     footer_odd: Option<String>,
     footer_first: Option<String>,
+    /// Footnote entries
+    footnotes: Vec<FootnoteEntry>,
+    /// Endnote entries
+    endnotes: Vec<FootnoteEntry>,
+    /// Numbering writer for list tables
+    numbering: NumberingWriter,
 }
 
 impl DocWriter {
@@ -275,6 +286,9 @@ impl DocWriter {
             footer_even: None,
             footer_odd: None,
             footer_first: None,
+            footnotes: Vec::new(),
+            endnotes: Vec::new(),
+            numbering: NumberingWriter::new(),
         }
     }
 
@@ -296,6 +310,15 @@ impl DocWriter {
             formatting: ParagraphFormatting::default(),
         });
         Ok(())
+    }
+
+    /// Add a paragraph with paragraph formatting (default character formatting)
+    pub fn add_formatted_paragraph(
+        &mut self,
+        text: &str,
+        para_fmt: ParagraphFormatting,
+    ) -> Result<(), DocWriteError> {
+        self.add_paragraph_with_format(text, CharacterFormatting::default(), para_fmt)
     }
 
     /// Add a paragraph with formatting
@@ -434,6 +457,164 @@ impl DocWriter {
         self.footer_first = Some(text.to_string());
     }
 
+    /// Add a footnote to the document.
+    ///
+    /// The `ref_position` in `FootnoteEntry` is the character position
+    /// in the main document where the footnote reference marker appears.
+    pub fn add_footnote(&mut self, entry: FootnoteEntry) {
+        self.footnotes.push(entry);
+    }
+
+    /// Add an endnote to the document.
+    pub fn add_endnote(&mut self, entry: FootnoteEntry) {
+        self.endnotes.push(entry);
+    }
+
+    /// Add a list structure definition.
+    pub fn add_list(&mut self, list: ListStructure) {
+        self.numbering.add_list(list);
+    }
+
+    /// Add a list format override.
+    pub fn add_list_override(&mut self, lfo: ListFormatOverride) {
+        self.numbering.add_override(lfo);
+    }
+
+    /// Build footnote or endnote subdocument text and PLCFs.
+    ///
+    /// Per MS-DOC spec:
+    /// - Each note text MUST begin with U+0002 (auto-numbered reference mark) with fSpec=1
+    /// - PlcffndRef final CP MUST equal `ccp_text` (main document character count)
+    /// - PlcffndTxt CPs are relative to the note subdocument start
+    ///
+    /// `actual_ref_cps`: actual CPs in main doc where U+0002 refs were injected (entry order).
+    /// `ccp_text`: FibRgLw97.ccpText — needed for the mandatory final CP in PlcffndRef.
+    #[allow(clippy::too_many_arguments)]
+    fn build_note_story(
+        entries: &[FootnoteEntry],
+        actual_ref_cps: &[u32],
+        ccp_text: u32,
+        text_fc_start: u32,
+        text_stream: &mut Vec<u8>,
+        chpx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
+        papx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
+        pieces: &mut Vec<Piece>,
+        current_cp_total: &mut u32,
+        font_builder: &mut FontTableBuilder,
+    ) -> Option<(Vec<u8>, Vec<u8>, u32)> {
+        if entries.is_empty() {
+            return None;
+        }
+
+        let mut note_cp: u32 = 0;
+        // PlcffndTxt: (n+1) CPs relative to note subdocument start
+        let mut txt_cps: Vec<u32> = vec![0];
+
+        for entry in entries {
+            let fc_para_start = text_fc_start + text_stream.len() as u32;
+
+            // 1) Auto-numbered reference mark U+0002 with fSpec=1 CHPX
+            //    This is what Word displays as the footnote number in the note area.
+            let fc_ref = fc_para_start;
+            text_stream.extend_from_slice(&0x0002u16.to_le_bytes());
+            let fc_ref_end = fc_ref + 2;
+            let ref_grpprl = build_chpx_grpprl(
+                &CharacterFormatting {
+                    special: Some(true),
+                    ..Default::default()
+                },
+                font_builder,
+            );
+            chpx_entries.push((fc_ref, fc_ref_end, ref_grpprl));
+
+            // 2) Note body text
+            let text = &entry.text;
+            let text_chars = text.chars().count() as u32;
+            let fc_text_start = text_fc_start + text_stream.len() as u32;
+            for u in text.encode_utf16() {
+                text_stream.extend_from_slice(&u.to_le_bytes());
+            }
+            let fc_text_end = fc_text_start + text_chars * 2;
+            let body_grpprl = build_chpx_grpprl(&CharacterFormatting::default(), font_builder);
+            chpx_entries.push((fc_text_start, fc_text_end, body_grpprl));
+
+            // 3) Paragraph mark (chEop 0x0D) — extends last CHPX
+            text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+            if let Some(last) = chpx_entries.last_mut() {
+                last.1 += 2;
+            }
+            let fc_para_end = text_fc_start + text_stream.len() as u32;
+
+            // PAPX for this note paragraph
+            papx_entries.push((
+                fc_para_start,
+                fc_para_end,
+                build_papx_grpprl(&ParagraphFormatting::default()),
+            ));
+
+            // Piece: 1 (auto-ref) + text_chars + 1 (para mark)
+            let total_chars = 1 + text_chars + 1;
+            pieces.push(Piece::new(
+                *current_cp_total,
+                *current_cp_total + total_chars,
+                fc_para_start,
+                true,
+            ));
+            *current_cp_total += total_chars;
+            note_cp += total_chars;
+
+            txt_cps.push(note_cp);
+        }
+
+        // Trailing guard paragraph mark — mandatory per MS-DOC spec:
+        // "The entire footnote subdocument MUST end with a paragraph mark."
+        // This is an EXTRA paragraph mark beyond the last footnote's own \r.
+        // LibreOffice and POI both write this guard.
+        {
+            let fc_guard = text_fc_start + text_stream.len() as u32;
+            text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+            let fc_guard_end = fc_guard + 2;
+            chpx_entries.push((fc_guard, fc_guard_end, Vec::new()));
+            papx_entries.push((
+                fc_guard,
+                fc_guard_end,
+                build_papx_grpprl(&ParagraphFormatting::default()),
+            ));
+            pieces.push(Piece::new(
+                *current_cp_total,
+                *current_cp_total + 1,
+                fc_guard,
+                true,
+            ));
+            *current_cp_total += 1;
+            note_cp += 1;
+            txt_cps.push(note_cp);
+        }
+
+        // PlcffndRef: actual reference CPs + mandatory final CP = ccpText
+        let mut ref_cps: Vec<u32> = actual_ref_cps.to_vec();
+        ref_cps.push(ccp_text);
+
+        // Serialize PlcffndRef: (n+1) CPs then n FRDs (2 bytes each)
+        let mut plcf_ref = Vec::with_capacity(ref_cps.len() * 4 + entries.len() * 2);
+        for cp in &ref_cps {
+            plcf_ref.extend_from_slice(&cp.to_le_bytes());
+        }
+        // FRD (Footnote Reference Descriptor): nAuto MUST be 0x0000 for
+        // auto-numbered references (MS-DOC 2.9.73). Non-zero = custom mark codepoint.
+        for _entry in entries {
+            plcf_ref.extend_from_slice(&0u16.to_le_bytes());
+        }
+
+        // Serialize PlcffndTxt: (n+2) CPs for n footnotes (n stories + 1 guard + 1 final)
+        let mut plcf_txt = Vec::with_capacity(txt_cps.len() * 4);
+        for cp in &txt_cps {
+            plcf_txt.extend_from_slice(&cp.to_le_bytes());
+        }
+
+        Some((plcf_ref, plcf_txt, note_cp))
+    }
+
     /// Build header/footer story text and PlcfHdd
     ///
     /// Appends header/footer text to `text_stream`, extends CHPX/PAPX entries and pieces.
@@ -463,8 +644,16 @@ impl DocWriter {
             return None;
         }
 
-        // Build index->text mapping for 12 slots defined by POI HeaderStories
-        // 0..5 unused here (footnote/endnote separators)
+        // Build index->text mapping for 12 slots per MS-DOC PlcfHdd / Apache POI:
+        //   Slots 0-5:  footnote/endnote separator/continuation stories
+        //   Slot 6:     even page header (section 0)
+        //   Slot 7:     odd page header (section 0) — "default" when no facing pages
+        //   Slot 8:     even page footer (section 0)
+        //   Slot 9:     odd page footer (section 0) — "default" when no facing pages
+        //   Slot 10:    first page header (section 0)
+        //   Slot 11:    first page footer (section 0)
+        // PlcfHdd has 13 CPs (12 slot starts + 1 final).
+        // Verified against LibreOffice DOC writer output.
         let mut idx_text: [Option<&str>; 12] = [None; 12];
         if let Some(ref s) = self.header_even {
             idx_text[6] = Some(s.as_str());
@@ -486,94 +675,87 @@ impl DocWriter {
         }
 
         // Local CP within header story (counts only header subdocument)
+        // Every slot (0-11) must have at least one paragraph mark.
+        // Word uses the CP ranges to locate header/footer stories.
         let mut header_cp: u32 = 0;
         let mut cp_starts: [u32; 12] = [0; 12];
 
         for i in 0..12 {
             cp_starts[i] = header_cp;
             if let Some(text) = idx_text[i] {
-                // Add a single paragraph for this header/footer part
+                // Slot has content: write text + paragraph mark + guard paragraph mark
                 let fc_para_start = text_fc_start + text_stream.len() as u32;
                 let mut para_chars: u32 = 0;
-                let last_run_index_for_para = chpx_entries.len() - 1;
 
-                // Character formatting default
                 let char_fmt = CharacterFormatting::default();
                 let grpprl = build_chpx_grpprl(&char_fmt, font_builder);
                 let run_fc_start = fc_para_start;
-                // Encode text to UTF-16LE
                 for u in text.encode_utf16() {
                     text_stream.extend_from_slice(&u.to_le_bytes());
                 }
                 para_chars += text.chars().count() as u32;
-                // chpx range for run (without paragraph mark yet)
                 let run_fc_end = run_fc_start + para_chars * 2;
                 chpx_entries.push((run_fc_start, run_fc_end, grpprl));
+                let current_chpx_idx = chpx_entries.len() - 1;
 
-                // Paragraph mark for the content paragraph
+                // Content paragraph mark
                 text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
-                // include content paragraph mark in the last run
-                chpx_entries[last_run_index_for_para].1 += 2;
+                chpx_entries[current_chpx_idx].1 += 2;
                 let fc_para_end = text_fc_start + text_stream.len() as u32;
+                papx_entries.push((
+                    fc_para_start,
+                    fc_para_end,
+                    build_papx_grpprl(&ParagraphFormatting::default()),
+                ));
 
-                // PAPX for content paragraph
-                let pap_grpprl = build_papx_grpprl(&ParagraphFormatting::default());
-                papx_entries.push((fc_para_start, fc_para_end, pap_grpprl));
-
-                // Guard paragraph mark between stories (required by MS-DOC for non-empty stories)
+                // Guard paragraph mark (required separator between stories)
                 let fc_guard_start = fc_para_end;
                 text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
-                // Extend last run to cover the guard mark as well (default formatting)
-                chpx_entries[last_run_index_for_para].1 += 2;
+                chpx_entries[current_chpx_idx].1 += 2;
                 let fc_guard_end = fc_guard_start + 2;
-                // PAPX for guard empty paragraph (default formatting)
-                let guard_pap_grpprl = build_papx_grpprl(&ParagraphFormatting::default());
-                papx_entries.push((fc_guard_start, fc_guard_end, guard_pap_grpprl));
+                papx_entries.push((
+                    fc_guard_start,
+                    fc_guard_end,
+                    build_papx_grpprl(&ParagraphFormatting::default()),
+                ));
 
-                // Add to global piece table (CLX) after main body; include content + guard marks
-                let fc_offset = fc_para_start;
+                // Piece for content + guard
                 pieces.push(Piece::new(
                     *current_cp_total,
                     *current_cp_total + para_chars + 2,
-                    fc_offset,
+                    fc_para_start,
                     true,
                 ));
                 *current_cp_total += para_chars + 2;
-
-                // Local header story CPs include content chars + content EOP + guard EOP
                 header_cp += para_chars + 2;
+            } else {
+                // Empty slot: write a single paragraph mark as guard (MS-DOC requires it)
+                let fc_guard = text_fc_start + text_stream.len() as u32;
+                text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+                let fc_guard_end = fc_guard + 2;
+
+                // CHPX for the guard mark
+                chpx_entries.push((fc_guard, fc_guard_end, Vec::new()));
+                // PAPX for the guard mark
+                papx_entries.push((
+                    fc_guard,
+                    fc_guard_end,
+                    build_papx_grpprl(&ParagraphFormatting::default()),
+                ));
+
+                // Piece for guard
+                pieces.push(Piece::new(
+                    *current_cp_total,
+                    *current_cp_total + 1,
+                    fc_guard,
+                    true,
+                ));
+                *current_cp_total += 1;
+                header_cp += 1;
             }
         }
 
-        // Trailing placeholder EOP after the last story (per MS-DOC PlcfHdd requirements):
-        // Ensure that the final CP (n+2) is exactly one greater than the last story's end CP (n+1),
-        // with an actual chEop stored at that file position.
-        if header_cp > 0 {
-            let fc_trailing_start = text_fc_start + text_stream.len() as u32;
-            // write trailing chEop
-            text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
-            // extend last CHPX to cover the trailing eop
-            if let Some((_, last_end, _)) = chpx_entries.last_mut() {
-                *last_end += 2;
-            }
-            let fc_trailing_end = text_fc_start + text_stream.len() as u32;
-            // PAPX for trailing empty paragraph
-            let trailing_pap = build_papx_grpprl(&ParagraphFormatting::default());
-            papx_entries.push((fc_trailing_start, fc_trailing_end, trailing_pap));
-            // Piece for trailing EOP
-            pieces.push(Piece::new(
-                *current_cp_total,
-                *current_cp_total + 1,
-                fc_trailing_start,
-                true,
-            ));
-            *current_cp_total += 1;
-
-            // Header CP accounts for this trailing paragraph mark
-            header_cp += 1;
-        }
-
-        // Build PlcfHdd (PLCF with cbStruct=0): cp starts for 12 props + final end CP
+        // Build PlcfHdd: 13 CPs (12 slot starts + 1 final end CP)
         let mut plcfhdd = Vec::with_capacity((12 + 1) * 4);
         for cp_start in &cp_starts {
             plcfhdd.extend_from_slice(&cp_start.to_le_bytes());
@@ -704,9 +886,9 @@ impl DocWriter {
         let mut table_stream = Vec::new();
 
         // 1. Reserve space for FIB (File Information Block)
-        // Word 2007+ format (nFib 0x0101) requires 1242 bytes
-        // We'll write the actual FIB later after we know all the offsets
-        let fib_placeholder = vec![0u8; 1242];
+        // Word 2007+ format (nFib 0x0101) requires 1248 bytes
+        // (includes cswNew + nFibNew + reserved short at the end)
+        let fib_placeholder = vec![0u8; 1248];
         word_document_stream.extend_from_slice(&fib_placeholder);
 
         // 2. fcMin: will be the padded start of text (set after padding below)
@@ -730,6 +912,25 @@ impl DocWriter {
         // Align fcMin to actual (padded) start of text
         let fc_min: u32 = text_fc_start;
 
+        // Build sorted list of note references with type tracking.
+        // Each entry: (ref_position, is_footnote, original_index_in_vec)
+        let mut note_refs: Vec<(u32, bool, usize)> = Vec::new();
+        for (idx, entry) in self.footnotes.iter().enumerate() {
+            note_refs.push((entry.ref_position, true, idx));
+        }
+        for (idx, entry) in self.endnotes.iter().enumerate() {
+            note_refs.push((entry.ref_position, false, idx));
+        }
+        note_refs.sort_by_key(|r| r.0);
+
+        // Track field character CPs for PlcfFldMom
+        let mut field_char_cps: Vec<(u32, u16)> = Vec::new();
+
+        // Track actual CPs where U+0002 was injected, keyed by (is_footnote, entry_index)
+        let mut footnote_actual_cps: Vec<(usize, u32)> = Vec::new();
+        let mut endnote_actual_cps: Vec<(usize, u32)> = Vec::new();
+        let mut note_inject_idx: usize = 0;
+
         for paragraph in &self.paragraphs {
             let fc_para_start = text_fc_start + text_stream.len() as u32;
             let mut para_chars: u32 = 0;
@@ -738,9 +939,19 @@ impl DocWriter {
                 let run_fc_start = text_fc_start + text_stream.len() as u32;
                 let run_text = &run.text;
                 let run_len_chars = run_text.chars().count() as u32;
-                // Build run grpprl
                 let grpprl = build_chpx_grpprl(&run.formatting, &mut font_builder);
-                // Encode run text to UTF-16LE
+
+                // Track field characters in this run
+                for (char_offset, ch) in run_text.chars().enumerate() {
+                    let cp = current_cp + para_chars + char_offset as u32;
+                    match ch as u32 {
+                        0x0013 => field_char_cps.push((cp, 0x13)),
+                        0x0014 => field_char_cps.push((cp, 0x14)),
+                        0x0015 => field_char_cps.push((cp, 0x15)),
+                        _ => {},
+                    }
+                }
+
                 for u in run_text.encode_utf16() {
                     text_stream.extend_from_slice(&u.to_le_bytes());
                 }
@@ -749,17 +960,47 @@ impl DocWriter {
                 para_chars += run_len_chars;
                 last_run_index_for_para = Some(chpx_entries.len() - 1);
             }
-            // Add paragraph mark (0x0D), include in last run coverage to avoid gaps
+
+            // Inject U+0002 reference characters for notes whose ref_position
+            // falls within this paragraph's CP range
+            while note_inject_idx < note_refs.len() {
+                let (ref_cp, is_footnote, entry_idx) = note_refs[note_inject_idx];
+                if ref_cp <= current_cp + para_chars {
+                    let actual_cp = current_cp + para_chars;
+                    let fc_ref = text_fc_start + text_stream.len() as u32;
+                    text_stream.extend_from_slice(&0x0002u16.to_le_bytes());
+                    let fc_ref_end = fc_ref + 2;
+                    let ref_grpprl = build_chpx_grpprl(
+                        &CharacterFormatting {
+                            special: Some(true),
+                            ..Default::default()
+                        },
+                        &mut font_builder,
+                    );
+                    chpx_entries.push((fc_ref, fc_ref_end, ref_grpprl));
+                    para_chars += 1;
+                    last_run_index_for_para = Some(chpx_entries.len() - 1);
+                    // Record actual CP for PlcffndRef/PlcfendRef
+                    if is_footnote {
+                        footnote_actual_cps.push((entry_idx, actual_cp));
+                    } else {
+                        endnote_actual_cps.push((entry_idx, actual_cp));
+                    }
+                    note_inject_idx += 1;
+                } else {
+                    break;
+                }
+            }
+
+            // Paragraph mark (0x0D)
             text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
             if let Some(last_idx) = last_run_index_for_para {
-                chpx_entries[last_idx].1 += 2; // include paragraph mark bytes
+                chpx_entries[last_idx].1 += 2;
             }
             let fc_para_end = text_fc_start + text_stream.len() as u32;
-            // Build PAPX grpprl for paragraph
             let pap_grpprl = build_papx_grpprl(&paragraph.formatting);
             papx_entries.push((fc_para_start, fc_para_end, pap_grpprl));
 
-            // Piece descriptor for this paragraph (includes paragraph mark)
             let fc_offset = fc_para_start;
             pieces.push(Piece::new(
                 current_cp,
@@ -770,11 +1011,29 @@ impl DocWriter {
             current_cp += para_chars + 1;
         }
 
-        // ccpText (main body) length in CPs
         let text_length = current_cp;
 
-        // Stage: headers_footers - build header story and PlcfHdd
-        // This appends header/footer text to the text stream and extends FKPs/pieces
+        // Sort actual CPs by entry index to match footnote/endnote entry order
+        footnote_actual_cps.sort_by_key(|&(idx, _)| idx);
+        endnote_actual_cps.sort_by_key(|&(idx, _)| idx);
+        let ftn_ref_cps: Vec<u32> = footnote_actual_cps.iter().map(|&(_, cp)| cp).collect();
+        let edn_ref_cps: Vec<u32> = endnote_actual_cps.iter().map(|&(_, cp)| cp).collect();
+
+        // Subdocument order: main text → footnotes → headers/footers → endnotes
+        let footnote_plcfs = Self::build_note_story(
+            &self.footnotes,
+            &ftn_ref_cps,
+            text_length,
+            text_fc_start,
+            &mut text_stream,
+            &mut chpx_entries,
+            &mut papx_entries,
+            &mut pieces,
+            &mut current_cp,
+            &mut font_builder,
+        );
+
+        // Build header/footer story
         let mut header_plcfhdd: Option<(Vec<u8>, u32)> = None;
         if let Some((plcf_bytes, header_cp)) = self.build_header_story(
             text_fc_start,
@@ -788,11 +1047,51 @@ impl DocWriter {
             header_plcfhdd = Some((plcf_bytes, header_cp));
         }
 
+        // Build endnote story (appends endnote text after headers)
+        let endnote_plcfs = Self::build_note_story(
+            &self.endnotes,
+            &edn_ref_cps,
+            text_length,
+            text_fc_start,
+            &mut text_stream,
+            &mut chpx_entries,
+            &mut papx_entries,
+            &mut pieces,
+            &mut current_cp,
+            &mut font_builder,
+        );
+
+        // Mandatory trailing paragraph mark when ANY subdocument exists.
+        // Per MS-DOC spec: "The total number of character positions is
+        // ccpText + ccpFtn + ccpHdd + ... + 1 if any of ccpFtn, ccpHdd, etc. are nonzero."
+        // This extra character MUST be present; Word uses it as a sentinel.
+        let has_subdocs =
+            footnote_plcfs.is_some() || header_plcfhdd.is_some() || endnote_plcfs.is_some();
+        if has_subdocs {
+            let fc_trailing = text_fc_start + text_stream.len() as u32;
+            text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+            let fc_trailing_end = fc_trailing + 2;
+            chpx_entries.push((fc_trailing, fc_trailing_end, Vec::new()));
+            papx_entries.push((
+                fc_trailing,
+                fc_trailing_end,
+                build_papx_grpprl(&ParagraphFormatting::default()),
+            ));
+            pieces.push(Piece::new(current_cp, current_cp + 1, fc_trailing, true));
+            current_cp += 1;
+        }
+
         // Initialize FIB builder
         let mut fib = FibBuilder::new();
         fib.set_main_text(0, text_length);
+        if let Some((_, _, ftn_cp)) = &footnote_plcfs {
+            fib.set_ccp_ftn(*ftn_cp);
+        }
         if let Some((_, header_cp)) = &header_plcfhdd {
             fib.set_ccp_hdd(*header_cp);
+        }
+        if let Some((_, _, edn_cp)) = &endnote_plcfs {
+            fib.set_ccp_edn(*edn_cp);
         }
 
         let mut table_offset = 0u32;
@@ -847,28 +1146,79 @@ impl DocWriter {
             table_offset = table_stream.len() as u32;
         }
 
-        // 6. Write CHPX bin table (character formatting) (MANDATORY - POI line 753-756)
-        // NOTE: Will be populated after FKPs are written
-        let chpx_bin_table_offset = table_offset;
-        // Reserve space for actual bin table (will be written later)
-        // Bin table with 1 entry: 2 CPs (8 bytes) + 1 PN (4 bytes) = 12 bytes
-        table_stream.extend_from_slice(&[0u8; 12]);
-        fib.set_plcfbte_chpx(table_offset, 12);
-        table_offset = table_stream.len() as u32;
+        // Write footnote PLCFs if present
+        if let Some((ref_bytes, txt_bytes, _)) = &footnote_plcfs {
+            fib.set_plcffnd_ref(table_offset, ref_bytes.len() as u32);
+            table_stream.extend_from_slice(ref_bytes);
+            table_offset = table_stream.len() as u32;
 
-        // 7. Write PAPX bin table (paragraph formatting) (MANDATORY - POI line 767-771)
-        // NOTE: Will be populated after FKPs are written
-        let papx_bin_table_offset = table_offset;
-        // Reserve space for actual bin table
-        table_stream.extend_from_slice(&[0u8; 12]);
-        fib.set_plcfbte_papx(table_offset, 12);
-        table_offset = table_stream.len() as u32;
+            fib.set_plcffnd_txt(table_offset, txt_bytes.len() as u32);
+            table_stream.extend_from_slice(txt_bytes);
+            table_offset = table_stream.len() as u32;
+        }
 
-        // 8. Reserve space for section table - will write after SEPX is created
-        let section_table_offset = table_offset;
-        let section_table_placeholder = vec![0u8; 20]; // 20 bytes: 2 CPs (8) + 1 SED (12)
-        table_stream.extend_from_slice(&section_table_placeholder);
-        table_offset = table_stream.len() as u32;
+        // Write endnote PLCFs if present
+        if let Some((ref_bytes, txt_bytes, _)) = &endnote_plcfs {
+            fib.set_plcfend_ref(table_offset, ref_bytes.len() as u32);
+            table_stream.extend_from_slice(ref_bytes);
+            table_offset = table_stream.len() as u32;
+
+            fib.set_plcfend_txt(table_offset, txt_bytes.len() as u32);
+            table_stream.extend_from_slice(txt_bytes);
+            table_offset = table_stream.len() as u32;
+        }
+
+        // Write PlcfFldMom (main document field table) if there are field characters
+        // Structure: (n+1) CPs + n FLD descriptors (2 bytes each)
+        // FLD descriptor per MS-DOC 2.8.25:
+        //   fldBegin (0x13): byte0 = 0x13, byte1 = flt (field type: 0x58 = HYPERLINK)
+        //   fldSep   (0x14): byte0 = 0x14, byte1 = flags (0x00)
+        //   fldEnd   (0x15): byte0 = 0x15, byte1 = flags (0x00)
+        // Final CP MUST equal ccpText per MS-DOC spec.
+        if !field_char_cps.is_empty() {
+            let n = field_char_cps.len();
+            let mut plcffld = Vec::with_capacity((n + 1) * 4 + n * 2);
+            for (cp, _) in &field_char_cps {
+                plcffld.extend_from_slice(&cp.to_le_bytes());
+            }
+            // Final CP = ccpText (per MS-DOC spec PlcfFld)
+            plcffld.extend_from_slice(&text_length.to_le_bytes());
+            // FLD descriptors
+            for (_, fld_type) in &field_char_cps {
+                let (fldch, flt_or_flags) = match *fld_type {
+                    0x13 => (0x13u8, 0x58u8), // fldBegin, flt = HYPERLINK (88)
+                    0x14 => (0x14u8, 0x00u8), // fldSep, no flags
+                    0x15 => (0x15u8, 0x00u8), // fldEnd, no flags
+                    _ => (0x00, 0x00),
+                };
+                plcffld.push(fldch);
+                plcffld.push(flt_or_flags);
+            }
+            fib.set_plcffld_mom(table_offset, plcffld.len() as u32);
+            table_stream.extend_from_slice(&plcffld);
+            table_offset = table_stream.len() as u32;
+        }
+
+        // Write numbering tables (PlfLst / PlfLfo) if present
+        if !self.numbering.is_empty() {
+            // PlfLst: lcbPlfLst covers only cLst + LSTF array.
+            // LVL data is appended immediately after but NOT counted in lcbPlfLst
+            // per MS-DOC spec and Apache POI ListTables.writeListDataTo().
+            let (plflst_header, lvl_data) = self.numbering.build_plflst();
+            fib.set_plflst(table_offset, plflst_header.len() as u32);
+            table_stream.extend_from_slice(&plflst_header);
+            table_stream.extend_from_slice(&lvl_data);
+            table_offset = table_stream.len() as u32;
+
+            let plflfo = self.numbering.build_plflfo();
+            fib.set_plflfo(table_offset, plflfo.len() as u32);
+            table_stream.extend_from_slice(&plflfo);
+            table_offset = table_stream.len() as u32;
+        }
+
+        // 6-8. Bin tables and section table are written AFTER FKPs
+        // (we need FKP page numbers first).
+        // Record current table_offset; bin tables will be appended later.
 
         // 9. Write Font Table to table stream (MANDATORY - POI line 899-903)
         let font_table = font_builder.generate();
@@ -880,8 +1230,7 @@ impl DocWriter {
 
         // Capture fcMac AFTER text, BEFORE FKPs (POI line 703)
         let fc_mac_value = word_document_stream.len() as u32;
-        // Compute FC end of text range for PLCFBTE (bin tables use FC domain per POI)
-        let text_fc_end = text_fc_start + text_stream.len() as u32;
+        // text_fc_end is computed inside FKP page ranges; no longer needed here
 
         // 10a. Write FKPs to WordDocument stream (CRITICAL - POI line 450-492)
         // FKPs must start at 512-byte aligned offsets
@@ -890,51 +1239,44 @@ impl DocWriter {
         let padding_needed = (512 - (current_size % 512)) % 512;
         word_document_stream.resize(current_size + padding_needed, 0);
 
-        // Calculate page number for first CHPX FKP
-        let chpx_fkp_page = (word_document_stream.len() / 512) as u32;
-
-        // Create CHPX FKP from collected runs (FKP entries use FC)
+        // ── CHPX FKPs (multi-page) ──
+        let chpx_first_page = (word_document_stream.len() / 512) as u32;
         let mut chpx_builder = crate::ole::doc::writer::fkp::ChpxFkpBuilder::new();
         for (fc_s, fc_e, grpprl) in &chpx_entries {
             chpx_builder.add_entry(*fc_s, *fc_e, grpprl.clone());
         }
-        let chpx_fkp = chpx_builder.generate()?;
-        word_document_stream.extend_from_slice(&chpx_fkp);
+        let chpx_pages = chpx_builder.generate_pages()?;
+        for page in &chpx_pages.pages {
+            word_document_stream.extend_from_slice(page);
+        }
 
-        // Update CHPX bin table with actual page number (FC domain)
-        let chpx_bin_table_with_fkp =
-            crate::ole::doc::writer::bin_table::generate_single_entry_bin_table(
-                text_fc_start,
-                text_fc_end,
-                chpx_fkp_page,
-            );
-        // Write the bin table to table_stream
-        let chpx_table_start = chpx_bin_table_offset as usize;
-        let chpx_table_end = chpx_table_start + 12;
-        table_stream[chpx_table_start..chpx_table_end].copy_from_slice(&chpx_bin_table_with_fkp);
-
-        // Calculate page number for first PAPX FKP (next 512-byte page)
-        let papx_fkp_page = (word_document_stream.len() / 512) as u32;
-
-        // Create PAPX FKP (one entry per paragraph, FC domain)
+        // ── PAPX FKPs (multi-page) ──
+        let papx_first_page = (word_document_stream.len() / 512) as u32;
         let mut papx_builder = crate::ole::doc::writer::fkp::PapxFkpBuilder::new();
         for (fc_s, fc_e, grpprl) in &papx_entries {
             papx_builder.add_entry(*fc_s, *fc_e, grpprl.clone());
         }
-        let papx_fkp = papx_builder.generate()?;
-        word_document_stream.extend_from_slice(&papx_fkp);
+        let papx_pages = papx_builder.generate_pages()?;
+        for page in &papx_pages.pages {
+            word_document_stream.extend_from_slice(page);
+        }
 
-        // Update PAPX bin table with actual page number (FC domain)
-        let papx_bin_table_with_fkp =
-            crate::ole::doc::writer::bin_table::generate_single_entry_bin_table(
-                text_fc_start,
-                text_fc_end,
-                papx_fkp_page,
-            );
-        // Write the bin table to table_stream
-        let papx_table_start = papx_bin_table_offset as usize;
-        let papx_table_end = papx_table_start + 12;
-        table_stream[papx_table_start..papx_table_end].copy_from_slice(&papx_bin_table_with_fkp);
+        // ── Write bin tables to table stream (now that we know page numbers) ──
+        let chpx_bin_table = crate::ole::doc::writer::bin_table::generate_bin_table_from_pages(
+            &chpx_pages.ranges,
+            chpx_first_page,
+        );
+        table_offset = table_stream.len() as u32;
+        fib.set_plcfbte_chpx(table_offset, chpx_bin_table.len() as u32);
+        table_stream.extend_from_slice(&chpx_bin_table);
+
+        let papx_bin_table = crate::ole::doc::writer::bin_table::generate_bin_table_from_pages(
+            &papx_pages.ranges,
+            papx_first_page,
+        );
+        table_offset = table_stream.len() as u32;
+        fib.set_plcfbte_papx(table_offset, papx_bin_table.len() as u32);
+        table_stream.extend_from_slice(&papx_bin_table);
 
         // 10b. Write SEPX to WordDocument stream (Apache POI line 825)
         // SEPX is written AFTER text and FKPs, per SectionTable.writeTo()
@@ -963,12 +1305,15 @@ impl DocWriter {
         let sepx_data = crate::ole::doc::writer::section::generate_sepx(first_page, grpf_ihdt);
         word_document_stream.extend_from_slice(&sepx_data);
 
-        // 10c. Now write section table with correct SEPX offset
+        // 10c. Write section table to table stream with correct SEPX offset
+        // Section table CP must span ALL subdocuments (main + footnotes + headers + endnotes),
+        // not just ccpText. Per MS-DOC spec and Apache POI SectionTable.
+        let total_cp = current_cp;
         let section_table =
-            crate::ole::doc::writer::section::generate_section_table(text_length, sepx_offset);
-        table_stream[section_table_offset as usize..(section_table_offset as usize + 20)]
-            .copy_from_slice(&section_table);
-        fib.set_plcfsed(section_table_offset, 20);
+            crate::ole::doc::writer::section::generate_section_table(total_cp, sepx_offset);
+        table_offset = table_stream.len() as u32;
+        fib.set_plcfsed(table_offset, section_table.len() as u32);
+        table_stream.extend_from_slice(&section_table);
 
         // 11. Set FibBase fields (Apache POI line 906-914)
         // fcMin = start of text (after FIB)
@@ -1008,9 +1353,13 @@ impl DocWriter {
         ];
         ole_writer.set_root_clsid(word_clsid);
 
-        // WordDocument stream FIRST to guarantee sector 0, then 1Table
+        // WordDocument stream FIRST to guarantee sector 0, then 1Table, then Data
         ole_writer.create_stream(&["WordDocument"], &word_document_stream)?;
         ole_writer.create_stream(&["1Table"], &table_stream)?;
+
+        // Data stream (MANDATORY per POI - even if empty, padded to 4096)
+        let data_stream = vec![0u8; 4096];
+        ole_writer.create_stream(&["Data"], &data_stream)?;
 
         // Create OLE metadata streams (optional for type association)
         let compobj_data = crate::ole::doc::writer::ole_metadata::generate_compobj_stream();
@@ -1035,8 +1384,8 @@ impl DocWriter {
         let mut word_document_stream = Vec::new();
         let mut table_stream = Vec::new();
 
-        // Reserve space for FIB (Word 2007+ format = 1242 bytes)
-        let fib_placeholder = vec![0u8; 1242];
+        // Reserve space for FIB (Word 2007+ format = 1248 bytes, includes cswNew)
+        let fib_placeholder = vec![0u8; 1248];
         word_document_stream.extend_from_slice(&fib_placeholder);
 
         // fcMin will be set to padded start of text (after 512 alignment below)
@@ -1055,8 +1404,22 @@ impl DocWriter {
         word_document_stream.resize(current_size + padding_needed, 0);
 
         let text_fc_start = word_document_stream.len() as u32;
-        // fcMin is the actual (padded) start of text
         let fc_min: u32 = text_fc_start;
+
+        // Build sorted list of note references with type tracking
+        let mut note_refs: Vec<(u32, bool, usize)> = Vec::new();
+        for (idx, entry) in self.footnotes.iter().enumerate() {
+            note_refs.push((entry.ref_position, true, idx));
+        }
+        for (idx, entry) in self.endnotes.iter().enumerate() {
+            note_refs.push((entry.ref_position, false, idx));
+        }
+        note_refs.sort_by_key(|r| r.0);
+
+        let mut field_char_cps: Vec<(u32, u16)> = Vec::new();
+        let mut footnote_actual_cps: Vec<(usize, u32)> = Vec::new();
+        let mut endnote_actual_cps: Vec<(usize, u32)> = Vec::new();
+        let mut note_inject_idx: usize = 0;
 
         for paragraph in &self.paragraphs {
             let fc_para_start = text_fc_start + text_stream.len() as u32;
@@ -1067,6 +1430,17 @@ impl DocWriter {
                 let run_text = &run.text;
                 let run_len_chars = run_text.chars().count() as u32;
                 let grpprl = build_chpx_grpprl(&run.formatting, &mut font_builder);
+
+                for (char_offset, ch) in run_text.chars().enumerate() {
+                    let cp = current_cp + para_chars + char_offset as u32;
+                    match ch as u32 {
+                        0x0013 => field_char_cps.push((cp, 0x13)),
+                        0x0014 => field_char_cps.push((cp, 0x14)),
+                        0x0015 => field_char_cps.push((cp, 0x15)),
+                        _ => {},
+                    }
+                }
+
                 for u in run_text.encode_utf16() {
                     text_stream.extend_from_slice(&u.to_le_bytes());
                 }
@@ -1075,7 +1449,35 @@ impl DocWriter {
                 para_chars += run_len_chars;
                 last_run_index_for_para = Some(chpx_entries.len() - 1);
             }
-            // Paragraph mark (0x0D)
+
+            while note_inject_idx < note_refs.len() {
+                let (ref_cp, is_footnote, entry_idx) = note_refs[note_inject_idx];
+                if ref_cp <= current_cp + para_chars {
+                    let actual_cp = current_cp + para_chars;
+                    let fc_ref = text_fc_start + text_stream.len() as u32;
+                    text_stream.extend_from_slice(&0x0002u16.to_le_bytes());
+                    let fc_ref_end = fc_ref + 2;
+                    let ref_grpprl = build_chpx_grpprl(
+                        &CharacterFormatting {
+                            special: Some(true),
+                            ..Default::default()
+                        },
+                        &mut font_builder,
+                    );
+                    chpx_entries.push((fc_ref, fc_ref_end, ref_grpprl));
+                    para_chars += 1;
+                    last_run_index_for_para = Some(chpx_entries.len() - 1);
+                    if is_footnote {
+                        footnote_actual_cps.push((entry_idx, actual_cp));
+                    } else {
+                        endnote_actual_cps.push((entry_idx, actual_cp));
+                    }
+                    note_inject_idx += 1;
+                } else {
+                    break;
+                }
+            }
+
             text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
             if let Some(last_idx) = last_run_index_for_para {
                 chpx_entries[last_idx].1 += 2;
@@ -1094,8 +1496,26 @@ impl DocWriter {
             current_cp += para_chars + 1;
         }
 
-        let text_length = current_cp; // ccpText
-        // Stage: headers_footers - build header story and PlcfHdd
+        let text_length = current_cp;
+
+        footnote_actual_cps.sort_by_key(|&(idx, _)| idx);
+        endnote_actual_cps.sort_by_key(|&(idx, _)| idx);
+        let ftn_ref_cps: Vec<u32> = footnote_actual_cps.iter().map(|&(_, cp)| cp).collect();
+        let edn_ref_cps: Vec<u32> = endnote_actual_cps.iter().map(|&(_, cp)| cp).collect();
+
+        let footnote_plcfs = Self::build_note_story(
+            &self.footnotes,
+            &ftn_ref_cps,
+            text_length,
+            text_fc_start,
+            &mut text_stream,
+            &mut chpx_entries,
+            &mut papx_entries,
+            &mut pieces,
+            &mut current_cp,
+            &mut font_builder,
+        );
+
         let mut header_plcfhdd: Option<(Vec<u8>, u32)> = None;
         if let Some((plcf_bytes, header_cp)) = self.build_header_story(
             text_fc_start,
@@ -1109,14 +1529,50 @@ impl DocWriter {
             header_plcfhdd = Some((plcf_bytes, header_cp));
         }
 
+        let endnote_plcfs = Self::build_note_story(
+            &self.endnotes,
+            &edn_ref_cps,
+            text_length,
+            text_fc_start,
+            &mut text_stream,
+            &mut chpx_entries,
+            &mut papx_entries,
+            &mut pieces,
+            &mut current_cp,
+            &mut font_builder,
+        );
+
+        // Mandatory trailing paragraph mark when ANY subdocument exists (same as save()).
+        let has_subdocs =
+            footnote_plcfs.is_some() || header_plcfhdd.is_some() || endnote_plcfs.is_some();
+        if has_subdocs {
+            let fc_trailing = text_fc_start + text_stream.len() as u32;
+            text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+            let fc_trailing_end = fc_trailing + 2;
+            chpx_entries.push((fc_trailing, fc_trailing_end, Vec::new()));
+            papx_entries.push((
+                fc_trailing,
+                fc_trailing_end,
+                build_papx_grpprl(&ParagraphFormatting::default()),
+            ));
+            pieces.push(Piece::new(current_cp, current_cp + 1, fc_trailing, true));
+            current_cp += 1;
+        }
+
         let mut fib = FibBuilder::new();
         fib.set_main_text(0, text_length);
+        if let Some((_, _, ftn_cp)) = &footnote_plcfs {
+            fib.set_ccp_ftn(*ftn_cp);
+        }
         if let Some((_, header_cp)) = &header_plcfhdd {
             fib.set_ccp_hdd(*header_cp);
         }
+        if let Some((_, _, edn_cp)) = &endnote_plcfs {
+            fib.set_ccp_edn(*edn_cp);
+        }
+
         let mut table_offset = 0u32;
 
-        // Write all mandatory structures to table stream
         let stylesheet_data = crate::ole::doc::writer::stylesheet::generate_minimal_stylesheet();
         fib.set_stshf(table_offset, stylesheet_data.len() as u32);
         table_stream.extend_from_slice(&stylesheet_data);
@@ -1131,7 +1587,7 @@ impl DocWriter {
         table_stream.extend_from_slice(&clx_data);
         table_offset = table_stream.len() as u32;
 
-        // DocumentProperties (again in this code path): set fFacingPages and doc-level grpfIhdt
+        // DocumentProperties
         let mut doc_grpf_ihdt: u8 = 0;
         if self.header_even.is_some() {
             doc_grpf_ihdt |= 0x01;
@@ -1157,20 +1613,74 @@ impl DocWriter {
         table_stream.extend_from_slice(&dop_data);
         table_offset = table_stream.len() as u32;
 
-        let chpx_bin_table_offset = table_offset;
-        table_stream.extend_from_slice(&[0u8; 12]);
-        fib.set_plcfbte_chpx(table_offset, 12);
-        table_offset = table_stream.len() as u32;
+        // Write PlcfHdd if present
+        if let Some((plcf_bytes, _header_cp)) = &header_plcfhdd {
+            fib.set_plcfhdd(table_offset, plcf_bytes.len() as u32);
+            table_stream.extend_from_slice(plcf_bytes);
+            table_offset = table_stream.len() as u32;
+        }
 
-        let papx_bin_table_offset = table_offset;
-        table_stream.extend_from_slice(&[0u8; 12]);
-        fib.set_plcfbte_papx(table_offset, 12);
-        table_offset = table_stream.len() as u32;
+        // Write footnote PLCFs if present
+        if let Some((ref_bytes, txt_bytes, _)) = &footnote_plcfs {
+            fib.set_plcffnd_ref(table_offset, ref_bytes.len() as u32);
+            table_stream.extend_from_slice(ref_bytes);
+            table_offset = table_stream.len() as u32;
 
-        let section_table_offset = table_offset;
-        let section_table_placeholder = vec![0u8; 20]; // 20 bytes: 2 CPs (8) + 1 SED (12)
-        table_stream.extend_from_slice(&section_table_placeholder);
-        table_offset = table_stream.len() as u32;
+            fib.set_plcffnd_txt(table_offset, txt_bytes.len() as u32);
+            table_stream.extend_from_slice(txt_bytes);
+            table_offset = table_stream.len() as u32;
+        }
+
+        // Write endnote PLCFs if present
+        if let Some((ref_bytes, txt_bytes, _)) = &endnote_plcfs {
+            fib.set_plcfend_ref(table_offset, ref_bytes.len() as u32);
+            table_stream.extend_from_slice(ref_bytes);
+            table_offset = table_stream.len() as u32;
+
+            fib.set_plcfend_txt(table_offset, txt_bytes.len() as u32);
+            table_stream.extend_from_slice(txt_bytes);
+            table_offset = table_stream.len() as u32;
+        }
+
+        // Write PlcfFldMom if there are field characters
+        if !field_char_cps.is_empty() {
+            let n = field_char_cps.len();
+            let mut plcffld = Vec::with_capacity((n + 1) * 4 + n * 2);
+            for (cp, _) in &field_char_cps {
+                plcffld.extend_from_slice(&cp.to_le_bytes());
+            }
+            // Final CP = ccpText (per MS-DOC spec PlcfFld)
+            plcffld.extend_from_slice(&text_length.to_le_bytes());
+            for (_, fld_type) in &field_char_cps {
+                let (fldch, flt_or_flags) = match *fld_type {
+                    0x13 => (0x13u8, 0x58u8), // fldBegin, flt = HYPERLINK (88)
+                    0x14 => (0x14u8, 0x00u8), // fldSep, no flags
+                    0x15 => (0x15u8, 0x00u8), // fldEnd, no flags
+                    _ => (0x00, 0x00),
+                };
+                plcffld.push(fldch);
+                plcffld.push(flt_or_flags);
+            }
+            fib.set_plcffld_mom(table_offset, plcffld.len() as u32);
+            table_stream.extend_from_slice(&plcffld);
+            table_offset = table_stream.len() as u32;
+        }
+
+        // Write numbering tables if present
+        if !self.numbering.is_empty() {
+            let (plflst_header, lvl_data) = self.numbering.build_plflst();
+            fib.set_plflst(table_offset, plflst_header.len() as u32);
+            table_stream.extend_from_slice(&plflst_header);
+            table_stream.extend_from_slice(&lvl_data);
+            table_offset = table_stream.len() as u32;
+
+            let plflfo = self.numbering.build_plflfo();
+            fib.set_plflfo(table_offset, plflfo.len() as u32);
+            table_stream.extend_from_slice(&plflfo);
+            table_offset = table_stream.len() as u32;
+        }
+
+        // 6-8. Bin tables and section table written AFTER FKPs (need page numbers).
 
         let font_table = font_builder.generate();
         fib.set_sttbfffn(table_offset, font_table.len() as u32);
@@ -1187,44 +1697,44 @@ impl DocWriter {
         let padding_needed = (512 - (current_size % 512)) % 512;
         word_document_stream.resize(current_size + padding_needed, 0);
 
-        let chpx_fkp_page = (word_document_stream.len() / 512) as u32;
+        // ── CHPX FKPs (multi-page) ──
+        let chpx_first_page = (word_document_stream.len() / 512) as u32;
         let mut chpx_builder = crate::ole::doc::writer::fkp::ChpxFkpBuilder::new();
-        let text_fc_end = text_fc_start + text_stream.len() as u32; // FC end in bytes
         for (fc_s, fc_e, grpprl) in &chpx_entries {
             chpx_builder.add_entry(*fc_s, *fc_e, grpprl.clone());
         }
-        let chpx_fkp = chpx_builder.generate()?;
-        word_document_stream.extend_from_slice(&chpx_fkp);
+        let chpx_pages = chpx_builder.generate_pages()?;
+        for page in &chpx_pages.pages {
+            word_document_stream.extend_from_slice(page);
+        }
 
-        // Use FC domain (byte offsets) for bin table ranges, same as in save()
-        let chpx_bin_table_with_fkp =
-            crate::ole::doc::writer::bin_table::generate_single_entry_bin_table(
-                text_fc_start,
-                text_fc_end,
-                chpx_fkp_page,
-            );
-        let chpx_table_start = chpx_bin_table_offset as usize;
-        let chpx_table_end = chpx_table_start + 12;
-        table_stream[chpx_table_start..chpx_table_end].copy_from_slice(&chpx_bin_table_with_fkp);
-
-        let papx_fkp_page = (word_document_stream.len() / 512) as u32;
+        // ── PAPX FKPs (multi-page) ──
+        let papx_first_page = (word_document_stream.len() / 512) as u32;
         let mut papx_builder = crate::ole::doc::writer::fkp::PapxFkpBuilder::new();
         for (fc_s, fc_e, grpprl) in &papx_entries {
             papx_builder.add_entry(*fc_s, *fc_e, grpprl.clone());
         }
-        let papx_fkp = papx_builder.generate()?;
-        word_document_stream.extend_from_slice(&papx_fkp);
+        let papx_pages = papx_builder.generate_pages()?;
+        for page in &papx_pages.pages {
+            word_document_stream.extend_from_slice(page);
+        }
 
-        // Use FC domain (byte offsets) for bin table ranges, same as in save()
-        let papx_bin_table_with_fkp =
-            crate::ole::doc::writer::bin_table::generate_single_entry_bin_table(
-                text_fc_start,
-                text_fc_end,
-                papx_fkp_page,
-            );
-        let papx_table_start = papx_bin_table_offset as usize;
-        let papx_table_end = papx_table_start + 12;
-        table_stream[papx_table_start..papx_table_end].copy_from_slice(&papx_bin_table_with_fkp);
+        // ── Write bin tables to table stream ──
+        let chpx_bin_table = crate::ole::doc::writer::bin_table::generate_bin_table_from_pages(
+            &chpx_pages.ranges,
+            chpx_first_page,
+        );
+        table_offset = table_stream.len() as u32;
+        fib.set_plcfbte_chpx(table_offset, chpx_bin_table.len() as u32);
+        table_stream.extend_from_slice(&chpx_bin_table);
+
+        let papx_bin_table = crate::ole::doc::writer::bin_table::generate_bin_table_from_pages(
+            &papx_pages.ranges,
+            papx_first_page,
+        );
+        table_offset = table_stream.len() as u32;
+        fib.set_plcfbte_papx(table_offset, papx_bin_table.len() as u32);
+        table_stream.extend_from_slice(&papx_bin_table);
 
         // Write SEPX to WordDocument stream (after text and FKPs)
         let sepx_offset = word_document_stream.len() as u32;
@@ -1251,15 +1761,16 @@ impl DocWriter {
         let sepx_data = crate::ole::doc::writer::section::generate_sepx(first_page, grpf_ihdt);
         word_document_stream.extend_from_slice(&sepx_data);
 
-        // Write section table with correct SEPX offset
+        // Write section table to table stream
+        let total_cp = current_cp;
         let section_table =
-            crate::ole::doc::writer::section::generate_section_table(text_length, sepx_offset);
-        table_stream[section_table_offset as usize..(section_table_offset as usize + 20)]
-            .copy_from_slice(&section_table);
-        fib.set_plcfsed(section_table_offset, 20);
+            crate::ole::doc::writer::section::generate_section_table(total_cp, sepx_offset);
+        table_offset = table_stream.len() as u32;
+        fib.set_plcfsed(table_offset, section_table.len() as u32);
+        table_stream.extend_from_slice(&section_table);
 
         // Set FibBase fields
-        let cb_mac = word_document_stream.len() as u32; // Total size after SEPX
+        let cb_mac = word_document_stream.len() as u32;
         fib.set_base_fields(fc_min, fc_mac_value, cb_mac);
         let fib_data = fib.generate()?;
         word_document_stream[0..fib_data.len()].copy_from_slice(&fib_data);
@@ -1285,9 +1796,13 @@ impl DocWriter {
         ];
         ole_writer.set_root_clsid(word_clsid);
 
-        // Ensure WordDocument gets sector 0: add it first, then 1Table
+        // Ensure WordDocument gets sector 0: add it first, then 1Table, then Data
         ole_writer.create_stream(&["WordDocument"], &word_document_stream)?;
         ole_writer.create_stream(&["1Table"], &table_stream)?;
+
+        // Data stream (MANDATORY per POI - even if empty, padded to 4096)
+        let data_stream = vec![0u8; 4096];
+        ole_writer.create_stream(&["Data"], &data_stream)?;
 
         // Add metadata streams after core ones
         let compobj_data = crate::ole::doc::writer::ole_metadata::generate_compobj_stream();
@@ -1497,6 +2012,14 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
     }
     if let Some(mi) = fmt.mirror_indents {
         push_bool(&mut grp, SPRM_P_F_MIRROR_INDENTS, mi);
+    }
+
+    // List numbering: ilvl (list level) and ilfo (list format override)
+    if let Some(ilvl) = fmt.ilvl {
+        push_byte(&mut grp, SPRM_P_ILVL, ilvl);
+    }
+    if let Some(ilfo) = fmt.ilfo {
+        push_u16(&mut grp, SPRM_P_ILFO, ilfo);
     }
 
     // Line spacing (LSPD: 4 bytes = dyaLine (i16 LE), fMulti (i16 LE))

@@ -52,6 +52,41 @@ impl TextExtractor {
         Ok(self.text.clone())
     }
 
+    /// Get a reference to the full extracted text.
+    #[inline]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    /// Extract text for a specific character position (CP) range.
+    ///
+    /// This is used for subdocument text extraction (headers, footnotes, etc.)
+    /// where the text occupies a known CP range within the full document text.
+    ///
+    /// # Arguments
+    ///
+    /// * `start_cp` - Starting character position (inclusive)
+    /// * `end_cp` - Ending character position (exclusive)
+    ///
+    /// # Returns
+    ///
+    /// The text slice for the given CP range, or an empty string if out of bounds.
+    pub fn text_at_range(&self, start_cp: u32, end_cp: u32) -> &str {
+        let chars: Vec<char> = self.text.chars().collect();
+        let start = start_cp as usize;
+        let end = (end_cp as usize).min(chars.len());
+
+        if start >= end || start >= chars.len() {
+            return "";
+        }
+
+        // Convert character indices to byte offsets
+        let byte_start: usize = chars[..start].iter().map(|c| c.len_utf8()).sum();
+        let byte_end: usize = chars[..end].iter().map(|c| c.len_utf8()).sum();
+
+        &self.text[byte_start..byte_end]
+    }
+
     /// Extract text using the piece table (CLX structure).
     ///
     /// The piece table maps character positions in the document to file positions
