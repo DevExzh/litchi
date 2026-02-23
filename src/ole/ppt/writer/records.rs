@@ -84,6 +84,13 @@ pub mod record_type {
     pub const USER_EDIT_ATOM: u16 = 4085;
     pub const INTERACTIVE_INFO: u16 = 4082; // InteractiveInfo container
     pub const INTERACTIVE_INFO_ATOM: u16 = 4083; // InteractiveInfoAtom
+    // Comment records (PPT 2000+)
+    pub const COMMENT2000: u16 = 12000; // EPP_Comment10 container
+    pub const COMMENT2000_ATOM: u16 = 12001; // EPP_CommentAtom10
+    // Named/Custom show records
+    pub const NAMED_SHOWS: u16 = 1040; // EPP_NamedShows container
+    pub const NAMED_SHOW: u16 = 1041; // EPP_NamedShow container
+    pub const NAMED_SHOW_SLIDES: u16 = 1042; // EPP_NamedShowSlides atom
 }
 
 /// PPT record header

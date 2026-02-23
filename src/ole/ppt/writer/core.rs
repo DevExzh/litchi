@@ -39,6 +39,8 @@
 //! ```
 
 use super::blip::{BlipStoreBuilder, BlipType};
+use super::comments::SlideComment;
+use super::custom_shows::CustomShow;
 use super::escher::{
     UserShapeData, create_dg_container_with_shapes, create_dgg_container,
     shape_type as escher_shape_type,
@@ -56,6 +58,7 @@ use super::records::{
 use super::shape_style::{ArrowStyle, FillStyle, LineStyleConfig, ShadowStyle, ShapeStyle};
 #[allow(unused_imports)]
 use super::shapes::ShapeKind;
+use super::slide_timing::SlideTiming;
 use super::spec::{BinaryTagData, ColorScheme, Ppt10Tag, SlideLayoutType, slide_flags};
 use super::text_format::{FontEntity, Paragraph};
 use crate::common::unit::pt_to_emu_i32;
@@ -311,6 +314,10 @@ struct WritableSlide {
     notes: Option<String>,
     /// Rich notes page
     notes_page: Option<NotesPage>,
+    /// Slide comments
+    comments: Vec<SlideComment>,
+    /// Per-slide timing (auto-advance, hidden, etc.)
+    timing: Option<SlideTiming>,
 }
 
 /// Convert ShapeType to Escher MSOSPT value
@@ -519,6 +526,8 @@ pub struct PptWriter {
     hyperlinks: HyperlinkCollection,
     /// Font collection
     fonts: Vec<FontEntity>,
+    /// Custom slide shows (named shows)
+    custom_shows: Vec<CustomShow>,
 }
 
 impl PptWriter {
@@ -547,6 +556,7 @@ impl PptWriter {
             blip_store: BlipStoreBuilder::new(),
             hyperlinks: HyperlinkCollection::new(),
             fonts: vec![FontEntity::arial()], // Default font
+            custom_shows: Vec::new(),
         }
     }
 
@@ -561,6 +571,8 @@ impl PptWriter {
             shapes: Vec::new(),
             notes: None,
             notes_page: None,
+            comments: Vec::new(),
+            timing: None,
         });
         Ok(index)
     }
@@ -1079,6 +1091,58 @@ impl PptWriter {
         self.fonts.len()
     }
 
+    /// Add a comment to a slide.
+    ///
+    /// # Arguments
+    ///
+    /// * `slide` - Slide index (0-based)
+    /// * `comment` - The comment to add
+    pub fn add_comment(
+        &mut self,
+        slide: usize,
+        comment: SlideComment,
+    ) -> Result<(), PptWriteError> {
+        let slide_data = self
+            .slides
+            .get_mut(slide)
+            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+        slide_data.comments.push(comment);
+        Ok(())
+    }
+
+    /// Set per-slide timing (auto-advance, hidden, etc.).
+    ///
+    /// # Arguments
+    ///
+    /// * `slide` - Slide index (0-based)
+    /// * `timing` - Timing configuration
+    pub fn set_slide_timing(
+        &mut self,
+        slide: usize,
+        timing: SlideTiming,
+    ) -> Result<(), PptWriteError> {
+        let slide_data = self
+            .slides
+            .get_mut(slide)
+            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+        slide_data.timing = Some(timing);
+        Ok(())
+    }
+
+    /// Add a custom slide show (named show).
+    ///
+    /// # Arguments
+    ///
+    /// * `show` - Custom show definition with name and slide indices
+    pub fn add_custom_show(&mut self, show: CustomShow) {
+        self.custom_shows.push(show);
+    }
+
+    /// Get the number of custom shows.
+    pub fn custom_show_count(&self) -> usize {
+        self.custom_shows.len()
+    }
+
     /// Set a presentation property
     ///
     /// # Arguments
@@ -1252,6 +1316,14 @@ impl PptWriter {
             }
         }
 
+        // 2.5.4) NamedShows (custom slide shows) in Document container
+        if !self.custom_shows.is_empty() {
+            let named_shows = super::custom_shows::build_named_shows(&self.custom_shows)?;
+            if !named_shows.is_empty() {
+                doc_container.write_child(&named_shows);
+            }
+        }
+
         // 2.6) EndDocument
         let end_doc = create_end_document()?;
         doc_container.write_child(&end_doc);
@@ -1313,14 +1385,24 @@ impl PptWriter {
             color.write_data(&ColorScheme::POI_DEFAULT.to_bytes());
             slide_container.write_child(&color.build()?);
 
+            // SSSlideInfoAtom for per-slide timing (if set and no transition handles it)
+            if let Some(ref timing) = slide.timing {
+                let timing_record = super::slide_timing::build_slide_timing(timing)?;
+                slide_container.write_child(&timing_record);
+            }
+
             // ProgTags with PPT10 binary tag (PowerPoint 2002+ features)
             let mut prog_tags = RecordBuilder::new(0x0F, 0, record_type::PROG_TAGS);
             let mut prog_bin = RecordBuilder::new(0x0F, 0, record_type::PROG_BINARY_TAG);
             let mut cstr = RecordBuilder::new(0x00, 0, record_type::CSTRING);
             cstr.write_data(&Ppt10Tag::to_bytes());
             prog_bin.write_child(&cstr.build()?);
+            // BinaryTagData: slide defaults + comments
+            let comment_bytes = super::comments::build_slide_comments(&slide.comments)?;
+            let mut tag_data = BinaryTagData::SLIDE.to_bytes().to_vec();
+            tag_data.extend_from_slice(&comment_bytes);
             let mut bin = RecordBuilder::new(0x00, 0, record_type::BINARY_TAG_DATA);
-            bin.write_data(&BinaryTagData::SLIDE.to_bytes());
+            bin.write_data(&tag_data);
             prog_bin.write_child(&bin.build()?);
             prog_tags.write_child(&prog_bin.build()?);
             slide_container.write_child(&prog_tags.build()?);
@@ -1537,6 +1619,14 @@ impl PptWriter {
             }
         }
 
+        // NamedShows (custom slide shows) in Document container
+        if !self.custom_shows.is_empty() {
+            let named_shows = super::custom_shows::build_named_shows(&self.custom_shows)?;
+            if !named_shows.is_empty() {
+                doc_container.write_child(&named_shows);
+            }
+        }
+
         let end_doc = create_end_document()?;
         doc_container.write_child(&end_doc);
 
@@ -1584,14 +1674,24 @@ impl PptWriter {
             color.write_data(&ColorScheme::POI_DEFAULT.to_bytes());
             slide_container.write_child(&color.build()?);
 
+            // SSSlideInfoAtom for per-slide timing (if set)
+            if let Some(ref timing) = slide.timing {
+                let timing_record = super::slide_timing::build_slide_timing(timing)?;
+                slide_container.write_child(&timing_record);
+            }
+
             // ProgTags with PPT10 binary tag
             let mut prog_tags = RecordBuilder::new(0x0F, 0, record_type::PROG_TAGS);
             let mut prog_bin = RecordBuilder::new(0x0F, 0, record_type::PROG_BINARY_TAG);
             let mut cstr = RecordBuilder::new(0x00, 0, record_type::CSTRING);
             cstr.write_data(&Ppt10Tag::to_bytes());
             prog_bin.write_child(&cstr.build()?);
+            // BinaryTagData: slide defaults + comments
+            let comment_bytes = super::comments::build_slide_comments(&slide.comments)?;
+            let mut tag_data = BinaryTagData::SLIDE.to_bytes().to_vec();
+            tag_data.extend_from_slice(&comment_bytes);
             let mut bin = RecordBuilder::new(0x00, 0, record_type::BINARY_TAG_DATA);
-            bin.write_data(&BinaryTagData::SLIDE.to_bytes());
+            bin.write_data(&tag_data);
             prog_bin.write_child(&bin.build()?);
             prog_tags.write_child(&prog_bin.build()?);
             slide_container.write_child(&prog_tags.build()?);

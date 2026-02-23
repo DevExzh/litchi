@@ -208,6 +208,12 @@ pub enum PptRecordType {
     TimePropertyList = 4115,
     /// Time behavior record
     TimeBehavior = 4112,
+    /// Named shows container (custom slide shows)
+    NamedShows = 1040,
+    /// Named show container
+    NamedShow = 1041,
+    /// Named show slides atom
+    NamedShowSlides = 1042,
     /// Comment 2000 record
     Comment2000 = 12000,
     /// Comment 2000 atom record
@@ -267,6 +273,9 @@ impl From<u16> for PptRecordType {
             4114 => PptRecordType::TimeNode,
             4115 => PptRecordType::TimePropertyList,
             4112 => PptRecordType::TimeBehavior,
+            1040 => PptRecordType::NamedShows,
+            1041 => PptRecordType::NamedShow,
+            1042 => PptRecordType::NamedShowSlides,
             12000 => PptRecordType::Comment2000,
             12001 => PptRecordType::Comment2000Atom,
             _ => PptRecordType::Unknown,

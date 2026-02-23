@@ -60,11 +60,22 @@ pub mod notes;
 /// Sound collection for animations
 mod sound_collection;
 
+/// Slide comment support
+pub mod comments;
+
+/// Custom slide show (named show) support
+pub mod custom_shows;
+
+/// Per-slide timing support
+pub mod slide_timing;
+
 // Re-export public types from core
 pub use core::{PptWriteError, PptWriter, ShapeProperties, ShapeType, TextAlignment};
 
 // Re-export commonly used types from submodules
 pub use blip::{BlipStoreBuilder, BlipType, PictureData};
+pub use comments::{CommentDateTime, SlideComment};
+pub use custom_shows::CustomShow;
 pub use escher::{EscherBuilder, create_dgg_container, create_shape_container};
 pub use hyperlink::{Hyperlink, HyperlinkCollection, HyperlinkTarget};
 pub use notes::{NotesCollection, NotesPage};
@@ -72,5 +83,6 @@ pub use persist::{PersistPtrBuilder, UserEditAtom};
 pub use records::{RecordBuilder, RecordHeader};
 pub use shape_style::{FillStyle, LineStyleConfig, ShadowStyle, ShapeColor, ShapeStyle};
 pub use shapes::{Shape, ShapeCollection, ShapeKind};
+pub use slide_timing::SlideTiming;
 pub use sound_collection::build_sound_collection;
 pub use text_format::{FontEntity, FontStyle, Paragraph, TextAlign, TextColor, TextRun};

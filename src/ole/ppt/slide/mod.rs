@@ -5,4 +5,4 @@ pub mod types;
 
 // Re-export main types
 pub use factory::{SlideData, SlideFactory};
-pub use types::Slide;
+pub use types::{ParsedComment, ParsedSlideTiming, Slide};

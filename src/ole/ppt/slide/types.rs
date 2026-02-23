@@ -3,6 +3,7 @@ use super::super::package::Result;
 use super::super::records::PptRecord;
 use super::super::shapes::ShapeEnum;
 use super::factory::SlideData;
+use crate::ole::consts::PptRecordType;
 use once_cell::unsync::OnceCell;
 
 /// A slide in a PowerPoint presentation with lazy-loaded shapes.
@@ -299,6 +300,195 @@ impl<'doc> Slide<'doc> {
     pub fn record(&self) -> &PptRecord {
         &self.record
     }
+
+    /// Parse comments from this slide's BinaryTagData.
+    ///
+    /// Comments are stored inside `ProgTags/ProgBinaryTag/BinaryTagData`
+    /// as `Comment2000` (type=12000) containers.
+    ///
+    /// # Returns
+    ///
+    /// A vector of parsed comments (author, text, initials, position, date).
+    /// Returns an empty vector if no comments are found.
+    pub fn comments(&self) -> Vec<ParsedComment> {
+        let mut comments = Vec::new();
+
+        // Navigate: Slide -> ProgTags -> ProgBinaryTag -> BinaryTagData
+        // Comment2000 records are children of BinaryTagData
+        for child in &self.record.children {
+            if child.record_type_raw == 5000 {
+                // PROG_TAGS
+                for prog_bin in &child.children {
+                    if prog_bin.record_type_raw == 5002 {
+                        // PROG_BINARY_TAG
+                        for bin_tag in &prog_bin.children {
+                            if bin_tag.record_type_raw == 5003 {
+                                // BINARY_TAG_DATA
+                                // Parse Comment2000 containers from the data
+                                Self::parse_comments_from_data(&bin_tag.data, &mut comments);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        comments
+    }
+
+    /// Parse Comment2000 containers from raw BinaryTagData bytes.
+    fn parse_comments_from_data(data: &[u8], comments: &mut Vec<ParsedComment>) {
+        let mut offset = 0;
+        while offset + 8 <= data.len() {
+            let ver_inst = u16::from_le_bytes([data[offset], data[offset + 1]]);
+            let version = ver_inst & 0x000F;
+            let rtype = u16::from_le_bytes([data[offset + 2], data[offset + 3]]);
+            let rlen = u32::from_le_bytes([
+                data[offset + 4],
+                data[offset + 5],
+                data[offset + 6],
+                data[offset + 7],
+            ]) as usize;
+
+            if rtype == 12000 && version == 0x0F {
+                // Comment2000 container — parse its children
+                let container_end = (offset + 8 + rlen).min(data.len());
+                let mut comment = ParsedComment::default();
+                let mut child_off = offset + 8;
+
+                while child_off + 8 <= container_end {
+                    let c_ver_inst = u16::from_le_bytes([data[child_off], data[child_off + 1]]);
+                    let c_instance = (c_ver_inst >> 4) & 0x0FFF;
+                    let c_type = u16::from_le_bytes([data[child_off + 2], data[child_off + 3]]);
+                    let c_len = u32::from_le_bytes([
+                        data[child_off + 4],
+                        data[child_off + 5],
+                        data[child_off + 6],
+                        data[child_off + 7],
+                    ]) as usize;
+
+                    let c_data_start = child_off + 8;
+                    let c_data_end = (c_data_start + c_len).min(container_end);
+
+                    if c_type == 4026 {
+                        // CString (UTF-16LE)
+                        let text = Self::decode_utf16le(&data[c_data_start..c_data_end]);
+                        match c_instance {
+                            0 => comment.author = text,
+                            1 => comment.text = text,
+                            2 => comment.initials = text,
+                            _ => {},
+                        }
+                    } else if c_type == 12001 && c_len >= 28 {
+                        // Comment2000Atom (28 bytes)
+                        let d = &data[c_data_start..c_data_end];
+                        comment.index = i32::from_le_bytes([d[0], d[1], d[2], d[3]]);
+                        comment.year = i16::from_le_bytes([d[4], d[5]]);
+                        comment.month = u16::from_le_bytes([d[6], d[7]]);
+                        // d[8..10] = day of week (skip)
+                        comment.day = u16::from_le_bytes([d[10], d[11]]);
+                        comment.hour = u16::from_le_bytes([d[12], d[13]]);
+                        comment.minute = u16::from_le_bytes([d[14], d[15]]);
+                        comment.second = u16::from_le_bytes([d[16], d[17]]);
+                        comment.millisecond = i16::from_le_bytes([d[18], d[19]]);
+                        comment.x = i32::from_le_bytes([d[20], d[21], d[22], d[23]]);
+                        comment.y = i32::from_le_bytes([d[24], d[25], d[26], d[27]]);
+                    }
+
+                    child_off = c_data_end;
+                }
+
+                comments.push(comment);
+                offset = container_end;
+            } else if version == 0x0F {
+                // Other container — skip into children
+                offset += 8;
+            } else {
+                // Atom — skip over data
+                offset += 8 + rlen;
+            }
+        }
+    }
+
+    /// Decode UTF-16LE bytes into a String.
+    fn decode_utf16le(data: &[u8]) -> String {
+        let chars: Vec<u16> = data
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect();
+        String::from_utf16_lossy(&chars)
+    }
+
+    /// Get the slide timing from the SSSlideInfoAtom record.
+    ///
+    /// Returns `None` if the slide has no timing record.
+    pub fn timing(&self) -> Option<ParsedSlideTiming> {
+        // SSSlideInfoAtom (type=1017) is a direct child of the Slide container
+        let info = self.record.find_child(PptRecordType::SSSlideInfoAtom)?;
+
+        if info.data.len() < 16 {
+            return None;
+        }
+
+        let d = &info.data;
+        let slide_time_ms = u32::from_le_bytes([d[0], d[1], d[2], d[3]]);
+        let _sound_id_ref = u32::from_le_bytes([d[4], d[5], d[6], d[7]]);
+        let _effect_direction = d[8];
+        let _effect_type = d[9];
+        let flags = u16::from_le_bytes([d[10], d[11]]);
+        let _speed = d[12];
+
+        Some(ParsedSlideTiming {
+            advance_time_ms: slide_time_ms,
+            advance_on_click: (flags & (1 << 0)) != 0,
+            auto_advance: (flags & (1 << 10)) != 0,
+            hidden: (flags & (1 << 2)) != 0,
+        })
+    }
+}
+
+/// A parsed comment from a PPT slide.
+#[derive(Debug, Clone, Default)]
+pub struct ParsedComment {
+    /// Comment index (1-based).
+    pub index: i32,
+    /// Author name.
+    pub author: String,
+    /// Comment text.
+    pub text: String,
+    /// Author initials.
+    pub initials: String,
+    /// Year.
+    pub year: i16,
+    /// Month (1-12).
+    pub month: u16,
+    /// Day (1-31).
+    pub day: u16,
+    /// Hour (0-23).
+    pub hour: u16,
+    /// Minute (0-59).
+    pub minute: u16,
+    /// Second (0-59).
+    pub second: u16,
+    /// Millisecond (0-999).
+    pub millisecond: i16,
+    /// X position in master units (576/inch).
+    pub x: i32,
+    /// Y position in master units.
+    pub y: i32,
+}
+
+/// Parsed per-slide timing information.
+#[derive(Debug, Clone)]
+pub struct ParsedSlideTiming {
+    /// Auto-advance time in milliseconds (0 = no auto-advance).
+    pub advance_time_ms: u32,
+    /// Whether the slide advances on mouse click.
+    pub advance_on_click: bool,
+    /// Whether auto-advance is enabled.
+    pub auto_advance: bool,
+    /// Whether the slide is hidden.
+    pub hidden: bool,
 }
 
 #[cfg(test)]

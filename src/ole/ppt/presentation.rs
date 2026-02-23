@@ -6,6 +6,7 @@ use super::persist::PersistMapping;
 use super::slide::{Slide, SlideFactory};
 #[cfg(feature = "imgconv")]
 use crate::images::{BlipStore, ExtractedImage, ImageExtractor};
+use crate::ole::consts::PptRecordType;
 use std::io::{Read, Seek};
 
 /// A PowerPoint presentation (.ppt) with high-performance zero-copy parsing.
@@ -272,4 +273,87 @@ impl Presentation {
     pub fn has_pictures(&self) -> bool {
         self.pictures_data.is_some()
     }
+
+    /// Parse custom slide shows (named shows) from the Document container.
+    ///
+    /// Custom shows are stored as `NamedShows` (type=1040) container in the
+    /// Document record, containing `NamedShow` (type=1041) children with
+    /// CString names and `NamedShowSlides` (type=1042) slide ID arrays.
+    ///
+    /// # Returns
+    ///
+    /// A vector of `(name, slide_indices)` tuples for each custom show.
+    /// Slide indices are 0-based.
+    pub fn custom_shows(&self) -> Vec<ParsedCustomShow> {
+        let mut shows = Vec::new();
+
+        // Parse Document record from the stream
+        let records = self.parser.find_records_ref();
+        for record in &records {
+            if record.record_type == PptRecordType::Document {
+                // Find NamedShows container in Document
+                for child in &record.children {
+                    if child.record_type == PptRecordType::NamedShows {
+                        Self::parse_named_shows(child, &mut shows);
+                    }
+                }
+            }
+        }
+
+        shows
+    }
+
+    /// Parse NamedShow containers from a NamedShows container.
+    fn parse_named_shows(
+        named_shows: &super::records::PptRecord,
+        shows: &mut Vec<ParsedCustomShow>,
+    ) {
+        for child in &named_shows.children {
+            if child.record_type == PptRecordType::NamedShow {
+                let mut name = String::new();
+                let mut slide_indices = Vec::new();
+
+                for sub in &child.children {
+                    match sub.record_type {
+                        PptRecordType::CString => {
+                            // UTF-16LE name
+                            let chars: Vec<u16> = sub
+                                .data
+                                .chunks_exact(2)
+                                .map(|c| u16::from_le_bytes([c[0], c[1]]))
+                                .collect();
+                            name = String::from_utf16_lossy(&chars);
+                        },
+                        PptRecordType::NamedShowSlides => {
+                            // Array of u32 slide IDs (0x100 + slide_index)
+                            for chunk in sub.data.chunks_exact(4) {
+                                let slide_id =
+                                    u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+                                // Convert slide ID (0x100+index) back to 0-based index
+                                let index = slide_id.saturating_sub(0x100) as usize;
+                                slide_indices.push(index);
+                            }
+                        },
+                        _ => {},
+                    }
+                }
+
+                if !name.is_empty() {
+                    shows.push(ParsedCustomShow {
+                        name,
+                        slide_indices,
+                    });
+                }
+            }
+        }
+    }
+}
+
+/// A parsed custom slide show from a PPT file.
+#[derive(Debug, Clone)]
+pub struct ParsedCustomShow {
+    /// Show name.
+    pub name: String,
+    /// 0-based slide indices in presentation order.
+    pub slide_indices: Vec<usize>,
 }
