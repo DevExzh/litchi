@@ -1,6 +1,8 @@
 //! Mutable XLSB worksheet for CRUD operations
 
 use crate::ooxml::xlsb::comments::Comment;
+use crate::ooxml::xlsb::conditional_formatting::ConditionalFormatting;
+use crate::ooxml::xlsb::data_validation::DataValidation;
 use crate::ooxml::xlsb::error::XlsbResult;
 use crate::ooxml::xlsb::hyperlinks::Hyperlink;
 use crate::ooxml::xlsb::merged_cells::MergedCell;
@@ -99,6 +101,10 @@ pub struct MutableXlsbWorksheet {
     auto_filter: Option<AutoFilter>,
     /// Optional sheet protection configuration.
     sheet_protection: Option<SheetProtection>,
+    /// Data validation rules.
+    data_validations: Vec<DataValidation>,
+    /// Conditional formatting rules.
+    conditional_formattings: Vec<ConditionalFormatting>,
 }
 
 impl MutableXlsbWorksheet {
@@ -124,6 +130,8 @@ impl MutableXlsbWorksheet {
             rows: BTreeMap::new(),
             auto_filter: None,
             sheet_protection: None,
+            data_validations: Vec::new(),
+            conditional_formattings: Vec::new(),
         }
     }
 
@@ -204,6 +212,8 @@ impl MutableXlsbWorksheet {
         self.rows.clear();
         self.auto_filter = None;
         self.sheet_protection = None;
+        self.data_validations.clear();
+        self.conditional_formattings.clear();
     }
 
     /// Set a custom column width (in character units) for a 0-based column.
@@ -326,6 +336,53 @@ impl MutableXlsbWorksheet {
     /// Get all comments
     pub fn comments(&self) -> &[Comment] {
         &self.comments
+    }
+
+    /// Add a data validation rule.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
+    /// use litchi::ooxml::xlsb::data_validation::DataValidation;
+    ///
+    /// let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+    /// let mut dv = DataValidation::new(3, "A1:A10".to_string()); // list
+    /// dv.formula1 = Some("Yes,No".to_string());
+    /// sheet.add_data_validation(dv);
+    /// ```
+    pub fn add_data_validation(&mut self, dv: DataValidation) {
+        self.data_validations.push(dv);
+    }
+
+    /// Get all data validations.
+    pub fn data_validations(&self) -> &[DataValidation] {
+        &self.data_validations
+    }
+
+    /// Add a conditional formatting block.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
+    /// use litchi::ooxml::xlsb::conditional_formatting::{
+    ///     ConditionalFormatting, ConditionalFormattingRule, CfRuleType,
+    /// };
+    ///
+    /// let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+    /// let mut cf = ConditionalFormatting::new(vec!["A1:A10".to_string()]);
+    /// let rule = ConditionalFormattingRule::new(CfRuleType::CellIs, 1);
+    /// cf.add_rule(rule);
+    /// sheet.add_conditional_formatting(cf);
+    /// ```
+    pub fn add_conditional_formatting(&mut self, cf: ConditionalFormatting) {
+        self.conditional_formattings.push(cf);
+    }
+
+    /// Get all conditional formatting blocks.
+    pub fn conditional_formattings(&self) -> &[ConditionalFormatting] {
+        &self.conditional_formattings
     }
 
     /// Get the number of non-empty cells
@@ -486,6 +543,22 @@ impl MutableXlsbWorksheet {
         // Write hyperlinks if present
         if !self.hyperlinks.is_empty() {
             self.write_hyperlinks(writer)?;
+        }
+
+        // Write data validations if present
+        if !self.data_validations.is_empty() {
+            crate::ooxml::xlsb::writer::data_validation::write_data_validations(
+                writer,
+                &self.data_validations,
+            )?;
+        }
+
+        // Write conditional formatting if present
+        if !self.conditional_formattings.is_empty() {
+            crate::ooxml::xlsb::writer::conditional_formatting::write_conditional_formattings(
+                writer,
+                &self.conditional_formattings,
+            )?;
         }
 
         // Write BrtEndSheet

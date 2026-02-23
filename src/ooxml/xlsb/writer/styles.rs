@@ -10,7 +10,18 @@ use crate::ooxml::xlsb::styles_table::{Fill, Font};
 use crate::ooxml::xlsb::writer::RecordWriter;
 use std::io::Write;
 
-/// Styles writer for XLSB with support for custom fonts, fills, and borders
+/// Differential formatting style for conditional formatting rules.
+///
+/// Each DXF is serialized as a `BrtDXF` record in styles.bin, referenced
+/// by `dxf_id` in `BrtBeginCFRule`.
+#[derive(Debug, Clone)]
+pub struct DxfStyle {
+    /// Fill foreground color (ARGB, e.g. `0xFFFF0000` for red).
+    /// When set, the DXF applies a solid fill with this color.
+    pub fill_fg_color: Option<u32>,
+}
+
+/// Styles writer for XLSB with support for custom fonts, fills, borders, and DXFs
 pub struct StylesWriter {
     /// Custom fonts (index 0 is the default font)
     fonts: Vec<Font>,
@@ -18,6 +29,8 @@ pub struct StylesWriter {
     fills: Vec<Fill>,
     /// Custom borders (index 0 is the default border)
     borders: Vec<Border>,
+    /// Differential formatting styles referenced by conditional formatting rules
+    dxfs: Vec<DxfStyle>,
 }
 
 impl StylesWriter {
@@ -27,6 +40,7 @@ impl StylesWriter {
             fonts: vec![Font::default()],
             fills: vec![Fill::default(), Fill::default()],
             borders: vec![Border::default()],
+            dxfs: Vec::new(),
         }
     }
 
@@ -65,6 +79,28 @@ impl StylesWriter {
     pub fn add_border(&mut self, border: Border) -> usize {
         self.borders.push(border);
         self.borders.len() - 1
+    }
+
+    /// Add a differential formatting style (DXF) with a solid fill color and
+    /// return its 0-based index.
+    ///
+    /// The returned index is used as `dxf_id` in [`ConditionalFormattingRule`].
+    ///
+    /// # Arguments
+    ///
+    /// * `fill_color` — ARGB fill color (e.g. `0xFFFF0000` for opaque red)
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// let dxf_idx = workbook.styles_mut().add_dxf_fill(0xFFFF0000);
+    /// rule.dxf_id = Some(dxf_idx as u32);
+    /// ```
+    pub fn add_dxf_fill(&mut self, fill_color: u32) -> usize {
+        self.dxfs.push(DxfStyle {
+            fill_fg_color: Some(fill_color),
+        });
+        self.dxfs.len() - 1
     }
 
     /// Write styles to binary format
@@ -276,14 +312,96 @@ impl StylesWriter {
         Ok(())
     }
 
-    /// Write an empty DXF table (BrtBeginDXFs / BrtEndDXFs).
+    /// Write DXF table (`BrtBeginDXFs` / `BrtDXF`* / `BrtEndDXFs`).
+    ///
+    /// Each [`DxfStyle`] is serialized as a `BrtDXF` record per [MS-XLSB] 2.4.356.
     fn write_default_dxfs<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+        // BrtBeginDXFs: count(u32)
         let mut data = Vec::new();
         let mut temp_writer = RecordWriter::new(&mut data);
-        temp_writer.write_u32(0)?; // no DXFs
+        temp_writer.write_u32(self.dxfs.len() as u32)?;
         writer.write_record(record_types::BEGIN_DXFS, &data)?;
+
+        for dxf in &self.dxfs {
+            let payload = Self::serialize_dxf(dxf);
+            writer.write_record(record_types::DXF, &payload)?;
+        }
+
         writer.write_record(record_types::END_DXFS, &[])?;
         Ok(())
+    }
+
+    /// Serialize a single [`DxfStyle`] into a `BrtDXF` payload.
+    ///
+    /// Layout per [MS-XLSB] 2.4.356:
+    ///   `flags(u16)` + `XFProps(reserved(u16) + cprops(u16) + xfPropArray)`
+    fn serialize_dxf(dxf: &DxfStyle) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(32);
+
+        // BrtDXF flags: unused(15 bits) + fNewBorder(1 bit) = 0
+        buf.extend_from_slice(&0u16.to_le_bytes());
+
+        // XFProps structure
+        let mut props: Vec<Vec<u8>> = Vec::new();
+
+        if let Some(color) = dxf.fill_fg_color {
+            // XFProp 0x0000: FillPattern = FLSSOLID (1)
+            props.push(Self::make_xf_prop(0x0000, &[0x01]));
+            // XFProp 0x0002: background XFPropColor (RGBA)
+            // CF DXFs use bgColor as the cell fill color per Excel/LO convention:
+            // LO finalizeImport() swaps bgColor → patternColor when pattern is solid.
+            props.push(Self::make_xf_prop(
+                0x0002,
+                &Self::make_xf_prop_color_rgba(color),
+            ));
+        }
+
+        // XFProps: reserved(u16=0) + cprops(u16) + xfPropArray
+        buf.extend_from_slice(&0u16.to_le_bytes()); // reserved
+        buf.extend_from_slice(&(props.len() as u16).to_le_bytes()); // cprops
+        for prop in &props {
+            buf.extend_from_slice(prop);
+        }
+
+        buf
+    }
+
+    /// Build a single XFProp: `xfPropType(u16) + cb(u16) + xfPropDataBlob`.
+    ///
+    /// `cb` is the total size of this XFProp structure (4-byte header + data).
+    fn make_xf_prop(prop_type: u16, data: &[u8]) -> Vec<u8> {
+        let cb = (4 + data.len()) as u16;
+        let mut buf = Vec::with_capacity(cb as usize);
+        buf.extend_from_slice(&prop_type.to_le_bytes());
+        buf.extend_from_slice(&cb.to_le_bytes());
+        buf.extend_from_slice(data);
+        buf
+    }
+
+    /// Build an `XFPropColor` blob (8 bytes) for a direct RGBA color.
+    ///
+    /// Layout per [MS-XLSB] 2.5.161:
+    ///   `fValidRGBA(1 bit) + xclrType(7 bits)` + `icv(u8)` + `nTintShade(i16)` + `dwRgba(u32)`
+    fn make_xf_prop_color_rgba(argb: u32) -> [u8; 8] {
+        let mut buf = [0u8; 8];
+        // byte 0: fValidRGBA=0 | xclrType=0x02 (RGBA) → (0x02 << 1) | 0 = 0x04
+        buf[0] = 0x04;
+        // byte 1: icv = 0 (ignored for RGBA type)
+        buf[1] = 0;
+        // bytes 2-3: nTintShade = 0 (no tint)
+        buf[2] = 0;
+        buf[3] = 0;
+        // bytes 4-7: dwRgba in RGBA byte order.
+        // ARGB input: 0xAARRGGBB → dwRgba expects RGBA: 0xRRGGBBAA
+        let a = ((argb >> 24) & 0xFF) as u8;
+        let r = ((argb >> 16) & 0xFF) as u8;
+        let g = ((argb >> 8) & 0xFF) as u8;
+        let b = (argb & 0xFF) as u8;
+        buf[4] = r;
+        buf[5] = g;
+        buf[6] = b;
+        buf[7] = a;
+        buf
     }
 
     /// Write minimal table styles (BrtBeginTableStyles / BrtEndTableStyles) with

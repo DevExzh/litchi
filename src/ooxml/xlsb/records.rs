@@ -281,6 +281,8 @@ pub mod record_types {
     pub const D_VAL: u16 = 0x0040;
 
     // Conditional formatting
+    pub const BEGIN_COND_FORMATTING: u16 = 0x01CD;
+    pub const END_COND_FORMATTING: u16 = 0x01CE;
     pub const BEGIN_CF_RULE: u16 = 0x01CF;
     pub const END_CF_RULE: u16 = 0x01D0;
     pub const BEGIN_ICON_SET: u16 = 0x01D1;

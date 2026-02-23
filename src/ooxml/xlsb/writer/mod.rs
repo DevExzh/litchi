@@ -51,9 +51,18 @@ mod worksheet;
 /// Workbook writer for creating complete XLSB files
 mod workbook;
 
+/// Binary cell range serialization helpers (shared by DV and CF writers)
+pub(crate) mod bin_range;
+
+/// Data validation writer (BrtBeginDVals / BrtDVal / BrtEndDVals)
+pub(crate) mod data_validation;
+
+/// Conditional formatting writer (BrtBeginCondFormatting / BrtBeginCFRule / …)
+pub(crate) mod conditional_formatting;
+
 // Re-export main types for public API
 pub use record::RecordWriter;
 pub use shared_strings::MutableSharedStringsWriter;
-pub use styles::StylesWriter;
+pub use styles::{DxfStyle, StylesWriter};
 pub use workbook::XlsbWorkbookWriter;
 pub use worksheet::{CellData, MutableXlsbWorksheet, SheetProtection};

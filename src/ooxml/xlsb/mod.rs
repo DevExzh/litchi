@@ -144,6 +144,9 @@ pub mod named_ranges;
 /// Data validation support
 pub mod data_validation;
 
+/// Conditional formatting support
+pub mod conditional_formatting;
+
 /// Formula parsing and generation
 pub mod formula;
 
