@@ -1,6 +1,15 @@
 use std::collections::{HashMap, HashSet};
 
 use super::{XlsCellValue, XlsConditionalFormat, XlsDataValidation};
+use crate::ole::xls::writer::biff::AutoFilterConditionWrite;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum PivotCellXfRole {
+    HeaderAccent,
+    HeaderPlain,
+    RowLabel,
+    Value,
+}
 
 #[derive(Debug, Clone)]
 pub(super) struct WritableCell {
@@ -11,6 +20,7 @@ pub(super) struct WritableCell {
     /// Cell value
     pub value: XlsCellValue,
     pub format_idx: u16,
+    pub pivot_xf_role: Option<PivotCellXfRole>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -92,6 +102,35 @@ pub(super) struct WritableWorksheet {
     pub auto_filter: Option<AutoFilterRange>,
     /// Cell or range hyperlinks stored for this worksheet.
     pub hyperlinks: Vec<XlsHyperlink>,
+    /// Per-column AutoFilter conditions.
+    pub auto_filter_columns: Vec<AutoFilterColumnDef>,
+    /// Sort configuration.
+    pub sort_config: Option<SortConfig>,
+    /// Pivot tables to write.
+    pub pivot_tables: Vec<WritablePivotTable>,
+}
+
+/// A column-level AutoFilter condition for the writer.
+#[derive(Debug, Clone)]
+pub(super) struct AutoFilterColumnDef {
+    /// Column index within the filter range (0-based relative to filter start).
+    pub column_index: u16,
+    /// Join logic: true = OR, false = AND.
+    pub join_or: bool,
+    /// First condition.
+    pub condition1: AutoFilterConditionWrite,
+    /// Second condition.
+    pub condition2: AutoFilterConditionWrite,
+}
+
+/// Sort configuration for the writer.
+#[derive(Debug, Clone)]
+pub(super) struct SortConfig {
+    pub case_sensitive: bool,
+    /// true = sort by columns (left-to-right), false = by rows (top-to-bottom)
+    pub sort_by_columns: bool,
+    /// Up to 3 sort keys: (column_index, descending).
+    pub keys: Vec<(u16, bool)>,
 }
 
 impl WritableWorksheet {
@@ -114,6 +153,9 @@ impl WritableWorksheet {
             sheet_protection: None,
             auto_filter: None,
             hyperlinks: Vec::new(),
+            auto_filter_columns: Vec::new(),
+            sort_config: None,
+            pivot_tables: Vec::new(),
         }
     }
 
@@ -184,4 +226,123 @@ impl WritableWorksheet {
     pub(super) fn show_row(&mut self, row: u32) {
         self.hidden_rows.remove(&row);
     }
+
+    pub(super) fn add_auto_filter_column(&mut self, def: AutoFilterColumnDef) {
+        self.auto_filter_columns.push(def);
+    }
+
+    pub(super) fn set_sort_config(&mut self, config: SortConfig) {
+        self.sort_config = Some(config);
+    }
+
+    pub(super) fn add_pivot_table(&mut self, pt: WritablePivotTable) {
+        // Expand worksheet dimensions to encompass the pivot table output
+        // range.  Excel validates that the DIMENSIONS record covers the
+        // SXVIEW output area; a mismatch causes a "corrupt file" repair
+        // dialog.
+        let pt_first_row = pt.first_row as u32;
+        let pt_last_row_excl = pt.last_row as u32 + 1; // DIMENSIONS uses exclusive end
+        let pt_first_col = pt.first_col;
+        let pt_last_col_excl = pt.last_col + 1;
+
+        if self.cells.is_empty() && self.pivot_tables.is_empty() {
+            self.first_row = pt_first_row;
+            self.last_row = pt_last_row_excl;
+            self.first_col = pt_first_col;
+            self.last_col = pt_last_col_excl;
+        } else {
+            self.first_row = self.first_row.min(pt_first_row);
+            self.last_row = self.last_row.max(pt_last_row_excl);
+            self.first_col = self.first_col.min(pt_first_col);
+            self.last_col = self.last_col.max(pt_last_col_excl);
+        }
+
+        self.pivot_tables.push(pt);
+    }
+}
+
+/// A pivot table definition for the writer.
+#[derive(Debug, Clone)]
+pub(super) struct WritablePivotTable {
+    /// Pivot table name.
+    pub name: String,
+    /// Source type (0x0001 = Worksheet).
+    pub source_type: u16,
+
+    // -- Source data range (for DCONREF + SXDB cache) --
+    /// Name of the source worksheet.
+    pub source_sheet_name: String,
+    /// Source range (0-based, inclusive).
+    pub source_first_row: u16,
+    pub source_last_row: u16,
+    pub source_first_col: u16,
+    pub source_last_col: u16,
+
+    // -- Output range --
+    pub first_row: u16,
+    pub last_row: u16,
+    pub first_col: u16,
+    pub last_col: u16,
+    /// First header row.
+    pub first_header_row: u16,
+    /// First data row.
+    pub first_data_row: u16,
+    /// First data column.
+    pub first_data_col: u16,
+    /// Data field header name (e.g. "Values").
+    pub data_field_name: String,
+    /// Axis for data field header.
+    pub data_axis: u16,
+    /// Position of data label within axis.
+    pub data_position: u16,
+    /// Field definitions.
+    pub fields: Vec<WritablePivotField>,
+    /// Data item definitions.
+    pub data_items: Vec<WritablePivotDataItem>,
+    /// Page field entries: (item_index, field_index, object_id).
+    pub page_entries: Vec<(u16, u16, u16)>,
+    /// Source data rows for the pivot cache.
+    pub source_data: Vec<Vec<super::PivotCacheValue>>,
+}
+
+/// A pivot field definition for the writer.
+#[derive(Debug, Clone)]
+pub(super) struct WritablePivotField {
+    /// Axis: 0=none, 1=row, 2=col, 4=page, 8=data.
+    pub axis: u16,
+    pub subtotal_count: u16,
+    pub subtotal_flags: u16,
+    /// Items in this field.
+    pub items: Vec<WritablePivotItem>,
+    /// Optional SXVD display name override (`None` → use cache name).
+    pub name: Option<String>,
+    /// Source column name for the pivot cache SXFDB record.
+    pub cache_name: String,
+    /// Unique source data values for this field's cache items (SXSTRING records).
+    pub cache_items: Vec<String>,
+    /// Whether this field is numeric (data-axis).
+    pub is_numeric: bool,
+}
+
+/// A pivot item for the writer.
+#[derive(Debug, Clone)]
+pub(super) struct WritablePivotItem {
+    /// Item type: 0x0000=Data, 0x0001=Default subtotal, 0x0002=Sum, etc.
+    pub item_type: u16,
+    pub flags: u16,
+    pub cache_index: u16,
+    pub name: Option<String>,
+}
+
+/// A pivot data item (value field) for the writer.
+#[derive(Debug, Clone)]
+pub(super) struct WritablePivotDataItem {
+    pub source_field_index: u16,
+    /// Aggregation function: 0=Sum,1=Count,2=Average,...
+    pub function: u16,
+    pub display_format: u16,
+    pub base_field_index: u16,
+    pub base_item_index: u16,
+    pub num_format_index: u16,
+    pub name: String,
 }

@@ -26,6 +26,24 @@ pub mod shapes;
 /// Shared parsing utilities
 mod utils;
 
+/// Merged cell range parsing (MERGECELLS 0x00E5)
+pub mod merged_cells;
+
+/// Hyperlink parsing (HLINK 0x01B8)
+pub mod hyperlinks;
+
+/// Comment/note parsing (NOTE 0x001C)
+pub mod comments;
+
+/// AutoFilter and sort parsing (AUTOFILTERINFO 0x009D, AUTOFILTER 0x009E, SORT 0x0090)
+pub mod autofilter;
+
+/// Pivot table parsing (SXVIEW, SXVD, SXVI, SXDI, SXVS, SXPI)
+pub mod pivot_table;
+
+/// Sheet protection parsing (PROTECT, OBJECTPROTECT, SCENPROTECT, PASSWORD)
+pub mod protection;
+
 /// XLS file writing
 pub mod writer;
 

@@ -14,6 +14,13 @@ use super::super::XlsResult;
 use std::collections::HashMap;
 use std::io::Write;
 
+#[derive(Debug, Clone, Copy)]
+pub struct PivotXfIndices {
+    pub header_accent: u16,
+    pub row_label: u16,
+    pub value: u16,
+}
+
 /// Font weight constants
 pub const FONT_WEIGHT_NORMAL: u16 = 400;
 pub const FONT_WEIGHT_BOLD: u16 = 700;
@@ -422,6 +429,7 @@ pub struct FormattingManager {
     // Built-in formats (0x00..0x31) come from BUILTIN_NUMBER_FORMATS.
     number_formats: Vec<(u16, String)>,
     number_format_map: HashMap<String, u16>,
+    pivot_xfs_enabled: bool,
 }
 
 impl FormattingManager {
@@ -432,6 +440,7 @@ impl FormattingManager {
             formats: Vec::new(),
             number_formats: Vec::new(),
             number_format_map: HashMap::new(),
+            pivot_xfs_enabled: false,
         };
 
         // Add default fonts (indices 0..3) to approximate Excel/POI defaults.
@@ -548,6 +557,20 @@ impl FormattingManager {
         self.add_format(xf)
     }
 
+    pub fn enable_pivot_xfs(&mut self) {
+        self.pivot_xfs_enabled = true;
+    }
+
+    pub fn pivot_xf_indices(&self) -> PivotXfIndices {
+        const TARGET_PIVOT_XF_START_INDEX: u16 = 64;
+        let base = TARGET_PIVOT_XF_START_INDEX;
+        PivotXfIndices {
+            header_accent: base,
+            row_label: base + 1,
+            value: base + 2,
+        }
+    }
+
     /// Get font by index
     pub fn get_font(&self, index: u16) -> Option<&Font> {
         self.fonts.get(index as usize)
@@ -630,6 +653,46 @@ impl FormattingManager {
         if self.formats.len() > 1 {
             for format in &self.formats[1..] {
                 write_xf(writer, format, false)?;
+            }
+        }
+
+        if self.pivot_xfs_enabled {
+            const TARGET_PIVOT_XF_START_INDEX: u16 = 64;
+            const PIVOT_HEADER_ACCENT: [u8; 20] = [
+                0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x02, 0xC0, 0x60,
+            ];
+            const PIVOT_ROW_LABEL: [u8; 20] = [
+                0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x11, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x02, 0xC0, 0x20,
+            ];
+            const PIVOT_VALUE: [u8; 20] = [
+                0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x10, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x02, 0xC0, 0x20,
+            ];
+            let emitted_xf_count = 15u16 + 1 + 5 + (self.formats.len() as u16).saturating_sub(1);
+            let pad_count = TARGET_PIVOT_XF_START_INDEX.saturating_sub(emitted_xf_count);
+            let default_payload = if let Some(default_cell_xf) = self.formats.first() {
+                let mut buf = Vec::with_capacity(20);
+                write_xf(&mut buf, default_cell_xf, false)?;
+                let mut payload = [0u8; 20];
+                payload.copy_from_slice(&buf[4..24]);
+                payload
+            } else {
+                [
+                    0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x3F,
+                ]
+            };
+
+            for _ in 0..pad_count {
+                super::biff::write_record_header(writer, 0x00E0, 20)?;
+                writer.write_all(&default_payload)?;
+            }
+
+            for payload in [PIVOT_HEADER_ACCENT, PIVOT_ROW_LABEL, PIVOT_VALUE] {
+                super::biff::write_record_header(writer, 0x00E0, 20)?;
+                writer.write_all(&payload)?;
             }
         }
 

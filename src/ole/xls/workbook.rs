@@ -3,11 +3,13 @@
 use crate::ole::file::OleFile;
 use crate::ole::xls::cell::XlsCell;
 use crate::ole::xls::error::{XlsError, XlsResult};
+use crate::ole::xls::pivot_table::PivotTable;
 use crate::ole::xls::records::{
     BiffVersion, BofRecord, BoundSheetRecord, CellRecord, DimensionsRecord, RecordIter,
     SharedStringTable, XlsEncoding,
 };
 use crate::ole::xls::worksheet::XlsWorksheet;
+use crate::ole::xls::{autofilter, comments, hyperlinks, merged_cells, pivot_table, protection};
 use crate::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
 use std::io::{Read, Seek};
 use std::sync::Arc;
@@ -221,6 +223,13 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     ) -> XlsResult<XlsWorksheet> {
         let mut worksheet = XlsWorksheet::with_shared_strings(name.to_string(), shared_strings);
 
+        // Accumulator for pivot table records: we collect SX* records in order
+        // and assemble complete PivotTable structs when SXVIEW boundaries are hit.
+        let mut current_pivot: Option<PivotTable> = None;
+
+        // Collector for TXO comment text: tracks OBJ→TXO→CONTINUE sequences.
+        let mut txo_collector = comments::TxoCollector::new();
+
         for record_result in record_iter.by_ref() {
             let record = record_result?;
 
@@ -229,10 +238,13 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     // This marks the start of a worksheet
                 }
                 0x000A => { // EOF - End of worksheet
+                    // Flush any in-progress pivot table
+                    if let Some(pt) = current_pivot.take() {
+                        worksheet.add_pivot_table(pt);
+                    }
                     break;
                 }
                 0x0200 => { // Dimensions
-                    // Parse dimensions to understand worksheet bounds
                     if let Ok(dimensions) = DimensionsRecord::parse(&record.data) {
                         worksheet.set_dimensions(dimensions.first_row, dimensions.last_row,
                                                dimensions.first_col, dimensions.last_col);
@@ -253,13 +265,154 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                         worksheet.add_cell(cell);
                     }
                 }
+
+                // --- Merged cells (MERGECELLS 0x00E5) ---
+                rt if rt == merged_cells::RECORD_TYPE => {
+                    let mut ranges = Vec::new();
+                    if merged_cells::parse_mergecells_record(&record.data, &mut ranges).is_ok() {
+                        worksheet.add_merged_cells(&ranges);
+                    }
+                }
+
+                // --- Hyperlinks (HLINK 0x01B8) ---
+                rt if rt == hyperlinks::RECORD_TYPE => {
+                    if let Ok(link) = hyperlinks::parse_hlink_record(&record.data) {
+                        worksheet.add_hyperlink(link);
+                    }
+                }
+
+                // --- Comments (NOTE 0x001C) ---
+                rt if rt == comments::RECORD_TYPE => {
+                    if let Ok(comment) = comments::parse_note_record(&record.data) {
+                        worksheet.add_comment(comment);
+                    }
+                }
+
+                // --- OBJ record (0x005D) — extract object ID for TXO linking ---
+                rt if rt == comments::OBJ_TYPE => {
+                    txo_collector.feed_obj(&record.data);
+                }
+
+                // --- TXO record (0x01B6) — text object header ---
+                rt if rt == comments::TXO_TYPE => {
+                    txo_collector.feed_txo(&record.data);
+                }
+
+                // --- CONTINUE record (0x003C) — may carry TXO text data ---
+                rt if rt == comments::CONTINUE_TYPE => {
+                    txo_collector.feed_continue(&record.data);
+                }
+
+                // --- AutoFilter (AUTOFILTERINFO 0x009D) ---
+                rt if rt == autofilter::AUTOFILTERINFO_TYPE => {
+                    if let Ok(count) = autofilter::parse_autofilterinfo(&record.data) {
+                        worksheet.set_autofilter_info(count);
+                    }
+                }
+
+                // --- AutoFilter column (AUTOFILTER 0x009E) ---
+                rt if rt == autofilter::AUTOFILTER_TYPE => {
+                    if let Ok(col) = autofilter::parse_autofilter(&record.data) {
+                        worksheet.add_autofilter_column(col);
+                    }
+                }
+
+                // --- Sort (SORT 0x0090) ---
+                rt if rt == autofilter::SORT_TYPE => {
+                    if let Ok(info) = autofilter::parse_sort(&record.data) {
+                        worksheet.set_sort_info(info);
+                    }
+                }
+
+                // --- Sheet protection records ---
+                rt if rt == protection::PROTECT_TYPE => {
+                    if let Ok(val) = protection::parse_protect_bool(&record.data) {
+                        worksheet.protection_mut().sheet_protected = val;
+                    }
+                }
+                rt if rt == protection::OBJECTPROTECT_TYPE => {
+                    if let Ok(val) = protection::parse_protect_bool(&record.data) {
+                        worksheet.protection_mut().objects_protected = val;
+                    }
+                }
+                rt if rt == protection::SCENPROTECT_TYPE => {
+                    if let Ok(val) = protection::parse_protect_bool(&record.data) {
+                        worksheet.protection_mut().scenarios_protected = val;
+                    }
+                }
+                rt if rt == protection::PASSWORD_TYPE => {
+                    if let Ok(hash) = protection::parse_password(&record.data) {
+                        worksheet.protection_mut().password_hash = hash;
+                    }
+                }
+
+                // --- Pivot table records ---
+                rt if rt == pivot_table::SXVIEW_TYPE => {
+                    // New SXVIEW starts a new pivot table; flush previous if any
+                    if let Some(pt) = current_pivot.take() {
+                        worksheet.add_pivot_table(pt);
+                    }
+                    if let Ok(view) = pivot_table::parse_sxview(&record.data) {
+                        current_pivot = Some(PivotTable::new(view));
+                    }
+                }
+                rt if rt == pivot_table::SXVD_TYPE => {
+                    if let Some(ref mut pt) = current_pivot
+                        && let Ok(field) = pivot_table::parse_sxvd(&record.data)
+                    {
+                        pt.fields.push(field);
+                    }
+                }
+                rt if rt == pivot_table::SXVI_TYPE => {
+                    if let Some(ref mut pt) = current_pivot
+                        && let Ok(item) = pivot_table::parse_sxvi(&record.data)
+                    {
+                        pt.items.push(item);
+                    }
+                }
+                rt if rt == pivot_table::SXDI_TYPE => {
+                    if let Some(ref mut pt) = current_pivot
+                        && let Ok(di) = pivot_table::parse_sxdi(&record.data)
+                    {
+                        pt.data_items.push(di);
+                    }
+                }
+                rt if rt == pivot_table::SXVS_TYPE => {
+                    if let Some(ref mut pt) = current_pivot
+                        && let Ok(src) = pivot_table::parse_sxvs(&record.data)
+                    {
+                        pt.source_type = src;
+                    }
+                }
+                rt if rt == pivot_table::SXPI_TYPE => {
+                    if let Some(ref mut pt) = current_pivot
+                        && let Ok(entries) = pivot_table::parse_sxpi(&record.data)
+                    {
+                        pt.page_entries.extend(entries);
+                    }
+                }
+
                 _ => {
-                    // Skip other records for now
+                    // Skip other records
                 }
             }
         }
 
+        // Resolve comment texts from TXO data collected during parsing.
+        txo_collector.resolve_comment_texts(worksheet.comments_mut());
+
         Ok(worksheet)
+    }
+
+    /// Access the typed `XlsWorksheet` at the given index.
+    ///
+    /// This provides access to XLS-specific data (protection, comments,
+    /// autofilter, pivot tables) that is not exposed through the generic
+    /// `WorkbookTrait` / `Worksheet` trait.
+    pub fn xls_worksheet(&self, index: usize) -> XlsResult<&XlsWorksheet> {
+        self.worksheets
+            .get(index)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet index {}", index)))
     }
 }
 

@@ -1,7 +1,13 @@
 //! Worksheet implementation for XLS files
 
+use crate::ole::xls::autofilter::{AutoFilterColumn, AutoFilterInfo, SortInfo};
 use crate::ole::xls::cell::XlsCell;
+use crate::ole::xls::comments::XlsComment;
 use crate::ole::xls::error::XlsError;
+use crate::ole::xls::hyperlinks::XlsHyperlink;
+use crate::ole::xls::merged_cells::MergedCellRange;
+use crate::ole::xls::pivot_table::PivotTable;
+use crate::ole::xls::protection::SheetProtection;
 use crate::sheet::{Cell as SheetCell, CellIterator, CellValue, Result, RowIterator, Worksheet};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -16,6 +22,20 @@ pub struct XlsWorksheet {
     max_col: u32,
     /// Shared string table (Arc for zero-copy sharing across worksheets)
     shared_strings: Option<Arc<Vec<String>>>,
+    /// Merged cell ranges (MERGECELLS records)
+    merged_cells: Vec<MergedCellRange>,
+    /// Hyperlinks (HLINK records)
+    hyperlinks: Vec<XlsHyperlink>,
+    /// Comments/notes (NOTE records)
+    comments: Vec<XlsComment>,
+    /// AutoFilter configuration (AUTOFILTERINFO + AUTOFILTER records)
+    autofilter: Option<AutoFilterInfo>,
+    /// Sort configuration (SORT record)
+    sort_info: Option<SortInfo>,
+    /// Pivot tables (aggregated SX* records)
+    pivot_tables: Vec<PivotTable>,
+    /// Sheet protection state (PROTECT/OBJECTPROTECT/SCENPROTECT/PASSWORD)
+    protection: SheetProtection,
 }
 
 impl XlsWorksheet {
@@ -27,6 +47,13 @@ impl XlsWorksheet {
             max_row: 0,
             max_col: 0,
             shared_strings: None,
+            merged_cells: Vec::new(),
+            hyperlinks: Vec::new(),
+            comments: Vec::new(),
+            autofilter: None,
+            sort_info: None,
+            pivot_tables: Vec::new(),
+            protection: SheetProtection::default(),
         }
     }
 
@@ -38,6 +65,13 @@ impl XlsWorksheet {
             max_row: 0,
             max_col: 0,
             shared_strings: Some(shared_strings),
+            merged_cells: Vec::new(),
+            hyperlinks: Vec::new(),
+            comments: Vec::new(),
+            autofilter: None,
+            sort_info: None,
+            pivot_tables: Vec::new(),
+            protection: SheetProtection::default(),
         }
     }
 
@@ -70,6 +104,105 @@ impl XlsWorksheet {
     /// Get cell at position
     pub fn get_cell(&self, row: u32, col: u32) -> Option<&XlsCell> {
         self.cells.get(&(row, col))
+    }
+
+    // -- Merged cells --
+
+    /// Add merged cell ranges parsed from a MERGECELLS record.
+    pub fn add_merged_cells(&mut self, ranges: &[MergedCellRange]) {
+        self.merged_cells.extend_from_slice(ranges);
+    }
+
+    /// All merged cell ranges in this worksheet.
+    pub fn merged_cells(&self) -> &[MergedCellRange] {
+        &self.merged_cells
+    }
+
+    // -- Hyperlinks --
+
+    /// Add a parsed hyperlink.
+    pub fn add_hyperlink(&mut self, link: XlsHyperlink) {
+        self.hyperlinks.push(link);
+    }
+
+    /// All hyperlinks in this worksheet.
+    pub fn hyperlinks(&self) -> &[XlsHyperlink] {
+        &self.hyperlinks
+    }
+
+    // -- Comments --
+
+    /// Add a parsed comment/note.
+    pub fn add_comment(&mut self, comment: XlsComment) {
+        self.comments.push(comment);
+    }
+
+    /// All comments/notes in this worksheet.
+    pub fn comments(&self) -> &[XlsComment] {
+        &self.comments
+    }
+
+    /// Mutable access to comments (used to resolve TXO text after parsing).
+    pub fn comments_mut(&mut self) -> &mut [XlsComment] {
+        &mut self.comments
+    }
+
+    // -- AutoFilter --
+
+    /// Initialize AutoFilter with the given column count (from AUTOFILTERINFO).
+    pub fn set_autofilter_info(&mut self, column_count: u16) {
+        self.autofilter = Some(AutoFilterInfo {
+            column_count,
+            columns: Vec::new(),
+        });
+    }
+
+    /// Add an AutoFilter column definition (from AUTOFILTER record).
+    pub fn add_autofilter_column(&mut self, col: AutoFilterColumn) {
+        if let Some(ref mut af) = self.autofilter {
+            af.columns.push(col);
+        }
+    }
+
+    /// AutoFilter configuration, if any.
+    pub fn autofilter(&self) -> Option<&AutoFilterInfo> {
+        self.autofilter.as_ref()
+    }
+
+    // -- Sort --
+
+    /// Set the sort configuration (from SORT record).
+    pub fn set_sort_info(&mut self, info: SortInfo) {
+        self.sort_info = Some(info);
+    }
+
+    /// Sort configuration, if any.
+    pub fn sort_info(&self) -> Option<&SortInfo> {
+        self.sort_info.as_ref()
+    }
+
+    // -- Pivot tables --
+
+    /// Add a fully assembled pivot table.
+    pub fn add_pivot_table(&mut self, pt: PivotTable) {
+        self.pivot_tables.push(pt);
+    }
+
+    /// All pivot tables in this worksheet.
+    pub fn pivot_tables(&self) -> &[PivotTable] {
+        &self.pivot_tables
+    }
+
+    // -- Sheet Protection --
+
+    /// Get the sheet protection state.
+    pub fn protection(&self) -> &SheetProtection {
+        &self.protection
+    }
+
+    /// Get a mutable reference to the sheet protection state.
+    pub fn protection_mut(&mut self) -> &mut SheetProtection {
+        &mut self.protection
     }
 }
 

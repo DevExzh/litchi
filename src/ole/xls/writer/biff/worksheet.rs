@@ -5,6 +5,72 @@ use std::io::Write;
 
 use super::write_record_header;
 
+/// Write DEFCOLWIDTH record.
+///
+/// Record type: 0x0055, Length: 2
+pub fn write_def_col_width<W: Write>(writer: &mut W, width_chars: u16) -> XlsResult<()> {
+    write_record_header(writer, 0x0055, 2)?;
+    writer.write_all(&width_chars.to_le_bytes())?;
+    Ok(())
+}
+
+/// Write INDEX record.
+///
+/// Record type: 0x020B, Length: 16 + 4 * cDbCell
+pub fn write_index<W: Write>(
+    writer: &mut W,
+    first_row: u32,
+    last_row_plus1: u32,
+    def_col_width_pos: u32,
+    dbcell_positions: &[u32],
+) -> XlsResult<()> {
+    let data_len = 16u16
+        + u16::try_from(dbcell_positions.len() * 4).map_err(|_| {
+            XlsError::InvalidData(
+                "INDEX record DBCell pointer list exceeds BIFF8 size limit".to_string(),
+            )
+        })?;
+    write_record_header(writer, 0x020B, data_len)?;
+    writer.write_all(&0u32.to_le_bytes())?;
+    writer.write_all(&first_row.to_le_bytes())?;
+    writer.write_all(&last_row_plus1.to_le_bytes())?;
+    writer.write_all(&def_col_width_pos.to_le_bytes())?;
+    for position in dbcell_positions {
+        writer.write_all(&position.to_le_bytes())?;
+    }
+    Ok(())
+}
+
+/// Write DBCELL record.
+///
+/// Record type: 0x00D7, Length: 4 + 2 * cOffsets
+pub fn write_dbcell<W: Write>(
+    writer: &mut W,
+    row_offset: u32,
+    cell_offsets: &[u16],
+) -> XlsResult<()> {
+    let data_len = 4u16
+        + u16::try_from(cell_offsets.len() * 2).map_err(|_| {
+            XlsError::InvalidData("DBCELL row offset list exceeds BIFF8 size limit".to_string())
+        })?;
+    write_record_header(writer, 0x00D7, data_len)?;
+    writer.write_all(&row_offset.to_le_bytes())?;
+    for offset in cell_offsets {
+        writer.write_all(&offset.to_le_bytes())?;
+    }
+    Ok(())
+}
+
+/// Write DEFAULTROWHEIGHT record.
+///
+/// Record type: 0x0225, Length: 4
+pub fn write_default_row_height<W: Write>(writer: &mut W) -> XlsResult<()> {
+    write_record_header(writer, 0x0225, 4)?;
+    writer.write_all(&0x0000u16.to_le_bytes())?;
+    writer.write_all(&0x0116u16.to_le_bytes())?;
+    Ok(())
+}
+
 /// Write WSBOOL record (Additional Workspace Information)
 ///
 /// Record type: 0x0081, Length: 2
@@ -16,6 +82,80 @@ pub fn write_wsbool<W: Write>(writer: &mut W) -> XlsResult<()> {
     // POI serializes as [WSBool2, WSBool1], so the on-disk u16 (little-endian)
     // is 0x04C1.
     writer.write_all(&0x04C1u16.to_le_bytes())?;
+    Ok(())
+}
+
+pub fn write_pivot_sheet_preamble<W: Write>(writer: &mut W) -> XlsResult<()> {
+    const DELTA_BYTES: [u8; 8] = [0xFC, 0xA9, 0xF1, 0xD2, 0x4D, 0x62, 0x50, 0x3F];
+    const MARGIN_BYTES: [u8; 8] = [0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0xE6, 0x3F];
+    const TOP_BOTTOM_MARGIN_BYTES: [u8; 8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xE8, 0x3F];
+    const PRINT_SETUP_BYTES: [u8; 34] = [
+        0x00, 0x00, 0x16, 0x01, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x04, 0x00, 0x02, 0x00, 0x01,
+        0xFF, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0xD3, 0x3F, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33,
+        0xD3, 0x3F, 0x0F, 0x00,
+    ];
+    const HEADER_FOOTER_BYTES: [u8; 38] = [
+        0x9C, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3C, 0x33,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ];
+
+    write_record_header(writer, 0x000D, 2)?;
+    writer.write_all(&0x0001u16.to_le_bytes())?;
+    write_record_header(writer, 0x000C, 2)?;
+    writer.write_all(&0x0064u16.to_le_bytes())?;
+    write_record_header(writer, 0x000F, 2)?;
+    writer.write_all(&0x0001u16.to_le_bytes())?;
+    write_record_header(writer, 0x0011, 2)?;
+    writer.write_all(&0x0000u16.to_le_bytes())?;
+    write_record_header(writer, 0x0010, 8)?;
+    writer.write_all(&DELTA_BYTES)?;
+    write_record_header(writer, 0x005F, 2)?;
+    writer.write_all(&0x0001u16.to_le_bytes())?;
+    write_record_header(writer, 0x002A, 2)?;
+    writer.write_all(&0x0000u16.to_le_bytes())?;
+    write_record_header(writer, 0x002B, 2)?;
+    writer.write_all(&0x0000u16.to_le_bytes())?;
+    write_record_header(writer, 0x0082, 2)?;
+    writer.write_all(&0x0001u16.to_le_bytes())?;
+    write_record_header(writer, 0x0080, 8)?;
+    writer.write_all(&0u64.to_le_bytes())?;
+    write_default_row_height(writer)?;
+    write_wsbool(writer)?;
+    write_record_header(writer, 0x0014, 0)?;
+    write_record_header(writer, 0x0015, 0)?;
+    write_record_header(writer, 0x0083, 2)?;
+    writer.write_all(&0x0000u16.to_le_bytes())?;
+    write_record_header(writer, 0x0084, 2)?;
+    writer.write_all(&0x0000u16.to_le_bytes())?;
+    write_record_header(writer, 0x0026, 8)?;
+    writer.write_all(&MARGIN_BYTES)?;
+    write_record_header(writer, 0x0027, 8)?;
+    writer.write_all(&MARGIN_BYTES)?;
+    write_record_header(writer, 0x0028, 8)?;
+    writer.write_all(&TOP_BOTTOM_MARGIN_BYTES)?;
+    write_record_header(writer, 0x0029, 8)?;
+    writer.write_all(&TOP_BOTTOM_MARGIN_BYTES)?;
+    write_record_header(writer, 0x00A1, 34)?;
+    writer.write_all(&PRINT_SETUP_BYTES)?;
+    write_record_header(writer, 0x089C, 38)?;
+    writer.write_all(&HEADER_FOOTER_BYTES)?;
+    Ok(())
+}
+
+pub fn write_pivot_colinfo<W: Write>(
+    writer: &mut W,
+    first_col: u16,
+    last_col: u16,
+    col_width: u16,
+) -> XlsResult<()> {
+    write_record_header(writer, 0x007D, 12)?;
+    writer.write_all(&first_col.to_le_bytes())?;
+    writer.write_all(&last_col.to_le_bytes())?;
+    writer.write_all(&col_width.to_le_bytes())?;
+    writer.write_all(&0x000Fu16.to_le_bytes())?;
+    writer.write_all(&0x0006u16.to_le_bytes())?;
+    writer.write_all(&0x0000u16.to_le_bytes())?;
     Ok(())
 }
 
@@ -110,6 +250,200 @@ pub fn write_autofilterinfo<W: Write>(writer: &mut W, c_entries: u16) -> XlsResu
 
     write_record_header(writer, 0x009D, 2)?;
     writer.write_all(&c_entries.to_le_bytes())?;
+    Ok(())
+}
+
+/// Write an AUTOFILTER record (0x009E) for a single column filter condition.
+///
+/// # Record layout (MS-XLS 2.4.6)
+///
+/// ```text
+/// Offset  Size  Field
+/// 0       2     iEntry     — column index within the AutoFilter range (0-based)
+/// 2       2     grbit      — option flags
+/// 4       10    doper1     — first DOPER condition
+/// 14      10    doper2     — second DOPER condition
+/// 24      var   rgch1      — string for condition 1 (if applicable)
+///         var   rgch2      — string for condition 2 (if applicable)
+/// ```
+#[allow(clippy::too_many_arguments)]
+pub fn write_autofilter<W: Write>(
+    writer: &mut W,
+    column_index: u16,
+    join_or: bool,
+    is_simple: bool,
+    is_top10: bool,
+    hide_arrow: bool,
+    cond1: &AutoFilterConditionWrite,
+    cond2: &AutoFilterConditionWrite,
+) -> XlsResult<()> {
+    let mut grbit: u16 = 0;
+    if join_or {
+        grbit |= 0x0001;
+    }
+    if is_simple {
+        grbit |= 0x0002;
+    }
+    if is_top10 {
+        grbit |= 0x0010;
+    }
+    if hide_arrow {
+        grbit |= 0x0020;
+    }
+
+    let (doper1, str1) = cond1.to_doper();
+    let (doper2, str2) = cond2.to_doper();
+
+    let str1_bytes = encode_autofilter_string(str1);
+    let str2_bytes = encode_autofilter_string(str2);
+
+    let data_len = 24u16 + str1_bytes.len() as u16 + str2_bytes.len() as u16;
+    write_record_header(writer, 0x009E, data_len)?;
+
+    writer.write_all(&column_index.to_le_bytes())?;
+    writer.write_all(&grbit.to_le_bytes())?;
+    writer.write_all(&doper1)?;
+    writer.write_all(&doper2)?;
+    writer.write_all(&str1_bytes)?;
+    writer.write_all(&str2_bytes)?;
+
+    Ok(())
+}
+
+/// A single filter condition for writing an AUTOFILTER record.
+#[derive(Debug, Clone)]
+pub enum AutoFilterConditionWrite {
+    /// No condition / unused.
+    None,
+    /// Numeric condition (IEEE 754 double).
+    Number { operator: u8, value: f64 },
+    /// String condition.
+    String { operator: u8, value: String },
+    /// Boolean condition.
+    Bool { operator: u8, value: bool },
+    /// Match all / blanks.
+    MatchAll { operator: u8 },
+}
+
+impl AutoFilterConditionWrite {
+    /// Serialize to a 10-byte DOPER structure + optional string.
+    ///
+    /// Returns `(doper: [u8; 10], optional_string: Option<&str>)`.
+    fn to_doper(&self) -> ([u8; 10], Option<&str>) {
+        let mut doper = [0u8; 10];
+        match self {
+            Self::None => (doper, None),
+            Self::Number { operator, value } => {
+                doper[0] = 0x04; // vt = IEEE double
+                doper[1] = *operator;
+                doper[2..10].copy_from_slice(&value.to_le_bytes());
+                (doper, None)
+            },
+            Self::String { operator, value } => {
+                doper[0] = 0x06; // vt = string
+                doper[1] = *operator;
+                // doper[2] = unused, doper[3] = byte length of string
+                let byte_len = value.len().min(255) as u8;
+                doper[3] = byte_len;
+                (doper, Some(value.as_str()))
+            },
+            Self::Bool { operator, value } => {
+                doper[0] = 0x08; // vt = boolean/error
+                doper[1] = *operator;
+                doper[2] = if *value { 1 } else { 0 };
+                doper[3] = 0; // is_error = false
+                (doper, None)
+            },
+            Self::MatchAll { operator } => {
+                doper[0] = 0x0C; // vt = match all
+                doper[1] = *operator;
+                (doper, None)
+            },
+        }
+    }
+}
+
+/// Encode a DOPER string operand as XLUnicodeStringNoCch for the trailing bytes.
+fn encode_autofilter_string(s: Option<&str>) -> Vec<u8> {
+    match s {
+        None => Vec::new(),
+        Some("") => Vec::new(),
+        Some(s) => {
+            let is_ascii = s.is_ascii();
+            if is_ascii {
+                let mut buf = Vec::with_capacity(1 + s.len());
+                buf.push(0x00); // flags: compressed
+                buf.extend_from_slice(s.as_bytes());
+                buf
+            } else {
+                let utf16: Vec<u16> = s.encode_utf16().collect();
+                let mut buf = Vec::with_capacity(1 + utf16.len() * 2);
+                buf.push(0x01); // flags: UTF-16LE
+                for ch in &utf16 {
+                    buf.extend_from_slice(&ch.to_le_bytes());
+                }
+                buf
+            }
+        },
+    }
+}
+
+/// Write a SORT record (0x0090).
+///
+/// # Record layout
+///
+/// ```text
+/// Offset  Size  Field
+/// 0       2     flags   — bit 0: case-sensitive, bit 2: sort by columns (not rows),
+///                          bits 4-6: key descending flags
+/// 2       2     col1    — first sort key column index
+/// 4       2     col2    — second sort key column index (0 if unused)
+/// 6       2     col3    — third sort key column index (0 if unused)
+/// 8       2     reserved
+/// ```
+pub fn write_sort<W: Write>(
+    writer: &mut W,
+    case_sensitive: bool,
+    sort_by_columns: bool,
+    keys: &[(u16, bool)], // (column_index, descending)
+) -> XlsResult<()> {
+    if keys.is_empty() {
+        return Ok(());
+    }
+
+    let mut flags: u16 = 0;
+    if case_sensitive {
+        flags |= 0x0001;
+    }
+    if sort_by_columns {
+        flags |= 0x0004;
+    }
+    // Number of keys encoded in bit 1 (0 = 1 key, 1 = 2+ keys)
+    if keys.len() >= 2 {
+        flags |= 0x0002;
+    }
+    // Descending flags for each key
+    if keys.first().is_some_and(|(_, desc)| *desc) {
+        flags |= 0x0010;
+    }
+    if keys.get(1).is_some_and(|(_, desc)| *desc) {
+        flags |= 0x0020;
+    }
+    if keys.get(2).is_some_and(|(_, desc)| *desc) {
+        flags |= 0x0040;
+    }
+
+    let col1 = keys.first().map_or(0, |(c, _)| *c);
+    let col2 = keys.get(1).map_or(0, |(c, _)| *c);
+    let col3 = keys.get(2).map_or(0, |(c, _)| *c);
+
+    write_record_header(writer, 0x0090, 10)?;
+    writer.write_all(&flags.to_le_bytes())?;
+    writer.write_all(&col1.to_le_bytes())?;
+    writer.write_all(&col2.to_le_bytes())?;
+    writer.write_all(&col3.to_le_bytes())?;
+    writer.write_all(&0u16.to_le_bytes())?; // reserved
+
     Ok(())
 }
 
@@ -363,6 +697,52 @@ pub fn write_window2<W: Write>(writer: &mut W, has_freeze_panes: bool) -> XlsRes
     Ok(())
 }
 
+pub fn write_pivot_window2<W: Write>(writer: &mut W) -> XlsResult<()> {
+    static DATA: &[u8] = &[
+        0xB6, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11,
+        0x00, 0x00, 0x00,
+    ];
+    write_record_header(writer, 0x023E, DATA.len() as u16)?;
+    writer.write_all(DATA)?;
+    Ok(())
+}
+
+pub fn write_plv<W: Write>(writer: &mut W) -> XlsResult<()> {
+    static DATA: &[u8] = &[
+        0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12,
+        0x00,
+    ];
+    write_record_header(writer, 0x088B, DATA.len() as u16)?;
+    writer.write_all(DATA)?;
+    Ok(())
+}
+
+pub fn write_selection<W: Write>(writer: &mut W) -> XlsResult<()> {
+    static DATA: &[u8] = &[
+        0x03, 0x0F, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x0F, 0x00, 0x0F, 0x00, 0x03, 0x03,
+    ];
+    write_record_header(writer, 0x001D, DATA.len() as u16)?;
+    writer.write_all(DATA)?;
+    Ok(())
+}
+
+pub fn write_phonetic_pr<W: Write>(writer: &mut W) -> XlsResult<()> {
+    static DATA: &[u8] = &[0x17, 0x00, 0x37, 0x00, 0x00, 0x00];
+    write_record_header(writer, 0x00EF, DATA.len() as u16)?;
+    writer.write_all(DATA)?;
+    Ok(())
+}
+
+pub fn write_sheet_ext<W: Write>(writer: &mut W) -> XlsResult<()> {
+    static DATA: &[u8] = &[
+        0x67, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01,
+        0xFF, 0xFF, 0xFF, 0xFF, 0x03, 0x44, 0x00, 0x00,
+    ];
+    write_record_header(writer, 0x0867, DATA.len() as u16)?;
+    writer.write_all(DATA)?;
+    Ok(())
+}
+
 /// Write DIMENSIONS record (worksheet dimensions)
 ///
 /// Record type: 0x0200
@@ -442,7 +822,7 @@ pub fn write_row<W: Write>(
     if hidden {
         option_flags |= 0x0020;
     }
-    if height != 0x00FF {
+    if height != 0x00FF && height != 0x0116 {
         option_flags |= 0x0040;
     }
     writer.write_all(&option_flags.to_le_bytes())?;

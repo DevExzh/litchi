@@ -16,9 +16,12 @@ pub mod formatting;
 pub mod formula;
 
 // Re-export public types
+pub use biff::AutoFilterConditionWrite;
 pub use core::{
-    XlsCellValue, XlsConditionalFormat, XlsConditionalFormatType, XlsConditionalPattern,
-    XlsDataValidation, XlsDataValidationOperator, XlsDataValidationType, XlsDefinedName, XlsWriter,
+    PivotCacheValue, XlsCellValue, XlsConditionalFormat, XlsConditionalFormatType,
+    XlsConditionalPattern, XlsDataValidation, XlsDataValidationOperator, XlsDataValidationType,
+    XlsDefinedName, XlsPivotDataItemConfig, XlsPivotFieldConfig, XlsPivotItemConfig,
+    XlsPivotTableConfig, XlsWriter,
 };
 pub use formatting::{
     BorderStyle, Borders, CellStyle, ExtendedFormat, Fill, FillPattern, Font, FormattingManager,

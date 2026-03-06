@@ -5,22 +5,50 @@ use crate::ole::xls::error::{XlsError, XlsResult};
 use crate::ole::xls::records::{FormulaValue, XlsEncoding};
 use zerocopy::{FromBytes, LE, U16};
 
-/// Parse a short string (used in sheet names, etc.)
-pub fn parse_short_string(data: &[u8], encoding: &XlsEncoding) -> XlsResult<String> {
-    if data.is_empty() {
+/// Parse a BIFF8 `ShortXLUnicodeString`.
+///
+/// Layout: `[cch: u8] [flags: u8] [chars...]`
+///
+/// - `cch` — character count
+/// - `flags` bit 0 (`fHighByte`) — 0 = compressed Latin-1 (1 byte/char),
+///   1 = uncompressed UTF-16LE (2 bytes/char)
+pub fn parse_short_string(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<String> {
+    if data.len() < 2 {
         return Ok(String::new());
     }
 
-    let len = data[0] as usize;
-    if data.len() < 1 + len {
+    let cch = data[0] as usize;
+    let flags = data[1];
+    let high_byte = (flags & 0x01) != 0;
+
+    let byte_len = if high_byte { cch * 2 } else { cch };
+    let offset = 2; // skip cch + flags
+
+    if data.len() < offset + byte_len {
         return Err(XlsError::InvalidLength {
-            expected: 1 + len,
+            expected: offset + byte_len,
             found: data.len(),
         });
     }
 
-    let string_data = &data[1..1 + len];
-    encoding.decode(string_data)
+    let string_data = &data[offset..offset + byte_len];
+
+    if high_byte {
+        // UTF-16LE
+        let utf16: Vec<u16> = string_data
+            .chunks_exact(2)
+            .map(|chunk| {
+                U16::<LE>::read_from_bytes(chunk)
+                    .map(|v| v.get())
+                    .unwrap_or(0)
+            })
+            .collect();
+        String::from_utf16(&utf16)
+            .map_err(|e| XlsError::Encoding(format!("UTF-16 decoding error: {}", e)))
+    } else {
+        // Compressed Latin-1 (each byte maps directly to U+00xx)
+        Ok(string_data.iter().map(|&b| b as char).collect())
+    }
 }
 
 /// Parse a string record with length prefix

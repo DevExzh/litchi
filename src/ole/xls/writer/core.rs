@@ -30,6 +30,7 @@
 //! ```
 
 use super::super::error::{XlsError, XlsResult};
+use super::biff::AutoFilterConditionWrite;
 use super::formatting::{CellStyle, ExtendedFormat, FormattingManager};
 use crate::ole::writer::OleWriter;
 use std::collections::HashMap;
@@ -49,8 +50,133 @@ pub use self::data_validation::{
 pub use self::named_range::XlsDefinedName;
 use self::named_range::XlsDefinedName as InternalDefinedName;
 use self::worksheet::{
-    AutoFilterRange, MergedRange, WritableCell, WritableWorksheet, XlsHyperlink, XlsSheetProtection,
+    AutoFilterColumnDef, AutoFilterRange, MergedRange, PivotCellXfRole, SortConfig, WritableCell,
+    WritablePivotDataItem, WritablePivotField, WritablePivotItem, WritablePivotTable,
+    WritableWorksheet, XlsHyperlink, XlsSheetProtection,
 };
+
+/// Public configuration for adding a pivot table via [`XlsWriter::add_pivot_table`].
+#[derive(Debug, Clone)]
+pub struct XlsPivotTableConfig {
+    /// Pivot table name.
+    pub name: String,
+    /// Source type (0x0001 = Worksheet, 0x0002 = External).
+    pub source_type: u16,
+
+    // -- Source data range --
+    /// Name of the worksheet that holds the source data.
+    pub source_sheet_name: String,
+    /// First row of the source data range (0-based, **including** the header row).
+    pub source_first_row: u16,
+    /// Last row of the source data range (0-based, inclusive).
+    pub source_last_row: u16,
+    /// First column of the source data range (0-based).
+    pub source_first_col: u16,
+    /// Last column of the source data range (0-based).
+    pub source_last_col: u16,
+
+    // -- Output range --
+    /// First row of the pivot table output.
+    pub first_row: u16,
+    pub last_row: u16,
+    pub first_col: u16,
+    pub last_col: u16,
+    /// First header row in the output.
+    pub first_header_row: u16,
+    /// First data row in the output.
+    pub first_data_row: u16,
+    /// First data column in the output.
+    pub first_data_col: u16,
+    /// Data field header name (e.g. "Values").
+    pub data_field_name: String,
+    /// Axis for the data field header (0=none, 1=row, 2=col, 4=page, 8=data).
+    pub data_axis: u16,
+    /// Position of data label within the axis.
+    pub data_position: u16,
+    /// Field definitions.
+    pub fields: Vec<XlsPivotFieldConfig>,
+    /// Data item (value field) definitions.
+    pub data_items: Vec<XlsPivotDataItemConfig>,
+    /// Page field entries: `(item_index, field_index, object_id)`.
+    pub page_entries: Vec<(u16, u16, u16)>,
+    /// Source data rows for the pivot cache (fSaveData).
+    ///
+    /// Each inner `Vec` has one entry per field in the same order as `fields`.
+    /// String fields use [`PivotCacheValue::StringIndex`] (index into that
+    /// field's `cache_items`), numeric fields use [`PivotCacheValue::Number`].
+    ///
+    /// When non-empty, SXDBB + SXNUM records are written to the cache stream
+    /// and the SXDB `fSaveData` flag is set.
+    pub source_data: Vec<Vec<PivotCacheValue>>,
+}
+
+/// A single pivot field definition.
+#[derive(Debug, Clone)]
+pub struct XlsPivotFieldConfig {
+    /// Axis: 0=none, 1=row, 2=col, 4=page, 8=data.
+    pub axis: u16,
+    /// Number of subtotals.
+    pub subtotal_count: u16,
+    /// Subtotal function bitmask.
+    pub subtotal_flags: u16,
+    /// Items belonging to this field.
+    pub items: Vec<XlsPivotItemConfig>,
+    /// Optional SXVD display name override (`None` → use cache name, i.e. cch=0xFFFF).
+    pub name: Option<String>,
+    /// Source column name used in the pivot cache SXFDB record.
+    /// This is the actual header text from the source data range.
+    pub cache_name: String,
+    /// Unique source data values for this field's cache items.
+    /// These become SXSTRING records in the pivot cache stream.
+    /// For data-axis (numeric) fields, leave this empty.
+    pub cache_items: Vec<String>,
+    /// Whether this is a numeric (data-axis) field.
+    ///
+    /// Numeric fields use SXFDB flags `0x0560` and contribute SXNUM records
+    /// (instead of SXDBB indices) in the cache source data.
+    pub is_numeric: bool,
+}
+
+/// A single cell value in the pivot cache source data.
+#[derive(Debug, Clone, Copy)]
+pub enum PivotCacheValue {
+    /// Index into the field's `cache_items` (for string fields).
+    StringIndex(u8),
+    /// Raw numeric value (for numeric/data-axis fields).
+    Number(f64),
+}
+
+/// A single pivot item.
+#[derive(Debug, Clone)]
+pub struct XlsPivotItemConfig {
+    /// Item type: 0x0000=Data, 0x0001=Default subtotal, 0x0002=Sum, etc.
+    pub item_type: u16,
+    /// Option flags.
+    pub flags: u16,
+    /// Cache index.
+    pub cache_index: u16,
+    /// Optional item name override.
+    pub name: Option<String>,
+}
+
+/// A pivot data item (value field).
+#[derive(Debug, Clone)]
+pub struct XlsPivotDataItemConfig {
+    /// Index of the source field in the pivot cache.
+    pub source_field_index: u16,
+    /// Aggregation function: 0=Sum, 1=Count, 2=Average, 3=Max, 4=Min, ...
+    pub function: u16,
+    /// Display format flags.
+    pub display_format: u16,
+    /// Base field index (for "show values as").
+    pub base_field_index: u16,
+    /// Base item index.
+    pub base_item_index: u16,
+    /// Number format index.
+    pub num_format_index: u16,
+    /// Optional name override.
+    pub name: String,
+}
 
 fn column_to_letters(col: u16) -> String {
     let mut col_index = col as u32;
@@ -453,6 +579,452 @@ impl XlsWriter {
         });
 
         Ok(())
+    }
+
+    /// Add a filter condition to a specific column within the AutoFilter range.
+    ///
+    /// The AutoFilter range must first be set via [`set_auto_filter`]. The
+    /// `column_index` is 0-based relative to the filter range start column.
+    ///
+    /// # Arguments
+    ///
+    /// * `sheet` — worksheet index (0-based)
+    /// * `column_index` — column within the filter range (0-based relative)
+    /// * `join_or` — `true` to join conditions with OR, `false` for AND
+    /// * `cond1` — first filter condition
+    /// * `cond2` — second filter condition (use `AutoFilterConditionWrite::None` if unused)
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use litchi::ole::xls::writer::biff::AutoFilterConditionWrite;
+    ///
+    /// // Filter column 2: value > 100
+    /// writer.add_filter_condition(
+    ///     sheet_idx, 2, false,
+    ///     AutoFilterConditionWrite::Number { operator: 0x04, value: 100.0 },
+    ///     AutoFilterConditionWrite::None,
+    /// )?;
+    /// ```
+    pub fn add_filter_condition(
+        &mut self,
+        sheet: usize,
+        column_index: u16,
+        join_or: bool,
+        cond1: AutoFilterConditionWrite,
+        cond2: AutoFilterConditionWrite,
+    ) -> XlsResult<()> {
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+
+        if worksheet.auto_filter.is_none() {
+            return Err(XlsError::InvalidData(
+                "add_filter_condition: call set_auto_filter first".to_string(),
+            ));
+        }
+
+        worksheet.add_auto_filter_column(AutoFilterColumnDef {
+            column_index,
+            join_or,
+            condition1: cond1,
+            condition2: cond2,
+        });
+
+        Ok(())
+    }
+
+    /// Set the sort configuration for a worksheet.
+    ///
+    /// # Arguments
+    ///
+    /// * `sheet` — worksheet index (0-based)
+    /// * `case_sensitive` — whether sorting is case-sensitive
+    /// * `sort_by_columns` — `true` for left-to-right sort, `false` for top-to-bottom
+    /// * `keys` — up to 3 sort keys as `(column_index, descending)` tuples
+    pub fn set_sort(
+        &mut self,
+        sheet: usize,
+        case_sensitive: bool,
+        sort_by_columns: bool,
+        keys: &[(u16, bool)],
+    ) -> XlsResult<()> {
+        if keys.is_empty() || keys.len() > 3 {
+            return Err(XlsError::InvalidData(
+                "set_sort: must provide 1..3 sort keys".to_string(),
+            ));
+        }
+
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+
+        worksheet.set_sort_config(SortConfig {
+            case_sensitive,
+            sort_by_columns,
+            keys: keys.to_vec(),
+        });
+
+        Ok(())
+    }
+
+    /// Add a pivot table definition to a worksheet.
+    ///
+    /// This writes the SX* record family (SXVS, SXVIEW, SXVD, SXVI, SXDI,
+    /// SXPI) to the worksheet stream. The pivot table must be fully
+    /// configured before calling this method.
+    ///
+    /// # Arguments
+    ///
+    /// * `sheet` — worksheet index (0-based)
+    /// * `config` — pivot table configuration (see [`XlsPivotTableConfig`])
+    pub fn add_pivot_table(&mut self, sheet: usize, config: XlsPivotTableConfig) -> XlsResult<()> {
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+
+        self.fmt.enable_pivot_xfs();
+
+        // Generate pivot output cells BEFORE consuming config.fields / config.data_items.
+        // Excel validates that DIMENSIONS and cell content are consistent with the
+        // pivot table definition; missing cells cause a "corrupt file" repair dialog.
+        Self::generate_pivot_output_cells(worksheet, &config);
+
+        let fields: Vec<WritablePivotField> = config
+            .fields
+            .into_iter()
+            .map(|f| {
+                let mut items: Vec<WritablePivotItem> = f
+                    .items
+                    .into_iter()
+                    .map(|i| WritablePivotItem {
+                        item_type: i.item_type,
+                        flags: i.flags,
+                        cache_index: i.cache_index,
+                        name: i.name,
+                    })
+                    .collect();
+
+                // Sort data items (item_type=0x0000) alphabetically by their
+                // cache label to match Excel's default SXVI ordering.  Non-data
+                // items (subtotals etc.) stay at the end.
+                let data_end = items
+                    .iter()
+                    .position(|i| i.item_type != 0x0000)
+                    .unwrap_or(items.len());
+                items[..data_end].sort_unstable_by(|a, b| {
+                    let al = f
+                        .cache_items
+                        .get(a.cache_index as usize)
+                        .map(String::as_str)
+                        .unwrap_or("");
+                    let bl = f
+                        .cache_items
+                        .get(b.cache_index as usize)
+                        .map(String::as_str)
+                        .unwrap_or("");
+                    al.cmp(bl)
+                });
+
+                WritablePivotField {
+                    axis: f.axis,
+                    subtotal_count: f.subtotal_count,
+                    subtotal_flags: f.subtotal_flags,
+                    items,
+                    name: f.name,
+                    cache_name: f.cache_name,
+                    cache_items: f.cache_items,
+                    is_numeric: f.is_numeric,
+                }
+            })
+            .collect();
+
+        let data_items: Vec<WritablePivotDataItem> = config
+            .data_items
+            .into_iter()
+            .map(|d| WritablePivotDataItem {
+                source_field_index: d.source_field_index,
+                function: d.function,
+                display_format: d.display_format,
+                base_field_index: d.base_field_index,
+                base_item_index: d.base_item_index,
+                num_format_index: d.num_format_index,
+                name: d.name,
+            })
+            .collect();
+
+        worksheet.add_pivot_table(WritablePivotTable {
+            name: config.name,
+            source_type: config.source_type,
+            source_sheet_name: config.source_sheet_name,
+            source_first_row: config.source_first_row,
+            source_last_row: config.source_last_row,
+            source_first_col: config.source_first_col,
+            source_last_col: config.source_last_col,
+            first_row: config.first_row,
+            last_row: config.last_row,
+            first_col: config.first_col,
+            last_col: config.last_col,
+            first_header_row: config.first_header_row,
+            first_data_row: config.first_data_row,
+            first_data_col: config.first_data_col,
+            data_field_name: config.data_field_name,
+            data_axis: config.data_axis,
+            data_position: config.data_position,
+            fields,
+            data_items,
+            page_entries: config.page_entries,
+            source_data: config.source_data,
+        });
+
+        Ok(())
+    }
+
+    /// Generate the cell data that Excel expects in the SXVIEW output area.
+    ///
+    /// The layout (for a single row-field, single col-field, single page-field,
+    /// single data-field configuration) is:
+    ///
+    /// ```text
+    /// (first_row-2, 0)       : page field name    (first_row-2, 1)       : "(All)"
+    /// (first_row,   0)       : data item name      (first_row, first_data_col): "Column Labels"
+    /// (first_header_row, 0)  : "Row Labels"        (fhr, fdc+j)           : col item names …
+    /// (first_data_row+i, 0)  : row item name       (fdr+i, fdc+j)         : aggregated value
+    /// (last_row, 0)          : "Grand Total"        (lr, fdc+j)            : column totals
+    /// ```
+    fn generate_pivot_output_cells(ws: &mut WritableWorksheet, cfg: &XlsPivotTableConfig) {
+        // Identify fields per axis.
+        let row_field = cfg.fields.iter().find(|f| f.axis == 0x0001);
+        let col_field = cfg.fields.iter().find(|f| f.axis == 0x0002);
+        let page_field = cfg.fields.iter().find(|f| f.axis == 0x0004);
+
+        let data_item = cfg.data_items.first();
+
+        // Helper: find the field index for a given field by cache_name.
+        let field_idx_of =
+            |name: &str| -> Option<usize> { cfg.fields.iter().position(|f| f.cache_name == name) };
+
+        // Collect row/col item labels from cache_items, sorted alphabetically
+        // to match Excel's default SXVI ordering.  Also build a mapping from
+        // cache_index → sorted position so the aggregation grid uses the same
+        // order as the output rows/columns.
+        let (row_items, row_cache_to_sorted) = Self::sorted_cache_items(row_field);
+        let (col_items, col_cache_to_sorted) = Self::sorted_cache_items(col_field);
+
+        let fr = cfg.first_row;
+        let fhr = cfg.first_header_row;
+        let fdr = cfg.first_data_row;
+        let fdc = cfg.first_data_col;
+        let lr = cfg.last_row;
+        let lc = cfg.last_col;
+        let fc = cfg.first_col;
+
+        let add = |ws: &mut WritableWorksheet,
+                   r: u16,
+                   c: u16,
+                   v: XlsCellValue,
+                   pivot_xf_role: Option<PivotCellXfRole>| {
+            ws.add_cell(WritableCell {
+                row: r as u32,
+                col: c,
+                value: v,
+                format_idx: 0,
+                pivot_xf_role,
+            });
+        };
+
+        // --- Page field area (above SXVIEW range) ---
+        if let Some(pf) = page_field {
+            let page_row = fr.saturating_sub(2);
+            add(
+                ws,
+                page_row,
+                0,
+                XlsCellValue::String(pf.cache_name.clone()),
+                Some(PivotCellXfRole::HeaderAccent),
+            );
+            add(
+                ws,
+                page_row,
+                1,
+                XlsCellValue::String("(All)".to_string()),
+                Some(PivotCellXfRole::HeaderPlain),
+            );
+        }
+
+        // --- Row at first_row: data item name + "Column Labels" ---
+        if let Some(di) = data_item {
+            add(
+                ws,
+                fr,
+                fc,
+                XlsCellValue::String(di.name.clone()),
+                Some(PivotCellXfRole::HeaderAccent),
+            );
+        }
+        if col_field.is_some() {
+            add(
+                ws,
+                fr,
+                fdc,
+                XlsCellValue::String("Column Labels".to_string()),
+                Some(PivotCellXfRole::HeaderAccent),
+            );
+        }
+
+        // --- Row at first_header_row: "Row Labels" + column item names + "Grand Total" ---
+        add(
+            ws,
+            fhr,
+            fc,
+            XlsCellValue::String("Row Labels".to_string()),
+            Some(PivotCellXfRole::HeaderAccent),
+        );
+        for (j, ci) in col_items.iter().enumerate() {
+            add(
+                ws,
+                fhr,
+                fdc + j as u16,
+                XlsCellValue::String(ci.clone()),
+                Some(PivotCellXfRole::HeaderPlain),
+            );
+        }
+        add(
+            ws,
+            fhr,
+            lc,
+            XlsCellValue::String("Grand Total".to_string()),
+            Some(PivotCellXfRole::HeaderPlain),
+        );
+
+        // --- Compute aggregated values from source_data ---
+        let row_fi = row_field.and_then(|f| field_idx_of(&f.cache_name));
+        let col_fi = col_field.and_then(|f| field_idx_of(&f.cache_name));
+        let data_fi = data_item.map(|di| di.source_field_index as usize);
+
+        let nr = row_items.len();
+        let nc = col_items.len();
+        let mut grid = vec![vec![0.0f64; nc]; nr];
+        let mut row_totals = vec![0.0f64; nr];
+        let mut col_totals = vec![0.0f64; nc];
+        let mut grand_total = 0.0f64;
+
+        for row_data in &cfg.source_data {
+            // Map cache indices through the sorted permutation so that
+            // grid positions match the alphabetically-sorted output.
+            let ri = row_fi.and_then(|fi| match row_data.get(fi) {
+                Some(PivotCacheValue::StringIndex(idx)) => {
+                    row_cache_to_sorted.get(*idx as usize).copied()
+                },
+                _ => None,
+            });
+            let ci = col_fi.and_then(|fi| match row_data.get(fi) {
+                Some(PivotCacheValue::StringIndex(idx)) => {
+                    col_cache_to_sorted.get(*idx as usize).copied()
+                },
+                _ => None,
+            });
+            let val = data_fi.and_then(|fi| match row_data.get(fi) {
+                Some(PivotCacheValue::Number(v)) => Some(*v),
+                _ => None,
+            });
+
+            if let (Some(ri), Some(ci), Some(val)) = (ri, ci, val)
+                && ri < nr
+                && ci < nc
+            {
+                grid[ri][ci] += val;
+                row_totals[ri] += val;
+                col_totals[ci] += val;
+                grand_total += val;
+            }
+        }
+
+        // --- Data rows ---
+        for (i, (ri_name, row_total)) in row_items.iter().zip(row_totals.iter()).enumerate() {
+            let r = fdr + i as u16;
+            add(
+                ws,
+                r,
+                fc,
+                XlsCellValue::String(ri_name.clone()),
+                Some(PivotCellXfRole::RowLabel),
+            );
+            for (j, cell_val) in grid[i].iter().enumerate() {
+                add(
+                    ws,
+                    r,
+                    fdc + j as u16,
+                    XlsCellValue::Number(*cell_val),
+                    Some(PivotCellXfRole::Value),
+                );
+            }
+            add(
+                ws,
+                r,
+                lc,
+                XlsCellValue::Number(*row_total),
+                Some(PivotCellXfRole::Value),
+            );
+        }
+
+        // --- Grand total row ---
+        add(
+            ws,
+            lr,
+            fc,
+            XlsCellValue::String("Grand Total".to_string()),
+            Some(PivotCellXfRole::RowLabel),
+        );
+        for (j, col_total) in col_totals.iter().enumerate() {
+            add(
+                ws,
+                lr,
+                fdc + j as u16,
+                XlsCellValue::Number(*col_total),
+                Some(PivotCellXfRole::Value),
+            );
+        }
+        add(
+            ws,
+            lr,
+            lc,
+            XlsCellValue::Number(grand_total),
+            Some(PivotCellXfRole::Value),
+        );
+    }
+
+    /// Sort a field's cache items alphabetically and return the sorted labels
+    /// plus a mapping from original cache index to sorted position.
+    ///
+    /// Returns `(sorted_labels, cache_to_sorted)` where `cache_to_sorted[i]`
+    /// gives the position of original cache item `i` in the sorted output.
+    fn sorted_cache_items(field: Option<&XlsPivotFieldConfig>) -> (Vec<String>, Vec<usize>) {
+        let Some(f) = field else {
+            return (Vec::new(), Vec::new());
+        };
+
+        // Build (original_index, label) pairs and sort by label.
+        let mut indexed: Vec<(usize, &str)> = f
+            .cache_items
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (i, s.as_str()))
+            .collect();
+        indexed.sort_unstable_by(|a, b| a.1.cmp(b.1));
+
+        let sorted_labels: Vec<String> = indexed.iter().map(|(_, s)| (*s).to_string()).collect();
+
+        // cache_to_sorted[original_cache_idx] = position in sorted output
+        let mut cache_to_sorted = vec![0usize; f.cache_items.len()];
+        for (sorted_pos, &(orig_idx, _)) in indexed.iter().enumerate() {
+            cache_to_sorted[orig_idx] = sorted_pos;
+        }
+
+        (sorted_labels, cache_to_sorted)
     }
 
     /// Define a workbook-scoped named range.
@@ -873,6 +1445,7 @@ impl XlsWriter {
             col,
             value,
             format_idx: format_id,
+            pivot_xf_role: None,
         });
 
         Ok(())
@@ -965,17 +1538,22 @@ impl XlsWriter {
         // Build shared string table
         self.build_shared_strings();
 
-        // Generate the Workbook stream
-        let workbook_stream = self.generate_workbook_stream()?;
+        // Generate the Workbook stream + pivot cache streams
+        let streams = self.generate_workbook_streams()?;
 
         // Create OLE compound document
         let mut ole_writer = OleWriter::new();
-        ole_writer.create_stream(&["Workbook"], &workbook_stream)?;
+        ole_writer.create_stream(&["Workbook"], &streams.workbook)?;
 
-        // Note: SummaryInformation and DocumentSummaryInformation streams are optional
-        // They provide metadata like title, author, creation date, etc.
-        // For now, we skip these as they're not required for a functional XLS file
-        // They can be added in a future enhancement for complete metadata support
+        // Pivot cache storage: _SX_DB_CUR/XXXX
+        // Stream names use 4-digit uppercase hex per LO ScfTools::GetHexStr.
+        if !streams.pivot_caches.is_empty() {
+            ole_writer.create_storage(&["_SX_DB_CUR"])?;
+            for (id, data) in &streams.pivot_caches {
+                let name = format!("{:04X}", id);
+                ole_writer.create_stream(&["_SX_DB_CUR", &name], data)?;
+            }
+        }
 
         // Save to file
         ole_writer.save(path)?;
@@ -996,12 +1574,21 @@ impl XlsWriter {
         // Build shared string table
         self.build_shared_strings();
 
-        // Generate the Workbook stream
-        let workbook_stream = self.generate_workbook_stream()?;
+        // Generate the Workbook stream + pivot cache streams
+        let streams = self.generate_workbook_streams()?;
 
         // Create OLE compound document
         let mut ole_writer = OleWriter::new();
-        ole_writer.create_stream(&["Workbook"], &workbook_stream)?;
+        ole_writer.create_stream(&["Workbook"], &streams.workbook)?;
+
+        // Pivot cache storage: _SX_DB_CUR/XXXX
+        if !streams.pivot_caches.is_empty() {
+            ole_writer.create_storage(&["_SX_DB_CUR"])?;
+            for (id, data) in &streams.pivot_caches {
+                let name = format!("{:04X}", id);
+                ole_writer.create_stream(&["_SX_DB_CUR", &name], data)?;
+            }
+        }
 
         // Write to the provided writer
         ole_writer.write_to(writer)?;
@@ -1032,8 +1619,9 @@ impl XlsWriter {
         }
     }
 
-    /// Generate the complete Workbook stream with all BIFF records
-    fn generate_workbook_stream(&self) -> XlsResult<Vec<u8>> {
+    /// Generate the complete Workbook stream (plus pivot cache streams) with
+    /// all BIFF records.
+    fn generate_workbook_streams(&self) -> XlsResult<stream::WorkbookStreams> {
         stream::generate_workbook_stream(
             self.use_1904_dates,
             &self.fmt,
