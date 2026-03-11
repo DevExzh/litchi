@@ -71,3 +71,32 @@ impl Default for Body {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_document_new() {
+        let doc = Document::new();
+        assert!(doc.version().is_none());
+    }
+
+    #[test]
+    fn test_document_default() {
+        let doc: Document = Default::default();
+        assert!(doc.version().is_none());
+    }
+
+    #[test]
+    fn test_body_new() {
+        let body = Body::new();
+        assert!(body.body_type().is_none());
+    }
+
+    #[test]
+    fn test_body_default() {
+        let body: Body = Default::default();
+        assert!(body.body_type().is_none());
+    }
+}

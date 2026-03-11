@@ -146,3 +146,80 @@ impl MutableHyperlink {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hyperlink_new() {
+        let link = MutableHyperlink::new("https://example.com", "Click here");
+        assert_eq!(link.url, Some("https://example.com".to_string()));
+        assert_eq!(link.text, Some("Click here".to_string()));
+        assert!(link.anchor.is_none());
+        assert!(link.elements.is_empty());
+        assert!(link.tooltip.is_none());
+    }
+
+    #[test]
+    fn test_hyperlink_new_anchor() {
+        let link = MutableHyperlink::new_anchor("bookmark1");
+        assert!(link.url.is_none());
+        assert!(link.text.is_none());
+        assert_eq!(link.anchor, Some("bookmark1".to_string()));
+        assert!(link.elements.is_empty());
+    }
+
+    #[test]
+    fn test_hyperlink_set_tooltip() {
+        let mut link = MutableHyperlink::new("https://example.com", "Click here");
+        link.set_tooltip("Example tooltip");
+        assert_eq!(link.tooltip, Some("Example tooltip".to_string()));
+    }
+
+    #[test]
+    fn test_hyperlink_add_run() {
+        let mut link = MutableHyperlink::new_anchor("bookmark1");
+        let run = MutableRun::new();
+        link.add_run(run);
+        assert_eq!(link.elements.len(), 1);
+    }
+
+    #[test]
+    fn test_hyperlink_to_xml_with_anchor() {
+        let link = MutableHyperlink::new_anchor("bookmark1");
+        let mut xml = String::new();
+        let result = link.to_xml(&mut xml, None);
+        assert!(result.is_ok());
+        assert!(xml.contains("<w:hyperlink"));
+        assert!(xml.contains("w:anchor=\"bookmark1\""));
+        assert!(xml.contains("</w:hyperlink>"));
+    }
+
+    #[test]
+    fn test_hyperlink_to_xml_with_url() {
+        let link = MutableHyperlink::new("https://example.com", "Click here");
+        let mut xml = String::new();
+        let result = link.to_xml(&mut xml, Some("rId1"));
+        assert!(result.is_ok());
+        assert!(xml.contains("<w:hyperlink"));
+        assert!(xml.contains("r:id=\"rId1\""));
+        assert!(xml.contains("Click here"));
+        assert!(xml.contains("<w:rStyle w:val=\"Hyperlink\"/>"));
+    }
+
+    #[test]
+    fn test_hyperlink_to_xml_without_r_id_or_anchor() {
+        let link = MutableHyperlink::new("https://example.com", "Click here");
+        let mut xml = String::new();
+        let result = link.to_xml(&mut xml, None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_hyperlink_element_debug() {
+        let element = HyperlinkElement::Run(MutableRun::new());
+        let debug_str = format!("{:?}", element);
+        assert!(debug_str.contains("Run"));
+    }
+}

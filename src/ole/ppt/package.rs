@@ -57,10 +57,10 @@ pub type Result<T> = std::result::Result<T, PptError>;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::ppt::Package;
+/// use litchi::ole::ppt::Package;
 ///
 /// // Open an existing presentation
-/// let pkg = Package::open("presentation.ppt")?;
+/// let mut pkg = Package::open("presentation.ppt")?;
 ///
 /// // Get the main presentation
 /// let pres = pkg.presentation()?;
@@ -85,9 +85,9 @@ impl Package<File> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ppt::Package;
+    /// use litchi::ole::ppt::Package;
     ///
-    /// let pkg = Package::open("presentation.ppt")?;
+    /// let mut pkg = Package::open("presentation.ppt")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
@@ -165,9 +165,9 @@ impl<R: Read + Seek> Package<R> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ppt::Package;
+    /// use litchi::ole::ppt::Package;
     ///
-    /// let pkg = Package::open("presentation.ppt")?;
+    /// let mut pkg = Package::open("presentation.ppt")?;
     /// let pres = pkg.presentation()?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -187,10 +187,17 @@ impl<R: Read + Seek> Package<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     #[test]
     fn test_open_package() {
-        let result = Package::open("test.ppt");
+        let base = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let result = Package::open(
+            base.join("test-data")
+                .join("ole")
+                .join("ppt")
+                .join("empty.ppt"),
+        );
         assert!(result.is_ok());
     }
 

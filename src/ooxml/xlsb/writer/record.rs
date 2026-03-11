@@ -222,7 +222,122 @@ mod tests {
     use std::io::Cursor;
 
     #[test]
-    fn test_write_variable_length_u16() {
+    fn test_new() {
+        let buffer = Vec::new();
+        let writer = RecordWriter::new(buffer);
+        // Just verify it creates without error
+        let _ = writer;
+    }
+
+    #[test]
+    fn test_write_record() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+
+        // Write a simple record
+        writer
+            .write_record(0x0001, &[0x00, 0x00, 0x00, 0x00])
+            .unwrap();
+
+        // Should have type (1 byte) + length (1 byte) + data (4 bytes) = 6 bytes
+        assert_eq!(buffer.len(), 6);
+    }
+
+    #[test]
+    fn test_write_u8() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+
+        writer.write_u8(0x42).unwrap();
+        assert_eq!(buffer, vec![0x42]);
+    }
+
+    #[test]
+    fn test_write_u16() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+
+        writer.write_u16(0x1234).unwrap();
+        assert_eq!(buffer, vec![0x34, 0x12]); // Little-endian
+    }
+
+    #[test]
+    fn test_write_u32() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+
+        writer.write_u32(0x12345678).unwrap();
+        assert_eq!(buffer, vec![0x78, 0x56, 0x34, 0x12]); // Little-endian
+    }
+
+    #[test]
+    fn test_write_i32() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+
+        writer.write_i32(-1).unwrap();
+        assert_eq!(buffer, vec![0xFF, 0xFF, 0xFF, 0xFF]);
+    }
+
+    #[test]
+    fn test_write_f64() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+
+        writer.write_f64(3.14159).unwrap();
+        assert_eq!(buffer.len(), 8);
+    }
+
+    #[test]
+    fn test_write_rk() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+
+        writer.write_rk(42.0).unwrap();
+        assert_eq!(buffer.len(), 4);
+    }
+
+    #[test]
+    fn test_flush() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+
+        writer.write_u8(0x01).unwrap();
+        writer.flush().unwrap();
+        // Flush should succeed
+    }
+
+    #[test]
+    fn test_inner() {
+        let buffer = Vec::new();
+        let writer = RecordWriter::new(buffer);
+
+        let inner = writer.inner();
+        assert!(inner.is_empty());
+    }
+
+    #[test]
+    fn test_inner_mut() {
+        let buffer = Vec::new();
+        let mut writer = RecordWriter::new(buffer);
+
+        let inner = writer.inner_mut();
+        inner.push(0x01);
+        assert_eq!(inner.len(), 1);
+    }
+
+    #[test]
+    fn test_into_inner() {
+        let buffer = Vec::new();
+        let mut writer = RecordWriter::new(buffer);
+
+        writer.write_u8(0x42).unwrap();
+        let inner = writer.into_inner();
+        assert_eq!(inner, vec![0x42]);
+    }
+
+    #[test]
+    fn test_write_variable_length_u16_single_byte() {
         let mut buffer = Vec::new();
         {
             let mut writer = RecordWriter::new(&mut buffer);
@@ -242,6 +357,38 @@ mod tests {
     }
 
     #[test]
+    fn test_write_variable_length_u16_two_bytes() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+
+        // 0x2000 = 8192 = 0b10000000000000
+        // First byte: 0b0000000 = 0x00 with continuation
+        // Second byte: 0b1000000 = 0x40
+        writer.write_variable_length_u16(0x2000).unwrap();
+        assert_eq!(buffer.len(), 2);
+    }
+
+    #[test]
+    fn test_write_variable_length_u16_three_bytes() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+
+        // 0x4000 requires 3 bytes in 7-bit varint
+        writer.write_variable_length_u16(0x4000).unwrap();
+        assert_eq!(buffer.len(), 3);
+    }
+
+    #[test]
+    fn test_write_variable_length_u16_max() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+
+        // u16::MAX = 0xFFFF
+        writer.write_variable_length_u16(u16::MAX).unwrap();
+        assert_eq!(buffer.len(), 3);
+    }
+
+    #[test]
     fn test_write_wide_string() {
         let mut buffer = Vec::new();
         let mut writer = RecordWriter::new(&mut buffer);
@@ -252,14 +399,57 @@ mod tests {
     }
 
     #[test]
-    fn test_f64_to_rk() {
+    fn test_write_wide_string_empty() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+
+        writer.write_wide_string("").unwrap();
+        // Length (0) = 4 bytes
+        assert_eq!(buffer, vec![0x00, 0x00, 0x00, 0x00]);
+    }
+
+    #[test]
+    fn test_write_wide_string_unicode() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+
+        writer.write_wide_string("Hello 世界").unwrap();
+        // Length (8 chars) + UTF-16LE bytes
+        assert!(buffer.len() > 4);
+    }
+
+    #[test]
+    fn test_f64_to_rk_integer() {
         // Integer value
         let rk = RecordWriter::<Vec<u8>>::f64_to_rk(100.0);
         assert_eq!(rk & 0x03, 0x01); // Integer flag
+    }
 
+    #[test]
+    fn test_f64_to_rk_integer_div100() {
         // Integer divisible by 100
         let rk = RecordWriter::<Vec<u8>>::f64_to_rk(10000.0);
         assert_eq!(rk & 0x03, 0x03); // Integer / 100 flag
+    }
+
+    #[test]
+    fn test_f64_to_rk_float() {
+        // Non-integer value
+        let rk = RecordWriter::<Vec<u8>>::f64_to_rk(3.14);
+        assert_eq!(rk & 0x03, 0x00); // Float flag
+    }
+
+    #[test]
+    fn test_f64_to_rk_negative_integer() {
+        // Negative integer
+        let rk = RecordWriter::<Vec<u8>>::f64_to_rk(-100.0);
+        assert_eq!(rk & 0x03, 0x01); // Integer flag
+    }
+
+    #[test]
+    fn test_f64_to_rk_zero() {
+        let rk = RecordWriter::<Vec<u8>>::f64_to_rk(0.0);
+        assert_eq!(rk & 0x03, 0x01); // Integer flag (0 is an integer)
     }
 
     #[test]
@@ -298,5 +488,23 @@ mod tests {
 
         assert_eq!(header.record_type, record_type);
         assert_eq!(header.data_len, data.len());
+    }
+
+    #[test]
+    fn test_write_variable_length_usize_single_byte() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+
+        writer.write_variable_length_usize(0x7F).unwrap();
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
+    fn test_write_variable_length_usize_multi_byte() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+
+        writer.write_variable_length_usize(0x100).unwrap();
+        assert!(buffer.len() >= 2);
     }
 }

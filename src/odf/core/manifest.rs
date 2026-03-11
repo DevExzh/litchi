@@ -153,3 +153,83 @@ impl Manifest {
         self.entries.get(path)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TEST_MANIFEST: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">
+    <manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text" manifest:size="1234"/>
+    <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml" manifest:size="5678"/>
+    <manifest:file-entry manifest:full-path="styles.xml" manifest:media-type="text/xml" manifest:size="901"/>
+    <manifest:file-entry manifest:full-path="meta.xml" manifest:media-type="text/xml" manifest:size="234"/>
+</manifest:manifest>"#;
+
+    #[test]
+    fn test_manifest_parse() {
+        let manifest = Manifest::parse(TEST_MANIFEST).unwrap();
+        assert_eq!(manifest.mimetype, "application/vnd.oasis.opendocument.text");
+        assert_eq!(manifest.entries.len(), 4);
+    }
+
+    #[test]
+    fn test_manifest_parse_empty() {
+        let xml = r#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"></manifest:manifest>"#;
+        let manifest = Manifest::parse(xml).unwrap();
+        assert_eq!(manifest.entries.len(), 0);
+        assert_eq!(manifest.mimetype, "application/vnd.oasis.opendocument.text"); // Default
+    }
+
+    #[test]
+    fn test_manifest_get_media_type() {
+        let manifest = Manifest::parse(TEST_MANIFEST).unwrap();
+        assert_eq!(
+            manifest.get_media_type("/"),
+            Some("application/vnd.oasis.opendocument.text")
+        );
+        assert_eq!(manifest.get_media_type("content.xml"), Some("text/xml"));
+        assert_eq!(manifest.get_media_type("nonexistent.xml"), None);
+    }
+
+    #[test]
+    fn test_manifest_has_path() {
+        let manifest = Manifest::parse(TEST_MANIFEST).unwrap();
+        assert!(manifest.has_path("/"));
+        assert!(manifest.has_path("content.xml"));
+        assert!(!manifest.has_path("nonexistent.xml"));
+    }
+
+    #[test]
+    fn test_manifest_paths() {
+        let manifest = Manifest::parse(TEST_MANIFEST).unwrap();
+        let paths: Vec<&String> = manifest.paths().collect();
+        assert_eq!(paths.len(), 4);
+        assert!(paths.contains(&&"/".to_string()));
+        assert!(paths.contains(&&"content.xml".to_string()));
+    }
+
+    #[test]
+    fn test_manifest_get_entry() {
+        let manifest = Manifest::parse(TEST_MANIFEST).unwrap();
+
+        let entry = manifest.get_entry("content.xml").unwrap();
+        assert_eq!(entry.full_path, "content.xml");
+        assert_eq!(entry.media_type, "text/xml");
+        assert_eq!(entry.size, Some(5678));
+        assert!(!entry.encrypted);
+
+        assert!(manifest.get_entry("nonexistent.xml").is_none());
+    }
+
+    #[test]
+    fn test_manifest_entry_encrypted() {
+        let xml = r#"<?xml version="1.0"?>
+<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">
+    <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="application/vnd.sun.star.oleobject"/>
+</manifest:manifest>"#;
+        let manifest = Manifest::parse(xml).unwrap();
+        let entry = manifest.get_entry("content.xml").unwrap();
+        assert!(entry.encrypted);
+    }
+}

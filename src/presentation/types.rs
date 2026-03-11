@@ -142,3 +142,84 @@ fn map_file_format_to_presentation_format(file_format: FileFormat) -> Result<Pre
         ))),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_presentation_format_variants() {
+        assert_eq!(PresentationFormat::Ppt, PresentationFormat::Ppt);
+        assert_eq!(PresentationFormat::Pptx, PresentationFormat::Pptx);
+        assert_eq!(PresentationFormat::Keynote, PresentationFormat::Keynote);
+        assert_eq!(PresentationFormat::Odp, PresentationFormat::Odp);
+    }
+
+    #[test]
+    fn test_presentation_format_inequality() {
+        assert_ne!(PresentationFormat::Ppt, PresentationFormat::Pptx);
+        assert_ne!(PresentationFormat::Pptx, PresentationFormat::Keynote);
+        assert_ne!(PresentationFormat::Odp, PresentationFormat::Ppt);
+    }
+
+    #[test]
+    fn test_map_file_format_ppt() {
+        let result = map_file_format_to_presentation_format(FileFormat::Ppt);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), PresentationFormat::Ppt);
+    }
+
+    #[test]
+    fn test_map_file_format_pptx() {
+        let result = map_file_format_to_presentation_format(FileFormat::Pptx);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), PresentationFormat::Pptx);
+    }
+
+    #[test]
+    fn test_map_file_format_keynote() {
+        let result = map_file_format_to_presentation_format(FileFormat::Keynote);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), PresentationFormat::Keynote);
+    }
+
+    #[test]
+    fn test_map_file_format_odp() {
+        let result = map_file_format_to_presentation_format(FileFormat::Odp);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), PresentationFormat::Odp);
+    }
+
+    #[test]
+    fn test_map_file_format_invalid() {
+        let result = map_file_format_to_presentation_format(FileFormat::Doc);
+        assert!(result.is_err());
+
+        let result = map_file_format_to_presentation_format(FileFormat::Docx);
+        assert!(result.is_err());
+
+        let result = map_file_format_to_presentation_format(FileFormat::Xls);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_presentation_format_debug() {
+        let format = PresentationFormat::Pptx;
+        let debug_str = format!("{:?}", format);
+        assert!(debug_str.contains("Pptx"));
+    }
+
+    #[test]
+    fn test_presentation_format_clone() {
+        let format = PresentationFormat::Ppt;
+        let cloned = format;
+        assert_eq!(format, cloned);
+    }
+
+    #[test]
+    fn test_presentation_format_copy() {
+        let format = PresentationFormat::Keynote;
+        let copied = format;
+        assert_eq!(format, copied);
+    }
+}

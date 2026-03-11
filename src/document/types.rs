@@ -133,3 +133,97 @@ fn map_file_format_to_document_format(file_format: FileFormat) -> Result<Documen
         ))),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_document_format_variants() {
+        // Test that all variants can be created and compared
+        assert_eq!(DocumentFormat::Doc, DocumentFormat::Doc);
+        assert_eq!(DocumentFormat::Docx, DocumentFormat::Docx);
+        assert_eq!(DocumentFormat::Rtf, DocumentFormat::Rtf);
+        assert_eq!(DocumentFormat::Pages, DocumentFormat::Pages);
+        assert_eq!(DocumentFormat::Odt, DocumentFormat::Odt);
+    }
+
+    #[test]
+    fn test_document_format_inequality() {
+        assert_ne!(DocumentFormat::Doc, DocumentFormat::Docx);
+        assert_ne!(DocumentFormat::Rtf, DocumentFormat::Pages);
+        assert_ne!(DocumentFormat::Odt, DocumentFormat::Doc);
+    }
+
+    #[test]
+    fn test_map_file_format_doc() {
+        let result = map_file_format_to_document_format(FileFormat::Doc);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), DocumentFormat::Doc);
+    }
+
+    #[test]
+    fn test_map_file_format_docx() {
+        let result = map_file_format_to_document_format(FileFormat::Docx);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), DocumentFormat::Docx);
+    }
+
+    #[test]
+    fn test_map_file_format_rtf() {
+        let result = map_file_format_to_document_format(FileFormat::Rtf);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), DocumentFormat::Rtf);
+    }
+
+    #[test]
+    fn test_map_file_format_pages() {
+        let result = map_file_format_to_document_format(FileFormat::Pages);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), DocumentFormat::Pages);
+    }
+
+    #[test]
+    fn test_map_file_format_odt() {
+        let result = map_file_format_to_document_format(FileFormat::Odt);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), DocumentFormat::Odt);
+    }
+
+    #[test]
+    fn test_map_file_format_invalid() {
+        // Test that non-document formats return an error
+        let result = map_file_format_to_document_format(FileFormat::Xls);
+        assert!(result.is_err());
+
+        let result = map_file_format_to_document_format(FileFormat::Xlsx);
+        assert!(result.is_err());
+
+        let result = map_file_format_to_document_format(FileFormat::Ppt);
+        assert!(result.is_err());
+
+        let result = map_file_format_to_document_format(FileFormat::Pptx);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_document_format_debug() {
+        let format = DocumentFormat::Docx;
+        let debug_str = format!("{:?}", format);
+        assert!(debug_str.contains("Docx"));
+    }
+
+    #[test]
+    fn test_document_format_clone() {
+        let format = DocumentFormat::Doc;
+        let cloned = format;
+        assert_eq!(format, cloned);
+    }
+
+    #[test]
+    fn test_document_format_copy() {
+        let format = DocumentFormat::Rtf;
+        let copied = format;
+        assert_eq!(format, copied);
+    }
+}

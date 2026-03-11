@@ -175,3 +175,151 @@ pub fn write_cfrule<W: Write>(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_write_cfheader_single_range() {
+        let mut buffer = Vec::new();
+        let ranges = vec![(0u32, 9u32, 0u16, 1u16)];
+        let result = write_cfheader(&mut buffer, &ranges, 1);
+
+        assert!(result.is_ok());
+        // Check record header
+        assert_eq!(buffer[0..2], [0xB0, 0x01]); // Record type CFHEADER
+        // Check numcf
+        assert_eq!(u16::from_le_bytes([buffer[4], buffer[5]]), 1);
+    }
+
+    #[test]
+    fn test_write_cfheader_multiple_ranges() {
+        let mut buffer = Vec::new();
+        let ranges = vec![(0u32, 9u32, 0u16, 1u16), (10u32, 19u32, 0u16, 1u16)];
+        let result = write_cfheader(&mut buffer, &ranges, 2);
+
+        assert!(result.is_ok());
+        // Record header is 4 bytes, then data starts
+        // Data layout: 2 (numcf) + 2 (flags) + 8 (enclosing range) + 2 (range count) + ranges...
+        // So range count is at offset 4 + 12 = 16
+        let range_count = u16::from_le_bytes([buffer[16], buffer[17]]);
+        assert_eq!(range_count, 2);
+    }
+
+    #[test]
+    fn test_write_cfheader_empty_ranges() {
+        let mut buffer = Vec::new();
+        let ranges: Vec<(u32, u32, u16, u16)> = vec![];
+        let result = write_cfheader(&mut buffer, &ranges, 1);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_write_cfheader_zero_rules() {
+        let mut buffer = Vec::new();
+        let ranges = vec![(0u32, 9u32, 0u16, 1u16)];
+        let result = write_cfheader(&mut buffer, &ranges, 0);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_write_cfheader_invalid_range() {
+        let mut buffer = Vec::new();
+        // First row > last row
+        let ranges = vec![(10u32, 0u32, 0u16, 1u16)];
+        let result = write_cfheader(&mut buffer, &ranges, 1);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_write_cfheader_row_limit_exceeded() {
+        let mut buffer = Vec::new();
+        // Row index exceeds BIFF8 limit (65535)
+        let ranges = vec![(0u32, 70000u32, 0u16, 1u16)];
+        let result = write_cfheader(&mut buffer, &ranges, 1);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_write_cfrule_formula_only() {
+        let mut buffer = Vec::new();
+        let formula1 = vec![0x01, 0x02, 0x03]; // dummy formula bytes
+        let formula2 = vec![];
+
+        let result = write_cfrule(
+            &mut buffer,
+            0x02, // CONDITION_TYPE_FORMULA
+            0x00, // NO_COMPARISON
+            &formula1,
+            &formula2,
+            None, // no pattern
+        );
+
+        assert!(result.is_ok());
+        // Check record type
+        assert_eq!(buffer[0..2], [0xB1, 0x01]); // CFRULE
+    }
+
+    #[test]
+    fn test_write_cfrule_with_pattern() {
+        let mut buffer = Vec::new();
+        let formula1 = vec![0x01, 0x02, 0x03];
+        let formula2 = vec![];
+        let pattern = Some((0x0001u16, 0x0040u16, 0x0041u16)); // pattern, fg, bg
+
+        let result = write_cfrule(&mut buffer, 0x02, 0x00, &formula1, &formula2, pattern);
+
+        assert!(result.is_ok());
+        // Pattern should be included in data
+        assert!(buffer.len() > 12); // Base size + pattern block
+    }
+
+    #[test]
+    fn test_write_cfrule_formula_sizes() {
+        let mut buffer = Vec::new();
+        let formula1 = vec![0x01; 100];
+        let formula2 = vec![0x02; 50];
+
+        let result = write_cfrule(&mut buffer, 0x02, 0x00, &formula1, &formula2, None);
+
+        assert!(result.is_ok());
+        // Check formula lengths in header
+        // Record header: 4 bytes (2 type + 2 length)
+        // condition_type: 1 byte at offset 4
+        // comparison_op: 1 byte at offset 5
+        // f1_len: 2 bytes at offset 6
+        // f2_len: 2 bytes at offset 8
+        let f1_len = u16::from_le_bytes([buffer[6], buffer[7]]);
+        let f2_len = u16::from_le_bytes([buffer[8], buffer[9]]);
+        assert_eq!(f1_len, 100);
+        assert_eq!(f2_len, 50);
+    }
+
+    #[test]
+    fn test_cfheader_computes_enclosing_range() {
+        let mut buffer = Vec::new();
+        // Multiple disjoint ranges
+        let ranges = vec![
+            (5u32, 10u32, 2u16, 4u16),  // smaller range
+            (0u32, 20u32, 0u16, 10u16), // larger range that encompasses
+        ];
+        let result = write_cfheader(&mut buffer, &ranges, 1);
+
+        assert!(result.is_ok());
+        // Enclosing range should be (0, 20, 0, 10)
+        let enc_first_row = u16::from_le_bytes([buffer[8], buffer[9]]);
+        let enc_last_row = u16::from_le_bytes([buffer[10], buffer[11]]);
+        let enc_first_col = u16::from_le_bytes([buffer[12], buffer[13]]);
+        let enc_last_col = u16::from_le_bytes([buffer[14], buffer[15]]);
+
+        assert_eq!(enc_first_row, 0);
+        assert_eq!(enc_last_row, 20);
+        assert_eq!(enc_first_col, 0);
+        assert_eq!(enc_last_col, 10);
+    }
+}

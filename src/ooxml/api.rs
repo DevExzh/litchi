@@ -45,7 +45,7 @@
 //!
 //! // Save
 //! pkg.save("output.docx")?;
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 //! ```
 //!
 //! ### Reading an existing document
@@ -88,7 +88,7 @@
 //! if let Some(title) = &props.title {
 //!     println!("Title: {}", title);
 //! }
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 //! ```
 //!
 //! ### Updating an existing document
@@ -109,7 +109,7 @@
 //!
 //! // Save (can overwrite or save to new file)
 //! pkg.save("updated_document.docx")?;
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 //! ```
 //!
 //! ### Working with Custom Properties
@@ -141,7 +141,7 @@
 //! pkg.custom_properties_mut().remove_property("Budget");
 //!
 //! pkg.save("document.docx")?;
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 //! ```
 //!
 //! ## Excel Workbooks (XLSX)
@@ -163,6 +163,9 @@
 //! ws.set_cell_value(3, 1, "Bob");
 //! ws.set_cell_value(3, 2, 25);
 //!
+//! // Set freeze panes before other workbook operations
+//! ws.freeze_panes(2, 1);
+//!
 //! // Add more worksheets
 //! let mut ws2 = wb.add_worksheet("Summary");
 //! ws2.set_cell_value(1, 1, "Total Records");
@@ -171,21 +174,19 @@
 //! // Define named ranges
 //! wb.define_name("DataRange", "Sheet1!$A$1:$B$3");
 //!
-//! // Set freeze panes
-//! ws.freeze_panes(2, 1)?;
-//!
 //! // Set metadata
 //! wb.properties_mut().title = Some("Employee Data".to_string());
 //!
 //! // Save
 //! wb.save("output.xlsx")?;
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 //! ```
 //!
 //! ### Reading an existing workbook
 //!
 //! ```rust,no_run
 //! use litchi::ooxml::xlsx::Workbook;
+//! use litchi::sheet::WorkbookTrait;
 //!
 //! // Open workbook
 //! let wb = Workbook::open("workbook.xlsx")?;
@@ -199,22 +200,15 @@
 //! let ws = wb.worksheet_by_name("Sheet1")?;
 //! println!("Sheet: {}", ws.name());
 //!
-//! // Iterate cells
-//! for row in ws.rows()? {
-//!     for cell in row.cells()? {
-//!         match cell.value() {
-//!             Some(v) => println!("Cell {}: {:?}", cell.reference(), v),
-//!             None => {}
+//! // Access specific cell values using row/column indices (1-based)
+//! for row_idx in 1..=10 {
+//!     for col_idx in 1..=5 {
+//!         if let Ok(value) = ws.cell_value(row_idx, col_idx) {
+//!             println!("Cell ({},{}): {:?}", row_idx, col_idx, value);
 //!         }
 //!     }
 //! }
-//!
-//! // Access specific cell
-//! let cell = ws.cell(1, 1)?;
-//! if let Some(value) = cell.value() {
-//!     println!("A1: {:?}", value);
-//! }
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 //! ```
 //!
 //! ### Updating an existing workbook
@@ -237,7 +231,7 @@
 //!
 //! // Save
 //! wb.save("updated_workbook.xlsx")?;
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 //! ```
 //!
 //! ## PowerPoint Presentations (PPTX)
@@ -258,15 +252,12 @@
 //!
 //! let slide2 = pres.add_slide()?;
 //! slide2.set_title("Agenda");
-//! slide2.add_bullet_points(&[
-//!     "Introduction",
-//!     "Main Content",
-//!     "Conclusion",
-//! ])?;
+//! slide2.add_text_box("- Introduction\n- Main Content\n- Conclusion",
+//!                     914400, 1828800, 4576000, 1828800);
 //!
 //! // Add image to slide
 //! let image_data = std::fs::read("logo.png")?;
-//! slide2.add_image(&image_data, 914400, 914400, 1828800, 1828800)?;
+//! slide2.add_picture_from_bytes(image_data, 914400, 914400, 1828800, 1828800, None)?;
 //!
 //! // Set metadata
 //! pkg.properties_mut().title = Some("My Presentation".to_string());
@@ -274,7 +265,7 @@
 //!
 //! // Save
 //! pkg.save("output.pptx")?;
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 //! ```
 //!
 //! ### Reading an existing presentation
@@ -304,7 +295,7 @@
 //!         }
 //!     }
 //! }
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 //! ```
 //!
 //! ### Updating an existing presentation
@@ -326,7 +317,7 @@
 //!
 //! // Save
 //! pkg.save("updated_presentation.pptx")?;
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 //! ```
 //!
 //! # Performance Considerations
@@ -357,7 +348,7 @@
 //!     Err(OoxmlError::InvalidFormat(msg)) => eprintln!("Invalid format: {}", msg),
 //!     Err(e) => eprintln!("Error: {}", e),
 //! }
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 //! ```
 
 pub use crate::ooxml::common::DocumentProperties;
@@ -429,7 +420,7 @@ pub mod helpers {
     /// // Works with DOCX, PPTX files
     /// let text = helpers::extract_text("document.docx")?;
     /// println!("{}", text);
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn extract_text<P: AsRef<std::path::Path>>(path: P) -> Result<String> {
         let path_ref = path.as_ref();
@@ -465,7 +456,7 @@ pub mod helpers {
     /// if let Some(title) = props.title {
     ///     println!("Title: {}", title);
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn get_properties<P: AsRef<std::path::Path>>(path: P) -> Result<DocumentProperties> {
         let path_ref = path.as_ref();

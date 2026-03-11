@@ -401,3 +401,186 @@ impl<'a> CommentAuthorsPart<'a> {
         self.part
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_comment_author_new() {
+        let author = CommentAuthor::new(1, "John Doe", "JD");
+        assert_eq!(author.id, 1);
+        assert_eq!(author.name, "John Doe");
+        assert_eq!(author.initials, "JD");
+    }
+
+    #[test]
+    fn test_comment_author_to_xml() {
+        let author = CommentAuthor::new(5, "Jane Smith", "JS");
+        let xml = author.to_xml();
+        assert!(xml.contains("id=\"5\""));
+        assert!(xml.contains("name=\"Jane Smith\""));
+        assert!(xml.contains("initials=\"JS\""));
+        assert!(xml.contains("clrIdx=\"5\"")); // 5 % 6 = 5
+    }
+
+    #[test]
+    fn test_comment_author_xml_escaping() {
+        let author = CommentAuthor::new(1, "John <Doe>", "J&D");
+        let xml = author.to_xml();
+        assert!(xml.contains("name=\"John &lt;Doe&gt;\""));
+        assert!(xml.contains("initials=\"J&amp;D\""));
+    }
+
+    #[test]
+    fn test_comment_author_clone() {
+        let author = CommentAuthor::new(1, "Test", "T");
+        let cloned = author.clone();
+        assert_eq!(cloned.id, author.id);
+        assert_eq!(cloned.name, author.name);
+        assert_eq!(cloned.initials, author.initials);
+    }
+
+    #[test]
+    fn test_comment_author_debug() {
+        let author = CommentAuthor::new(1, "Test", "T");
+        let debug = format!("{:?}", author);
+        assert!(debug.contains("CommentAuthor"));
+        assert!(debug.contains("Test"));
+    }
+
+    #[test]
+    fn test_comment_author_equality() {
+        let a1 = CommentAuthor::new(1, "Test", "T");
+        let a2 = CommentAuthor::new(1, "Test", "T");
+        let a3 = CommentAuthor::new(2, "Other", "O");
+        assert_eq!(a1, a2);
+        assert_ne!(a1, a3);
+    }
+
+    #[test]
+    fn test_comment_new() {
+        let comment = Comment::new(1, "Hello!", 100, 200);
+        assert_eq!(comment.author_id, 1);
+        assert_eq!(comment.text, "Hello!");
+        assert_eq!(comment.x, 100);
+        assert_eq!(comment.y, 200);
+        assert_eq!(comment.datetime, None);
+        assert_eq!(comment.index, None);
+    }
+
+    #[test]
+    fn test_comment_with_datetime() {
+        let comment = Comment::new(1, "Test", 0, 0).with_datetime("2025-01-15T10:30:00");
+        assert_eq!(comment.datetime, Some("2025-01-15T10:30:00".to_string()));
+    }
+
+    #[test]
+    fn test_comment_with_index() {
+        let comment = Comment::new(1, "Test", 0, 0).with_index(5);
+        assert_eq!(comment.index, Some(5));
+    }
+
+    #[test]
+    fn test_comment_to_xml_basic() {
+        let comment = Comment::new(1, "Hello!", 100, 200);
+        let xml = comment.to_xml();
+        assert!(xml.contains("authorId=\"1\""));
+        assert!(xml.contains("<p:text>Hello!</p:text>"));
+        assert!(xml.contains("x=\"100\""));
+        assert!(xml.contains("y=\"200\""));
+    }
+
+    #[test]
+    fn test_comment_to_xml_with_all_fields() {
+        let comment = Comment::new(2, "Test comment", 500, 600)
+            .with_datetime("2025-03-13T14:30:00")
+            .with_index(3);
+        let xml = comment.to_xml();
+        assert!(xml.contains("authorId=\"2\""));
+        assert!(xml.contains("dt=\"2025-03-13T14:30:00\""));
+        assert!(xml.contains("idx=\"3\""));
+        assert!(xml.contains("x=\"500\""));
+        assert!(xml.contains("y=\"600\""));
+        assert!(xml.contains("<p:text>Test comment</p:text>"));
+    }
+
+    #[test]
+    fn test_comment_to_xml_escaping() {
+        let comment = Comment::new(1, "<script>alert('xss')</script>", 0, 0);
+        let xml = comment.to_xml();
+        assert!(xml.contains("&lt;script&gt;"));
+        assert!(!xml.contains("<script>"));
+    }
+
+    #[test]
+    fn test_comment_clone() {
+        let comment = Comment::new(1, "Test", 100, 200)
+            .with_datetime("2025-01-01")
+            .with_index(1);
+        let cloned = comment.clone();
+        assert_eq!(cloned.author_id, comment.author_id);
+        assert_eq!(cloned.text, comment.text);
+        assert_eq!(cloned.x, comment.x);
+        assert_eq!(cloned.y, comment.y);
+        assert_eq!(cloned.datetime, comment.datetime);
+        assert_eq!(cloned.index, comment.index);
+    }
+
+    #[test]
+    fn test_comment_debug() {
+        let comment = Comment::new(1, "Test", 100, 200);
+        let debug = format!("{:?}", comment);
+        assert!(debug.contains("Comment"));
+        assert!(debug.contains("Test"));
+    }
+
+    #[test]
+    fn test_generate_comments_xml_empty() {
+        let xml = generate_comments_xml(&[]);
+        assert!(xml.contains("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"));
+        assert!(xml.contains("<p:cmLst"));
+        assert!(
+            xml.contains("xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\"")
+        );
+        assert!(xml.contains("</p:cmLst>"));
+    }
+
+    #[test]
+    fn test_generate_comments_xml_with_comments() {
+        let comments = vec![
+            Comment::new(1, "First comment", 100, 200),
+            Comment::new(2, "Second comment", 300, 400),
+        ];
+        let xml = generate_comments_xml(&comments);
+        assert!(xml.contains("<p:cmLst"));
+        assert!(xml.contains("authorId=\"1\""));
+        assert!(xml.contains("authorId=\"2\""));
+        assert!(xml.contains("<p:text>First comment</p:text>"));
+        assert!(xml.contains("<p:text>Second comment</p:text>"));
+        assert!(xml.contains("</p:cmLst>"));
+    }
+
+    #[test]
+    fn test_generate_comment_authors_xml_empty() {
+        let xml = generate_comment_authors_xml(&[]);
+        assert!(xml.contains("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"));
+        assert!(xml.contains("<p:cmAuthorLst"));
+        assert!(xml.contains("</p:cmAuthorLst>"));
+    }
+
+    #[test]
+    fn test_generate_comment_authors_xml_with_authors() {
+        let authors = vec![
+            CommentAuthor::new(1, "Alice", "A"),
+            CommentAuthor::new(2, "Bob", "B"),
+        ];
+        let xml = generate_comment_authors_xml(&authors);
+        assert!(xml.contains("<p:cmAuthorLst"));
+        assert!(xml.contains("id=\"1\""));
+        assert!(xml.contains("id=\"2\""));
+        assert!(xml.contains("name=\"Alice\""));
+        assert!(xml.contains("name=\"Bob\""));
+        assert!(xml.contains("</p:cmAuthorLst>"));
+    }
+}

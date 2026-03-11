@@ -324,3 +324,349 @@ impl Default for NumberingWriter {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_number_format_variants() {
+        assert_eq!(NumberFormat::Decimal as u8, 0);
+        assert_eq!(NumberFormat::UpperRoman as u8, 1);
+        assert_eq!(NumberFormat::LowerRoman as u8, 2);
+        assert_eq!(NumberFormat::UpperLetter as u8, 3);
+        assert_eq!(NumberFormat::LowerLetter as u8, 4);
+        assert_eq!(NumberFormat::Ordinal as u8, 5);
+        assert_eq!(NumberFormat::Bullet as u8, 23);
+    }
+
+    #[test]
+    fn test_list_level_new() {
+        let level = ListLevel::new(1, NumberFormat::Decimal);
+        assert_eq!(level.start_at, 1);
+        assert_eq!(level.number_format, NumberFormat::Decimal);
+        assert_eq!(level.number_text, "%1.");
+        assert_eq!(level.indent_left, 720);
+        assert_eq!(level.indent_hanging, -360);
+    }
+
+    #[test]
+    fn test_list_level_to_bytes_basic() {
+        let level = ListLevel::new(1, NumberFormat::Decimal);
+        let bytes = level.to_bytes();
+
+        // LVLF is 28 bytes + xst length
+        assert!(bytes.len() >= 30); // 28 + at least 2 for cch
+
+        // Check iStartAt (offset 0, 4 bytes)
+        assert_eq!(
+            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            1
+        );
+
+        // Check nfc (offset 4)
+        assert_eq!(bytes[4], 0); // Decimal = 0
+    }
+
+    #[test]
+    fn test_list_level_bullet_format() {
+        let mut level = ListLevel::new(1, NumberFormat::Bullet);
+        level.number_text = "•".to_string();
+        let bytes = level.to_bytes();
+
+        // Bullet format should have bullet character 0x2022
+        assert_eq!(bytes[4], 23); // Bullet = 23
+    }
+
+    #[test]
+    fn test_list_level_with_level_placeholder() {
+        let mut level = ListLevel::new(1, NumberFormat::Decimal);
+        level.number_text = "%1.".to_string();
+        let bytes = level.to_bytes();
+
+        // Should generate valid LVL structure
+        assert!(bytes.len() > 28);
+    }
+
+    #[test]
+    fn test_list_level_multi_level_placeholder() {
+        let mut level = ListLevel::new(1, NumberFormat::Decimal);
+        level.number_text = "%1.%2.%3.".to_string();
+        let bytes = level.to_bytes();
+
+        // Should handle multiple level placeholders
+        assert!(bytes.len() >= 28);
+    }
+
+    #[test]
+    fn test_list_structure_new() {
+        let list = ListStructure::new(42);
+        assert_eq!(list.list_id, 42);
+        assert_eq!(list.template_id, 42);
+        assert!(list.levels.is_empty());
+    }
+
+    #[test]
+    fn test_list_structure_add_level() {
+        let mut list = ListStructure::new(1);
+        let level = ListLevel::new(1, NumberFormat::Decimal);
+        list.add_level(level);
+
+        assert_eq!(list.levels.len(), 1);
+    }
+
+    #[test]
+    fn test_list_structure_max_levels() {
+        let mut list = ListStructure::new(1);
+        for i in 0..15 {
+            list.add_level(ListLevel::new(i as u32 + 1, NumberFormat::Decimal));
+        }
+        // Should only have 9 levels max
+        assert_eq!(list.levels.len(), 9);
+    }
+
+    #[test]
+    fn test_list_structure_to_bytes() {
+        let mut list = ListStructure::new(0x12345678);
+        list.add_level(ListLevel::new(1, NumberFormat::Decimal));
+
+        let bytes = list.to_bytes();
+        assert_eq!(bytes.len(), 28); // Fixed LSTF size
+
+        // Check list ID
+        assert_eq!(
+            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            0x12345678
+        );
+    }
+
+    #[test]
+    fn test_list_structure_simple_list_flag() {
+        let mut list_single = ListStructure::new(1);
+        list_single.add_level(ListLevel::new(1, NumberFormat::Decimal));
+
+        let bytes_single = list_single.to_bytes();
+        // Offset 26: flags byte (4 + 4 + 18 = 26), bit 0 = fSimpleList
+        assert_eq!(bytes_single[26] & 0x01, 1);
+
+        let mut list_multi = ListStructure::new(2);
+        list_multi.add_level(ListLevel::new(1, NumberFormat::Decimal));
+        list_multi.add_level(ListLevel::new(1, NumberFormat::Decimal));
+
+        let bytes_multi = list_multi.to_bytes();
+        assert_eq!(bytes_multi[26] & 0x01, 0);
+    }
+
+    #[test]
+    fn test_list_structure_levels_to_bytes() {
+        let mut list = ListStructure::new(1);
+        list.add_level(ListLevel::new(1, NumberFormat::Decimal));
+        list.add_level(ListLevel::new(1, NumberFormat::Bullet));
+
+        let bytes = list.levels_to_bytes();
+        // Should contain bytes from both levels
+        assert!(!bytes.is_empty());
+        assert!(bytes.len() >= 56); // At least 28 bytes per level
+    }
+
+    #[test]
+    fn test_list_format_override_new() {
+        let lfo = ListFormatOverride::new(100, 1);
+        assert_eq!(lfo.list_id, 100);
+        assert_eq!(lfo.lfo_id, 1);
+    }
+
+    #[test]
+    fn test_list_format_override_to_bytes() {
+        let lfo = ListFormatOverride::new(0x12345678, 5);
+        let bytes = lfo.to_bytes();
+        assert_eq!(bytes.len(), 16);
+
+        // Check list ID
+        assert_eq!(
+            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            0x12345678
+        );
+    }
+
+    #[test]
+    fn test_numbering_writer_new() {
+        let writer = NumberingWriter::new();
+        assert!(writer.is_empty());
+        assert_eq!(writer.list_count(), 0);
+    }
+
+    #[test]
+    fn test_numbering_writer_default() {
+        let writer: NumberingWriter = Default::default();
+        assert!(writer.is_empty());
+    }
+
+    #[test]
+    fn test_numbering_writer_add_list() {
+        let mut writer = NumberingWriter::new();
+        let list = ListStructure::new(1);
+        writer.add_list(list);
+
+        assert_eq!(writer.list_count(), 1);
+        assert!(!writer.is_empty());
+    }
+
+    #[test]
+    fn test_numbering_writer_add_override() {
+        let mut writer = NumberingWriter::new();
+        let lfo = ListFormatOverride::new(100, 1);
+        writer.add_override(lfo);
+
+        assert_eq!(writer.list_overrides.len(), 1);
+    }
+
+    #[test]
+    fn test_build_plflst_empty() {
+        let writer = NumberingWriter::new();
+        let (header, lvl_data) = writer.build_plflst();
+
+        // Should have just count (0)
+        assert_eq!(header.len(), 2);
+        assert_eq!(u16::from_le_bytes([header[0], header[1]]), 0);
+        assert!(lvl_data.is_empty());
+    }
+
+    #[test]
+    fn test_build_plflst_with_lists() {
+        let mut writer = NumberingWriter::new();
+        let mut list = ListStructure::new(1);
+        list.add_level(ListLevel::new(1, NumberFormat::Decimal));
+        writer.add_list(list);
+
+        let (header, lvl_data) = writer.build_plflst();
+
+        // Header: 2 bytes count + 28 bytes LSTF
+        assert_eq!(header.len(), 30);
+        assert!(!lvl_data.is_empty());
+    }
+
+    #[test]
+    fn test_build_plflfo_empty() {
+        let writer = NumberingWriter::new();
+        let bytes = writer.build_plflfo();
+
+        // Just count (0)
+        assert_eq!(bytes.len(), 4);
+        assert_eq!(
+            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            0
+        );
+    }
+
+    #[test]
+    fn test_build_plflfo_with_overrides() {
+        let mut writer = NumberingWriter::new();
+        writer.add_override(ListFormatOverride::new(100, 1));
+        writer.add_override(ListFormatOverride::new(200, 2));
+
+        let bytes = writer.build_plflfo();
+
+        // 4 bytes count + 2 * 16 bytes LFO
+        assert_eq!(bytes.len(), 36);
+        assert_eq!(
+            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            2
+        );
+    }
+
+    #[test]
+    fn test_list_level_clone() {
+        let level = ListLevel::new(1, NumberFormat::Decimal);
+        let cloned = level.clone();
+        assert_eq!(level.start_at, cloned.start_at);
+        assert_eq!(level.number_format, cloned.number_format);
+    }
+
+    #[test]
+    fn test_list_structure_clone() {
+        let mut list = ListStructure::new(42);
+        list.add_level(ListLevel::new(1, NumberFormat::Decimal));
+        let cloned = list.clone();
+        assert_eq!(list.list_id, cloned.list_id);
+        assert_eq!(list.levels.len(), cloned.levels.len());
+    }
+
+    #[test]
+    fn test_list_format_override_clone() {
+        let lfo = ListFormatOverride::new(100, 1);
+        let cloned = lfo.clone();
+        assert_eq!(lfo.list_id, cloned.list_id);
+        assert_eq!(lfo.lfo_id, cloned.lfo_id);
+    }
+
+    #[test]
+    fn test_list_level_debug() {
+        let level = ListLevel::new(1, NumberFormat::Decimal);
+        let debug_str = format!("{:?}", level);
+        assert!(debug_str.contains("ListLevel"));
+    }
+
+    #[test]
+    fn test_list_structure_debug() {
+        let list = ListStructure::new(1);
+        let debug_str = format!("{:?}", list);
+        assert!(debug_str.contains("ListStructure"));
+    }
+
+    #[test]
+    fn test_numbering_writer_debug() {
+        let writer = NumberingWriter::new();
+        let debug_str = format!("{:?}", writer);
+        assert!(debug_str.contains("NumberingWriter"));
+    }
+
+    #[test]
+    fn test_all_number_formats_to_bytes() {
+        let formats = vec![
+            NumberFormat::Decimal,
+            NumberFormat::UpperRoman,
+            NumberFormat::LowerRoman,
+            NumberFormat::UpperLetter,
+            NumberFormat::LowerLetter,
+            NumberFormat::Ordinal,
+            NumberFormat::Bullet,
+        ];
+
+        for format in formats {
+            let level = ListLevel::new(1, format);
+            let bytes = level.to_bytes();
+            assert!(!bytes.is_empty(), "Failed for format {:?}", format);
+            assert_eq!(bytes[4], format as u8);
+        }
+    }
+
+    #[test]
+    fn test_list_level_custom_indent() {
+        let mut level = ListLevel::new(1, NumberFormat::Decimal);
+        level.indent_left = 1440; // 1 inch
+        level.indent_hanging = -720; // -0.5 inch
+
+        assert_eq!(level.indent_left, 1440);
+        assert_eq!(level.indent_hanging, -720);
+    }
+
+    #[test]
+    fn test_multiple_lists() {
+        let mut writer = NumberingWriter::new();
+
+        let mut list1 = ListStructure::new(1);
+        list1.add_level(ListLevel::new(1, NumberFormat::Decimal));
+
+        let mut list2 = ListStructure::new(2);
+        list2.add_level(ListLevel::new(1, NumberFormat::Bullet));
+
+        writer.add_list(list1);
+        writer.add_list(list2);
+
+        assert_eq!(writer.list_count(), 2);
+
+        let (header, _) = writer.build_plflst();
+        assert_eq!(header.len(), 2 + 2 * 28); // count + 2 LSTFs
+    }
+}

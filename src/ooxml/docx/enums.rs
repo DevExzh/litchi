@@ -301,32 +301,206 @@ mod tests {
             Some(WdOrientation::Landscape)
         );
         assert_eq!(WdOrientation::from_xml("invalid"), None);
+        assert_eq!(WdOrientation::from_xml(""), None);
+    }
+
+    #[test]
+    fn test_orientation_default() {
+        assert_eq!(WdOrientation::default(), WdOrientation::Portrait);
+    }
+
+    #[test]
+    fn test_orientation_display() {
+        assert_eq!(format!("{}", WdOrientation::Portrait), "Portrait");
+        assert_eq!(format!("{}", WdOrientation::Landscape), "Landscape");
+    }
+
+    #[test]
+    fn test_orientation_variants() {
+        // Test that all variants can be created
+        let portrait = WdOrientation::Portrait;
+        let landscape = WdOrientation::Landscape;
+
+        // Test equality and inequality
+        assert_eq!(portrait, WdOrientation::Portrait);
+        assert_eq!(landscape, WdOrientation::Landscape);
+        assert_ne!(portrait, landscape);
+    }
+
+    #[test]
+    fn test_orientation_debug() {
+        let debug_str = format!("{:?}", WdOrientation::Portrait);
+        assert!(debug_str.contains("Portrait"));
     }
 
     #[test]
     fn test_section_start_conversion() {
+        assert_eq!(WdSectionStart::Continuous.to_xml(), "continuous");
+        assert_eq!(WdSectionStart::NewColumn.to_xml(), "nextColumn");
         assert_eq!(WdSectionStart::NewPage.to_xml(), "nextPage");
+        assert_eq!(WdSectionStart::EvenPage.to_xml(), "evenPage");
+        assert_eq!(WdSectionStart::OddPage.to_xml(), "oddPage");
+
+        assert_eq!(
+            WdSectionStart::from_xml("continuous"),
+            Some(WdSectionStart::Continuous)
+        );
+        assert_eq!(
+            WdSectionStart::from_xml("nextColumn"),
+            Some(WdSectionStart::NewColumn)
+        );
         assert_eq!(
             WdSectionStart::from_xml("nextPage"),
             Some(WdSectionStart::NewPage)
         );
+        assert_eq!(
+            WdSectionStart::from_xml("evenPage"),
+            Some(WdSectionStart::EvenPage)
+        );
+        assert_eq!(
+            WdSectionStart::from_xml("oddPage"),
+            Some(WdSectionStart::OddPage)
+        );
+        assert_eq!(WdSectionStart::from_xml("invalid"), None);
+    }
+
+    #[test]
+    fn test_section_start_default() {
+        assert_eq!(WdSectionStart::default(), WdSectionStart::NewPage);
+    }
+
+    #[test]
+    fn test_section_start_display() {
+        assert_eq!(format!("{}", WdSectionStart::Continuous), "Continuous");
+        assert_eq!(format!("{}", WdSectionStart::NewColumn), "New Column");
+        assert_eq!(format!("{}", WdSectionStart::NewPage), "New Page");
+        assert_eq!(format!("{}", WdSectionStart::EvenPage), "Even Page");
+        assert_eq!(format!("{}", WdSectionStart::OddPage), "Odd Page");
+    }
+
+    #[test]
+    fn test_section_start_variants() {
+        assert_eq!(WdSectionStart::Continuous as u8, 0);
+        assert_eq!(WdSectionStart::NewColumn as u8, 1);
+        assert_eq!(WdSectionStart::NewPage as u8, 2);
+        assert_eq!(WdSectionStart::EvenPage as u8, 3);
+        assert_eq!(WdSectionStart::OddPage as u8, 4);
     }
 
     #[test]
     fn test_header_footer_conversion() {
         assert_eq!(WdHeaderFooter::Primary.to_xml(), "default");
+        assert_eq!(WdHeaderFooter::FirstPage.to_xml(), "first");
+        assert_eq!(WdHeaderFooter::EvenPage.to_xml(), "even");
+
         assert_eq!(
             WdHeaderFooter::from_xml("default"),
             Some(WdHeaderFooter::Primary)
         );
+        assert_eq!(
+            WdHeaderFooter::from_xml("first"),
+            Some(WdHeaderFooter::FirstPage)
+        );
+        assert_eq!(
+            WdHeaderFooter::from_xml("even"),
+            Some(WdHeaderFooter::EvenPage)
+        );
+        assert_eq!(WdHeaderFooter::from_xml("invalid"), None);
+    }
+
+    #[test]
+    fn test_header_footer_default() {
+        assert_eq!(WdHeaderFooter::default(), WdHeaderFooter::Primary);
+    }
+
+    #[test]
+    fn test_header_footer_display() {
+        assert_eq!(format!("{}", WdHeaderFooter::Primary), "Primary");
+        assert_eq!(format!("{}", WdHeaderFooter::FirstPage), "First Page");
+        assert_eq!(format!("{}", WdHeaderFooter::EvenPage), "Even Page");
+    }
+
+    #[test]
+    fn test_header_footer_variants() {
+        assert_eq!(WdHeaderFooter::Primary as u8, 1);
+        assert_eq!(WdHeaderFooter::FirstPage as u8, 2);
+        assert_eq!(WdHeaderFooter::EvenPage as u8, 3);
     }
 
     #[test]
     fn test_style_type_conversion() {
         assert_eq!(WdStyleType::Paragraph.to_xml(), "paragraph");
+        assert_eq!(WdStyleType::Character.to_xml(), "character");
+        assert_eq!(WdStyleType::Table.to_xml(), "table");
+        assert_eq!(WdStyleType::List.to_xml(), "numbering");
+
         assert_eq!(
             WdStyleType::from_xml("paragraph"),
             Some(WdStyleType::Paragraph)
         );
+        assert_eq!(
+            WdStyleType::from_xml("character"),
+            Some(WdStyleType::Character)
+        );
+        assert_eq!(WdStyleType::from_xml("table"), Some(WdStyleType::Table));
+        assert_eq!(WdStyleType::from_xml("numbering"), Some(WdStyleType::List));
+        assert_eq!(WdStyleType::from_xml("invalid"), None);
+    }
+
+    #[test]
+    fn test_style_type_default() {
+        assert_eq!(WdStyleType::default(), WdStyleType::Paragraph);
+    }
+
+    #[test]
+    fn test_style_type_display() {
+        assert_eq!(format!("{}", WdStyleType::Paragraph), "Paragraph");
+        assert_eq!(format!("{}", WdStyleType::Character), "Character");
+        assert_eq!(format!("{}", WdStyleType::Table), "Table");
+        assert_eq!(format!("{}", WdStyleType::List), "List");
+    }
+
+    #[test]
+    fn test_style_type_variants() {
+        assert_eq!(WdStyleType::Paragraph as u8, 1);
+        assert_eq!(WdStyleType::Character as u8, 2);
+        assert_eq!(WdStyleType::Table as u8, 3);
+        assert_eq!(WdStyleType::List as u8, 4);
+    }
+
+    #[test]
+    fn test_all_enums_clone_copy() {
+        // Test that all enums implement Clone and Copy
+        let orientation = WdOrientation::Portrait;
+        let orientation2 = orientation;
+        assert_eq!(orientation, orientation2);
+
+        let section_start = WdSectionStart::NewPage;
+        let section_start2 = section_start;
+        assert_eq!(section_start, section_start2);
+
+        let header_footer = WdHeaderFooter::Primary;
+        let header_footer2 = header_footer;
+        assert_eq!(header_footer, header_footer2);
+
+        let style_type = WdStyleType::Paragraph;
+        let style_type2 = style_type;
+        assert_eq!(style_type, style_type2);
+    }
+
+    #[test]
+    fn test_all_enums_hash() {
+        use std::collections::HashSet;
+
+        // Test that all enums implement Hash
+        let mut orientations = HashSet::new();
+        orientations.insert(WdOrientation::Portrait);
+        orientations.insert(WdOrientation::Landscape);
+        assert_eq!(orientations.len(), 2);
+
+        let mut section_starts = HashSet::new();
+        section_starts.insert(WdSectionStart::Continuous);
+        section_starts.insert(WdSectionStart::NewPage);
+        assert_eq!(section_starts.len(), 2);
     }
 }

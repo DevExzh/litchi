@@ -16,6 +16,7 @@
 //! ```rust,no_run
 //! use litchi::sheet::Workbook;
 //!
+//! # fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 //! // Open any spreadsheet format - auto-detected
 //! let workbook = Workbook::open("data.numbers")?;
 //!
@@ -32,7 +33,8 @@
 //! if let Some(title) = metadata.title {
 //!     println!("Title: {}", title);
 //! }
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+//! # }
 //! ```
 //!
 //! # Architecture

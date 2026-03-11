@@ -28,7 +28,7 @@ use std::path::Path;
 ///
 /// // Get the main document
 /// let doc = pkg.document()?;
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 /// ```
 ///
 /// ## Creating a new document
@@ -46,7 +46,7 @@ use std::path::Path;
 ///
 /// // Save the document
 /// pkg.save("output.docx")?;
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 /// ```
 pub struct Package {
     /// The underlying OPC package
@@ -195,10 +195,10 @@ impl Package {
     /// ```rust,no_run
     /// use litchi::ooxml::docx::Package;
     ///
-    /// let pkg = Package::new()?;
+    /// let mut pkg = Package::new()?;
     /// // Add content to the document...
     /// pkg.save("new_document.docx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn new() -> Result<Self> {
         use crate::ooxml::docx::template;
@@ -384,7 +384,7 @@ impl Package {
     /// use litchi::ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let opc = OpcPackage::open(path)?;
@@ -440,7 +440,7 @@ impl Package {
     /// let bytes = std::fs::read("document.docx")?;
     /// let opc = OpcPackage::from_reader(Cursor::new(bytes))?;
     /// let pkg = Package::from_opc_package(opc)?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn from_opc_package(opc: OpcPackage) -> Result<Self> {
         // Verify it's a Word document by checking the main part's content type
@@ -483,7 +483,7 @@ impl Package {
     /// let data = std::fs::read("document.docx")?;
     /// let cursor = Cursor::new(data);
     /// let pkg = Package::from_reader(cursor)?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn from_reader<R: Read + Seek>(reader: R) -> Result<Self> {
         let opc = OpcPackage::from_reader(reader)?;
@@ -537,7 +537,7 @@ impl Package {
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn document(&self) -> Result<Document<'_>> {
         let main_part = self
@@ -591,7 +591,7 @@ impl Package {
     /// table.cell(0, 0).unwrap().set_text("Header 1");
     ///
     /// pkg.save("output.docx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn document_mut(&mut self) -> Result<&mut MutableDocument> {
         // If we don't have a mutable document, try to load it from the package
@@ -629,7 +629,7 @@ impl Package {
     /// let mut pkg = Package::new()?;
     /// // Modify document...
     /// pkg.save("output.docx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         let mut file = std::fs::OpenOptions::new()
@@ -658,7 +658,7 @@ impl Package {
     /// // Modify document...
     /// let mut cursor = Cursor::new(Vec::new());
     /// pkg.to_stream(&mut cursor)?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn to_stream<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
         use crate::ooxml::docx::writer::relmap::RelationshipMapper;
@@ -938,7 +938,7 @@ impl Package {
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let props = pkg.properties();
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn properties(&self) -> &DocumentProperties {
         &self.properties
@@ -955,7 +955,7 @@ impl Package {
     /// pkg.properties_mut().title = Some("My Document".to_string());
     /// pkg.properties_mut().creator = Some("John Doe".to_string());
     /// pkg.save("document.docx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn properties_mut(&mut self) -> &mut DocumentProperties {
         &mut self.properties
@@ -976,7 +976,7 @@ impl Package {
     /// if let Some(value) = custom_props.get_property("ProjectName") {
     ///     println!("Project: {:?}", value);
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn custom_properties(&self) -> &CustomProperties {
         &self.custom_properties
@@ -998,7 +998,7 @@ impl Package {
     /// custom_props.add_property("Budget", PropertyValue::Double(50000.0));
     ///
     /// pkg.save("document.docx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn custom_properties_mut(&mut self) -> &mut CustomProperties {
         &mut self.custom_properties

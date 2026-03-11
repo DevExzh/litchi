@@ -685,3 +685,132 @@ pub(crate) async fn eval_oct2hex(
     }
     Ok(CellValue::String(result))
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::parser::Expr;
+
+    fn num_expr(n: f64) -> Expr {
+        if n == n.floor() {
+            Expr::Literal(CellValue::Int(n as i64))
+        } else {
+            Expr::Literal(CellValue::Float(n))
+        }
+    }
+
+    fn str_expr(s: &str) -> Expr {
+        Expr::Literal(CellValue::String(s.to_string()))
+    }
+
+    #[tokio::test]
+    async fn test_eval_bin2dec() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("1010")];
+        let result = eval_bin2dec(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(10));
+    }
+
+    #[tokio::test]
+    async fn test_eval_bin2hex() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("1111")];
+        let result = eval_bin2hex(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("F".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_dec2bin() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(10.0)];
+        let result = eval_dec2bin(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("1010".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_dec2hex() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(255.0)];
+        let result = eval_dec2hex(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("FF".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_hex2dec() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("FF")];
+        let result = eval_hex2dec(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(255));
+    }
+
+    #[tokio::test]
+    async fn test_eval_hex2bin() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("F")];
+        let result = eval_hex2bin(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("1111".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_dec2oct() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(64.0)];
+        let result = eval_dec2oct(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("100".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_oct2dec() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("100")];
+        let result = eval_oct2dec(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(64));
+    }
+
+    #[tokio::test]
+    async fn test_eval_base() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // BASE(255, 16) = "FF"
+        let args = vec![num_expr(255.0), num_expr(16.0)];
+        let result = eval_base(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("FF".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_base_with_min_length() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // BASE(255, 16, 4) = "00FF"
+        let args = vec![num_expr(255.0), num_expr(16.0), num_expr(4.0)];
+        let result = eval_base(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("00FF".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_decimal() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // DECIMAL("FF", 16) = 255
+        let args = vec![str_expr("FF"), num_expr(16.0)];
+        let result = eval_decimal(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(255));
+    }
+
+    #[tokio::test]
+    async fn test_eval_decimal_binary() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // DECIMAL("1010", 2) = 10
+        let args = vec![str_expr("1010"), num_expr(2.0)];
+        let result = eval_decimal(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(10));
+    }
+}

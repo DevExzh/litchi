@@ -229,6 +229,52 @@ mod tests {
     }
 
     #[test]
+    fn test_header_footer_type_all_variants() {
+        let all = HeaderFooterType::all_types();
+        assert_eq!(all.len(), 6);
+
+        // Verify order
+        assert_eq!(all[0], HeaderFooterType::FirstPageHeader);
+        assert_eq!(all[1], HeaderFooterType::FirstPageFooter);
+        assert_eq!(all[2], HeaderFooterType::EvenPageHeader);
+        assert_eq!(all[3], HeaderFooterType::EvenPageFooter);
+        assert_eq!(all[4], HeaderFooterType::OddPageHeader);
+        assert_eq!(all[5], HeaderFooterType::OddPageFooter);
+    }
+
+    #[test]
+    fn test_header_footer_type_discriminants() {
+        assert_eq!(HeaderFooterType::FirstPageHeader as u8, 0);
+        assert_eq!(HeaderFooterType::FirstPageFooter as u8, 1);
+        assert_eq!(HeaderFooterType::EvenPageHeader as u8, 2);
+        assert_eq!(HeaderFooterType::EvenPageFooter as u8, 3);
+        assert_eq!(HeaderFooterType::OddPageHeader as u8, 4);
+        assert_eq!(HeaderFooterType::OddPageFooter as u8, 5);
+    }
+
+    #[test]
+    fn test_header_footer_type_is_header() {
+        assert!(HeaderFooterType::FirstPageHeader.is_header());
+        assert!(HeaderFooterType::EvenPageHeader.is_header());
+        assert!(HeaderFooterType::OddPageHeader.is_header());
+
+        assert!(!HeaderFooterType::FirstPageFooter.is_header());
+        assert!(!HeaderFooterType::EvenPageFooter.is_header());
+        assert!(!HeaderFooterType::OddPageFooter.is_header());
+    }
+
+    #[test]
+    fn test_header_footer_type_is_footer() {
+        assert!(HeaderFooterType::FirstPageFooter.is_footer());
+        assert!(HeaderFooterType::EvenPageFooter.is_footer());
+        assert!(HeaderFooterType::OddPageFooter.is_footer());
+
+        assert!(!HeaderFooterType::FirstPageHeader.is_footer());
+        assert!(!HeaderFooterType::EvenPageHeader.is_footer());
+        assert!(!HeaderFooterType::OddPageHeader.is_footer());
+    }
+
+    #[test]
     fn test_header_footer_story() {
         let story = HeaderFooterStory::new(HeaderFooterType::OddPageHeader, 100, 200);
         assert_eq!(story.length(), 100);
@@ -236,5 +282,119 @@ mod tests {
 
         let empty_story = HeaderFooterStory::new(HeaderFooterType::OddPageFooter, 100, 100);
         assert!(empty_story.is_empty());
+    }
+
+    #[test]
+    fn test_header_footer_story_new() {
+        let story = HeaderFooterStory::new(HeaderFooterType::EvenPageHeader, 50, 150);
+
+        assert_eq!(story.story_type, HeaderFooterType::EvenPageHeader);
+        assert_eq!(story.start_cp, 50);
+        assert_eq!(story.end_cp, 150);
+        assert_eq!(story.length(), 100);
+    }
+
+    #[test]
+    fn test_header_footer_story_length() {
+        let story = HeaderFooterStory::new(HeaderFooterType::FirstPageHeader, 0, 100);
+        assert_eq!(story.length(), 100);
+
+        let story2 = HeaderFooterStory::new(HeaderFooterType::FirstPageFooter, 500, 600);
+        assert_eq!(story2.length(), 100);
+
+        let empty = HeaderFooterStory::new(HeaderFooterType::OddPageHeader, 100, 100);
+        assert_eq!(empty.length(), 0);
+    }
+
+    #[test]
+    fn test_header_footer_story_is_empty() {
+        let empty = HeaderFooterStory::new(HeaderFooterType::OddPageFooter, 100, 100);
+        assert!(empty.is_empty());
+
+        let non_empty = HeaderFooterStory::new(HeaderFooterType::OddPageHeader, 100, 101);
+        assert!(!non_empty.is_empty());
+    }
+
+    #[test]
+    fn test_header_footer_story_all_types() {
+        let types = [
+            HeaderFooterType::FirstPageHeader,
+            HeaderFooterType::FirstPageFooter,
+            HeaderFooterType::EvenPageHeader,
+            HeaderFooterType::EvenPageFooter,
+            HeaderFooterType::OddPageHeader,
+            HeaderFooterType::OddPageFooter,
+        ];
+
+        for (i, story_type) in types.iter().enumerate() {
+            let story = HeaderFooterStory::new(*story_type, i as u32 * 100, (i as u32 + 1) * 100);
+            assert_eq!(story.story_type, *story_type);
+            assert_eq!(story.length(), 100);
+        }
+    }
+
+    #[test]
+    fn test_header_footer_story_large_ranges() {
+        let story = HeaderFooterStory::new(HeaderFooterType::OddPageHeader, 0, u32::MAX);
+        assert_eq!(story.length(), u32::MAX);
+        assert!(!story.is_empty());
+    }
+
+    #[test]
+    fn test_header_footer_story_zero_length() {
+        let story = HeaderFooterStory::new(HeaderFooterType::FirstPageHeader, 1000, 1000);
+        assert_eq!(story.length(), 0);
+        assert!(story.is_empty());
+    }
+
+    #[test]
+    fn test_header_footer_story_clone() {
+        let story = HeaderFooterStory::new(HeaderFooterType::EvenPageFooter, 200, 300);
+        let cloned = story.clone();
+
+        assert_eq!(cloned.story_type, story.story_type);
+        assert_eq!(cloned.start_cp, story.start_cp);
+        assert_eq!(cloned.end_cp, story.end_cp);
+        assert_eq!(cloned.length(), story.length());
+    }
+
+    #[test]
+    fn test_header_footer_type_debug() {
+        let header_type = HeaderFooterType::OddPageHeader;
+        let debug_str = format!("{:?}", header_type);
+        assert!(debug_str.contains("OddPageHeader") || debug_str.contains("Odd Page Header"));
+    }
+
+    #[test]
+    fn test_header_footer_story_debug() {
+        let story = HeaderFooterStory::new(HeaderFooterType::FirstPageHeader, 100, 200);
+        let debug_str = format!("{:?}", story);
+        assert!(debug_str.contains("HeaderFooterStory"));
+        assert!(debug_str.contains("FirstPageHeader") || debug_str.contains("First Page Header"));
+    }
+
+    #[test]
+    fn test_header_footer_type_equality() {
+        assert_eq!(
+            HeaderFooterType::OddPageHeader,
+            HeaderFooterType::OddPageHeader
+        );
+        assert_ne!(
+            HeaderFooterType::OddPageHeader,
+            HeaderFooterType::OddPageFooter
+        );
+        assert_ne!(
+            HeaderFooterType::FirstPageHeader,
+            HeaderFooterType::EvenPageHeader
+        );
+    }
+
+    #[test]
+    fn test_header_footer_type_copy() {
+        let header = HeaderFooterType::OddPageHeader;
+        let copied = header;
+        // After copy, original should still be valid
+        assert_eq!(header, HeaderFooterType::OddPageHeader);
+        assert_eq!(copied, HeaderFooterType::OddPageHeader);
     }
 }

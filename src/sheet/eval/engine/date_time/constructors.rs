@@ -166,3 +166,137 @@ pub(crate) async fn eval_timevalue(
     let fraction = total_seconds / SECONDS_PER_DAY;
     Ok(CellValue::DateTime(fraction))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::parser::Expr;
+
+    fn num_expr(n: f64) -> Expr {
+        if n == n.floor() {
+            Expr::Literal(CellValue::Int(n as i64))
+        } else {
+            Expr::Literal(CellValue::Float(n))
+        }
+    }
+
+    fn str_expr(s: &str) -> Expr {
+        Expr::Literal(CellValue::String(s.to_string()))
+    }
+
+    #[tokio::test]
+    async fn test_eval_date() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(2024.0), num_expr(3.0), num_expr(15.0)];
+        let result = eval_date(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::DateTime(v) => assert!(v > 0.0),
+            _ => panic!("Expected DateTime"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_date_wrong_args() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(2024.0), num_expr(3.0)];
+        let result = eval_date(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 3 arguments")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_time() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(12.0), num_expr(30.0), num_expr(0.0)];
+        let result = eval_time(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::DateTime(v) => {
+                // 12:30:00 is halfway through the day
+                assert!((v - 0.52083333).abs() < 0.001);
+            },
+            _ => panic!("Expected DateTime"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_time_out_of_range() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(25.0), num_expr(0.0), num_expr(0.0)];
+        let result = eval_time(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("out of range")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_datevalue() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("2024-03-15")];
+        let result = eval_datevalue(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::DateTime(v) => assert!(v > 0.0),
+            _ => panic!("Expected DateTime"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_datevalue_numeric() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(45000.75)];
+        let result = eval_datevalue(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::DateTime(v) => assert_eq!(v, 45000.0),
+            _ => panic!("Expected DateTime"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_datevalue_invalid() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("not a date")];
+        let result = eval_datevalue(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("unsupported date format")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_timevalue() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("12:00:00")];
+        let result = eval_timevalue(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::DateTime(v) => {
+                // Noon is 0.5 of a day
+                assert!((v - 0.5).abs() < 0.001);
+            },
+            _ => panic!("Expected DateTime"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_timevalue_numeric() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(45000.75)];
+        let result = eval_timevalue(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::DateTime(v) => {
+                assert!((v - 0.75).abs() < 0.001);
+            },
+            _ => panic!("Expected DateTime"),
+        }
+    }
+}

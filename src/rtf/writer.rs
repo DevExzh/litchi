@@ -127,7 +127,7 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write document header
-    fn write_document_header(&mut self) -> io::Result<()> {
+    pub fn write_document_header(&mut self) -> io::Result<()> {
         self.write_str("{")?;
         self.write_control_word("rtf", Some(1))?;
 
@@ -606,7 +606,7 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write a control word
-    fn write_control_word(&mut self, word: &str, param: Option<i32>) -> io::Result<()> {
+    pub fn write_control_word(&mut self, word: &str, param: Option<i32>) -> io::Result<()> {
         self.write_str("\\")?;
         self.write_str(word)?;
         if let Some(p) = param {
@@ -616,7 +616,7 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write plain text (with proper escaping)
-    fn write_text(&mut self, text: &str) -> io::Result<()> {
+    pub fn write_text(&mut self, text: &str) -> io::Result<()> {
         for ch in text.chars() {
             match ch {
                 '\\' => self.write_str("\\\\")?,
@@ -640,7 +640,7 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write a string
-    fn write_str(&mut self, s: &str) -> io::Result<()> {
+    pub fn write_str(&mut self, s: &str) -> io::Result<()> {
         self.writer.write_all(s.as_bytes())
     }
 
@@ -815,7 +815,6 @@ impl<W: Write> RtfWriter<W> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
 
     #[test]
     fn test_simple_document() {

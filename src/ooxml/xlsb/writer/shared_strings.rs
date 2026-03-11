@@ -84,3 +84,78 @@ impl Default for MutableSharedStringsWriter {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_shared_strings_writer_new() {
+        let writer = MutableSharedStringsWriter::new();
+        assert!(writer.is_empty());
+        assert_eq!(writer.len(), 0);
+    }
+
+    #[test]
+    fn test_shared_strings_writer_default() {
+        let writer: MutableSharedStringsWriter = Default::default();
+        assert!(writer.is_empty());
+        assert_eq!(writer.len(), 0);
+    }
+
+    #[test]
+    fn test_add_string() {
+        let mut writer = MutableSharedStringsWriter::new();
+        let idx1 = writer.add_string("Hello".to_string());
+        let idx2 = writer.add_string("World".to_string());
+
+        assert_eq!(idx1, 0);
+        assert_eq!(idx2, 1);
+        assert_eq!(writer.len(), 2);
+        assert!(!writer.is_empty());
+    }
+
+    #[test]
+    fn test_add_duplicate_string() {
+        let mut writer = MutableSharedStringsWriter::new();
+        let idx1 = writer.add_string("Test".to_string());
+        let idx2 = writer.add_string("Test".to_string());
+        let idx3 = writer.add_string("Other".to_string());
+
+        assert_eq!(idx1, 0);
+        assert_eq!(idx2, 0); // Same index for duplicate
+        assert_eq!(idx3, 1);
+        assert_eq!(writer.len(), 2); // Only 2 unique strings
+    }
+
+    #[test]
+    fn test_add_multiple_strings() {
+        let mut writer = MutableSharedStringsWriter::new();
+        let strings = vec!["A", "B", "C", "D", "E"];
+
+        for (i, s) in strings.iter().enumerate() {
+            let idx = writer.add_string(s.to_string());
+            assert_eq!(idx, i as u32);
+        }
+
+        assert_eq!(writer.len(), 5);
+    }
+
+    #[test]
+    fn test_add_empty_string() {
+        let mut writer = MutableSharedStringsWriter::new();
+        let idx = writer.add_string("".to_string());
+
+        assert_eq!(idx, 0);
+        assert_eq!(writer.len(), 1);
+    }
+
+    #[test]
+    fn test_add_unicode_string() {
+        let mut writer = MutableSharedStringsWriter::new();
+        let idx = writer.add_string("Hello 世界 🌍".to_string());
+
+        assert_eq!(idx, 0);
+        assert_eq!(writer.len(), 1);
+    }
+}

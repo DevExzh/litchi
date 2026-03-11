@@ -411,3 +411,277 @@ impl OdtParser {
         Ok(sections)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TEST_TRACK_CHANGES_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+    xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <text:tracked-changes>
+        <text:changed-region text:id="change1">
+            <text:insertion>
+                <office:change-info>
+                    <dc:creator>John Doe</dc:creator>
+                    <dc:date>2024-03-15T10:30:00</dc:date>
+                </office:change-info>
+            </text:insertion>
+        </text:changed-region>
+        <text:changed-region text:id="change2">
+            <text:deletion>
+                <office:change-info>
+                    <dc:creator>Jane Smith</dc:creator>
+                    <dc:date>2024-03-15T11:00:00</dc:date>
+                </office:change-info>
+            </text:deletion>
+        </text:changed-region>
+        <text:changed-region text:id="change3">
+            <text:format-change>
+                <office:change-info>
+                    <dc:creator>Bob Wilson</dc:creator>
+                    <dc:date>2024-03-15T12:00:00</dc:date>
+                </office:change-info>
+            </text:format-change>
+        </text:changed-region>
+    </text:tracked-changes>
+</office:document-content>"#;
+
+    const TEST_COMMENTS_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+    xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <text:p>
+        <office:annotation office:name="cmt1">
+            <dc:creator>Alice</dc:creator>
+            <dc:date>2024-03-15T09:00:00</dc:date>
+            <text:p>This is a comment</text:p>
+        </office:annotation>
+        Some text
+    </text:p>
+    <text:p>
+        <office:annotation office:name="cmt2">
+            <dc:creator>Bob</dc:creator>
+            <dc:date>2024-03-15T10:00:00</dc:date>
+            <text:p>First paragraph</text:p>
+            <text:p>Second paragraph</text:p>
+        </office:annotation>
+        More text
+    </text:p>
+</office:document-content>"#;
+
+    const TEST_SECTIONS_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+    <text:section text:name="Introduction" text:style-name="IntroStyle">
+        <text:p>Introduction content</text:p>
+    </text:section>
+    <text:section text:name="ProtectedSection" text:protected="true">
+        <text:p>Protected content</text:p>
+    </text:section>
+    <text:section text:name="Chapter1" text:style-name="ChapterStyle" text:protected="false">
+        <text:p>Chapter 1 content</text:p>
+    </text:section>
+</office:document-content>"#;
+
+    const TEST_EMPTY_TRACK_CHANGES: &str = r#"<?xml version="1.0"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+    <text:tracked-changes>
+    </text:tracked-changes>
+</office:document-content>"#;
+
+    const TEST_EMPTY_CONTENT: &str = r#"<?xml version="1.0"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0">
+</office:document-content>"#;
+
+    #[test]
+    fn test_parse_track_changes() {
+        let changes = OdtParser::parse_track_changes(TEST_TRACK_CHANGES_XML).unwrap();
+        assert_eq!(changes.len(), 3);
+
+        // Check first change (insertion)
+        assert_eq!(changes[0].id, "change1");
+        assert_eq!(changes[0].change_type, ChangeType::Insertion);
+        // Parser extracts text elements - author/date extraction depends on XML structure
+        assert!(changes[0].author.is_some());
+
+        // Check second change (deletion)
+        assert_eq!(changes[1].id, "change2");
+        assert_eq!(changes[1].change_type, ChangeType::Deletion);
+
+        // Check third change (format)
+        assert_eq!(changes[2].id, "change3");
+        assert_eq!(changes[2].change_type, ChangeType::FormatChange);
+    }
+
+    #[test]
+    fn test_parse_track_changes_empty() {
+        let changes = OdtParser::parse_track_changes(TEST_EMPTY_TRACK_CHANGES).unwrap();
+        assert!(changes.is_empty());
+    }
+
+    #[test]
+    fn test_parse_track_changes_no_tracked_changes() {
+        let changes = OdtParser::parse_track_changes(TEST_EMPTY_CONTENT).unwrap();
+        assert!(changes.is_empty());
+    }
+
+    #[test]
+    fn test_parse_comments() {
+        let comments = OdtParser::parse_comments(TEST_COMMENTS_XML).unwrap();
+        assert_eq!(comments.len(), 2);
+
+        // First comment
+        assert_eq!(comments[0].id, "cmt1");
+        assert_eq!(comments[0].author, Some("Alice".to_string()));
+        assert_eq!(comments[0].date, Some("2024-03-15T09:00:00".to_string()));
+        assert_eq!(comments[0].content, "This is a comment");
+
+        // Second comment (with multiple paragraphs)
+        assert_eq!(comments[1].id, "cmt2");
+        assert_eq!(comments[1].author, Some("Bob".to_string()));
+        assert_eq!(comments[1].date, Some("2024-03-15T10:00:00".to_string()));
+        assert!(comments[1].content.contains("First paragraph"));
+        assert!(comments[1].content.contains("Second paragraph"));
+    }
+
+    #[test]
+    fn test_parse_comments_empty() {
+        let comments = OdtParser::parse_comments(TEST_EMPTY_CONTENT).unwrap();
+        assert!(comments.is_empty());
+    }
+
+    #[test]
+    fn test_parse_sections() {
+        let sections = OdtParser::parse_sections(TEST_SECTIONS_XML).unwrap();
+        assert_eq!(sections.len(), 3);
+
+        // First section
+        assert_eq!(sections[0].name, "Introduction");
+        assert_eq!(sections[0].style, Some("IntroStyle".to_string()));
+        assert!(!sections[0].protected);
+
+        // Second section (protected)
+        assert_eq!(sections[1].name, "ProtectedSection");
+        assert_eq!(sections[1].style, None);
+        assert!(sections[1].protected);
+
+        // Third section
+        assert_eq!(sections[2].name, "Chapter1");
+        assert_eq!(sections[2].style, Some("ChapterStyle".to_string()));
+        assert!(!sections[2].protected);
+    }
+
+    #[test]
+    fn test_parse_sections_empty() {
+        let sections = OdtParser::parse_sections(TEST_EMPTY_CONTENT).unwrap();
+        assert!(sections.is_empty());
+    }
+
+    #[test]
+    fn test_track_change_debug() {
+        let change = TrackChange {
+            id: "test1".to_string(),
+            author: Some("Author".to_string()),
+            date: Some("2024-03-15".to_string()),
+            change_type: ChangeType::Insertion,
+            content: "content".to_string(),
+        };
+        let debug_str = format!("{:?}", change);
+        assert!(debug_str.contains("TrackChange"));
+        assert!(debug_str.contains("test1"));
+    }
+
+    #[test]
+    fn test_change_type_equality() {
+        assert_eq!(ChangeType::Insertion, ChangeType::Insertion);
+        assert_eq!(ChangeType::Deletion, ChangeType::Deletion);
+        assert_eq!(ChangeType::FormatChange, ChangeType::FormatChange);
+        assert_ne!(ChangeType::Insertion, ChangeType::Deletion);
+    }
+
+    #[test]
+    fn test_change_type_clone() {
+        let t1 = ChangeType::Insertion;
+        let t2 = t1.clone();
+        assert_eq!(t1, t2);
+    }
+
+    #[test]
+    fn test_change_type_copy() {
+        let t1 = ChangeType::Insertion;
+        let t2 = t1;
+        assert_eq!(t1, t2); // Copy trait allows this
+    }
+
+    #[test]
+    fn test_comment_debug() {
+        let comment = Comment {
+            id: "cmt1".to_string(),
+            author: Some("Author".to_string()),
+            date: Some("2024-03-15".to_string()),
+            content: "Comment text".to_string(),
+            reference: None,
+        };
+        let debug_str = format!("{:?}", comment);
+        assert!(debug_str.contains("Comment"));
+        assert!(debug_str.contains("cmt1"));
+    }
+
+    #[test]
+    fn test_section_debug() {
+        let section = Section {
+            name: "Sec1".to_string(),
+            style: Some("Style1".to_string()),
+            protected: true,
+            content: "Content".to_string(),
+        };
+        let debug_str = format!("{:?}", section);
+        assert!(debug_str.contains("Section"));
+        assert!(debug_str.contains("Sec1"));
+    }
+
+    #[test]
+    fn test_comment_clone() {
+        let comment = Comment {
+            id: "cmt1".to_string(),
+            author: Some("Author".to_string()),
+            date: Some("2024-03-15".to_string()),
+            content: "Content".to_string(),
+            reference: Some("ref".to_string()),
+        };
+        let cloned = comment.clone();
+        assert_eq!(comment.id, cloned.id);
+        assert_eq!(comment.author, cloned.author);
+        assert_eq!(comment.content, cloned.content);
+    }
+
+    #[test]
+    fn test_track_change_clone() {
+        let change = TrackChange {
+            id: "tc1".to_string(),
+            author: Some("Author".to_string()),
+            date: Some("2024-03-15".to_string()),
+            change_type: ChangeType::Deletion,
+            content: "Deleted text".to_string(),
+        };
+        let cloned = change.clone();
+        assert_eq!(change.id, cloned.id);
+        assert_eq!(change.change_type, cloned.change_type);
+    }
+
+    #[test]
+    fn test_section_clone() {
+        let section = Section {
+            name: "Sec1".to_string(),
+            style: None,
+            protected: false,
+            content: "Text".to_string(),
+        };
+        let cloned = section.clone();
+        assert_eq!(section.name, cloned.name);
+        assert_eq!(section.protected, cloned.protected);
+    }
+}

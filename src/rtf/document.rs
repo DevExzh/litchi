@@ -227,10 +227,10 @@ impl<'a> RtfDocument<'a> {
     /// ```rust,no_run
     /// use litchi::rtf::RtfDocument;
     ///
-    /// let bytes = std::fs::read("document.rtf")?;
+    /// let bytes = std::fs::read("document.rtf").map_err(|e| format!("IO error: {}", e))?;
     /// let doc = RtfDocument::from_bytes(&bytes)?;
     /// let text = doc.text();
-    /// # Ok::<(), litchi::rtf::RtfError>(())
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_bytes(bytes: &[u8]) -> RtfResult<RtfDocument<'static>> {
         Self::parse_internal(bytes)

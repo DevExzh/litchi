@@ -353,10 +353,80 @@ mod tests {
     }
 
     #[test]
+    fn test_chpx_fkp_empty() {
+        let builder = ChpxFkpBuilder::new();
+        let fkp = builder.generate().unwrap();
+        assert_eq!(fkp.len(), 512);
+    }
+
+    #[test]
+    fn test_chpx_fkp_single_entry() {
+        let mut builder = ChpxFkpBuilder::new();
+        builder.add_entry(0, 1000, vec![0x80, 0x00, 0x01, 0x02]);
+
+        let fkp = builder.generate().unwrap();
+        assert_eq!(fkp.len(), 512);
+        assert_eq!(fkp[511], 1);
+    }
+
+    #[test]
+    fn test_chpx_fkp_multiple_entries() {
+        let mut builder = ChpxFkpBuilder::new();
+        for i in 0..10 {
+            builder.add_entry(i * 100, (i + 1) * 100, vec![0x80, i as u8]);
+        }
+
+        let fkp = builder.generate().unwrap();
+        assert_eq!(fkp.len(), 512);
+        assert_eq!(fkp[511], 10);
+    }
+
+    #[test]
+    fn test_chpx_fkp_default() {
+        let builder: ChpxFkpBuilder = Default::default();
+        let fkp = builder.generate().unwrap();
+        assert_eq!(fkp.len(), 512);
+    }
+
+    #[test]
     fn test_papx_fkp() {
         let mut builder = PapxFkpBuilder::new();
         builder.add_entry(0, 100, vec![0x80, 0x00]);
 
+        let fkp = builder.generate().unwrap();
+        assert_eq!(fkp.len(), 512);
+    }
+
+    #[test]
+    fn test_papx_fkp_empty() {
+        let builder = PapxFkpBuilder::new();
+        let fkp = builder.generate().unwrap();
+        assert_eq!(fkp.len(), 512);
+    }
+
+    #[test]
+    fn test_papx_fkp_single_entry() {
+        let mut builder = PapxFkpBuilder::new();
+        builder.add_entry(0, 500, vec![0x40, 0x42, 0x08, 0x00]);
+
+        let fkp = builder.generate().unwrap();
+        assert_eq!(fkp.len(), 512);
+    }
+
+    #[test]
+    fn test_papx_fkp_multiple_entries() {
+        let mut builder = PapxFkpBuilder::new();
+        for i in 0..20 {
+            builder.add_entry(i * 100, (i + 1) * 100, vec![0x40, 0x42, i as u8, 0x00]);
+        }
+
+        let fkp = builder.generate().unwrap();
+        assert_eq!(fkp.len(), 512);
+    }
+
+    #[test]
+    fn test_papx_fkp_default() {
+        let builder: PapxFkpBuilder = Default::default();
         let fkp = builder.generate().unwrap();
         assert_eq!(fkp.len(), 512);
     }
@@ -374,5 +444,29 @@ mod tests {
         for i in 1..pages.ranges.len() {
             assert_eq!(pages.ranges[i].0, pages.ranges[i - 1].1);
         }
+    }
+
+    #[test]
+    fn test_multi_page_chpx() {
+        let mut builder = ChpxFkpBuilder::new();
+        // Add many entries to trigger multi-page
+        for i in 0..50u32 {
+            builder.add_entry(i * 50, (i + 1) * 50, vec![0x80, 0x00, i as u8]);
+        }
+        let pages = builder.generate_pages().unwrap();
+        assert!(
+            !pages.pages.is_empty(),
+            "Should produce at least one FKP page"
+        );
+    }
+
+    #[test]
+    fn test_fkp_pages_collection() {
+        let pages = FkpPages {
+            pages: vec![vec![0u8; 512], vec![0u8; 512]],
+            ranges: vec![(0, 1000), (1000, 2000)],
+        };
+        assert_eq!(pages.pages.len(), 2);
+        assert_eq!(pages.ranges.len(), 2);
     }
 }

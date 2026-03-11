@@ -315,3 +315,277 @@ fn write_optional_string(data: &mut Vec<u8>, s: Option<&str>) {
         data.extend_from_slice(&0u32.to_le_bytes());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cf_rule_type_from_u8() {
+        assert_eq!(CfRuleType::from_u8(1), Some(CfRuleType::CellIs));
+        assert_eq!(CfRuleType::from_u8(2), Some(CfRuleType::Expression));
+        assert_eq!(CfRuleType::from_u8(3), Some(CfRuleType::ColorScale));
+        assert_eq!(CfRuleType::from_u8(4), Some(CfRuleType::DataBar));
+        assert_eq!(CfRuleType::from_u8(5), Some(CfRuleType::TopN));
+        assert_eq!(CfRuleType::from_u8(6), Some(CfRuleType::IconSet));
+        assert_eq!(CfRuleType::from_u8(0), None);
+        assert_eq!(CfRuleType::from_u8(7), None);
+        assert_eq!(CfRuleType::from_u8(255), None);
+    }
+
+    #[test]
+    fn test_cfvo_new() {
+        let cfvo = Cfvo::new(1, Some("10".to_string()));
+        assert_eq!(cfvo.cfvo_type, 1);
+        assert_eq!(cfvo.value, Some("10".to_string()));
+    }
+
+    #[test]
+    fn test_cfvo_serialize_roundtrip() {
+        let cfvo = Cfvo::new(2, Some("50".to_string()));
+        let serialized = cfvo.serialize();
+        let parsed = Cfvo::parse(&serialized).unwrap();
+        assert_eq!(parsed.cfvo_type, cfvo.cfvo_type);
+        assert_eq!(parsed.value, cfvo.value);
+    }
+
+    #[test]
+    fn test_cfvo_serialize_none_value() {
+        let cfvo = Cfvo::new(4, None); // min type
+        let serialized = cfvo.serialize();
+        assert_eq!(serialized[0], 4); // type
+        assert_eq!(serialized[1], 0); // flags
+        // Should have 4 bytes of length (0)
+        assert_eq!(&serialized[2..6], &[0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn test_cfvo_parse_too_short() {
+        let result = Cfvo::parse(&[0x01]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_color_scale_new() {
+        let min_cfvo = Cfvo::new(4, None); // min
+        let max_cfvo = Cfvo::new(3, None); // max
+        let cs = ColorScale::new(min_cfvo, max_cfvo, 0xFFFF0000, 0xFF00FF00);
+
+        assert_eq!(cs.min_cfvo.cfvo_type, 4);
+        assert_eq!(cs.max_cfvo.cfvo_type, 3);
+        assert_eq!(cs.min_color, 0xFFFF0000);
+        assert_eq!(cs.max_color, 0xFF00FF00);
+        assert!(cs.mid_cfvo.is_none());
+        assert!(cs.mid_color.is_none());
+    }
+
+    #[test]
+    fn test_color_scale_with_middle() {
+        let min_cfvo = Cfvo::new(4, None);
+        let mid_cfvo = Cfvo::new(1, Some("50".to_string()));
+        let max_cfvo = Cfvo::new(3, None);
+        let cs = ColorScale::new(min_cfvo, max_cfvo, 0xFFFF0000, 0xFF00FF00)
+            .with_middle(mid_cfvo, 0xFFFFFF00);
+
+        assert!(cs.mid_cfvo.is_some());
+        assert!(cs.mid_color.is_some());
+        assert_eq!(cs.mid_color.unwrap(), 0xFFFFFF00);
+    }
+
+    #[test]
+    fn test_data_bar_new() {
+        let min_cfvo = Cfvo::new(4, None);
+        let max_cfvo = Cfvo::new(3, None);
+        let db = DataBar::new(min_cfvo, max_cfvo, 0xFF4472C4);
+
+        assert_eq!(db.min_cfvo.cfvo_type, 4);
+        assert_eq!(db.max_cfvo.cfvo_type, 3);
+        assert_eq!(db.color, 0xFF4472C4);
+        assert!(db.show_value);
+    }
+
+    #[test]
+    fn test_icon_set_new() {
+        let cfvos = vec![
+            Cfvo::new(1, Some("0".to_string())),
+            Cfvo::new(1, Some("33".to_string())),
+            Cfvo::new(1, Some("67".to_string())),
+        ];
+        let icon_set = IconSet::new(0x01, cfvos); // 3Arrows
+
+        assert_eq!(icon_set.icon_set_type, 0x01);
+        assert_eq!(icon_set.cfvos.len(), 3);
+        assert!(icon_set.show_value);
+        assert!(!icon_set.reverse);
+    }
+
+    #[test]
+    fn test_conditional_formatting_rule_new() {
+        let rule = ConditionalFormattingRule::new(CfRuleType::CellIs, 1);
+
+        assert_eq!(rule.rule_type, CfRuleType::CellIs);
+        assert_eq!(rule.priority, 1);
+        assert!(rule.dxf_id.is_none());
+        assert!(!rule.stop_if_true);
+        assert!(rule.formulas.is_empty());
+        assert!(rule.color_scale.is_none());
+        assert!(rule.data_bar.is_none());
+        assert!(rule.icon_set.is_none());
+        assert!(rule.operator.is_none());
+    }
+
+    #[test]
+    fn test_conditional_formatting_new() {
+        let ranges = vec!["A1:B10".to_string()];
+        let cf = ConditionalFormatting::new(ranges);
+
+        assert_eq!(cf.ranges.len(), 1);
+        assert_eq!(cf.ranges[0], "A1:B10");
+        assert!(cf.rules.is_empty());
+    }
+
+    #[test]
+    fn test_conditional_formatting_add_rule() {
+        let mut cf = ConditionalFormatting::new(vec!["A1:A10".to_string()]);
+        let rule = ConditionalFormattingRule::new(CfRuleType::CellIs, 1);
+        cf.add_rule(rule);
+
+        assert_eq!(cf.rules.len(), 1);
+        assert_eq!(cf.rules[0].rule_type, CfRuleType::CellIs);
+    }
+
+    #[test]
+    fn test_conditional_formatting_rule_parse() {
+        // Create minimal valid data for parsing (need at least 12 bytes)
+        let data = [
+            0x01, // type = CellIs
+            0xFF, 0xFF, 0xFF, 0xFF, // dxf_id = -1 (none)
+            0x01, 0x00, 0x00, 0x00, // priority = 1
+            0x00, // flags (stop_if_true = false)
+            0x02, // operator = greater than
+            0x00, // padding
+            0x00, // padding
+        ];
+
+        let rule = ConditionalFormattingRule::parse(&data).unwrap();
+        assert_eq!(rule.rule_type, CfRuleType::CellIs);
+        assert!(rule.dxf_id.is_none());
+        assert_eq!(rule.priority, 1);
+        assert!(!rule.stop_if_true);
+        assert_eq!(rule.operator, Some(0x02));
+    }
+
+    #[test]
+    fn test_conditional_formatting_rule_parse_with_dxf() {
+        let data = [
+            0x01, // type = CellIs
+            0x05, 0x00, 0x00, 0x00, // dxf_id = 5
+            0x0A, 0x00, 0x00, 0x00, // priority = 10
+            0x01, // flags (stop_if_true = true)
+            0x00, // operator
+            0x00, // padding
+            0x00, // padding
+        ];
+
+        let rule = ConditionalFormattingRule::parse(&data).unwrap();
+        assert_eq!(rule.dxf_id, Some(5));
+        assert_eq!(rule.priority, 10);
+        assert!(rule.stop_if_true);
+    }
+
+    #[test]
+    fn test_conditional_formatting_rule_parse_too_short() {
+        let data = [0x01, 0x02, 0x03]; // too short
+        let result = ConditionalFormattingRule::parse(&data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_conditional_formatting_rule_parse_invalid_type() {
+        let data = [
+            0xFF, // invalid type
+            0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let result = ConditionalFormattingRule::parse(&data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_optional_string_none() {
+        let data = [0x00, 0x00, 0x00, 0x00]; // length = 0
+        let (result, bytes_read) = read_optional_string(&data).unwrap();
+        assert!(result.is_none());
+        assert_eq!(bytes_read, 4);
+    }
+
+    #[test]
+    fn test_read_optional_string_some() {
+        // "Hi" encoded as UTF-16LE with length prefix
+        let data = [
+            0x02, 0x00, 0x00, 0x00, // length = 2
+            0x48, 0x00, // 'H'
+            0x69, 0x00, // 'i'
+        ];
+        let (result, bytes_read) = read_optional_string(&data).unwrap();
+        assert_eq!(result, Some("Hi".to_string()));
+        assert_eq!(bytes_read, 8);
+    }
+
+    #[test]
+    fn test_read_optional_string_too_short() {
+        let data = [0x01]; // too short
+        let (result, bytes_read) = read_optional_string(&data).unwrap();
+        assert!(result.is_none());
+        assert_eq!(bytes_read, 0);
+    }
+
+    #[test]
+    fn test_write_optional_string_none() {
+        let mut data = Vec::new();
+        write_optional_string(&mut data, None);
+        assert_eq!(data, vec![0x00, 0x00, 0x00, 0x00]);
+    }
+
+    #[test]
+    fn test_write_optional_string_some() {
+        let mut data = Vec::new();
+        write_optional_string(&mut data, Some("Test"));
+
+        // Should have 4-byte length (4) followed by UTF-16LE chars
+        assert_eq!(data[0..4], [0x04, 0x00, 0x00, 0x00]);
+        assert_eq!(data.len(), 4 + 8); // 4 bytes length + 4 chars * 2 bytes
+    }
+
+    #[test]
+    fn test_cf_rule_type_variants() {
+        // Verify all enum variants have correct discriminant values
+        assert_eq!(CfRuleType::CellIs as u8, 1);
+        assert_eq!(CfRuleType::Expression as u8, 2);
+        assert_eq!(CfRuleType::ColorScale as u8, 3);
+        assert_eq!(CfRuleType::DataBar as u8, 4);
+        assert_eq!(CfRuleType::TopN as u8, 5);
+        assert_eq!(CfRuleType::IconSet as u8, 6);
+    }
+
+    #[test]
+    fn test_conditional_formatting_clone() {
+        let mut cf = ConditionalFormatting::new(vec!["A1:A10".to_string()]);
+        let rule = ConditionalFormattingRule::new(CfRuleType::CellIs, 1);
+        cf.add_rule(rule);
+
+        let cloned = cf.clone();
+        assert_eq!(cloned.ranges.len(), cf.ranges.len());
+        assert_eq!(cloned.rules.len(), cf.rules.len());
+    }
+
+    #[test]
+    fn test_color_scale_clone() {
+        let min_cfvo = Cfvo::new(4, None);
+        let max_cfvo = Cfvo::new(3, None);
+        let cs = ColorScale::new(min_cfvo, max_cfvo, 0xFFFF0000, 0xFF00FF00);
+        let cloned = cs.clone();
+
+        assert_eq!(cloned.min_color, cs.min_color);
+        assert_eq!(cloned.max_color, cs.max_color);
+    }
+}

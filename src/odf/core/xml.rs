@@ -172,3 +172,102 @@ impl Meta {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_xml_part_from_bytes() {
+        let xml = b"<?xml version=\"1.0\"?><root><child>text</child></root>";
+        let part = XmlPart::from_bytes(xml).unwrap();
+        assert_eq!(
+            part.content(),
+            "<?xml version=\"1.0\"?><root><child>text</child></root>"
+        );
+    }
+
+    #[test]
+    fn test_xml_part_from_bytes_invalid_utf8() {
+        // Invalid UTF-8 sequence
+        let invalid = vec![0x80, 0x81, 0x82];
+        assert!(XmlPart::from_bytes(&invalid).is_err());
+    }
+
+    #[test]
+    fn test_xml_part_as_bytes() {
+        let xml = b"<root/>";
+        let part = XmlPart::from_bytes(xml).unwrap();
+        assert_eq!(part.as_bytes(), b"<root/>");
+    }
+
+    #[test]
+    fn test_content_from_bytes() {
+        let xml = b"<?xml version=\"1.0\"?><office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\"><office:body><office:text><text:p>Hello World</text:p></office:text></office:body></office:document-content>";
+        let content = Content::from_bytes(xml).unwrap();
+        assert!(content.xml_content().contains("Hello World"));
+    }
+
+    #[test]
+    fn test_content_extract_paragraphs() {
+        let xml = r#"<?xml version="1.0"?>
+        <office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+            <office:body>
+                <office:text>
+                    <text:p>First paragraph</text:p>
+                    <text:p>Second paragraph</text:p>
+                    <text:h>Heading</text:h>
+                </office:text>
+            </office:body>
+        </office:document-content>"#;
+        let content = Content::from_bytes(xml.as_bytes()).unwrap();
+        let paragraphs = content.extract_paragraphs().unwrap();
+        assert_eq!(paragraphs.len(), 3);
+        assert_eq!(paragraphs[0].text().unwrap(), "First paragraph");
+        assert_eq!(paragraphs[1].text().unwrap(), "Second paragraph");
+        assert_eq!(paragraphs[2].text().unwrap(), "Heading");
+    }
+
+    #[test]
+    fn test_content_extract_empty_paragraphs() {
+        let xml = r#"<?xml version="1.0"?>
+        <office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+            <office:body>
+                <office:text>
+                    <text:p></text:p>
+                    <text:p>   </text:p>
+                </office:text>
+            </office:body>
+        </office:document-content>"#;
+        let content = Content::from_bytes(xml.as_bytes()).unwrap();
+        let paragraphs = content.extract_paragraphs().unwrap();
+        assert!(paragraphs.is_empty()); // Empty paragraphs are skipped
+    }
+
+    #[test]
+    fn test_styles_from_bytes() {
+        let xml = b"<?xml version=\"1.0\"?><office:document-styles xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\"></office:document-styles>";
+        let styles = Styles::from_bytes(xml).unwrap();
+        assert!(styles.xml_content().contains("document-styles"));
+    }
+
+    #[test]
+    fn test_meta_from_bytes() {
+        let xml = b"<?xml version=\"1.0\"?><office:document-meta xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\"></office:document-meta>";
+        let meta = Meta::from_bytes(xml).unwrap();
+        assert!(meta.xml_content().contains("document-meta"));
+    }
+
+    #[test]
+    fn test_meta_extract_metadata_empty() {
+        let xml = r#"<?xml version="1.0"?>
+        <office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                              xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"
+                              xmlns:dc="http://purl.org/dc/elements/1.1/">
+        </office:document-meta>"#;
+        let meta = Meta::from_bytes(xml.as_bytes()).unwrap();
+        let metadata = meta.extract_metadata();
+        // Default metadata should be returned
+        assert!(metadata.title.is_none());
+    }
+}

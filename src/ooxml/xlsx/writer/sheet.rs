@@ -860,7 +860,7 @@ impl MutableWorksheet {
     /// ws.set_cell_value(1, 1, "Click here");
     /// ws.set_hyperlink(1, 1, "https://example.com", None);
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn set_hyperlink(&mut self, row: u32, col: u32, url: &str, display: Option<&str>) {
         // Convert row/col to cell reference (API is 1-based, no conversion needed for display)
@@ -919,7 +919,7 @@ impl MutableWorksheet {
     /// ws.set_cell_value(1, 1, 42);
     /// ws.set_cell_comment(1, 1, "This is important!", "John Doe");
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn set_cell_comment(&mut self, row: u32, col: u32, text: &str, author: &str) {
         // Remove existing comment for this cell if any (row/col are 1-based, stored as-is)
@@ -980,7 +980,7 @@ impl MutableWorksheet {
     /// ws.add_threaded_comment(comment);
     ///
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn add_threaded_comment(&mut self, comment: crate::ooxml::xlsx::ThreadedComment) {
         self.threaded_comments.push(comment);
@@ -1263,7 +1263,7 @@ impl MutableWorksheet {
     /// ws.add_image(image_data, "png", 1, 1, 5, 5, Some("Company Logo"));
     ///
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     #[allow(clippy::too_many_arguments)]
     pub fn add_image(
@@ -1460,7 +1460,7 @@ impl MutableWorksheet {
     /// );
     ///
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn add_conditional_formatting(
         &mut self,
@@ -1508,7 +1508,7 @@ impl MutableWorksheet {
     /// let mut ws = wb.worksheet_mut(0)?;
     /// ws.set_page_setup("landscape", 9); // A4 landscape
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn set_page_setup(&mut self, orientation: &str, paper_size: u32) {
         self.page_setup = Some(PageSetup {
@@ -1566,7 +1566,7 @@ impl MutableWorksheet {
     /// let mut ws = wb.worksheet_mut(0)?;
     /// ws.set_print_area("A1:F50");
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn set_print_area(&mut self, range: &str) {
         self.print_area = Some(range.to_string());
@@ -1606,7 +1606,7 @@ impl MutableWorksheet {
     ///
     /// ws.set_header_footer(hf);
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn set_header_footer(&mut self, header_footer: HeaderFooter) {
         self.header_footer = Some(header_footer);
@@ -1640,7 +1640,7 @@ impl MutableWorksheet {
     /// let mut ws = wb.worksheet_mut(0)?;
     /// ws.set_repeating_rows("1:1"); // Repeat row 1 on each printed page
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn set_repeating_rows(&mut self, rows: &str) {
         self.repeating_rows = Some(rows.to_string());
@@ -1672,7 +1672,7 @@ impl MutableWorksheet {
     /// let mut ws = wb.worksheet_mut(0)?;
     /// ws.set_repeating_columns("A:A"); // Repeat column A on each printed page
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn set_repeating_columns(&mut self, columns: &str) {
         self.repeating_columns = Some(columns.to_string());
@@ -1706,7 +1706,7 @@ impl MutableWorksheet {
     /// let mut ws = wb.worksheet_mut(0)?;
     /// ws.set_auto_filter("A1:D10");
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn set_auto_filter(&mut self, range: &str) {
         self.auto_filter = Some(AutoFilter {
@@ -1873,7 +1873,7 @@ impl MutableWorksheet {
     /// let mut ws = wb.worksheet_mut(0)?;
     /// ws.protect_sheet(Some("password123"));
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn protect_sheet(&mut self, password: Option<&str>) {
         let password_hash = password.map(Self::hash_password);
@@ -1966,7 +1966,7 @@ impl MutableWorksheet {
     /// ws.group_rows(2, 5, 1); // Group rows 2-5 at level 1
     /// ws.group_rows(3, 4, 2); // Nested group rows 3-4 at level 2
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn group_rows(&mut self, start_row: u32, end_row: u32, level: u8) {
         let level = level.clamp(1, 7); // Excel supports levels 1-7
@@ -2006,7 +2006,7 @@ impl MutableWorksheet {
     /// let mut ws = wb.worksheet_mut(0)?;
     /// ws.group_columns(2, 5, 1); // Group columns B-E at level 1
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn group_columns(&mut self, start_col: u32, end_col: u32, level: u8) {
         let level = level.clamp(1, 7); // Excel supports levels 1-7

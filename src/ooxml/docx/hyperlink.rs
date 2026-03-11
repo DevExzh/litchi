@@ -367,4 +367,327 @@ mod tests {
         assert!(link.is_internal());
         assert_eq!(link.anchor(), Some("section1"));
     }
+
+    #[test]
+    fn test_hyperlink_with_all_fields() {
+        let link = Hyperlink::new(
+            "Test Link".to_string(),
+            Some("https://example.org".to_string()),
+            Some("rId5".to_string()),
+            Some("bookmark1".to_string()),
+            Some("Click me".to_string()),
+        );
+
+        assert_eq!(link.text(), "Test Link");
+        assert_eq!(link.url(), Some("https://example.org"));
+        assert_eq!(link.r_id(), Some("rId5"));
+        assert_eq!(link.anchor(), Some("bookmark1"));
+        assert_eq!(link.tooltip(), Some("Click me"));
+        assert!(link.is_external());
+        assert!(link.is_internal());
+    }
+
+    #[test]
+    fn test_hyperlink_empty_text() {
+        let link = Hyperlink::new(
+            "".to_string(),
+            Some("https://example.com".to_string()),
+            Some("rId1".to_string()),
+            None,
+            None,
+        );
+
+        assert_eq!(link.text(), "");
+        assert!(link.is_external());
+        assert!(!link.is_internal());
+    }
+
+    #[test]
+    fn test_hyperlink_no_optional_fields() {
+        let link = Hyperlink::new("Plain Text".to_string(), None, None, None, None);
+
+        assert_eq!(link.text(), "Plain Text");
+        assert_eq!(link.url(), None);
+        assert_eq!(link.r_id(), None);
+        assert_eq!(link.anchor(), None);
+        assert_eq!(link.tooltip(), None);
+        assert!(!link.is_external());
+        assert!(!link.is_internal());
+    }
+
+    #[test]
+    fn test_hyperlink_clone() {
+        let link = Hyperlink::new(
+            "Clone me".to_string(),
+            Some("https://clone.test".to_string()),
+            Some("rId10".to_string()),
+            Some("anchor".to_string()),
+            Some("Tooltip".to_string()),
+        );
+        let cloned = link.clone();
+
+        assert_eq!(cloned.text(), link.text());
+        assert_eq!(cloned.url(), link.url());
+        assert_eq!(cloned.r_id(), link.r_id());
+        assert_eq!(cloned.anchor(), link.anchor());
+        assert_eq!(cloned.tooltip(), link.tooltip());
+    }
+
+    #[test]
+    fn test_hyperlink_debug() {
+        let link = Hyperlink::new(
+            "Debug".to_string(),
+            Some("https://debug.test".to_string()),
+            None,
+            None,
+            None,
+        );
+        let debug_str = format!("{:?}", link);
+
+        assert!(debug_str.contains("Hyperlink"));
+        assert!(debug_str.contains("Debug"));
+        assert!(debug_str.contains("https://debug.test"));
+    }
+
+    #[test]
+    fn test_hyperlink_with_unicode() {
+        let link = Hyperlink::new(
+            "Unicode: 你好世界 🎉".to_string(),
+            Some("https://例子.com".to_string()),
+            Some("rId99".to_string()),
+            None,
+            Some("工具提示 🎈".to_string()),
+        );
+
+        assert_eq!(link.text(), "Unicode: 你好世界 🎉");
+        assert_eq!(link.url(), Some("https://例子.com"));
+        assert_eq!(link.tooltip(), Some("工具提示 🎈"));
+    }
+
+    #[test]
+    fn test_hyperlink_long_url() {
+        let long_url =
+            "https://example.com/".to_string() + &"a".repeat(1000) + "/" + &"b".repeat(1000);
+        let link = Hyperlink::new(
+            "Long URL".to_string(),
+            Some(long_url.clone()),
+            Some("rId1".to_string()),
+            None,
+            None,
+        );
+
+        assert_eq!(link.url(), Some(long_url.as_str()));
+    }
+
+    #[test]
+    fn test_extract_from_paragraph_simple() {
+        let para_xml = r#"<w:p>
+            <w:hyperlink r:id="rId1">
+                <w:r><w:t>Click here</w:t></w:r>
+            </w:hyperlink>
+        </w:p>"#;
+
+        let mut rels = Relationships::new("/word/document.xml".to_string());
+        rels.add_relationship(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
+                .to_string(),
+            "https://example.com".to_string(),
+            "rId1".to_string(),
+            true,
+        );
+
+        let hyperlinks = Hyperlink::extract_from_paragraph(para_xml.as_bytes(), &rels).unwrap();
+
+        assert_eq!(hyperlinks.len(), 1);
+        assert_eq!(hyperlinks[0].text(), "Click here");
+        assert_eq!(hyperlinks[0].url(), Some("https://example.com"));
+        assert_eq!(hyperlinks[0].r_id(), Some("rId1"));
+    }
+
+    #[test]
+    fn test_extract_from_paragraph_internal() {
+        let para_xml = r#"<w:p>
+            <w:hyperlink w:anchor="section1" w:tooltip="Go to section">
+                <w:r><w:t>Jump to Section</w:t></w:r>
+            </w:hyperlink>
+        </w:p>"#;
+
+        let rels = Relationships::new("/word/document.xml".to_string());
+        let hyperlinks = Hyperlink::extract_from_paragraph(para_xml.as_bytes(), &rels).unwrap();
+
+        assert_eq!(hyperlinks.len(), 1);
+        assert_eq!(hyperlinks[0].text(), "Jump to Section");
+        assert_eq!(hyperlinks[0].anchor(), Some("section1"));
+        assert_eq!(hyperlinks[0].tooltip(), Some("Go to section"));
+        assert!(!hyperlinks[0].is_external());
+        assert!(hyperlinks[0].is_internal());
+    }
+
+    #[test]
+    fn test_extract_from_paragraph_multiple() {
+        let para_xml = r#"<w:p>
+            <w:hyperlink r:id="rId1">
+                <w:r><w:t>First</w:t></w:r>
+            </w:hyperlink>
+            <w:r><w:t> text </w:t></w:r>
+            <w:hyperlink r:id="rId2">
+                <w:r><w:t>Second</w:t></w:r>
+            </w:hyperlink>
+        </w:p>"#;
+
+        let mut rels = Relationships::new("/word/document.xml".to_string());
+        rels.add_relationship(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
+                .to_string(),
+            "https://first.com".to_string(),
+            "rId1".to_string(),
+            true,
+        );
+        rels.add_relationship(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
+                .to_string(),
+            "https://second.com".to_string(),
+            "rId2".to_string(),
+            true,
+        );
+
+        let hyperlinks = Hyperlink::extract_from_paragraph(para_xml.as_bytes(), &rels).unwrap();
+
+        assert_eq!(hyperlinks.len(), 2);
+        assert_eq!(hyperlinks[0].text(), "First");
+        assert_eq!(hyperlinks[0].url(), Some("https://first.com"));
+        assert_eq!(hyperlinks[1].text(), "Second");
+        assert_eq!(hyperlinks[1].url(), Some("https://second.com"));
+    }
+
+    #[test]
+    fn test_extract_from_paragraph_no_hyperlinks() {
+        let para_xml = r#"<w:p>
+            <w:r><w:t>Plain paragraph without links</w:t></w:r>
+        </w:p>"#;
+
+        let rels = Relationships::new("/word/document.xml".to_string());
+        let hyperlinks = Hyperlink::extract_from_paragraph(para_xml.as_bytes(), &rels).unwrap();
+
+        assert!(hyperlinks.is_empty());
+    }
+
+    #[test]
+    fn test_extract_from_document() {
+        let doc_xml = r#"<?xml version="1.0"?>
+        <w:document>
+            <w:body>
+                <w:p>
+                    <w:hyperlink r:id="rId1">
+                        <w:r><w:t>External Link</w:t></w:r>
+                    </w:hyperlink>
+                </w:p>
+                <w:p>
+                    <w:hyperlink w:anchor="bookmark1">
+                        <w:r><w:t>Internal Link</w:t></w:r>
+                    </w:hyperlink>
+                </w:p>
+            </w:body>
+        </w:document>"#;
+
+        let mut rels = Relationships::new("/word/document.xml".to_string());
+        rels.add_relationship(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
+                .to_string(),
+            "https://external.com".to_string(),
+            "rId1".to_string(),
+            true,
+        );
+
+        let hyperlinks = Hyperlink::extract_from_document(doc_xml.as_bytes(), &rels).unwrap();
+
+        assert_eq!(hyperlinks.len(), 2);
+        assert_eq!(hyperlinks[0].text(), "External Link");
+        assert_eq!(hyperlinks[0].url(), Some("https://external.com"));
+        assert_eq!(hyperlinks[1].text(), "Internal Link");
+        assert_eq!(hyperlinks[1].anchor(), Some("bookmark1"));
+    }
+
+    #[test]
+    fn test_extract_from_paragraph_empty_hyperlink() {
+        let para_xml = r#"<w:p>
+            <w:hyperlink r:id="rId1">
+                <w:r><w:t></w:t></w:r>
+            </w:hyperlink>
+        </w:p>"#;
+
+        let mut rels = Relationships::new("/word/document.xml".to_string());
+        rels.add_relationship(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
+                .to_string(),
+            "https://empty.com".to_string(),
+            "rId1".to_string(),
+            true,
+        );
+
+        let hyperlinks = Hyperlink::extract_from_paragraph(para_xml.as_bytes(), &rels).unwrap();
+
+        assert_eq!(hyperlinks.len(), 1);
+        assert_eq!(hyperlinks[0].text(), "");
+        assert_eq!(hyperlinks[0].url(), Some("https://empty.com"));
+    }
+
+    #[test]
+    fn test_extract_with_missing_relationship() {
+        let para_xml = r#"<w:p>
+            <w:hyperlink r:id="rId99">
+                <w:r><w:t>Broken Link</w:t></w:r>
+            </w:hyperlink>
+        </w:p>"#;
+
+        let rels = Relationships::new("/word/document.xml".to_string()); // No relationships defined
+        let hyperlinks = Hyperlink::extract_from_paragraph(para_xml.as_bytes(), &rels).unwrap();
+
+        assert_eq!(hyperlinks.len(), 1);
+        assert_eq!(hyperlinks[0].text(), "Broken Link");
+        assert_eq!(hyperlinks[0].url(), None); // URL not resolved
+        assert_eq!(hyperlinks[0].r_id(), Some("rId99"));
+    }
+
+    #[test]
+    fn test_hyperlink_mailto_url() {
+        let link = Hyperlink::new(
+            "Email me".to_string(),
+            Some("mailto:test@example.com".to_string()),
+            Some("rId1".to_string()),
+            None,
+            None,
+        );
+
+        assert_eq!(link.url(), Some("mailto:test@example.com"));
+        assert!(link.is_external());
+    }
+
+    #[test]
+    fn test_hyperlink_ftp_url() {
+        let link = Hyperlink::new(
+            "FTP Link".to_string(),
+            Some("ftp://ftp.example.com/file.txt".to_string()),
+            Some("rId1".to_string()),
+            None,
+            None,
+        );
+
+        assert_eq!(link.url(), Some("ftp://ftp.example.com/file.txt"));
+        assert!(link.is_external());
+    }
+
+    #[test]
+    fn test_hyperlink_file_url() {
+        let link = Hyperlink::new(
+            "File Link".to_string(),
+            Some("file:///C:/path/to/file.txt".to_string()),
+            Some("rId1".to_string()),
+            None,
+            None,
+        );
+
+        assert_eq!(link.url(), Some("file:///C:/path/to/file.txt"));
+        assert!(link.is_external());
+    }
 }

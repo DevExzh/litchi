@@ -7,6 +7,7 @@ use crate::ooxml::opc::constants::relationship_type as rel;
 use crate::ooxml::opc::part::Part;
 use crate::ooxml::opc::{BlobPart, OpcPackage, PackURI};
 use crate::ooxml::xlsb::error::XlsbResult;
+use crate::ooxml::xlsb::named_ranges::NamedRange;
 use crate::ooxml::xlsb::records::record_types;
 use crate::ooxml::xlsb::writer::{
     MutableSharedStringsWriter, MutableXlsbWorksheet, RecordWriter, StylesWriter,
@@ -41,6 +42,7 @@ use std::io::{Seek, Write};
 /// ```
 pub struct XlsbWorkbookWriter {
     worksheets: Vec<MutableXlsbWorksheet>,
+    named_ranges: Vec<NamedRange>,
     shared_strings: MutableSharedStringsWriter,
     styles: StylesWriter,
     is_1904: bool,
@@ -68,6 +70,7 @@ impl XlsbWorkbookWriter {
     pub fn new() -> Self {
         XlsbWorkbookWriter {
             worksheets: Vec::new(),
+            named_ranges: Vec::new(),
             shared_strings: MutableSharedStringsWriter::new(),
             styles: StylesWriter::new(),
             is_1904: false,
@@ -96,6 +99,11 @@ impl XlsbWorkbookWriter {
     /// ```
     pub fn add_worksheet(&mut self, worksheet: MutableXlsbWorksheet) {
         self.worksheets.push(worksheet);
+    }
+
+    /// Add a named range (defined name) to the workbook.
+    pub fn add_named_range(&mut self, named_range: NamedRange) {
+        self.named_ranges.push(named_range);
     }
 
     /// Get a mutable reference to a worksheet by index
@@ -153,6 +161,37 @@ impl XlsbWorkbookWriter {
 
         // Save package to output
         package.to_stream(writer)?;
+
+        Ok(())
+    }
+
+    /// Write workbook-level defined names (BrtName records).
+    fn write_named_ranges<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+        for named_range in &self.named_ranges {
+            let mut data = Vec::new();
+            let mut temp_writer = RecordWriter::new(&mut data);
+
+            let mut flags = 0u32;
+            if named_range.hidden {
+                flags |= 0x0001;
+            }
+            if named_range.function {
+                flags |= 0x0002;
+            }
+            temp_writer.write_u32(flags)?;
+
+            let sheet_id_raw = named_range.sheet_id.map(|id| id as i32).unwrap_or(-1);
+            temp_writer.write_i32(sheet_id_raw)?;
+            temp_writer.write_wide_string(&named_range.name)?;
+
+            let formula = named_range.formula.as_deref().unwrap_or(&[]);
+            temp_writer.write_u32(formula.len() as u32)?;
+            for byte in formula {
+                temp_writer.write_u8(*byte)?;
+            }
+
+            writer.write_record(record_types::NAME, &data)?;
+        }
 
         Ok(())
     }
@@ -383,6 +422,9 @@ impl XlsbWorkbookWriter {
         // [MS-XLSB] examples. This creates a minimal but fully valid
         // extern sheet table for the workbook.
         self.write_externals(writer)?;
+
+        // Defined names (named ranges), if any.
+        self.write_named_ranges(writer)?;
 
         // Basic calculation properties describing recalc behavior and
         // numerical tolerance. This is tiny and follows the spec example
@@ -725,5 +767,110 @@ mod tests {
         let mut workbook = XlsbWorkbookWriter::new();
         workbook.set_date_system(true);
         assert!(workbook.is_1904);
+    }
+
+    #[test]
+    fn test_workbook_writer_default() {
+        let workbook: XlsbWorkbookWriter = Default::default();
+        assert_eq!(workbook.worksheet_count(), 0);
+        assert!(!workbook.is_1904);
+    }
+
+    #[test]
+    fn test_get_worksheet_mut() {
+        let mut workbook = XlsbWorkbookWriter::new();
+        let sheet = MutableXlsbWorksheet::new("Sheet1");
+        workbook.add_worksheet(sheet);
+
+        let sheet_ref = workbook.get_worksheet_mut(0);
+        assert!(sheet_ref.is_some());
+        assert_eq!(sheet_ref.unwrap().name(), "Sheet1");
+
+        assert!(workbook.get_worksheet_mut(99).is_none());
+    }
+
+    #[test]
+    fn test_styles_accessor() {
+        let workbook = XlsbWorkbookWriter::new();
+        let styles = workbook.styles();
+        // Just verify it returns a reference
+        let _ = styles;
+    }
+
+    #[test]
+    fn test_styles_mut_accessor() {
+        let mut workbook = XlsbWorkbookWriter::new();
+        let styles = workbook.styles_mut();
+        // Just verify it returns a mutable reference
+        let _ = styles;
+    }
+
+    #[test]
+    fn test_add_multiple_worksheets() {
+        let mut workbook = XlsbWorkbookWriter::new();
+        workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet1"));
+        workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet2"));
+        workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet3"));
+
+        assert_eq!(workbook.worksheet_count(), 3);
+    }
+
+    #[test]
+    fn test_create_app_xml() {
+        let mut workbook = XlsbWorkbookWriter::new();
+        workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet1"));
+        workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet2"));
+
+        let app_xml = workbook.create_app_xml();
+        assert!(app_xml.contains("<Application>The Litchi Rust Library</Application>"));
+        assert!(app_xml.contains("<vt:i4>2</vt:i4>")); // Sheet count
+        assert!(app_xml.contains("<vt:lpstr>Sheet1</vt:lpstr>"));
+        assert!(app_xml.contains("<vt:lpstr>Sheet2</vt:lpstr>"));
+    }
+
+    #[test]
+    fn test_create_core_xml() {
+        let workbook = XlsbWorkbookWriter::new();
+        let core_xml = workbook.create_core_xml();
+
+        assert!(core_xml.contains("<dc:creator>The Litchi Rust Library</dc:creator>"));
+        assert!(
+            core_xml.contains("<cp:lastModifiedBy>The Litchi Rust Library</cp:lastModifiedBy>")
+        );
+        assert!(core_xml.contains("<cp:coreProperties"));
+        assert!(core_xml.contains("</cp:coreProperties>"));
+    }
+
+    #[test]
+    fn test_create_minimal_theme() {
+        let workbook = XlsbWorkbookWriter::new();
+        let theme = workbook.create_minimal_theme();
+
+        assert!(theme.contains("<a:theme"));
+        assert!(theme.contains("</a:theme>"));
+    }
+
+    #[test]
+    fn test_format_w3cdtf() {
+        let timestamp = format_w3cdtf(0); // Unix epoch
+        assert!(timestamp.contains("T"));
+        assert!(timestamp.ends_with("Z"));
+        assert!(timestamp.starts_with("1970-"));
+    }
+
+    #[test]
+    fn test_workbook_with_named_ranges() {
+        use crate::ooxml::xlsb::named_ranges::NamedRange;
+
+        let mut workbook = XlsbWorkbookWriter::new();
+        let named_range = NamedRange {
+            name: "TestRange".to_string(),
+            sheet_id: Some(0),
+            formula: None,
+            hidden: false,
+            function: false,
+        };
+        workbook.add_named_range(named_range);
+        // Verify it was added (indirectly via the test not failing)
     }
 }

@@ -662,6 +662,16 @@ mod tests {
     }
 
     #[test]
+    fn test_write_bof_worksheet() {
+        let mut buf = Vec::new();
+        write_bof(&mut buf, 0x0010).unwrap(); // Worksheet substream
+
+        assert_eq!(&buf[0..2], &[0x09, 0x08]); // Record type 0x0809
+        // Record header is 4 bytes, then BIFF8 BOF structure follows
+        // Substream type is at offset 8 within the record data
+    }
+
+    #[test]
     fn test_write_eof() {
         let mut buf = Vec::new();
         write_eof(&mut buf).unwrap();
@@ -677,5 +687,290 @@ mod tests {
 
         assert_eq!(&buf[0..2], &[0x03, 0x02]); // Record type 0x0203
         assert_eq!(&buf[2..4], &[14, 0]); // Length = 14
+    }
+
+    #[test]
+    fn test_write_number_different_values() {
+        let mut buf = Vec::new();
+        write_number(&mut buf, 5, 3, 0x0010, -123.456).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x03, 0x02]); // Record type 0x0203
+        assert_eq!(buf.len(), 18); // Header (4) + data (14)
+
+        // Verify row index
+        let row = u16::from_le_bytes([buf[4], buf[5]]);
+        assert_eq!(row, 5);
+
+        // Verify column index
+        let col = u16::from_le_bytes([buf[6], buf[7]]);
+        assert_eq!(col, 3);
+    }
+
+    #[test]
+    fn test_write_labelsst() {
+        let mut buf = Vec::new();
+        write_labelsst(&mut buf, 1, 2, 0x000F, 42).unwrap();
+
+        assert_eq!(&buf[0..2], &[0xFD, 0x00]); // Record type 0x00FD
+        // LABELSST record structure: row(2) + col(2) + xf_idx(2) + sst_idx(4) = 10 bytes
+    }
+
+    #[test]
+    fn test_write_boolerr() {
+        let mut buf = Vec::new();
+        write_boolerr(&mut buf, 2, 3, 0x000F, true).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x05, 0x02]); // Record type 0x0205
+
+        // Check row and col
+        let row = u16::from_le_bytes([buf[4], buf[5]]);
+        let col = u16::from_le_bytes([buf[6], buf[7]]);
+        assert_eq!(row, 2);
+        assert_eq!(col, 3);
+    }
+
+    #[test]
+    fn test_write_dimensions() {
+        let mut buf = Vec::new();
+        write_dimensions(&mut buf, 0, 100, 0, 50).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x00, 0x02]); // Record type 0x0200
+        assert_eq!(&buf[2..4], &[14, 0]); // Length = 14
+
+        // Verify dimensions
+        let first_row = u32::from_le_bytes([buf[4], buf[5], buf[6], buf[7]]);
+        let last_row = u32::from_le_bytes([buf[8], buf[9], buf[10], buf[11]]);
+        assert_eq!(first_row, 0);
+        assert_eq!(last_row, 100);
+    }
+
+    #[test]
+    fn test_write_codepage() {
+        let mut buf = Vec::new();
+        write_codepage(&mut buf, 1252).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x42, 0x00]); // Record type 0x0042
+        assert_eq!(&buf[2..4], &[2, 0]); // Length = 2
+        assert_eq!(u16::from_le_bytes([buf[4], buf[5]]), 1252);
+    }
+
+    #[test]
+    fn test_write_date1904() {
+        let mut buf = Vec::new();
+        write_date1904(&mut buf, false).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x22, 0x00]); // Record type 0x0022
+        assert_eq!(&buf[2..4], &[2, 0]); // Length = 2
+        assert_eq!(u16::from_le_bytes([buf[4], buf[5]]), 0);
+
+        let mut buf2 = Vec::new();
+        write_date1904(&mut buf2, true).unwrap();
+        assert_eq!(u16::from_le_bytes([buf2[4], buf2[5]]), 1);
+    }
+
+    #[test]
+    fn test_write_boundsheet() {
+        let mut buf = Vec::new();
+        write_boundsheet(&mut buf, 4096, "Sheet1").unwrap();
+
+        assert_eq!(&buf[0..2], &[0x85, 0x00]); // Record type 0x0085
+
+        // Check position
+        let pos = u32::from_le_bytes([buf[4], buf[5], buf[6], buf[7]]);
+        assert_eq!(pos, 4096);
+    }
+
+    #[test]
+    fn test_write_row() {
+        let mut buf = Vec::new();
+        write_row(&mut buf, 10, 0, 5, 255, false).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x08, 0x02]); // Record type 0x0208
+
+        // Verify row index
+        let row_idx = u32::from_le_bytes([buf[4], buf[5], buf[6], buf[7]]);
+        assert_eq!(row_idx, 10);
+    }
+
+    #[test]
+    fn test_write_colinfo() {
+        let mut buf = Vec::new();
+        write_colinfo(&mut buf, 0, 5, 2560, false).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x7D, 0x00]); // Record type 0x007D
+        assert_eq!(&buf[2..4], &[12, 0]); // Length = 12
+
+        let first_col = u16::from_le_bytes([buf[4], buf[5]]);
+        let last_col = u16::from_le_bytes([buf[6], buf[7]]);
+        assert_eq!(first_col, 0);
+        assert_eq!(last_col, 5);
+    }
+
+    #[test]
+    fn test_write_window1() {
+        let mut buf = Vec::new();
+        write_window1(&mut buf).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x3D, 0x00]); // Record type 0x003D
+        assert_eq!(&buf[2..4], &[18, 0]); // Length = 18
+    }
+
+    #[test]
+    fn test_write_def_col_width() {
+        let mut buf = Vec::new();
+        write_def_col_width(&mut buf, 8).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x55, 0x00]); // Record type 0x0055
+        assert_eq!(&buf[2..4], &[2, 0]); // Length = 2
+        assert_eq!(u16::from_le_bytes([buf[4], buf[5]]), 8);
+    }
+
+    #[test]
+    fn test_write_wsbool() {
+        let mut buf = Vec::new();
+        write_wsbool(&mut buf).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x81, 0x00]); // Record type 0x0081
+        assert_eq!(&buf[2..4], &[2, 0]); // Length = 2
+    }
+
+    #[test]
+    fn test_write_record_header() {
+        let mut buf = Vec::new();
+        write_record_header(&mut buf, 0x0203, 14).unwrap();
+
+        assert_eq!(u16::from_le_bytes([buf[0], buf[1]]), 0x0203);
+        assert_eq!(u16::from_le_bytes([buf[2], buf[3]]), 14);
+    }
+
+    #[test]
+    fn test_has_multibyte_char() {
+        assert!(!has_multibyte_char("Hello"));
+        assert!(!has_multibyte_char("ABC123"));
+        assert!(has_multibyte_char("日本語"));
+        assert!(has_multibyte_char("Hello 世界"));
+    }
+
+    #[test]
+    fn test_unicode_string_size() {
+        let size_ascii = unicode_string_size("Hello");
+        assert_eq!(size_ascii, 2 + 1 + 5); // char_count (2) + options (1) + chars (5)
+
+        let size_unicode = unicode_string_size("日本語");
+        assert_eq!(size_unicode, 2 + 1 + 6); // char_count (2) + options (1) + chars*2 (6)
+    }
+
+    #[test]
+    fn test_write_unicode_string_biff8_ascii() {
+        let mut buf = Vec::new();
+        write_unicode_string_biff8(&mut buf, "Test").unwrap();
+
+        assert_eq!(u16::from_le_bytes([buf[0], buf[1]]), 4); // char count
+        assert_eq!(buf[2], 0x00); // ASCII flag
+        assert_eq!(&buf[3..7], b"Test");
+    }
+
+    #[test]
+    fn test_write_format_record() {
+        let mut buf = Vec::new();
+        write_format_record(&mut buf, 164, "0.00\"mm\"").unwrap();
+
+        assert_eq!(&buf[0..2], &[0x1E, 0x04]); // Record type 0x041E
+        // Format index should be at offset 4
+        let fmt_idx = u16::from_le_bytes([buf[4], buf[5]]);
+        assert_eq!(fmt_idx, 164);
+    }
+
+    #[test]
+    fn test_write_tab_id() {
+        let mut buf = Vec::new();
+        write_tab_id(&mut buf, 3).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x3D, 0x01]); // Record type 0x013D
+        assert_eq!(&buf[2..4], &[6, 0]); // Length = 6 (3 * 2 bytes)
+    }
+
+    #[test]
+    fn test_write_protect() {
+        let mut buf = Vec::new();
+        write_protect(&mut buf, true).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x12, 0x00]); // Record type 0x0012
+        assert_eq!(u16::from_le_bytes([buf[4], buf[5]]), 1);
+
+        let mut buf2 = Vec::new();
+        write_protect(&mut buf2, false).unwrap();
+        assert_eq!(u16::from_le_bytes([buf2[4], buf2[5]]), 0);
+    }
+
+    #[test]
+    fn test_write_window_protect() {
+        let mut buf = Vec::new();
+        write_window_protect(&mut buf, true).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x19, 0x00]); // Record type 0x0019
+    }
+
+    #[test]
+    fn test_write_backup() {
+        let mut buf = Vec::new();
+        write_backup(&mut buf, true).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x40, 0x00]); // Record type 0x0040
+        assert_eq!(u16::from_le_bytes([buf[4], buf[5]]), 1);
+    }
+
+    #[test]
+    fn test_write_refresh_all() {
+        let mut buf = Vec::new();
+        write_refresh_all(&mut buf, false).unwrap();
+
+        assert_eq!(&buf[0..2], &[0xB7, 0x01]); // Record type 0x01B7
+    }
+
+    #[test]
+    fn test_write_book_bool() {
+        let mut buf = Vec::new();
+        write_book_bool(&mut buf, true).unwrap();
+
+        assert_eq!(&buf[0..2], &[0xDA, 0x00]); // Record type 0x00DA
+        assert_eq!(u16::from_le_bytes([buf[4], buf[5]]), 1);
+    }
+
+    #[test]
+    fn test_write_country() {
+        let mut buf = Vec::new();
+        write_country(&mut buf, 1, 1).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x8C, 0x00]); // Record type 0x008C
+        assert_eq!(&buf[2..4], &[4, 0]); // Length = 4
+        assert_eq!(u16::from_le_bytes([buf[4], buf[5]]), 1);
+        assert_eq!(u16::from_le_bytes([buf[6], buf[7]]), 1);
+    }
+
+    #[test]
+    fn test_write_precision() {
+        let mut buf = Vec::new();
+        write_precision(&mut buf, true).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x0E, 0x00]); // Record type 0x000E
+    }
+
+    #[test]
+    fn test_write_hide_obj() {
+        let mut buf = Vec::new();
+        write_hide_obj(&mut buf, 2).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x8D, 0x00]); // Record type 0x008D
+        assert_eq!(u16::from_le_bytes([buf[4], buf[5]]), 2);
+    }
+
+    #[test]
+    fn test_write_fn_group_count() {
+        let mut buf = Vec::new();
+        write_fn_group_count(&mut buf, 14).unwrap();
+
+        assert_eq!(&buf[0..2], &[0x9C, 0x00]); // Record type 0x009C
+        // Record data follows the 4-byte header
     }
 }

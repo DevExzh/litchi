@@ -232,3 +232,167 @@ pub struct DataValidation {
     pub error_title: Option<String>,
     pub error_message: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cell_format_default() {
+        let format = CellFormat::default();
+        assert!(format.font.is_none());
+        assert!(format.fill.is_none());
+        assert!(format.border.is_none());
+        assert!(format.number_format.is_none());
+    }
+
+    #[test]
+    fn test_cell_font_default() {
+        let font = CellFont::default();
+        assert!(font.name.is_none());
+        assert!(font.size.is_none());
+        assert!(!font.bold);
+        assert!(!font.italic);
+        assert!(!font.underline);
+        assert!(font.color.is_none());
+    }
+
+    #[test]
+    fn test_cell_font_clone() {
+        let font = CellFont {
+            name: Some("Arial".to_string()),
+            size: Some(12.0),
+            bold: true,
+            italic: false,
+            underline: true,
+            color: Some("FF0000".to_string()),
+        };
+        let font2 = font.clone();
+        assert_eq!(font.name, font2.name);
+        assert_eq!(font.bold, font2.bold);
+    }
+
+    #[test]
+    fn test_cell_fill_pattern_type_as_str() {
+        assert_eq!(CellFillPatternType::None.as_str(), "none");
+        assert_eq!(CellFillPatternType::Solid.as_str(), "solid");
+        assert_eq!(CellFillPatternType::Gray125.as_str(), "gray125");
+        assert_eq!(CellFillPatternType::DarkGray.as_str(), "darkGray");
+        assert_eq!(CellFillPatternType::MediumGray.as_str(), "mediumGray");
+        assert_eq!(CellFillPatternType::LightGray.as_str(), "lightGray");
+        assert_eq!(CellFillPatternType::Gray0625.as_str(), "gray0625");
+        assert_eq!(
+            CellFillPatternType::DarkHorizontal.as_str(),
+            "darkHorizontal"
+        );
+        assert_eq!(CellFillPatternType::DarkVertical.as_str(), "darkVertical");
+        assert_eq!(CellFillPatternType::DarkDown.as_str(), "darkDown");
+        assert_eq!(CellFillPatternType::DarkUp.as_str(), "darkUp");
+        assert_eq!(CellFillPatternType::DarkGrid.as_str(), "darkGrid");
+        assert_eq!(CellFillPatternType::DarkTrellis.as_str(), "darkTrellis");
+    }
+
+    #[test]
+    fn test_cell_fill_pattern_type_debug() {
+        let debug_str = format!("{:?}", CellFillPatternType::Solid);
+        assert!(debug_str.contains("Solid"));
+    }
+
+    #[test]
+    fn test_cell_border_default() {
+        let border = CellBorder::default();
+        assert!(border.left.is_none());
+        assert!(border.right.is_none());
+        assert!(border.top.is_none());
+        assert!(border.bottom.is_none());
+        assert!(border.diagonal.is_none());
+    }
+
+    #[test]
+    fn test_cell_border_side() {
+        let side = CellBorderSide {
+            style: CellBorderLineStyle::Thin,
+            color: Some("000000".to_string()),
+        };
+        assert_eq!(side.style.as_str(), "thin");
+        assert_eq!(side.color, Some("000000".to_string()));
+    }
+
+    #[test]
+    fn test_cell_border_line_style_as_str() {
+        assert_eq!(CellBorderLineStyle::None.as_str(), "none");
+        assert_eq!(CellBorderLineStyle::Thin.as_str(), "thin");
+        assert_eq!(CellBorderLineStyle::Medium.as_str(), "medium");
+        assert_eq!(CellBorderLineStyle::Dashed.as_str(), "dashed");
+        assert_eq!(CellBorderLineStyle::Dotted.as_str(), "dotted");
+        assert_eq!(CellBorderLineStyle::Thick.as_str(), "thick");
+        assert_eq!(CellBorderLineStyle::Double.as_str(), "double");
+        assert_eq!(CellBorderLineStyle::Hair.as_str(), "hair");
+        assert_eq!(CellBorderLineStyle::MediumDashed.as_str(), "mediumDashed");
+        assert_eq!(CellBorderLineStyle::DashDot.as_str(), "dashDot");
+        assert_eq!(CellBorderLineStyle::MediumDashDot.as_str(), "mediumDashDot");
+        assert_eq!(CellBorderLineStyle::DashDotDot.as_str(), "dashDotDot");
+        assert_eq!(
+            CellBorderLineStyle::MediumDashDotDot.as_str(),
+            "mediumDashDotDot"
+        );
+        assert_eq!(CellBorderLineStyle::SlantDashDot.as_str(), "slantDashDot");
+    }
+
+    #[test]
+    fn test_chart_type_debug() {
+        let chart = Chart {
+            chart_type: ChartType::Bar,
+            title: Some("Test Chart".to_string()),
+            data_range: "A1:B10".to_string(),
+            position: (0, 0, 10, 10),
+            show_legend: true,
+        };
+        assert!(format!("{:?}", chart).contains("Bar"));
+    }
+
+    #[test]
+    fn test_data_validation_operator_as_str() {
+        assert_eq!(DataValidationOperator::Between.as_str(), "between");
+        assert_eq!(DataValidationOperator::NotBetween.as_str(), "notBetween");
+        assert_eq!(DataValidationOperator::Equal.as_str(), "equal");
+        assert_eq!(DataValidationOperator::NotEqual.as_str(), "notEqual");
+        assert_eq!(DataValidationOperator::GreaterThan.as_str(), "greaterThan");
+        assert_eq!(DataValidationOperator::LessThan.as_str(), "lessThan");
+        assert_eq!(
+            DataValidationOperator::GreaterThanOrEqual.as_str(),
+            "greaterThanOrEqual"
+        );
+        assert_eq!(
+            DataValidationOperator::LessThanOrEqual.as_str(),
+            "lessThanOrEqual"
+        );
+    }
+
+    #[test]
+    fn test_data_validation_types() {
+        let whole = DataValidationType::Whole {
+            operator: DataValidationOperator::Between,
+            value1: 1,
+            value2: Some(10),
+        };
+        assert!(matches!(whole, DataValidationType::Whole { .. }));
+
+        let decimal = DataValidationType::Decimal {
+            operator: DataValidationOperator::GreaterThan,
+            value1: 0.0,
+            value2: None,
+        };
+        assert!(matches!(decimal, DataValidationType::Decimal { .. }));
+
+        let list = DataValidationType::List {
+            values: vec!["A".to_string(), "B".to_string()],
+        };
+        assert!(matches!(list, DataValidationType::List { .. }));
+
+        let custom = DataValidationType::Custom {
+            formula: "A1>0".to_string(),
+        };
+        assert!(matches!(custom, DataValidationType::Custom { .. }));
+    }
+}

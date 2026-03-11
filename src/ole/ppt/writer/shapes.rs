@@ -764,4 +764,418 @@ mod tests {
         let bounds = shapes.bounds().unwrap();
         assert_eq!(bounds, (0, 0, 150, 150));
     }
+
+    #[test]
+    fn test_shape_kind_all_variants() {
+        // Test all shape kind variants and their Escher types
+        let test_cases = vec![
+            (ShapeKind::Rectangle, shape_type::RECTANGLE),
+            (ShapeKind::RoundRectangle, shape_type::ROUND_RECTANGLE),
+            (ShapeKind::Ellipse, shape_type::ELLIPSE),
+            (ShapeKind::Diamond, shape_type::DIAMOND),
+            (ShapeKind::Triangle, shape_type::ISOCELES_TRIANGLE),
+            (ShapeKind::RightTriangle, shape_type::RIGHT_TRIANGLE),
+            (ShapeKind::Parallelogram, shape_type::PARALLELOGRAM),
+            (ShapeKind::Trapezoid, shape_type::TRAPEZOID),
+            (ShapeKind::Hexagon, shape_type::HEXAGON),
+            (ShapeKind::Octagon, shape_type::OCTAGON),
+            (ShapeKind::Plus, shape_type::PLUS),
+            (ShapeKind::Star, shape_type::STAR),
+            (ShapeKind::Line, shape_type::LINE),
+            (ShapeKind::Connector, shape_type::STRAIGHT_CONNECTOR),
+            (ShapeKind::CurvedConnector, shape_type::CURVED_CONNECTOR_3),
+            (ShapeKind::BentConnector, shape_type::BENT_CONNECTOR_3),
+            (ShapeKind::ArrowRight, shape_type::ARROW),
+            (ShapeKind::ArrowLeft, shape_type::LEFT_ARROW),
+            (ShapeKind::ArrowUp, shape_type::UP_ARROW),
+            (ShapeKind::ArrowDown, shape_type::DOWN_ARROW),
+            (ShapeKind::ArrowLeftRight, shape_type::LEFT_RIGHT_ARROW),
+            (ShapeKind::ArrowUpDown, shape_type::UP_DOWN_ARROW),
+            (ShapeKind::ArrowQuad, shape_type::QUAD_ARROW),
+            (ShapeKind::CircularArrow, shape_type::CIRCULAR_ARROW),
+            (ShapeKind::UturnArrow, shape_type::UTURN_ARROW),
+            (ShapeKind::StripedArrow, shape_type::STRIPED_RIGHT_ARROW),
+            (ShapeKind::NotchedArrow, shape_type::NOTCHED_RIGHT_ARROW),
+            (ShapeKind::CalloutRect, shape_type::CALLOUT_1),
+            (ShapeKind::CalloutRound, shape_type::CALLOUT_2),
+            (ShapeKind::CalloutOval, shape_type::CALLOUT_3),
+            (ShapeKind::CalloutCloud, shape_type::CLOUD_CALLOUT),
+            (ShapeKind::FlowchartProcess, shape_type::FLOWCHART_PROCESS),
+            (ShapeKind::FlowchartDecision, shape_type::FLOWCHART_DECISION),
+            (
+                ShapeKind::FlowchartTerminator,
+                shape_type::FLOWCHART_TERMINATOR,
+            ),
+            (ShapeKind::FlowchartDocument, shape_type::FLOWCHART_DOCUMENT),
+            (
+                ShapeKind::FlowchartConnector,
+                shape_type::FLOWCHART_CONNECTOR,
+            ),
+            (ShapeKind::TextBox, shape_type::TEXT_BOX),
+            (ShapeKind::PictureFrame, shape_type::PICTURE_FRAME),
+            (ShapeKind::Heart, shape_type::HEART),
+            (ShapeKind::LightningBolt, shape_type::LIGHTNING_BOLT),
+            (ShapeKind::SmileyFace, shape_type::SMILEY_FACE),
+            (ShapeKind::Donut, shape_type::DONUT),
+            (ShapeKind::Arc, shape_type::ARC),
+            (ShapeKind::Cube, shape_type::CUBE),
+            (ShapeKind::Can, shape_type::CAN),
+        ];
+
+        for (kind, expected_type) in test_cases {
+            assert_eq!(
+                kind.to_escher_type(),
+                expected_type,
+                "{:?} should map to {}",
+                kind,
+                expected_type
+            );
+        }
+    }
+
+    #[test]
+    fn test_shape_kind_is_line() {
+        assert!(ShapeKind::Line.is_line());
+        assert!(ShapeKind::Connector.is_line());
+        assert!(ShapeKind::CurvedConnector.is_line());
+        assert!(ShapeKind::BentConnector.is_line());
+
+        assert!(!ShapeKind::Rectangle.is_line());
+        assert!(!ShapeKind::Ellipse.is_line());
+        assert!(!ShapeKind::TextBox.is_line());
+        assert!(!ShapeKind::ArrowRight.is_line());
+    }
+
+    #[test]
+    fn test_shape_kind_is_arrow() {
+        assert!(ShapeKind::ArrowRight.is_arrow());
+        assert!(ShapeKind::ArrowLeft.is_arrow());
+        assert!(ShapeKind::ArrowUp.is_arrow());
+        assert!(ShapeKind::ArrowDown.is_arrow());
+        assert!(ShapeKind::ArrowLeftRight.is_arrow());
+        assert!(ShapeKind::ArrowUpDown.is_arrow());
+        assert!(ShapeKind::ArrowQuad.is_arrow());
+        assert!(ShapeKind::CircularArrow.is_arrow());
+        assert!(ShapeKind::UturnArrow.is_arrow());
+        assert!(ShapeKind::StripedArrow.is_arrow());
+        assert!(ShapeKind::NotchedArrow.is_arrow());
+
+        assert!(!ShapeKind::Rectangle.is_arrow());
+        assert!(!ShapeKind::Line.is_arrow());
+        assert!(!ShapeKind::Connector.is_arrow());
+    }
+
+    #[test]
+    fn test_shape_kind_can_contain_text() {
+        assert!(ShapeKind::Rectangle.can_contain_text());
+        assert!(ShapeKind::Ellipse.can_contain_text());
+        assert!(ShapeKind::TextBox.can_contain_text());
+        assert!(ShapeKind::ArrowRight.can_contain_text());
+
+        assert!(!ShapeKind::Line.can_contain_text());
+        assert!(!ShapeKind::Connector.can_contain_text());
+        assert!(!ShapeKind::CurvedConnector.can_contain_text());
+        assert!(!ShapeKind::BentConnector.can_contain_text());
+    }
+
+    #[test]
+    fn test_shape_factory_methods() {
+        let rect = Shape::rectangle(100, 200, 300, 400);
+        assert_eq!(rect.kind, ShapeKind::Rectangle);
+        assert_eq!(rect.x, 100);
+        assert_eq!(rect.y, 200);
+        assert_eq!(rect.width, 300);
+        assert_eq!(rect.height, 400);
+
+        let ellipse = Shape::ellipse(50, 50, 200, 150);
+        assert_eq!(ellipse.kind, ShapeKind::Ellipse);
+
+        let line = Shape::line(0, 0, 100, 50);
+        assert_eq!(line.kind, ShapeKind::Line);
+        assert_eq!(line.x, 0);
+        assert_eq!(line.y, 0);
+        assert_eq!(line.width, 100);
+        assert_eq!(line.height, 50);
+
+        let arrow = Shape::arrow(0, 0, 100, 0);
+        assert_eq!(arrow.kind, ShapeKind::Line); // Arrow is a line with arrowhead
+        // Arrow should have end arrow style set
+        assert!(arrow.style.line.end_arrow != ArrowStyle::None);
+    }
+
+    #[test]
+    fn test_line_orientation() {
+        // Forward line
+        let line1 = Shape::line(0, 0, 100, 100);
+        assert!(!line1.flip_h);
+        assert!(!line1.flip_v);
+
+        // Backward X
+        let line2 = Shape::line(100, 0, 0, 100);
+        assert!(line2.flip_h);
+        assert!(!line2.flip_v);
+
+        // Backward Y
+        let line3 = Shape::line(0, 100, 100, 0);
+        assert!(!line3.flip_h);
+        assert!(line3.flip_v);
+
+        // Both backward
+        let line4 = Shape::line(100, 100, 0, 0);
+        assert!(line4.flip_h);
+        assert!(line4.flip_v);
+    }
+
+    #[test]
+    fn test_text_box_creation() {
+        let text_box = Shape::text_box(100, 100, 400, 200, "Hello World");
+        assert_eq!(text_box.kind, ShapeKind::TextBox);
+        assert!(text_box.text.is_some());
+        assert_eq!(text_box.text.as_ref().unwrap().len(), 1);
+        assert_eq!(text_box.text.as_ref().unwrap()[0].text(), "Hello World");
+        // Text boxes should have no fill by default
+        assert!(!text_box.style.fill.enabled);
+    }
+
+    #[test]
+    fn test_picture_creation() {
+        let picture = Shape::picture(100, 100, 400, 300, 1);
+        assert_eq!(picture.kind, ShapeKind::PictureFrame);
+        assert_eq!(picture.picture_index, Some(1));
+        assert_eq!(picture.style.fill.picture_index, Some(1));
+        assert_eq!(picture.style.fill.picture_index, Some(1));
+    }
+
+    #[test]
+    fn test_shape_style_builder_methods() {
+        let shape = Shape::rectangle(0, 0, 100, 100)
+            .with_fill(FillStyle::solid_rgb(255, 0, 0))
+            .with_line(LineStyleConfig::with_color_and_width(
+                ShapeColor::BLACK,
+                2.0,
+            ))
+            .with_rotation(45.0)
+            .with_flip(true, false);
+
+        assert_eq!(shape.style.fill.color.r, 255);
+        assert_eq!(shape.style.fill.color.g, 0);
+        assert_eq!(shape.style.fill.color.b, 0);
+        assert!(shape.flip_h);
+        assert!(!shape.flip_v);
+        assert_eq!(shape.rotation, 45.0);
+    }
+
+    #[test]
+    fn test_shape_fill_color_methods() {
+        let shape1 = Shape::rectangle(0, 0, 100, 100).with_fill_rgb(255, 0, 0);
+        assert_eq!(shape1.style.fill.color.to_rgbx(), 0x000000FF);
+
+        let shape2 = Shape::rectangle(0, 0, 100, 100).with_fill_color(ShapeColor::BLUE);
+        assert_eq!(shape2.style.fill.color.b, 255);
+
+        let shape3 = Shape::rectangle(0, 0, 100, 100).with_no_fill();
+        assert!(!shape3.style.fill.enabled);
+    }
+
+    #[test]
+    fn test_shape_line_methods() {
+        let shape1 = Shape::rectangle(0, 0, 100, 100).with_line_color(ShapeColor::RED, 1.0);
+        assert!(shape1.style.line.enabled);
+
+        let shape2 = Shape::rectangle(0, 0, 100, 100).with_no_line();
+        assert!(!shape2.style.line.enabled);
+    }
+
+    #[test]
+    fn test_shape_text_methods() {
+        let paragraphs = vec![Paragraph::new("Paragraph 1"), Paragraph::new("Paragraph 2")];
+        let shape = Shape::rectangle(0, 0, 100, 100).with_text(paragraphs);
+        assert!(shape.text.is_some());
+        assert_eq!(shape.text.as_ref().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_shape_adjust_values() {
+        let shape = Shape::rectangle(0, 0, 100, 100)
+            .with_adjust(0, 50)
+            .with_adjust(1, 100);
+        assert_eq!(shape.adjust_values.len(), 2);
+        assert_eq!(shape.adjust_values[0], 50);
+        assert_eq!(shape.adjust_values[1], 100);
+    }
+
+    #[test]
+    fn test_shape_bounds() {
+        let shape = Shape::rectangle(100, 200, 300, 400);
+        let bounds = shape.bounds();
+        assert_eq!(bounds, (100, 200, 400, 600));
+    }
+
+    #[test]
+    fn test_shape_escher_properties() {
+        let shape = Shape::rectangle(100, 200, 300, 400)
+            .with_rotation(90.0)
+            .with_adjust(0, 50);
+        let props = shape.build_escher_properties();
+        assert!(!props.is_empty());
+    }
+
+    #[test]
+    fn test_shape_get_shape_flags() {
+        let shape1 = Shape::rectangle(0, 0, 100, 100);
+        let flags1 = shape1.get_shape_flags();
+        assert!(flags1 & 0x0200 != 0); // fHaveAnchor
+        assert!(flags1 & 0x0800 != 0); // fHaveSpt
+        assert!(flags1 & 0x0040 == 0); // fFlipH not set
+        assert!(flags1 & 0x0080 == 0); // fFlipV not set
+
+        let shape2 = Shape::line(100, 100, 0, 0); // Backward line
+        let flags2 = shape2.get_shape_flags();
+        assert!(flags2 & 0x0040 != 0); // fFlipH set
+        assert!(flags2 & 0x0080 != 0); // fFlipV set
+    }
+
+    #[test]
+    fn test_shape_collection_basic() {
+        let mut collection = ShapeCollection::new();
+        assert!(collection.is_empty());
+        assert_eq!(collection.len(), 0);
+
+        let idx = collection.add(Shape::rectangle(0, 0, 100, 100));
+        assert_eq!(idx, 0);
+        assert!(!collection.is_empty());
+        assert_eq!(collection.len(), 1);
+
+        let idx = collection.add(Shape::ellipse(100, 100, 100, 100));
+        assert_eq!(idx, 1);
+        assert_eq!(collection.len(), 2);
+    }
+
+    #[test]
+    fn test_shape_collection_get() {
+        let mut collection = ShapeCollection::new();
+        collection.add(Shape::rectangle(0, 0, 100, 100));
+        collection.add(Shape::ellipse(50, 50, 100, 100));
+
+        let shape0 = collection.get(0);
+        assert!(shape0.is_some());
+        assert_eq!(shape0.unwrap().kind, ShapeKind::Rectangle);
+
+        let shape1 = collection.get(1);
+        assert!(shape1.is_some());
+        assert_eq!(shape1.unwrap().kind, ShapeKind::Ellipse);
+
+        let shape2 = collection.get(2);
+        assert!(shape2.is_none());
+    }
+
+    #[test]
+    fn test_shape_collection_get_mut() {
+        let mut collection = ShapeCollection::new();
+        collection.add(Shape::rectangle(0, 0, 100, 100));
+
+        if let Some(shape) = collection.get_mut(0) {
+            shape.x = 200;
+        }
+
+        assert_eq!(collection.get(0).unwrap().x, 200);
+    }
+
+    #[test]
+    fn test_shape_collection_bounds_empty() {
+        let collection = ShapeCollection::new();
+        assert!(collection.bounds().is_none());
+    }
+
+    #[test]
+    fn test_shape_collection_bounds_single() {
+        let mut collection = ShapeCollection::new();
+        collection.add(Shape::rectangle(100, 200, 300, 400));
+        let bounds = collection.bounds().unwrap();
+        assert_eq!(bounds, (100, 200, 400, 600));
+    }
+
+    #[test]
+    fn test_shape_collection_bounds_multiple() {
+        let mut collection = ShapeCollection::new();
+        collection.add(Shape::rectangle(0, 0, 100, 100));
+        collection.add(Shape::ellipse(50, 50, 100, 100));
+        collection.add(Shape::rectangle(200, 0, 50, 50));
+
+        let bounds = collection.bounds().unwrap();
+        assert_eq!(bounds, (0, 0, 250, 150));
+    }
+
+    #[test]
+    fn test_shape_collection_iter() {
+        let mut collection = ShapeCollection::new();
+        collection.add(Shape::rectangle(0, 0, 100, 100));
+        collection.add(Shape::ellipse(0, 0, 100, 100));
+
+        let mut count = 0;
+        for shape in collection.iter() {
+            count += 1;
+            assert!(shape.width > 0);
+        }
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_shape_collection_default() {
+        let collection: ShapeCollection = Default::default();
+        assert!(collection.is_empty());
+    }
+
+    #[test]
+    fn test_shape_type_constants() {
+        assert_eq!(shape_type::NOT_PRIMITIVE, 0);
+        assert_eq!(shape_type::RECTANGLE, 1);
+        assert_eq!(shape_type::ROUND_RECTANGLE, 2);
+        assert_eq!(shape_type::ELLIPSE, 3);
+        assert_eq!(shape_type::DIAMOND, 4);
+        assert_eq!(shape_type::ISOCELES_TRIANGLE, 5);
+        assert_eq!(shape_type::RIGHT_TRIANGLE, 6);
+        assert_eq!(shape_type::PARALLELOGRAM, 7);
+        assert_eq!(shape_type::TRAPEZOID, 8);
+        assert_eq!(shape_type::HEXAGON, 9);
+        assert_eq!(shape_type::OCTAGON, 10);
+        assert_eq!(shape_type::PLUS, 11);
+        assert_eq!(shape_type::STAR, 12);
+        assert_eq!(shape_type::ARROW, 13);
+        assert_eq!(shape_type::THICK_ARROW, 14);
+        assert_eq!(shape_type::HOME_PLATE, 15);
+        assert_eq!(shape_type::CUBE, 16);
+        assert_eq!(shape_type::BALLOON, 17);
+        assert_eq!(shape_type::SEAL, 18);
+        assert_eq!(shape_type::ARC, 19);
+        assert_eq!(shape_type::LINE, 20);
+        assert_eq!(shape_type::PLAQUE, 21);
+        assert_eq!(shape_type::CAN, 22);
+        assert_eq!(shape_type::DONUT, 23);
+        assert_eq!(shape_type::STRAIGHT_CONNECTOR, 32);
+        assert_eq!(shape_type::BENT_CONNECTOR_2, 33);
+        assert_eq!(shape_type::CURVED_CONNECTOR_2, 37);
+        assert_eq!(shape_type::CALLOUT_1, 41);
+        assert_eq!(shape_type::CALLOUT_2, 42);
+        assert_eq!(shape_type::CALLOUT_3, 43);
+        assert_eq!(shape_type::LEFT_ARROW, 66);
+        assert_eq!(shape_type::UP_ARROW, 67);
+        assert_eq!(shape_type::DOWN_ARROW, 68);
+        assert_eq!(shape_type::LEFT_RIGHT_ARROW, 69);
+        assert_eq!(shape_type::UP_DOWN_ARROW, 70);
+        assert_eq!(shape_type::HEART, 74);
+        assert_eq!(shape_type::PICTURE_FRAME, 75);
+        assert_eq!(shape_type::QUAD_ARROW, 76);
+        assert_eq!(shape_type::LEFT_ARROW_CALLOUT, 77);
+        assert_eq!(shape_type::SMILEY_FACE, 96);
+        assert_eq!(shape_type::CLOUD_CALLOUT, 106);
+        assert_eq!(shape_type::ELLIPSE_RIBBON, 107);
+        assert_eq!(shape_type::FLOWCHART_PROCESS, 109);
+        assert_eq!(shape_type::FLOWCHART_DECISION, 110);
+        assert_eq!(shape_type::FLOWCHART_TERMINATOR, 116);
+        assert_eq!(shape_type::FLOWCHART_OFFPAGE_CONNECTOR, 177);
+        assert_eq!(shape_type::ACTION_BUTTON_BLANK, 189);
+        assert_eq!(shape_type::ACTION_BUTTON_HOME, 190);
+        assert_eq!(shape_type::TEXT_BOX, 202);
+    }
 }

@@ -2057,6 +2057,7 @@ impl Default for DocWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Cursor;
 
     #[test]
     fn test_create_writer() {
@@ -2071,6 +2072,83 @@ mod tests {
         writer.add_paragraph("Test").unwrap();
         assert_eq!(writer.paragraphs.len(), 1);
         assert_eq!(writer.paragraphs[0].runs[0].text, "Test");
+    }
+
+    #[test]
+    fn test_add_multiple_paragraphs() {
+        let mut writer = DocWriter::new();
+        writer.add_paragraph("First paragraph").unwrap();
+        writer.add_paragraph("Second paragraph").unwrap();
+        writer.add_paragraph("Third paragraph").unwrap();
+        assert_eq!(writer.paragraphs.len(), 3);
+        assert_eq!(writer.paragraphs[0].runs[0].text, "First paragraph");
+        assert_eq!(writer.paragraphs[1].runs[0].text, "Second paragraph");
+        assert_eq!(writer.paragraphs[2].runs[0].text, "Third paragraph");
+    }
+
+    #[test]
+    fn test_add_formatted_paragraph() {
+        let mut writer = DocWriter::new();
+        let para_fmt = ParagraphFormatting {
+            alignment: Some(1), // Center
+            space_before: Some(240),
+            space_after: Some(120),
+            ..Default::default()
+        };
+        writer
+            .add_formatted_paragraph("Formatted text", para_fmt)
+            .unwrap();
+        assert_eq!(writer.paragraphs.len(), 1);
+        assert_eq!(writer.paragraphs[0].runs[0].text, "Formatted text");
+        assert_eq!(writer.paragraphs[0].formatting.alignment, Some(1));
+    }
+
+    #[test]
+    fn test_add_paragraph_with_character_formatting() {
+        let mut writer = DocWriter::new();
+        let char_fmt = CharacterFormatting {
+            bold: Some(true),
+            italic: Some(true),
+            font_size: Some(24),
+            ..Default::default()
+        };
+        let para_fmt = ParagraphFormatting::default();
+        writer
+            .add_paragraph_with_format("Bold italic text", char_fmt, para_fmt)
+            .unwrap();
+        assert_eq!(writer.paragraphs.len(), 1);
+        assert_eq!(writer.paragraphs[0].runs[0].text, "Bold italic text");
+        assert_eq!(writer.paragraphs[0].runs[0].formatting.bold, Some(true));
+        assert_eq!(writer.paragraphs[0].runs[0].formatting.italic, Some(true));
+        assert_eq!(writer.paragraphs[0].runs[0].formatting.font_size, Some(24));
+    }
+
+    #[test]
+    fn test_add_paragraph_runs() {
+        let mut writer = DocWriter::new();
+        let runs = vec![
+            (
+                "Bold ".to_string(),
+                CharacterFormatting {
+                    bold: Some(true),
+                    ..Default::default()
+                },
+            ),
+            (
+                "Italic".to_string(),
+                CharacterFormatting {
+                    italic: Some(true),
+                    ..Default::default()
+                },
+            ),
+        ];
+        writer
+            .add_paragraph_runs(runs, ParagraphFormatting::default())
+            .unwrap();
+        assert_eq!(writer.paragraphs.len(), 1);
+        assert_eq!(writer.paragraphs[0].runs.len(), 2);
+        assert_eq!(writer.paragraphs[0].runs[0].text, "Bold ");
+        assert_eq!(writer.paragraphs[0].runs[1].text, "Italic");
     }
 
     #[test]
@@ -2091,5 +2169,144 @@ mod tests {
             writer.tables[0].rows[0].cells[0].paragraphs[0].runs[0].text,
             "Cell"
         );
+    }
+
+    #[test]
+    fn test_set_table_cell_multiple() {
+        let mut writer = DocWriter::new();
+        let idx = writer.add_table(2, 2).unwrap();
+        writer.set_table_cell_text(idx, 0, 0, "A").unwrap();
+        writer.set_table_cell_text(idx, 0, 1, "B").unwrap();
+        writer.set_table_cell_text(idx, 1, 0, "C").unwrap();
+        writer.set_table_cell_text(idx, 1, 1, "D").unwrap();
+        assert_eq!(
+            writer.tables[0].rows[0].cells[0].paragraphs[0].runs[0].text,
+            "A"
+        );
+        assert_eq!(
+            writer.tables[0].rows[0].cells[1].paragraphs[0].runs[0].text,
+            "B"
+        );
+        assert_eq!(
+            writer.tables[0].rows[1].cells[0].paragraphs[0].runs[0].text,
+            "C"
+        );
+        assert_eq!(
+            writer.tables[0].rows[1].cells[1].paragraphs[0].runs[0].text,
+            "D"
+        );
+    }
+
+    #[test]
+    fn test_set_property() {
+        let mut writer = DocWriter::new();
+        writer.set_property("Title", "Test Document");
+        writer.set_property("Author", "Test Author");
+        assert_eq!(
+            writer.properties.get("Title"),
+            Some(&"Test Document".to_string())
+        );
+        assert_eq!(
+            writer.properties.get("Author"),
+            Some(&"Test Author".to_string())
+        );
+    }
+
+    #[test]
+    fn test_headers_and_footers() {
+        let mut writer = DocWriter::new();
+        writer.set_odd_header("Odd Header");
+        writer.set_even_header("Even Header");
+        writer.set_first_header("First Header");
+        writer.set_odd_footer("Odd Footer");
+        writer.set_even_footer("Even Footer");
+        writer.set_first_footer("First Footer");
+        assert_eq!(writer.header_odd, Some("Odd Header".to_string()));
+        assert_eq!(writer.header_even, Some("Even Header".to_string()));
+        assert_eq!(writer.header_first, Some("First Header".to_string()));
+        assert_eq!(writer.footer_odd, Some("Odd Footer".to_string()));
+        assert_eq!(writer.footer_even, Some("Even Footer".to_string()));
+        assert_eq!(writer.footer_first, Some("First Footer".to_string()));
+    }
+
+    #[test]
+    fn test_footnotes() {
+        let mut writer = DocWriter::new();
+        let entry = FootnoteEntry::new(0u32, "This is a footnote", 1u16);
+        writer.add_footnote(entry);
+        assert_eq!(writer.footnotes.len(), 1);
+        assert_eq!(writer.footnotes[0].text, "This is a footnote");
+    }
+
+    #[test]
+    fn test_endnotes() {
+        let mut writer = DocWriter::new();
+        let entry = FootnoteEntry::new(0u32, "This is an endnote", 1u16);
+        writer.add_endnote(entry);
+        assert_eq!(writer.endnotes.len(), 1);
+        assert_eq!(writer.endnotes[0].text, "This is an endnote");
+    }
+
+    #[test]
+    fn test_write_to_memory() {
+        let mut writer = DocWriter::new();
+        writer.add_paragraph("Test paragraph").unwrap();
+        let mut cursor = Cursor::new(Vec::new());
+        let result = writer.write_to(&mut cursor);
+        assert!(result.is_ok());
+        assert!(cursor.into_inner().len() > 0);
+    }
+
+    #[test]
+    fn test_empty_document_write() {
+        let mut writer = DocWriter::new();
+        let mut cursor = Cursor::new(Vec::new());
+        let result = writer.write_to(&mut cursor);
+        assert!(result.is_ok());
+        let data = cursor.into_inner();
+        assert!(data.len() > 0);
+    }
+
+    #[test]
+    fn test_character_formatting_default() {
+        let fmt = CharacterFormatting::default();
+        assert!(fmt.bold.is_none());
+        assert!(fmt.italic.is_none());
+        assert!(fmt.underline.is_none());
+        assert!(fmt.font_size.is_none());
+    }
+
+    #[test]
+    fn test_paragraph_formatting_default() {
+        let fmt = ParagraphFormatting::default();
+        assert!(fmt.alignment.is_none());
+        assert!(fmt.left_indent.is_none());
+        assert!(fmt.right_indent.is_none());
+        assert!(fmt.space_before.is_none());
+        assert!(fmt.space_after.is_none());
+    }
+
+    #[test]
+    fn test_line_spacing_default() {
+        let ls = LineSpacing::default();
+        assert_eq!(ls.dya_line, 0);
+        assert!(!ls.is_multiple);
+    }
+
+    #[test]
+    fn test_add_table_invalid_dimensions() {
+        let mut writer = DocWriter::new();
+        assert!(writer.add_table(0, 3).is_err());
+        assert!(writer.add_table(2, 0).is_err());
+        assert!(writer.add_table(0, 0).is_err());
+    }
+
+    #[test]
+    fn test_set_table_cell_invalid_indices() {
+        let mut writer = DocWriter::new();
+        let idx = writer.add_table(2, 2).unwrap();
+        assert!(writer.set_table_cell_text(idx, 2, 0, "Invalid").is_err());
+        assert!(writer.set_table_cell_text(idx, 0, 2, "Invalid").is_err());
+        assert!(writer.set_table_cell_text(999, 0, 0, "Invalid").is_err());
     }
 }

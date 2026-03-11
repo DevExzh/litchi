@@ -123,3 +123,196 @@ pub(crate) async fn eval_filterxml(
         Ok(CellValue::Error("#NAME?".to_string()))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::engine::test_helpers::TestEngine;
+    use crate::sheet::eval::parser::Expr;
+
+    fn str_expr(s: &str) -> Expr {
+        Expr::Literal(CellValue::String(s.to_string()))
+    }
+
+    // Tests for when eval_engine_web_functions feature is NOT enabled
+    #[cfg(not(feature = "eval_engine_web_functions"))]
+    mod no_feature_tests {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_encodeurl_without_feature() {
+            let engine = TestEngine::new();
+            let ctx = engine.ctx();
+            let args = vec![str_expr("hello world")];
+            let result = eval_encodeurl(ctx, "Sheet1", &args).await.unwrap();
+            assert_eq!(result, CellValue::Error("#NAME?".to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_webservice_without_feature() {
+            let engine = TestEngine::new();
+            let ctx = engine.ctx();
+            let args = vec![str_expr("https://example.com")];
+            let result = eval_webservice(ctx, "Sheet1", &args).await.unwrap();
+            assert_eq!(result, CellValue::Error("#NAME?".to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_filterxml_without_feature() {
+            let engine = TestEngine::new();
+            let ctx = engine.ctx();
+            let args = vec![str_expr("<root></root>"), str_expr("/root")];
+            let result = eval_filterxml(ctx, "Sheet1", &args).await.unwrap();
+            assert_eq!(result, CellValue::Error("#NAME?".to_string()));
+        }
+    }
+
+    // Tests for when eval_engine_web_functions feature IS enabled
+    #[cfg(feature = "eval_engine_web_functions")]
+    mod feature_tests {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_encodeurl_simple() {
+            let engine = TestEngine::new();
+            let ctx = engine.ctx();
+            let args = vec![str_expr("hello world")];
+            let result = eval_encodeurl(ctx, "Sheet1", &args).await.unwrap();
+            assert_eq!(result, CellValue::String("hello%20world".to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_encodeurl_special_chars() {
+            let engine = TestEngine::new();
+            let ctx = engine.ctx();
+            let args = vec![str_expr("foo/bar+baz?key=value")];
+            let result = eval_encodeurl(ctx, "Sheet1", &args).await.unwrap();
+            assert_eq!(
+                result,
+                CellValue::String("foo%2Fbar%2Bbaz%3Fkey%3Dvalue".to_string())
+            );
+        }
+
+        #[tokio::test]
+        async fn test_encodeurl_wrong_args() {
+            let engine = TestEngine::new();
+            let ctx = engine.ctx();
+            let args: Vec<Expr> = vec![];
+            let result = eval_encodeurl(ctx, "Sheet1", &args).await.unwrap();
+            match result {
+                CellValue::Error(e) => assert!(e.contains("expects 1 argument")),
+                _ => panic!("Expected Error result, got {:?}", result),
+            }
+        }
+
+        #[tokio::test]
+        async fn test_filterxml_basic() {
+            let engine = TestEngine::new();
+            let ctx = engine.ctx();
+            let xml = "<root><item>Hello</item></root>";
+            let xpath = "/root/item";
+            let args = vec![str_expr(xml), str_expr(xpath)];
+            let result = eval_filterxml(ctx, "Sheet1", &args).await.unwrap();
+            assert_eq!(result, CellValue::String("Hello".to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_filterxml_number_result() {
+            let engine = TestEngine::new();
+            let ctx = engine.ctx();
+            let xml = "<data><value>42.5</value></data>";
+            let xpath = "/data/value";
+            let args = vec![str_expr(xml), str_expr(xpath)];
+            let result = eval_filterxml(ctx, "Sheet1", &args).await.unwrap();
+            // XPath on element returns the text content as a string
+            assert_eq!(result, CellValue::String("42.5".to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_filterxml_attribute() {
+            let engine = TestEngine::new();
+            let ctx = engine.ctx();
+            let xml = "<user id='123' name='John'/>";
+            let xpath = "/user/@name";
+            let args = vec![str_expr(xml), str_expr(xpath)];
+            let result = eval_filterxml(ctx, "Sheet1", &args).await.unwrap();
+            assert_eq!(result, CellValue::String("John".to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_filterxml_invalid_xml() {
+            let engine = TestEngine::new();
+            let ctx = engine.ctx();
+            let xml = "<invalid>unclosed";
+            let xpath = "/root";
+            let args = vec![str_expr(xml), str_expr(xpath)];
+            let result = eval_filterxml(ctx, "Sheet1", &args).await.unwrap();
+            assert_eq!(result, CellValue::Error("#VALUE!".to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_filterxml_invalid_xpath() {
+            let engine = TestEngine::new();
+            let ctx = engine.ctx();
+            let xml = "<root></root>";
+            let xpath = "[[[invalid";
+            let args = vec![str_expr(xml), str_expr(xpath)];
+            let result = eval_filterxml(ctx, "Sheet1", &args).await.unwrap();
+            assert_eq!(result, CellValue::Error("#VALUE!".to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_filterxml_no_match() {
+            let engine = TestEngine::new();
+            let ctx = engine.ctx();
+            let xml = "<root><item>value</item></root>";
+            let xpath = "/root/nonexistent";
+            let args = vec![str_expr(xml), str_expr(xpath)];
+            let result = eval_filterxml(ctx, "Sheet1", &args).await.unwrap();
+            assert_eq!(result, CellValue::Error("#VALUE!".to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_filterxml_wrong_args() {
+            let engine = TestEngine::new();
+            let ctx = engine.ctx();
+            let args: Vec<Expr> = vec![str_expr("<root></root>")];
+            let result = eval_filterxml(ctx, "Sheet1", &args).await.unwrap();
+            match result {
+                CellValue::Error(e) => assert!(e.contains("expects 2 arguments")),
+                _ => panic!("Expected Error result, got {:?}", result),
+            }
+        }
+
+        #[tokio::test]
+        async fn test_webservice_wrong_args() {
+            let engine = TestEngine::new();
+            let ctx = engine.ctx();
+            let args: Vec<Expr> = vec![];
+            let result = eval_webservice(ctx, "Sheet1", &args).await.unwrap();
+            match result {
+                CellValue::Error(e) => assert!(e.contains("expects 1 argument")),
+                _ => panic!("Expected Error result, got {:?}", result),
+            }
+        }
+
+        #[tokio::test]
+        async fn test_webservice_invalid_url() {
+            let engine = TestEngine::new();
+            let ctx = engine.ctx();
+            let args = vec![str_expr("ftp://invalid.protocol.com")];
+            let result = eval_webservice(ctx, "Sheet1", &args).await.unwrap();
+            assert_eq!(result, CellValue::Error("#VALUE!".to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_webservice_url_too_long() {
+            let engine = TestEngine::new();
+            let ctx = engine.ctx();
+            let long_url = format!("https://example.com/{}", "a".repeat(2048));
+            let args = vec![str_expr(&long_url)];
+            let result = eval_webservice(ctx, "Sheet1", &args).await.unwrap();
+            assert_eq!(result, CellValue::Error("#VALUE!".to_string()));
+        }
+    }
+}

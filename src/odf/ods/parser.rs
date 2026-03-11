@@ -338,3 +338,484 @@ impl CellBuilder {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TEST_SHEETS_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+    <office:body>
+        <office:spreadsheet>
+            <table:table table:name="Sheet1">
+                <table:table-row>
+                    <table:table-cell office:value-type="string">
+                        <text:p>Hello</text:p>
+                    </table:table-cell>
+                    <table:table-cell office:value-type="float" office:value="42">
+                        <text:p>42</text:p>
+                    </table:table-cell>
+                </table:table-row>
+            </table:table>
+        </office:spreadsheet>
+    </office:body>
+</office:document-content>"#;
+
+    const TEST_MULTIPLE_SHEETS_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+    <office:body>
+        <office:spreadsheet>
+            <table:table table:name="Sheet1">
+                <table:table-row>
+                    <table:table-cell office:value-type="string">
+                        <text:p>First Sheet</text:p>
+                    </table:table-cell>
+                </table:table-row>
+            </table:table>
+            <table:table table:name="Sheet2">
+                <table:table-row>
+                    <table:table-cell office:value-type="string">
+                        <text:p>Second Sheet</text:p>
+                    </table:table-cell>
+                </table:table-row>
+            </table:table>
+        </office:spreadsheet>
+    </office:body>
+</office:document-content>"#;
+
+    const TEST_CELL_TYPES_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+    <office:body>
+        <office:spreadsheet>
+            <table:table table:name="TypesTest">
+                <table:table-row>
+                    <table:table-cell office:value-type="string"><text:p>Text</text:p></table:table-cell>
+                    <table:table-cell office:value-type="float" office:value="3.14"><text:p>3.14</text:p></table:table-cell>
+                    <table:table-cell office:value-type="currency" office:value="100" office:currency="EUR"><text:p>€100</text:p></table:table-cell>
+                    <table:table-cell office:value-type="percentage" office:value="0.5"><text:p>50%</text:p></table:table-cell>
+                    <table:table-cell office:value-type="boolean" office:value="true"><text:p>TRUE</text:p></table:table-cell>
+                    <table:table-cell office:value-type="date" office:value="2024-03-15"><text:p>2024-03-15</text:p></table:table-cell>
+                    <table:table-cell office:value-type="time" office:value="PT12H30M00S"><text:p>12:30:00</text:p></table:table-cell>
+                </table:table-row>
+            </table:table>
+        </office:spreadsheet>
+    </office:body>
+</office:document-content>"#;
+
+    const TEST_FORMULA_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+    <office:body>
+        <office:spreadsheet>
+            <table:table table:name="FormulaTest">
+                <table:table-row>
+                    <table:table-cell office:value-type="float" office:value="10"><text:p>10</text:p></table:table-cell>
+                    <table:table-cell office:value-type="float" office:value="20"><text:p>20</text:p></table:table-cell>
+                    <table:table-cell table:formula="=SUM([.A1]:[.B1])" office:value-type="float" office:value="30">
+                        <text:p>30</text:p>
+                    </table:table-cell>
+                </table:table-row>
+            </table:table>
+        </office:spreadsheet>
+    </office:body>
+</office:document-content>"#;
+
+    const TEST_REPEATED_CELLS_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+    <office:body>
+        <office:spreadsheet>
+            <table:table table:name="RepeatedTest">
+                <table:table-row>
+                    <table:table-cell table:number-columns-repeated="3" office:value-type="string">
+                        <text:p>Repeated</text:p>
+                    </table:table-cell>
+                    <table:table-cell office:value-type="string">
+                        <text:p>Single</text:p>
+                    </table:table-cell>
+                </table:table-row>
+            </table:table>
+        </office:spreadsheet>
+    </office:body>
+</office:document-content>"#;
+
+    const TEST_EMPTY_SHEET_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
+    <office:body>
+        <office:spreadsheet>
+            <table:table table:name="EmptySheet">
+            </table:table>
+        </office:spreadsheet>
+    </office:body>
+</office:document-content>"#;
+
+    const TEST_SPAN_TEXT_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+    <office:body>
+        <office:spreadsheet>
+            <table:table table:name="SpanTest">
+                <table:table-row>
+                    <table:table-cell office:value-type="string">
+                        <text:p>Normal text <text:span>spanned text</text:span> more text</text:p>
+                    </table:table-cell>
+                </table:table-row>
+            </table:table>
+        </office:spreadsheet>
+    </office:body>
+</office:document-content>"#;
+
+    #[test]
+    fn test_parse_sheets_basic() {
+        let sheets = OdsParser::parse_sheets(TEST_SHEETS_XML).unwrap();
+        assert_eq!(sheets.len(), 1);
+        assert_eq!(sheets[0].name, "Sheet1");
+        assert_eq!(sheets[0].rows.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_multiple_sheets() {
+        let sheets = OdsParser::parse_sheets(TEST_MULTIPLE_SHEETS_XML).unwrap();
+        assert_eq!(sheets.len(), 2);
+        assert_eq!(sheets[0].name, "Sheet1");
+        assert_eq!(sheets[1].name, "Sheet2");
+    }
+
+    #[test]
+    fn test_parse_cell_types() {
+        let sheets = OdsParser::parse_sheets(TEST_CELL_TYPES_XML).unwrap();
+        assert_eq!(sheets.len(), 1);
+
+        let row = &sheets[0].rows[0];
+        assert_eq!(row.cells.len(), 7);
+
+        // Text cell
+        match &row.cells[0].value {
+            CellValue::Text(t) => assert_eq!(t, "Text"),
+            _ => panic!("Expected Text"),
+        }
+
+        // Float/Number cell
+        match &row.cells[1].value {
+            CellValue::Number(n) => assert!((n - 3.14).abs() < f64::EPSILON),
+            _ => panic!("Expected Number"),
+        }
+
+        // Currency cell
+        match &row.cells[2].value {
+            CellValue::Currency(amount, currency) => {
+                assert!((amount - 100.0).abs() < f64::EPSILON);
+                assert_eq!(currency, "EUR");
+            },
+            _ => panic!("Expected Currency"),
+        }
+
+        // Percentage cell
+        match &row.cells[3].value {
+            CellValue::Percentage(p) => assert!((p - 0.5).abs() < f64::EPSILON),
+            _ => panic!("Expected Percentage"),
+        }
+
+        // Boolean cell
+        match &row.cells[4].value {
+            CellValue::Boolean(b) => assert!(*b),
+            _ => panic!("Expected Boolean"),
+        }
+
+        // Date cell
+        match &row.cells[5].value {
+            CellValue::Date(d) => assert_eq!(d, "2024-03-15"),
+            _ => panic!("Expected Date"),
+        }
+
+        // Time cell
+        match &row.cells[6].value {
+            CellValue::Time(t) => assert_eq!(t, "PT12H30M00S"),
+            _ => panic!("Expected Time"),
+        }
+    }
+
+    #[test]
+    fn test_parse_formula() {
+        let sheets = OdsParser::parse_sheets(TEST_FORMULA_XML).unwrap();
+        assert_eq!(sheets.len(), 1);
+
+        let row = &sheets[0].rows[0];
+        assert_eq!(row.cells.len(), 3);
+
+        // Cell with formula
+        assert_eq!(row.cells[2].formula, Some("=SUM([.A1]:[.B1])".to_string()));
+        match &row.cells[2].value {
+            CellValue::Number(n) => assert!((n - 30.0).abs() < f64::EPSILON),
+            _ => panic!("Expected Number for formula result"),
+        }
+    }
+
+    #[test]
+    fn test_parse_repeated_cells() {
+        let sheets = OdsParser::parse_sheets(TEST_REPEATED_CELLS_XML).unwrap();
+        assert_eq!(sheets.len(), 1);
+
+        let row = &sheets[0].rows[0];
+        // 3 repeated cells + 1 single = 4 cells
+        assert_eq!(row.cells.len(), 4);
+
+        for i in 0..3 {
+            match &row.cells[i].value {
+                CellValue::Text(t) => assert_eq!(t, "Repeated"),
+                _ => panic!("Expected Text for repeated cell {i}"),
+            }
+        }
+
+        match &row.cells[3].value {
+            CellValue::Text(t) => assert_eq!(t, "Single"),
+            _ => panic!("Expected Text for single cell"),
+        }
+    }
+
+    #[test]
+    fn test_parse_empty_sheet() {
+        let sheets = OdsParser::parse_sheets(TEST_EMPTY_SHEET_XML).unwrap();
+        assert_eq!(sheets.len(), 1);
+        assert_eq!(sheets[0].name, "EmptySheet");
+        assert_eq!(sheets[0].rows.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_span_text() {
+        let sheets = OdsParser::parse_sheets(TEST_SPAN_TEXT_XML).unwrap();
+        assert_eq!(sheets.len(), 1);
+
+        let row = &sheets[0].rows[0];
+        assert_eq!(row.cells.len(), 1);
+
+        // Text should include content from both text:p and text:span
+        assert!(row.cells[0].text.contains("Normal text"));
+        assert!(row.cells[0].text.contains("spanned text"));
+    }
+
+    #[test]
+    fn test_extract_table_name_default() {
+        // XML without table:name attribute
+        let xml = r#"<?xml version="1.0"?>
+<office:document-content xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
+    <table:table>
+    </table:table>
+</office:document-content>"#;
+
+        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        assert_eq!(sheets.len(), 1);
+        assert_eq!(sheets[0].name, "Sheet1"); // Default name
+    }
+
+    #[test]
+    fn test_sheet_builder() {
+        let mut builder = SheetBuilder::new("TestSheet".to_string());
+
+        let row1 = Row {
+            cells: vec![],
+            index: 0,
+        };
+        builder.add_row(row1);
+
+        let row2 = Row {
+            cells: vec![Cell {
+                value: CellValue::Text("A1".to_string()),
+                text: "A1".to_string(),
+                formula: None,
+                row: 0,
+                col: 0,
+            }],
+            index: 0,
+        };
+        builder.add_row(row2);
+
+        let sheet = builder.build();
+        assert_eq!(sheet.name, "TestSheet");
+        assert_eq!(sheet.rows.len(), 2);
+        assert_eq!(sheet.rows[0].index, 0);
+        assert_eq!(sheet.rows[1].index, 1);
+    }
+
+    #[test]
+    fn test_row_builder() {
+        let mut builder = RowBuilder::new();
+
+        let cell1 = Cell {
+            value: CellValue::Text("A".to_string()),
+            text: "A".to_string(),
+            formula: None,
+            row: 0,
+            col: 0,
+        };
+        builder.add_cell(cell1);
+
+        let cell2 = Cell {
+            value: CellValue::Number(42.0),
+            text: "42".to_string(),
+            formula: None,
+            row: 0,
+            col: 0,
+        };
+        builder.add_cell(cell2);
+
+        let row = builder.build();
+        assert_eq!(row.cells.len(), 2);
+        assert_eq!(row.cells[0].col, 0);
+        assert_eq!(row.cells[1].col, 1);
+    }
+
+    #[test]
+    fn test_cell_builder_float_types() {
+        // Test "float" value type
+        let builder = CellBuilder {
+            value_type: Some("float".to_string()),
+            value_str: Some("123.45".to_string()),
+            currency: None,
+            formula: None,
+            repeated: 1,
+        };
+        let cell = builder.build("123.45");
+        match cell.value {
+            CellValue::Number(n) => assert!((n - 123.45).abs() < f64::EPSILON),
+            _ => panic!("Expected Number for float"),
+        }
+
+        // Test "double" value type
+        let builder = CellBuilder {
+            value_type: Some("double".to_string()),
+            value_str: Some("99.99".to_string()),
+            currency: None,
+            formula: None,
+            repeated: 1,
+        };
+        let cell = builder.build("99.99");
+        match cell.value {
+            CellValue::Number(n) => assert!((n - 99.99).abs() < f64::EPSILON),
+            _ => panic!("Expected Number for double"),
+        }
+
+        // Test "decimal" value type
+        let builder = CellBuilder {
+            value_type: Some("decimal".to_string()),
+            value_str: Some("0.001".to_string()),
+            currency: None,
+            formula: None,
+            repeated: 1,
+        };
+        let cell = builder.build("0.001");
+        match cell.value {
+            CellValue::Number(n) => assert!((n - 0.001).abs() < f64::EPSILON),
+            _ => panic!("Expected Number for decimal"),
+        }
+    }
+
+    #[test]
+    fn test_cell_builder_invalid_number_fallback() {
+        let builder = CellBuilder {
+            value_type: Some("float".to_string()),
+            value_str: Some("not-a-number".to_string()),
+            currency: None,
+            formula: None,
+            repeated: 1,
+        };
+        let cell = builder.build("some text");
+        match cell.value {
+            CellValue::Text(t) => assert_eq!(t, "some text"),
+            _ => panic!("Expected Text fallback for invalid number"),
+        }
+    }
+
+    #[test]
+    fn test_cell_builder_boolean_variations() {
+        // Test "false" boolean
+        let builder = CellBuilder {
+            value_type: Some("boolean".to_string()),
+            value_str: Some("false".to_string()),
+            currency: None,
+            formula: None,
+            repeated: 1,
+        };
+        let cell = builder.build("FALSE");
+        match cell.value {
+            CellValue::Boolean(b) => assert!(!b),
+            _ => panic!("Expected Boolean false"),
+        }
+
+        // Test invalid boolean value (falls back to text)
+        let builder = CellBuilder {
+            value_type: Some("boolean".to_string()),
+            value_str: Some("maybe".to_string()),
+            currency: None,
+            formula: None,
+            repeated: 1,
+        };
+        let cell = builder.build("maybe");
+        match cell.value {
+            CellValue::Text(t) => assert_eq!(t, "maybe"),
+            _ => panic!("Expected Text for invalid boolean"),
+        }
+    }
+
+    #[test]
+    fn test_cell_builder_empty_text() {
+        let builder = CellBuilder {
+            value_type: None,
+            value_str: None,
+            currency: None,
+            formula: None,
+            repeated: 1,
+        };
+        let cell = builder.build("   ");
+        match cell.value {
+            CellValue::Empty => {},
+            _ => panic!("Expected Empty for whitespace-only text"),
+        }
+    }
+
+    #[test]
+    fn test_cell_builder_currency_default() {
+        let builder = CellBuilder {
+            value_type: Some("currency".to_string()),
+            value_str: Some("50".to_string()),
+            currency: None, // No currency specified
+            formula: None,
+            repeated: 1,
+        };
+        let cell = builder.build("$50");
+        match cell.value {
+            CellValue::Currency(amount, currency) => {
+                assert!((amount - 50.0).abs() < f64::EPSILON);
+                assert_eq!(currency, "USD"); // Default
+            },
+            _ => panic!("Expected Currency with default USD"),
+        }
+    }
+
+    #[test]
+    fn test_parse_invalid_xml() {
+        let invalid_xml = "<invalid>unclosed tag";
+        let result = OdsParser::parse_sheets(invalid_xml);
+        // The parser may return Ok with empty sheets or Err depending on implementation
+        // Either behavior is acceptable - we just verify it doesn't panic
+        match result {
+            Ok(sheets) => {
+                // If parsing succeeds, we should get 0 sheets
+                assert_eq!(sheets.len(), 0);
+            },
+            Err(_) => {
+                // Error is also acceptable
+            },
+        }
+    }
+}

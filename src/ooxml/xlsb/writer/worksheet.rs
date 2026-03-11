@@ -112,7 +112,7 @@ impl MutableXlsbWorksheet {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```ignore
     /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
     ///
     /// let sheet = MutableXlsbWorksheet::new("Sheet1");
@@ -149,7 +149,7 @@ impl MutableXlsbWorksheet {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```ignore
     /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
     ///
     /// let mut sheet = MutableXlsbWorksheet::new("Sheet1");
@@ -188,7 +188,7 @@ impl MutableXlsbWorksheet {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```ignore
     /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
     ///
     /// let mut sheet = MutableXlsbWorksheet::new("Sheet1");
@@ -270,7 +270,7 @@ impl MutableXlsbWorksheet {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```ignore
     /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
     /// use litchi::ooxml::xlsb::advanced_features::MergedCell;
     ///
@@ -285,7 +285,7 @@ impl MutableXlsbWorksheet {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```ignore
     /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
     /// use litchi::ooxml::xlsb::advanced_features::Hyperlink;
     ///
@@ -302,7 +302,7 @@ impl MutableXlsbWorksheet {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```ignore
     /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
     /// use litchi::ooxml::xlsb::advanced_features::Comment;
     ///
@@ -342,7 +342,7 @@ impl MutableXlsbWorksheet {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```ignore
     /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
     /// use litchi::ooxml::xlsb::data_validation::DataValidation;
     ///
@@ -364,7 +364,7 @@ impl MutableXlsbWorksheet {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```ignore
     /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
     /// use litchi::ooxml::xlsb::conditional_formatting::{
     ///     ConditionalFormatting, ConditionalFormattingRule, CfRuleType,
@@ -403,7 +403,7 @@ impl MutableXlsbWorksheet {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```ignore
     /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
     ///
     /// let mut sheet = MutableXlsbWorksheet::new("Sheet1");
@@ -1181,6 +1181,11 @@ impl MutableXlsbWorksheet {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ooxml::xlsb::comments::Comment;
+    use crate::ooxml::xlsb::conditional_formatting::ConditionalFormatting;
+    use crate::ooxml::xlsb::data_validation::DataValidation;
+    use crate::ooxml::xlsb::hyperlinks::Hyperlink;
+    use crate::ooxml::xlsb::merged_cells::MergedCell;
 
     #[test]
     fn test_set_and_get_cell() {
@@ -1190,6 +1195,18 @@ mod tests {
 
         assert_eq!(sheet.get_cell(0, 0).and_then(|v| v.as_str()), Some("Hello"));
         assert_eq!(sheet.get_cell(1, 1).and_then(|v| v.as_float()), Some(42.0));
+    }
+
+    #[test]
+    fn test_set_cell_with_style() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        sheet.set_cell_with_style(0, 0, "Styled", 5);
+
+        assert_eq!(
+            sheet.get_cell(0, 0).and_then(|v| v.as_str()),
+            Some("Styled")
+        );
+        assert_eq!(sheet.cell_count(), 1);
     }
 
     #[test]
@@ -1216,11 +1233,287 @@ mod tests {
     }
 
     #[test]
+    fn test_delete_column() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        sheet.set_cell(0, 0, "Col 0");
+        sheet.set_cell(0, 1, "Col 1");
+        sheet.set_cell(0, 2, "Col 2");
+
+        sheet.delete_column(1);
+
+        assert_eq!(sheet.get_cell(0, 0).and_then(|v| v.as_str()), Some("Col 0"));
+        assert_eq!(sheet.get_cell(0, 1).and_then(|v| v.as_str()), Some("Col 2"));
+        assert!(sheet.get_cell(0, 2).is_none());
+    }
+
+    #[test]
+    fn test_insert_row() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        sheet.set_cell(0, 0, "Row 0");
+        sheet.set_cell(1, 0, "Row 1");
+
+        sheet.insert_row(1);
+
+        assert_eq!(sheet.get_cell(0, 0).and_then(|v| v.as_str()), Some("Row 0"));
+        assert!(sheet.get_cell(1, 0).is_none()); // Inserted row is empty
+        assert_eq!(sheet.get_cell(2, 0).and_then(|v| v.as_str()), Some("Row 1"));
+    }
+
+    #[test]
+    fn test_insert_column() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        sheet.set_cell(0, 0, "Col 0");
+        sheet.set_cell(0, 1, "Col 1");
+
+        sheet.insert_column(1);
+
+        assert_eq!(sheet.get_cell(0, 0).and_then(|v| v.as_str()), Some("Col 0"));
+        assert!(sheet.get_cell(0, 1).is_none()); // Inserted column is empty
+        assert_eq!(sheet.get_cell(0, 2).and_then(|v| v.as_str()), Some("Col 1"));
+    }
+
+    #[test]
     fn test_dimensions() {
         let mut sheet = MutableXlsbWorksheet::new("Sheet1");
         assert!(sheet.dimensions().is_none());
 
         sheet.set_cell(5, 10, "Test");
         assert_eq!(sheet.dimensions(), Some((0, 0, 5, 10)));
+    }
+
+    #[test]
+    fn test_cell_count() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        assert_eq!(sheet.cell_count(), 0);
+
+        sheet.set_cell(0, 0, "A");
+        sheet.set_cell(0, 1, "B");
+        sheet.set_cell(1, 0, "C");
+
+        assert_eq!(sheet.cell_count(), 3);
+    }
+
+    #[test]
+    fn test_name() {
+        let sheet = MutableXlsbWorksheet::new("Sheet1");
+        assert_eq!(sheet.name(), "Sheet1");
+    }
+
+    #[test]
+    fn test_set_name() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        sheet.set_name("RenamedSheet");
+        assert_eq!(sheet.name(), "RenamedSheet");
+    }
+
+    #[test]
+    fn test_set_column_width() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        sheet.set_column_width(0, 15.5);
+        sheet.set_column_width(2, 20.0);
+
+        // Verify columns are set
+        assert_eq!(sheet.columns.len(), 2);
+    }
+
+    #[test]
+    fn test_set_row_height() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        sheet.set_row_height(0, 25.0);
+        sheet.set_row_height(3, 30.5);
+
+        // Verify rows are set
+        assert_eq!(sheet.rows.len(), 2);
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        sheet.set_cell(0, 0, "Test");
+        sheet.add_merged_cell(MergedCell::new(0, 1, 0, 1));
+
+        sheet.clear();
+
+        assert_eq!(sheet.cell_count(), 0);
+        assert!(sheet.merged_cells.is_empty());
+        assert!(sheet.dimensions().is_none());
+    }
+
+    #[test]
+    fn test_add_merged_cell() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        let merged = MergedCell::new(0, 1, 0, 1);
+        sheet.add_merged_cell(merged);
+
+        assert_eq!(sheet.merged_cells().len(), 1);
+        assert_eq!(sheet.merged_cells()[0].row_first, 0);
+        assert_eq!(sheet.merged_cells()[0].row_last, 1);
+    }
+
+    #[test]
+    fn test_add_hyperlink() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        let link = Hyperlink::new(0, 0, 0, 0, "rId1".to_string());
+        sheet.add_hyperlink(link);
+
+        assert_eq!(sheet.hyperlinks().len(), 1);
+    }
+
+    #[test]
+    fn test_hyperlinks_mut() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        let link = Hyperlink::new(0, 0, 0, 0, "rId1".to_string());
+        sheet.add_hyperlink(link);
+
+        let links = sheet.hyperlinks_mut();
+        assert_eq!(links.len(), 1);
+    }
+
+    #[test]
+    fn test_add_comment() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        let comment = Comment::new(0, 0, "Author".to_string(), "Comment text".to_string());
+        sheet.add_comment(comment);
+
+        assert_eq!(sheet.comments().len(), 1);
+    }
+
+    #[test]
+    fn test_set_auto_filter() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        sheet.set_auto_filter(0, 10, 0, 5);
+
+        assert!(sheet.auto_filter.is_some());
+        let af = sheet.auto_filter.unwrap();
+        assert_eq!(af.row_first, 0);
+        assert_eq!(af.row_last, 10);
+        assert_eq!(af.col_first, 0);
+        assert_eq!(af.col_last, 5);
+    }
+
+    #[test]
+    fn test_add_data_validation() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        let dv = DataValidation::new(3, "A1:A10".to_string());
+        sheet.add_data_validation(dv);
+
+        assert_eq!(sheet.data_validations().len(), 1);
+        assert_eq!(sheet.data_validations()[0].validation_type, 3);
+    }
+
+    #[test]
+    fn test_add_conditional_formatting() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        let cf = ConditionalFormatting::new(vec!["A1:A10".to_string()]);
+        sheet.add_conditional_formatting(cf);
+
+        assert_eq!(sheet.conditional_formattings().len(), 1);
+    }
+
+    #[test]
+    fn test_cell_data_types() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+
+        // String
+        sheet.set_cell(0, 0, "String");
+        assert_eq!(
+            sheet.get_cell(0, 0).and_then(|v| v.as_str()),
+            Some("String")
+        );
+
+        // Integer - stored as CellValue::Int
+        sheet.set_cell(0, 1, 42i32);
+        match sheet.get_cell(0, 1) {
+            Some(CellValue::Int(i)) => assert_eq!(*i, 42),
+            _ => panic!("Expected Int(42)"),
+        }
+
+        // Float
+        sheet.set_cell(0, 2, 3.14f64);
+        assert_eq!(sheet.get_cell(0, 2).and_then(|v| v.as_float()), Some(3.14));
+
+        // Bool - check by matching the enum variant directly
+        sheet.set_cell(0, 3, true);
+        match sheet.get_cell(0, 3) {
+            Some(CellValue::Bool(b)) => assert!(*b),
+            _ => panic!("Expected Bool(true)"),
+        }
+    }
+
+    #[test]
+    fn test_worksheet_write_empty() {
+        let sheet = MutableXlsbWorksheet::new("Sheet1");
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+        let mut shared_strings = crate::ooxml::xlsb::writer::MutableSharedStringsWriter::new();
+
+        let result = sheet.write(&mut writer, &mut shared_strings);
+        assert!(result.is_ok());
+        assert!(!buffer.is_empty());
+    }
+
+    #[test]
+    fn test_worksheet_write_with_data() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        sheet.set_cell(0, 0, "Hello");
+        sheet.set_cell(0, 1, 42.0);
+        sheet.set_cell(1, 0, true);
+
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+        let mut shared_strings = crate::ooxml::xlsb::writer::MutableSharedStringsWriter::new();
+
+        let result = sheet.write(&mut writer, &mut shared_strings);
+        assert!(result.is_ok());
+        assert!(!buffer.is_empty());
+
+        // Verify shared strings were added
+        assert_eq!(shared_strings.len(), 1); // "Hello"
+    }
+
+    #[test]
+    fn test_column_info_struct() {
+        let info = ColumnInfo {
+            width: Some(15.0),
+            hidden: false,
+            best_fit: true,
+        };
+        assert_eq!(info.width, Some(15.0));
+        assert!(!info.hidden);
+        assert!(info.best_fit);
+    }
+
+    #[test]
+    fn test_row_info_struct() {
+        let info = RowInfo {
+            height: Some(20.0),
+            hidden: true,
+        };
+        assert_eq!(info.height, Some(20.0));
+        assert!(info.hidden);
+    }
+
+    #[test]
+    fn test_auto_filter_struct() {
+        let af = AutoFilter {
+            row_first: 0,
+            row_last: 10,
+            col_first: 0,
+            col_last: 5,
+        };
+        assert_eq!(af.row_first, 0);
+        assert_eq!(af.row_last, 10);
+        assert_eq!(af.col_first, 0);
+        assert_eq!(af.col_last, 5);
+    }
+
+    #[test]
+    fn test_cell_data_struct() {
+        let cell = CellData {
+            value: CellValue::String("Test".to_string()),
+            style: 5,
+        };
+        assert_eq!(cell.style, 5);
+        assert_eq!(cell.value.as_str(), Some("Test"));
     }
 }

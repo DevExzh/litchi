@@ -21,10 +21,10 @@
 /// # Example
 ///
 /// ```rust,no_run
-/// use litchi::ppt::Package;
+/// use litchi::ole::ppt::{Package, shapes::ShapeEnum};
 ///
 /// // Open a presentation
-/// let package = Package::open("presentation.ppt")?;
+/// let mut package = Package::open("presentation.ppt")?;
 /// let pres = package.presentation()?;
 ///
 /// // Extract all text
@@ -38,10 +38,10 @@
 ///     // Access individual shapes
 ///     for shape in slide.shapes()? {
 ///         match shape {
-///             litchi::ppt::shapes::Shape::TextBox(textbox) => {
-///                 println!("Text box: {}", textbox.text()?);
+///             ShapeEnum::TextBox(textbox) => {
+///                 println!("Text box: {}", textbox.text());
 ///             }
-///             litchi::ppt::shapes::Shape::Placeholder(placeholder) => {
+///             ShapeEnum::Placeholder(placeholder) => {
 ///                 println!("Placeholder type: {:?}", placeholder.placeholder_type());
 ///             }
 ///             _ => {}

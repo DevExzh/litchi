@@ -21,14 +21,15 @@
 // - `extractor`: High-level image extraction from Office files
 // - `svg`: SVG conversion utilities
 //
-// # Quick Start: Extract Images from Office Files
-//
-// ```no_run
-// use litchi::images::{extract_images_from_doc, extract_images_from_ppt};
-//
-// // Extract from Word document
-// let images = extract_images_from_doc("document.doc")?;
-// for (i, img) in images.iter().enumerate() {
+/// # Quick Start: Extract Images from Office Files
+///
+/// ```no_run
+/// use litchi::images::{extract_images_from_doc, extract_images_from_ppt};
+///
+/// # fn main() -> Result<(), litchi::Error> {
+/// // Extract from Word document
+/// let images = extract_images_from_doc("document.doc")?;
+/// for (i, img) in images.iter().enumerate() {
 ///     let png = img.to_png(Some(800), None)?;
 ///     std::fs::write(format!("image_{}.png", i), png)?;
 /// }
@@ -40,7 +41,8 @@
 ///     let png = img.to_png(None, None)?;
 ///     std::fs::write(filename, png)?;
 /// }
-/// # Ok::<(), litchi::common::error::Error>(())
+/// # Ok::<(), litchi::Error>(())
+/// # }
 /// ```
 ///
 /// # Example: Converting a BLIP record
@@ -52,7 +54,7 @@
 /// let blip_data = vec![/* BLIP record bytes */];
 /// let blip = Blip::parse(&blip_data)?;
 /// let png_bytes = convert_blip_to_png(&blip, Some(800), None)?;
-/// # Ok::<(), litchi::common::error::Error>(())
+/// # Ok::<(), litchi::Error>(())
 /// ```
 ///
 /// # Example: Converting EMF to PNG
@@ -205,7 +207,7 @@ pub fn convert_blip_to_format<'data>(
 /// let blip_data = vec![/* BLIP record bytes */];
 /// let blip = Blip::parse(&blip_data)?;
 /// let png = convert_blip_to_png(&blip, Some(800), None)?;
-/// # Ok::<(), litchi::common::error::Error>(())
+/// # Ok::<(), litchi::Error>(())
 /// ```
 pub fn convert_blip_to_png<'data>(
     blip: &Blip<'data>,
@@ -252,7 +254,7 @@ pub fn convert_blip_to_webp<'data>(
 ///     let png_data = img.to_png(None, None)?;
 ///     std::fs::write(format!("image_{}.png", i), png_data)?;
 /// }
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok::<(), litchi::Error>(())
 /// ```
 #[cfg(feature = "ole")]
 pub fn extract_images_from_ppt<P: AsRef<std::path::Path>>(
@@ -287,7 +289,7 @@ pub fn extract_images_from_ppt<P: AsRef<std::path::Path>>(
 ///     let data = img.decompressed_data()?;
 ///     std::fs::write(filename, &*data)?;
 /// }
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok::<(), litchi::Error>(())
 /// ```
 #[cfg(feature = "ole")]
 pub fn extract_images_from_doc<P: AsRef<std::path::Path>>(

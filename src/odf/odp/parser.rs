@@ -241,3 +241,249 @@ impl OdpParser {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TEST_PRESENTATION_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+    xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+    xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0">
+    <office:body>
+        <office:presentation>
+            <draw:page draw:name="Slide1">
+                <draw:frame draw:name="Title" presentation:class="title" svg:x="1cm" svg:y="1cm" svg:width="18cm" svg:height="3cm">
+                    <draw:text-box>
+                        <text:p>Welcome</text:p>
+                    </draw:text-box>
+                </draw:frame>
+                <draw:rect draw:name="Box1" svg:x="2cm" svg:y="5cm" svg:width="5cm" svg:height="3cm">
+                    <draw:text-box>
+                        <text:p>Rectangle content</text:p>
+                    </draw:text-box>
+                </draw:rect>
+            </draw:page>
+            <draw:page draw:name="Slide2">
+                <draw:frame draw:name="Content" presentation:class="object" svg:x="1cm" svg:y="4cm">
+                    <draw:text-box>
+                        <text:p>Bullet 1</text:p>
+                        <text:p>Bullet 2</text:p>
+                    </draw:text-box>
+                </draw:frame>
+            </draw:page>
+        </office:presentation>
+    </office:body>
+</office:document-content>"#;
+
+    const TEST_EMPTY_PRESENTATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0">
+    <office:body>
+        <office:presentation>
+        </office:presentation>
+    </office:body>
+</office:document-content>"#;
+
+    const TEST_SHAPES_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+    xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0">
+    <office:body>
+        <office:presentation>
+            <draw:page draw:name="Shapes">
+                <draw:ellipse draw:name="Circle1" svg:x="1cm" svg:y="1cm" svg:width="3cm" svg:height="3cm">
+                    <draw:text-box>
+                        <text:p>Circle</text:p>
+                    </draw:text-box>
+                </draw:ellipse>
+                <draw:line draw:name="Line1" svg:x1="0cm" svg:y1="0cm" svg:x2="10cm" svg:y2="10cm"/>
+                <draw:custom-shape draw:name="Custom1" svg:x="5cm" svg:y="5cm"/>
+            </draw:page>
+        </office:presentation>
+    </office:body>
+</office:document-content>"#;
+
+    #[test]
+    fn test_parse_slides() {
+        let slides = OdpParser::parse_slides(TEST_PRESENTATION_XML).unwrap();
+        assert_eq!(slides.len(), 2);
+
+        // First slide
+        assert_eq!(slides[0].title, Some("Slide1".to_string()));
+        assert_eq!(slides[0].index, 0);
+        assert!(slides[0].text.contains("Welcome"));
+        assert!(!slides[0].shapes.is_empty());
+
+        // Second slide
+        assert_eq!(slides[1].title, Some("Slide2".to_string()));
+        assert_eq!(slides[1].index, 1);
+    }
+
+    #[test]
+    fn test_parse_empty_presentation() {
+        let slides = OdpParser::parse_slides(TEST_EMPTY_PRESENTATION).unwrap();
+        assert!(slides.is_empty());
+    }
+
+    #[test]
+    fn test_parse_shapes() {
+        let slides = OdpParser::parse_slides(TEST_SHAPES_XML).unwrap();
+        assert_eq!(slides.len(), 1);
+
+        let slide = &slides[0];
+        // Parser extracts shapes from draw:ellipse, draw:line, draw:custom-shape, etc.
+        // Verify that at least one shape was parsed (actual count depends on parser implementation)
+        assert!(!slide.shapes.is_empty());
+    }
+
+    #[test]
+    fn test_slide_debug() {
+        let slide = Slide {
+            title: Some("Test".to_string()),
+            text: "Content".to_string(),
+            index: 0,
+            notes: None,
+            shapes: vec![],
+        };
+        let debug_str = format!("{:?}", slide);
+        assert!(debug_str.contains("Slide"));
+        assert!(debug_str.contains("Test"));
+    }
+
+    #[test]
+    fn test_slide_clone() {
+        let slide = Slide {
+            title: Some("Test".to_string()),
+            text: "Content".to_string(),
+            index: 0,
+            notes: None,
+            shapes: vec![],
+        };
+        let cloned = slide.clone();
+        assert_eq!(slide.title, cloned.title);
+        assert_eq!(slide.text, cloned.text);
+    }
+
+    #[test]
+    fn test_shape_debug() {
+        let shape = Shape {
+            shape_type: ShapeType::TextBox,
+            text: "Shape text".to_string(),
+            name: Some("Shape1".to_string()),
+            x: Some("1cm".to_string()),
+            y: Some("2cm".to_string()),
+            width: Some("10cm".to_string()),
+            height: Some("5cm".to_string()),
+            style_name: Some("Style1".to_string()),
+        };
+        let debug_str = format!("{:?}", shape);
+        assert!(debug_str.contains("Shape"));
+        assert!(debug_str.contains("TextBox"));
+    }
+
+    #[test]
+    fn test_shape_clone() {
+        let shape = Shape {
+            shape_type: ShapeType::AutoShape,
+            text: "Text".to_string(),
+            name: Some("Name".to_string()),
+            x: Some("0cm".to_string()),
+            y: Some("0cm".to_string()),
+            width: Some("5cm".to_string()),
+            height: Some("3cm".to_string()),
+            style_name: None,
+        };
+        let cloned = shape.clone();
+        assert_eq!(shape.shape_type, cloned.shape_type);
+        assert_eq!(shape.name, cloned.name);
+    }
+
+    #[test]
+    fn test_shape_type_variants() {
+        // Test all shape type variants
+        let types = vec![
+            ShapeType::TextBox,
+            ShapeType::AutoShape,
+            ShapeType::Line,
+            ShapeType::Placeholder,
+            ShapeType::Picture,
+            ShapeType::Group,
+            ShapeType::Connector,
+            ShapeType::Table,
+            ShapeType::GraphicFrame,
+            ShapeType::Unknown,
+        ];
+
+        for shape_type in types {
+            let shape = Shape {
+                shape_type,
+                text: String::new(),
+                name: None,
+                x: None,
+                y: None,
+                width: None,
+                height: None,
+                style_name: None,
+            };
+            let _ = format!("{:?}", shape);
+        }
+    }
+
+    #[test]
+    fn test_shape_type_equality() {
+        assert_eq!(ShapeType::TextBox, ShapeType::TextBox);
+        assert_ne!(ShapeType::TextBox, ShapeType::Line);
+        assert_ne!(ShapeType::AutoShape, ShapeType::Picture);
+    }
+
+    #[test]
+    fn test_shape_type_clone() {
+        let t1 = ShapeType::Placeholder;
+        let t2 = t1.clone();
+        assert_eq!(t1, t2);
+    }
+
+    #[test]
+    fn test_shape_type_copy() {
+        let t1 = ShapeType::Line;
+        let t2 = t1;
+        assert_eq!(t1, t2); // Copy trait allows this
+    }
+
+    #[test]
+    fn test_shape_builder() {
+        let builder = ShapeBuilder::new();
+        let shape = builder.build();
+        assert_eq!(shape.shape_type, ShapeType::AutoShape);
+        assert!(shape.text.is_empty());
+    }
+
+    #[test]
+    fn test_shape_builder_with_data() {
+        let mut builder = ShapeBuilder::new();
+        builder.name = Some("TestShape".to_string());
+        builder.x = Some("1cm".to_string());
+        builder.y = Some("2cm".to_string());
+        builder.width = Some("10cm".to_string());
+        builder.height = Some("5cm".to_string());
+        builder.text = "Hello".to_string();
+        builder.shape_type = ShapeType::TextBox;
+
+        let shape = builder.build();
+        assert_eq!(shape.name, Some("TestShape".to_string()));
+        assert_eq!(shape.x, Some("1cm".to_string()));
+        assert_eq!(shape.text, "Hello");
+        assert_eq!(shape.shape_type, ShapeType::TextBox);
+    }
+
+    #[test]
+    fn test_shape_builder_clone() {
+        let builder = ShapeBuilder::new();
+        let cloned = builder.build().clone();
+        assert_eq!(cloned.shape_type, ShapeType::AutoShape);
+    }
+}

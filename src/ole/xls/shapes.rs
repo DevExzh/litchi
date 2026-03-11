@@ -139,3 +139,269 @@ pub fn count_shapes_in_workbook(workbook_data: &[u8]) -> usize {
         EscherShapeFactory::count_shapes_in_drawing(&drawing_data)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_xls_shape(
+        shape_type: crate::ole::escher::EscherShapeType,
+        shape_id: u32,
+        text: Option<String>,
+        is_group: bool,
+        children: Vec<XlsShape>,
+    ) -> XlsShape {
+        XlsShape {
+            shape_type,
+            shape_id,
+            text,
+            is_group,
+            children,
+        }
+    }
+
+    #[test]
+    fn test_xls_shape_creation() {
+        let shape = create_test_xls_shape(
+            crate::ole::escher::EscherShapeType::Rectangle,
+            100,
+            Some("Shape text".to_string()),
+            false,
+            vec![],
+        );
+
+        assert_eq!(shape.shape_id, 100);
+        assert_eq!(shape.text, Some("Shape text".to_string()));
+        assert!(!shape.is_group);
+        assert!(shape.children.is_empty());
+    }
+
+    #[test]
+    fn test_xls_shape_group() {
+        let child = create_test_xls_shape(
+            crate::ole::escher::EscherShapeType::Rectangle,
+            101,
+            None,
+            false,
+            vec![],
+        );
+
+        let parent = create_test_xls_shape(
+            crate::ole::escher::EscherShapeType::Group,
+            100,
+            None,
+            true,
+            vec![child],
+        );
+
+        assert!(parent.is_group);
+        assert_eq!(parent.children.len(), 1);
+        assert_eq!(parent.children[0].shape_id, 101);
+    }
+
+    #[test]
+    fn test_xls_shape_clone() {
+        let shape = create_test_xls_shape(
+            crate::ole::escher::EscherShapeType::Ellipse,
+            50,
+            Some("Clonable".to_string()),
+            false,
+            vec![],
+        );
+        let cloned = shape.clone();
+
+        assert_eq!(cloned.shape_id, shape.shape_id);
+        assert_eq!(cloned.text, shape.text);
+        assert_eq!(cloned.is_group, shape.is_group);
+    }
+
+    #[test]
+    fn test_xls_shape_debug() {
+        let shape = create_test_xls_shape(
+            crate::ole::escher::EscherShapeType::Rectangle,
+            1,
+            Some("Debug test".to_string()),
+            false,
+            vec![],
+        );
+        let debug_str = format!("{:?}", shape);
+
+        assert!(debug_str.contains("XlsShape"));
+    }
+
+    #[test]
+    fn test_nested_groups() {
+        let inner_child = create_test_xls_shape(
+            crate::ole::escher::EscherShapeType::Rectangle,
+            3,
+            Some("Inner".to_string()),
+            false,
+            vec![],
+        );
+
+        let middle = create_test_xls_shape(
+            crate::ole::escher::EscherShapeType::Group,
+            2,
+            None,
+            true,
+            vec![inner_child],
+        );
+
+        let outer = create_test_xls_shape(
+            crate::ole::escher::EscherShapeType::Group,
+            1,
+            None,
+            true,
+            vec![middle],
+        );
+
+        assert!(outer.is_group);
+        assert_eq!(outer.children.len(), 1);
+        assert!(outer.children[0].is_group);
+        assert_eq!(outer.children[0].children.len(), 1);
+        assert_eq!(outer.children[0].children[0].shape_id, 3);
+    }
+
+    #[test]
+    fn test_xls_shape_variants() {
+        use crate::ole::escher::EscherShapeType;
+
+        let shape_types = vec![
+            EscherShapeType::Rectangle,
+            EscherShapeType::Ellipse,
+            EscherShapeType::Line,
+            EscherShapeType::Group,
+            EscherShapeType::Picture,
+            EscherShapeType::TextBox,
+            EscherShapeType::Polygon,
+            EscherShapeType::AutoShape,
+            EscherShapeType::Connector,
+            EscherShapeType::Unknown,
+        ];
+
+        for (i, shape_type) in shape_types.iter().enumerate() {
+            let shape = create_test_xls_shape(*shape_type, i as u32, None, false, vec![]);
+            assert_eq!(shape.shape_id, i as u32);
+            assert_eq!(shape.shape_type, *shape_type);
+        }
+    }
+
+    #[test]
+    fn test_xls_shape_empty_text() {
+        let shape = create_test_xls_shape(
+            crate::ole::escher::EscherShapeType::TextBox,
+            1,
+            None,
+            false,
+            vec![],
+        );
+        assert!(shape.text.is_none());
+    }
+
+    #[test]
+    fn test_xls_shape_unicode_text() {
+        let shape = create_test_xls_shape(
+            crate::ole::escher::EscherShapeType::TextBox,
+            1,
+            Some("Unicode: 你好世界 🎉".to_string()),
+            false,
+            vec![],
+        );
+        assert_eq!(shape.text.unwrap(), "Unicode: 你好世界 🎉");
+    }
+
+    #[test]
+    fn test_extract_shapes_empty_data() {
+        let result = extract_shapes_from_workbook(b"");
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_extract_shape_text_empty_data() {
+        let result = extract_shape_text_from_workbook(b"");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "");
+    }
+
+    #[test]
+    fn test_count_shapes_empty_data() {
+        let count = count_shapes_in_workbook(b"");
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_count_shapes_invalid_data() {
+        // Random data that isn't valid BIFF
+        let data = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+        let count = count_shapes_in_workbook(&data);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_multiple_children() {
+        let children: Vec<XlsShape> = (1..=5)
+            .map(|i| {
+                create_test_xls_shape(
+                    crate::ole::escher::EscherShapeType::Rectangle,
+                    i,
+                    Some(format!("Child {}", i)),
+                    false,
+                    vec![],
+                )
+            })
+            .collect();
+
+        let parent = create_test_xls_shape(
+            crate::ole::escher::EscherShapeType::Group,
+            0,
+            None,
+            true,
+            children,
+        );
+
+        assert_eq!(parent.children.len(), 5);
+        for (i, child) in parent.children.iter().enumerate() {
+            assert_eq!(child.shape_id, (i + 1) as u32);
+            assert_eq!(child.text, Some(format!("Child {}", i + 1)));
+        }
+    }
+
+    #[test]
+    fn test_deeply_nested_groups() {
+        let level4 = create_test_xls_shape(
+            crate::ole::escher::EscherShapeType::Rectangle,
+            4,
+            None,
+            false,
+            vec![],
+        );
+        let level3 = create_test_xls_shape(
+            crate::ole::escher::EscherShapeType::Group,
+            3,
+            None,
+            true,
+            vec![level4],
+        );
+        let level2 = create_test_xls_shape(
+            crate::ole::escher::EscherShapeType::Group,
+            2,
+            None,
+            true,
+            vec![level3],
+        );
+        let level1 = create_test_xls_shape(
+            crate::ole::escher::EscherShapeType::Group,
+            1,
+            None,
+            true,
+            vec![level2],
+        );
+
+        assert!(level1.is_group);
+        assert!(level1.children[0].is_group);
+        assert!(level1.children[0].children[0].is_group);
+        assert!(!level1.children[0].children[0].children[0].is_group);
+        assert_eq!(level1.children[0].children[0].children[0].shape_id, 4);
+    }
+}

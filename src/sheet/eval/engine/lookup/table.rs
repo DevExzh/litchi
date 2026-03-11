@@ -120,3 +120,233 @@ pub(crate) async fn eval_hlookup(
 
     Ok(CellValue::Error("HLOOKUP: value not found".to_string()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::engine::test_helpers::TestEngine;
+    use crate::sheet::eval::parser::Expr;
+    use crate::sheet::eval::parser::ast::RangeRef;
+
+    fn num_expr(n: f64) -> Expr {
+        if n == n.floor() {
+            Expr::Literal(CellValue::Int(n as i64))
+        } else {
+            Expr::Literal(CellValue::Float(n))
+        }
+    }
+
+    fn str_expr(s: &str) -> Expr {
+        Expr::Literal(CellValue::String(s.to_string()))
+    }
+
+    fn range_expr(sheet: &str, start_row: u32, start_col: u32, end_row: u32, end_col: u32) -> Expr {
+        Expr::Range(RangeRef {
+            sheet: sheet.to_string(),
+            start_row,
+            start_col,
+            end_row,
+            end_col,
+        })
+    }
+
+    #[tokio::test]
+    async fn test_vlookup_basic() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        // Create a table: | ID | Name  | Value |
+        //                   | 1  | Alice | 100   |
+        //                   | 2  | Bob   | 200   |
+        //                   | 3  | Carol | 300   |
+        let values = vec![
+            CellValue::Int(1),
+            CellValue::String("Alice".to_string()),
+            CellValue::Int(100),
+            CellValue::Int(2),
+            CellValue::String("Bob".to_string()),
+            CellValue::Int(200),
+            CellValue::Int(3),
+            CellValue::String("Carol".to_string()),
+            CellValue::Int(300),
+        ];
+        engine.add_range("Sheet1", 1, 1, 3, 3, values);
+
+        // VLOOKUP(2, Sheet1!A1:C3, 2) should return "Bob"
+        let args = vec![
+            num_expr(2.0),
+            range_expr("Sheet1", 1, 1, 3, 3),
+            num_expr(2.0),
+        ];
+        let result = eval_vlookup(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("Bob".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_vlookup_third_column() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        let values = vec![
+            CellValue::Int(1),
+            CellValue::String("Alice".to_string()),
+            CellValue::Int(100),
+            CellValue::Int(2),
+            CellValue::String("Bob".to_string()),
+            CellValue::Int(200),
+        ];
+        engine.add_range("Sheet1", 1, 1, 2, 3, values);
+
+        // VLOOKUP(2, Sheet1!A1:C2, 3) should return 200
+        let args = vec![
+            num_expr(2.0),
+            range_expr("Sheet1", 1, 1, 2, 3),
+            num_expr(3.0),
+        ];
+        let result = eval_vlookup(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(200));
+    }
+
+    #[tokio::test]
+    async fn test_vlookup_not_found() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        let values = vec![
+            CellValue::Int(1),
+            CellValue::String("Alice".to_string()),
+            CellValue::Int(2),
+            CellValue::String("Bob".to_string()),
+        ];
+        engine.add_range("Sheet1", 1, 1, 2, 2, values);
+
+        let args = vec![
+            num_expr(999.0),
+            range_expr("Sheet1", 1, 1, 2, 2),
+            num_expr(2.0),
+        ];
+        let result = eval_vlookup(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("not found")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_vlookup_col_index_out_of_bounds() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        let values = vec![CellValue::Int(1), CellValue::String("Alice".to_string())];
+        engine.add_range("Sheet1", 1, 1, 1, 2, values);
+
+        let args = vec![
+            num_expr(1.0),
+            range_expr("Sheet1", 1, 1, 1, 2),
+            num_expr(5.0),
+        ];
+        let result = eval_vlookup(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("out of bounds")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_vlookup_string_lookup() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        let values = vec![
+            CellValue::String("apple".to_string()),
+            CellValue::Int(100),
+            CellValue::String("banana".to_string()),
+            CellValue::Int(200),
+        ];
+        engine.add_range("Sheet1", 1, 1, 2, 2, values);
+
+        // VLOOKUP("banana", Sheet1!A1:B2, 2) should return 200
+        let args = vec![
+            str_expr("banana"),
+            range_expr("Sheet1", 1, 1, 2, 2),
+            num_expr(2.0),
+        ];
+        let result = eval_vlookup(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(200));
+    }
+
+    #[tokio::test]
+    async fn test_hlookup_basic() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        // Create a horizontal table:
+        // | Name  | Alice | Bob   | Carol |
+        // | Value | 100   | 200   | 300   |
+        let values = vec![
+            CellValue::String("Name".to_string()),
+            CellValue::String("Alice".to_string()),
+            CellValue::String("Bob".to_string()),
+            CellValue::String("Carol".to_string()),
+            CellValue::String("Value".to_string()),
+            CellValue::Int(100),
+            CellValue::Int(200),
+            CellValue::Int(300),
+        ];
+        engine.add_range("Sheet1", 1, 1, 2, 4, values);
+
+        // HLOOKUP("Bob", Sheet1!A1:D2, 2) should return 200
+        let args = vec![
+            str_expr("Bob"),
+            range_expr("Sheet1", 1, 1, 2, 4),
+            num_expr(2.0),
+        ];
+        let result = eval_hlookup(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(200));
+    }
+
+    #[tokio::test]
+    async fn test_hlookup_not_found() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        let values = vec![
+            CellValue::String("A".to_string()),
+            CellValue::String("B".to_string()),
+            CellValue::Int(1),
+            CellValue::Int(2),
+        ];
+        engine.add_range("Sheet1", 1, 1, 2, 2, values);
+
+        let args = vec![
+            str_expr("Z"),
+            range_expr("Sheet1", 1, 1, 2, 2),
+            num_expr(2.0),
+        ];
+        let result = eval_hlookup(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("not found")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_hlookup_row_index_out_of_bounds() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        let values = vec![CellValue::String("A".to_string()), CellValue::Int(1)];
+        engine.add_range("Sheet1", 1, 1, 1, 2, values);
+
+        let args = vec![
+            str_expr("A"),
+            range_expr("Sheet1", 1, 1, 1, 2),
+            num_expr(5.0),
+        ];
+        let result = eval_hlookup(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("out of bounds")),
+            _ => panic!("Expected Error"),
+        }
+    }
+}

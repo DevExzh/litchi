@@ -463,3 +463,284 @@ impl<'a> ParagraphContent<'a> {
         &self.runs
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_color_new() {
+        let color = Color::new(255, 128, 0);
+        assert_eq!(color.red, 255);
+        assert_eq!(color.green, 128);
+        assert_eq!(color.blue, 0);
+    }
+
+    #[test]
+    fn test_color_black() {
+        let color = Color::black();
+        assert_eq!(color.red, 0);
+        assert_eq!(color.green, 0);
+        assert_eq!(color.blue, 0);
+    }
+
+    #[test]
+    fn test_color_white() {
+        let color = Color::white();
+        assert_eq!(color.red, 255);
+        assert_eq!(color.green, 255);
+        assert_eq!(color.blue, 255);
+    }
+
+    #[test]
+    fn test_color_clone() {
+        let color = Color::new(100, 150, 200);
+        let cloned = color.clone();
+        assert_eq!(cloned.red, color.red);
+        assert_eq!(cloned.green, color.green);
+        assert_eq!(cloned.blue, color.blue);
+    }
+
+    #[test]
+    fn test_color_debug() {
+        let color = Color::new(255, 0, 0);
+        let debug = format!("{:?}", color);
+        assert!(debug.contains("Color"));
+        assert!(debug.contains("255"));
+    }
+
+    #[test]
+    fn test_color_table_new() {
+        let table = ColorTable::new();
+        assert!(table.colors().is_empty());
+    }
+
+    #[test]
+    fn test_color_table_default() {
+        let table: ColorTable = Default::default();
+        assert!(table.colors().is_empty());
+    }
+
+    #[test]
+    fn test_color_table_add() {
+        let mut table = ColorTable::new();
+        let idx1 = table.add(Color::new(255, 0, 0));
+        let idx2 = table.add(Color::new(0, 255, 0));
+        assert_eq!(idx1, 0);
+        assert_eq!(idx2, 1);
+        assert_eq!(table.colors().len(), 2);
+    }
+
+    #[test]
+    fn test_color_table_get() {
+        let mut table = ColorTable::new();
+        table.add(Color::new(255, 0, 0));
+        table.add(Color::new(0, 255, 0));
+        assert!(table.get(0).is_some());
+        assert!(table.get(1).is_some());
+        assert!(table.get(2).is_none());
+    }
+
+    #[test]
+    fn test_font_family_variants() {
+        assert_eq!(FontFamily::default(), FontFamily::Nil);
+        assert_ne!(FontFamily::Roman, FontFamily::Swiss);
+    }
+
+    #[test]
+    fn test_font_new() {
+        let font = Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss, 0);
+        assert_eq!(font.name, "Arial");
+        assert_eq!(font.family, FontFamily::Swiss);
+        assert_eq!(font.charset, 0);
+    }
+
+    #[test]
+    fn test_font_table_new() {
+        let table: FontTable = FontTable::new();
+        assert!(table.fonts().is_empty());
+    }
+
+    #[test]
+    fn test_font_table_insert() {
+        let mut table: FontTable = FontTable::new();
+        table.insert(0, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss, 0));
+        table.insert(1, Font::new(Cow::Borrowed("Times"), FontFamily::Roman, 0));
+        assert_eq!(table.fonts().len(), 2);
+    }
+
+    #[test]
+    fn test_font_table_get() {
+        let mut table: FontTable = FontTable::new();
+        table.insert(0, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss, 0));
+        assert!(table.get(0).is_some());
+        assert!(table.get(1).is_none());
+    }
+
+    #[test]
+    fn test_font_table_sparse() {
+        let mut table: FontTable = FontTable::new();
+        table.insert(5, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss, 0));
+        assert_eq!(table.fonts().len(), 6);
+    }
+
+    #[test]
+    fn test_alignment_variants() {
+        assert_eq!(Alignment::default(), Alignment::Left);
+        assert_ne!(Alignment::Left, Alignment::Right);
+    }
+
+    #[test]
+    fn test_spacing_default() {
+        let spacing = Spacing::default();
+        assert_eq!(spacing.before, 0);
+        assert_eq!(spacing.after, 0);
+        assert_eq!(spacing.line, 0);
+        assert!(!spacing.line_multiple);
+    }
+
+    #[test]
+    fn test_indentation_default() {
+        let indent = Indentation::default();
+        assert_eq!(indent.left, 0);
+        assert_eq!(indent.right, 0);
+        assert_eq!(indent.first_line, 0);
+    }
+
+    #[test]
+    fn test_paragraph_default() {
+        let para = Paragraph::default();
+        assert_eq!(para.alignment, Alignment::Left);
+        assert!(!para.keep_together);
+        assert!(!para.keep_next);
+        assert!(!para.page_break_before);
+        assert!(!para.widow_control);
+    }
+
+    #[test]
+    fn test_underline_style_variants() {
+        assert_eq!(UnderlineStyle::default(), UnderlineStyle::None);
+        assert_ne!(UnderlineStyle::Single, UnderlineStyle::Double);
+    }
+
+    #[test]
+    fn test_formatting_default() {
+        let fmt = Formatting::default();
+        assert_eq!(fmt.font_ref, 0);
+        assert!(!fmt.bold);
+        assert!(!fmt.italic);
+        assert!(!fmt.strike);
+        assert!(!fmt.superscript);
+        assert!(!fmt.subscript);
+    }
+
+    #[test]
+    fn test_run_new() {
+        let fmt = Formatting::default();
+        let run = Run::new(Cow::Borrowed("Hello"), fmt);
+        assert_eq!(run.text(), "Hello");
+        assert!(!run.bold().unwrap());
+    }
+
+    #[test]
+    fn test_run_bold() {
+        let mut fmt = Formatting::default();
+        fmt.bold = true;
+        let run = Run::new(Cow::Borrowed("Bold"), fmt);
+        assert!(run.bold().unwrap());
+    }
+
+    #[test]
+    fn test_run_italic() {
+        let mut fmt = Formatting::default();
+        fmt.italic = true;
+        let run = Run::new(Cow::Borrowed("Italic"), fmt);
+        assert!(run.italic().unwrap());
+    }
+
+    #[test]
+    fn test_run_strikethrough() {
+        let mut fmt = Formatting::default();
+        fmt.strike = true;
+        let run = Run::new(Cow::Borrowed("Strike"), fmt);
+        assert!(run.strikethrough().unwrap());
+    }
+
+    #[test]
+    fn test_run_double_strikethrough() {
+        let mut fmt = Formatting::default();
+        fmt.double_strike = true;
+        let run = Run::new(Cow::Borrowed("DStrike"), fmt);
+        assert!(run.strikethrough().unwrap());
+    }
+
+    #[test]
+    fn test_run_underline() {
+        let mut fmt = Formatting::default();
+        fmt.underline = UnderlineStyle::Single;
+        let run = Run::new(Cow::Borrowed("Underline"), fmt);
+        assert!(run.underline());
+    }
+
+    #[test]
+    fn test_run_no_underline() {
+        let fmt = Formatting::default();
+        let run = Run::new(Cow::Borrowed("No Underline"), fmt);
+        assert!(!run.underline());
+    }
+
+    #[test]
+    fn test_run_vertical_position_superscript() {
+        let mut fmt = Formatting::default();
+        fmt.superscript = true;
+        let run = Run::new(Cow::Borrowed("Super"), fmt);
+        assert!(matches!(
+            run.vertical_position(),
+            Some(crate::common::style::text::pos::VerticalPosition::Superscript)
+        ));
+    }
+
+    #[test]
+    fn test_run_vertical_position_subscript() {
+        let mut fmt = Formatting::default();
+        fmt.subscript = true;
+        let run = Run::new(Cow::Borrowed("Sub"), fmt);
+        assert!(matches!(
+            run.vertical_position(),
+            Some(crate::common::style::text::pos::VerticalPosition::Subscript)
+        ));
+    }
+
+    #[test]
+    fn test_run_vertical_position_none() {
+        let fmt = Formatting::default();
+        let run = Run::new(Cow::Borrowed("Normal"), fmt);
+        assert!(run.vertical_position().is_none());
+    }
+
+    #[test]
+    fn test_style_block_new() {
+        let fmt = Formatting::default();
+        let para = Paragraph::default();
+        let block = StyleBlock::new(Cow::Borrowed("Text"), fmt, para);
+        assert_eq!(block.text(), "Text");
+    }
+
+    #[test]
+    fn test_paragraph_content_new() {
+        let para = Paragraph::default();
+        let content = ParagraphContent::new(para, vec![]);
+        assert!(content.runs().is_empty());
+    }
+
+    #[test]
+    fn test_paragraph_content_text() {
+        let fmt = Formatting::default();
+        let runs = vec![
+            Run::new(Cow::Borrowed("Hello "), fmt.clone()),
+            Run::new(Cow::Borrowed("World"), fmt),
+        ];
+        let content = ParagraphContent::new(Paragraph::default(), runs);
+        assert_eq!(content.text(), "Hello World");
+    }
+}

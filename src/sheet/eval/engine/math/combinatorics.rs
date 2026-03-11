@@ -425,3 +425,128 @@ fn lcm_u128(a: u128, b: u128) -> u128 {
     let g = gcd_u128(a, b);
     (a / g) * b
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::parser::Expr;
+
+    fn num_expr(n: f64) -> Expr {
+        if n == n.floor() {
+            Expr::Literal(CellValue::Int(n as i64))
+        } else {
+            Expr::Literal(CellValue::Float(n))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_fact() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(5.0)];
+        let result = eval_fact(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(120)); // 5! = 120
+    }
+
+    #[tokio::test]
+    async fn test_eval_fact_zero() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_fact(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(1)); // 0! = 1
+    }
+
+    #[tokio::test]
+    async fn test_eval_fact_negative() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(-5.0)];
+        let result = eval_fact(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("non-negative")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_combin() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // C(5, 2) = 10
+        let args = vec![num_expr(5.0), num_expr(2.0)];
+        let result = eval_combin(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(10));
+    }
+
+    #[tokio::test]
+    async fn test_eval_combin_k_greater_n() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(3.0), num_expr(5.0)];
+        let result = eval_combin(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("number_chosen <= number")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_permut() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // P(5, 2) = 20
+        let args = vec![num_expr(5.0), num_expr(2.0)];
+        let result = eval_permut(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(20));
+    }
+
+    #[tokio::test]
+    async fn test_eval_gcd() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // GCD(48, 18) = 6
+        let args = vec![num_expr(48.0), num_expr(18.0)];
+        let result = eval_gcd(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(6));
+    }
+
+    #[tokio::test]
+    async fn test_eval_gcd_single_arg() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(42.0)];
+        let result = eval_gcd(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(42));
+    }
+
+    #[tokio::test]
+    async fn test_eval_lcm() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // LCM(4, 6) = 12
+        let args = vec![num_expr(4.0), num_expr(6.0)];
+        let result = eval_lcm(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(12));
+    }
+
+    #[tokio::test]
+    async fn test_eval_factdouble() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // 6!! = 6 * 4 * 2 = 48
+        let args = vec![num_expr(6.0)];
+        let result = eval_factdouble(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(48));
+    }
+
+    #[tokio::test]
+    async fn test_eval_multinomial() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // MULTINOMIAL(2, 3, 4) = (2+3+4)! / (2! * 3! * 4!) = 9! / (2! * 3! * 4!) = 1260
+        let args = vec![num_expr(2.0), num_expr(3.0), num_expr(4.0)];
+        let result = eval_multinomial(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(1260));
+    }
+}

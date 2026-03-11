@@ -20,9 +20,9 @@ use std::io::{Read, Seek};
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::ppt::Package;
+/// use litchi::ole::ppt::Package;
 ///
-/// let pkg = Package::open("presentation.ppt")?;
+/// let mut pkg = Package::open("presentation.ppt")?;
 /// let pres = pkg.presentation()?;
 ///
 /// // Get slides (zero-copy, lazy evaluation)

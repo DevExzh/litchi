@@ -748,3 +748,245 @@ fn round_to_significance(value: f64, significance: u32) -> f64 {
     let factor = 10f64.powi(significance as i32);
     (value * factor).round() / factor
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::engine::test_helpers::TestEngine;
+    use crate::sheet::eval::parser::Expr;
+
+    fn num_expr(n: f64) -> Expr {
+        if n == n.floor() {
+            Expr::Literal(CellValue::Int(n as i64))
+        } else {
+            Expr::Literal(CellValue::Float(n))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_large() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Array: [3, 1, 4, 1, 5, 9, 2, 6]
+        // Sorted descending: [9, 6, 5, 4, 3, 2, 1, 1]
+        // 1st largest = 9, 2nd largest = 6, 3rd largest = 5
+        engine.set_cell("Sheet1", 0, 0, CellValue::Int(3));
+        engine.set_cell("Sheet1", 0, 1, CellValue::Int(1));
+        engine.set_cell("Sheet1", 0, 2, CellValue::Int(4));
+        engine.set_cell("Sheet1", 0, 3, CellValue::Int(1));
+        engine.set_cell("Sheet1", 0, 4, CellValue::Int(5));
+        engine.set_cell("Sheet1", 0, 5, CellValue::Int(9));
+        engine.set_cell("Sheet1", 0, 6, CellValue::Int(2));
+        engine.set_cell("Sheet1", 0, 7, CellValue::Int(6));
+
+        let range = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 0,
+            end_col: 7,
+        });
+        let args = vec![range, num_expr(3.0)];
+        let result = eval_large(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 5.0).abs() < 1e-9, "Expected 5, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_small() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Array: [3, 1, 4, 1, 5, 9, 2, 6]
+        // Sorted ascending: [1, 1, 2, 3, 4, 5, 6, 9]
+        // 1st smallest = 1, 2nd smallest = 1 (duplicates), 3rd smallest = 2
+        engine.set_cell("Sheet1", 0, 0, CellValue::Int(3));
+        engine.set_cell("Sheet1", 0, 1, CellValue::Int(1));
+        engine.set_cell("Sheet1", 0, 2, CellValue::Int(4));
+        engine.set_cell("Sheet1", 0, 3, CellValue::Int(1));
+        engine.set_cell("Sheet1", 0, 4, CellValue::Int(5));
+        engine.set_cell("Sheet1", 0, 5, CellValue::Int(9));
+        engine.set_cell("Sheet1", 0, 6, CellValue::Int(2));
+        engine.set_cell("Sheet1", 0, 7, CellValue::Int(6));
+
+        let range = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 0,
+            end_col: 7,
+        });
+        // Get 3rd smallest since there are duplicates of 1
+        let args = vec![range, num_expr(3.0)];
+        let result = eval_small(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 2.0).abs() < 1e-9, "Expected 2, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_rank_eq() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Rank of 5 in [1, 2, 3, 4, 5, 6, 7] = 3 (descending order, 5 is 3rd largest)
+        engine.set_cell("Sheet1", 0, 0, CellValue::Int(1));
+        engine.set_cell("Sheet1", 0, 1, CellValue::Int(2));
+        engine.set_cell("Sheet1", 0, 2, CellValue::Int(3));
+        engine.set_cell("Sheet1", 0, 3, CellValue::Int(4));
+        engine.set_cell("Sheet1", 0, 4, CellValue::Int(5));
+        engine.set_cell("Sheet1", 0, 5, CellValue::Int(6));
+        engine.set_cell("Sheet1", 0, 6, CellValue::Int(7));
+
+        let range = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 0,
+            end_col: 6,
+        });
+        let args = vec![num_expr(5.0), range];
+        let result = eval_rank_eq(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 3.0).abs() < 1e-9, "Expected 3, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_rank_avg() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Rank of 5 in [5, 5, 5, 4, 3, 2, 1] with duplicates
+        engine.set_cell("Sheet1", 0, 0, CellValue::Int(5));
+        engine.set_cell("Sheet1", 0, 1, CellValue::Int(5));
+        engine.set_cell("Sheet1", 0, 2, CellValue::Int(5));
+        engine.set_cell("Sheet1", 0, 3, CellValue::Int(4));
+        engine.set_cell("Sheet1", 0, 4, CellValue::Int(3));
+        engine.set_cell("Sheet1", 0, 5, CellValue::Int(2));
+        engine.set_cell("Sheet1", 0, 6, CellValue::Int(1));
+
+        let range = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 0,
+            end_col: 6,
+        });
+        let args = vec![num_expr(5.0), range];
+        let result = eval_rank_avg(ctx, "Sheet1", &args).await.unwrap();
+        // Average rank of the three 5s would be (1+2+3)/3 = 2
+        match result {
+            CellValue::Float(v) => assert!((v - 2.0).abs() < 1e-9, "Expected 2, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_percentile_inc() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Data: [1, 2, 3, 4, 5], 50th percentile (median) = 3
+        engine.set_cell("Sheet1", 0, 0, CellValue::Int(1));
+        engine.set_cell("Sheet1", 0, 1, CellValue::Int(2));
+        engine.set_cell("Sheet1", 0, 2, CellValue::Int(3));
+        engine.set_cell("Sheet1", 0, 3, CellValue::Int(4));
+        engine.set_cell("Sheet1", 0, 4, CellValue::Int(5));
+
+        let range = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 0,
+            end_col: 4,
+        });
+        let args = vec![range, num_expr(0.5)];
+        let result = eval_percentile_inc(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 3.0).abs() < 1e-9, "Expected 3, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_percentile_exc() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Data: [1, 2, 3, 4, 5], 50th percentile exclusive
+        engine.set_cell("Sheet1", 0, 0, CellValue::Int(1));
+        engine.set_cell("Sheet1", 0, 1, CellValue::Int(2));
+        engine.set_cell("Sheet1", 0, 2, CellValue::Int(3));
+        engine.set_cell("Sheet1", 0, 3, CellValue::Int(4));
+        engine.set_cell("Sheet1", 0, 4, CellValue::Int(5));
+
+        let range = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 0,
+            end_col: 4,
+        });
+        let args = vec![range, num_expr(0.5)];
+        let result = eval_percentile_exc(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 3.0).abs() < 1e-9, "Expected 3, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_quartile_inc() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Data: [1, 2, 3, 4, 5, 6, 7, 8], quartile 2 (median) = 4.5
+        engine.set_cell("Sheet1", 0, 0, CellValue::Int(1));
+        engine.set_cell("Sheet1", 0, 1, CellValue::Int(2));
+        engine.set_cell("Sheet1", 0, 2, CellValue::Int(3));
+        engine.set_cell("Sheet1", 0, 3, CellValue::Int(4));
+        engine.set_cell("Sheet1", 0, 4, CellValue::Int(5));
+        engine.set_cell("Sheet1", 0, 5, CellValue::Int(6));
+        engine.set_cell("Sheet1", 0, 6, CellValue::Int(7));
+        engine.set_cell("Sheet1", 0, 7, CellValue::Int(8));
+
+        let range = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 0,
+            end_col: 7,
+        });
+        let args = vec![range, num_expr(2.0)];
+        let result = eval_quartile_inc(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 4.5).abs() < 1e-9, "Expected 4.5, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_percentrank_inc() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Data: [1, 2, 3, 4, 5], percent rank of 3 = 0.5
+        engine.set_cell("Sheet1", 0, 0, CellValue::Int(1));
+        engine.set_cell("Sheet1", 0, 1, CellValue::Int(2));
+        engine.set_cell("Sheet1", 0, 2, CellValue::Int(3));
+        engine.set_cell("Sheet1", 0, 3, CellValue::Int(4));
+        engine.set_cell("Sheet1", 0, 4, CellValue::Int(5));
+
+        let range = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 0,
+            end_col: 4,
+        });
+        let args = vec![range, num_expr(3.0)];
+        let result = eval_percentrank_inc(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.5).abs() < 1e-9, "Expected 0.5, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+}

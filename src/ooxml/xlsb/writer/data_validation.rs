@@ -225,6 +225,7 @@ fn build_ptg_for_value(text: &str, ptg: &mut Vec<u8>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ooxml::xlsb::writer::RecordWriter;
 
     #[test]
     fn test_serialize_list_validation() {
@@ -253,5 +254,190 @@ mod tests {
         assert_ne!(flags & 0x0100, 0); // allow blank
         assert_eq!(flags & 0x0200, 0); // show dropdown (not suppressed)
         assert_ne!(flags & 0x0008_0000, 0); // show error
+    }
+
+    #[test]
+    fn test_serialize_whole_number_validation() {
+        let dv = DataValidation {
+            validation_type: 1, // whole number
+            operator: 2,        // greater than
+            formula1: Some("10".to_string()),
+            formula2: None,
+            allow_blank: false,
+            show_dropdown: false,
+            show_input_message: true,
+            show_error_message: false,
+            error_style: 1, // warning
+            input_title: Some("Input Title".to_string()),
+            input_text: Some("Enter a number".to_string()),
+            error_title: Some("Error".to_string()),
+            error_text: Some("Must be > 10".to_string()),
+            cell_ranges: "B1:B20".to_string(),
+        };
+
+        let payload = serialize_data_validation(&dv).unwrap();
+        let flags = u32::from_le_bytes(payload[0..4].try_into().unwrap());
+        assert_eq!(flags & 0x0F, 1); // type = whole number
+        assert_eq!((flags >> 4) & 0x07, 1); // error style = warning
+        assert_eq!(flags & 0x0100, 0); // allow blank = false
+    }
+
+    #[test]
+    fn test_serialize_decimal_validation() {
+        let dv = DataValidation {
+            validation_type: 2, // decimal
+            operator: 4,        // between
+            formula1: Some("0.0".to_string()),
+            formula2: Some("100.0".to_string()),
+            allow_blank: true,
+            show_dropdown: false,
+            show_input_message: false,
+            show_error_message: true,
+            error_style: 0,
+            input_title: None,
+            input_text: None,
+            error_title: None,
+            error_text: None,
+            cell_ranges: "C1:C10".to_string(),
+        };
+
+        let payload = serialize_data_validation(&dv).unwrap();
+        let flags = u32::from_le_bytes(payload[0..4].try_into().unwrap());
+        assert_eq!(flags & 0x0F, 2); // type = decimal
+        assert_eq!((flags >> 20) & 0x0F, 4); // operator = between
+    }
+
+    #[test]
+    fn test_serialize_date_validation() {
+        let dv = DataValidation {
+            validation_type: 4, // date
+            operator: 3,        // less than
+            formula1: Some("2024-01-01".to_string()),
+            formula2: None,
+            allow_blank: true,
+            show_dropdown: false,
+            show_input_message: false,
+            show_error_message: true,
+            error_style: 0,
+            input_title: None,
+            input_text: None,
+            error_title: None,
+            error_text: None,
+            cell_ranges: "D1:D10".to_string(),
+        };
+
+        let payload = serialize_data_validation(&dv).unwrap();
+        let flags = u32::from_le_bytes(payload[0..4].try_into().unwrap());
+        assert_eq!(flags & 0x0F, 4); // type = date
+    }
+
+    #[test]
+    fn test_write_data_validations_empty() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+        let validations: Vec<DataValidation> = vec![];
+
+        let result = write_data_validations(&mut writer, &validations);
+        assert!(result.is_ok());
+        assert!(buffer.is_empty()); // No records written for empty list
+    }
+
+    #[test]
+    fn test_write_data_validations_single() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+        let validations = vec![DataValidation {
+            validation_type: 3, // list
+            operator: 0,
+            formula1: Some("Yes,No".to_string()),
+            formula2: None,
+            allow_blank: true,
+            show_dropdown: true,
+            show_input_message: false,
+            show_error_message: true,
+            error_style: 0,
+            input_title: None,
+            input_text: None,
+            error_title: None,
+            error_text: None,
+            cell_ranges: "A1:A10".to_string(),
+        }];
+
+        let result = write_data_validations(&mut writer, &validations);
+        assert!(result.is_ok());
+        assert!(!buffer.is_empty());
+    }
+
+    #[test]
+    fn test_build_ptg_for_value_integer() {
+        let mut ptg = Vec::new();
+        build_ptg_for_value("42", &mut ptg);
+        assert_eq!(ptg.len(), 3); // opcode(1) + u16(2)
+        assert_eq!(ptg[0], 0x1E); // PtgInt opcode
+        assert_eq!(u16::from_le_bytes([ptg[1], ptg[2]]), 42);
+    }
+
+    #[test]
+    fn test_build_ptg_for_value_float() {
+        let mut ptg = Vec::new();
+        build_ptg_for_value("3.14159", &mut ptg);
+        assert_eq!(ptg.len(), 9); // opcode(1) + f64(8)
+        assert_eq!(ptg[0], 0x1F); // PtgNum opcode
+    }
+
+    #[test]
+    fn test_build_ptg_for_value_string() {
+        let mut ptg = Vec::new();
+        build_ptg_for_value("Hello", &mut ptg);
+        assert_eq!(ptg[0], 0x17); // PtgStr opcode
+    }
+
+    #[test]
+    fn test_build_ptg_for_value_quoted_string() {
+        let mut ptg = Vec::new();
+        build_ptg_for_value("\"Test Value\"", &mut ptg);
+        assert_eq!(ptg[0], 0x17); // PtgStr opcode
+    }
+
+    #[test]
+    fn test_write_biff12_formula_empty() {
+        let mut buf = Vec::new();
+        write_biff12_formula(&mut buf, None);
+        assert_eq!(buf.len(), 8); // cb_ptg(4) + cb_adddata(4) both zeros
+        assert_eq!(i32::from_le_bytes(buf[0..4].try_into().unwrap()), 0);
+        assert_eq!(i32::from_le_bytes(buf[4..8].try_into().unwrap()), 0);
+    }
+
+    #[test]
+    fn test_write_biff12_formula_with_equals() {
+        let mut buf = Vec::new();
+        write_biff12_formula(&mut buf, Some("=A1+B1"));
+        // Should strip leading '=' and write as string
+        assert!(!buf.is_empty());
+    }
+
+    #[test]
+    fn test_write_biff12_formula_number() {
+        let mut buf = Vec::new();
+        write_biff12_formula(&mut buf, Some("100"));
+        assert!(!buf.is_empty());
+    }
+
+    #[test]
+    fn test_write_xl_wide_string() {
+        let mut buf = Vec::new();
+        write_xl_wide_string(&mut buf, "Test");
+        assert!(!buf.is_empty());
+
+        let char_count = u32::from_le_bytes(buf[0..4].try_into().unwrap());
+        assert_eq!(char_count, 4); // "Test" has 4 chars
+    }
+
+    #[test]
+    fn test_write_xl_wide_string_empty() {
+        let mut buf = Vec::new();
+        write_xl_wide_string(&mut buf, "");
+        assert_eq!(buf.len(), 4); // Just the char count (0)
+        assert_eq!(u32::from_le_bytes(buf[0..4].try_into().unwrap()), 0);
     }
 }

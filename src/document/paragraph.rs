@@ -76,3 +76,86 @@ impl Paragraph {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::Document;
+    use std::path::PathBuf;
+
+    fn test_data_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-data")
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_paragraph_text_docx() {
+        let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
+        let doc = Document::open(&path).expect("Failed to open DOCX");
+        let paragraphs = doc.paragraphs().expect("Failed to get paragraphs");
+
+        for para in paragraphs {
+            let text = para.text().expect("Failed to get paragraph text");
+            // Text should be extractable
+            let _ = text.len();
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_paragraph_text_doc() {
+        let path = test_data_path().join("ole/doc/FancyFoot.doc");
+        let doc = Document::open(&path).expect("Failed to open DOC");
+        let paragraphs = doc.paragraphs().expect("Failed to get paragraphs");
+
+        for para in paragraphs {
+            let text = para.text().expect("Failed to get paragraph text");
+            let _ = text.len();
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_paragraph_runs_docx() {
+        let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
+        let doc = Document::open(&path).expect("Failed to open DOCX");
+        let paragraphs = doc.paragraphs().expect("Failed to get paragraphs");
+
+        for para in paragraphs {
+            let runs = para.runs().expect("Failed to get runs");
+            for run in runs {
+                let _text = run.text().expect("Failed to get run text");
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_paragraph_runs_doc() {
+        let path = test_data_path().join("ole/doc/FancyFoot.doc");
+        let doc = Document::open(&path).expect("Failed to open DOC");
+        let paragraphs = doc.paragraphs().expect("Failed to get paragraphs");
+
+        for para in paragraphs {
+            let runs = para.runs().expect("Failed to get runs");
+            for run in runs {
+                let _text = run.text().expect("Failed to get run text");
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "rtf")]
+    fn test_paragraph_rtf() {
+        // Use testUnicode.rtf which parses correctly
+        let path = test_data_path().join("rtf/testUnicode.rtf");
+        let doc = Document::open(&path).expect("Failed to open RTF");
+        let paragraphs = doc.paragraphs().expect("Failed to get paragraphs");
+
+        assert!(!paragraphs.is_empty(), "Expected at least one paragraph");
+
+        for para in paragraphs {
+            let text = para.text().expect("Failed to get paragraph text");
+            let _ = text.len();
+        }
+    }
+}

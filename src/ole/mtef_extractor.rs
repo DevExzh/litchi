@@ -112,7 +112,7 @@ impl<'arena> MtefExtractor<'arena> {
         // Parse cbObject (u32 little-endian at offset 8)
         let cb_object = u32::from_le_bytes([data[8], data[9], data[10], data[11]]);
         // Check that the object size is reasonable
-        if cb_object == 0 || cb_object as usize > data.len() - 28 {
+        if cb_object == 0 || cb_object > 16 * 1024 * 1024 {
             return false;
         }
 

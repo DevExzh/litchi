@@ -684,10 +684,12 @@ impl<'a> Presentation<'a> {
     ///
     /// for (slide_idx, hyperlink) in pres.get_hyperlinks()? {
     ///     if hyperlink.is_external() {
-    ///         println!("Slide {}: External link to {}", slide_idx, hyperlink.target());
+    ///         if let Some(tooltip) = hyperlink.tooltip() {
+    ///             println!("Slide {}: External link: {}", slide_idx, tooltip);
+    ///         }
     ///     }
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn get_hyperlinks(&self) -> Result<Vec<(usize, crate::ooxml::pptx::Hyperlink)>> {
         use crate::ooxml::pptx::Hyperlink;

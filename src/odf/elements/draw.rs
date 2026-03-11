@@ -102,3 +102,52 @@ impl Default for Image {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_draw_page_new() {
+        let page = DrawPage::new();
+        assert!(page.name().is_none());
+        assert!(page.style_name().is_none());
+    }
+
+    #[test]
+    fn test_draw_page_default() {
+        let page: DrawPage = Default::default();
+        assert!(page.name().is_none());
+    }
+
+    #[test]
+    fn test_draw_page_name() {
+        let mut page = DrawPage::new();
+        page.set_name("Slide1");
+        assert_eq!(page.name(), Some("Slide1"));
+    }
+
+    #[test]
+    fn test_text_box_new() {
+        let text_box = TextBox::new();
+        assert_eq!(text_box.text().unwrap(), "");
+    }
+
+    #[test]
+    fn test_text_box_default() {
+        let text_box: TextBox = Default::default();
+        assert_eq!(text_box.text().unwrap(), "");
+    }
+
+    #[test]
+    fn test_image_new() {
+        let image = Image::new();
+        assert!(image.href().is_none());
+    }
+
+    #[test]
+    fn test_image_default() {
+        let image: Image = Default::default();
+        assert!(image.href().is_none());
+    }
+}

@@ -17,3 +17,27 @@ impl std::fmt::Display for LatexError {
 }
 
 impl std::error::Error for LatexError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_latex_error_display() {
+        let err = LatexError::FormatError("test format".to_string());
+        assert!(err.to_string().contains("Format error"));
+        assert!(err.to_string().contains("test format"));
+
+        let err = LatexError::InvalidNode("test node".to_string());
+        assert!(err.to_string().contains("Invalid node"));
+        assert!(err.to_string().contains("test node"));
+    }
+
+    #[test]
+    fn test_latex_error_debug() {
+        let err = LatexError::FormatError("test".to_string());
+        let debug_str = format!("{:?}", err);
+        assert!(debug_str.contains("FormatError"));
+        assert!(debug_str.contains("test"));
+    }
+}

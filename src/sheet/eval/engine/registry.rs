@@ -474,3 +474,142 @@ register_functions!(
     wrap_besselk => super::engineering::eval_besselk => ["BESSELK"],
     wrap_bessely => super::engineering::eval_bessely => ["BESSELY"],
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_function_map_populated() {
+        // Verify that the function map contains expected functions
+        assert!(FUNCTION_MAP.get("SUM").is_some());
+        assert!(FUNCTION_MAP.get("AVERAGE").is_some());
+        assert!(FUNCTION_MAP.get("COUNT").is_some());
+        assert!(FUNCTION_MAP.get("MAX").is_some());
+        assert!(FUNCTION_MAP.get("MIN").is_some());
+    }
+
+    #[test]
+    fn test_function_map_aggregate_functions() {
+        assert!(FUNCTION_MAP.get("SUM").is_some());
+        assert!(FUNCTION_MAP.get("PRODUCT").is_some());
+        assert!(FUNCTION_MAP.get("COUNTA").is_some());
+        assert!(FUNCTION_MAP.get("COUNTBLANK").is_some());
+    }
+
+    #[test]
+    fn test_function_map_math_functions() {
+        assert!(FUNCTION_MAP.get("ABS").is_some());
+        assert!(FUNCTION_MAP.get("ROUND").is_some());
+        assert!(FUNCTION_MAP.get("POWER").is_some());
+        assert!(FUNCTION_MAP.get("SQRT").is_some());
+        assert!(FUNCTION_MAP.get("PI").is_some());
+    }
+
+    #[test]
+    fn test_function_map_trig_functions() {
+        assert!(FUNCTION_MAP.get("SIN").is_some());
+        assert!(FUNCTION_MAP.get("COS").is_some());
+        assert!(FUNCTION_MAP.get("TAN").is_some());
+        assert!(FUNCTION_MAP.get("ASIN").is_some());
+        assert!(FUNCTION_MAP.get("ATAN2").is_some());
+    }
+
+    #[test]
+    fn test_function_map_logical_functions() {
+        assert!(FUNCTION_MAP.get("IF").is_some());
+        assert!(FUNCTION_MAP.get("AND").is_some());
+        assert!(FUNCTION_MAP.get("OR").is_some());
+        assert!(FUNCTION_MAP.get("NOT").is_some());
+        assert!(FUNCTION_MAP.get("XOR").is_some());
+        assert!(FUNCTION_MAP.get("TRUE").is_some());
+        assert!(FUNCTION_MAP.get("FALSE").is_some());
+    }
+
+    #[test]
+    fn test_function_map_text_functions() {
+        assert!(FUNCTION_MAP.get("LEN").is_some());
+        assert!(FUNCTION_MAP.get("UPPER").is_some());
+        assert!(FUNCTION_MAP.get("LOWER").is_some());
+        assert!(FUNCTION_MAP.get("LEFT").is_some());
+        assert!(FUNCTION_MAP.get("RIGHT").is_some());
+        assert!(FUNCTION_MAP.get("MID").is_some());
+    }
+
+    #[test]
+    fn test_function_map_date_time_functions() {
+        assert!(FUNCTION_MAP.get("TODAY").is_some());
+        assert!(FUNCTION_MAP.get("NOW").is_some());
+        assert!(FUNCTION_MAP.get("DATE").is_some());
+        assert!(FUNCTION_MAP.get("YEAR").is_some());
+        assert!(FUNCTION_MAP.get("MONTH").is_some());
+        assert!(FUNCTION_MAP.get("DAY").is_some());
+    }
+
+    #[test]
+    fn test_function_map_lookup_functions() {
+        assert!(FUNCTION_MAP.get("VLOOKUP").is_some());
+        assert!(FUNCTION_MAP.get("HLOOKUP").is_some());
+        assert!(FUNCTION_MAP.get("INDEX").is_some());
+        assert!(FUNCTION_MAP.get("MATCH").is_some());
+        assert!(FUNCTION_MAP.get("CHOOSE").is_some());
+    }
+
+    #[test]
+    fn test_function_map_statistical_functions() {
+        assert!(FUNCTION_MAP.get("STDEV").is_some());
+        assert!(FUNCTION_MAP.get("STDEVP").is_some());
+        assert!(FUNCTION_MAP.get("VAR").is_some());
+        assert!(FUNCTION_MAP.get("VARP").is_some());
+        assert!(FUNCTION_MAP.get("MEDIAN").is_some());
+    }
+
+    #[test]
+    fn test_function_map_info_functions() {
+        assert!(FUNCTION_MAP.get("ISBLANK").is_some());
+        assert!(FUNCTION_MAP.get("ISERROR").is_some());
+        assert!(FUNCTION_MAP.get("ISNUMBER").is_some());
+        assert!(FUNCTION_MAP.get("ISTEXT").is_some());
+        assert!(FUNCTION_MAP.get("ISLOGICAL").is_some());
+    }
+
+    #[test]
+    fn test_function_map_criteria_functions() {
+        assert!(FUNCTION_MAP.get("SUMIF").is_some());
+        assert!(FUNCTION_MAP.get("COUNTIF").is_some());
+        assert!(FUNCTION_MAP.get("AVERAGEIF").is_some());
+        assert!(FUNCTION_MAP.get("SUMIFS").is_some());
+        assert!(FUNCTION_MAP.get("COUNTIFS").is_some());
+    }
+
+    #[test]
+    fn test_function_map_financial_functions() {
+        assert!(FUNCTION_MAP.get("PV").is_some());
+        assert!(FUNCTION_MAP.get("FV").is_some());
+        assert!(FUNCTION_MAP.get("NPV").is_some());
+        assert!(FUNCTION_MAP.get("IRR").is_some());
+        assert!(FUNCTION_MAP.get("PMT").is_some());
+    }
+
+    #[test]
+    fn test_function_map_case_sensitivity() {
+        // Function names should be case-sensitive in the map
+        // (typically normalized before lookup)
+        assert!(FUNCTION_MAP.get("SUM").is_some());
+    }
+
+    #[test]
+    fn test_function_map_aliases() {
+        // Test that aliases are registered
+        assert!(FUNCTION_MAP.get("STDEV").is_some());
+        assert!(FUNCTION_MAP.get("STDEV.S").is_some());
+        assert!(FUNCTION_MAP.get("NORMDIST").is_some());
+        assert!(FUNCTION_MAP.get("NORM.DIST").is_some());
+    }
+
+    #[test]
+    fn test_function_map_nonexistent() {
+        assert!(FUNCTION_MAP.get("NONEXISTENT").is_none());
+        assert!(FUNCTION_MAP.get("XYZ123").is_none());
+    }
+}

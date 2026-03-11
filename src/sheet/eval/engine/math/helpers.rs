@@ -509,3 +509,353 @@ pub(super) fn permutation(n: u64, k: u64) -> f64 {
     }
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_number_result_int() {
+        let result = number_result(5.0);
+        assert!(matches!(result, CellValue::Int(5)));
+    }
+
+    #[test]
+    fn test_number_result_float() {
+        let result = number_result(5.5);
+        assert!(matches!(result, CellValue::Float(v) if (v - 5.5).abs() < 1e-9));
+    }
+
+    #[test]
+    fn test_number_result_large_float() {
+        let result = number_result(1e20);
+        assert!(matches!(result, CellValue::Float(_)));
+    }
+
+    #[test]
+    fn test_is_even_true() {
+        assert!(is_even(4.0));
+        assert!(is_even(-2.0));
+        assert!(is_even(0.0));
+    }
+
+    #[test]
+    fn test_is_even_false() {
+        assert!(!is_even(3.0));
+        assert!(!is_even(-1.0));
+    }
+
+    #[test]
+    fn test_round_away_from_zero() {
+        assert_eq!(round_away_from_zero(2.3), 3.0);
+        assert_eq!(round_away_from_zero(2.7), 3.0);
+        assert_eq!(round_away_from_zero(-2.3), -3.0);
+        assert_eq!(round_away_from_zero(-2.7), -3.0);
+        assert_eq!(round_away_from_zero(0.0), 0.0);
+    }
+
+    #[test]
+    fn test_to_int_if_whole() {
+        assert_eq!(to_int_if_whole(5.0), Some(5));
+        assert_eq!(to_int_if_whole(-5.0), Some(-5));
+        assert_eq!(to_int_if_whole(5.5), None);
+        assert_eq!(to_int_if_whole(f64::NAN), None);
+        assert_eq!(to_int_if_whole(f64::INFINITY), None);
+    }
+
+    #[test]
+    fn test_to_u48_valid() {
+        assert_eq!(to_u48(0.0), Some(0));
+        assert_eq!(to_u48(100.0), Some(100));
+        assert_eq!(to_u48(((1u64 << 48) - 1) as f64), Some((1u64 << 48) - 1));
+    }
+
+    #[test]
+    fn test_to_u48_invalid() {
+        assert_eq!(to_u48(-1.0), None);
+        assert_eq!(to_u48((1u64 << 48) as f64), None);
+        assert_eq!(to_u48(5.5), None);
+        assert_eq!(to_u48(f64::NAN), None);
+    }
+
+    #[test]
+    fn test_to_shift_amount_valid() {
+        assert_eq!(to_shift_amount(0.0), Some(0));
+        assert_eq!(to_shift_amount(10.0), Some(10));
+        assert_eq!(to_shift_amount(53.0), Some(53));
+    }
+
+    #[test]
+    fn test_to_shift_amount_invalid() {
+        assert_eq!(to_shift_amount(-1.0), None);
+        assert_eq!(to_shift_amount(54.0), None);
+        assert_eq!(to_shift_amount(5.5), None);
+    }
+
+    #[test]
+    fn test_factorial() {
+        assert_eq!(factorial(0), 1.0);
+        assert_eq!(factorial(1), 1.0);
+        assert_eq!(factorial(5), 120.0);
+        assert_eq!(factorial(10), 3628800.0);
+    }
+
+    #[test]
+    fn test_double_factorial() {
+        assert_eq!(double_factorial(0), 1.0);
+        assert_eq!(double_factorial(1), 1.0);
+        assert_eq!(double_factorial(5), 15.0); // 5 * 3 * 1
+        assert_eq!(double_factorial(6), 48.0); // 6 * 4 * 2
+    }
+
+    #[test]
+    fn test_combination() {
+        assert_eq!(combination(5, 0), 1.0);
+        assert_eq!(combination(5, 5), 1.0);
+        assert_eq!(combination(5, 2), 10.0);
+        assert_eq!(combination(10, 3), 120.0);
+        // C(n, k) = C(n, n-k)
+        assert_eq!(combination(10, 3), combination(10, 7));
+    }
+
+    #[test]
+    fn test_permutation() {
+        assert_eq!(permutation(5, 0), 1.0);
+        assert_eq!(permutation(5, 1), 5.0);
+        assert_eq!(permutation(5, 2), 20.0);
+        assert_eq!(permutation(10, 3), 720.0);
+    }
+
+    #[test]
+    fn test_extend_binary() {
+        assert_eq!(extend_binary("101", 5, '0'), "00101");
+        assert_eq!(extend_binary("101", 3, '0'), "101");
+        assert_eq!(extend_binary("101", 5, '1'), "11101");
+    }
+
+    #[test]
+    fn test_is_negative_binary() {
+        assert!(is_negative_binary("1000000000")); // 10 bits starting with 1
+        assert!(!is_negative_binary("0111111111")); // 10 bits starting with 0
+        assert!(!is_negative_binary("101")); // Less than 10 bits
+    }
+
+    #[test]
+    fn test_twos_complement_value() {
+        // The function calculates (2^bits + number) for two's complement
+        // Positive 5 with 8 bits: 256 + 5 = 261
+        assert_eq!(twos_complement_value(5, 8), 261);
+        // Negative number: -1 with 8 bits: 256 + (-1) = 255
+        assert_eq!(twos_complement_value(-1, 8), 255);
+        // Negative number: -5 with 8 bits: 256 + (-5) = 251
+        assert_eq!(twos_complement_value(-5, 8), 251);
+    }
+
+    #[test]
+    fn test_parse_decimal_for_conversion_valid() {
+        let value = CellValue::Int(100);
+        let result = parse_decimal_for_conversion(&value, "TEST", -100, 100);
+        assert_eq!(result.unwrap(), 100);
+    }
+
+    #[test]
+    fn test_parse_decimal_for_conversion_out_of_range() {
+        let value = CellValue::Int(200);
+        let result = parse_decimal_for_conversion(&value, "TEST", -100, 100);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_decimal_for_conversion_non_numeric() {
+        let value = CellValue::String("abc".to_string());
+        let result = parse_decimal_for_conversion(&value, "TEST", -100, 100);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_ensure_number_in_range() {
+        assert!(ensure_number_in_range(50, 0, 100, "TEST").is_ok());
+        assert!(ensure_number_in_range(-1, 0, 100, "TEST").is_err());
+        assert!(ensure_number_in_range(101, 0, 100, "TEST").is_err());
+    }
+
+    #[test]
+    fn test_bit_operand_value_valid() {
+        let value = CellValue::Int(42);
+        let result = bit_operand_value(&value, "BITAND");
+        assert_eq!(result.unwrap(), 42);
+    }
+
+    #[test]
+    fn test_bit_operand_value_negative() {
+        let value = CellValue::Int(-1);
+        let result = bit_operand_value(&value, "BITAND");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_bit_operand_value_non_numeric() {
+        let value = CellValue::String("abc".to_string());
+        let result = bit_operand_value(&value, "BITAND");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_bit_shift_value_valid() {
+        let value = CellValue::Int(10);
+        let result = bit_shift_value(&value, "BITLSHIFT");
+        assert_eq!(result.unwrap(), 10);
+    }
+
+    #[test]
+    fn test_bit_shift_value_too_large() {
+        let value = CellValue::Int(100);
+        let result = bit_shift_value(&value, "BITLSHIFT");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_places_argument_valid() {
+        let value = CellValue::Int(5);
+        let result = parse_places_argument(&value, "DEC2BIN");
+        assert_eq!(result.unwrap(), 5);
+    }
+
+    #[test]
+    fn test_parse_places_argument_out_of_range() {
+        let value = CellValue::Int(15);
+        let result = parse_places_argument(&value, "DEC2BIN");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_places_argument_non_numeric() {
+        let value = CellValue::String("abc".to_string());
+        let result = parse_places_argument(&value, "DEC2BIN");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_pad_with_places_success() {
+        let mut result = "101".to_string();
+        assert!(pad_with_places(&mut result, Some(5), "DEC2BIN").is_ok());
+        assert_eq!(result, "00101");
+    }
+
+    #[test]
+    fn test_pad_with_places_too_small() {
+        let mut result = "1010".to_string();
+        assert!(pad_with_places(&mut result, Some(2), "DEC2BIN").is_err());
+    }
+
+    #[test]
+    fn test_binary_string_from_value_valid() {
+        let value = CellValue::String("1010".to_string());
+        let result = binary_string_from_value(&value, "BIN2DEC");
+        assert_eq!(result.unwrap(), "1010");
+    }
+
+    #[test]
+    fn test_binary_string_from_value_invalid_characters() {
+        let value = CellValue::String("102".to_string());
+        let result = binary_string_from_value(&value, "BIN2DEC");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_binary_string_from_value_int() {
+        let value = CellValue::Int(101);
+        let result = binary_string_from_value(&value, "BIN2DEC");
+        assert_eq!(result.unwrap(), "101");
+    }
+
+    #[test]
+    fn test_parse_signed_binary_positive() {
+        let result = parse_signed_binary("101", "BIN2DEC").unwrap();
+        assert_eq!(result, 5);
+    }
+
+    #[test]
+    fn test_parse_signed_binary_negative() {
+        // 10-bit two's complement: 1111111111 = -1
+        let result = parse_signed_binary("1111111111", "BIN2DEC").unwrap();
+        assert_eq!(result, -1);
+    }
+
+    #[test]
+    fn test_parse_signed_binary_out_of_range() {
+        let result = parse_signed_binary("101010101010", "BIN2DEC");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_hex_string_from_value_valid() {
+        let value = CellValue::String("A1F".to_string());
+        let result = parse_hex_string(&value, "HEX2DEC").unwrap();
+        assert_eq!(result, "A1F");
+    }
+
+    #[test]
+    fn test_hex_string_from_value_negative() {
+        let value = CellValue::String("-A1F".to_string());
+        let result = parse_hex_string(&value, "HEX2DEC").unwrap();
+        assert_eq!(result, "-A1F");
+    }
+
+    #[test]
+    fn test_hex_string_from_value_invalid() {
+        let value = CellValue::String("GHI".to_string());
+        let result = parse_hex_string(&value, "HEX2DEC");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_signed_hex_to_decimal_positive() {
+        let result = signed_hex_to_decimal("A", "HEX2DEC").unwrap();
+        assert_eq!(result, 10);
+    }
+
+    #[test]
+    fn test_signed_hex_to_decimal_negative() {
+        let result = signed_hex_to_decimal("-A", "HEX2DEC").unwrap();
+        assert_eq!(result, -10);
+    }
+
+    #[test]
+    fn test_octal_string_from_value_valid() {
+        let value = CellValue::String("755".to_string());
+        let result = parse_octal_string(&value, "OCT2DEC").unwrap();
+        assert_eq!(result, "755");
+    }
+
+    #[test]
+    fn test_octal_string_from_value_invalid() {
+        let value = CellValue::String("789".to_string());
+        let result = parse_octal_string(&value, "OCT2DEC");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_signed_octal_to_decimal_positive() {
+        let result = signed_octal_to_decimal("755", "OCT2DEC").unwrap();
+        assert_eq!(result, 0o755);
+    }
+
+    #[test]
+    fn test_signed_octal_to_decimal_negative() {
+        let result = signed_octal_to_decimal("-755", "OCT2DEC").unwrap();
+        assert_eq!(result, -0o755);
+    }
+
+    #[test]
+    fn test_negative_binary_to_hex() {
+        let result = negative_binary_to_hex("1000000000");
+        assert_eq!(result, "FFFFFFFE00");
+    }
+
+    #[test]
+    fn test_negative_binary_to_oct() {
+        let result = negative_binary_to_oct("1000000000");
+        assert_eq!(result, "7777777000");
+    }
+}

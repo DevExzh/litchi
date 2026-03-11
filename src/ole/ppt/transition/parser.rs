@@ -19,7 +19,7 @@ pub fn parse_transition(record: &PptRecord) -> Result<TransitionInfo> {
         )));
     }
 
-    if record.data.len() < 20 {
+    if record.data.len() < 16 {
         return Err(PptError::Corrupted(
             "SSSlideInfoAtom record too small".to_string(),
         ));
@@ -39,17 +39,15 @@ pub fn parse_transition(record: &PptRecord) -> Result<TransitionInfo> {
         .map(|v| v.get())
         .unwrap_or(0);
 
-    let effect_type = U16::<LittleEndian>::read_from_bytes(&record.data[8..10])
-        .map(|v| v.get())
+    let effect_direction = record.data.get(8).copied().unwrap_or(0);
+
+    let effect_type = record.data.get(9).copied().map(u16::from).unwrap_or(0);
+
+    let flags = U16::<LittleEndian>::read_from_bytes(&record.data[10..12])
+        .map(|v| u32::from(v.get()))
         .unwrap_or(0);
 
-    let effect_direction = record.data.get(10).copied().unwrap_or(0);
-
-    let effect_speed = record.data.get(11).copied().unwrap_or(0);
-
-    let flags = U32::<LittleEndian>::read_from_bytes(&record.data[12..16])
-        .map(|v| v.get())
-        .unwrap_or(0);
+    let effect_speed = record.data.get(12).copied().unwrap_or(0);
 
     transition.transition_type = parse_transition_type(effect_type);
     transition.direction = parse_transition_direction(effect_direction, effect_type);

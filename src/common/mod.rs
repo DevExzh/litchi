@@ -23,6 +23,9 @@ pub mod xml_slice;
 // ID generation utilities
 pub mod id;
 
+#[cfg(test)]
+mod tests;
+
 // Re-exports for convenience
 pub use bom::{
     BomKind, UTF8_BOM, UTF16_BE_BOM, UTF16_LE_BOM, UTF32_BE_BOM, UTF32_LE_BOM, strip_bom, write_bom,

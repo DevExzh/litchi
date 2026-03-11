@@ -795,3 +795,517 @@ async fn collect_aligned_numeric_pairs(
 
     Ok((xs, ys))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::parser::Expr;
+
+    fn num_expr(n: f64) -> Expr {
+        if n == n.floor() {
+            Expr::Literal(CellValue::Int(n as i64))
+        } else {
+            Expr::Literal(CellValue::Float(n))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_median_odd() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0), num_expr(3.0), num_expr(5.0)];
+        let result = eval_median(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 3.0).abs() < 1e-9),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_median_even() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0), num_expr(3.0), num_expr(5.0), num_expr(7.0)];
+        let result = eval_median(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 4.0).abs() < 1e-9),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_median_empty() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args: Vec<Expr> = vec![];
+        let result = eval_median(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects at least 1")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_mode_sngl() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0), num_expr(2.0), num_expr(2.0), num_expr(3.0)];
+        let result = eval_mode_sngl(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 2.0).abs() < 1e-9),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_mode_sngl_no_duplicates() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0), num_expr(2.0), num_expr(3.0)];
+        let result = eval_mode_sngl(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "#N/A"),
+            _ => panic!("Expected #N/A"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_stdev_s() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0), num_expr(2.0), num_expr(3.0), num_expr(4.0)];
+        let result = eval_stdev_s(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.290994).abs() < 1e-5),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_stdev_p() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0), num_expr(2.0), num_expr(3.0), num_expr(4.0)];
+        let result = eval_stdev_p(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.118034).abs() < 1e-5),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_var_s() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0), num_expr(2.0), num_expr(3.0), num_expr(4.0)];
+        let result = eval_var_s(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.666667).abs() < 1e-5),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_var_p() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0), num_expr(2.0), num_expr(3.0), num_expr(4.0)];
+        let result = eval_var_p(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.25).abs() < 1e-5),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_geomean() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(2.0), num_expr(8.0)];
+        let result = eval_geomean(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 4.0).abs() < 1e-9),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_geomean_negative() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(-1.0), num_expr(2.0)];
+        let result = eval_geomean(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "#NUM!"),
+            _ => panic!("Expected #NUM!"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_harmean() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(2.0), num_expr(4.0), num_expr(8.0)];
+        let result = eval_harmean(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 3.428571).abs() < 1e-5),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_fisher() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.5)];
+        let result = eval_fisher(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.549306).abs() < 1e-5),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_fisher_out_of_range() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0)];
+        let result = eval_fisher(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "#NUM!"),
+            _ => panic!("Expected #NUM!"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_fisherinv() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.5)];
+        let result = eval_fisherinv(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.462117).abs() < 1e-5),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_standardize() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(10.0), num_expr(5.0), num_expr(2.0)];
+        let result = eval_standardize(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 2.5).abs() < 1e-9),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_standardize_zero_stdev() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(10.0), num_expr(5.0), num_expr(0.0)];
+        let result = eval_standardize(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "#NUM!"),
+            _ => panic!("Expected #NUM!"),
+        }
+    }
+
+    use crate::sheet::eval::parser::RangeRef;
+
+    fn range_expr(start_row: u32, start_col: u32, end_row: u32, end_col: u32) -> Expr {
+        Expr::Range(RangeRef {
+            sheet: String::new(),
+            start_row,
+            start_col,
+            end_row,
+            end_col,
+        })
+    }
+
+    #[tokio::test]
+    async fn test_eval_trimmean() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // Data: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 20% trim
+        for i in 0..10 {
+            engine.set_cell("", 0, i, CellValue::Int((i + 1) as i64));
+        }
+        let args = vec![range_expr(0, 0, 0, 9), num_expr(0.2)];
+        let result = eval_trimmean(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 5.5).abs() < 1e-9, "Expected 5.5, got {}", v),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_trimmean_wrong_args() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0)];
+        let result = eval_trimmean(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 2 arguments")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_skew() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // Skewness of symmetric distribution should be near 0
+        for i in 0..5 {
+            engine.set_cell("", 0, i, CellValue::Int((i + 1) as i64));
+        }
+        let args = vec![range_expr(0, 0, 0, 4)];
+        let result = eval_skew(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v.abs() < 0.5, "Expected near 0, got {}", v),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_skew_too_few() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        engine.set_cell("", 0, 0, CellValue::Int(1));
+        engine.set_cell("", 0, 1, CellValue::Int(2));
+        let args = vec![range_expr(0, 0, 0, 1)];
+        let result = eval_skew(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "#DIV/0!"),
+            _ => panic!("Expected #DIV/0!"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_skew_p() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        for i in 0..5 {
+            engine.set_cell("", 0, i, CellValue::Int((i + 1) as i64));
+        }
+        let args = vec![range_expr(0, 0, 0, 4)];
+        let result = eval_skew_p(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v.abs() < 0.5, "Expected near 0, got {}", v),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_kurt() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // Kurtosis of normal-like data
+        for i in 0..8 {
+            engine.set_cell("", 0, i, CellValue::Int((i + 1) as i64));
+        }
+        let args = vec![range_expr(0, 0, 0, 7)];
+        let result = eval_kurt(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(
+                v > -2.0 && v < 2.0,
+                "Expected reasonable kurtosis, got {}",
+                v
+            ),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_kurt_too_few() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        engine.set_cell("", 0, 0, CellValue::Int(1));
+        engine.set_cell("", 0, 1, CellValue::Int(2));
+        engine.set_cell("", 0, 2, CellValue::Int(3));
+        let args = vec![range_expr(0, 0, 0, 2)];
+        let result = eval_kurt(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "#DIV/0!"),
+            _ => panic!("Expected #DIV/0!"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_correl() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // Perfect positive correlation: y = x
+        for i in 0..5 {
+            engine.set_cell("", 0, i, CellValue::Int((i + 1) as i64));
+            engine.set_cell("", 1, i, CellValue::Int((i + 1) as i64));
+        }
+        let args = vec![range_expr(0, 0, 0, 4), range_expr(1, 0, 1, 4)];
+        let result = eval_correl(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9, "Expected 1.0, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_correl_wrong_args() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0)];
+        let result = eval_correl(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 2 arguments")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_pearson() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // PEARSON is same as CORREL
+        for i in 0..5 {
+            engine.set_cell("", 0, i, CellValue::Int((i + 1) as i64));
+            engine.set_cell("", 1, i, CellValue::Int((i + 1) as i64));
+        }
+        let args = vec![range_expr(0, 0, 0, 4), range_expr(1, 0, 1, 4)];
+        let result = eval_pearson(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9, "Expected 1.0, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_rsq() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // R-squared of perfect correlation is 1
+        for i in 0..5 {
+            engine.set_cell("", 0, i, CellValue::Int((i + 1) as i64));
+            engine.set_cell("", 1, i, CellValue::Int((i + 1) as i64));
+        }
+        let args = vec![range_expr(0, 0, 0, 4), range_expr(1, 0, 1, 4)];
+        let result = eval_rsq(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9, "Expected 1.0, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_slope() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // y = 2x, slope should be 2
+        for i in 0..5 {
+            engine.set_cell("", 0, i, CellValue::Int((i + 1) as i64));
+            engine.set_cell("", 1, i, CellValue::Int(((i + 1) * 2) as i64));
+        }
+        let args = vec![range_expr(1, 0, 1, 4), range_expr(0, 0, 0, 4)];
+        let result = eval_slope(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 2.0).abs() < 1e-9, "Expected 2.0, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_intercept() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // y = 2x + 1, intercept should be 1
+        for i in 0..5 {
+            engine.set_cell("", 0, i, CellValue::Int((i + 1) as i64));
+            engine.set_cell("", 1, i, CellValue::Int(((i + 1) * 2 + 1) as i64));
+        }
+        let args = vec![range_expr(1, 0, 1, 4), range_expr(0, 0, 0, 4)];
+        let result = eval_intercept(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9, "Expected 1.0, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_steyx() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // Standard error for y = 2x + 1 (perfect fit, error should be 0)
+        for i in 0..5 {
+            engine.set_cell("", 0, i, CellValue::Int((i + 1) as i64));
+            engine.set_cell("", 1, i, CellValue::Int(((i + 1) * 2 + 1) as i64));
+        }
+        let args = vec![range_expr(1, 0, 1, 4), range_expr(0, 0, 0, 4)];
+        let result = eval_steyx(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v < 1e-9, "Expected near 0, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_covar_p() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // Perfect linear relationship: y = 2x
+        for i in 0..5 {
+            engine.set_cell("", 0, i, CellValue::Int((i + 1) as i64));
+            engine.set_cell("", 1, i, CellValue::Int(((i + 1) * 2) as i64));
+        }
+        let args = vec![range_expr(0, 0, 0, 4), range_expr(1, 0, 1, 4)];
+        let result = eval_covar_p(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v > 0.0, "Expected positive covariance, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_covar_s() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // Perfect linear relationship: y = 2x
+        for i in 0..5 {
+            engine.set_cell("", 0, i, CellValue::Int((i + 1) as i64));
+            engine.set_cell("", 1, i, CellValue::Int(((i + 1) * 2) as i64));
+        }
+        let args = vec![range_expr(0, 0, 0, 4), range_expr(1, 0, 1, 4)];
+        let result = eval_covar_s(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v > 0.0, "Expected positive covariance, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_stdev_a() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0), num_expr(2.0), num_expr(3.0), num_expr(4.0)];
+        let result = eval_stdev_a(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => {
+                assert!((v - 1.290994).abs() < 1e-5, "Expected ~1.291, got {}", v)
+            },
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_var_a() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0), num_expr(2.0), num_expr(3.0), num_expr(4.0)];
+        let result = eval_var_a(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => {
+                assert!((v - 1.666667).abs() < 1e-5, "Expected ~1.667, got {}", v)
+            },
+            _ => panic!("Expected Float"),
+        }
+    }
+}

@@ -357,23 +357,25 @@ impl<'a> FormulaParser<'a> {
             self.advance();
             // Current sheet reference
         } else if self.peek_is_letter() {
-            // Might have sheet name
+            // Might have a sheet-qualified reference like Sheet1.A1.
+            // If there is no dot after the identifier chunk, this is a plain
+            // cell reference like A1 and we must rewind.
             let start = self.position;
             while let Some(ch) = self.peek() {
-                if ch == b'.' {
-                    let sheet_name = std::str::from_utf8(&self.input[start..self.position])
-                        .map_err(|_| Error::InvalidFormat("Invalid sheet name".to_string()))?;
-                    sheet = Some(sheet_name.to_string());
-                    self.advance(); // Skip dot
-                    break;
-                }
                 if ch.is_ascii_alphanumeric() || ch == b'_' || ch == b' ' {
                     self.advance();
                 } else {
-                    // Not a sheet name, rewind
-                    self.position = start;
                     break;
                 }
+            }
+
+            if self.peek() == Some(b'.') {
+                let sheet_name = std::str::from_utf8(&self.input[start..self.position])
+                    .map_err(|_| Error::InvalidFormat("Invalid sheet name".to_string()))?;
+                sheet = Some(sheet_name.to_string());
+                self.advance(); // Skip dot
+            } else {
+                self.position = start;
             }
         }
 
@@ -561,5 +563,310 @@ mod tests {
         let formula = parser.parse().unwrap();
         let refs = extract_cell_refs(&formula);
         assert!(refs.len() >= 2); // At least A1 and B2
+    }
+
+    #[test]
+    fn test_parse_formula_without_equals() {
+        let parser = FormulaParser::new("A1+B1");
+        let formula = parser.parse().unwrap();
+        assert!(!formula.tokens.is_empty());
+    }
+
+    #[test]
+    fn test_cell_ref_parsing() {
+        let parser = FormulaParser::new("=Sheet1.A1");
+        let formula = parser.parse().unwrap();
+        match &formula.tokens[0] {
+            Token::CellRef(cell_ref) => {
+                assert_eq!(cell_ref.sheet, Some("Sheet1".to_string()));
+                assert_eq!(cell_ref.column, "A");
+                assert_eq!(cell_ref.row, 1);
+            },
+            _ => panic!("Expected cell reference"),
+        }
+    }
+
+    #[test]
+    fn test_range_ref_parsing() {
+        let parser = FormulaParser::new("=A1:B10");
+        let formula = parser.parse().unwrap();
+        match &formula.tokens[0] {
+            Token::RangeRef(range_ref) => {
+                assert_eq!(range_ref.start.column, "A");
+                assert_eq!(range_ref.start.row, 1);
+                assert_eq!(range_ref.end.column, "B");
+                assert_eq!(range_ref.end.row, 10);
+            },
+            _ => panic!("Expected range reference"),
+        }
+    }
+
+    #[test]
+    fn test_number_token() {
+        let parser = FormulaParser::new("=42.5");
+        let formula = parser.parse().unwrap();
+        match &formula.tokens[0] {
+            Token::Number(n) => {
+                assert!((n - 42.5).abs() < 0.0001);
+            },
+            _ => panic!("Expected number token"),
+        }
+    }
+
+    #[test]
+    fn test_string_token() {
+        let parser = FormulaParser::new("=\"Hello World\"");
+        let formula = parser.parse().unwrap();
+        match &formula.tokens[0] {
+            Token::String(s) => {
+                assert_eq!(s, "Hello World");
+            },
+            _ => panic!("Expected string token: {:?}", formula.tokens),
+        }
+    }
+
+    #[test]
+    fn test_boolean_tokens() {
+        let parser = FormulaParser::new("=TRUE()");
+        let formula = parser.parse().unwrap();
+        assert!(matches!(&formula.tokens[0], Token::Function(f) if f == "TRUE"));
+
+        let parser = FormulaParser::new("=FALSE()");
+        let formula = parser.parse().unwrap();
+        assert!(matches!(&formula.tokens[0], Token::Function(f) if f == "FALSE"));
+    }
+
+    #[test]
+    fn test_operators() {
+        let parser = FormulaParser::new("=A1+B1-C1*D1/E1^F1");
+        let formula = parser.parse().unwrap();
+        // Should have cell refs and operators
+        let operators: Vec<_> = formula
+            .tokens
+            .iter()
+            .filter(|t| matches!(t, Token::Operator(_)))
+            .collect();
+        assert!(!operators.is_empty());
+    }
+
+    #[test]
+    fn test_parentheses() {
+        let parser = FormulaParser::new("=(A1+B1)*C1");
+        let formula = parser.parse().unwrap();
+        let has_lparen = formula.tokens.iter().any(|t| matches!(t, Token::LParen));
+        let has_rparen = formula.tokens.iter().any(|t| matches!(t, Token::RParen));
+        assert!(has_lparen);
+        assert!(has_rparen);
+    }
+
+    #[test]
+    fn test_function_with_multiple_args() {
+        let parser = FormulaParser::new("=IF(A1>0,\"Positive\",\"Negative\")");
+        let formula = parser.parse().unwrap();
+        assert!(matches!(&formula.tokens[0], Token::Function(f) if f == "IF"));
+
+        // Check for commas
+        let commas = formula
+            .tokens
+            .iter()
+            .filter(|t| matches!(t, Token::Comma))
+            .count();
+        assert_eq!(commas, 2);
+    }
+
+    #[test]
+    fn test_nested_functions() {
+        let parser = FormulaParser::new("=SUM(AVERAGE(A1:A10),MAX(B1:B10))");
+        let formula = parser.parse().unwrap();
+        let functions: Vec<_> = formula
+            .tokens
+            .iter()
+            .filter_map(|t| match t {
+                Token::Function(f) => Some(f.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(functions.contains(&"SUM"));
+        assert!(functions.contains(&"AVERAGE"));
+        assert!(functions.contains(&"MAX"));
+    }
+
+    #[test]
+    fn test_mixed_references() {
+        // Mixed absolute/relative references
+        let parser = FormulaParser::new("=$A1+B$1");
+        let formula = parser.parse().unwrap();
+        match &formula.tokens[0] {
+            Token::CellRef(cell_ref) => {
+                assert!(cell_ref.column_absolute);
+                assert!(!cell_ref.row_absolute);
+            },
+            _ => panic!("Expected cell reference"),
+        }
+    }
+
+    #[test]
+    fn test_formula_struct() {
+        let formula = Formula {
+            text: "=A1+B1".to_string(),
+            tokens: vec![
+                Token::CellRef(CellRef {
+                    sheet: None,
+                    column: "A".to_string(),
+                    row: 1,
+                    column_absolute: false,
+                    row_absolute: false,
+                }),
+                Token::Operator('+'),
+                Token::CellRef(CellRef {
+                    sheet: None,
+                    column: "B".to_string(),
+                    row: 1,
+                    column_absolute: false,
+                    row_absolute: false,
+                }),
+            ],
+        };
+        assert_eq!(formula.text, "=A1+B1");
+        assert_eq!(formula.tokens.len(), 3);
+    }
+
+    #[test]
+    fn test_cell_ref_equality() {
+        let ref1 = CellRef {
+            sheet: None,
+            column: "A".to_string(),
+            row: 1,
+            column_absolute: false,
+            row_absolute: false,
+        };
+        let ref2 = CellRef {
+            sheet: None,
+            column: "A".to_string(),
+            row: 1,
+            column_absolute: false,
+            row_absolute: false,
+        };
+        let ref3 = CellRef {
+            sheet: Some("Sheet1".to_string()),
+            column: "A".to_string(),
+            row: 1,
+            column_absolute: false,
+            row_absolute: false,
+        };
+        assert_eq!(ref1, ref2);
+        assert_ne!(ref1, ref3);
+    }
+
+    #[test]
+    fn test_range_ref_equality() {
+        let range1 = RangeRef {
+            start: CellRef {
+                sheet: None,
+                column: "A".to_string(),
+                row: 1,
+                column_absolute: false,
+                row_absolute: false,
+            },
+            end: CellRef {
+                sheet: None,
+                column: "B".to_string(),
+                row: 10,
+                column_absolute: false,
+                row_absolute: false,
+            },
+        };
+        let range2 = RangeRef {
+            start: CellRef {
+                sheet: None,
+                column: "A".to_string(),
+                row: 1,
+                column_absolute: false,
+                row_absolute: false,
+            },
+            end: CellRef {
+                sheet: None,
+                column: "B".to_string(),
+                row: 10,
+                column_absolute: false,
+                row_absolute: false,
+            },
+        };
+        assert_eq!(range1, range2);
+    }
+
+    #[test]
+    fn test_token_variants() {
+        let cell_ref = CellRef {
+            sheet: None,
+            column: "A".to_string(),
+            row: 1,
+            column_absolute: false,
+            row_absolute: false,
+        };
+        let token1 = Token::CellRef(cell_ref.clone());
+        let token2 = Token::CellRef(cell_ref.clone());
+        assert_eq!(token1, token2);
+
+        assert_eq!(Token::Operator('+'), Token::Operator('+'));
+        assert_eq!(Token::LParen, Token::LParen);
+        assert_eq!(Token::RParen, Token::RParen);
+        assert_eq!(Token::Comma, Token::Comma);
+        assert_eq!(Token::Semicolon, Token::Semicolon);
+    }
+
+    #[test]
+    fn test_extract_functions() {
+        let parser = FormulaParser::new("=SUM(A1:A10)+AVERAGE(B1:B10)");
+        let formula = parser.parse().unwrap();
+        let funcs = extract_functions(&formula);
+        assert!(funcs.contains(&"SUM"));
+        assert!(funcs.contains(&"AVERAGE"));
+    }
+
+    #[test]
+    fn test_formula_functions_catalog() {
+        // Test that common functions are valid
+        assert!(is_valid_function("SUM"));
+        assert!(is_valid_function("AVERAGE"));
+        assert!(is_valid_function("IF"));
+        assert!(is_valid_function("VLOOKUP"));
+        assert!(is_valid_function("COUNT"));
+        assert!(is_valid_function("MAX"));
+        assert!(is_valid_function("MIN"));
+        assert!(is_valid_function("ABS"));
+        assert!(is_valid_function("ROUND"));
+        assert!(is_valid_function("TODAY"));
+        assert!(is_valid_function("NOW"));
+
+        // Invalid functions
+        assert!(!is_valid_function("NOTAFUNCTION"));
+        assert!(!is_valid_function(""));
+    }
+
+    #[test]
+    fn test_whitespace_handling() {
+        let parser = FormulaParser::new("=  A1  +  B1  ");
+        let formula = parser.parse().unwrap();
+        assert!(!formula.tokens.is_empty());
+    }
+
+    #[test]
+    fn test_complex_formula() {
+        let parser = FormulaParser::new("=IF(SUM(A1:A10)>100,AVERAGE(B1:B10),0)");
+        let formula = parser.parse().unwrap();
+        assert!(!formula.tokens.is_empty());
+        // Check all expected tokens are present
+        let funcs: Vec<_> = formula
+            .tokens
+            .iter()
+            .filter_map(|t| match t {
+                Token::Function(f) => Some(f.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(funcs.contains(&"IF"));
+        assert!(funcs.contains(&"SUM"));
+        assert!(funcs.contains(&"AVERAGE"));
     }
 }

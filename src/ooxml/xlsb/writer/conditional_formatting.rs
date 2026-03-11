@@ -187,7 +187,10 @@ fn cf_rule_sub_type(rule: &ConditionalFormattingRule) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ooxml::xlsb::conditional_formatting::ConditionalFormattingRule;
+    use crate::ooxml::xlsb::conditional_formatting::{
+        CfRuleType, ConditionalFormatting, ConditionalFormattingRule,
+    };
+    use crate::ooxml::xlsb::writer::RecordWriter;
 
     #[test]
     fn test_serialize_cond_formatting_header() {
@@ -231,5 +234,192 @@ mod tests {
         assert_eq!(i32::from_le_bytes(payload[12..16].try_into().unwrap()), 1);
         // iParam = 3 (equal)
         assert_eq!(i32::from_le_bytes(payload[16..20].try_into().unwrap()), 3);
+    }
+
+    #[test]
+    fn test_cf_rule_sub_type() {
+        let rule_cellis = ConditionalFormattingRule {
+            rule_type: CfRuleType::CellIs,
+            dxf_id: None,
+            priority: 1,
+            stop_if_true: false,
+            formulas: Vec::new(),
+            color_scale: None,
+            data_bar: None,
+            icon_set: None,
+            operator: None,
+        };
+        assert_eq!(cf_rule_sub_type(&rule_cellis), 0);
+
+        let rule_expr = ConditionalFormattingRule {
+            rule_type: CfRuleType::Expression,
+            dxf_id: None,
+            priority: 1,
+            stop_if_true: false,
+            formulas: Vec::new(),
+            color_scale: None,
+            data_bar: None,
+            icon_set: None,
+            operator: None,
+        };
+        assert_eq!(cf_rule_sub_type(&rule_expr), 1);
+
+        let rule_colorscale = ConditionalFormattingRule {
+            rule_type: CfRuleType::ColorScale,
+            dxf_id: None,
+            priority: 1,
+            stop_if_true: false,
+            formulas: Vec::new(),
+            color_scale: None,
+            data_bar: None,
+            icon_set: None,
+            operator: None,
+        };
+        assert_eq!(cf_rule_sub_type(&rule_colorscale), 2);
+
+        let rule_databar = ConditionalFormattingRule {
+            rule_type: CfRuleType::DataBar,
+            dxf_id: None,
+            priority: 1,
+            stop_if_true: false,
+            formulas: Vec::new(),
+            color_scale: None,
+            data_bar: None,
+            icon_set: None,
+            operator: None,
+        };
+        assert_eq!(cf_rule_sub_type(&rule_databar), 3);
+
+        let rule_iconset = ConditionalFormattingRule {
+            rule_type: CfRuleType::IconSet,
+            dxf_id: None,
+            priority: 1,
+            stop_if_true: false,
+            formulas: Vec::new(),
+            color_scale: None,
+            data_bar: None,
+            icon_set: None,
+            operator: None,
+        };
+        assert_eq!(cf_rule_sub_type(&rule_iconset), 4);
+
+        let rule_topn = ConditionalFormattingRule {
+            rule_type: CfRuleType::TopN,
+            dxf_id: None,
+            priority: 1,
+            stop_if_true: false,
+            formulas: Vec::new(),
+            color_scale: None,
+            data_bar: None,
+            icon_set: None,
+            operator: None,
+        };
+        assert_eq!(cf_rule_sub_type(&rule_topn), 5);
+    }
+
+    #[test]
+    fn test_serialize_cf_rule_with_formulas() {
+        let formula_bytes: Vec<u8> = vec![0x01, 0x02, 0x03];
+        let rule = ConditionalFormattingRule {
+            rule_type: CfRuleType::Expression,
+            dxf_id: Some(5),
+            priority: 3,
+            stop_if_true: true,
+            formulas: vec![formula_bytes.clone()],
+            color_scale: None,
+            data_bar: None,
+            icon_set: None,
+            operator: None,
+        };
+
+        let payload = serialize_cf_rule(&rule).unwrap();
+
+        // Verify type = Expression (2)
+        assert_eq!(i32::from_le_bytes(payload[0..4].try_into().unwrap()), 2);
+        // iSubType = 1 (Expression)
+        assert_eq!(i32::from_le_bytes(payload[4..8].try_into().unwrap()), 1);
+        // dxfId = 5
+        assert_eq!(i32::from_le_bytes(payload[8..12].try_into().unwrap()), 5);
+        // iPri = 3
+        assert_eq!(i32::from_le_bytes(payload[12..16].try_into().unwrap()), 3);
+
+        // Check flags for stop_if_true
+        let flags = u16::from_le_bytes(payload[28..30].try_into().unwrap());
+        assert_ne!(flags & 0x0002, 0); // stopIfTrue bit
+
+        // cbFmla1 should be 8 + ptg_len = 8 + 3 = 11
+        let cb_fmla1 = i32::from_le_bytes(payload[30..34].try_into().unwrap());
+        assert_eq!(cb_fmla1, 11);
+    }
+
+    #[test]
+    fn test_serialize_cf_rule_no_dxf() {
+        let rule = ConditionalFormattingRule {
+            rule_type: CfRuleType::CellIs,
+            dxf_id: None, // No differential format
+            priority: 1,
+            stop_if_true: false,
+            formulas: Vec::new(),
+            color_scale: None,
+            data_bar: None,
+            icon_set: None,
+            operator: Some(1),
+        };
+
+        let payload = serialize_cf_rule(&rule).unwrap();
+        // dxfId = -1 when not present
+        assert_eq!(i32::from_le_bytes(payload[8..12].try_into().unwrap()), -1);
+    }
+
+    #[test]
+    fn test_serialize_cond_formatting_header_multiple_ranges() {
+        let cf = ConditionalFormatting {
+            ranges: vec!["A1:B10".to_string(), "C1:D10".to_string()],
+            rules: Vec::new(),
+        };
+        let payload = serialize_cond_formatting_header(&cf).unwrap();
+        // ccf(4) + fPivot(4) + range_count(4) + 2 ranges(32) = 44
+        assert_eq!(payload.len(), 44);
+        // Range count = 2
+        assert_eq!(i32::from_le_bytes(payload[8..12].try_into().unwrap()), 2);
+    }
+
+    #[test]
+    fn test_write_conditional_formattings_empty() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+        let cfs: Vec<ConditionalFormatting> = vec![];
+
+        let result = write_conditional_formattings(&mut writer, &cfs);
+        assert!(result.is_ok());
+        assert!(buffer.is_empty()); // No records for empty list
+    }
+
+    #[test]
+    fn test_write_single_cond_formatting() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+        let cf = ConditionalFormatting::new(vec!["A1:A10".to_string()]);
+
+        let result = write_single_cond_formatting(&mut writer, &cf);
+        assert!(result.is_ok());
+        assert!(!buffer.is_empty());
+    }
+
+    #[test]
+    fn test_write_conditional_formattings_with_rules() {
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+
+        let mut cf = ConditionalFormatting::new(vec!["A1:A10".to_string()]);
+        let mut rule = ConditionalFormattingRule::new(CfRuleType::CellIs, 1);
+        rule.dxf_id = Some(0);
+        rule.operator = Some(2); // greater than
+        cf.add_rule(rule);
+
+        let cfs = vec![cf];
+        let result = write_conditional_formattings(&mut writer, &cfs);
+        assert!(result.is_ok());
+        assert!(!buffer.is_empty());
     }
 }

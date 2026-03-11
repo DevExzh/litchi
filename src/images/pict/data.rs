@@ -195,7 +195,7 @@ mod tests {
     #[test]
     fn test_unpack_bits_noop() {
         // Test no-op code (-128)
-        let compressed = vec![0x80, 1, 0xEE]; // -128, then literal
+        let compressed = vec![0x80, 0, 0xEE]; // -128, then one literal byte
         let result = unpack_bits(&compressed, 1).unwrap();
         assert_eq!(result, vec![0xEE]);
     }
@@ -203,7 +203,7 @@ mod tests {
     #[test]
     fn test_unpack_bits_mixed() {
         // Test mixed literal and run-length
-        let compressed = vec![1, 0x11, 0x22, 0xFD, 0x33]; // 2 literals, then 3 repeats
+        let compressed = vec![1, 0x11, 0x22, 0xFE, 0x33]; // 2 literals, then 3 repeats
         let result = unpack_bits(&compressed, 5).unwrap();
         assert_eq!(result, vec![0x11, 0x22, 0x33, 0x33, 0x33]);
     }

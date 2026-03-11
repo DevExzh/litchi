@@ -1689,6 +1689,7 @@ impl Default for XlsWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Cursor;
 
     #[test]
     fn test_create_writer() {
@@ -1707,11 +1708,52 @@ mod tests {
     }
 
     #[test]
+    fn test_add_multiple_worksheets() {
+        let mut writer = XlsWriter::new();
+        let idx1 = writer.add_worksheet("Sheet1").unwrap();
+        let idx2 = writer.add_worksheet("Sheet2").unwrap();
+        let idx3 = writer.add_worksheet("Sheet3").unwrap();
+
+        assert_eq!(idx1, 0);
+        assert_eq!(idx2, 1);
+        assert_eq!(idx3, 2);
+        assert_eq!(writer.worksheets.len(), 3);
+    }
+
+    #[test]
+    fn test_add_worksheet_empty_name() {
+        let mut writer = XlsWriter::new();
+        let result = writer.add_worksheet("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_add_worksheet_long_name() {
+        let mut writer = XlsWriter::new();
+        let long_name = "A".repeat(50);
+        let result = writer.add_worksheet(&long_name);
+        assert!(result.is_err()); // Name too long
+    }
+
+    #[test]
+    fn test_add_worksheet_duplicate_name() {
+        let mut writer = XlsWriter::new();
+        writer.add_worksheet("Sheet1").unwrap();
+        let result = writer.add_worksheet("Sheet1");
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_write_string() {
         let mut writer = XlsWriter::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
         writer.write_string(sheet, 0, 0, "Hello").unwrap();
         assert_eq!(writer.worksheets[0].cells.len(), 1);
+
+        let cell = writer.worksheets[0].cells.get(&(0, 0)).unwrap();
+        assert_eq!(cell.row, 0);
+        assert_eq!(cell.col, 0);
+        assert!(matches!(&cell.value, XlsCellValue::String(s) if s == "Hello"));
     }
 
     #[test]
@@ -1720,5 +1762,316 @@ mod tests {
         let sheet = writer.add_worksheet("Sheet1").unwrap();
         writer.write_number(sheet, 0, 0, 42.5).unwrap();
         assert_eq!(writer.worksheets[0].cells.len(), 1);
+
+        let cell = writer.worksheets[0].cells.get(&(0, 0)).unwrap();
+        assert!(matches!(&cell.value, XlsCellValue::Number(n) if *n == 42.5));
+    }
+
+    #[test]
+    fn test_write_boolean() {
+        let mut writer = XlsWriter::new();
+        let sheet = writer.add_worksheet("Sheet1").unwrap();
+        writer.write_boolean(sheet, 0, 0, true).unwrap();
+        writer.write_boolean(sheet, 1, 0, false).unwrap();
+
+        assert_eq!(writer.worksheets[0].cells.len(), 2);
+        assert!(matches!(
+            writer.worksheets[0].cells.get(&(0, 0)).unwrap().value,
+            XlsCellValue::Boolean(true)
+        ));
+        assert!(matches!(
+            writer.worksheets[0].cells.get(&(1, 0)).unwrap().value,
+            XlsCellValue::Boolean(false)
+        ));
+    }
+
+    #[test]
+    fn test_write_formula() {
+        let mut writer = XlsWriter::new();
+        let sheet = writer.add_worksheet("Sheet1").unwrap();
+        writer.write_formula(sheet, 0, 0, "SUM(A1:B1)").unwrap();
+
+        let cell = writer.worksheets[0].cells.get(&(0, 0)).unwrap();
+        assert!(matches!(&cell.value, XlsCellValue::Formula(f) if f == "SUM(A1:B1)"));
+    }
+
+    #[test]
+    fn test_write_multiple_cells() {
+        let mut writer = XlsWriter::new();
+        let sheet = writer.add_worksheet("Sheet1").unwrap();
+
+        writer.write_string(sheet, 0, 0, "A1").unwrap();
+        writer.write_string(sheet, 0, 1, "B1").unwrap();
+        writer.write_string(sheet, 1, 0, "A2").unwrap();
+        writer.write_string(sheet, 1, 1, "B2").unwrap();
+
+        assert_eq!(writer.worksheets[0].cells.len(), 4);
+    }
+
+    #[test]
+    fn test_shared_strings_build() {
+        let mut writer = XlsWriter::new();
+        let sheet = writer.add_worksheet("Sheet1").unwrap();
+
+        writer.write_string(sheet, 0, 0, "Hello").unwrap();
+        writer.write_string(sheet, 0, 1, "Hello").unwrap();
+        writer.write_string(sheet, 1, 0, "World").unwrap();
+
+        // Build shared strings table (normally done during write)
+        writer.build_shared_strings();
+
+        // Should only have 2 unique strings
+        assert_eq!(writer.shared_strings.len(), 2);
+    }
+
+    #[test]
+    fn test_write_to_memory() {
+        let mut writer = XlsWriter::new();
+        let sheet = writer.add_worksheet("Sheet1").unwrap();
+        writer.write_string(sheet, 0, 0, "Test").unwrap();
+        writer.write_number(sheet, 0, 1, 123.45).unwrap();
+
+        let mut cursor = Cursor::new(Vec::new());
+        let result = writer.write_to(&mut cursor);
+        assert!(result.is_ok());
+
+        let data = cursor.into_inner();
+        assert!(!data.is_empty());
+        // Should start with OLE compound document signature
+        assert_eq!(
+            &data[0..8],
+            [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]
+        );
+    }
+
+    #[test]
+    fn test_save_to_file() {
+        let mut writer = XlsWriter::new();
+        let sheet = writer.add_worksheet("Sheet1").unwrap();
+        writer.write_string(sheet, 0, 0, "Hello").unwrap();
+
+        let temp_path = std::env::temp_dir().join("test_xls_writer.xls");
+        let result = writer.save(&temp_path);
+        assert!(result.is_ok());
+
+        // Verify file was created
+        assert!(temp_path.exists());
+
+        // Clean up
+        let _ = std::fs::remove_file(temp_path);
+    }
+
+    #[test]
+    fn test_xls_writer_default() {
+        let writer: XlsWriter = Default::default();
+        assert_eq!(writer.worksheets.len(), 0);
+        assert_eq!(writer.shared_strings.len(), 0);
+    }
+
+    #[test]
+    fn test_xlscellvalue_variants() {
+        let string_val = XlsCellValue::String("test".to_string());
+        let number_val = XlsCellValue::Number(42.0);
+        let bool_val = XlsCellValue::Boolean(true);
+        let formula_val = XlsCellValue::Formula("A1+B1".to_string());
+        let blank_val = XlsCellValue::Blank;
+
+        assert!(matches!(string_val, XlsCellValue::String(_)));
+        assert!(matches!(number_val, XlsCellValue::Number(_)));
+        assert!(matches!(bool_val, XlsCellValue::Boolean(_)));
+        assert!(matches!(formula_val, XlsCellValue::Formula(_)));
+        assert!(matches!(blank_val, XlsCellValue::Blank));
+    }
+
+    #[test]
+    fn test_xlscellvalue_debug() {
+        let val = XlsCellValue::String("test".to_string());
+        let debug = format!("{:?}", val);
+        assert!(debug.contains("String"));
+    }
+
+    #[test]
+    fn test_xlscellvalue_clone() {
+        let val = XlsCellValue::Number(42.0);
+        let cloned = val.clone();
+        assert!(matches!(cloned, XlsCellValue::Number(42.0)));
+    }
+
+    #[test]
+    fn test_writablecell_creation() {
+        let cell = WritableCell {
+            row: 5,
+            col: 3,
+            value: XlsCellValue::String("Test".to_string()),
+            format_idx: 15,
+            pivot_xf_role: None,
+        };
+
+        assert_eq!(cell.row, 5);
+        assert_eq!(cell.col, 3);
+        assert_eq!(cell.format_idx, 15);
+    }
+
+    #[test]
+    fn test_writableworksheet_creation() {
+        let ws = WritableWorksheet::new("TestSheet".to_string());
+        assert_eq!(ws.name, "TestSheet");
+        assert!(ws.cells.is_empty());
+        assert!(ws.merged_ranges.is_empty());
+        assert!(ws.column_widths.is_empty());
+    }
+
+    #[test]
+    fn test_writableworksheet_add_cell() {
+        let mut ws = WritableWorksheet::new("Sheet1".to_string());
+        let cell = WritableCell {
+            row: 0,
+            col: 0,
+            value: XlsCellValue::Number(100.0),
+            format_idx: 0,
+            pivot_xf_role: None,
+        };
+        ws.add_cell(cell);
+        assert_eq!(ws.cells.len(), 1);
+    }
+
+    #[test]
+    fn test_writableworksheet_set_column_width() {
+        let mut ws = WritableWorksheet::new("Sheet1".to_string());
+        ws.set_column_width(0, 2560); // ~10 characters
+        assert_eq!(ws.column_widths.get(&0), Some(&2560));
+    }
+
+    #[test]
+    fn test_writableworksheet_merge_cells() {
+        let mut ws = WritableWorksheet::new("Sheet1".to_string());
+        ws.add_merged_range(super::MergedRange {
+            first_row: 0,
+            last_row: 1,
+            first_col: 0,
+            last_col: 2,
+        }); // Merge A1:C2
+        assert_eq!(ws.merged_ranges.len(), 1);
+        assert_eq!(ws.merged_ranges[0].first_row, 0);
+        assert_eq!(ws.merged_ranges[0].last_row, 1);
+        assert_eq!(ws.merged_ranges[0].first_col, 0);
+        assert_eq!(ws.merged_ranges[0].last_col, 2);
+    }
+
+    #[test]
+    fn test_writableworksheet_freeze_panes() {
+        let mut ws = WritableWorksheet::new("Sheet1".to_string());
+        assert!(ws.freeze_panes.is_none());
+        ws.set_freeze_panes(1, 2);
+        assert!(ws.freeze_panes.is_some());
+        let fp = ws.freeze_panes.unwrap();
+        assert_eq!(fp.freeze_rows, 1);
+        assert_eq!(fp.freeze_cols, 2);
+    }
+
+    #[test]
+    fn test_writableworksheet_add_conditional_format() {
+        let mut ws = WritableWorksheet::new("Sheet1".to_string());
+        let cf = XlsConditionalFormat {
+            first_row: 0,
+            last_row: 10,
+            first_col: 0,
+            last_col: 0,
+            format_type: super::XlsConditionalFormatType::Formula {
+                formula: "A1>100".to_string(),
+            },
+            pattern: None,
+        };
+        ws.add_conditional_format(cf);
+        assert_eq!(ws.conditional_formats.len(), 1);
+    }
+
+    #[test]
+    fn test_writableworksheet_add_data_validation() {
+        let mut ws = WritableWorksheet::new("Sheet1".to_string());
+        let dv = XlsDataValidation {
+            first_row: 0,
+            last_row: 10,
+            first_col: 0,
+            last_col: 0,
+            validation_type: super::XlsDataValidationType::List {
+                values: vec!["Option1".to_string(), "Option2".to_string()],
+            },
+            show_input_message: true,
+            input_title: None,
+            input_message: None,
+            show_error_alert: true,
+            error_title: None,
+            error_message: None,
+        };
+        ws.add_data_validation(dv);
+        assert_eq!(ws.data_validations.len(), 1);
+    }
+
+    #[test]
+    fn test_writableworksheet_add_hyperlink() {
+        let mut ws = WritableWorksheet::new("Sheet1".to_string());
+        let link = super::XlsHyperlink {
+            first_row: 0,
+            last_row: 0,
+            first_col: 0,
+            last_col: 0,
+            url: "https://example.com".to_string(),
+        };
+        ws.add_hyperlink(link);
+        assert_eq!(ws.hyperlinks.len(), 1);
+        assert_eq!(ws.hyperlinks[0].url, "https://example.com");
+    }
+
+    #[test]
+    fn test_xls_defined_name_basic() {
+        let name = XlsDefinedName {
+            name: "TestRange".to_string(),
+            reference: "A1:B10".to_string(),
+            comment: None,
+            local_sheet: None,
+            target_sheet: Some(0),
+            hidden: false,
+            is_function: false,
+            is_built_in: false,
+            built_in_code: None,
+        };
+        assert_eq!(name.name, "TestRange");
+        assert_eq!(name.reference, "A1:B10");
+        assert_eq!(name.target_sheet, Some(0));
+    }
+
+    #[test]
+    fn test_xls_defined_name_to_biff_formula_area() {
+        let name = XlsDefinedName {
+            name: "TestRange".to_string(),
+            reference: "A1:B10".to_string(),
+            comment: None,
+            local_sheet: None,
+            target_sheet: Some(0),
+            hidden: false,
+            is_function: false,
+            is_built_in: false,
+            built_in_code: None,
+        };
+        let formula = name.to_biff_formula().unwrap();
+        assert!(!formula.is_empty());
+    }
+
+    #[test]
+    fn test_xls_defined_name_to_biff_formula_single() {
+        let name = XlsDefinedName {
+            name: "SingleCell".to_string(),
+            reference: "C5".to_string(),
+            comment: None,
+            local_sheet: None,
+            target_sheet: None,
+            hidden: false,
+            is_function: false,
+            is_built_in: false,
+            built_in_code: None,
+        };
+        let formula = name.to_biff_formula().unwrap();
+        assert!(!formula.is_empty());
     }
 }

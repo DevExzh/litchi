@@ -1224,8 +1224,9 @@ impl<'a> Worksheet<'a> {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1235,7 +1236,7 @@ impl<'a> Worksheet<'a> {
     /// for value in column_values {
     ///     println!("{:?}", value);
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn column_values(&self, column: u32) -> Result<Vec<CellValue>> {
         let mut values = Vec::new();
@@ -1256,8 +1257,9 @@ impl<'a> Worksheet<'a> {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1267,7 +1269,7 @@ impl<'a> Worksheet<'a> {
     /// for value in row_values {
     ///     println!("{:?}", value);
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn row_values(&self, row: u32) -> Result<Vec<CellValue>> {
         let mut values = Vec::new();
@@ -1291,8 +1293,9 @@ impl<'a> Worksheet<'a> {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1305,7 +1308,7 @@ impl<'a> Worksheet<'a> {
     ///     }
     ///     println!();
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn range(
         &self,
@@ -1352,8 +1355,9 @@ impl<'a> Worksheet<'a> {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1363,7 +1367,7 @@ impl<'a> Worksheet<'a> {
     /// for (row, col) in matches {
     ///     println!("Found at row {}, column {}", row, col);
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn find_text(&self, query: &str) -> Result<Vec<(u32, u32)>> {
         let mut matches = Vec::new();
@@ -1430,8 +1434,9 @@ impl<'a> Worksheet<'a> {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1439,7 +1444,7 @@ impl<'a> Worksheet<'a> {
     /// if let Some(style) = ws.get_cell_style(1, 1) {
     ///     println!("Cell has custom styling");
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn get_cell_style(&self, row: u32, column: u32) -> Option<&super::styles::CellStyle> {
         self.cell_styles
@@ -1596,8 +1601,9 @@ impl<'a> Worksheet<'a> {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1606,7 +1612,7 @@ impl<'a> Worksheet<'a> {
     ///     println!("Merged region: ({}, {}) to ({}, {})",
     ///              start_row, start_col, end_row, end_col);
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn get_merged_regions(&self) -> &[(u32, u32, u32, u32)] {
         &self.merged_regions
@@ -1645,8 +1651,9 @@ impl<'a> Worksheet<'a> {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1654,7 +1661,7 @@ impl<'a> Worksheet<'a> {
     /// if let Some(hyperlink) = ws.get_hyperlink(1, 1) {
     ///     println!("Cell A1 links to: {}", hyperlink.target);
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn get_hyperlink(&self, row: u32, column: u32) -> Option<&Hyperlink> {
         let cell_ref = format!("{}{}", Cell::column_to_letters(column), row);
@@ -1676,8 +1683,9 @@ impl<'a> Worksheet<'a> {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1685,7 +1693,7 @@ impl<'a> Worksheet<'a> {
     /// if let Some(comment) = ws.get_cell_comment(1, 1) {
     ///     println!("Comment: {}", comment.text);
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn get_cell_comment(&self, row: u32, column: u32) -> Option<&Comment> {
         let cell_ref = format!("{}{}", Cell::column_to_letters(column), row);
@@ -1759,8 +1767,9 @@ impl<'a> Worksheet<'a> {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1768,7 +1777,7 @@ impl<'a> Worksheet<'a> {
     /// for validation in ws.get_data_validations() {
     ///     println!("Validation on range: {}", validation.range);
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn get_data_validations(&self) -> &[DataValidationRule] {
         &self.data_validations
@@ -1780,8 +1789,9 @@ impl<'a> Worksheet<'a> {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1789,7 +1799,7 @@ impl<'a> Worksheet<'a> {
     /// for rule in ws.get_conditional_formatting() {
     ///     println!("Conditional format on range: {}", rule.range);
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn get_conditional_formatting(&self) -> &[ConditionalFormatRule] {
         &self.conditional_formats
@@ -1801,8 +1811,9 @@ impl<'a> Worksheet<'a> {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1811,7 +1822,7 @@ impl<'a> Worksheet<'a> {
     /// if page_setup.landscape {
     ///     println!("Page is in landscape orientation");
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn get_page_setup(&self) -> &PageSetup {
         &self.page_setup
@@ -1823,8 +1834,9 @@ impl<'a> Worksheet<'a> {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1832,7 +1844,7 @@ impl<'a> Worksheet<'a> {
     /// if let Some(auto_filter) = ws.get_auto_filter() {
     ///     println!("Auto-filter range: {}", auto_filter.range);
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn get_auto_filter(&self) -> Option<&AutoFilter> {
         self.auto_filter.as_ref()

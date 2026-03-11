@@ -1,17 +1,34 @@
 # Treat all the Office files as binary
-*.pptx binary
-*.docx binary
+
+# Legacy OLE2 files
 *.xls binary
-*.xlsx binary
-*.xlsb binary
 *.doc binary
 *.ppt binary
+
+# OpenOffice XML
+*.pptx binary
+*.docx binary
+*.xlsx binary
+*.xlsb binary
+
+# OpenDocument
 *.odt binary
 *.ods binary
 *.odp binary
+
+# Apple iWork
 *.pages binary
 *.numbers binary
 *.key binary
+
 # Though RTF could be text, it's better to treat it as binary
 *.rtf binary
+
+# Zip files
 *.zip binary
+
+# Images
+*.emf binary
+*.jpg binary
+*.png binary
+*.wmf binary

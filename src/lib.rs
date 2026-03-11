@@ -100,7 +100,7 @@
 //! ```no_run
 //! use litchi::ooxml::pptx::Package;
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 //! // Create a new empty presentation
 //! let mut pkg = Package::new()?;
 //!
@@ -121,7 +121,7 @@
 //! use litchi::ooxml::xlsx::Workbook;
 //! use litchi::sheet::WorkbookTrait;
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 //! // Create a new empty workbook
 //! let mut workbook = Workbook::create()?;
 //!

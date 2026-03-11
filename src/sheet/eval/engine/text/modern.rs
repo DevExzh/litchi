@@ -347,3 +347,167 @@ pub(crate) async fn eval_textsplit(
         Ok(CellValue::String(parts[0].clone()))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::engine::test_helpers::TestEngine;
+    use crate::sheet::eval::parser::Expr;
+
+    fn str_expr(s: &str) -> Expr {
+        Expr::Literal(CellValue::String(s.to_string()))
+    }
+
+    #[tokio::test]
+    async fn test_eval_valuetotext_default() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello")];
+        let result = eval_valuetotext(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("hello".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_valuetotext_strict() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Format 1 = strict, adds quotes around strings
+        let args = vec![str_expr("hello"), Expr::Literal(CellValue::Int(1))];
+        let result = eval_valuetotext(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("\"hello\"".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_valuetotext_bool() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![Expr::Literal(CellValue::Bool(true))];
+        let result = eval_valuetotext(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("TRUE".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_valuetotext_wrong_args() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args: Vec<Expr> = vec![];
+        let result = eval_valuetotext(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 1 or 2")),
+            _ => panic!("Expected Error, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_arraytotext_default() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Set up a range with values
+        for i in 0..3 {
+            engine.set_cell("Sheet1", 0, i, CellValue::Int(i as i64 + 1));
+        }
+        let range = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 0,
+            end_col: 2,
+        });
+        let args = vec![range];
+        let result = eval_arraytotext(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("1, 2, 3".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_arraytotext_array_format() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        engine.set_cell("Sheet1", 0, 0, CellValue::String("a".to_string()));
+        engine.set_cell("Sheet1", 0, 1, CellValue::Int(1));
+        let range = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 0,
+            end_col: 1,
+        });
+        let args = vec![range, Expr::Literal(CellValue::Int(1))];
+        let result = eval_arraytotext(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("{\"a\", 1}".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_textbefore() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello-world-test"), str_expr("-")];
+        let result = eval_textbefore(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("hello".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_textbefore_instance() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Get text before 2nd hyphen
+        let args = vec![
+            str_expr("hello-world-test"),
+            str_expr("-"),
+            Expr::Literal(CellValue::Int(2)),
+        ];
+        let result = eval_textbefore(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("hello-world".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_textbefore_not_found() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello"), str_expr("-")];
+        let result = eval_textbefore(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Error("#N/A".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_textafter() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello-world-test"), str_expr("-")];
+        let result = eval_textafter(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("world-test".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_textafter_instance() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Get text after 2nd hyphen
+        let args = vec![
+            str_expr("hello-world-test"),
+            str_expr("-"),
+            Expr::Literal(CellValue::Int(2)),
+        ];
+        let result = eval_textafter(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("test".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_textsplit() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("a,b,c"), str_expr(",")];
+        let result = eval_textsplit(ctx, "Sheet1", &args).await.unwrap();
+        // Returns first part since no dynamic array support
+        assert_eq!(result, CellValue::String("a".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_textsplit_empty_delim() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("abc"), str_expr("")];
+        let result = eval_textsplit(ctx, "Sheet1", &args).await.unwrap();
+        // Empty delimiter returns original text
+        assert_eq!(result, CellValue::String("abc".to_string()));
+    }
+}

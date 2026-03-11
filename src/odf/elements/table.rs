@@ -535,6 +535,485 @@ impl From<TableColumn> for Element {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========== Table Tests ==========
+    #[test]
+    fn test_table_new() {
+        let table = Table::new();
+        assert!(table.name().is_none());
+        assert!(table.style_name().is_none());
+        assert_eq!(table.row_count().unwrap(), 0);
+        assert_eq!(table.column_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn test_table_name() {
+        let mut table = Table::new();
+        table.set_name("Sheet1");
+        assert_eq!(table.name(), Some("Sheet1"));
+    }
+
+    #[test]
+    fn test_table_style_name() {
+        let mut table = Table::new();
+        table.set_style_name("TableStyle");
+        assert_eq!(table.style_name(), Some("TableStyle"));
+    }
+
+    #[test]
+    fn test_table_from_element() {
+        let element = Element::new("table:table");
+        let table = Table::from_element(element).unwrap();
+        assert!(table.name().is_none());
+    }
+
+    #[test]
+    fn test_table_from_element_wrong_tag() {
+        let element = Element::new("table:row");
+        assert!(Table::from_element(element).is_err());
+    }
+
+    #[test]
+    fn test_table_add_row() {
+        let mut table = Table::new();
+        let row = TableRow::new();
+        table.add_row(row);
+        assert_eq!(table.row_count().unwrap(), 1);
+    }
+
+    #[test]
+    fn test_table_row_access() {
+        let mut table = Table::new();
+        let mut row = TableRow::new();
+        let cell = TableCell::new();
+        row.add_cell(cell);
+        table.add_row(row);
+
+        assert!(table.row(0).unwrap().is_some());
+        assert!(table.row_at(0).unwrap().is_some());
+        assert!(table.row(1).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_table_add_column() {
+        let mut table = Table::new();
+        let col = TableColumn::new();
+        table.add_column(col);
+        // Column doesn't affect row-based column count
+        assert_eq!(table.column_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn test_table_set_column_count() {
+        let mut table = Table::new();
+        table.set_column_count(3);
+        // Column count is based on widest row, so still 0
+        assert_eq!(table.column_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn test_table_rows() {
+        let mut table = Table::new();
+        let row1 = TableRow::new();
+        let row2 = TableRow::new();
+        table.add_row(row1);
+        table.add_row(row2);
+
+        let rows = table.rows().unwrap();
+        assert_eq!(rows.len(), 2);
+    }
+
+    #[test]
+    fn test_table_column_count_with_data() {
+        let mut table = Table::new();
+        let mut row = TableRow::new();
+        row.add_cell(TableCell::new());
+        row.add_cell(TableCell::new());
+        row.add_cell(TableCell::new());
+        table.add_row(row);
+
+        assert_eq!(table.column_count().unwrap(), 3);
+    }
+
+    // ========== TableRow Tests ==========
+    #[test]
+    fn test_table_row_new() {
+        let row = TableRow::new();
+        assert_eq!(row.cell_count().unwrap(), 0);
+        assert!(row.style_name().is_none());
+        assert_eq!(row.repeat_count(), 1);
+    }
+
+    #[test]
+    fn test_table_row_from_element() {
+        let element = Element::new("table:table-row");
+        let row = TableRow::from_element(element).unwrap();
+        assert_eq!(row.cell_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn test_table_row_from_element_wrong_tag() {
+        let element = Element::new("table:table-cell");
+        assert!(TableRow::from_element(element).is_err());
+    }
+
+    #[test]
+    fn test_table_row_add_cell() {
+        let mut row = TableRow::new();
+        let cell = TableCell::new();
+        row.add_cell(cell);
+        assert_eq!(row.cell_count().unwrap(), 1);
+    }
+
+    #[test]
+    fn test_table_row_cells() {
+        let mut row = TableRow::new();
+        row.add_cell(TableCell::new());
+        row.add_cell(TableCell::new());
+
+        let cells = row.cells().unwrap();
+        assert_eq!(cells.len(), 2);
+    }
+
+    #[test]
+    fn test_table_row_cell_access() {
+        let mut row = TableRow::new();
+        let mut cell = TableCell::new();
+        cell.set_text("Test");
+        row.add_cell(cell);
+
+        assert!(row.cell(0).unwrap().is_some());
+        assert!(row.cell_at(0).unwrap().is_some());
+        assert!(row.cell(1).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_table_row_style_name() {
+        let mut row = TableRow::new();
+        row.set_style_name("RowStyle");
+        assert_eq!(row.style_name(), Some("RowStyle"));
+    }
+
+    #[test]
+    fn test_table_row_repeat_count() {
+        let mut row = TableRow::new();
+        assert_eq!(row.repeat_count(), 1);
+
+        row.set_repeat_count(5);
+        assert_eq!(row.repeat_count(), 5);
+
+        row.set_repeat_count(1);
+        assert_eq!(row.repeat_count(), 1);
+    }
+
+    // ========== TableCell Tests ==========
+    #[test]
+    fn test_table_cell_new() {
+        let cell = TableCell::new();
+        assert_eq!(cell.text().unwrap(), "");
+        assert!(cell.formula().is_none());
+        assert!(cell.style_name().is_none());
+        assert_eq!(cell.colspan(), 1);
+        assert_eq!(cell.rowspan(), 1);
+        assert_eq!(cell.repeat_count(), 1);
+    }
+
+    #[test]
+    fn test_table_cell_from_element() {
+        let element = Element::new("table:table-cell");
+        let cell = TableCell::from_element(element).unwrap();
+        assert_eq!(cell.text().unwrap(), "");
+    }
+
+    #[test]
+    fn test_table_cell_from_element_wrong_tag() {
+        let element = Element::new("table:table-row");
+        assert!(TableCell::from_element(element).is_err());
+    }
+
+    #[test]
+    fn test_table_cell_set_text() {
+        let mut cell = TableCell::new();
+        cell.set_text("Hello World");
+        assert_eq!(cell.text().unwrap(), "Hello World");
+    }
+
+    #[test]
+    fn test_table_cell_formula() {
+        let mut cell = TableCell::new();
+        assert!(cell.formula().is_none());
+
+        cell.set_formula("=SUM(A1:B2)");
+        assert_eq!(cell.formula(), Some("=SUM(A1:B2)"));
+    }
+
+    #[test]
+    fn test_table_cell_style_name() {
+        let mut cell = TableCell::new();
+        cell.set_style_name("CellStyle");
+        assert_eq!(cell.style_name(), Some("CellStyle"));
+    }
+
+    #[test]
+    fn test_table_cell_colspan() {
+        let mut cell = TableCell::new();
+        assert_eq!(cell.colspan(), 1);
+
+        cell.set_colspan(3);
+        assert_eq!(cell.colspan(), 3);
+    }
+
+    #[test]
+    fn test_table_cell_rowspan() {
+        let mut cell = TableCell::new();
+        assert_eq!(cell.rowspan(), 1);
+
+        cell.set_rowspan(2);
+        assert_eq!(cell.rowspan(), 2);
+    }
+
+    #[test]
+    fn test_table_cell_repeat_count() {
+        let mut cell = TableCell::new();
+        assert_eq!(cell.repeat_count(), 1);
+
+        cell.set_repeat_count(4);
+        assert_eq!(cell.repeat_count(), 4);
+
+        cell.set_repeat_count(1);
+        assert_eq!(cell.repeat_count(), 1);
+    }
+
+    #[test]
+    fn test_table_cell_is_empty() {
+        let cell = TableCell::new();
+        assert!(cell.is_empty());
+
+        let mut cell = TableCell::new();
+        cell.set_text("Content");
+        assert!(!cell.is_empty());
+    }
+
+    #[test]
+    fn test_table_cell_value_empty() {
+        let cell = TableCell::new();
+        assert!(matches!(cell.value().unwrap(), CellValue::Empty));
+    }
+
+    #[test]
+    fn test_table_cell_value_text() {
+        let mut cell = TableCell::new();
+        cell.set_text("Hello");
+        assert!(matches!(cell.value().unwrap(), CellValue::Text(_)));
+    }
+
+    #[test]
+    fn test_table_cell_value_number() {
+        let mut element = Element::new("table:table-cell");
+        element.set_attribute("office:value-type", "float");
+        element.set_attribute("office:value", "42.5");
+        let cell = TableCell::from_element(element).unwrap();
+
+        match cell.value().unwrap() {
+            CellValue::Number(n) => assert!((n - 42.5).abs() < f64::EPSILON),
+            _ => panic!("Expected Number"),
+        }
+    }
+
+    #[test]
+    fn test_table_cell_value_boolean() {
+        let mut element = Element::new("table:table-cell");
+        element.set_attribute("office:value-type", "boolean");
+        element.set_attribute("office:value", "true");
+        let cell = TableCell::from_element(element).unwrap();
+
+        match cell.value().unwrap() {
+            CellValue::Boolean(b) => assert!(b),
+            _ => panic!("Expected Boolean"),
+        }
+    }
+
+    #[test]
+    fn test_table_cell_value_date() {
+        let mut element = Element::new("table:table-cell");
+        element.set_attribute("office:value-type", "date");
+        element.set_attribute("office:value", "2024-03-15");
+        let cell = TableCell::from_element(element).unwrap();
+
+        match cell.value().unwrap() {
+            CellValue::Date(d) => assert_eq!(d, "2024-03-15"),
+            _ => panic!("Expected Date"),
+        }
+    }
+
+    // ========== TableColumn Tests ==========
+    #[test]
+    fn test_table_column_new() {
+        let col = TableColumn::new();
+        assert!(col.style_name().is_none());
+        assert!(col.default_cell_style_name().is_none());
+        assert_eq!(col.repeated(), 1);
+    }
+
+    #[test]
+    fn test_table_column_from_element() {
+        let element = Element::new("table:table-column");
+        let col = TableColumn::from_element(element).unwrap();
+        assert_eq!(col.repeated(), 1);
+    }
+
+    #[test]
+    fn test_table_column_from_element_wrong_tag() {
+        let element = Element::new("table:table-cell");
+        assert!(TableColumn::from_element(element).is_err());
+    }
+
+    #[test]
+    fn test_table_column_style_name() {
+        let mut col = TableColumn::new();
+        col.set_style_name("ColumnStyle");
+        assert_eq!(col.style_name(), Some("ColumnStyle"));
+    }
+
+    #[test]
+    fn test_table_column_default_cell_style() {
+        let mut col = TableColumn::new();
+        col.set_default_cell_style_name("DefaultCell");
+        assert_eq!(col.default_cell_style_name(), Some("DefaultCell"));
+    }
+
+    #[test]
+    fn test_table_column_repeated() {
+        let mut col = TableColumn::new();
+        assert_eq!(col.repeated(), 1);
+
+        col.set_repeated(5);
+        assert_eq!(col.repeated(), 5);
+    }
+
+    // ========== TableElements Tests ==========
+    #[test]
+    fn test_table_elements_parse_tables_empty() {
+        let xml = r#"<office:document xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"></office:document>"#;
+        let tables = TableElements::parse_tables(xml).unwrap();
+        assert!(tables.is_empty());
+    }
+
+    #[test]
+    fn test_table_elements_parse_tables_single() {
+        let xml = r#"<office:document xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
+            <table:table table:name="Table1">
+                <table:table-row>
+                    <table:table-cell>Cell 1</table:table-cell>
+                </table:table-row>
+            </table:table>
+        </office:document>"#;
+
+        let tables = TableElements::parse_tables(xml).unwrap();
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables[0].name(), Some("Table1"));
+    }
+
+    #[test]
+    fn test_table_elements_parse_tables_multiple() {
+        let xml = r#"<office:document xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
+            <table:table table:name="Table1"></table:table>
+            <table:table table:name="Table2"></table:table>
+        </office:document>"#;
+
+        let tables = TableElements::parse_tables(xml).unwrap();
+        assert_eq!(tables.len(), 2);
+    }
+
+    #[test]
+    fn test_table_elements_parse_from_content() {
+        let xml = r#"<office:document-content xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
+            <table:table table:name="Sheet1"></table:table>
+        </office:document-content>"#;
+
+        let tables = TableElements::parse_tables_from_content(xml).unwrap();
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables[0].name(), Some("Sheet1"));
+    }
+
+    #[test]
+    fn test_table_elements_parse_table_with_attributes() {
+        let xml = r#"<office:document xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
+            <table:table table:name="TestTable" table:style-name="TableStyle">
+            </table:table>
+        </office:document>"#;
+
+        let tables = TableElements::parse_tables(xml).unwrap();
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables[0].name(), Some("TestTable"));
+        assert_eq!(tables[0].style_name(), Some("TableStyle"));
+    }
+
+    #[test]
+    fn test_table_roundtrip() {
+        // Test converting Table to Element and back
+        let mut table = Table::new();
+        table.set_name("TestTable");
+        table.set_style_name("TestStyle");
+
+        let element: Element = table.into();
+        let table2 = Table::from_element(element).unwrap();
+
+        assert_eq!(table2.name(), Some("TestTable"));
+        assert_eq!(table2.style_name(), Some("TestStyle"));
+    }
+
+    #[test]
+    fn test_table_row_roundtrip() {
+        let mut row = TableRow::new();
+        row.set_style_name("RowStyle");
+        row.set_repeat_count(3);
+
+        let element: Element = row.into();
+        let row2 = TableRow::from_element(element).unwrap();
+
+        assert_eq!(row2.style_name(), Some("RowStyle"));
+        assert_eq!(row2.repeat_count(), 3);
+    }
+
+    #[test]
+    fn test_table_cell_roundtrip() {
+        let mut cell = TableCell::new();
+        cell.set_text("Test");
+        cell.set_formula("=A1+B1");
+        cell.set_style_name("CellStyle");
+        cell.set_colspan(2);
+        cell.set_rowspan(3);
+
+        let element: Element = cell.into();
+        let cell2 = TableCell::from_element(element).unwrap();
+
+        assert_eq!(cell2.text().unwrap(), "Test");
+        assert_eq!(cell2.formula(), Some("=A1+B1"));
+        assert_eq!(cell2.style_name(), Some("CellStyle"));
+        assert_eq!(cell2.colspan(), 2);
+        assert_eq!(cell2.rowspan(), 3);
+    }
+
+    #[test]
+    fn test_table_column_roundtrip() {
+        let mut col = TableColumn::new();
+        col.set_style_name("ColStyle");
+        col.set_default_cell_style_name("DefaultCell");
+        col.set_repeated(5);
+
+        let element: Element = col.into();
+        let col2 = TableColumn::from_element(element).unwrap();
+
+        assert_eq!(col2.style_name(), Some("ColStyle"));
+        assert_eq!(col2.default_cell_style_name(), Some("DefaultCell"));
+        assert_eq!(col2.repeated(), 5);
+    }
+}
+
 /// Collection of table elements for easy parsing
 pub struct TableElements;
 

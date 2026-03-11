@@ -28,7 +28,7 @@
 /// let options = MarkdownOptions::new()
 ///     .with_styles(true)
 ///     .with_metadata(false)
-///     .with_html_tables(false);
+///     .with_table_style(litchi::markdown::TableStyle::Markdown);
 /// let markdown = doc.to_markdown_with_options(&options)?;
 /// # Ok(())
 /// # }

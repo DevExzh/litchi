@@ -295,3 +295,173 @@ fn parse_cell_ref(cell_ref: &str) -> Option<(u32, u32)> {
     let row = row_str.parse::<u32>().ok()?;
     Some((col, row))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_table_style_info_new() {
+        let style = TableStyleInfo::new();
+        assert!(style.name.is_none());
+        assert!(style.show_first_column.is_none());
+        assert!(style.show_last_column.is_none());
+        assert!(style.show_row_stripes.is_none());
+        assert!(style.show_column_stripes.is_none());
+    }
+
+    #[test]
+    fn test_table_style_info_default() {
+        let style: TableStyleInfo = Default::default();
+        assert!(style.name.is_none());
+    }
+
+    #[test]
+    fn test_table_style_info_parse() {
+        let tag = r#"name="TableStyleMedium2" showFirstColumn="1" showLastColumn="0" showRowStripes="1" showColumnStripes="0""#;
+        let style = TableStyleInfo::parse(tag).unwrap();
+        assert_eq!(style.name, Some("TableStyleMedium2".to_string()));
+        assert_eq!(style.show_first_column, Some(true));
+        assert_eq!(style.show_last_column, Some(false));
+        assert_eq!(style.show_row_stripes, Some(true));
+        assert_eq!(style.show_column_stripes, Some(false));
+    }
+
+    #[test]
+    fn test_table_style_info_parse_partial() {
+        let tag = r#"name="TableStyleLight1" showRowStripes="true""#;
+        let style = TableStyleInfo::parse(tag).unwrap();
+        assert_eq!(style.name, Some("TableStyleLight1".to_string()));
+        assert_eq!(style.show_row_stripes, Some(true));
+        assert!(style.show_first_column.is_none());
+    }
+
+    #[test]
+    fn test_totals_row_function_as_str() {
+        assert_eq!(TotalsRowFunction::Sum.as_str(), "sum");
+        assert_eq!(TotalsRowFunction::Min.as_str(), "min");
+        assert_eq!(TotalsRowFunction::Max.as_str(), "max");
+        assert_eq!(TotalsRowFunction::Average.as_str(), "average");
+        assert_eq!(TotalsRowFunction::Count.as_str(), "count");
+        assert_eq!(TotalsRowFunction::CountNums.as_str(), "countNums");
+        assert_eq!(TotalsRowFunction::StdDev.as_str(), "stdDev");
+        assert_eq!(TotalsRowFunction::Var.as_str(), "var");
+        assert_eq!(TotalsRowFunction::Custom.as_str(), "custom");
+    }
+
+    #[test]
+    fn test_totals_row_function_parse() {
+        assert_eq!(
+            TotalsRowFunction::parse("sum"),
+            Some(TotalsRowFunction::Sum)
+        );
+        assert_eq!(
+            TotalsRowFunction::parse("min"),
+            Some(TotalsRowFunction::Min)
+        );
+        assert_eq!(
+            TotalsRowFunction::parse("max"),
+            Some(TotalsRowFunction::Max)
+        );
+        assert_eq!(
+            TotalsRowFunction::parse("average"),
+            Some(TotalsRowFunction::Average)
+        );
+        assert_eq!(
+            TotalsRowFunction::parse("count"),
+            Some(TotalsRowFunction::Count)
+        );
+        assert_eq!(
+            TotalsRowFunction::parse("countNums"),
+            Some(TotalsRowFunction::CountNums)
+        );
+        assert_eq!(
+            TotalsRowFunction::parse("stdDev"),
+            Some(TotalsRowFunction::StdDev)
+        );
+        assert_eq!(
+            TotalsRowFunction::parse("var"),
+            Some(TotalsRowFunction::Var)
+        );
+        assert_eq!(
+            TotalsRowFunction::parse("custom"),
+            Some(TotalsRowFunction::Custom)
+        );
+        assert_eq!(TotalsRowFunction::parse("invalid"), None);
+    }
+
+    #[test]
+    fn test_table_column_new() {
+        let col = TableColumn::new(1u32, "Sales");
+        assert_eq!(col.id, 1);
+        assert_eq!(col.name, "Sales");
+        assert!(col.unique_name.is_none());
+        assert!(col.totals_row_function.is_none());
+        assert!(col.totals_row_label.is_none());
+        assert!(col.calculated_column_formula.is_none());
+        assert!(col.totals_row_formula.is_none());
+    }
+
+    #[test]
+    fn test_table_type_as_str() {
+        assert_eq!(TableType::Worksheet.as_str(), "worksheet");
+        assert_eq!(TableType::Xml.as_str(), "xml");
+        assert_eq!(TableType::QueryTable.as_str(), "queryTable");
+    }
+
+    #[test]
+    fn test_table_type_parse() {
+        assert_eq!(TableType::parse("worksheet"), Some(TableType::Worksheet));
+        assert_eq!(TableType::parse("xml"), Some(TableType::Xml));
+        assert_eq!(TableType::parse("queryTable"), Some(TableType::QueryTable));
+        assert_eq!(TableType::parse("invalid"), None);
+    }
+
+    #[test]
+    fn test_table_new() {
+        let table = Table::new(1u32, "Table1", "A1:D10");
+        assert_eq!(table.id, 1);
+        assert_eq!(table.name, "Table1");
+        assert_eq!(table.display_name, "Table1");
+        assert_eq!(table.ref_range, "A1:D10");
+        assert_eq!(table.header_row_count, Some(1));
+        assert!(table.columns.is_empty());
+        assert!(table.comment.is_none());
+        assert!(table.table_type.is_none());
+    }
+
+    #[test]
+    fn test_table_initialize_columns() {
+        let mut table = Table::new(1u32, "Table1", "A1:D10");
+        table.initialize_columns();
+        assert_eq!(table.columns.len(), 4);
+        assert_eq!(table.columns[0].name, "Column1");
+        assert_eq!(table.columns[3].name, "Column4");
+        assert!(table.auto_filter_range.is_some());
+    }
+
+    #[test]
+    fn test_table_column_names() {
+        let mut table = Table::new(1u32, "Table1", "A1:C5");
+        table.initialize_columns();
+        let names = table.column_names();
+        assert_eq!(names, vec!["Column1", "Column2", "Column3"]);
+    }
+
+    #[test]
+    fn test_parse_cell_ref() {
+        assert_eq!(parse_cell_ref("A1"), Some((1, 1)));
+        assert_eq!(parse_cell_ref("B2"), Some((2, 2)));
+        assert_eq!(parse_cell_ref("Z10"), Some((26, 10)));
+        assert_eq!(parse_cell_ref("AA1"), Some((27, 1)));
+        assert_eq!(parse_cell_ref("AB100"), Some((28, 100)));
+    }
+
+    #[test]
+    fn test_parse_range() {
+        assert_eq!(parse_range("A1:D10"), Some((1, 1, 4, 10)));
+        assert_eq!(parse_range("B2:C5"), Some((2, 2, 3, 5)));
+        assert_eq!(parse_range("A1"), None); // Missing colon
+        assert_eq!(parse_range(""), None);
+    }
+}

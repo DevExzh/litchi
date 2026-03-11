@@ -53,10 +53,10 @@ impl Workbook {
     /// ```rust,no_run
     /// use litchi::ooxml::xlsx::Workbook;
     ///
-    /// let workbook = Workbook::create()?;
+    /// let mut workbook = Workbook::create()?;
     /// // Add data to worksheets...
     /// workbook.save("new_workbook.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn create() -> SheetResult<Self> {
         use crate::ooxml::opc::constants::content_type as ct;
@@ -496,7 +496,7 @@ impl Workbook {
     /// ws.set_cell_value(1, 2, "World");
     ///
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn worksheet_mut(&mut self, index: usize) -> SheetResult<&mut MutableWorksheet> {
         if self.mutable_data.is_none() {
@@ -588,7 +588,7 @@ impl Workbook {
     /// let mut wb = Workbook::create()?;
     /// wb.add_worksheet("Sheet2");
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn add_worksheet(&mut self, name: &str) -> &mut MutableWorksheet {
         if self.mutable_data.is_none() {
@@ -617,7 +617,7 @@ impl Workbook {
     /// let mut wb = Workbook::create()?;
     /// wb.define_name("TaxRate", "Sheet1!$A$1");
     /// wb.define_name("SalesData", "Sheet1!$A$1:$D$100");
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn define_name(&mut self, name: &str, reference: &str) {
         if self.mutable_data.is_none() {
@@ -676,7 +676,7 @@ impl Workbook {
     ///
     /// let wb = Workbook::create()?;
     /// let props = wb.properties();
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn properties(&self) -> &DocumentProperties {
         &self.properties
@@ -693,7 +693,7 @@ impl Workbook {
     /// wb.properties_mut().title = Some("My Workbook".to_string());
     /// wb.properties_mut().creator = Some("John Doe".to_string());
     /// wb.save("workbook.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn properties_mut(&mut self) -> &mut DocumentProperties {
         &mut self.properties
@@ -720,7 +720,7 @@ impl Workbook {
     ///     provider_id: None,
     /// });
     /// wb.set_person_list(person_list);
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn set_person_list(&mut self, person_list: crate::ooxml::xlsx::PersonList) {
         if self.mutable_data.is_none() {
@@ -748,7 +748,7 @@ impl Workbook {
     /// let mut workbook = Workbook::create()?;
     /// // Modify workbook...
     /// workbook.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> SheetResult<()> {
         // If we have mutable data, update the workbook parts
@@ -1423,7 +1423,7 @@ impl Workbook {
     /// let mut wb = Workbook::create()?;
     /// wb.hide_sheet(0)?; // Hide the first sheet
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn hide_sheet(&mut self, index: usize) -> SheetResult<()> {
         if index >= self.worksheets.len() {
@@ -1482,7 +1482,7 @@ impl Workbook {
     /// wb.add_worksheet("Sheet3");
     /// wb.move_sheet(2, 0)?; // Move Sheet3 to the first position
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn move_sheet(&mut self, from_index: usize, to_index: usize) -> SheetResult<()> {
         if from_index >= self.worksheets.len() || to_index >= self.worksheets.len() {
@@ -1519,7 +1519,7 @@ impl Workbook {
     /// let mut wb = Workbook::create()?;
     /// wb.set_sheet_visibility(0, "hidden")?;
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn set_sheet_visibility(&mut self, index: usize, visibility: &str) -> SheetResult<()> {
         if index >= self.worksheets.len() {
@@ -1569,7 +1569,7 @@ impl Workbook {
     /// wb.add_worksheet("Sheet2");
     /// wb.set_active_sheet(1)?; // Make Sheet2 active
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn set_active_sheet(&mut self, index: usize) -> SheetResult<()> {
         if index >= self.worksheets.len() {
@@ -1599,7 +1599,7 @@ impl Workbook {
     /// let mut wb = Workbook::create()?;
     /// wb.set_force_formula_recalculation(true);
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn set_force_formula_recalculation(&mut self, force: bool) {
         if self.mutable_data.is_none() {
@@ -1625,7 +1625,7 @@ impl Workbook {
     /// let mut wb = Workbook::create()?;
     /// wb.set_calculation_mode("manual")?;
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn set_calculation_mode(&mut self, mode: &str) -> SheetResult<()> {
         if !matches!(mode, "auto" | "manual" | "autoNoTable") {
@@ -1669,7 +1669,7 @@ impl Workbook {
     /// let mut wb = Workbook::create()?;
     /// wb.set_tab_color(0, "FF0000")?; // Set red tab color
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn set_tab_color(&mut self, index: usize, color: &str) -> SheetResult<()> {
         if self.mutable_data.is_none() {
@@ -1710,7 +1710,7 @@ impl Workbook {
     /// let mut wb = Workbook::create()?;
     /// wb.protect_workbook(Some("password123"), true, false);
     /// wb.save("output.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn protect_workbook(
         &mut self,

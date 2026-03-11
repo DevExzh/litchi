@@ -15,7 +15,7 @@ use crate::common::unit::{EMUS_PER_INCH, emu_to_pt_f64, emu_to_px_96};
 /// # Example
 ///
 /// ```rust,no_run
-/// use litchi::ooxml::docx::Package;
+/// use litchi::ooxml::docx::{Package, drawing::ShapeType};
 ///
 /// let pkg = Package::open("document.docx")?;
 /// let doc = pkg.document()?;

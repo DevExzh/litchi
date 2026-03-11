@@ -478,3 +478,146 @@ impl QualifiedName {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_namespace_constants() {
+        // Verify some key namespace constants exist
+        assert_eq!(OFFICENS, "urn:oasis:names:tc:opendocument:xmlns:office:1.0");
+        assert_eq!(TEXTNS, "urn:oasis:names:tc:opendocument:xmlns:text:1.0");
+        assert_eq!(TABLENS, "urn:oasis:names:tc:opendocument:xmlns:table:1.0");
+        assert_eq!(STYLENS, "urn:oasis:names:tc:opendocument:xmlns:style:1.0");
+    }
+
+    #[test]
+    fn test_uri_to_prefix_mapping() {
+        assert_eq!(URI_TO_PREFIX.get(OFFICENS), Some(&"office"));
+        assert_eq!(URI_TO_PREFIX.get(TEXTNS), Some(&"text"));
+        assert_eq!(URI_TO_PREFIX.get(TABLENS), Some(&"table"));
+        assert_eq!(URI_TO_PREFIX.get(STYLENS), Some(&"style"));
+    }
+
+    #[test]
+    fn test_prefix_to_uri_mapping() {
+        assert_eq!(PREFIX_TO_URI.get("office"), Some(&OFFICENS));
+        assert_eq!(PREFIX_TO_URI.get("text"), Some(&TEXTNS));
+        assert_eq!(PREFIX_TO_URI.get("table"), Some(&TABLENS));
+        assert_eq!(PREFIX_TO_URI.get("style"), Some(&STYLENS));
+    }
+
+    #[test]
+    fn test_qualified_name_new() {
+        let qn = QualifiedName::new(Some(OFFICENS.to_string()), "body".to_string());
+        assert_eq!(qn.local_name, "body");
+        assert_eq!(qn.qualified_name, "office:body");
+        assert_eq!(qn.namespace_uri, Some(OFFICENS.to_string()));
+    }
+
+    #[test]
+    fn test_qualified_name_new_no_namespace() {
+        let qn = QualifiedName::new(None, "body".to_string());
+        assert_eq!(qn.local_name, "body");
+        assert_eq!(qn.qualified_name, "body");
+        assert_eq!(qn.namespace_uri, None);
+    }
+
+    #[test]
+    fn test_qualified_name_from_string() {
+        let qn = QualifiedName::from_string("office:body");
+        assert_eq!(qn.local_name, "body");
+        assert_eq!(qn.qualified_name, "office:body");
+        assert_eq!(qn.namespace_uri, Some(OFFICENS.to_string()));
+    }
+
+    #[test]
+    fn test_qualified_name_from_string_no_prefix() {
+        let qn = QualifiedName::from_string("body");
+        assert_eq!(qn.local_name, "body");
+        assert_eq!(qn.qualified_name, "body");
+        assert_eq!(qn.namespace_uri, None);
+    }
+
+    #[test]
+    fn test_qualified_name_from_str() {
+        let qn: QualifiedName = "text:p".into();
+        assert_eq!(qn.local_name, "p");
+        assert_eq!(qn.qualified_name, "text:p");
+        assert_eq!(qn.namespace_uri, Some(TEXTNS.to_string()));
+    }
+
+    #[test]
+    fn test_qualified_name_display() {
+        let qn = QualifiedName::from_string("table:table");
+        assert_eq!(format!("{}", qn), "table:table");
+    }
+
+    #[test]
+    fn test_qualified_name_matches() {
+        let qn1 = QualifiedName::from_string("office:body");
+        let qn2 = QualifiedName::new(Some(OFFICENS.to_string()), "body".to_string());
+        let qn3 = QualifiedName::from_string("text:p");
+
+        assert!(qn1.matches(&qn2));
+        assert!(!qn1.matches(&qn3));
+    }
+
+    #[test]
+    fn test_namespace_context_default() {
+        let ctx = NamespaceContext::default();
+        assert!(ctx.default_namespace.is_none());
+        assert!(ctx.prefixes.is_empty());
+    }
+
+    #[test]
+    fn test_namespace_context_add_namespace() {
+        let mut ctx = NamespaceContext::default();
+        ctx.add_namespace("xmlns:text", TEXTNS);
+
+        assert_eq!(ctx.resolve_prefix("text"), Some(TEXTNS));
+    }
+
+    #[test]
+    fn test_namespace_context_add_default_namespace() {
+        let mut ctx = NamespaceContext::default();
+        ctx.add_namespace("xmlns", OFFICENS);
+
+        assert_eq!(ctx.default_namespace(), Some(OFFICENS));
+    }
+
+    #[test]
+    fn test_namespace_context_resolve_prefix() {
+        let mut ctx = NamespaceContext::default();
+        ctx.add_namespace("xmlns:table", TABLENS);
+        ctx.add_namespace("xmlns:text", TEXTNS);
+
+        assert_eq!(ctx.resolve_prefix("table"), Some(TABLENS));
+        assert_eq!(ctx.resolve_prefix("text"), Some(TEXTNS));
+        assert_eq!(ctx.resolve_prefix("office"), None);
+    }
+
+    #[test]
+    fn test_qualified_name_with_context() {
+        let mut ctx = NamespaceContext::default();
+        ctx.add_namespace("xmlns:custom", "http://example.com/custom");
+
+        let qn = ctx.parse_qualified_name("custom:element");
+        assert_eq!(qn.local_name, "element");
+        assert_eq!(
+            qn.namespace_uri,
+            Some("http://example.com/custom".to_string())
+        );
+    }
+
+    #[test]
+    fn test_qualified_name_with_default_namespace() {
+        let mut ctx = NamespaceContext::default();
+        ctx.add_namespace("xmlns", OFFICENS);
+
+        let qn = ctx.parse_qualified_name("body");
+        assert_eq!(qn.local_name, "body");
+        assert_eq!(qn.namespace_uri, Some(OFFICENS.to_string()));
+    }
+}

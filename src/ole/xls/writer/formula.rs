@@ -509,6 +509,35 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_cell_ref_row_abs() {
+        let ref_row_abs = parse_cell_ref("A$5").unwrap();
+        assert!(matches!(ref_row_abs, Ptg::PtgRef(4, 0, false, true)));
+    }
+
+    #[test]
+    fn test_parse_cell_ref_col_abs() {
+        let ref_col_abs = parse_cell_ref("$C10").unwrap();
+        assert!(matches!(ref_col_abs, Ptg::PtgRef(9, 2, true, false)));
+    }
+
+    #[test]
+    fn test_parse_cell_ref_multiletter_col() {
+        let ref_aa1 = parse_cell_ref("AA1").unwrap();
+        assert!(matches!(ref_aa1, Ptg::PtgRef(0, 26, true, true)));
+
+        let ref_zz5 = parse_cell_ref("ZZ5").unwrap();
+        assert!(matches!(ref_zz5, Ptg::PtgRef(4, 701, true, true)));
+    }
+
+    #[test]
+    fn test_parse_cell_ref_invalid() {
+        assert!(parse_cell_ref("").is_err());
+        assert!(parse_cell_ref("123").is_err());
+        assert!(parse_cell_ref("ABC").is_err());
+        assert!(parse_cell_ref("A0").is_err()); // Row 0 is invalid
+    }
+
+    #[test]
     fn test_tokenize_simple() {
         let tokenizer = FormulaTokenizer::new();
         let tokens = tokenizer.tokenize("A1+B1").unwrap();
@@ -521,5 +550,255 @@ mod tests {
         let tokens = tokenizer.tokenize("A1+B1*2").unwrap();
         // Should be: A1, B1, 2, *, + (RPN)
         assert_eq!(tokens.len(), 5);
+    }
+
+    #[test]
+    fn test_tokenize_empty() {
+        let tokenizer = FormulaTokenizer::new();
+        let tokens = tokenizer.tokenize("").unwrap();
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn test_tokenize_whitespace() {
+        let tokenizer = FormulaTokenizer::new();
+        let tokens = tokenizer.tokenize("  A1  +  B1  ").unwrap();
+        assert_eq!(tokens.len(), 3);
+    }
+
+    #[test]
+    fn test_tokenize_numbers() {
+        let tokenizer = FormulaTokenizer::new();
+        let tokens = tokenizer.tokenize("123+456.78").unwrap();
+        assert_eq!(tokens.len(), 3);
+        assert!(matches!(tokens[0], Ptg::PtgInt(123)));
+        assert!(matches!(tokens[1], Ptg::PtgNum(456.78)));
+        assert!(matches!(tokens[2], Ptg::PtgAdd));
+    }
+
+    #[test]
+    fn test_tokenize_string() {
+        let tokenizer = FormulaTokenizer::new();
+        let tokens = tokenizer.tokenize("\"Hello World\"").unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(&tokens[0], Ptg::PtgStr(s) if s == "Hello World"));
+    }
+
+    #[test]
+    fn test_tokenize_subtraction() {
+        let tokenizer = FormulaTokenizer::new();
+        let tokens = tokenizer.tokenize("A1-B1").unwrap();
+        assert_eq!(tokens.len(), 3);
+        assert!(matches!(tokens[2], Ptg::PtgSub));
+    }
+
+    #[test]
+    fn test_tokenize_multiplication() {
+        let tokenizer = FormulaTokenizer::new();
+        let tokens = tokenizer.tokenize("A1*B1").unwrap();
+        assert_eq!(tokens.len(), 3);
+        assert!(matches!(tokens[2], Ptg::PtgMul));
+    }
+
+    #[test]
+    fn test_tokenize_division() {
+        let tokenizer = FormulaTokenizer::new();
+        let tokens = tokenizer.tokenize("A1/B1").unwrap();
+        assert_eq!(tokens.len(), 3);
+        assert!(matches!(tokens[2], Ptg::PtgDiv));
+    }
+
+    #[test]
+    fn test_tokenize_power() {
+        let tokenizer = FormulaTokenizer::new();
+        let tokens = tokenizer.tokenize("A1^2").unwrap();
+        assert_eq!(tokens.len(), 3);
+        assert!(matches!(tokens[2], Ptg::PtgPower));
+    }
+
+    #[test]
+    fn test_tokenize_concatenation() {
+        let tokenizer = FormulaTokenizer::new();
+        let tokens = tokenizer.tokenize("A1&B1").unwrap();
+        assert_eq!(tokens.len(), 3);
+        assert!(matches!(tokens[2], Ptg::PtgConcat));
+    }
+
+    #[test]
+    fn test_tokenize_comparison_operators() {
+        let tokenizer = FormulaTokenizer::new();
+
+        let tokens_eq = tokenizer.tokenize("A1=B1").unwrap();
+        assert!(matches!(tokens_eq[2], Ptg::PtgEQ));
+
+        let tokens_ne = tokenizer.tokenize("A1<>B1").unwrap();
+        assert!(matches!(tokens_ne[2], Ptg::PtgNE));
+
+        let tokens_lt = tokenizer.tokenize("A1<B1").unwrap();
+        assert!(matches!(tokens_lt[2], Ptg::PtgLT));
+
+        let tokens_le = tokenizer.tokenize("A1<=B1").unwrap();
+        assert!(matches!(tokens_le[2], Ptg::PtgLE));
+
+        let tokens_gt = tokenizer.tokenize("A1>B1").unwrap();
+        assert!(matches!(tokens_gt[2], Ptg::PtgGT));
+
+        let tokens_ge = tokenizer.tokenize("A1>=B1").unwrap();
+        assert!(matches!(tokens_ge[2], Ptg::PtgGE));
+    }
+
+    #[test]
+    fn test_tokenize_parentheses() {
+        let tokenizer = FormulaTokenizer::new();
+        let tokens = tokenizer.tokenize("(A1+B1)*C1").unwrap();
+        // Should be: A1, B1, +, C1, * (RPN)
+        assert_eq!(tokens.len(), 5);
+        assert!(matches!(tokens[2], Ptg::PtgAdd));
+        assert!(matches!(tokens[4], Ptg::PtgMul));
+    }
+
+    #[test]
+    fn test_tokenize_function() {
+        let tokenizer = FormulaTokenizer::new();
+        let tokens = tokenizer.tokenize("SUM(A1)").unwrap();
+        assert!(tokens.iter().any(|t| matches!(t, Ptg::PtgFunc(4, 1))));
+    }
+
+    #[test]
+    fn test_tokenize_precedence() {
+        let tokenizer = FormulaTokenizer::new();
+        // Multiplication has higher precedence than addition
+        let tokens = tokenizer.tokenize("A1+B1*C1").unwrap();
+        // Should be: A1, B1, C1, *, + (RPN)
+        assert_eq!(tokens.len(), 5);
+        assert!(matches!(tokens[3], Ptg::PtgMul));
+        assert!(matches!(tokens[4], Ptg::PtgAdd));
+    }
+
+    #[test]
+    fn test_ptg_enum_variants() {
+        // Test that all Ptg variants can be created
+        let _ = Ptg::PtgInt(42);
+        let _ = Ptg::PtgNum(3.14);
+        let _ = Ptg::PtgStr("test".to_string());
+        let _ = Ptg::PtgRef(0, 0, true, true);
+        let _ = Ptg::PtgArea(0, 0, 1, 1);
+        let _ = Ptg::PtgArea3d(0, 0, 1, 0, 1);
+        let _ = Ptg::PtgAdd;
+        let _ = Ptg::PtgSub;
+        let _ = Ptg::PtgMul;
+        let _ = Ptg::PtgDiv;
+        let _ = Ptg::PtgPower;
+        let _ = Ptg::PtgConcat;
+        let _ = Ptg::PtgLT;
+        let _ = Ptg::PtgLE;
+        let _ = Ptg::PtgEQ;
+        let _ = Ptg::PtgGE;
+        let _ = Ptg::PtgGT;
+        let _ = Ptg::PtgNE;
+        let _ = Ptg::PtgFunc(0, 1);
+        let _ = Ptg::PtgParen;
+        let _ = Ptg::PtgMissArg;
+    }
+
+    #[test]
+    fn test_ptg_clone() {
+        let ptg = Ptg::PtgRef(1, 2, true, false);
+        let cloned = ptg.clone();
+        assert_eq!(ptg, cloned);
+    }
+
+    #[test]
+    fn test_ptg_partial_eq() {
+        assert_eq!(Ptg::PtgAdd, Ptg::PtgAdd);
+        assert_eq!(Ptg::PtgInt(42), Ptg::PtgInt(42));
+        assert_ne!(Ptg::PtgInt(42), Ptg::PtgInt(43));
+    }
+
+    #[test]
+    fn test_ptg_debug() {
+        let ptg = Ptg::PtgRef(0, 0, true, true);
+        let debug_str = format!("{:?}", ptg);
+        assert!(debug_str.contains("PtgRef"));
+    }
+
+    #[test]
+    fn test_tokenizer_default() {
+        let tokenizer: FormulaTokenizer = Default::default();
+        let tokens = tokenizer.tokenize("A1").unwrap();
+        assert_eq!(tokens.len(), 1);
+    }
+
+    #[test]
+    fn test_encode_ptg_tokens() {
+        let tokens = vec![Ptg::PtgInt(42), Ptg::PtgAdd, Ptg::PtgNum(3.14)];
+        let bytes = encode_ptg_tokens(&tokens);
+        assert!(!bytes.is_empty());
+        assert_eq!(bytes[0], 0x1E); // PtgInt opcode
+    }
+
+    #[test]
+    fn test_encode_ptg_ref() {
+        let tokens = vec![Ptg::PtgRef(5, 3, true, false)];
+        let bytes = encode_ptg_tokens(&tokens);
+        assert_eq!(bytes[0], 0x24); // PtgRef opcode
+        assert_eq!(bytes.len(), 5); // 1 (opcode) + 2 (row) + 2 (col with flags)
+    }
+
+    #[test]
+    fn test_encode_ptg_str() {
+        let tokens = vec![Ptg::PtgStr("Test".to_string())];
+        let bytes = encode_ptg_tokens(&tokens);
+        assert_eq!(bytes[0], 0x17); // PtgStr opcode
+        assert_eq!(bytes[1], 4); // String length
+    }
+
+    #[test]
+    fn test_encode_ptg_area() {
+        let tokens = vec![Ptg::PtgArea(0, 5, 0, 3)];
+        let bytes = encode_ptg_tokens(&tokens);
+        assert_eq!(bytes[0], 0x25); // PtgArea opcode
+        assert_eq!(bytes.len(), 9); // 1 + 2*4 bytes for coordinates
+    }
+
+    #[test]
+    fn test_encode_ptg_area3d() {
+        let tokens = vec![Ptg::PtgArea3d(0, 0, 5, 0, 3)];
+        let bytes = encode_ptg_tokens(&tokens);
+        assert_eq!(bytes[0], 0x3B); // PtgArea3d opcode
+        assert_eq!(bytes.len(), 11); // 1 + 2 (ixti) + 2*4 bytes for coordinates
+    }
+
+    #[test]
+    fn test_encode_ptg_func() {
+        let tokens = vec![Ptg::PtgFunc(4, 1)]; // SUM with 1 arg
+        let bytes = encode_ptg_tokens(&tokens);
+        assert_eq!(bytes[0], 0x41); // PtgFuncVar opcode
+        assert_eq!(bytes[1], 1); // Arg count
+    }
+
+    #[test]
+    fn test_encode_all_operators() {
+        let operators = vec![
+            (Ptg::PtgAdd, 0x03),
+            (Ptg::PtgSub, 0x04),
+            (Ptg::PtgMul, 0x05),
+            (Ptg::PtgDiv, 0x06),
+            (Ptg::PtgPower, 0x07),
+            (Ptg::PtgConcat, 0x08),
+            (Ptg::PtgLT, 0x09),
+            (Ptg::PtgLE, 0x0A),
+            (Ptg::PtgEQ, 0x0B),
+            (Ptg::PtgGE, 0x0C),
+            (Ptg::PtgGT, 0x0D),
+            (Ptg::PtgNE, 0x0E),
+            (Ptg::PtgParen, 0x15),
+            (Ptg::PtgMissArg, 0x16),
+        ];
+
+        for (ptg, expected_opcode) in operators {
+            let bytes = encode_ptg_tokens(&[ptg.clone()]);
+            assert_eq!(bytes[0], expected_opcode, "Opcode mismatch for {:?}", ptg);
+        }
     }
 }

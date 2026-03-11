@@ -155,3 +155,79 @@ pub(crate) async fn eval_bitrshift(
     };
     Ok(CellValue::Int((number >> shift) as i64))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::parser::Expr;
+
+    fn num_expr(n: f64) -> Expr {
+        if n == n.floor() {
+            Expr::Literal(CellValue::Int(n as i64))
+        } else {
+            Expr::Literal(CellValue::Float(n))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_bitand() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // 6 = 110, 3 = 011, result = 010 = 2
+        let args = vec![num_expr(6.0), num_expr(3.0)];
+        let result = eval_bitand(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(2));
+    }
+
+    #[tokio::test]
+    async fn test_eval_bitor() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // 6 = 110, 3 = 011, result = 111 = 7
+        let args = vec![num_expr(6.0), num_expr(3.0)];
+        let result = eval_bitor(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(7));
+    }
+
+    #[tokio::test]
+    async fn test_eval_bitxor() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // 6 = 110, 3 = 011, result = 101 = 5
+        let args = vec![num_expr(6.0), num_expr(3.0)];
+        let result = eval_bitxor(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(5));
+    }
+
+    #[tokio::test]
+    async fn test_eval_bitlshift() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // 5 << 2 = 20
+        let args = vec![num_expr(5.0), num_expr(2.0)];
+        let result = eval_bitlshift(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(20));
+    }
+
+    #[tokio::test]
+    async fn test_eval_bitrshift() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // 20 >> 2 = 5
+        let args = vec![num_expr(20.0), num_expr(2.0)];
+        let result = eval_bitrshift(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(5));
+    }
+
+    #[tokio::test]
+    async fn test_eval_bitand_wrong_args() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(6.0)];
+        let result = eval_bitand(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 2 arguments")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+}

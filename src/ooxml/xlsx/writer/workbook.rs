@@ -1510,3 +1510,276 @@ fn subtotal_from_function(func: PivotValueFunction) -> &'static str {
         PivotValueFunction::Custom => "sum",
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_escape_sheet_name() {
+        assert_eq!(escape_sheet_name("Sheet1"), "Sheet1");
+        assert_eq!(escape_sheet_name("Bob's Sheet"), "Bob''s Sheet");
+        assert_eq!(escape_sheet_name("Data'Value"), "Data''Value");
+    }
+
+    #[test]
+    fn test_mutable_workbook_data_new() {
+        let wb = MutableWorkbookData::new();
+        assert_eq!(wb.worksheet_count(), 1);
+        assert_eq!(wb.worksheets[0].name(), "Sheet1");
+        // Note: is_modified() also checks worksheets, which may be marked modified on creation
+    }
+
+    #[test]
+    fn test_mutable_workbook_add_worksheet() {
+        let mut wb = MutableWorkbookData::new();
+        let ws = wb.add_worksheet("Data".to_string());
+        assert_eq!(ws.name(), "Data");
+        assert_eq!(wb.worksheet_count(), 2);
+        assert!(wb.is_modified());
+    }
+
+    #[test]
+    fn test_mutable_workbook_worksheet_mut() {
+        let mut wb = MutableWorkbookData::new();
+        let ws = wb.worksheet_mut(0).unwrap();
+        ws.set_name("Updated".to_string());
+        assert_eq!(wb.worksheets[0].name(), "Updated");
+    }
+
+    #[test]
+    fn test_mutable_workbook_worksheet_mut_out_of_bounds() {
+        let mut wb = MutableWorkbookData::new();
+        assert!(wb.worksheet_mut(99).is_err());
+    }
+
+    #[test]
+    fn test_define_name() {
+        let mut wb = MutableWorkbookData::new();
+        wb.define_name("SalesRange", "Sheet1!$A$1:$D$10");
+        assert_eq!(wb.named_ranges.len(), 1);
+        assert_eq!(wb.named_ranges[0].name, "SalesRange");
+        assert_eq!(wb.named_ranges[0].reference, "Sheet1!$A$1:$D$10");
+        assert!(wb.named_ranges[0].local_sheet_id.is_none());
+    }
+
+    #[test]
+    fn test_define_name_local() {
+        let mut wb = MutableWorkbookData::new();
+        wb.define_name_local("LocalRange", "A1:B10", 0);
+        assert_eq!(wb.named_ranges[0].local_sheet_id, Some(0));
+    }
+
+    #[test]
+    fn test_define_name_with_comment() {
+        let mut wb = MutableWorkbookData::new();
+        wb.define_name_with_comment("NamedRange", "A1:C5", "This is a comment");
+        assert_eq!(
+            wb.named_ranges[0].comment,
+            Some("This is a comment".to_string())
+        );
+    }
+
+    #[test]
+    fn test_remove_name() {
+        let mut wb = MutableWorkbookData::new();
+        wb.define_name("Range1", "A1:A10");
+        wb.define_name("Range2", "B1:B10");
+        assert_eq!(wb.named_ranges.len(), 2);
+
+        let removed = wb.remove_name("Range1");
+        assert!(removed);
+        assert_eq!(wb.named_ranges.len(), 1);
+        assert_eq!(wb.named_ranges[0].name, "Range2");
+
+        let not_removed = wb.remove_name("NonExistent");
+        assert!(!not_removed);
+    }
+
+    #[test]
+    fn test_named_ranges_accessor() {
+        let mut wb = MutableWorkbookData::new();
+        wb.define_name("Test", "A1");
+        let ranges = wb.named_ranges();
+        assert_eq!(ranges.len(), 1);
+    }
+
+    #[test]
+    fn test_hide_unhide_sheet() {
+        let mut wb = MutableWorkbookData::new();
+        wb.hide_sheet(0).unwrap();
+        assert!(wb.worksheets[0].is_hidden());
+
+        wb.unhide_sheet(0).unwrap();
+        assert!(!wb.worksheets[0].is_hidden());
+    }
+
+    #[test]
+    fn test_hide_sheet_out_of_bounds() {
+        let mut wb = MutableWorkbookData::new();
+        assert!(wb.hide_sheet(99).is_err());
+    }
+
+    #[test]
+    fn test_is_sheet_hidden() {
+        let mut wb = MutableWorkbookData::new();
+        assert_eq!(wb.is_sheet_hidden(0), Some(false));
+
+        wb.hide_sheet(0).unwrap();
+        assert_eq!(wb.is_sheet_hidden(0), Some(true));
+
+        assert!(wb.is_sheet_hidden(99).is_none());
+    }
+
+    #[test]
+    fn test_set_calculation_mode() {
+        let mut wb = MutableWorkbookData::new();
+        wb.set_calculation_mode("manual");
+        assert_eq!(wb.calculation_mode, "manual");
+
+        wb.set_calculation_mode("autoNoTable");
+        assert_eq!(wb.calculation_mode, "autoNoTable");
+    }
+
+    #[test]
+    fn test_protection_direct() {
+        let mut wb = MutableWorkbookData::new();
+        assert!(!wb.is_protected());
+
+        wb.protection = Some(WorkbookProtection {
+            password_hash: None,
+            lock_structure: true,
+            lock_windows: false,
+        });
+
+        assert!(wb.is_protected());
+        assert!(wb.protection.as_ref().unwrap().lock_structure);
+        assert!(!wb.protection.as_ref().unwrap().lock_windows);
+    }
+
+    #[test]
+    fn test_remove_protection_direct() {
+        let mut wb = MutableWorkbookData::new();
+        wb.protection = Some(WorkbookProtection {
+            password_hash: None,
+            lock_structure: true,
+            lock_windows: false,
+        });
+        assert!(wb.is_protected());
+
+        wb.protection = None;
+        assert!(!wb.is_protected());
+    }
+
+    #[test]
+    fn test_force_formula_recalculation_direct() {
+        let mut wb = MutableWorkbookData::new();
+        assert!(!wb.force_formula_recalculation);
+
+        wb.force_formula_recalculation = true;
+        assert!(wb.force_formula_recalculation);
+    }
+
+    #[test]
+    fn test_generate_workbook_xml_basic() {
+        let wb = MutableWorkbookData::new();
+        let rel_ids = vec!["rId1".to_string()];
+        let xml = wb.generate_workbook_xml_with_rels(&rel_ids, &[]).unwrap();
+
+        assert!(xml.contains(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#));
+        assert!(xml.contains(
+            r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main""#
+        ));
+        assert!(xml.contains(r#"<sheets>"#));
+        assert!(xml.contains(r#"<sheet name="Sheet1" sheetId="1" r:id="rId1"/>"#));
+        assert!(xml.contains(r#"</workbook>"#));
+    }
+
+    #[test]
+    fn test_generate_workbook_xml_with_protection() {
+        let mut wb = MutableWorkbookData::new();
+        wb.protection = Some(WorkbookProtection {
+            password_hash: Some("ABCD1234".to_string()),
+            lock_structure: true,
+            lock_windows: true,
+        });
+
+        let xml = wb
+            .generate_workbook_xml_with_rels(&["rId1".to_string()], &[])
+            .unwrap();
+
+        assert!(xml.contains(
+            r#"<workbookProtection workbookPassword="ABCD1234" lockStructure="1" lockWindows="1"/>"#
+        ));
+    }
+
+    #[test]
+    fn test_generate_workbook_xml_with_defined_names() {
+        let mut wb = MutableWorkbookData::new();
+        wb.define_name("Range1", "Sheet1!$A$1:$B$10");
+        // local_sheet_id is 1-based (1 = first sheet), will be stored as 1 and output as 0
+        wb.define_name_local("LocalRange", "A1:C5", 1);
+
+        let xml = wb
+            .generate_workbook_xml_with_rels(&["rId1".to_string()], &[])
+            .unwrap();
+
+        assert!(xml.contains(r#"<definedNames>"#));
+        assert!(xml.contains(r#"<definedName name="Range1">"#));
+        assert!(xml.contains(r#"<definedName name="LocalRange" localSheetId="0">"#));
+        assert!(xml.contains(r#"</definedNames>"#));
+    }
+
+    #[test]
+    fn test_build_field_index() {
+        let fields = vec![
+            "FieldA".to_string(),
+            "FieldB".to_string(),
+            "FieldC".to_string(),
+        ];
+        let index = build_field_index(&fields);
+
+        assert_eq!(index.get("FieldA"), Some(&0u32));
+        assert_eq!(index.get("FieldB"), Some(&1u32));
+        assert_eq!(index.get("FieldC"), Some(&2u32));
+    }
+
+    #[test]
+    fn test_resolve_field_indexes() {
+        let mut index = HashMap::new();
+        index.insert("A".to_string(), 0u32);
+        index.insert("B".to_string(), 1u32);
+        index.insert("C".to_string(), 2u32);
+
+        let selected = vec!["A".to_string(), "C".to_string()];
+        let resolved = resolve_field_indexes(&index, &selected);
+
+        assert_eq!(resolved, vec![0, 2]);
+    }
+
+    #[test]
+    fn test_subtotal_from_function() {
+        assert_eq!(subtotal_from_function(PivotValueFunction::Sum), "sum");
+        assert_eq!(subtotal_from_function(PivotValueFunction::Count), "count");
+        assert_eq!(
+            subtotal_from_function(PivotValueFunction::Average),
+            "average"
+        );
+        assert_eq!(subtotal_from_function(PivotValueFunction::Min), "min");
+        assert_eq!(subtotal_from_function(PivotValueFunction::Max), "max");
+        assert_eq!(subtotal_from_function(PivotValueFunction::Custom), "sum");
+    }
+
+    #[test]
+    fn test_parse_a1_range_valid() {
+        let result = parse_a1_range("A1:D10").unwrap();
+        // Returns 0-based indices (row, col) format
+        assert_eq!(result, ((0, 0), (9, 3)));
+    }
+
+    #[test]
+    fn test_parse_a1_range_invalid() {
+        assert!(parse_a1_range("invalid").is_err());
+        assert!(parse_a1_range("").is_err());
+    }
+}

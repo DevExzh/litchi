@@ -101,3 +101,124 @@ pub(crate) async fn eval_roman(
 
     Ok(CellValue::String(result))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::engine::test_helpers::TestEngine;
+    use crate::sheet::eval::parser::Expr;
+
+    #[tokio::test]
+    async fn test_eval_arabic_simple() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![Expr::Literal(CellValue::String("XII".to_string()))];
+        let result = eval_arabic(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(12));
+    }
+
+    #[tokio::test]
+    async fn test_eval_arabic_complex() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![Expr::Literal(CellValue::String("MCMXCIV".to_string()))];
+        let result = eval_arabic(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(1994));
+    }
+
+    #[tokio::test]
+    async fn test_eval_arabic_lowercase() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![Expr::Literal(CellValue::String("xiv".to_string()))];
+        let result = eval_arabic(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(14));
+    }
+
+    #[tokio::test]
+    async fn test_eval_arabic_empty() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![Expr::Literal(CellValue::String("".to_string()))];
+        let result = eval_arabic(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(0));
+    }
+
+    #[tokio::test]
+    async fn test_eval_arabic_invalid() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![Expr::Literal(CellValue::String("ABC".to_string()))];
+        let result = eval_arabic(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Error("#VALUE!".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_arabic_wrong_args() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args: Vec<Expr> = vec![];
+        let result = eval_arabic(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 1 argument")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_roman_simple() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![Expr::Literal(CellValue::Int(12))];
+        let result = eval_roman(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("XII".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_roman_complex() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![Expr::Literal(CellValue::Int(1994))];
+        let result = eval_roman(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("MCMXCIV".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_roman_zero() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![Expr::Literal(CellValue::Int(0))];
+        let result = eval_roman(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_roman_too_large() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![Expr::Literal(CellValue::Int(4000))];
+        let result = eval_roman(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Error("#VALUE!".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_roman_negative() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![Expr::Literal(CellValue::Int(-5))];
+        let result = eval_roman(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Error("#VALUE!".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_roman_wrong_args() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args: Vec<Expr> = vec![];
+        let result = eval_roman(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 1 or 2")),
+            _ => panic!("Expected Error"),
+        }
+    }
+}

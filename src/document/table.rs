@@ -269,3 +269,175 @@ impl Cell {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::Document;
+    use std::path::PathBuf;
+
+    fn test_data_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-data")
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_table_row_count_docx() {
+        let path = test_data_path().join("ooxml/docx/table_footnotes.docx");
+        let doc = Document::open(&path).expect("Failed to open DOCX");
+        let tables = doc.tables().expect("Failed to get tables");
+
+        for table in &tables {
+            let row_count = table.row_count().expect("Failed to get row count");
+            assert!(row_count > 0, "Table should have at least one row");
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_table_rows_docx() {
+        let path = test_data_path().join("ooxml/docx/table_footnotes.docx");
+        let doc = Document::open(&path).expect("Failed to open DOCX");
+        let tables = doc.tables().expect("Failed to get tables");
+
+        for table in &tables {
+            let rows = table.rows().expect("Failed to get rows");
+            assert!(!rows.is_empty(), "Expected at least one row");
+
+            for row in &rows {
+                let cell_count = row.cell_count().expect("Failed to get cell count");
+                assert!(cell_count > 0, "Row should have at least one cell");
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_table_row_at_docx() {
+        let path = test_data_path().join("ooxml/docx/table_footnotes.docx");
+        let doc = Document::open(&path).expect("Failed to open DOCX");
+        let tables = doc.tables().expect("Failed to get tables");
+
+        for table in &tables {
+            let first_row = table.row_at(0).expect("Failed to get row at index 0");
+            assert!(first_row.is_some(), "Expected to find first row");
+
+            let nonexistent_row = table
+                .row_at(9999)
+                .expect("Failed to check row at index 9999");
+            assert!(nonexistent_row.is_none(), "Expected no row at index 9999");
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_table_cells_docx() {
+        let path = test_data_path().join("ooxml/docx/table_footnotes.docx");
+        let doc = Document::open(&path).expect("Failed to open DOCX");
+        let tables = doc.tables().expect("Failed to get tables");
+
+        for table in &tables {
+            let rows = table.rows().expect("Failed to get rows");
+
+            for row in &rows {
+                let cells = row.cells().expect("Failed to get cells");
+                assert!(!cells.is_empty(), "Expected at least one cell");
+
+                for cell in &cells {
+                    let _text = cell.text().expect("Failed to get cell text");
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_table_cell_at_docx() {
+        let path = test_data_path().join("ooxml/docx/table_footnotes.docx");
+        let doc = Document::open(&path).expect("Failed to open DOCX");
+        let tables = doc.tables().expect("Failed to get tables");
+
+        for table in &tables {
+            let rows = table.rows().expect("Failed to get rows");
+
+            for row in &rows {
+                let first_cell = row.cell_at(0).expect("Failed to get cell at index 0");
+                assert!(first_cell.is_some(), "Expected to find first cell");
+
+                let nonexistent_cell = row
+                    .cell_at(9999)
+                    .expect("Failed to check cell at index 9999");
+                assert!(nonexistent_cell.is_none(), "Expected no cell at index 9999");
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_table_cell_grid_span_docx() {
+        let path = test_data_path().join("ooxml/docx/table_footnotes.docx");
+        let doc = Document::open(&path).expect("Failed to open DOCX");
+        let tables = doc.tables().expect("Failed to get tables");
+
+        for table in &tables {
+            let rows = table.rows().expect("Failed to get rows");
+
+            for row in &rows {
+                let cells = row.cells().expect("Failed to get cells");
+
+                for cell in &cells {
+                    let grid_span = cell.grid_span().expect("Failed to get grid span");
+                    assert!(grid_span >= 1, "Grid span should be at least 1");
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_table_document_with_tables() {
+        let test_files = [
+            "ooxml/docx/table_footnotes.docx",
+            "ooxml/docx/table-indent.docx",
+            "ooxml/docx/table-alignment.docx",
+        ];
+
+        for file in &test_files {
+            let path = test_data_path().join(file);
+            if path.exists() {
+                let doc = Document::open(&path);
+                assert!(doc.is_ok(), "Failed to open {}", file);
+
+                if let Ok(d) = doc {
+                    let tables = d.tables().expect("Failed to get tables");
+                    for table in &tables {
+                        let row_count = table.row_count().expect("Failed to get row count");
+                        assert!(row_count > 0, "Expected at least one row in {}", file);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "rtf")]
+    fn test_table_rtf() {
+        let path = test_data_path().join("rtf/chtoutline.rtf");
+        let doc = Document::open(&path).expect("Failed to open RTF");
+        let tables = doc.tables().expect("Failed to get tables");
+
+        for table in &tables {
+            let row_count = table.row_count().expect("Failed to get row count");
+            assert!(row_count > 0, "RTF table should have at least one row");
+
+            let rows = table.rows().expect("Failed to get rows");
+            for row in &rows {
+                let cells = row.cells().expect("Failed to get cells");
+                assert!(!cells.is_empty(), "RTF row should have cells");
+
+                for cell in &cells {
+                    let _text = cell.text().expect("Failed to get cell text");
+                }
+            }
+        }
+    }
+}

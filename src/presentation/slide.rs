@@ -139,3 +139,77 @@ impl Slide {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::Presentation;
+    use std::path::PathBuf;
+
+    fn test_data_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-data")
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_slide_text_ppt() {
+        let path = test_data_path().join("ole/ppt/SampleShow.ppt");
+        let pres = Presentation::open(&path).expect("Failed to open PPT");
+        let slides = pres.slides().expect("Failed to get slides");
+
+        for slide in slides {
+            let _text = slide.text().expect("Failed to get slide text");
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_slide_text_pptx() {
+        let path = test_data_path().join("ooxml/pptx/sample.pptx");
+        let pres = Presentation::open(&path).expect("Failed to open PPTX");
+        let slides = pres.slides().expect("Failed to get slides");
+
+        for slide in slides {
+            let _text = slide.text().expect("Failed to get slide text");
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_slide_number_ppt() {
+        let path = test_data_path().join("ole/ppt/SampleShow.ppt");
+        let pres = Presentation::open(&path).expect("Failed to open PPT");
+        let slides = pres.slides().expect("Failed to get slides");
+
+        for slide in &slides {
+            let num = slide.number();
+            assert!(num.is_some(), "PPT slides should have numbers");
+            assert!(num.unwrap() > 0, "Slide number should be positive");
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_slide_shape_count_ppt() {
+        // Use SampleShow.ppt to avoid metadata overflow issues
+        let path = test_data_path().join("ole/ppt/SampleShow.ppt");
+        let pres = Presentation::open(&path).expect("Failed to open PPT");
+        let slides = pres.slides().expect("Failed to get slides");
+
+        for slide in &slides {
+            // shape_count is only available for PPT format
+            let _ = slide.shape_count();
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_slide_name_pptx() {
+        let path = test_data_path().join("ooxml/pptx/sample.pptx");
+        let pres = Presentation::open(&path).expect("Failed to open PPTX");
+        let slides = pres.slides().expect("Failed to get slides");
+
+        for slide in slides {
+            let _name = slide.name().expect("Failed to get slide name");
+        }
+    }
+}

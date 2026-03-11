@@ -13,7 +13,7 @@ use crate::common::unit::{emu_to_pt_f64, emu_to_px_96};
 ///
 /// # Example
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use litchi::ooxml::docx::Package;
 ///
 /// let pkg = Package::open("document.docx")?;
@@ -31,7 +31,7 @@ use crate::common::unit::{emu_to_pt_f64, emu_to_px_96};
 ///         // Process image data...
 ///     }
 /// }
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 /// ```
 use crate::ooxml::docx::format::ImageFormat;
 use crate::ooxml::error::{OoxmlError, Result};

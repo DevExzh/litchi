@@ -514,3 +514,175 @@ fn insert_commas(digits: &str) -> String {
     }
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::engine::test_helpers::TestEngine;
+    use crate::sheet::eval::parser::Expr;
+
+    fn num_expr(n: f64) -> Expr {
+        if n == n.floor() {
+            Expr::Literal(CellValue::Int(n as i64))
+        } else {
+            Expr::Literal(CellValue::Float(n))
+        }
+    }
+
+    fn str_expr(s: &str) -> Expr {
+        Expr::Literal(CellValue::String(s.to_string()))
+    }
+
+    #[tokio::test]
+    async fn test_eval_fixed_default() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1234.567)];
+        let result = eval_fixed(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("1,234.57".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_fixed_custom_decimals() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1234.567), Expr::Literal(CellValue::Int(1))];
+        let result = eval_fixed(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("1,234.6".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_fixed_no_commas() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(1234.567),
+            Expr::Literal(CellValue::Int(2)),
+            Expr::Literal(CellValue::Bool(true)),
+        ];
+        let result = eval_fixed(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("1234.57".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_fixed_negative() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(-1234.5)];
+        let result = eval_fixed(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("-1,234.50".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_fixed_wrong_args() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args: Vec<Expr> = vec![];
+        let result = eval_fixed(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 1 to 3")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_dollar_default() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1234.567)];
+        let result = eval_dollar(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("$1,234.57".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_dollar_custom_decimals() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1234.567), Expr::Literal(CellValue::Int(0))];
+        let result = eval_dollar(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("$1,235".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_dollar_negative() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(-1234.5)];
+        let result = eval_dollar(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("-$1,234.50".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_dollar_wrong_args() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args: Vec<Expr> = vec![];
+        let result = eval_dollar(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 1 or 2")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_text_number_simple() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1234.5), str_expr("0.00")];
+        let result = eval_text(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("1234.50".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_text_number_integer() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1234.5), str_expr("0")];
+        let result = eval_text(ctx, "Sheet1", &args).await.unwrap();
+        // "0" format truncates to integer
+        assert_eq!(result, CellValue::String("1234".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_text_string() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello"), str_expr("@")];
+        let result = eval_text(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("hello".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_text_string_with_prefix() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Simple format patterns without 4th section just return string as-is
+        let args = vec![str_expr("hello"), str_expr("@")];
+        let result = eval_text(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("hello".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_text_empty_format() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(123.0), str_expr("")];
+        let result = eval_text(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("must not be empty")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_text_wrong_args() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(123.0)];
+        let result = eval_text(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 2 arguments")),
+            _ => panic!("Expected Error"),
+        }
+    }
+}

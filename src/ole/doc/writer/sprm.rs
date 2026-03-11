@@ -148,8 +148,96 @@ mod tests {
     }
 
     #[test]
+    fn test_sprm_builder_empty() {
+        let builder = SprmBuilder::new();
+        let sprms = builder.build();
+        assert!(sprms.is_empty());
+    }
+
+    #[test]
+    fn test_sprm_builder_add_byte() {
+        let mut builder = SprmBuilder::new();
+        builder.add_byte(chp::BOLD, 1);
+
+        let sprms = builder.build();
+        assert_eq!(sprms.len(), 3); // byte SPRM is 3 bytes
+    }
+
+    #[test]
+    fn test_sprm_builder_add_word() {
+        let mut builder = SprmBuilder::new();
+        builder.add_word(chp::FONT_SIZE, 24);
+
+        let sprms = builder.build();
+        assert_eq!(sprms.len(), 4); // word SPRM is 4 bytes
+    }
+
+    #[test]
+    fn test_sprm_builder_add_dword() {
+        let mut builder = SprmBuilder::new();
+        builder.add_dword(0x1234, 0xABCDEF00);
+
+        let sprms = builder.build();
+        assert_eq!(sprms.len(), 6); // dword SPRM is 6 bytes
+    }
+
+    #[test]
+    fn test_sprm_builder_add_bool_true() {
+        let mut builder = SprmBuilder::new();
+        builder.add_bool(chp::BOLD, true);
+
+        let sprms = builder.build();
+        assert_eq!(sprms.len(), 3);
+    }
+
+    #[test]
+    fn test_sprm_builder_add_bool_false() {
+        let mut builder = SprmBuilder::new();
+        builder.add_bool(chp::ITALIC, false);
+
+        let sprms = builder.build();
+        assert_eq!(sprms.len(), 3);
+    }
+
+    #[test]
+    fn test_sprm_builder_multiple_sprms() {
+        let mut builder = SprmBuilder::new();
+        builder.add_bool(chp::BOLD, true);
+        builder.add_bool(chp::ITALIC, true);
+        builder.add_word(chp::FONT_SIZE, 24);
+        builder.add_byte(chp::UNDERLINE, 1);
+
+        let sprms = builder.build();
+        assert!(sprms.len() > 0);
+    }
+
+    #[test]
     fn test_build_chp_sprms() {
         let sprms = build_chp_sprms(true, true, Some(12));
         assert!(!sprms.is_empty());
+    }
+
+    #[test]
+    fn test_build_chp_sprms_no_bold() {
+        let sprms = build_chp_sprms(false, true, Some(12));
+        assert!(!sprms.is_empty());
+    }
+
+    #[test]
+    fn test_build_chp_sprms_no_italic() {
+        let sprms = build_chp_sprms(true, false, Some(12));
+        assert!(!sprms.is_empty());
+    }
+
+    #[test]
+    fn test_build_chp_sprms_no_font_size() {
+        let sprms = build_chp_sprms(true, true, None);
+        assert!(!sprms.is_empty());
+    }
+
+    #[test]
+    fn test_build_chp_sprms_none() {
+        let sprms = build_chp_sprms(false, false, None);
+        assert!(sprms.is_empty());
     }
 }

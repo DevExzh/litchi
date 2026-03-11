@@ -561,4 +561,128 @@ mod tests {
             0x0101
         );
     }
+
+    #[test]
+    fn test_fib_default() {
+        let fib = FibBuilder::default();
+        let fib_bytes = fib.generate().unwrap();
+        assert_eq!(fib_bytes.len(), 1248);
+    }
+
+    #[test]
+    fn test_fib_with_stylesheet() {
+        let mut fib = FibBuilder::new();
+        fib.set_main_text(0, 1000);
+        fib.set_stshf(512, 256);
+
+        let fib_bytes = fib.generate().unwrap();
+        assert_eq!(fib_bytes.len(), 1248);
+
+        // Verify magic number is still correct
+        assert_eq!(u16::from_le_bytes([fib_bytes[0], fib_bytes[1]]), 0xA5EC);
+    }
+
+    #[test]
+    fn test_fib_with_document_properties() {
+        let mut fib = FibBuilder::new();
+        fib.set_main_text(0, 1000);
+        fib.set_dop(768, 128);
+
+        let fib_bytes = fib.generate().unwrap();
+        assert_eq!(fib_bytes.len(), 1248);
+    }
+
+    #[test]
+    fn test_fib_with_piece_table() {
+        let mut fib = FibBuilder::new();
+        fib.set_main_text(0, 1000);
+        fib.set_clx(1024, 512);
+
+        let fib_bytes = fib.generate().unwrap();
+        assert_eq!(fib_bytes.len(), 1248);
+    }
+
+    #[test]
+    fn test_fib_with_font_table() {
+        let mut fib = FibBuilder::new();
+        fib.set_main_text(0, 1000);
+        fib.set_sttbfffn(1536, 256);
+
+        let fib_bytes = fib.generate().unwrap();
+        assert_eq!(fib_bytes.len(), 1248);
+    }
+
+    #[test]
+    fn test_fib_with_section_table() {
+        let mut fib = FibBuilder::new();
+        fib.set_main_text(0, 1000);
+        fib.set_plcfsed(2048, 128);
+
+        let fib_bytes = fib.generate().unwrap();
+        assert_eq!(fib_bytes.len(), 1248);
+    }
+
+    #[test]
+    fn test_fib_with_headers_footers() {
+        let mut fib = FibBuilder::new();
+        fib.set_main_text(0, 1000);
+        fib.set_plcfhdd(2304, 256);
+
+        let fib_bytes = fib.generate().unwrap();
+        assert_eq!(fib_bytes.len(), 1248);
+    }
+
+    #[test]
+    fn test_fib_with_footnotes() {
+        let mut fib = FibBuilder::new();
+        fib.set_main_text(0, 1000);
+        fib.set_plcffnd_ref(2816, 128);
+        fib.set_plcffnd_txt(2944, 256);
+
+        let fib_bytes = fib.generate().unwrap();
+        assert_eq!(fib_bytes.len(), 1248);
+    }
+
+    #[test]
+    fn test_fib_with_endnotes() {
+        let mut fib = FibBuilder::new();
+        fib.set_main_text(0, 1000);
+        fib.set_plcfend_ref(3584, 128);
+        fib.set_plcfend_txt(3712, 256);
+
+        let fib_bytes = fib.generate().unwrap();
+        assert_eq!(fib_bytes.len(), 1248);
+    }
+
+    #[test]
+    fn test_fib_with_list_tables() {
+        let mut fib = FibBuilder::new();
+        fib.set_main_text(0, 1000);
+        fib.set_plflst(4352, 512);
+        fib.set_plflfo(4864, 256);
+
+        let fib_bytes = fib.generate().unwrap();
+        assert_eq!(fib_bytes.len(), 1248);
+    }
+
+    #[test]
+    fn test_fib_with_field_table() {
+        let mut fib = FibBuilder::new();
+        fib.set_main_text(0, 1000);
+        fib.set_plcffld_mom(5120, 256);
+
+        let fib_bytes = fib.generate().unwrap();
+        assert_eq!(fib_bytes.len(), 1248);
+    }
+
+    #[test]
+    fn test_fib_with_bin_tables() {
+        let mut fib = FibBuilder::new();
+        fib.set_main_text(0, 1000);
+        fib.set_plcfbte_chpx(5376, 128);
+        fib.set_plcfbte_papx(5504, 128);
+
+        let fib_bytes = fib.generate().unwrap();
+        assert_eq!(fib_bytes.len(), 1248);
+    }
 }

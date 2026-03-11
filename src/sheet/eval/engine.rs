@@ -46,6 +46,127 @@ mod web;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+pub(crate) mod test_helpers {
+    use super::*;
+    use crate::sheet::Result;
+    use crate::sheet::eval::BoxFuture;
+    use std::collections::HashMap;
+    use std::sync::{Arc, RwLock};
+
+    /// A simple test engine for creating EvalCtx in tests.
+    pub(crate) struct TestEngine {
+        cells: Arc<RwLock<HashMap<(String, u32, u32), CellValue>>>,
+        current_pos: Arc<RwLock<Option<(String, u32, u32)>>>,
+        sheet_count: usize,
+    }
+
+    impl TestEngine {
+        pub(crate) fn new() -> Self {
+            Self {
+                cells: Arc::new(RwLock::new(HashMap::new())),
+                current_pos: Arc::new(RwLock::new(None)),
+                sheet_count: 1,
+            }
+        }
+
+        /// Returns a reference to self as an EvalCtx
+        pub(crate) fn ctx(&self) -> EvalCtx<'_> {
+            self
+        }
+
+        /// Set a cell value in the test engine
+        pub(crate) fn set_cell(&self, sheet: &str, row: u32, col: u32, value: CellValue) {
+            let mut cells = self.cells.write().unwrap();
+            cells.insert((sheet.to_string(), row, col), value);
+        }
+
+        /// Add a range of values starting at the given position
+        pub(crate) fn add_range(
+            &self,
+            sheet: &str,
+            start_row: u32,
+            start_col: u32,
+            rows: usize,
+            cols: usize,
+            values: Vec<CellValue>,
+        ) {
+            let mut cells = self.cells.write().unwrap();
+            for (idx, value) in values.iter().enumerate() {
+                let r = idx / cols;
+                let c = idx % cols;
+                if r < rows {
+                    cells.insert(
+                        (
+                            sheet.to_string(),
+                            start_row + r as u32,
+                            start_col + c as u32,
+                        ),
+                        value.clone(),
+                    );
+                }
+            }
+        }
+
+        /// Set the current position for ROW/COLUMN functions
+        pub(crate) fn set_current_position(&self, sheet: &str, row: u32, col: u32) {
+            let mut pos = self.current_pos.write().unwrap();
+            *pos = Some((sheet.to_string(), row, col));
+        }
+    }
+
+    impl EngineCtx for TestEngine {
+        fn get_cell_value<'a>(
+            &'a self,
+            sheet_name: &'a str,
+            row: u32,
+            col: u32,
+        ) -> BoxFuture<'a, Result<CellValue>> {
+            let cells = self.cells.clone();
+            let sheet = sheet_name.to_string();
+            Box::pin(async move {
+                let cells = cells.read().unwrap();
+                Ok(cells
+                    .get(&(sheet, row, col))
+                    .cloned()
+                    .unwrap_or(CellValue::Empty))
+            })
+        }
+
+        fn current_position(&self) -> Option<(String, u32, u32)> {
+            self.current_pos.read().unwrap().clone()
+        }
+
+        fn raw_cell_value<'a>(
+            &'a self,
+            sheet_name: &'a str,
+            row: u32,
+            col: u32,
+        ) -> BoxFuture<'a, Result<CellValue>> {
+            self.get_cell_value(sheet_name, row, col)
+        }
+
+        fn is_1904_date_system(&self) -> bool {
+            false
+        }
+
+        #[cfg(feature = "eval_engine_web_functions")]
+        fn http_client(&self) -> &reqwest::Client {
+            panic!("TestEngine does not support HTTP client")
+        }
+
+        fn get_sheet_index(&self, _name: &str) -> Option<usize> {
+            Some(0)
+        }
+
+        fn get_sheet_count(&self) -> usize {
+            self.sheet_count
+        }
+    }
+
+    impl ReferenceResolver for TestEngine {}
+}
+
 /// Evaluate a parsed expression in the context of an evaluation engine.
 pub(crate) async fn evaluate_expression(
     ctx: &dyn DispatchCtx,

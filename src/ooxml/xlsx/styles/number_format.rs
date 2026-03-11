@@ -118,12 +118,56 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_number_format_new() {
+        let format = NumberFormat::new(14, "mm-dd-yy".to_string());
+        assert_eq!(format.id, 14);
+        assert_eq!(format.code, "mm-dd-yy");
+    }
+
+    #[test]
+    fn test_number_format_is_builtin() {
+        let builtin = NumberFormat::new(100, "0.00".to_string());
+        assert!(builtin.is_builtin());
+
+        let custom = NumberFormat::new(164, "Custom Format".to_string());
+        assert!(!custom.is_builtin());
+
+        let custom2 = NumberFormat::new(200, "Another Custom".to_string());
+        assert!(!custom2.is_builtin());
+    }
+
+    #[test]
+    fn test_number_format_is_date_format() {
+        let date_format = NumberFormat::new(14, "mm-dd-yy".to_string());
+        assert!(date_format.is_date_format());
+
+        let time_format = NumberFormat::new(20, "h:mm".to_string());
+        assert!(time_format.is_date_format());
+
+        let number_format = NumberFormat::new(1, "0".to_string());
+        assert!(!number_format.is_date_format());
+    }
+
+    #[test]
+    fn test_number_format_clone() {
+        let format = NumberFormat::new(2, "0.00".to_string());
+        let format2 = format.clone();
+        assert_eq!(format.id, format2.id);
+        assert_eq!(format.code, format2.code);
+    }
+
+    #[test]
     fn test_is_date_format() {
         assert!(is_date_format("DD/MM/YY"));
         assert!(is_date_format("H:MM:SS;@"));
         assert!(is_date_format("m\"M\"d\"D\";@"));
         assert!(is_date_format("[$-404]e\"\\xfc\"m\"\\xfc\"d\"\\xfc\""));
-        assert!(is_date_format("ha/p\\\\m"));
+        assert!(is_date_format("ha/p\\m"));
+        assert!(is_date_format("yyyy-mm-dd"));
+        assert!(is_date_format("mm/dd/yyyy"));
+        assert!(is_date_format("h:mm:ss"));
+        assert!(is_date_format("AM/PM"));
+        assert!(is_date_format("d-mmm-yy"));
 
         assert!(!is_date_format("#,##0\\ [$\\u20bd-46D]"));
         assert!(!is_date_format(
@@ -137,13 +181,61 @@ mod tests {
         assert!(!is_date_format("[h]:mm:ss")); // TimeDelta
         assert!(!is_date_format("[ss]")); // TimeDelta
         assert!(!is_date_format("[m]")); // TimeDelta
+        assert!(!is_date_format("General"));
+        assert!(!is_date_format("0.00"));
+        assert!(!is_date_format("#,##0"));
+    }
+
+    #[test]
+    fn test_is_date_format_edge_cases() {
+        // Empty string
+        assert!(!is_date_format(""));
+
+        // Just quotes
+        assert!(!is_date_format("\"\""));
+
+        // Escaped characters
+        assert!(!is_date_format("\\d\\m\\y"));
+
+        // Semicolon (multiple formats)
+        assert!(!is_date_format("0.00;-0.00"));
     }
 
     #[test]
     fn test_builtin_format_code() {
         assert_eq!(builtin_format_code(0), Some("General"));
+        assert_eq!(builtin_format_code(1), Some("0"));
+        assert_eq!(builtin_format_code(2), Some("0.00"));
+        assert_eq!(builtin_format_code(3), Some("#,##0"));
+        assert_eq!(builtin_format_code(4), Some("#,##0.00"));
+        assert_eq!(builtin_format_code(9), Some("0%"));
+        assert_eq!(builtin_format_code(10), Some("0.00%"));
+        assert_eq!(builtin_format_code(11), Some("0.00E+00"));
+        assert_eq!(builtin_format_code(12), Some("# ?/?"));
+        assert_eq!(builtin_format_code(13), Some("# ??/??"));
         assert_eq!(builtin_format_code(14), Some("mm-dd-yy"));
+        assert_eq!(builtin_format_code(15), Some("d-mmm-yy"));
+        assert_eq!(builtin_format_code(16), Some("d-mmm"));
+        assert_eq!(builtin_format_code(17), Some("mmm-yy"));
+        assert_eq!(builtin_format_code(18), Some("h:mm AM/PM"));
+        assert_eq!(builtin_format_code(19), Some("h:mm:ss AM/PM"));
+        assert_eq!(builtin_format_code(20), Some("h:mm"));
+        assert_eq!(builtin_format_code(21), Some("h:mm:ss"));
         assert_eq!(builtin_format_code(22), Some("m/d/yy h:mm"));
+        assert_eq!(builtin_format_code(37), Some("#,##0 ;(#,##0)"));
+        assert_eq!(builtin_format_code(38), Some("#,##0 ;[Red](#,##0)"));
+        assert_eq!(builtin_format_code(39), Some("#,##0.00;(#,##0.00)"));
+        assert_eq!(builtin_format_code(40), Some("#,##0.00;[Red](#,##0.00)"));
+        assert_eq!(builtin_format_code(45), Some("mm:ss"));
+        assert_eq!(builtin_format_code(46), Some("[h]:mm:ss"));
+        assert_eq!(builtin_format_code(47), Some("mmss.0"));
+        assert_eq!(builtin_format_code(48), Some("##0.0E+0"));
+        assert_eq!(builtin_format_code(49), Some("@"));
+
+        // Non-existent format codes
+        assert_eq!(builtin_format_code(5), None);
         assert_eq!(builtin_format_code(999), None);
+        assert_eq!(builtin_format_code(163), None);
+        assert_eq!(builtin_format_code(164), None);
     }
 }

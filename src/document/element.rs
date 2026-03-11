@@ -92,3 +92,49 @@ impl DocumentElement {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_document_element_is_paragraph() {
+        // Create a mock paragraph element (we can't easily create a Paragraph, so we test the enum directly)
+        let element = DocumentElement::Paragraph(Box::new(unsafe { std::mem::zeroed() }));
+        assert!(element.is_paragraph());
+        assert!(!element.is_table());
+    }
+
+    #[test]
+    fn test_document_element_is_table() {
+        let element = DocumentElement::Table(Box::new(unsafe { std::mem::zeroed() }));
+        assert!(element.is_table());
+        assert!(!element.is_paragraph());
+    }
+
+    #[test]
+    fn test_document_element_as_paragraph() {
+        let element = DocumentElement::Paragraph(Box::new(unsafe { std::mem::zeroed() }));
+        assert!(element.as_paragraph().is_some());
+        assert!(element.as_table().is_none());
+    }
+
+    #[test]
+    fn test_document_element_as_table() {
+        let element = DocumentElement::Table(Box::new(unsafe { std::mem::zeroed() }));
+        assert!(element.as_table().is_some());
+        assert!(element.as_paragraph().is_none());
+    }
+
+    #[test]
+    fn test_document_element_into_paragraph() {
+        let element = DocumentElement::Paragraph(Box::new(unsafe { std::mem::zeroed() }));
+        assert!(element.into_paragraph().is_some());
+    }
+
+    #[test]
+    fn test_document_element_into_table() {
+        let element = DocumentElement::Table(Box::new(unsafe { std::mem::zeroed() }));
+        assert!(element.into_table().is_some());
+    }
+}

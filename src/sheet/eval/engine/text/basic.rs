@@ -429,3 +429,374 @@ pub(crate) async fn eval_substitute(
         Ok(CellValue::String(text.replace(&old_text, &new_text)))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::parser::Expr;
+
+    fn str_expr(s: &str) -> Expr {
+        Expr::Literal(CellValue::String(s.to_string()))
+    }
+
+    fn num_expr(n: f64) -> Expr {
+        if n == n.floor() {
+            Expr::Literal(CellValue::Int(n as i64))
+        } else {
+            Expr::Literal(CellValue::Float(n))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_len() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello")];
+        let result = eval_len(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Int(v) => assert_eq!(v, 5),
+            _ => panic!("Expected Int(5)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_len_unicode() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello 世界")];
+        let result = eval_len(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Int(v) => assert_eq!(v, 8), // 5 chars + 1 space + 2 CJK chars
+            _ => panic!("Expected Int(8)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_len_wrong_args() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args: Vec<Expr> = vec![];
+        let result = eval_len(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 1 argument")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_lower() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("HELLO WORLD")];
+        let result = eval_lower(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "hello world"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_upper() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello world")];
+        let result = eval_upper(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "HELLO WORLD"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_proper() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello world")];
+        let result = eval_proper(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "Hello World"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_proper_multiple_spaces() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello   world")];
+        let result = eval_proper(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "Hello   World"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_trim() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("  hello world  ")];
+        let result = eval_trim(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "hello world"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_rept() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("ab"), num_expr(3.0)];
+        let result = eval_rept(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "ababab"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_rept_zero() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("ab"), num_expr(0.0)];
+        let result = eval_rept(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, ""),
+            _ => panic!("Expected empty String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_rept_negative() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("ab"), num_expr(-1.0)];
+        let result = eval_rept(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("non-negative")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_exact_same() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello"), str_expr("hello")];
+        let result = eval_exact(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Bool(v) => assert!(v),
+            _ => panic!("Expected Bool(true)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_exact_different() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello"), str_expr("world")];
+        let result = eval_exact(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Bool(v) => assert!(!v),
+            _ => panic!("Expected Bool(false)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_exact_case_sensitive() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("Hello"), str_expr("hello")];
+        let result = eval_exact(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Bool(v) => assert!(!v),
+            _ => panic!("Expected Bool(false) - EXACT is case sensitive"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_substitute_all() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello world"), str_expr("o"), str_expr("0")];
+        let result = eval_substitute(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "hell0 w0rld"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_substitute_instance() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            str_expr("hello world"),
+            str_expr("o"),
+            str_expr("0"),
+            num_expr(1.0),
+        ];
+        let result = eval_substitute(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "hell0 world"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_substitute_empty_old() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello"), str_expr(""), str_expr("x")];
+        let result = eval_substitute(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("must not be empty")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_concat() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello"), str_expr(" "), str_expr("world")];
+        let result = eval_concat(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "hello world"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_textjoin() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr(","), bool_expr(true), str_expr("a"), str_expr("b")];
+        let result = eval_textjoin(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "a,b"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    fn bool_expr(b: bool) -> Expr {
+        Expr::Literal(CellValue::Bool(b))
+    }
+
+    #[tokio::test]
+    async fn test_eval_textjoin_ignore_empty() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // Test with ignore_empty = true and an empty string
+        let args = vec![
+            str_expr(","),
+            bool_expr(true),
+            str_expr("a"),
+            str_expr(""),
+            str_expr("b"),
+        ];
+        let result = eval_textjoin(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "a,b"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_numbervalue_default() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("123.45")];
+        let result = eval_numbervalue(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 123.45).abs() < 1e-9),
+            CellValue::Int(v) => assert_eq!(v, 123),
+            _ => panic!("Expected numeric"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_numbervalue_with_group() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("1,234.56"), str_expr("."), str_expr(",")];
+        let result = eval_numbervalue(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1234.56).abs() < 1e-9),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_numbervalue_invalid() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("abc")];
+        let result = eval_numbervalue(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "#VALUE!"),
+            _ => panic!("Expected #VALUE! error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_asc() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("ＡＢＣ")]; // Fullwidth characters
+        let result = eval_asc(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "ABC"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_jis() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("ABC")];
+        let result = eval_jis(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "ＡＢＣ"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_lenb() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello")];
+        let result = eval_lenb(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Int(v) => assert_eq!(v, 5), // Byte length
+            _ => panic!("Expected Int(5)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_phonetic() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello")];
+        let result = eval_phonetic(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "hello"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_phonetic_non_string() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(123.0)];
+        let result = eval_phonetic(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, ""),
+            _ => panic!("Expected empty String"),
+        }
+    }
+}

@@ -19,3 +19,15 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
+      - id: cargo-test-lib
+        name: Run cargo test (lib and tests)
+        entry: cargo test --all-features --lib --tests
+        language: system
+        types: [rust]
+        pass_filenames: false
+      - id: cargo-test-doc
+        name: Run cargo test (doc tests)
+        entry: cargo test --all-features --doc
+        language: system
+        types: [rust]
+        pass_filenames: false

@@ -92,3 +92,92 @@ impl RelationshipMapper {
         self.endnotes_id.as_deref()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_relationship_mapper_new() {
+        let mapper = RelationshipMapper::new();
+        assert!(mapper.hyperlink_ids.is_empty());
+        assert!(mapper.image_ids.is_empty());
+        assert!(mapper.header_id.is_none());
+        assert!(mapper.footer_id.is_none());
+        assert!(mapper.footnotes_id.is_none());
+        assert!(mapper.endnotes_id.is_none());
+    }
+
+    #[test]
+    fn test_relationship_mapper_default() {
+        let mapper: RelationshipMapper = Default::default();
+        assert!(mapper.hyperlink_ids.is_empty());
+        assert!(mapper.image_ids.is_empty());
+    }
+
+    #[test]
+    fn test_add_and_get_hyperlink() {
+        let mut mapper = RelationshipMapper::new();
+        mapper.add_hyperlink(0, "rId1".to_string());
+        mapper.add_hyperlink(1, "rId2".to_string());
+
+        assert_eq!(mapper.get_hyperlink_id(0), Some("rId1"));
+        assert_eq!(mapper.get_hyperlink_id(1), Some("rId2"));
+        assert_eq!(mapper.get_hyperlink_id(2), None);
+    }
+
+    #[test]
+    fn test_add_and_get_image() {
+        let mut mapper = RelationshipMapper::new();
+        mapper.add_image(0, "rId5".to_string());
+        mapper.add_image(1, "rId6".to_string());
+
+        assert_eq!(mapper.get_image_id(0), Some("rId5"));
+        assert_eq!(mapper.get_image_id(1), Some("rId6"));
+        assert_eq!(mapper.get_image_id(99), None);
+    }
+
+    #[test]
+    fn test_set_and_get_header_id() {
+        let mut mapper = RelationshipMapper::new();
+        assert_eq!(mapper.get_header_id(), None);
+
+        mapper.set_header_id("rId10".to_string());
+        assert_eq!(mapper.get_header_id(), Some("rId10"));
+    }
+
+    #[test]
+    fn test_set_and_get_footer_id() {
+        let mut mapper = RelationshipMapper::new();
+        assert_eq!(mapper.get_footer_id(), None);
+
+        mapper.set_footer_id("rId11".to_string());
+        assert_eq!(mapper.get_footer_id(), Some("rId11"));
+    }
+
+    #[test]
+    fn test_set_and_get_footnotes_id() {
+        let mut mapper = RelationshipMapper::new();
+        assert_eq!(mapper.get_footnotes_id(), None);
+
+        mapper.set_footnotes_id("rId20".to_string());
+        assert_eq!(mapper.get_footnotes_id(), Some("rId20"));
+    }
+
+    #[test]
+    fn test_set_and_get_endnotes_id() {
+        let mut mapper = RelationshipMapper::new();
+        assert_eq!(mapper.get_endnotes_id(), None);
+
+        mapper.set_endnotes_id("rId21".to_string());
+        assert_eq!(mapper.get_endnotes_id(), Some("rId21"));
+    }
+
+    #[test]
+    fn test_relationship_mapper_debug() {
+        let mut mapper = RelationshipMapper::new();
+        mapper.add_hyperlink(0, "rId1".to_string());
+        let debug_str = format!("{:?}", mapper);
+        assert!(debug_str.contains("RelationshipMapper"));
+    }
+}

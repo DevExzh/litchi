@@ -474,7 +474,7 @@ mod tests {
         assert!(empty_cell.is_empty());
 
         let number_cell = CellValue::Number(std::f64::consts::PI);
-        assert_eq!(number_cell.to_string(), "3.14");
+        assert_eq!(number_cell.to_string(), "3.141592653589793");
     }
 
     #[test]

@@ -173,6 +173,39 @@ mod tests {
     }
 
     #[test]
+    fn test_document_atom_different_sizes() {
+        // Standard 4:3
+        let atom1 = build_document_atom(9144000, 6858000);
+        assert_eq!(atom1.len(), 48);
+
+        // Widescreen 16:9
+        let atom2 = build_document_atom(12192000, 6858000);
+        assert_eq!(atom2.len(), 48);
+
+        // Verify record type in header
+        let record_type = u16::from_le_bytes([atom1[2], atom1[3]]);
+        assert_eq!(record_type, record_type::DOCUMENT_ATOM);
+    }
+
+    #[test]
+    fn test_document_atom_content() {
+        let atom = build_document_atom(9144000, 6858000);
+
+        // Verify header version (should be 1 for DocumentAtom)
+        let ver_inst = u16::from_le_bytes([atom[0], atom[1]]);
+        let version = ver_inst & 0x0F;
+        assert_eq!(version, 0x01);
+
+        // Verify record type
+        let rec_type = u16::from_le_bytes([atom[2], atom[3]]);
+        assert_eq!(rec_type, record_type::DOCUMENT_ATOM);
+
+        // Verify length (40 bytes)
+        let length = u32::from_le_bytes([atom[4], atom[5], atom[6], atom[7]]);
+        assert_eq!(length, 40);
+    }
+
+    #[test]
     fn test_slide_atom_size() {
         let atom = build_slide_atom(0x80000000, 0);
         // 8 bytes header + 24 bytes data = 32 bytes
@@ -180,9 +213,179 @@ mod tests {
     }
 
     #[test]
+    fn test_slide_atom_variations() {
+        // With master reference only
+        let atom1 = build_slide_atom(0x80000000, 0);
+        assert_eq!(atom1.len(), 32);
+
+        // With notes reference
+        let atom2 = build_slide_atom(0x80000000, 257);
+        assert_eq!(atom2.len(), 32);
+
+        // Verify header version (should be 2 for SlideAtom)
+        let ver_inst = u16::from_le_bytes([atom1[0], atom1[1]]);
+        let version = ver_inst & 0x0F;
+        assert_eq!(version, 0x02);
+    }
+
+    #[test]
+    fn test_slide_atom_content_structure() {
+        let atom = build_slide_atom(0x80000000, 0);
+
+        // Record type
+        let rec_type = u16::from_le_bytes([atom[2], atom[3]]);
+        assert_eq!(rec_type, record_type::SLIDE_ATOM);
+
+        // Data length
+        let length = u32::from_le_bytes([atom[4], atom[5], atom[6], atom[7]]);
+        assert_eq!(length, 24);
+
+        // SSlideLayoutAtom at offset 8
+        let geom = u32::from_le_bytes([atom[8], atom[9], atom[10], atom[11]]);
+        assert_eq!(geom, 0x0010); // SL_Blank
+
+        // masterIdRef at offset 20
+        let master_id = u32::from_le_bytes([atom[20], atom[21], atom[22], atom[23]]);
+        assert_eq!(master_id, 0x80000000);
+
+        // flags at offset 28
+        let flags = u16::from_le_bytes([atom[28], atom[29]]);
+        assert_eq!(flags, 0x0007); // fMasterObjects | fMasterScheme | fMasterBackground
+    }
+
+    #[test]
     fn test_slide_persist_atom_size() {
         let atom = build_slide_persist_atom(1, 256, true);
         // 8 bytes header + 20 bytes data = 28 bytes
         assert_eq!(atom.len(), 28);
+    }
+
+    #[test]
+    fn test_slide_persist_atom_with_shapes() {
+        let atom = build_slide_persist_atom(1, 256, true);
+
+        // Record type
+        let rec_type = u16::from_le_bytes([atom[2], atom[3]]);
+        assert_eq!(rec_type, record_type::SLIDE_PERSIST_ATOM);
+
+        // Check flags (should have fNonOutlineData set)
+        let flags = u32::from_le_bytes([atom[12], atom[13], atom[14], atom[15]]);
+        assert_eq!(flags, 0x04);
+
+        // Check slideId
+        let slide_id = u32::from_le_bytes([atom[20], atom[21], atom[22], atom[23]]);
+        assert_eq!(slide_id, 256);
+    }
+
+    #[test]
+    fn test_slide_persist_atom_without_shapes() {
+        let atom = build_slide_persist_atom(2, 257, false);
+
+        // Check flags (should be 0)
+        let flags = u32::from_le_bytes([atom[12], atom[13], atom[14], atom[15]]);
+        assert_eq!(flags, 0x00);
+    }
+
+    #[test]
+    fn test_color_scheme_atom() {
+        let colors = default_color_scheme();
+        let atom = build_color_scheme_atom(1, &colors);
+
+        // 8 bytes header + 32 bytes data (8 colors * 4 bytes)
+        assert_eq!(atom.len(), 40);
+
+        // Record type
+        let rec_type = u16::from_le_bytes([atom[2], atom[3]]);
+        assert_eq!(rec_type, record_type::COLOR_SCHEME_ATOM);
+
+        // Instance should be 1
+        let ver_inst = u16::from_le_bytes([atom[0], atom[1]]);
+        let instance = ver_inst >> 4;
+        assert_eq!(instance, 1);
+    }
+
+    #[test]
+    fn test_color_scheme_atom_different_instances() {
+        let colors = default_color_scheme();
+
+        let atom0 = build_color_scheme_atom(0, &colors);
+        let atom1 = build_color_scheme_atom(1, &colors);
+        let atom2 = build_color_scheme_atom(2, &colors);
+
+        // Same size, different instance values
+        assert_eq!(atom0.len(), atom1.len());
+        assert_eq!(atom1.len(), atom2.len());
+
+        // Check instance values in headers
+        let inst0 = u16::from_le_bytes([atom0[0], atom0[1]]) >> 4;
+        let inst1 = u16::from_le_bytes([atom1[0], atom1[1]]) >> 4;
+        let inst2 = u16::from_le_bytes([atom2[0], atom2[1]]) >> 4;
+
+        assert_eq!(inst0, 0);
+        assert_eq!(inst1, 1);
+        assert_eq!(inst2, 2);
+    }
+
+    #[test]
+    fn test_default_color_scheme_values() {
+        let colors = default_color_scheme();
+        assert_eq!(colors.len(), 8);
+
+        // Background color (white)
+        assert_eq!(colors[0], 0x00FFFFFF);
+
+        // Text and lines color (black)
+        assert_eq!(colors[1], 0x00000000);
+
+        // Shadows (gray)
+        assert_eq!(colors[2], 0x00808080);
+
+        // Title text (black)
+        assert_eq!(colors[3], 0x00000000);
+    }
+
+    #[test]
+    fn test_end_document_atom() {
+        let atom = build_end_document_atom();
+        assert_eq!(atom.len(), 8); // Just header, no data
+
+        // Record type
+        let rec_type = u16::from_le_bytes([atom[2], atom[3]]);
+        assert_eq!(rec_type, record_type::END_DOCUMENT);
+
+        // Length should be 0
+        let length = u32::from_le_bytes([atom[4], atom[5], atom[6], atom[7]]);
+        assert_eq!(length, 0);
+    }
+
+    #[test]
+    fn test_document_atom_conversion() {
+        // EMU to master units conversion
+        // 914400 EMUs = 1 inch = 576 master units
+        let atom = build_document_atom(914400, 914400);
+
+        // After conversion, should be 576x576 master units
+        let slide_w = u32::from_le_bytes([atom[8], atom[9], atom[10], atom[11]]);
+        let slide_h = u32::from_le_bytes([atom[12], atom[13], atom[14], atom[15]]);
+
+        assert_eq!(slide_w, 576);
+        assert_eq!(slide_h, 576);
+    }
+
+    #[test]
+    fn test_slide_persist_atom_multiple() {
+        let ids = vec![(1, 256), (2, 257), (3, 258), (4, 259)];
+
+        for (persist_id, slide_id) in ids {
+            let atom = build_slide_persist_atom(persist_id, slide_id, true);
+
+            // Verify persistIdRef
+            let stored_persist_id = u32::from_le_bytes([atom[8], atom[9], atom[10], atom[11]]);
+            assert_eq!(stored_persist_id, persist_id);
+
+            // Verify slideId
+            let stored_slide_id = u32::from_le_bytes([atom[20], atom[21], atom[22], atom[23]]);
+            assert_eq!(stored_slide_id, slide_id);
+        }
     }
 }

@@ -44,7 +44,7 @@ const DEFAULT_MEDIA_POSTER: &[u8] = &[
 ///
 /// // Access slides
 /// println!("Presentation has {} slides", pres.slide_count()?);
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 /// ```
 pub struct Package {
     /// The underlying OPC package
@@ -165,10 +165,10 @@ impl Package {
     /// ```rust,no_run
     /// use litchi::ooxml::pptx::Package;
     ///
-    /// let pkg = Package::new()?;
+    /// let mut pkg = Package::new()?;
     /// // Add slides to the presentation...
     /// pkg.save("new_presentation.pptx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn new() -> Result<Self> {
         use crate::ooxml::opc::constants::content_type as ct;
@@ -366,7 +366,7 @@ impl Package {
     /// use litchi::ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let opc = OpcPackage::open(path)?;
@@ -422,7 +422,7 @@ impl Package {
     /// let bytes = std::fs::read("presentation.pptx")?;
     /// let opc = OpcPackage::from_reader(Cursor::new(bytes))?;
     /// let pkg = Package::from_opc_package(opc)?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn from_opc_package(opc: OpcPackage) -> Result<Self> {
         // Verify it's a PowerPoint presentation by checking the main part's content type
@@ -465,7 +465,7 @@ impl Package {
     /// let data = std::fs::read("presentation.pptx")?;
     /// let cursor = Cursor::new(data);
     /// let pkg = Package::from_reader(cursor)?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn from_reader<R: Read + Seek>(reader: R) -> Result<Self> {
         let opc = OpcPackage::from_reader(reader)?;
@@ -512,7 +512,7 @@ impl Package {
     /// for slide in pres.slides()? {
     ///     println!("Slide text: {}", slide.text()?);
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn presentation(&self) -> Result<Presentation<'_>> {
         let main_part = self
@@ -562,7 +562,7 @@ impl Package {
     /// slide.add_text_box("Hello, World!", 914400, 914400, 2743200, 914400);
     ///
     /// pkg.save("output.pptx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn presentation_mut(&mut self) -> Result<&mut MutablePresentation> {
         // If we don't have a mutable presentation, create one
@@ -582,7 +582,7 @@ impl Package {
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let props = pkg.properties();
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn properties(&self) -> &DocumentProperties {
         &self.properties
@@ -599,7 +599,7 @@ impl Package {
     /// pkg.properties_mut().title = Some("My Presentation".to_string());
     /// pkg.properties_mut().creator = Some("John Doe".to_string());
     /// pkg.save("presentation.pptx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn properties_mut(&mut self) -> &mut DocumentProperties {
         &mut self.properties
@@ -621,7 +621,7 @@ impl Package {
     /// let mut pkg = Package::new()?;
     /// // Modify presentation...
     /// pkg.save("output.pptx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         // If we have a mutable presentation, update the presentation parts

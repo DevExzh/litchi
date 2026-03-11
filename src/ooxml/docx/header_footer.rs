@@ -415,4 +415,254 @@ mod tests {
         let footer = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
         assert_eq!(footer.text().unwrap(), "Footer Text");
     }
+
+    #[test]
+    fn test_header_footer_type_accessors() {
+        let xml = b"<w:hdr><w:p><w:r><w:t>Test</w:t></w:r></w:p></w:hdr>";
+
+        let primary = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        assert_eq!(primary.header_footer_type(), WdHeaderFooter::Primary);
+
+        let first_page = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::FirstPage);
+        assert_eq!(first_page.header_footer_type(), WdHeaderFooter::FirstPage);
+
+        let even_page = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::EvenPage);
+        assert_eq!(even_page.header_footer_type(), WdHeaderFooter::EvenPage);
+    }
+
+    #[test]
+    fn test_header_footer_is_header_is_footer() {
+        let header_xml = b"<w:hdr><w:p><w:r><w:t>Header</w:t></w:r></w:p></w:hdr>";
+        let footer_xml = b"<w:ftr><w:p><w:r><w:t>Footer</w:t></w:r></w:p></w:ftr>";
+
+        let header = HeaderFooter::from_xml_bytes(header_xml.to_vec(), WdHeaderFooter::Primary);
+        let footer = HeaderFooter::from_xml_bytes(footer_xml.to_vec(), WdHeaderFooter::Primary);
+
+        // Both have the same type (Primary), but different XML elements
+        assert_eq!(header.header_footer_type(), WdHeaderFooter::Primary);
+        assert_eq!(footer.header_footer_type(), WdHeaderFooter::Primary);
+    }
+
+    #[test]
+    fn test_xml_bytes_access() {
+        let xml = b"<w:hdr><w:p><w:r><w:t>Test Content</w:t></w:r></w:p></w:hdr>";
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+
+        let bytes = header.xml_bytes();
+        assert_eq!(bytes, xml);
+    }
+
+    #[test]
+    fn test_empty_header_footer() {
+        let xml = b"<w:hdr></w:hdr>";
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        assert_eq!(header.text().unwrap(), "");
+        assert_eq!(header.paragraph_count().unwrap(), 0);
+        assert_eq!(header.table_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn test_multiple_paragraphs_text_extraction() {
+        let xml = b"<w:hdr>\
+            <w:p><w:r><w:t>First Paragraph</w:t></w:r></w:p>\
+            <w:p><w:r><w:t>Second Paragraph</w:t></w:r></w:p>\
+        </w:hdr>";
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+
+        let text = header.text().unwrap();
+        assert!(text.contains("First Paragraph"));
+        assert!(text.contains("Second Paragraph"));
+    }
+
+    #[test]
+    fn test_header_with_multiple_runs() {
+        let xml = b"<w:hdr>\
+            <w:p>\
+                <w:r><w:t>Run One</w:t></w:r>\
+                <w:r><w:t> Run Two</w:t></w:r>\
+            </w:p>\
+        </w:hdr>";
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+
+        // Text extraction concatenates all text content from <w:t> elements
+        let text = header.text().unwrap();
+        assert!(text.contains("Run One"));
+        assert!(text.contains("Run Two"));
+    }
+
+    #[test]
+    fn test_paragraph_count() {
+        let xml = b"<w:hdr>\
+            <w:p><w:r><w:t>Para 1</w:t></w:r></w:p>\
+            <w:p><w:r><w:t>Para 2</w:t></w:r></w:p>\
+            <w:p><w:r><w:t>Para 3</w:t></w:r></w:p>\
+        </w:hdr>";
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+
+        assert_eq!(header.paragraph_count().unwrap(), 3);
+    }
+
+    #[test]
+    fn test_paragraphs_extraction() {
+        let xml = b"<w:hdr>\
+            <w:p><w:r><w:t>First</w:t></w:r></w:p>\
+            <w:p><w:r><w:t>Second</w:t></w:r></w:p>\
+        </w:hdr>";
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+
+        let paragraphs = header.paragraphs().unwrap();
+        assert_eq!(paragraphs.len(), 2);
+    }
+
+    #[test]
+    fn test_table_count_no_tables() {
+        let xml = b"<w:hdr><w:p><w:r><w:t>No tables here</w:t></w:r></w:p></w:hdr>";
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+
+        assert_eq!(header.table_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn test_table_count_with_tables() {
+        let xml = b"<w:hdr>\
+            <w:tbl><w:tr><w:tc><w:p><w:r><w:t>Cell 1</w:t></w:r></w:p></w:tc></w:tr></w:tbl>\
+            <w:tbl><w:tr><w:tc><w:p><w:r><w:t>Cell 2</w:t></w:r></w:p></w:tc></w:tr></w:tbl>\
+        </w:hdr>";
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+
+        assert_eq!(header.table_count().unwrap(), 2);
+    }
+
+    #[test]
+    fn test_tables_extraction() {
+        let xml = b"<w:hdr>\
+            <w:tbl><w:tr><w:tc><w:p><w:r><w:t>Table 1</w:t></w:r></w:p></w:tc></w:tr></w:tbl>\
+        </w:hdr>";
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+
+        let tables = header.tables().unwrap();
+        assert_eq!(tables.len(), 1);
+    }
+
+    #[test]
+    fn test_mixed_content_header() {
+        let xml = b"<w:hdr>\
+            <w:p><w:r><w:t>Paragraph before table</w:t></w:r></w:p>\
+            <w:tbl><w:tr><w:tc><w:p><w:r><w:t>Table content</w:t></w:r></w:p></w:tc></w:tr></w:tbl>\
+            <w:p><w:r><w:t>Paragraph after table</w:t></w:r></w:p>\
+        </w:hdr>";
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+
+        assert_eq!(header.paragraph_count().unwrap(), 3);
+        assert_eq!(header.table_count().unwrap(), 1);
+
+        let text = header.text().unwrap();
+        assert!(text.contains("Paragraph before table"));
+        assert!(text.contains("Table content"));
+        assert!(text.contains("Paragraph after table"));
+    }
+
+    #[test]
+    fn test_header_with_unicode() {
+        let xml = "<w:hdr><w:p><w:r><w:t>Unicode: 你好世界 🎉</w:t></w:r></w:p></w:hdr>".as_bytes();
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+
+        let text = header.text().unwrap();
+        assert!(text.contains("你好世界"));
+        assert!(text.contains("🎉"));
+    }
+
+    #[test]
+    fn test_first_page_header_footer() {
+        let header_xml = b"<w:hdr><w:p><w:r><w:t>First Page Header</w:t></w:r></w:p></w:hdr>";
+        let footer_xml = b"<w:ftr><w:p><w:r><w:t>First Page Footer</w:t></w:r></w:p></w:ftr>";
+
+        let header = HeaderFooter::from_xml_bytes(header_xml.to_vec(), WdHeaderFooter::FirstPage);
+        let footer = HeaderFooter::from_xml_bytes(footer_xml.to_vec(), WdHeaderFooter::FirstPage);
+
+        assert_eq!(header.header_footer_type(), WdHeaderFooter::FirstPage);
+        assert_eq!(footer.header_footer_type(), WdHeaderFooter::FirstPage);
+        assert!(header.text().unwrap().contains("First Page Header"));
+        assert!(footer.text().unwrap().contains("First Page Footer"));
+    }
+
+    #[test]
+    fn test_even_page_header_footer() {
+        let header_xml = b"<w:hdr><w:p><w:r><w:t>Even Page Header</w:t></w:r></w:p></w:hdr>";
+        let footer_xml = b"<w:ftr><w:p><w:r><w:t>Even Page Footer</w:t></w:r></w:p></w:ftr>";
+
+        let header = HeaderFooter::from_xml_bytes(header_xml.to_vec(), WdHeaderFooter::EvenPage);
+        let footer = HeaderFooter::from_xml_bytes(footer_xml.to_vec(), WdHeaderFooter::EvenPage);
+
+        assert_eq!(header.header_footer_type(), WdHeaderFooter::EvenPage);
+        assert_eq!(footer.header_footer_type(), WdHeaderFooter::EvenPage);
+        assert!(header.text().unwrap().contains("Even Page Header"));
+        assert!(footer.text().unwrap().contains("Even Page Footer"));
+    }
+
+    #[test]
+    fn test_clone_header_footer() {
+        let xml = b"<w:hdr><w:p><w:r><w:t>Clonable Content</w:t></w:r></w:p></w:hdr>";
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let cloned = header.clone();
+
+        assert_eq!(header.text().unwrap(), cloned.text().unwrap());
+        assert_eq!(header.header_footer_type(), cloned.header_footer_type());
+    }
+
+    #[test]
+    fn test_header_with_nested_elements() {
+        let xml = b"<w:hdr>\
+            <w:p>\
+                <w:pPr><w:jc w:val=\"center\"/></w:pPr>\
+                <w:r>\
+                    <w:rPr><w:b/></w:rPr>\
+                    <w:t>Bold Centered Text</w:t>\
+                </w:r>\
+            </w:p>\
+        </w:hdr>";
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+
+        assert_eq!(header.text().unwrap(), "Bold Centered Text");
+        assert_eq!(header.paragraph_count().unwrap(), 1);
+    }
+
+    #[test]
+    fn test_empty_run_text() {
+        let xml = b"<w:hdr><w:p><w:r><w:t></w:t></w:r></w:p></w:hdr>";
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+
+        assert_eq!(header.text().unwrap(), "");
+    }
+
+    #[test]
+    fn test_header_with_tab_and_break() {
+        // Test that tabs and breaks in text are handled
+        let xml = b"<w:hdr>\
+            <w:p>\
+                <w:r><w:t>Before</w:t></w:r>\
+                <w:r><w:tab/><w:t>After</w:t></w:r>\
+            </w:p>\
+        </w:hdr>";
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+
+        let text = header.text().unwrap();
+        assert!(text.contains("Before"));
+        assert!(text.contains("After"));
+    }
+
+    #[test]
+    fn test_multiple_headers_different_types() {
+        let primary_xml = b"<w:hdr><w:p><w:r><w:t>Primary Header</w:t></w:r></w:p></w:hdr>";
+        let first_xml = b"<w:hdr><w:p><w:r><w:t>First Page Header</w:t></w:r></w:p></w:hdr>";
+        let even_xml = b"<w:hdr><w:p><w:r><w:t>Even Page Header</w:t></w:r></w:p></w:hdr>";
+
+        let primary = HeaderFooter::from_xml_bytes(primary_xml.to_vec(), WdHeaderFooter::Primary);
+        let first = HeaderFooter::from_xml_bytes(first_xml.to_vec(), WdHeaderFooter::FirstPage);
+        let even = HeaderFooter::from_xml_bytes(even_xml.to_vec(), WdHeaderFooter::EvenPage);
+
+        assert!(primary.text().unwrap().contains("Primary"));
+        assert!(first.text().unwrap().contains("First Page"));
+        assert!(even.text().unwrap().contains("Even Page"));
+    }
 }

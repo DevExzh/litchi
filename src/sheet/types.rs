@@ -144,3 +144,182 @@ impl From<&String> for CellValue {
         Self::String(s.clone())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cell_value_variants() {
+        let empty = CellValue::Empty;
+        assert!(matches!(empty, CellValue::Empty));
+
+        let boolean = CellValue::Bool(true);
+        assert!(matches!(boolean, CellValue::Bool(true)));
+
+        let int = CellValue::Int(42);
+        assert!(matches!(int, CellValue::Int(42)));
+
+        let float = CellValue::Float(3.14);
+        assert!(matches!(float, CellValue::Float(3.14)));
+
+        let string = CellValue::String("test".to_string());
+        assert!(matches!(string, CellValue::String(_)));
+
+        let datetime = CellValue::DateTime(44561.5);
+        assert!(matches!(datetime, CellValue::DateTime(44561.5)));
+
+        let error = CellValue::Error("#DIV/0!".to_string());
+        assert!(matches!(error, CellValue::Error(_)));
+    }
+
+    #[test]
+    fn test_cell_value_formula() {
+        let formula = CellValue::Formula {
+            formula: "A1+B1".to_string(),
+            cached_value: Some(Box::new(CellValue::Float(10.0))),
+            is_array: false,
+            array_range: None,
+        };
+        assert!(matches!(formula, CellValue::Formula { .. }));
+    }
+
+    #[test]
+    fn test_as_str() {
+        let string_val = CellValue::String("hello".to_string());
+        assert_eq!(string_val.as_str(), Some("hello"));
+
+        let int_val = CellValue::Int(42);
+        assert_eq!(int_val.as_str(), None);
+
+        let empty_val = CellValue::Empty;
+        assert_eq!(empty_val.as_str(), None);
+    }
+
+    #[test]
+    fn test_as_float() {
+        let float_val = CellValue::Float(3.14);
+        assert!((float_val.as_float().unwrap() - 3.14).abs() < 0.001);
+
+        let int_val = CellValue::Int(42);
+        assert_eq!(int_val.as_float(), None);
+
+        let string_val = CellValue::String("3.14".to_string());
+        assert_eq!(string_val.as_float(), None);
+    }
+
+    #[test]
+    fn test_infer_from_str_empty() {
+        assert!(matches!(CellValue::infer_from_str(""), CellValue::Empty));
+    }
+
+    #[test]
+    fn test_infer_from_str_integer() {
+        assert!(matches!(
+            CellValue::infer_from_str("42"),
+            CellValue::Int(42)
+        ));
+        assert!(matches!(
+            CellValue::infer_from_str("-123"),
+            CellValue::Int(-123)
+        ));
+        assert!(matches!(CellValue::infer_from_str("0"), CellValue::Int(0)));
+    }
+
+    #[test]
+    fn test_infer_from_str_float() {
+        let float_val = CellValue::infer_from_str("3.14");
+        assert!(matches!(float_val, CellValue::Float(_)));
+        if let CellValue::Float(f) = float_val {
+            assert!((f - 3.14).abs() < 0.001);
+        }
+
+        let float_val = CellValue::infer_from_str("-0.5");
+        assert!(matches!(float_val, CellValue::Float(_)));
+    }
+
+    #[test]
+    fn test_infer_from_str_boolean() {
+        assert!(matches!(
+            CellValue::infer_from_str("TRUE"),
+            CellValue::Bool(true)
+        ));
+        assert!(matches!(
+            CellValue::infer_from_str("true"),
+            CellValue::Bool(true)
+        ));
+        // Note: "1" and "0" are parsed as integers before boolean check
+        assert!(matches!(
+            CellValue::infer_from_str("YES"),
+            CellValue::Bool(true)
+        ));
+        assert!(matches!(
+            CellValue::infer_from_str("ON"),
+            CellValue::Bool(true)
+        ));
+
+        assert!(matches!(
+            CellValue::infer_from_str("FALSE"),
+            CellValue::Bool(false)
+        ));
+        assert!(matches!(
+            CellValue::infer_from_str("false"),
+            CellValue::Bool(false)
+        ));
+        assert!(matches!(
+            CellValue::infer_from_str("NO"),
+            CellValue::Bool(false)
+        ));
+        assert!(matches!(
+            CellValue::infer_from_str("OFF"),
+            CellValue::Bool(false)
+        ));
+    }
+
+    #[test]
+    fn test_infer_from_str_string() {
+        assert!(matches!(
+            CellValue::infer_from_str("hello"),
+            CellValue::String(_)
+        ));
+        assert!(matches!(
+            CellValue::infer_from_str("3.14.15"),
+            CellValue::String(_)
+        ));
+        assert!(matches!(
+            CellValue::infer_from_str("abc123"),
+            CellValue::String(_)
+        ));
+    }
+
+    #[test]
+    fn test_from_conversions() {
+        assert!(matches!(CellValue::from(true), CellValue::Bool(true)));
+        assert!(matches!(CellValue::from(false), CellValue::Bool(false)));
+
+        assert!(matches!(CellValue::from(42i32), CellValue::Int(42)));
+        assert!(matches!(CellValue::from(42i64), CellValue::Int(42)));
+        assert!(matches!(CellValue::from(42u32), CellValue::Int(42)));
+
+        let float_val: CellValue = 3.14f32.into();
+        assert!(matches!(float_val, CellValue::Float(_)));
+
+        let float_val: CellValue = 3.14f64.into();
+        assert!(matches!(float_val, CellValue::Float(_)));
+
+        assert!(matches!(
+            CellValue::from("hello".to_string()),
+            CellValue::String(_)
+        ));
+        assert!(matches!(CellValue::from("hello"), CellValue::String(_)));
+        assert!(matches!(
+            CellValue::from(&"hello".to_string()),
+            CellValue::String(_)
+        ));
+    }
+
+    #[test]
+    fn test_empty_constant() {
+        assert!(matches!(CellValue::EMPTY, CellValue::Empty));
+    }
+}

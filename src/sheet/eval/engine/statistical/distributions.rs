@@ -1937,3 +1937,1197 @@ pub(crate) async fn eval_phi(
     let dist = Normal::standard();
     Ok(CellValue::Float(dist.pdf(x)))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::engine::test_helpers::TestEngine;
+    use crate::sheet::eval::parser::Expr;
+
+    fn num_expr(n: f64) -> Expr {
+        Expr::Literal(CellValue::Float(n))
+    }
+
+    fn int_expr(n: i64) -> Expr {
+        Expr::Literal(CellValue::Int(n))
+    }
+
+    fn bool_expr(b: bool) -> Expr {
+        Expr::Literal(CellValue::Bool(b))
+    }
+
+    // NORM.DIST tests
+    #[tokio::test]
+    async fn test_eval_norm_dist_cdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(42.0),
+            num_expr(40.0),
+            num_expr(1.5),
+            bool_expr(true),
+        ];
+        let result = eval_norm_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.9088).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_norm_dist_pdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(42.0),
+            num_expr(40.0),
+            num_expr(1.5),
+            bool_expr(false),
+        ];
+        let result = eval_norm_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.1093).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_norm_dist_invalid_std_dev() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(42.0),
+            num_expr(40.0),
+            num_expr(0.0),
+            bool_expr(true),
+        ];
+        let result = eval_norm_dist(ctx, "Sheet1", &args).await.unwrap();
+        assert!(matches!(result, CellValue::Error(_)));
+    }
+
+    #[tokio::test]
+    async fn test_eval_norm_dist_wrong_args() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(42.0), num_expr(40.0)];
+        let result = eval_norm_dist(ctx, "Sheet1", &args).await.unwrap();
+        assert!(matches!(result, CellValue::Error(_)));
+    }
+
+    // NORM.S.INV tests
+    #[tokio::test]
+    async fn test_eval_norm_s_inv() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.95)];
+        let result = eval_norm_s_inv(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.645).abs() < 0.01),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_norm_s_inv_invalid_prob() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.5)];
+        let result = eval_norm_s_inv(ctx, "Sheet1", &args).await.unwrap();
+        assert!(matches!(result, CellValue::Error(_)));
+    }
+
+    #[tokio::test]
+    async fn test_eval_norm_s_inv_wrong_args() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args: Vec<Expr> = vec![];
+        let result = eval_norm_s_inv(ctx, "Sheet1", &args).await.unwrap();
+        assert!(matches!(result, CellValue::Error(_)));
+    }
+
+    // NORM.S.DIST tests
+    #[tokio::test]
+    async fn test_eval_norm_s_dist_cdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.5), bool_expr(true)];
+        let result = eval_norm_s_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.9332).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_norm_s_dist_pdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0), bool_expr(false)];
+        let result = eval_norm_s_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.3989).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_norm_s_dist_default() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_norm_s_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.5).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    // BETA.DIST tests
+    #[tokio::test]
+    async fn test_eval_beta_dist_cdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.5), num_expr(2.0), num_expr(3.0), bool_expr(true)];
+        let result = eval_beta_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.6875).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_beta_dist_scaled() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // With custom bounds A=0, B=2
+        let args = vec![
+            num_expr(1.0),
+            num_expr(2.0),
+            num_expr(3.0),
+            bool_expr(true),
+            num_expr(0.0),
+            num_expr(2.0),
+        ];
+        let result = eval_beta_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.6875).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_beta_dist_invalid_alpha() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.5), num_expr(0.0), num_expr(3.0), bool_expr(true)];
+        let result = eval_beta_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_beta_dist_x_out_of_bounds() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.5), num_expr(2.0), num_expr(3.0), bool_expr(true)];
+        let result = eval_beta_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    // BETA.INV tests
+    #[tokio::test]
+    async fn test_eval_beta_inv() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.6875), num_expr(2.0), num_expr(3.0)];
+        let result = eval_beta_inv(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.5).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_beta_inv_scaled() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(0.6875),
+            num_expr(2.0),
+            num_expr(3.0),
+            num_expr(0.0),
+            num_expr(2.0),
+        ];
+        let result = eval_beta_inv(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.0).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_beta_inv_invalid_prob() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(-0.5), num_expr(2.0), num_expr(3.0)];
+        let result = eval_beta_inv(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    // DEVSQ tests
+    #[tokio::test]
+    async fn test_eval_devsq() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        engine.set_cell("Sheet1", 0, 0, CellValue::Int(4));
+        engine.set_cell("Sheet1", 1, 0, CellValue::Int(5));
+        engine.set_cell("Sheet1", 2, 0, CellValue::Int(8));
+        engine.set_cell("Sheet1", 3, 0, CellValue::Int(9));
+        let range = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 3,
+            end_col: 0,
+        });
+        let args = vec![range];
+        let result = eval_devsq(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            // Mean = (4+5+8+9)/4 = 6.5
+            // DEVSQ = (-2.5)^2 + (-1.5)^2 + (1.5)^2 + (2.5)^2 = 6.25 + 2.25 + 2.25 + 6.25 = 17.0
+            CellValue::Float(v) => assert!((v - 17.0).abs() < 0.001),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_devsq_no_values() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args: Vec<Expr> = vec![];
+        let result = eval_devsq(ctx, "Sheet1", &args).await.unwrap();
+        assert!(matches!(result, CellValue::Error(_)));
+    }
+
+    // PROB tests
+    #[tokio::test]
+    async fn test_eval_prob() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Set up x_range
+        engine.set_cell("Sheet1", 0, 0, CellValue::Int(1));
+        engine.set_cell("Sheet1", 1, 0, CellValue::Int(2));
+        engine.set_cell("Sheet1", 2, 0, CellValue::Int(3));
+        engine.set_cell("Sheet1", 3, 0, CellValue::Int(4));
+        // Set up prob_range
+        engine.set_cell("Sheet1", 0, 1, CellValue::Float(0.1));
+        engine.set_cell("Sheet1", 1, 1, CellValue::Float(0.2));
+        engine.set_cell("Sheet1", 2, 1, CellValue::Float(0.3));
+        engine.set_cell("Sheet1", 3, 1, CellValue::Float(0.4));
+        let x_range = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 3,
+            end_col: 0,
+        });
+        let prob_range = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 1,
+            end_row: 3,
+            end_col: 1,
+        });
+        let args = vec![x_range, prob_range, num_expr(2.0), num_expr(3.0)];
+        let result = eval_prob(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.5).abs() < 0.001),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    // CHISQ.DIST tests
+    #[tokio::test]
+    async fn test_eval_chisq_dist_cdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(6.0), num_expr(3.0), bool_expr(true)];
+        let result = eval_chisq_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.8884).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_chisq_dist_pdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(6.0), num_expr(3.0), bool_expr(false)];
+        let result = eval_chisq_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v > 0.0),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_chisq_dist_invalid_df() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(6.0), num_expr(0.0), bool_expr(true)];
+        let result = eval_chisq_dist(ctx, "Sheet1", &args).await.unwrap();
+        assert!(matches!(result, CellValue::Error(_)));
+    }
+
+    // CHISQ.DIST.RT tests
+    #[tokio::test]
+    async fn test_eval_chisq_dist_rt() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(6.0), num_expr(3.0)];
+        let result = eval_chisq_dist_rt(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.1116).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_chisq_dist_rt_wrong_args() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(6.0)];
+        let result = eval_chisq_dist_rt(ctx, "Sheet1", &args).await.unwrap();
+        assert!(matches!(result, CellValue::Error(_)));
+    }
+
+    // CHISQ.INV tests
+    #[tokio::test]
+    async fn test_eval_chisq_inv() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.5), num_expr(10.0)];
+        let result = eval_chisq_inv(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 9.3418).abs() < 0.01),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_chisq_inv_invalid() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.5), num_expr(10.0)];
+        let result = eval_chisq_inv(ctx, "Sheet1", &args).await.unwrap();
+        assert!(matches!(result, CellValue::Error(_)));
+    }
+
+    // CHISQ.INV.RT tests
+    #[tokio::test]
+    async fn test_eval_chisq_inv_rt() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.5), num_expr(10.0)];
+        let result = eval_chisq_inv_rt(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            // CHISQ.INV.RT(0.5, 10) returns x where P(X > x) = 0.5, which equals CHISQ.INV(0.5, 10)
+            CellValue::Float(v) => assert!((v - 9.3418).abs() < 0.01),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    // T.DIST tests
+    #[tokio::test]
+    async fn test_eval_t_dist_cdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.5), num_expr(10.0), bool_expr(true)];
+        let result = eval_t_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.9177).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_t_dist_pdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.5), num_expr(10.0), bool_expr(false)];
+        let result = eval_t_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v > 0.0),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_t_dist_invalid_df() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.5), num_expr(0.0), bool_expr(true)];
+        let result = eval_t_dist(ctx, "Sheet1", &args).await.unwrap();
+        assert!(matches!(result, CellValue::Error(_)));
+    }
+
+    // T.DIST.2T tests
+    #[tokio::test]
+    async fn test_eval_t_dist_2t() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.5), num_expr(10.0)];
+        let result = eval_t_dist_2t(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.1646).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    // T.DIST.RT tests
+    #[tokio::test]
+    async fn test_eval_t_dist_rt() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.5), num_expr(10.0)];
+        let result = eval_t_dist_rt(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.0823).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    // T.INV tests
+    #[tokio::test]
+    async fn test_eval_t_inv() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.95), num_expr(10.0)];
+        let result = eval_t_inv(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.8125).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_t_inv_invalid_prob() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(-0.1), num_expr(10.0)];
+        let result = eval_t_inv(ctx, "Sheet1", &args).await.unwrap();
+        assert!(matches!(result, CellValue::Error(_)));
+    }
+
+    // T.INV.2T tests
+    #[tokio::test]
+    async fn test_eval_t_inv_2t() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.1), num_expr(10.0)];
+        let result = eval_t_inv_2t(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.8125).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    // F.DIST tests
+    #[tokio::test]
+    async fn test_eval_f_dist_cdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(2.0),
+            num_expr(5.0),
+            num_expr(10.0),
+            bool_expr(true),
+        ];
+        let result = eval_f_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.8358).abs() < 0.01),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_f_dist_pdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(2.0),
+            num_expr(5.0),
+            num_expr(10.0),
+            bool_expr(false),
+        ];
+        let result = eval_f_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v > 0.0),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_f_dist_invalid_df() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(2.0),
+            num_expr(0.0),
+            num_expr(10.0),
+            bool_expr(true),
+        ];
+        let result = eval_f_dist(ctx, "Sheet1", &args).await.unwrap();
+        assert!(matches!(result, CellValue::Error(_)));
+    }
+
+    // F.DIST.RT tests
+    #[tokio::test]
+    async fn test_eval_f_dist_rt() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(2.0), num_expr(5.0), num_expr(10.0)];
+        let result = eval_f_dist_rt(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.1642).abs() < 0.01),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    // F.INV tests
+    #[tokio::test]
+    async fn test_eval_f_inv() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.95), num_expr(5.0), num_expr(10.0)];
+        let result = eval_f_inv(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 3.3258).abs() < 0.01),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_f_inv_invalid() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.5), num_expr(5.0), num_expr(10.0)];
+        let result = eval_f_inv(ctx, "Sheet1", &args).await.unwrap();
+        assert!(matches!(result, CellValue::Error(_)));
+    }
+
+    // F.INV.RT tests
+    #[tokio::test]
+    async fn test_eval_f_inv_rt() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.05), num_expr(5.0), num_expr(10.0)];
+        let result = eval_f_inv_rt(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 3.3258).abs() < 0.01),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    // BINOM.DIST tests
+    #[tokio::test]
+    async fn test_eval_binom_dist_cdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![int_expr(6), int_expr(10), num_expr(0.5), bool_expr(true)];
+        let result = eval_binom_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.8281).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_binom_dist_pmf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![int_expr(6), int_expr(10), num_expr(0.5), bool_expr(false)];
+        let result = eval_binom_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.2051).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_binom_dist_invalid() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![int_expr(6), int_expr(10), num_expr(1.5), bool_expr(true)];
+        let result = eval_binom_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    // HYPGEOM.DIST tests
+    #[tokio::test]
+    async fn test_eval_hypgeom_dist_pmf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // sample_s=1, number_sample=4, population_s=8, number_pop=20
+        let args = vec![
+            int_expr(1),
+            int_expr(4),
+            int_expr(8),
+            int_expr(20),
+            bool_expr(false),
+        ];
+        let result = eval_hypgeom_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.3633).abs() < 0.001),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_hypgeom_dist_cdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            int_expr(1),
+            int_expr(4),
+            int_expr(8),
+            int_expr(20),
+            bool_expr(true),
+        ];
+        let result = eval_hypgeom_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v > 0.4 && v < 0.5),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    // NEGBINOM.DIST tests
+    #[tokio::test]
+    async fn test_eval_negbinom_dist_pmf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // number_f=2, number_s=5, probability_s=0.5
+        let args = vec![int_expr(2), int_expr(5), num_expr(0.5), bool_expr(false)];
+        let result = eval_negbinom_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.1172).abs() < 0.001),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    // POISSON.DIST tests
+    #[tokio::test]
+    async fn test_eval_poisson_dist_pmf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![int_expr(3), num_expr(5.0), bool_expr(false)];
+        let result = eval_poisson_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.1404).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_poisson_dist_cdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![int_expr(3), num_expr(5.0), bool_expr(true)];
+        let result = eval_poisson_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.2650).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    // CONFIDENCE.NORM tests
+    #[tokio::test]
+    async fn test_eval_confidence_norm() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.05), num_expr(2.5), num_expr(100.0)];
+        let result = eval_confidence_norm(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.49).abs() < 0.01),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_confidence_norm_invalid_alpha() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0), num_expr(2.5), num_expr(100.0)];
+        let result = eval_confidence_norm(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    // CONFIDENCE.T tests
+    #[tokio::test]
+    async fn test_eval_confidence_t() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.05), num_expr(2.5), num_expr(100.0)];
+        let result = eval_confidence_t(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v > 0.49 && v < 0.5),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    // EXPON.DIST tests
+    #[tokio::test]
+    async fn test_eval_expon_dist_cdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.5), num_expr(2.0), bool_expr(true)];
+        let result = eval_expon_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.6321).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_expon_dist_pdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.5), num_expr(2.0), bool_expr(false)];
+        let result = eval_expon_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.7358).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_expon_dist_invalid_x() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(-0.5), num_expr(2.0), bool_expr(true)];
+        let result = eval_expon_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    // GAMMA.DIST tests
+    #[tokio::test]
+    async fn test_eval_gamma_dist_cdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(5.0), num_expr(3.0), num_expr(2.0), bool_expr(true)];
+        let result = eval_gamma_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.4562).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_gamma_dist_invalid_x() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(-1.0),
+            num_expr(3.0),
+            num_expr(2.0),
+            bool_expr(true),
+        ];
+        let result = eval_gamma_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    // GAMMAINV tests
+    #[tokio::test]
+    async fn test_eval_gammainv() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.5), num_expr(3.0), num_expr(2.0)];
+        let result = eval_gammainv(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 5.3481).abs() < 0.01),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    // GAMMALN tests
+    #[tokio::test]
+    async fn test_eval_gammaln() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(5.0)];
+        let result = eval_gammaln(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 3.1781).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_gammaln_invalid() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_gammaln(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    // LOGNORM.DIST tests
+    #[tokio::test]
+    async fn test_eval_lognorm_dist_cdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(4.0), num_expr(1.0), num_expr(0.5), bool_expr(true)];
+        let result = eval_lognorm_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.7801).abs() < 0.01),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_lognorm_dist_invalid_x() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0), num_expr(1.0), num_expr(0.5), bool_expr(true)];
+        let result = eval_lognorm_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    // LOGNORM.INV tests
+    #[tokio::test]
+    async fn test_eval_lognorm_inv() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.5), num_expr(1.0), num_expr(0.5)];
+        let result = eval_lognorm_inv(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 2.7183).abs() < 0.01),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    // WEIBULL.DIST tests
+    #[tokio::test]
+    async fn test_eval_weibull_dist_cdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(5.0), num_expr(2.0), num_expr(3.0), bool_expr(true)];
+        let result = eval_weibull_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.9378).abs() < 0.01),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_weibull_dist_pdf() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(5.0),
+            num_expr(2.0),
+            num_expr(3.0),
+            bool_expr(false),
+        ];
+        let result = eval_weibull_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v > 0.0),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    // Z.TEST tests
+    #[tokio::test]
+    async fn test_eval_z_test() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Set up data range
+        engine.set_cell("Sheet1", 0, 0, CellValue::Int(3));
+        engine.set_cell("Sheet1", 1, 0, CellValue::Int(6));
+        engine.set_cell("Sheet1", 2, 0, CellValue::Int(7));
+        engine.set_cell("Sheet1", 3, 0, CellValue::Int(8));
+        engine.set_cell("Sheet1", 4, 0, CellValue::Int(6));
+        engine.set_cell("Sheet1", 5, 0, CellValue::Int(5));
+        engine.set_cell("Sheet1", 6, 0, CellValue::Int(4));
+        engine.set_cell("Sheet1", 7, 0, CellValue::Int(2));
+        engine.set_cell("Sheet1", 8, 0, CellValue::Int(1));
+        engine.set_cell("Sheet1", 9, 0, CellValue::Int(9));
+        let range = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 9,
+            end_col: 0,
+        });
+        let args = vec![range, num_expr(4.0)];
+        let result = eval_z_test(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v > 0.0 && v < 1.0),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    // F.TEST tests
+    #[tokio::test]
+    async fn test_eval_f_test() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Set up data ranges
+        engine.set_cell("Sheet1", 0, 0, CellValue::Int(6));
+        engine.set_cell("Sheet1", 1, 0, CellValue::Int(7));
+        engine.set_cell("Sheet1", 2, 0, CellValue::Int(9));
+        engine.set_cell("Sheet1", 3, 0, CellValue::Int(15));
+        engine.set_cell("Sheet1", 4, 0, CellValue::Int(21));
+
+        engine.set_cell("Sheet1", 0, 1, CellValue::Int(20));
+        engine.set_cell("Sheet1", 1, 1, CellValue::Int(28));
+        engine.set_cell("Sheet1", 2, 1, CellValue::Int(31));
+        engine.set_cell("Sheet1", 3, 1, CellValue::Int(38));
+        engine.set_cell("Sheet1", 4, 1, CellValue::Int(40));
+
+        let range1 = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 4,
+            end_col: 0,
+        });
+        let range2 = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 1,
+            end_row: 4,
+            end_col: 1,
+        });
+        let args = vec![range1, range2];
+        let result = eval_f_test(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v > 0.0 && v <= 1.0),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    // CHISQ.TEST tests
+    #[tokio::test]
+    async fn test_eval_chisq_test() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Set up actual range (2x2)
+        engine.set_cell("Sheet1", 0, 0, CellValue::Int(58));
+        engine.set_cell("Sheet1", 0, 1, CellValue::Int(35));
+        engine.set_cell("Sheet1", 1, 0, CellValue::Int(11));
+        engine.set_cell("Sheet1", 1, 1, CellValue::Int(25));
+        // Set up expected range (2x2)
+        engine.set_cell("Sheet1", 2, 0, CellValue::Float(45.35));
+        engine.set_cell("Sheet1", 2, 1, CellValue::Float(47.65));
+        engine.set_cell("Sheet1", 3, 0, CellValue::Float(23.65));
+        engine.set_cell("Sheet1", 3, 1, CellValue::Float(24.85));
+
+        let actual = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 1,
+            end_col: 1,
+        });
+        let expected = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 2,
+            start_col: 0,
+            end_row: 3,
+            end_col: 1,
+        });
+        let args = vec![actual, expected];
+        let result = eval_chisq_test(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v > 0.0 && v < 1.0),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    // T.TEST tests
+    #[tokio::test]
+    async fn test_eval_t_test_paired() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // Set up paired data
+        engine.set_cell("Sheet1", 0, 0, CellValue::Int(3));
+        engine.set_cell("Sheet1", 1, 0, CellValue::Int(4));
+        engine.set_cell("Sheet1", 2, 0, CellValue::Int(5));
+        engine.set_cell("Sheet1", 0, 1, CellValue::Int(6));
+        engine.set_cell("Sheet1", 1, 1, CellValue::Int(19));
+        engine.set_cell("Sheet1", 2, 1, CellValue::Int(3));
+
+        let range1 = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 2,
+            end_col: 0,
+        });
+        let range2 = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 1,
+            end_row: 2,
+            end_col: 1,
+        });
+        // type=1 for paired, tails=2 for two-tailed
+        let args = vec![range1, range2, int_expr(2), int_expr(1)];
+        let result = eval_t_test(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v >= 0.0 && v <= 1.0),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_t_test_invalid_tails() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        engine.set_cell("Sheet1", 0, 0, CellValue::Int(3));
+        engine.set_cell("Sheet1", 1, 0, CellValue::Int(4));
+
+        let range = Expr::Range(crate::sheet::eval::parser::RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 1,
+            end_col: 0,
+        });
+        // tails=3 is invalid
+        let args = vec![range.clone(), range, int_expr(3), int_expr(1)];
+        let result = eval_t_test(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    // BINOM.INV tests
+    #[tokio::test]
+    async fn test_eval_binom_inv() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(6.0), num_expr(0.5), num_expr(0.75)];
+        let result = eval_binom_inv(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Int(v) => assert!(v >= 0 && v <= 6),
+            _ => panic!("Expected Int, got {:?}", result),
+        }
+    }
+
+    // BINOM.DIST.RANGE tests
+    #[tokio::test]
+    async fn test_eval_binom_dist_range() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // 6 trials, p=0.5, probability of exactly 4 successes
+        let args = vec![num_expr(6.0), num_expr(0.5), num_expr(4.0)];
+        let result = eval_binom_dist_range(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.2344).abs() < 0.001),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_binom_dist_range_between() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // 6 trials, p=0.5, probability of between 2 and 4 successes (inclusive)
+        let args = vec![num_expr(6.0), num_expr(0.5), num_expr(2.0), num_expr(4.0)];
+        let result = eval_binom_dist_range(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v > 0.6 && v < 0.8),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    // NORM.INV tests
+    #[tokio::test]
+    async fn test_eval_norm_inv() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.95), num_expr(40.0), num_expr(1.5)];
+        let result = eval_norm_inv(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 42.4673).abs() < 0.01),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_norm_inv_invalid_prob() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(-0.1), num_expr(40.0), num_expr(1.5)];
+        let result = eval_norm_inv(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    // GAUSS tests
+    #[tokio::test]
+    async fn test_eval_gauss() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(2.0)];
+        let result = eval_gauss(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.4772).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    // PHI tests
+    #[tokio::test]
+    async fn test_eval_phi() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_phi(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.3989).abs() < 0.001),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_phi_wrong_args() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0), num_expr(1.0)];
+        let result = eval_phi(ctx, "Sheet1", &args).await.unwrap();
+        assert!(matches!(result, CellValue::Error(_)));
+    }
+}

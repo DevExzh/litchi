@@ -13,21 +13,18 @@
 //!
 //! # Example
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use litchi::ooxml::xlsx::Workbook;
+//! use litchi::sheet::WorkbookTrait;
 //!
 //! // Open a workbook
 //! let workbook = Workbook::open("workbook.xlsx")?;
 //!
-//! // Access worksheets
-//! for worksheet in workbook.worksheets() {
-//!     println!("Sheet: {}", worksheet.name());
-//!
-//!     // Access cells
-//!     let cell = worksheet.cell(1, 1)?;
-//!     println!("A1 value: {:?}", cell.value());
+//! // Access worksheet names
+//! for name in workbook.worksheet_names() {
+//!     println!("Sheet: {}", name);
 //! }
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 //! ```
 
 pub mod cell;

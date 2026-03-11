@@ -892,4 +892,460 @@ mod tests {
         assert!(matches!(tokens[1], Token::Control(ControlWord::Rtf(1))));
         assert!(matches!(tokens[2], Token::Control(ControlWord::Ansi)));
     }
+
+    #[test]
+    fn test_lexer_new() {
+        let arena = Bump::new();
+        let lexer = Lexer::new(r"{\rtf1}", &arena);
+        assert_eq!(lexer.pos, 0);
+    }
+
+    #[test]
+    fn test_character_set_variants() {
+        assert_eq!(CharacterSet::default(), CharacterSet::Ansi);
+        assert_ne!(CharacterSet::Ansi, CharacterSet::Mac);
+    }
+
+    #[test]
+    fn test_token_variants() {
+        let token = Token::OpenBrace;
+        assert!(matches!(token, Token::OpenBrace));
+        let token = Token::CloseBrace;
+        assert!(matches!(token, Token::CloseBrace));
+    }
+
+    #[test]
+    fn test_control_word_variants() {
+        let word = ControlWord::Rtf(1);
+        assert!(matches!(word, ControlWord::Rtf(1)));
+        let word = ControlWord::Bold(true);
+        assert!(matches!(word, ControlWord::Bold(true)));
+        let word = ControlWord::FontNumber(0);
+        assert!(matches!(word, ControlWord::FontNumber(0)));
+    }
+
+    #[test]
+    fn test_tokenize_empty_braces() {
+        let arena = Bump::new();
+        let input = "{}";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(tokens[0], Token::OpenBrace));
+        assert!(matches!(tokens[1], Token::CloseBrace));
+    }
+
+    #[test]
+    fn test_tokenize_control_word_with_param() {
+        let arena = Bump::new();
+        let input = r"{\rtf1}";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 3);
+        assert!(matches!(tokens[1], Token::Control(ControlWord::Rtf(1))));
+    }
+
+    #[test]
+    fn test_tokenize_control_word_without_param() {
+        let arena = Bump::new();
+        let input = r"{\b}";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert!(matches!(tokens[1], Token::Control(ControlWord::Bold(true))));
+    }
+
+    #[test]
+    fn test_tokenize_text() {
+        let arena = Bump::new();
+        let input = r"{Hello}";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 3);
+        assert!(matches!(tokens[1], Token::Text(_)));
+    }
+
+    #[test]
+    fn test_tokenize_multiple_control_words() {
+        let arena = Bump::new();
+        let input = r"{\rtf1\ansi\deff0}";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 5);
+        assert!(matches!(tokens[1], Token::Control(ControlWord::Rtf(1))));
+        assert!(matches!(tokens[2], Token::Control(ControlWord::Ansi)));
+    }
+
+    #[test]
+    fn test_tokenize_escaped_braces() {
+        let arena = Bump::new();
+        let input = r"\{\}";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 2);
+        // Should be text tokens containing { and }
+        assert!(matches!(tokens[0], Token::Text(_)));
+        assert!(matches!(tokens[1], Token::Text(_)));
+    }
+
+    #[test]
+    fn test_tokenize_backslash_escape() {
+        let arena = Bump::new();
+        let input = r"\\";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(tokens[0], Token::Text(_)));
+    }
+
+    #[test]
+    fn test_tokenize_hex_escape() {
+        let arena = Bump::new();
+        let input = r"\'41"; // 'A' in hex
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(tokens[0], Token::Text(_)));
+    }
+
+    #[test]
+    fn test_tokenize_asterisk_destination() {
+        let arena = Bump::new();
+        let input = r"\*";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(
+            tokens[0],
+            Token::Control(ControlWord::IgnorableDestination)
+        ));
+    }
+
+    #[test]
+    fn test_tokenize_par_control_word() {
+        let arena = Bump::new();
+        let input = r"\par";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(tokens[0], Token::Control(ControlWord::Par)));
+    }
+
+    #[test]
+    fn test_tokenize_non_breaking_space() {
+        let arena = Bump::new();
+        let input = r"\~";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(tokens[0], Token::Text(_)));
+    }
+
+    #[test]
+    fn test_tokenize_optional_hyphen() {
+        let arena = Bump::new();
+        let input = r"\-";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(tokens[0], Token::Text(_)));
+    }
+
+    #[test]
+    fn test_tokenize_non_breaking_hyphen() {
+        let arena = Bump::new();
+        let input = r"\_";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(tokens[0], Token::Text(_)));
+    }
+
+    #[test]
+    fn test_tokenize_tab() {
+        let arena = Bump::new();
+        let input = r"\tab";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(tokens[0], Token::Control(ControlWord::Tab)));
+    }
+
+    #[test]
+    fn test_tokenize_par() {
+        let arena = Bump::new();
+        let input = r"\par";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(tokens[0], Token::Control(ControlWord::Par)));
+    }
+
+    #[test]
+    fn test_tokenize_line() {
+        let arena = Bump::new();
+        let input = r"\line";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(tokens[0], Token::Control(ControlWord::Line)));
+    }
+
+    #[test]
+    fn test_tokenize_page() {
+        let arena = Bump::new();
+        let input = r"\page";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(tokens[0], Token::Control(ControlWord::Page)));
+    }
+
+    #[test]
+    fn test_tokenize_font_size() {
+        let arena = Bump::new();
+        let input = r"\fs24";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(
+            tokens[0],
+            Token::Control(ControlWord::FontSize(24))
+        ));
+    }
+
+    #[test]
+    fn test_tokenize_font_number() {
+        let arena = Bump::new();
+        let input = r"\f0";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(
+            tokens[0],
+            Token::Control(ControlWord::FontNumber(0))
+        ));
+    }
+
+    #[test]
+    fn test_tokenize_bold_toggle() {
+        let arena = Bump::new();
+        let input = r"\b\b0";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(tokens[0], Token::Control(ControlWord::Bold(true))));
+        assert!(matches!(
+            tokens[1],
+            Token::Control(ControlWord::Bold(false))
+        ));
+    }
+
+    #[test]
+    fn test_tokenize_italic_toggle() {
+        let arena = Bump::new();
+        let input = r"\i\i0";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(
+            tokens[0],
+            Token::Control(ControlWord::Italic(true))
+        ));
+        assert!(matches!(
+            tokens[1],
+            Token::Control(ControlWord::Italic(false))
+        ));
+    }
+
+    #[test]
+    fn test_tokenize_underline_variants() {
+        let arena = Bump::new();
+        let input = r"\ul\ulnone\uldb";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 3);
+        assert!(matches!(
+            tokens[0],
+            Token::Control(ControlWord::Underline(true))
+        ));
+        assert!(matches!(
+            tokens[1],
+            Token::Control(ControlWord::UnderlineNone)
+        ));
+        assert!(matches!(
+            tokens[2],
+            Token::Control(ControlWord::UnderlineDouble)
+        ));
+    }
+
+    #[test]
+    fn test_tokenize_alignment() {
+        let arena = Bump::new();
+        let input = r"\ql\qr\qc\qj";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 4);
+        assert!(matches!(tokens[0], Token::Control(ControlWord::LeftAlign)));
+        assert!(matches!(tokens[1], Token::Control(ControlWord::RightAlign)));
+        assert!(matches!(tokens[2], Token::Control(ControlWord::Center)));
+        assert!(matches!(tokens[3], Token::Control(ControlWord::Justify)));
+    }
+
+    #[test]
+    fn test_tokenize_color_table() {
+        let arena = Bump::new();
+        let input = r"{\colortbl;\red255\green0\blue0;}";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert!(matches!(tokens[1], Token::Control(ControlWord::ColorTable)));
+        assert!(matches!(tokens[3], Token::Control(ControlWord::Red(255))));
+        assert!(matches!(tokens[4], Token::Control(ControlWord::Green(0))));
+        assert!(matches!(tokens[5], Token::Control(ControlWord::Blue(0))));
+    }
+
+    #[test]
+    fn test_tokenize_font_table() {
+        let arena = Bump::new();
+        let input = r"{\fonttbl{\f0\fnil Arial;}}";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert!(matches!(tokens[1], Token::Control(ControlWord::FontTable)));
+    }
+
+    #[test]
+    fn test_tokenize_unknown_control_word() {
+        let arena = Bump::new();
+        let input = r"\xyz123";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(
+            tokens[0],
+            Token::Control(ControlWord::Unknown(_, _))
+        ));
+    }
+
+    #[test]
+    fn test_tokenize_section_break() {
+        let arena = Bump::new();
+        let input = r"\sect";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(tokens[0], Token::Control(ControlWord::Section)));
+    }
+
+    #[test]
+    fn test_tokenize_page_dimensions() {
+        let arena = Bump::new();
+        let input = r"\paperw12240\paperh15840";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert!(matches!(
+            tokens[0],
+            Token::Control(ControlWord::PageWidth(12240))
+        ));
+        assert!(matches!(
+            tokens[1],
+            Token::Control(ControlWord::PageHeight(15840))
+        ));
+    }
+
+    #[test]
+    fn test_tokenize_margins() {
+        let arena = Bump::new();
+        let input = r"\margl1440\margr1440\margt1440\margb1440";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert!(matches!(
+            tokens[0],
+            Token::Control(ControlWord::MarginLeft(1440))
+        ));
+        assert!(matches!(
+            tokens[1],
+            Token::Control(ControlWord::MarginRight(1440))
+        ));
+        assert!(matches!(
+            tokens[2],
+            Token::Control(ControlWord::MarginTop(1440))
+        ));
+        assert!(matches!(
+            tokens[3],
+            Token::Control(ControlWord::MarginBottom(1440))
+        ));
+    }
+
+    #[test]
+    fn test_tokenize_lists() {
+        let arena = Bump::new();
+        let input = r"\listtable\listid1\listlevel1";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 3);
+        assert!(matches!(tokens[0], Token::Control(ControlWord::ListTable)));
+        assert!(matches!(tokens[1], Token::Control(ControlWord::ListId(1))));
+        assert!(matches!(
+            tokens[2],
+            Token::Control(ControlWord::ListLevel(1))
+        ));
+    }
+
+    #[test]
+    fn test_tokenize_table() {
+        let arena = Bump::new();
+        let input = r"\trowd\cellx4320";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(
+            tokens[0],
+            Token::Control(ControlWord::TableRowDefaults)
+        ));
+        assert!(matches!(
+            tokens[1],
+            Token::Control(ControlWord::CellX(4320))
+        ));
+    }
+
+    #[test]
+    fn test_tokenize_field() {
+        let arena = Bump::new();
+        let input = r"\field\fldinst HYPERLINK";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert!(matches!(tokens[0], Token::Control(ControlWord::Field)));
+        assert!(matches!(
+            tokens[1],
+            Token::Control(ControlWord::FieldInstruction)
+        ));
+        // HYPERLINK is parsed as text since it's after a space
+        assert!(matches!(tokens[2], Token::Text(_)));
+    }
+
+    #[test]
+    fn test_tokenize_picture() {
+        let arena = Bump::new();
+        let input = r"{\pict\pngblip\picw100\pich100}";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert!(matches!(tokens[1], Token::Control(ControlWord::Picture)));
+        assert!(matches!(tokens[2], Token::Control(ControlWord::Pngblip)));
+        assert!(matches!(
+            tokens[3],
+            Token::Control(ControlWord::PictureWidth(100))
+        ));
+        assert!(matches!(
+            tokens[4],
+            Token::Control(ControlWord::PictureHeight(100))
+        ));
+    }
+
+    #[test]
+    fn test_tokenize_binary() {
+        let arena = Bump::new();
+        let input = r"\bin4 ABCD"; // 4 bytes of binary data
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert!(matches!(tokens[0], Token::Binary(4)));
+    }
 }

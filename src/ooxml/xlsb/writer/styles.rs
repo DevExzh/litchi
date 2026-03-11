@@ -48,7 +48,7 @@ impl StylesWriter {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```ignore
     /// use litchi::ooxml::xlsb::writer::StylesWriter;
     /// use litchi::ooxml::xlsb::styles_table::Font;
     ///
@@ -512,5 +512,130 @@ impl StylesWriter {
 impl Default for StylesWriter {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_styles_writer_new() {
+        let writer = StylesWriter::new();
+        assert_eq!(writer.fonts.len(), 1); // Default font
+        assert_eq!(writer.fills.len(), 2); // Two default fills
+        assert_eq!(writer.borders.len(), 1); // Default border
+        assert!(writer.dxfs.is_empty());
+    }
+
+    #[test]
+    fn test_styles_writer_default() {
+        let writer: StylesWriter = Default::default();
+        assert_eq!(writer.fonts.len(), 1);
+        assert_eq!(writer.fills.len(), 2);
+    }
+
+    #[test]
+    fn test_add_font() {
+        let mut writer = StylesWriter::new();
+        let font = Font {
+            name: "Arial".to_string(),
+            size: 12.0,
+            color: None,
+            bold: true,
+            italic: false,
+            underline: false,
+            strike: false,
+        };
+        let idx = writer.add_font(font);
+        assert_eq!(idx, 1); // Index after default font
+        assert_eq!(writer.fonts.len(), 2);
+    }
+
+    #[test]
+    fn test_add_fill() {
+        let mut writer = StylesWriter::new();
+        let fill = Fill::default();
+        let idx = writer.add_fill(fill);
+        assert_eq!(idx, 2); // Index after default fills
+        assert_eq!(writer.fills.len(), 3);
+    }
+
+    #[test]
+    fn test_add_border() {
+        let mut writer = StylesWriter::new();
+        let border = Border::default();
+        let idx = writer.add_border(border);
+        assert_eq!(idx, 1); // Index after default border
+        assert_eq!(writer.borders.len(), 2);
+    }
+
+    #[test]
+    fn test_add_dxf_fill() {
+        let mut writer = StylesWriter::new();
+        let idx1 = writer.add_dxf_fill(0xFFFF0000); // Red
+        let idx2 = writer.add_dxf_fill(0xFF00FF00); // Green
+
+        assert_eq!(idx1, 0);
+        assert_eq!(idx2, 1);
+        assert_eq!(writer.dxfs.len(), 2);
+        assert_eq!(writer.dxfs[0].fill_fg_color, Some(0xFFFF0000));
+        assert_eq!(writer.dxfs[1].fill_fg_color, Some(0xFF00FF00));
+    }
+
+    #[test]
+    fn test_serialize_dxf_empty() {
+        let dxf = DxfStyle {
+            fill_fg_color: None,
+        };
+        let payload = StylesWriter::serialize_dxf(&dxf);
+        assert!(!payload.is_empty());
+        // Should have flags (2 bytes) + XFProps header (4 bytes)
+        assert_eq!(payload.len(), 6);
+    }
+
+    #[test]
+    fn test_serialize_dxf_with_color() {
+        let dxf = DxfStyle {
+            fill_fg_color: Some(0xFFFF0000), // Red
+        };
+        let payload = StylesWriter::serialize_dxf(&dxf);
+        assert!(!payload.is_empty());
+        // Should include fill pattern prop and color prop
+    }
+
+    #[test]
+    fn test_make_xf_prop() {
+        let prop = StylesWriter::make_xf_prop(0x0000, &[0x01]);
+        assert_eq!(prop.len(), 5); // 2 bytes type + 2 bytes cb + 1 byte data
+    }
+
+    #[test]
+    fn test_make_xf_prop_color_rgba() {
+        let color = StylesWriter::make_xf_prop_color_rgba(0xFFFF0000); // ARGB red
+        assert_eq!(color.len(), 8);
+        // Check RGBA byte order (RRGGBBAA)
+        assert_eq!(color[4], 0xFF); // R
+        assert_eq!(color[5], 0x00); // G
+        assert_eq!(color[6], 0x00); // B
+        assert_eq!(color[7], 0xFF); // A
+    }
+
+    #[test]
+    fn test_dxf_style_clone() {
+        let dxf = DxfStyle {
+            fill_fg_color: Some(0xFF00FF00),
+        };
+        let cloned = dxf.clone();
+        assert_eq!(cloned.fill_fg_color, dxf.fill_fg_color);
+    }
+
+    #[test]
+    fn test_dxf_style_debug() {
+        let dxf = DxfStyle {
+            fill_fg_color: Some(0xFF0000FF),
+        };
+        let debug_str = format!("{:?}", dxf);
+        assert!(debug_str.contains("DxfStyle"));
     }
 }

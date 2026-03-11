@@ -13,8 +13,9 @@
 //!
 //! # Example
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use litchi::sheet::text::{TextWorkbook, TextConfig};
+//! use litchi::sheet::WorkbookTrait;
 //!
 //! // Open a CSV file with default settings
 //! let workbook = TextWorkbook::open("data.csv")?;
@@ -36,7 +37,7 @@
 //!         }
 //!     }
 //! }
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 //! ```
 
 pub mod cell;

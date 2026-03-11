@@ -549,3 +549,435 @@ pub mod color_schemes {
         BROWN,
     ];
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // =============================================================================
+    // SlideLayoutType Tests
+    // =============================================================================
+
+    #[test]
+    fn test_slide_layout_type_values() {
+        assert_eq!(SlideLayoutType::TitleSlide as u32, 0x0000);
+        assert_eq!(SlideLayoutType::TitleBody as u32, 0x0001);
+        assert_eq!(SlideLayoutType::MasterTitle as u32, 0x0002);
+        assert_eq!(SlideLayoutType::TitleOnly as u32, 0x0007);
+        assert_eq!(SlideLayoutType::TwoColumns as u32, 0x0008);
+        assert_eq!(SlideLayoutType::TwoRows as u32, 0x0009);
+        assert_eq!(SlideLayoutType::ColumnTwoRows as u32, 0x000A);
+        assert_eq!(SlideLayoutType::TwoRowsColumn as u32, 0x000B);
+        assert_eq!(SlideLayoutType::TwoColumnsRow as u32, 0x000C);
+        assert_eq!(SlideLayoutType::Blank as u32, 0x000D);
+        assert_eq!(SlideLayoutType::FourObjects as u32, 0x000E);
+        assert_eq!(SlideLayoutType::BigObject as u32, 0x000F);
+        assert_eq!(SlideLayoutType::VerticalTitleBody as u32, 0x0010);
+        assert_eq!(SlideLayoutType::VerticalTwoRows as u32, 0x0011);
+    }
+
+    // =============================================================================
+    // PlaceholderType Tests
+    // =============================================================================
+
+    #[test]
+    fn test_placeholder_type_values() {
+        assert_eq!(PlaceholderType::None as u8, 0x00);
+        assert_eq!(PlaceholderType::MasterTitle as u8, 0x01);
+        assert_eq!(PlaceholderType::MasterBody as u8, 0x02);
+        assert_eq!(PlaceholderType::MasterCenterTitle as u8, 0x03);
+        assert_eq!(PlaceholderType::MasterSubTitle as u8, 0x04);
+        assert_eq!(PlaceholderType::MasterNotesSlideImage as u8, 0x05);
+        assert_eq!(PlaceholderType::MasterNotesBody as u8, 0x06);
+        assert_eq!(PlaceholderType::MasterDate as u8, 0x07);
+        assert_eq!(PlaceholderType::MasterSlideNumber as u8, 0x08);
+        assert_eq!(PlaceholderType::MasterFooter as u8, 0x09);
+        assert_eq!(PlaceholderType::MasterHeader as u8, 0x0A);
+    }
+
+    // =============================================================================
+    // Slide Flags Tests
+    // =============================================================================
+
+    #[test]
+    fn test_slide_flags_values() {
+        assert_eq!(slide_flags::MASTER_OBJECTS, 0x0001);
+        assert_eq!(slide_flags::MASTER_SCHEME, 0x0002);
+        assert_eq!(slide_flags::MASTER_BACKGROUND, 0x0004);
+        assert_eq!(slide_flags::DEFAULT, 0x0007);
+    }
+
+    // =============================================================================
+    // ColorScheme Tests
+    // =============================================================================
+
+    #[test]
+    fn test_color_scheme_poi_default() {
+        let scheme = ColorScheme::POI_DEFAULT;
+        assert_eq!(scheme.background, 0x00FFFFFF);
+        assert_eq!(scheme.text_and_lines, 0x00000000);
+        assert_eq!(scheme.shadow, 0x00808080);
+        assert_eq!(scheme.title_text, 0x00000000);
+        assert_eq!(scheme.fill, 0x00996630);
+        assert_eq!(scheme.accent, 0x00CC9963);
+        assert_eq!(scheme.accent_and_hyperlink, 0x00FFCC66);
+        assert_eq!(scheme.accent_and_followed_hyperlink, 0x00B256AE);
+    }
+
+    #[test]
+    fn test_color_scheme_to_bytes() {
+        let scheme = ColorScheme::POI_DEFAULT;
+        let bytes = scheme.to_bytes();
+        assert_eq!(bytes.len(), 32);
+
+        // Check first color (background) - stored in little-endian
+        assert_eq!(
+            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            0x00FFFFFF
+        );
+
+        // Check last color
+        assert_eq!(
+            u32::from_le_bytes([bytes[28], bytes[29], bytes[30], bytes[31]]),
+            0x00B256AE
+        );
+    }
+
+    // =============================================================================
+    // Ppt10Tag Tests
+    // =============================================================================
+
+    #[test]
+    fn test_ppt10_tag_string() {
+        assert_eq!(Ppt10Tag::TAG_STRING, "___PPT10");
+    }
+
+    #[test]
+    fn test_ppt10_tag_to_bytes() {
+        let bytes = Ppt10Tag::to_bytes();
+        assert_eq!(bytes.len(), 16);
+
+        // Check UTF-16LE encoding of "___PPT10"
+        // First char '_' = 0x5F in UTF-16LE: 0x5F 0x00
+        assert_eq!(bytes[0], 0x5F);
+        assert_eq!(bytes[1], 0x00);
+
+        // 'P' = 0x50 in UTF-16LE
+        assert_eq!(bytes[6], 0x50);
+        assert_eq!(bytes[7], 0x00);
+
+        // '0' = 0x30 in UTF-16LE (last char)
+        assert_eq!(bytes[14], 0x30);
+        assert_eq!(bytes[15], 0x00);
+    }
+
+    // =============================================================================
+    // BinaryTagData Tests
+    // =============================================================================
+
+    #[test]
+    fn test_binary_tag_type_constants() {
+        assert_eq!(BinaryTagData::TAG_TYPE_MAIN_MASTER, 0x2EEB);
+        assert_eq!(BinaryTagData::TAG_TYPE_SLIDE, 0x040D);
+    }
+
+    #[test]
+    fn test_binary_tag_data_main_master() {
+        let tag = BinaryTagData::MAIN_MASTER;
+        assert_eq!(tag.reserved, 0);
+        assert_eq!(tag.tag_type, 0x2EEB);
+        assert_eq!(tag.data_length, 8);
+        assert_eq!(tag.data_word1, 0x01C2_F3F7);
+        assert_eq!(tag.data_word2, 0x4F2D_3670);
+    }
+
+    #[test]
+    fn test_binary_tag_data_slide() {
+        let tag = BinaryTagData::SLIDE;
+        assert_eq!(tag.reserved, 0);
+        assert_eq!(tag.tag_type, 0x040D);
+        assert_eq!(tag.data_length, 8);
+        assert_eq!(tag.data_word1, 0);
+        assert_eq!(tag.data_word2, 0);
+    }
+
+    #[test]
+    fn test_binary_tag_data_docinfo() {
+        let tag = BinaryTagData::DOCINFO;
+        assert_eq!(tag.reserved, 0);
+        assert_eq!(tag.tag_type, 0x040D);
+        assert_eq!(tag.data_length, 8);
+        assert_eq!(tag.data_word1, 0x0000_C000);
+        assert_eq!(tag.data_word2, 0x0000_C000);
+    }
+
+    #[test]
+    fn test_binary_tag_data_to_bytes() {
+        let tag = BinaryTagData::MAIN_MASTER;
+        let bytes = tag.to_bytes();
+        assert_eq!(bytes.len(), 16);
+
+        // Verify byte layout
+        assert_eq!(u16::from_le_bytes([bytes[0], bytes[1]]), 0);
+        assert_eq!(u16::from_le_bytes([bytes[2], bytes[3]]), 0x2EEB);
+        assert_eq!(
+            u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
+            8
+        );
+        assert_eq!(
+            u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]),
+            0x01C2_F3F7
+        );
+        assert_eq!(
+            u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]),
+            0x4F2D_3670
+        );
+    }
+
+    // =============================================================================
+    // UserEditAtom Constants Tests
+    // =============================================================================
+
+    #[test]
+    fn test_ppt_version() {
+        assert_eq!(PPT_VERSION, 0x0300106D);
+    }
+
+    #[test]
+    fn test_default_last_viewed_slide_id() {
+        assert_eq!(DEFAULT_LAST_VIEWED_SLIDE_ID, 256);
+    }
+
+    #[test]
+    fn test_default_last_view_type() {
+        assert_eq!(DEFAULT_LAST_VIEW_TYPE, 1);
+    }
+
+    #[test]
+    fn test_user_edit_padword() {
+        assert_eq!(USER_EDIT_PADWORD, 0x07B9);
+    }
+
+    // =============================================================================
+    // Escher Property Tests
+    // =============================================================================
+
+    #[test]
+    fn test_escher_prop_values() {
+        assert_eq!(escher_prop::FILL_COLOR, 0x0181);
+        assert_eq!(escher_prop::FILL_BACK_COLOR, 0x0183);
+        assert_eq!(escher_prop::FILL_BLIP, 0x4186);
+        assert_eq!(escher_prop::LINE_STYLE_BOOL, 0x01BF);
+        assert_eq!(escher_prop::LINE_COLOR, 0x01C0);
+        assert_eq!(escher_prop::LINE_BLIP, 0x41C5);
+        assert_eq!(escher_prop::SHAPE_BOOL, 0x01FF);
+        assert_eq!(escher_prop::SHADOW_COLOR, 0x0201);
+    }
+
+    // =============================================================================
+    // Escher Color Tests
+    // =============================================================================
+
+    #[test]
+    fn test_escher_color_values() {
+        assert_eq!(escher_color::USE_SCHEME, 0x08000000);
+        assert_eq!(escher_color::SCHEME_FILL, 0x04);
+        assert_eq!(escher_color::SCHEME_LINE, 0x01);
+        assert_eq!(escher_color::SCHEME_SHADOW, 0x02);
+        assert_eq!(escher_color::SCHEME_BACKGROUND, 0x00);
+    }
+
+    // =============================================================================
+    // Escher Type Tests
+    // =============================================================================
+
+    #[test]
+    fn test_escher_type_values() {
+        assert_eq!(escher_type::DGG_CONTAINER, 0xF000);
+        assert_eq!(escher_type::DGG, 0xF006);
+        assert_eq!(escher_type::DG_CONTAINER, 0xF002);
+        assert_eq!(escher_type::DG, 0xF008);
+        assert_eq!(escher_type::SPGR_CONTAINER, 0xF003);
+        assert_eq!(escher_type::SP_CONTAINER, 0xF004);
+        assert_eq!(escher_type::SPGR, 0xF009);
+        assert_eq!(escher_type::SP, 0xF00A);
+        assert_eq!(escher_type::OPT, 0xF00B);
+        assert_eq!(escher_type::CLIENT_ANCHOR, 0xF010);
+        assert_eq!(escher_type::CLIENT_DATA, 0xF011);
+        assert_eq!(escher_type::SPLIT_MENU_COLORS, 0xF11E);
+    }
+
+    // =============================================================================
+    // Escher Shape Tests
+    // =============================================================================
+
+    #[test]
+    fn test_escher_shape_values() {
+        assert_eq!(escher_shape::RECTANGLE, 1);
+        assert_eq!(escher_shape::ROUND_RECTANGLE, 2);
+        assert_eq!(escher_shape::ELLIPSE, 3);
+        assert_eq!(escher_shape::TEXT_BOX, 202);
+    }
+
+    // =============================================================================
+    // Escher Flags Tests
+    // =============================================================================
+
+    #[test]
+    fn test_escher_flags_values() {
+        assert_eq!(escher_flags::GROUP, 0x0001);
+        assert_eq!(escher_flags::CHILD, 0x0002);
+        assert_eq!(escher_flags::PATRIARCH, 0x0004);
+        assert_eq!(escher_flags::DELETED, 0x0008);
+        assert_eq!(escher_flags::OLE_SHAPE, 0x0010);
+        assert_eq!(escher_flags::HAVE_MASTER, 0x0020);
+        assert_eq!(escher_flags::FLIP_H, 0x0040);
+        assert_eq!(escher_flags::FLIP_V, 0x0080);
+        assert_eq!(escher_flags::CONNECTOR, 0x0100);
+        assert_eq!(escher_flags::HAVE_ANCHOR, 0x0200);
+        assert_eq!(escher_flags::BACKGROUND, 0x0400);
+        assert_eq!(escher_flags::HAVE_SPT, 0x0800);
+    }
+
+    // =============================================================================
+    // MainMaster Constants Tests
+    // =============================================================================
+
+    #[test]
+    fn test_main_master_placeholders() {
+        assert_eq!(MAIN_MASTER_PLACEHOLDERS.len(), 8);
+        assert_eq!(
+            MAIN_MASTER_PLACEHOLDERS[0],
+            PlaceholderType::MasterTitle as u8
+        );
+        assert_eq!(
+            MAIN_MASTER_PLACEHOLDERS[1],
+            PlaceholderType::MasterBody as u8
+        );
+        assert_eq!(
+            MAIN_MASTER_PLACEHOLDERS[2],
+            PlaceholderType::MasterDate as u8
+        );
+        assert_eq!(
+            MAIN_MASTER_PLACEHOLDERS[3],
+            PlaceholderType::MasterFooter as u8
+        );
+        assert_eq!(
+            MAIN_MASTER_PLACEHOLDERS[4],
+            PlaceholderType::MasterSlideNumber as u8
+        );
+        assert_eq!(MAIN_MASTER_PLACEHOLDERS[5], PlaceholderType::None as u8);
+        assert_eq!(MAIN_MASTER_PLACEHOLDERS[6], PlaceholderType::None as u8);
+        assert_eq!(MAIN_MASTER_PLACEHOLDERS[7], PlaceholderType::None as u8);
+    }
+
+    #[test]
+    fn test_main_master_slide_atom_reserved() {
+        assert_eq!(MAIN_MASTER_SLIDE_ATOM_RESERVED, 0x0013);
+    }
+
+    // =============================================================================
+    // Color Schemes Tests
+    // =============================================================================
+
+    #[test]
+    fn test_rgb_helper() {
+        assert_eq!(rgb(0xFF, 0x00, 0x00), 0x0000FF); // Red
+        assert_eq!(rgb(0x00, 0xFF, 0x00), 0x00FF00); // Green
+        assert_eq!(rgb(0x00, 0x00, 0xFF), 0xFF0000); // Blue
+        assert_eq!(rgb(0xFF, 0xFF, 0xFF), 0xFFFFFF); // White
+        assert_eq!(rgb(0x00, 0x00, 0x00), 0x000000); // Black
+    }
+
+    #[test]
+    fn test_color_scheme_default_light() {
+        let scheme = color_schemes::DEFAULT_LIGHT;
+        assert_eq!(scheme.background, rgb(0xFF, 0xFF, 0xFF));
+        assert_eq!(scheme.text_and_lines, rgb(0x00, 0x00, 0x00));
+        assert_eq!(scheme.fill, rgb(0xBB, 0xE0, 0xE3));
+    }
+
+    #[test]
+    fn test_color_scheme_golden() {
+        let scheme = color_schemes::GOLDEN;
+        assert_eq!(scheme.fill, rgb(0xFB, 0xDF, 0x53));
+        assert_eq!(scheme.accent, rgb(0xFF, 0x99, 0x66));
+    }
+
+    #[test]
+    fn test_color_scheme_blue_accent() {
+        let scheme = color_schemes::BLUE_ACCENT;
+        assert_eq!(scheme.fill, rgb(0x99, 0xCC, 0xFF));
+        assert_eq!(scheme.accent, rgb(0xCC, 0xCC, 0xFF));
+    }
+
+    #[test]
+    fn test_color_scheme_mint() {
+        let scheme = color_schemes::MINT;
+        assert_eq!(scheme.background, rgb(0xDE, 0xF6, 0xF1));
+    }
+
+    #[test]
+    fn test_color_scheme_cream() {
+        let scheme = color_schemes::CREAM;
+        assert_eq!(scheme.background, rgb(0xFF, 0xFF, 0xD9));
+    }
+
+    #[test]
+    fn test_color_scheme_teal_dark() {
+        let scheme = color_schemes::TEAL_DARK;
+        assert_eq!(scheme.background, rgb(0x00, 0x80, 0x80));
+        assert_eq!(scheme.text_and_lines, rgb(0xFF, 0xFF, 0xFF));
+    }
+
+    #[test]
+    fn test_color_scheme_maroon_dark() {
+        let scheme = color_schemes::MAROON_DARK;
+        assert_eq!(scheme.background, rgb(0x80, 0x00, 0x00));
+    }
+
+    #[test]
+    fn test_color_scheme_navy_dark() {
+        let scheme = color_schemes::NAVY_DARK;
+        assert_eq!(scheme.background, rgb(0x00, 0x00, 0x99));
+    }
+
+    #[test]
+    fn test_color_scheme_black_dark() {
+        let scheme = color_schemes::BLACK_DARK;
+        assert_eq!(scheme.background, rgb(0x00, 0x00, 0x00));
+        assert_eq!(scheme.text_and_lines, rgb(0xFF, 0xFF, 0xFF));
+    }
+
+    #[test]
+    fn test_color_scheme_olive() {
+        let scheme = color_schemes::OLIVE;
+        assert_eq!(scheme.background, rgb(0x68, 0x6B, 0x5D));
+    }
+
+    #[test]
+    fn test_color_scheme_purple() {
+        let scheme = color_schemes::PURPLE;
+        assert_eq!(scheme.background, rgb(0x66, 0x66, 0x99));
+    }
+
+    #[test]
+    fn test_color_scheme_brown() {
+        let scheme = color_schemes::BROWN;
+        assert_eq!(scheme.background, rgb(0x52, 0x3E, 0x26));
+    }
+
+    #[test]
+    fn test_color_schemes_all_array() {
+        assert_eq!(color_schemes::ALL.len(), 12);
+        // Verify all schemes are included
+        assert_eq!(
+            color_schemes::ALL[0].background,
+            color_schemes::DEFAULT_LIGHT.background
+        );
+        assert_eq!(
+            color_schemes::ALL[11].background,
+            color_schemes::BROWN.background
+        );
+    }
+}

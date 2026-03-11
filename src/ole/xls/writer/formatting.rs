@@ -752,6 +752,104 @@ mod tests {
     }
 
     #[test]
+    fn test_font_default() {
+        let font: Font = Default::default();
+        assert_eq!(font.name, "Arial");
+        assert_eq!(font.height, 200); // 10pt
+        assert_eq!(font.weight, FONT_WEIGHT_NORMAL);
+        assert!(!font.italic);
+        assert_eq!(font.underline, 0);
+        assert_eq!(font.color_index, COLOR_AUTOMATIC);
+    }
+
+    #[test]
+    fn test_font_clone() {
+        let font = Font {
+            name: "Arial".to_string(),
+            height: 240,
+            weight: FONT_WEIGHT_BOLD,
+            italic: true,
+            ..Default::default()
+        };
+        let cloned = font.clone();
+        assert_eq!(font.name, cloned.name);
+        assert_eq!(font.height, cloned.height);
+        assert_eq!(font.weight, cloned.weight);
+        assert_eq!(font.italic, cloned.italic);
+    }
+
+    #[test]
+    fn test_border_style_default() {
+        let style: BorderStyle = Default::default();
+        assert_eq!(style, BorderStyle::None);
+    }
+
+    #[test]
+    fn test_borders_default() {
+        let borders: Borders = Default::default();
+        assert_eq!(borders.left_style, BorderStyle::None);
+        assert_eq!(borders.right_style, BorderStyle::None);
+        assert_eq!(borders.top_style, BorderStyle::None);
+        assert_eq!(borders.bottom_style, BorderStyle::None);
+    }
+
+    #[test]
+    fn test_borders_custom() {
+        let borders = Borders {
+            left_style: BorderStyle::Thin,
+            left_color: COLOR_BLACK,
+            right_style: BorderStyle::Medium,
+            right_color: COLOR_RED,
+            top_style: BorderStyle::Thick,
+            top_color: COLOR_WHITE,
+            bottom_style: BorderStyle::Double,
+            bottom_color: COLOR_AUTOMATIC,
+        };
+        assert_eq!(borders.left_style, BorderStyle::Thin);
+        assert_eq!(borders.right_style, BorderStyle::Medium);
+        assert_eq!(borders.top_style, BorderStyle::Thick);
+        assert_eq!(borders.bottom_style, BorderStyle::Double);
+    }
+
+    #[test]
+    fn test_fill_default() {
+        let fill: Fill = Default::default();
+        assert_eq!(fill.pattern, FillPattern::None);
+        assert_eq!(fill.foreground_color, COLOR_AUTOMATIC);
+        assert_eq!(fill.background_color, COLOR_AUTOMATIC);
+    }
+
+    #[test]
+    fn test_fill_solid() {
+        let fill = Fill {
+            pattern: FillPattern::Solid,
+            foreground_color: COLOR_RED,
+            background_color: COLOR_WHITE,
+        };
+        assert_eq!(fill.pattern, FillPattern::Solid);
+        assert_eq!(fill.foreground_color, COLOR_RED);
+    }
+
+    #[test]
+    fn test_extended_format_default() {
+        let xf: ExtendedFormat = Default::default();
+        assert_eq!(xf.font_index, 0);
+        assert_eq!(xf.format_index, 0);
+        assert_eq!(xf.h_align, HorizontalAlignment::General);
+        assert_eq!(xf.v_align, VerticalAlignment::Bottom);
+        assert!(!xf.text_wrap);
+    }
+
+    #[test]
+    fn test_cell_style_default() {
+        let style: CellStyle = Default::default();
+        assert_eq!(style.h_align, HorizontalAlignment::General);
+        assert_eq!(style.v_align, VerticalAlignment::Bottom);
+        assert!(!style.text_wrap);
+        assert!(style.number_format.is_none());
+    }
+
+    #[test]
     fn test_formatting_manager() {
         let mut mgr = FormattingManager::new();
 
@@ -763,5 +861,260 @@ mod tests {
 
         assert_eq!(font_idx, 4); // Indices 0..3 are default fonts
         assert_eq!(mgr.get_font(4).unwrap().name, "Times");
+    }
+
+    #[test]
+    fn test_formatting_manager_default_fonts() {
+        let mgr = FormattingManager::new();
+        // Should have 4 default fonts
+        assert_eq!(mgr.get_font(0).unwrap().weight, FONT_WEIGHT_NORMAL);
+        assert_eq!(mgr.get_font(1).unwrap().weight, FONT_WEIGHT_BOLD);
+        assert!(mgr.get_font(2).unwrap().italic);
+        assert!(mgr.get_font(3).unwrap().italic);
+        assert_eq!(mgr.get_font(3).unwrap().weight, FONT_WEIGHT_BOLD);
+    }
+
+    #[test]
+    fn test_formatting_manager_get_font_invalid() {
+        let mgr = FormattingManager::new();
+        assert!(mgr.get_font(100).is_none());
+    }
+
+    #[test]
+    fn test_formatting_manager_get_format_invalid() {
+        let mgr = FormattingManager::new();
+        assert!(mgr.get_format(100).is_none());
+    }
+
+    #[test]
+    fn test_formatting_manager_add_format() {
+        let mut mgr = FormattingManager::new();
+        let xf = ExtendedFormat {
+            font_index: 1,
+            format_index: 2,
+            h_align: HorizontalAlignment::Center,
+            v_align: VerticalAlignment::Center,
+            text_wrap: true,
+            ..Default::default()
+        };
+        let idx = mgr.add_format(xf);
+        assert_eq!(idx, 1); // Index 0 is default format
+        let retrieved = mgr.get_format(1).unwrap();
+        assert_eq!(retrieved.font_index, 1);
+        assert_eq!(retrieved.h_align, HorizontalAlignment::Center);
+        assert!(retrieved.text_wrap);
+    }
+
+    #[test]
+    fn test_formatting_manager_register_number_format_builtin() {
+        let mut mgr = FormattingManager::new();
+        // Built-in format should return predefined index
+        let idx = mgr.register_number_format("General");
+        assert_eq!(idx, 0);
+        let idx2 = mgr.register_number_format("0.00");
+        assert_eq!(idx2, 2);
+    }
+
+    #[test]
+    fn test_formatting_manager_register_number_format_custom() {
+        let mut mgr = FormattingManager::new();
+        let idx = mgr.register_number_format("0.00\"mm\"");
+        // Custom formats start at index 164
+        assert_eq!(idx, 164);
+        // Second registration should return same index
+        let idx2 = mgr.register_number_format("0.00\"mm\"");
+        assert_eq!(idx2, 164);
+    }
+
+    #[test]
+    fn test_formatting_manager_register_number_format_text_alias() {
+        let mut mgr = FormattingManager::new();
+        let idx = mgr.register_number_format("TEXT");
+        assert_eq!(idx, 0x31); // "@" is index 49
+    }
+
+    #[test]
+    fn test_formatting_manager_register_cell_style() {
+        let mut mgr = FormattingManager::new();
+        let style = CellStyle {
+            font: Font {
+                name: "Courier".to_string(),
+                height: 220,
+                ..Default::default()
+            },
+            h_align: HorizontalAlignment::Right,
+            v_align: VerticalAlignment::Top,
+            number_format: Some("0.00".to_string()),
+            ..Default::default()
+        };
+        let idx = mgr.register_cell_style(style);
+        assert_eq!(idx, 1); // Index 0 is default
+        let retrieved = mgr.get_format(1).unwrap();
+        assert_eq!(retrieved.h_align, HorizontalAlignment::Right);
+        assert_eq!(retrieved.v_align, VerticalAlignment::Top);
+        assert_eq!(retrieved.format_index, 2); // "0.00" is built-in index 2
+    }
+
+    #[test]
+    fn test_formatting_manager_pivot_xfs() {
+        let mut mgr = FormattingManager::new();
+        assert!(!mgr.pivot_xfs_enabled);
+        mgr.enable_pivot_xfs();
+        let indices = mgr.pivot_xf_indices();
+        assert_eq!(indices.header_accent, 64);
+        assert_eq!(indices.row_label, 65);
+        assert_eq!(indices.value, 66);
+    }
+
+    #[test]
+    fn test_builtin_number_format_index() {
+        assert_eq!(builtin_number_format_index("General"), Some(0));
+        assert_eq!(builtin_number_format_index("0"), Some(1));
+        assert_eq!(builtin_number_format_index("0.00"), Some(2));
+        assert_eq!(builtin_number_format_index("@"), Some(0x31));
+        assert_eq!(builtin_number_format_index("NonExistent"), None);
+    }
+
+    #[test]
+    fn test_horizontal_alignment_variants() {
+        assert_eq!(HorizontalAlignment::General as u8, 0);
+        assert_eq!(HorizontalAlignment::Left as u8, 1);
+        assert_eq!(HorizontalAlignment::Center as u8, 2);
+        assert_eq!(HorizontalAlignment::Right as u8, 3);
+        assert_eq!(HorizontalAlignment::Fill as u8, 4);
+        assert_eq!(HorizontalAlignment::Justify as u8, 5);
+        assert_eq!(HorizontalAlignment::CenterAcrossSelection as u8, 6);
+    }
+
+    #[test]
+    fn test_vertical_alignment_variants() {
+        assert_eq!(VerticalAlignment::Top as u8, 0);
+        assert_eq!(VerticalAlignment::Center as u8, 1);
+        assert_eq!(VerticalAlignment::Bottom as u8, 2);
+        assert_eq!(VerticalAlignment::Justify as u8, 3);
+    }
+
+    #[test]
+    fn test_fill_pattern_variants() {
+        assert_eq!(FillPattern::None as u8, 0);
+        assert_eq!(FillPattern::Solid as u8, 1);
+        assert_eq!(FillPattern::MediumGray as u8, 2);
+        assert_eq!(FillPattern::DarkGray as u8, 3);
+        assert_eq!(FillPattern::LightGray as u8, 4);
+    }
+
+    #[test]
+    fn test_border_style_variants() {
+        assert_eq!(BorderStyle::None as u8, 0);
+        assert_eq!(BorderStyle::Thin as u8, 1);
+        assert_eq!(BorderStyle::Medium as u8, 2);
+        assert_eq!(BorderStyle::Dashed as u8, 3);
+        assert_eq!(BorderStyle::Dotted as u8, 4);
+        assert_eq!(BorderStyle::Thick as u8, 5);
+        assert_eq!(BorderStyle::Double as u8, 6);
+        assert_eq!(BorderStyle::Hair as u8, 7);
+    }
+
+    #[test]
+    fn test_formatting_manager_default() {
+        let mgr: FormattingManager = Default::default();
+        assert!(mgr.get_font(0).is_some());
+    }
+
+    #[test]
+    fn test_write_font_basic() {
+        let mut buf = Vec::new();
+        let font = Font::default();
+        write_font(&mut buf, &font).unwrap();
+
+        // Check record type (0x0031 = FONT)
+        assert_eq!(u16::from_le_bytes([buf[0], buf[1]]), 0x0031);
+
+        // Check height
+        let height = u16::from_le_bytes([buf[4], buf[5]]);
+        assert_eq!(height, 200); // 10pt = 200 twips
+    }
+
+    #[test]
+    fn test_write_font_bold() {
+        let mut buf = Vec::new();
+        let font = Font {
+            weight: FONT_WEIGHT_BOLD,
+            ..Default::default()
+        };
+        write_font(&mut buf, &font).unwrap();
+
+        let weight = u16::from_le_bytes([buf[10], buf[11]]);
+        assert_eq!(weight, FONT_WEIGHT_BOLD);
+    }
+
+    #[test]
+    fn test_write_font_italic() {
+        let mut buf = Vec::new();
+        let font = Font {
+            italic: true,
+            ..Default::default()
+        };
+        write_font(&mut buf, &font).unwrap();
+
+        let flags = u16::from_le_bytes([buf[6], buf[7]]);
+        assert!(flags & 0x0002 != 0); // Italic flag
+    }
+
+    #[test]
+    fn test_write_xf() {
+        let mut buf = Vec::new();
+        let xf = ExtendedFormat::default();
+        write_xf(&mut buf, &xf, false).unwrap();
+
+        // Check record type (0x00E0 = XF)
+        assert_eq!(u16::from_le_bytes([buf[0], buf[1]]), 0x00E0);
+        assert_eq!(u16::from_le_bytes([buf[2], buf[3]]), 20); // Length = 20
+    }
+
+    #[test]
+    fn test_write_xf_style() {
+        let mut buf = Vec::new();
+        let xf = ExtendedFormat::default();
+        write_xf(&mut buf, &xf, true).unwrap();
+
+        // For style XF, xf_type should be 0xFFF5
+        let xf_type = u16::from_le_bytes([buf[8], buf[9]]);
+        assert_eq!(xf_type, 0xFFF5);
+    }
+
+    #[test]
+    fn test_write_xf_with_alignment() {
+        let mut buf = Vec::new();
+        let xf = ExtendedFormat {
+            h_align: HorizontalAlignment::Center,
+            v_align: VerticalAlignment::Center,
+            text_wrap: true,
+            ..Default::default()
+        };
+        write_xf(&mut buf, &xf, false).unwrap();
+
+        // Check alignment byte
+        let align = buf[10];
+        assert_eq!(align & 0x07, 2); // Horizontal center
+        assert!(align & 0x08 != 0); // Text wrap
+    }
+
+    #[test]
+    fn test_cell_xf_index_for() {
+        let mgr = FormattingManager::new();
+        // Default format (index 0) maps to cell XF index 15
+        assert_eq!(mgr.cell_xf_index_for(0), 15);
+        // Custom format index 1 maps to index 21 (15 + 1 + 5)
+        assert_eq!(mgr.cell_xf_index_for(1), 21);
+    }
+
+    #[test]
+    fn test_pivot_xf_indices_default() {
+        let mgr = FormattingManager::new();
+        let indices = mgr.pivot_xf_indices();
+        assert_eq!(indices.header_accent, 64);
+        assert_eq!(indices.row_label, 65);
+        assert_eq!(indices.value, 66);
     }
 }

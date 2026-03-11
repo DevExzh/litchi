@@ -584,3 +584,589 @@ pub(crate) async fn eval_received(
 ) -> Result<CellValue> {
     Ok(CellValue::Float(0.0))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::parser::Expr;
+
+    fn num_expr(n: f64) -> Expr {
+        if n == n.floor() {
+            Expr::Literal(CellValue::Int(n as i64))
+        } else {
+            Expr::Literal(CellValue::Float(n))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_yield_basic() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // YIELD with settlement=0, maturity=365, rate=5%, pr=95, redemption=100, frequency=2
+        let args = vec![
+            num_expr(0.0),
+            num_expr(365.0),
+            num_expr(0.05),
+            num_expr(95.0),
+            num_expr(100.0),
+            num_expr(2.0),
+        ];
+        let result = eval_yield(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v > 0.0 && v < 0.15),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_yield_with_basis() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // YIELD with basis=1 (actual/actual)
+        let args = vec![
+            num_expr(0.0),
+            num_expr(365.0),
+            num_expr(0.05),
+            num_expr(95.0),
+            num_expr(100.0),
+            num_expr(2.0),
+            num_expr(1.0),
+        ];
+        let result = eval_yield(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v > 0.0 && v < 0.15),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_yield_wrong_args() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0), num_expr(365.0)];
+        let result = eval_yield(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 6 or 7")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_yield_invalid_frequency() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(0.0),
+            num_expr(365.0),
+            num_expr(0.05),
+            num_expr(95.0),
+            num_expr(100.0),
+            num_expr(3.0), // Invalid: must be 1, 2, or 4
+        ];
+        let result = eval_yield(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("frequency must be")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_yield_maturity_before_settlement() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(365.0),
+            num_expr(0.0), // Maturity before settlement
+            num_expr(0.05),
+            num_expr(95.0),
+            num_expr(100.0),
+            num_expr(2.0),
+        ];
+        let result = eval_yield(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("maturity to be after settlement")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_duration_basic() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // DURATION with settlement=0, maturity=730 (2 years), coupon=5%, yield=6%, frequency=2
+        let args = vec![
+            num_expr(0.0),
+            num_expr(730.0),
+            num_expr(0.05),
+            num_expr(0.06),
+            num_expr(2.0),
+        ];
+        let result = eval_duration(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            // Duration should be around 1.9 years for a 2-year bond
+            CellValue::Float(v) => assert!(v > 1.0 && v < 3.0),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_duration_with_basis() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(0.0),
+            num_expr(730.0),
+            num_expr(0.05),
+            num_expr(0.06),
+            num_expr(2.0),
+            num_expr(1.0), // Actual/actual basis
+        ];
+        let result = eval_duration(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v > 1.0 && v < 3.0),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_duration_wrong_args() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0), num_expr(365.0)];
+        let result = eval_duration(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 5 or 6")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_duration_invalid_frequency() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(0.0),
+            num_expr(730.0),
+            num_expr(0.05),
+            num_expr(0.06),
+            num_expr(3.0), // Invalid frequency
+        ];
+        let result = eval_duration(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("frequency error")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_accrint_basic() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // ACCRINT: issue=0, first_interest=180, settlement=90, rate=5%, par=1000
+        let args = vec![
+            num_expr(0.0),
+            num_expr(180.0),
+            num_expr(90.0),
+            num_expr(0.05),
+            num_expr(1000.0),
+        ];
+        let result = eval_accrint(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            // Accrued interest for 90 days at 5% on $1000 par
+            CellValue::Float(v) => {
+                // Expected: (1000 * 0.05 * 90) / 360 = 12.5
+                assert!((v - 12.5).abs() < 1.0)
+            },
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_accrint_with_basis() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // ACCRINT with basis=1 (actual/365)
+        let args = vec![
+            num_expr(0.0),
+            num_expr(180.0),
+            num_expr(90.0),
+            num_expr(0.05),
+            num_expr(1000.0),
+            num_expr(1.0), // Basis
+        ];
+        let result = eval_accrint(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => {
+                // With 365 day year: (1000 * 0.05 * 90) / 365 ≈ 12.33
+                assert!((v - 12.33).abs() < 1.0)
+            },
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_accrint_invalid_rate() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(0.0),
+            num_expr(180.0),
+            num_expr(90.0),
+            num_expr(-0.05), // Negative rate
+            num_expr(1000.0),
+        ];
+        let result = eval_accrint(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_accrint_settlement_before_issue() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(90.0),
+            num_expr(180.0),
+            num_expr(0.0), // Settlement before issue
+            num_expr(0.05),
+            num_expr(1000.0),
+        ];
+        let result = eval_accrint(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_accrintm_basic() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // ACCRINTM: issue=0, settlement=180, rate=5%, par=1000
+        let args = vec![
+            num_expr(0.0),
+            num_expr(180.0),
+            num_expr(0.05),
+            num_expr(1000.0),
+        ];
+        let result = eval_accrintm(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            // Accrued interest for 180 days at 5% on $1000 par
+            CellValue::Float(v) => {
+                // Expected: (1000 * 0.05 * 180) / 360 = 25.0
+                assert!((v - 25.0).abs() < 1.0)
+            },
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_accrintm_default_par() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // ACCRINTM with default par=1000
+        let args = vec![num_expr(0.0), num_expr(180.0), num_expr(0.05)];
+        let result = eval_accrintm(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v > 0.0),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_yielddisc_basic() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // YIELDDISC: settlement=0, maturity=180, pr=95, redemption=100
+        let args = vec![
+            num_expr(0.0),
+            num_expr(180.0),
+            num_expr(95.0),
+            num_expr(100.0),
+        ];
+        let result = eval_yielddisc(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            // Yield for discounted security
+            CellValue::Float(v) => assert!(v > 0.0 && v < 0.5),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_yielddisc_invalid_price() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(0.0),
+            num_expr(180.0),
+            num_expr(-95.0), // Negative price
+            num_expr(100.0),
+        ];
+        let result = eval_yielddisc(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_yielddisc_settlement_after_maturity() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(180.0),
+            num_expr(0.0), // Maturity before settlement
+            num_expr(95.0),
+            num_expr(100.0),
+        ];
+        let result = eval_yielddisc(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_yieldmat_basic() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // YIELDMAT: settlement=90, maturity=365, issue=0, rate=5%, pr=98
+        let args = vec![
+            num_expr(90.0),
+            num_expr(365.0),
+            num_expr(0.0),
+            num_expr(0.05),
+            num_expr(98.0),
+        ];
+        let result = eval_yieldmat(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v > 0.0 && v < 0.5),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_yieldmat_invalid_dates() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // Settlement after maturity
+        let args = vec![
+            num_expr(365.0),
+            num_expr(90.0),
+            num_expr(0.0),
+            num_expr(0.05),
+            num_expr(98.0),
+        ];
+        let result = eval_yieldmat(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_disc_basic() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // DISC: settlement=0, maturity=180, pr=95, redemption=100
+        let args = vec![
+            num_expr(0.0),
+            num_expr(180.0),
+            num_expr(95.0),
+            num_expr(100.0),
+        ];
+        let result = eval_disc(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            // Discount rate
+            CellValue::Float(v) => assert!(v > 0.0 && v < 0.5),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_disc_invalid() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(0.0),
+            num_expr(180.0),
+            num_expr(-95.0), // Negative price
+            num_expr(100.0),
+        ];
+        let result = eval_disc(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_intrate_basic() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // INTRATE: settlement=0, maturity=180, investment=95000, redemption=100000
+        let args = vec![
+            num_expr(0.0),
+            num_expr(180.0),
+            num_expr(95000.0),
+            num_expr(100000.0),
+        ];
+        let result = eval_intrate(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            // Interest rate for fully invested security
+            CellValue::Float(v) => assert!(v > 0.0 && v < 0.5),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_intrate_invalid() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(0.0),
+            num_expr(180.0),
+            num_expr(-95000.0), // Negative investment
+            num_expr(100000.0),
+        ];
+        let result = eval_intrate(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_coupdaybs_stub() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![];
+        let result = eval_coupdaybs(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert_eq!(v, 0.0),
+            _ => panic!("Expected Float(0.0)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_coupdays_stub() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![];
+        let result = eval_coupdays(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert_eq!(v, 0.0),
+            _ => panic!("Expected Float(0.0)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_coupdaysnc_stub() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![];
+        let result = eval_coupdaysnc(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert_eq!(v, 0.0),
+            _ => panic!("Expected Float(0.0)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_coupncd_stub() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![];
+        let result = eval_coupncd(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert_eq!(v, 0.0),
+            _ => panic!("Expected Float(0.0)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_coupnum_stub() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![];
+        let result = eval_coupnum(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Int(v) => assert_eq!(v, 0),
+            _ => panic!("Expected Int(0)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_couppcd_stub() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![];
+        let result = eval_couppcd(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert_eq!(v, 0.0),
+            _ => panic!("Expected Float(0.0)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_amordegrc_stub() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![];
+        let result = eval_amordegrc(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert_eq!(v, 0.0),
+            _ => panic!("Expected Float(0.0)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_amorlinc_stub() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![];
+        let result = eval_amorlinc(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert_eq!(v, 0.0),
+            _ => panic!("Expected Float(0.0)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_pricedisc_stub() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![];
+        let result = eval_pricedisc(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert_eq!(v, 0.0),
+            _ => panic!("Expected Float(0.0)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_pricemat_stub() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![];
+        let result = eval_pricemat(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert_eq!(v, 0.0),
+            _ => panic!("Expected Float(0.0)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_received_stub() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![];
+        let result = eval_received(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert_eq!(v, 0.0),
+            _ => panic!("Expected Float(0.0)"),
+        }
+    }
+}

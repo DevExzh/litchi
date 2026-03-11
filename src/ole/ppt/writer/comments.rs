@@ -194,6 +194,119 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_slide_comment_new() {
+        let comment = SlideComment::new("John Doe", "Hello!", 100, 50);
+        assert_eq!(comment.author, "John Doe");
+        assert_eq!(comment.text, "Hello!");
+        assert_eq!(comment.x, 100);
+        assert_eq!(comment.y, 50);
+        assert_eq!(comment.initials, "JD");
+    }
+
+    #[test]
+    fn test_slide_comment_initials_single_word() {
+        let comment = SlideComment::new("Alice", "Test", 0, 0);
+        assert_eq!(comment.initials, "A");
+    }
+
+    #[test]
+    fn test_slide_comment_initials_multiple_words() {
+        let comment = SlideComment::new("John Jacob Jingleheimer Schmidt", "Test", 0, 0);
+        assert_eq!(comment.initials, "JJJS");
+    }
+
+    #[test]
+    fn test_slide_comment_with_initials() {
+        let comment = SlideComment::new("John Doe", "Test", 0, 0).with_initials("JDOE");
+        assert_eq!(comment.initials, "JDOE");
+    }
+
+    #[test]
+    fn test_slide_comment_with_date() {
+        let date = CommentDateTime {
+            year: 2025,
+            month: 3,
+            day: 13,
+            hour: 14,
+            minute: 30,
+            second: 45,
+            millisecond: 500,
+        };
+        let comment = SlideComment::new("Test", "Test", 0, 0).with_date(date.clone());
+        assert_eq!(comment.date.year, 2025);
+        assert_eq!(comment.date.month, 3);
+        assert_eq!(comment.date.day, 13);
+    }
+
+    #[test]
+    fn test_slide_comment_clone() {
+        let comment = SlideComment::new("Author", "Text", 100, 200)
+            .with_initials("A")
+            .with_date(CommentDateTime {
+                year: 2025,
+                month: 1,
+                day: 1,
+                hour: 0,
+                minute: 0,
+                second: 0,
+                millisecond: 0,
+            });
+        let cloned = comment.clone();
+        assert_eq!(cloned.author, comment.author);
+        assert_eq!(cloned.text, comment.text);
+        assert_eq!(cloned.x, comment.x);
+        assert_eq!(cloned.y, comment.y);
+        assert_eq!(cloned.initials, comment.initials);
+    }
+
+    #[test]
+    fn test_slide_comment_debug() {
+        let comment = SlideComment::new("Test", "Text", 100, 200);
+        let debug = format!("{:?}", comment);
+        assert!(debug.contains("SlideComment"));
+        assert!(debug.contains("Test"));
+    }
+
+    #[test]
+    fn test_comment_date_time_default() {
+        let date = CommentDateTime::default();
+        assert_eq!(date.year, 0);
+        assert_eq!(date.month, 0);
+        assert_eq!(date.day, 0);
+        assert_eq!(date.hour, 0);
+        assert_eq!(date.minute, 0);
+        assert_eq!(date.second, 0);
+        assert_eq!(date.millisecond, 0);
+    }
+
+    #[test]
+    fn test_comment_date_time_clone() {
+        let date = CommentDateTime {
+            year: 2025,
+            month: 6,
+            day: 15,
+            hour: 12,
+            minute: 30,
+            second: 0,
+            millisecond: 0,
+        };
+        let cloned = date.clone();
+        assert_eq!(cloned.year, 2025);
+        assert_eq!(cloned.month, 6);
+        assert_eq!(cloned.day, 15);
+    }
+
+    #[test]
+    fn test_pt_to_master() {
+        // 72 points = 1 inch = 576 master units
+        assert_eq!(pt_to_master(72), 576);
+        // 0 points = 0 master units
+        assert_eq!(pt_to_master(0), 0);
+        // 144 points = 2 inches = 1152 master units
+        assert_eq!(pt_to_master(144), 1152);
+    }
+
+    #[test]
     fn test_build_comment_container() {
         let comment = SlideComment::new("John Doe", "Hello!", 100, 50);
         let data = build_comment_container(&comment, 1).unwrap();
@@ -205,9 +318,54 @@ mod tests {
     }
 
     #[test]
+    fn test_build_comment_container_with_date() {
+        let comment = SlideComment::new("Author", "Text", 100, 50).with_date(CommentDateTime {
+            year: 2025,
+            month: 3,
+            day: 13,
+            hour: 14,
+            minute: 30,
+            second: 0,
+            millisecond: 0,
+        });
+        let data = build_comment_container(&comment, 1).unwrap();
+        assert!(!data.is_empty());
+    }
+
+    #[test]
     fn test_build_slide_comments_empty() {
         let data = build_slide_comments(&[]).unwrap();
         assert!(data.is_empty());
+    }
+
+    #[test]
+    fn test_build_slide_comments_single() {
+        let comments = vec![SlideComment::new("Alice", "First comment", 10, 20)];
+        let data = build_slide_comments(&comments).unwrap();
+        assert!(!data.is_empty());
+
+        // Count Comment2000 containers (type=12000)
+        let mut count = 0;
+        let mut offset = 0;
+        while offset + 8 <= data.len() {
+            let rtype = u16::from_le_bytes([data[offset + 2], data[offset + 3]]);
+            let rlen = u32::from_le_bytes([
+                data[offset + 4],
+                data[offset + 5],
+                data[offset + 6],
+                data[offset + 7],
+            ]);
+            let ver = data[offset] & 0x0F;
+            if rtype == 12000 {
+                count += 1;
+            }
+            if ver == 0x0F {
+                offset += 8; // container: descend
+            } else {
+                offset += 8 + rlen as usize; // atom: skip data
+            }
+        }
+        assert_eq!(count, 1);
     }
 
     #[test]
@@ -241,5 +399,45 @@ mod tests {
             }
         }
         assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_build_slide_comments_unicode() {
+        let comments = vec![SlideComment::new(
+            "\u{4f60}\u{597d}",
+            "\u{4e16}\u{754c}",
+            100,
+            100,
+        )];
+        let data = build_slide_comments(&comments).unwrap();
+        assert!(!data.is_empty());
+    }
+
+    #[test]
+    fn test_build_slide_comments_empty_author() {
+        let comments = vec![SlideComment::new("", "Anonymous comment", 100, 100)];
+        let data = build_slide_comments(&comments).unwrap();
+        assert!(!data.is_empty());
+    }
+
+    #[test]
+    fn test_build_slide_comments_empty_text() {
+        let comments = vec![SlideComment::new("Author", "", 100, 100)];
+        let data = build_slide_comments(&comments).unwrap();
+        assert!(!data.is_empty());
+    }
+
+    #[test]
+    fn test_build_slide_comments_large_coordinates() {
+        let comments = vec![SlideComment::new("Author", "Text", 10000, 20000)];
+        let data = build_slide_comments(&comments).unwrap();
+        assert!(!data.is_empty());
+    }
+
+    #[test]
+    fn test_build_slide_comments_negative_coordinates() {
+        let comments = vec![SlideComment::new("Author", "Text", -100, -200)];
+        let data = build_slide_comments(&comments).unwrap();
+        assert!(!data.is_empty());
     }
 }

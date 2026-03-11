@@ -219,3 +219,148 @@ fn serialize_table_style_info(xml: &mut String, style_info: &TableStyleInfo) -> 
     xml.push_str("/>");
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ooxml::xlsx::sort::{SortCondition, SortState};
+    use crate::ooxml::xlsx::table::{TableColumn, TableFormula, TableStyleInfo, TotalsRowFunction};
+
+    fn create_test_table() -> Table {
+        let mut table = Table::new(1u32, "TestTable", "A1:D5");
+        table.display_name = "Test Table".to_string();
+        table.comment = Some("Test comment".to_string());
+        table.header_row_count = Some(1);
+        table.totals_row_count = Some(1);
+        table.totals_row_shown = Some(true);
+        table.columns = vec![
+            TableColumn::new(1u32, "Column A"),
+            TableColumn::new(2u32, "Column B"),
+        ];
+        table
+    }
+
+    #[test]
+    fn test_serialize_table_basic() {
+        let table = create_test_table();
+        let xml = serialize_table(&table).unwrap();
+
+        assert!(xml.contains(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><table"#));
+        assert!(xml.contains(r#"id="1""#));
+        assert!(xml.contains(r#"name="TestTable""#));
+        assert!(xml.contains(r#"displayName="Test Table""#));
+        assert!(xml.contains(r#"ref="A1:D5""#));
+        assert!(xml.contains(r#"comment="Test comment""#));
+        assert!(xml.contains(r#"headerRowCount="1""#));
+        assert!(xml.contains(r#"totalsRowCount="1""#));
+        assert!(xml.contains(r#"totalsRowShown="1""#));
+        assert!(xml.contains("</table>"));
+    }
+
+    #[test]
+    fn test_serialize_table_with_columns() {
+        let table = create_test_table();
+        let xml = serialize_table(&table).unwrap();
+
+        assert!(xml.contains(r#"<tableColumns count="2">"#));
+        assert!(xml.contains(r#"<tableColumn id="1" name="Column A"/>"#));
+        assert!(xml.contains(r#"<tableColumn id="2" name="Column B"/>"#));
+        assert!(xml.contains("</tableColumns>"));
+    }
+
+    #[test]
+    fn test_serialize_table_with_auto_filter() {
+        let mut table = create_test_table();
+        table.auto_filter_range = Some("A1:D5".to_string());
+        let xml = serialize_table(&table).unwrap();
+
+        assert!(xml.contains(r#"<autoFilter ref="A1:D5"/>"#));
+    }
+
+    #[test]
+    fn test_serialize_table_with_style_info() {
+        let mut table = create_test_table();
+        let mut style_info = TableStyleInfo::new();
+        style_info.name = Some("TableStyleMedium2".to_string());
+        style_info.show_first_column = Some(true);
+        style_info.show_last_column = Some(false);
+        style_info.show_row_stripes = Some(true);
+        style_info.show_column_stripes = Some(false);
+        table.style_info = Some(style_info);
+
+        let xml = serialize_table(&table).unwrap();
+
+        assert!(xml.contains(r#"<tableStyleInfo name="TableStyleMedium2" showFirstColumn="1" showLastColumn="0" showRowStripes="1" showColumnStripes="0"/>"#));
+    }
+
+    #[test]
+    fn test_serialize_table_column_with_totals_function() {
+        let mut table = create_test_table();
+        let mut col = TableColumn::new(1u32, "Sales");
+        col.totals_row_function = Some(TotalsRowFunction::Sum);
+        table.columns = vec![col];
+
+        let xml = serialize_table(&table).unwrap();
+        assert!(xml.contains(r#"totalsRowFunction="sum""#));
+    }
+
+    #[test]
+    fn test_serialize_table_column_with_formula() {
+        let mut table = create_test_table();
+        let mut col = TableColumn::new(1u32, "Calculated");
+        col.calculated_column_formula = Some(TableFormula {
+            array: Some(false),
+            text: "=[@Price]*[@Qty]".to_string(),
+        });
+        table.columns = vec![col];
+
+        let xml = serialize_table(&table).unwrap();
+        // The formula is serialized with array="0" attribute when array is Some(false)
+        assert!(
+            xml.contains("<calculatedColumnFormula"),
+            "Expected <calculatedColumnFormula> in XML: {}",
+            xml
+        );
+        assert!(
+            xml.contains("=[@Price]*[@Qty]"),
+            "Expected formula text in XML: {}",
+            xml
+        );
+    }
+
+    #[test]
+    fn test_serialize_table_with_sort_state() {
+        let mut table = create_test_table();
+        let sort_condition = SortCondition {
+            ref_range: "A2:A10".to_string(),
+            descending: Some(true),
+            sort_by: None,
+            custom_list: None,
+            dxf_id: None,
+            icon_set: None,
+            icon_id: None,
+        };
+        table.sort_state = Some(SortState {
+            ref_range: "A2:D10".to_string(),
+            column_sort: Some(true),
+            case_sensitive: Some(false),
+            sort_method: None,
+            conditions: vec![sort_condition],
+        });
+
+        let xml = serialize_table(&table).unwrap();
+        assert!(xml.contains(r#"<sortState ref="A2:D10" columnSort="1" caseSensitive="0">"#));
+        assert!(xml.contains(r#"<sortCondition ref="A2:A10" descending="1"/>"#));
+        assert!(xml.contains("</sortState>"));
+    }
+
+    #[test]
+    fn test_serialize_table_escapes_xml() {
+        let mut table = create_test_table();
+        table.name = "Table<>&\"'".to_string();
+        table.display_name = "Test <Table>".to_string();
+
+        let xml = serialize_table(&table).unwrap();
+        assert!(xml.contains("Table&lt;&gt;&amp;")); // XML escaped
+    }
+}

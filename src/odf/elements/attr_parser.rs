@@ -633,4 +633,138 @@ mod tests {
             _ => panic!("Expected Length value"),
         }
     }
+
+    #[test]
+    fn test_validate_font_weight() {
+        assert!(validate_font_weight("normal").is_ok());
+        assert!(validate_font_weight("bold").is_ok());
+        assert!(validate_font_weight("700").is_ok());
+        assert!(validate_font_weight("invalid").is_err());
+    }
+
+    #[test]
+    fn test_validate_font_style() {
+        assert!(validate_font_style("normal").is_ok());
+        assert!(validate_font_style("italic").is_ok());
+        assert!(validate_font_style("oblique").is_ok());
+        assert!(validate_font_style("bold").is_err());
+    }
+
+    #[test]
+    fn test_validate_text_align() {
+        assert!(validate_text_align("left").is_ok());
+        assert!(validate_text_align("center").is_ok());
+        assert!(validate_text_align("right").is_ok());
+        assert!(validate_text_align("justify").is_ok());
+        assert!(validate_text_align("invalid").is_err());
+    }
+
+    #[test]
+    fn test_attr_type_variants() {
+        assert_eq!(AttrType::String, AttrType::String);
+        assert_eq!(AttrType::Boolean, AttrType::Boolean);
+        assert_eq!(AttrType::Integer, AttrType::Integer);
+        assert_eq!(AttrType::Float, AttrType::Float);
+        assert_eq!(AttrType::Length, AttrType::Length);
+        assert_eq!(AttrType::Percentage, AttrType::Percentage);
+        assert_eq!(AttrType::Color, AttrType::Color);
+        assert_eq!(AttrType::DateTime, AttrType::DateTime);
+        assert_eq!(AttrType::Duration, AttrType::Duration);
+        assert_eq!(AttrType::Uri, AttrType::Uri);
+        assert_eq!(AttrType::Enum, AttrType::Enum);
+    }
+
+    #[test]
+    fn test_attr_parser_attr_type() {
+        assert_eq!(
+            AttrParser::attr_type("text:style-name"),
+            Some(AttrType::String)
+        );
+        assert_eq!(
+            AttrParser::attr_type("table:number-columns-repeated"),
+            Some(AttrType::Integer)
+        );
+        assert_eq!(
+            AttrParser::attr_type("office:boolean-value"),
+            Some(AttrType::Boolean)
+        );
+        assert_eq!(AttrParser::attr_type("unknown:attribute"), None);
+    }
+
+    #[test]
+    fn test_parsed_value_equality() {
+        assert_eq!(
+            ParsedValue::String("test".to_string()),
+            ParsedValue::String("test".to_string())
+        );
+        assert_eq!(ParsedValue::Boolean(true), ParsedValue::Boolean(true));
+        assert_eq!(ParsedValue::Integer(42), ParsedValue::Integer(42));
+        assert_eq!(ParsedValue::Float(3.14), ParsedValue::Float(3.14));
+        assert_eq!(
+            ParsedValue::Length(10.0, "pt".to_string()),
+            ParsedValue::Length(10.0, "pt".to_string())
+        );
+        assert_eq!(ParsedValue::Percentage(0.5), ParsedValue::Percentage(0.5));
+        assert_eq!(ParsedValue::Color(255, 0, 0), ParsedValue::Color(255, 0, 0));
+
+        assert_ne!(ParsedValue::Integer(1), ParsedValue::Integer(2));
+        assert_ne!(ParsedValue::Boolean(true), ParsedValue::Boolean(false));
+    }
+
+    #[test]
+    fn test_parse_color_errors() {
+        // Missing # prefix
+        assert!(parse_color(b"FF0000").is_err());
+        // Wrong length
+        assert!(parse_color(b"#FF00").is_err());
+        assert!(parse_color(b"#FF000000").is_err());
+        // Invalid hex
+        assert!(parse_color(b"#GG0000").is_err());
+    }
+
+    #[test]
+    fn test_parse_length_edge_cases() {
+        // Number only defaults to "pt"
+        let (val, unit) = parse_length(b"10").unwrap();
+        assert!((val - 10.0).abs() < 0.0001);
+        assert_eq!(unit, "pt");
+
+        // Unit only - will fail because no number
+        assert!(parse_length(b"cm").is_err());
+
+        // Various units
+        let (_, unit) = parse_length(b"5px").unwrap();
+        assert_eq!(unit, "px");
+        let (_, unit) = parse_length(b"10em").unwrap();
+        assert_eq!(unit, "em");
+    }
+
+    #[test]
+    fn test_parse_percentage_edge_cases() {
+        // Missing % still divides by 100
+        let result = parse_percentage(b"50").unwrap();
+        assert!((result - 0.5).abs() < 0.0001);
+
+        // Just % is error (no number to parse)
+        assert!(parse_percentage(b"%").is_err());
+
+        // With %
+        let result = parse_percentage(b"75%").unwrap();
+        assert!((result - 0.75).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_parse_int_edge_cases() {
+        assert_eq!(parse_int(b"-1").unwrap(), -1);
+        assert_eq!(parse_int(b"0").unwrap(), 0);
+        assert_eq!(parse_int(b"999999").unwrap(), 999999);
+    }
+
+    #[test]
+    fn test_parse_uint() {
+        assert_eq!(parse_uint(b"42").unwrap(), 42);
+        assert_eq!(parse_uint(b"0").unwrap(), 0);
+        // Negative numbers should fail
+        assert!(parse_uint(b"-1").is_err());
+    }
 }

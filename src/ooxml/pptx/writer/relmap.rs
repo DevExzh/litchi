@@ -219,3 +219,167 @@ impl RelationshipMapper {
             .map(|(d, l, s, c)| (d.as_str(), l.as_str(), s.as_str(), c.as_str()))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_relationship_mapper_new() {
+        let mapper = RelationshipMapper::new();
+        assert!(mapper.image_ids.is_empty());
+        assert!(mapper.notes_ids.is_empty());
+        assert!(mapper.background_ids.is_empty());
+    }
+
+    #[test]
+    fn test_relationship_mapper_default() {
+        let mapper: RelationshipMapper = Default::default();
+        assert!(mapper.image_ids.is_empty());
+    }
+
+    #[test]
+    fn test_add_and_get_image() {
+        let mut mapper = RelationshipMapper::new();
+        mapper.add_image(0, 0, "rId2".to_string());
+        mapper.add_image(0, 1, "rId3".to_string());
+        mapper.add_image(1, 0, "rId4".to_string());
+
+        assert_eq!(mapper.get_image_id(0, 0), Some("rId2"));
+        assert_eq!(mapper.get_image_id(0, 1), Some("rId3"));
+        assert_eq!(mapper.get_image_id(1, 0), Some("rId4"));
+        assert_eq!(mapper.get_image_id(0, 2), None);
+        assert_eq!(mapper.get_image_id(2, 0), None);
+    }
+
+    #[test]
+    fn test_add_and_get_notes() {
+        let mut mapper = RelationshipMapper::new();
+        mapper.add_notes(0, "rId5".to_string());
+        mapper.add_notes(1, "rId6".to_string());
+
+        assert_eq!(mapper.get_notes_id(0), Some("rId5"));
+        assert_eq!(mapper.get_notes_id(1), Some("rId6"));
+        assert_eq!(mapper.get_notes_id(2), None);
+    }
+
+    #[test]
+    fn test_add_and_get_background() {
+        let mut mapper = RelationshipMapper::new();
+        mapper.add_background(0, "rId7".to_string());
+
+        assert_eq!(mapper.get_background_id(0), Some("rId7"));
+        assert_eq!(mapper.get_background_id(1), None);
+    }
+
+    #[test]
+    fn test_add_and_get_media() {
+        let mut mapper = RelationshipMapper::new();
+        mapper.add_media(
+            0,
+            0,
+            "rIdVideo1".to_string(),
+            "rIdMedia1".to_string(),
+            "rIdPoster1".to_string(),
+        );
+        mapper.add_media(
+            0,
+            1,
+            "rIdVideo2".to_string(),
+            "rIdMedia2".to_string(),
+            "rIdPoster2".to_string(),
+        );
+
+        let result = mapper.get_media_ids(0, 0);
+        assert!(result.is_some());
+        let (video, media, poster) = result.unwrap();
+        assert_eq!(video, "rIdVideo1");
+        assert_eq!(media, "rIdMedia1");
+        assert_eq!(poster, "rIdPoster1");
+
+        let result2 = mapper.get_media_ids(0, 1);
+        assert!(result2.is_some());
+        let (video2, media2, poster2) = result2.unwrap();
+        assert_eq!(video2, "rIdVideo2");
+        assert_eq!(media2, "rIdMedia2");
+        assert_eq!(poster2, "rIdPoster2");
+
+        assert_eq!(mapper.get_media_ids(0, 2), None);
+        assert_eq!(mapper.get_media_ids(1, 0), None);
+    }
+
+    #[test]
+    fn test_add_and_get_comments() {
+        let mut mapper = RelationshipMapper::new();
+        mapper.add_comments(0, "rId8".to_string());
+        mapper.add_comments(2, "rId9".to_string());
+
+        assert_eq!(mapper.get_comments_id(0), Some("rId8"));
+        assert_eq!(mapper.get_comments_id(2), Some("rId9"));
+        assert_eq!(mapper.get_comments_id(1), None);
+    }
+
+    #[test]
+    fn test_add_and_get_chart() {
+        let mut mapper = RelationshipMapper::new();
+        mapper.add_chart(0, 1, "rIdChart1".to_string());
+        mapper.add_chart(0, 2, "rIdChart2".to_string());
+        mapper.add_chart(1, 1, "rIdChart3".to_string());
+
+        assert_eq!(mapper.get_chart_id(0, 1), Some("rIdChart1"));
+        assert_eq!(mapper.get_chart_id(0, 2), Some("rIdChart2"));
+        assert_eq!(mapper.get_chart_id(1, 1), Some("rIdChart3"));
+        assert_eq!(mapper.get_chart_id(0, 3), None);
+        assert_eq!(mapper.get_chart_id(2, 1), None);
+    }
+
+    #[test]
+    fn test_add_and_get_smartart() {
+        let mut mapper = RelationshipMapper::new();
+        mapper.add_smartart(
+            0,
+            1,
+            "rIdData1".to_string(),
+            "rIdLayout1".to_string(),
+            "rIdStyle1".to_string(),
+            "rIdColors1".to_string(),
+        );
+
+        let result = mapper.get_smartart_ids(0, 1);
+        assert!(result.is_some());
+        let (data, layout, style, colors) = result.unwrap();
+        assert_eq!(data, "rIdData1");
+        assert_eq!(layout, "rIdLayout1");
+        assert_eq!(style, "rIdStyle1");
+        assert_eq!(colors, "rIdColors1");
+
+        assert_eq!(mapper.get_smartart_ids(0, 2), None);
+        assert_eq!(mapper.get_smartart_ids(1, 1), None);
+    }
+
+    #[test]
+    fn test_multiple_relationships_per_slide() {
+        let mut mapper = RelationshipMapper::new();
+        // Add multiple types of relationships for the same slide
+        mapper.add_image(0, 0, "rIdImage1".to_string());
+        mapper.add_notes(0, "rIdNotes1".to_string());
+        mapper.add_background(0, "rIdBg1".to_string());
+        mapper.add_chart(0, 1, "rIdChart1".to_string());
+
+        assert_eq!(mapper.get_image_id(0, 0), Some("rIdImage1"));
+        assert_eq!(mapper.get_notes_id(0), Some("rIdNotes1"));
+        assert_eq!(mapper.get_background_id(0), Some("rIdBg1"));
+        assert_eq!(mapper.get_chart_id(0, 1), Some("rIdChart1"));
+    }
+
+    #[test]
+    fn test_overwrite_relationship() {
+        let mut mapper = RelationshipMapper::new();
+        mapper.add_image(0, 0, "rId1".to_string());
+        assert_eq!(mapper.get_image_id(0, 0), Some("rId1"));
+
+        // Overwrite with new relationship ID
+        mapper.add_image(0, 0, "rId2".to_string());
+        assert_eq!(mapper.get_image_id(0, 0), Some("rId2"));
+    }
+}

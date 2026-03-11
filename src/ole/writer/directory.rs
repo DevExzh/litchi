@@ -103,10 +103,13 @@ impl DirectoryEntryBuilder {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```ignore
+    /// use litchi::ole::writer::DirectoryEntryBuilder;
+    ///
     /// // Word 97-2003 Document CLSID: {00020906-0000-0000-C000-000000000046}
     /// let word_clsid = [0x06, 0x09, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
     ///                   0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46];
+    /// let mut root = DirectoryEntryBuilder::root();
     /// root.set_clsid(word_clsid);
     /// ```
     pub fn set_clsid(&mut self, clsid: [u8; 16]) {

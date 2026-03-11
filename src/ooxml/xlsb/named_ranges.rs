@@ -2,6 +2,7 @@
 
 use crate::common::binary;
 use crate::ooxml::xlsb::error::{XlsbError, XlsbResult};
+use crate::ooxml::xlsb::formula::ptg_types;
 use crate::ooxml::xlsb::records::wide_str_with_len;
 
 /// Named range definition
@@ -51,6 +52,28 @@ impl NamedRange {
     pub fn with_hidden(mut self, hidden: bool) -> Self {
         self.hidden = hidden;
         self
+    }
+
+    /// Create a 3D area formula token stream for a workbook-local sheet range.
+    ///
+    /// The `sheet_id` is the zero-based worksheet index. XLSB formulas reference
+    /// the workbook's self extern-sheet table, which reserves the first two
+    /// entries for workbook and `#REF!`, so sheet references start at index 2.
+    pub fn create_area3d_formula(
+        sheet_id: u32,
+        first_row: u16,
+        last_row: u16,
+        first_col: u16,
+        last_col: u16,
+    ) -> Vec<u8> {
+        let mut formula = Vec::with_capacity(11);
+        formula.push(ptg_types::PTG_AREA_3D);
+        formula.extend_from_slice(&((sheet_id as u16) + 2).to_le_bytes());
+        formula.extend_from_slice(&first_row.to_le_bytes());
+        formula.extend_from_slice(&last_row.to_le_bytes());
+        formula.extend_from_slice(&first_col.to_le_bytes());
+        formula.extend_from_slice(&last_col.to_le_bytes());
+        formula
     }
 
     /// Parse from XLSB BrtName record
@@ -117,4 +140,26 @@ mod tests {
         assert!(range.hidden);
         assert_eq!(range.formula, Some(vec![1, 2, 3]));
     }
+
+    #[test]
+    fn test_create_area3d_formula() {
+        let formula = NamedRange::create_area3d_formula(0, 1, 3, 1, 1);
+        assert_eq!(formula[0], ptg_types::PTG_AREA_3D);
+        assert_eq!(u16::from_le_bytes([formula[1], formula[2]]), 2);
+        assert_eq!(u16::from_le_bytes([formula[3], formula[4]]), 1);
+        assert_eq!(u16::from_le_bytes([formula[5], formula[6]]), 3);
+        assert_eq!(u16::from_le_bytes([formula[7], formula[8]]), 1);
+        assert_eq!(u16::from_le_bytes([formula[9], formula[10]]), 1);
+    }
+}
+
+/// Create a 3D area formula token stream for a workbook-local sheet range.
+pub fn create_area3d_formula(
+    sheet_id: u32,
+    first_row: u16,
+    last_row: u16,
+    first_col: u16,
+    last_col: u16,
+) -> Vec<u8> {
+    NamedRange::create_area3d_formula(sheet_id, first_row, last_row, first_col, last_col)
 }

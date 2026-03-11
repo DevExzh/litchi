@@ -1073,7 +1073,7 @@ mod tests {
                 height in 100i64..10000000i64,
             ) {
                 let mut pres = MutablePresentation::new();
-                let slide = pres.add_slide().unwrap();
+                let _slide = pres.add_slide().unwrap();
 
                 let chart = ChartData::new(ChartType::Bar, x, y, width, height)
                     .add_series(ChartSeries::new("Test").with_values(vec![1.0]));
@@ -1099,7 +1099,7 @@ mod tests {
                 height in 100i64..10000000i64,
             ) {
                 let mut pres = MutablePresentation::new();
-                let slide = pres.add_slide().unwrap();
+                let _slide = pres.add_slide().unwrap();
 
                 let smartart = SmartArtBuilder::new(DiagramType::List)
                     .add_item("Item")

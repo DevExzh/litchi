@@ -16,10 +16,12 @@
 //! ```rust,no_run
 //! use litchi::rtf::RtfDocument;
 //!
+//! # fn main() -> Result<(), litchi::rtf::RtfError> {
 //! let rtf_text = r#"{\rtf1\ansi{\fonttbl\f0\fswiss Helvetica;}\f0\pard Hello World!\par}"#;
 //! let doc = RtfDocument::parse(rtf_text)?;
 //! let text = doc.text();
-//! # Ok::<(), litchi::common::Error>(())
+//! # Ok::<(), litchi::rtf::RtfError>(())
+//! # }
 //! ```
 
 mod annotation;

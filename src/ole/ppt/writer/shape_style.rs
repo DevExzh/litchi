@@ -880,17 +880,16 @@ mod tests {
 
     #[test]
     fn test_shape_color() {
-        // Red = RGB(255, 0, 0) -> BGR: B=0, G=0, R=255 -> (0) | (0<<8) | (255<<16) = 0x00FF0000
+        // Red = RGB(255, 0, 0) -> OfficeArt COLORREF stores R in byte 0, G in byte 1, B in byte 2
         let red = ShapeColor::RED;
-        assert_eq!(red.to_rgbx(), 0x00FF0000);
+        assert_eq!(red.to_rgbx(), 0x000000FF);
 
-        // 0x336699 = RGB(0x33, 0x66, 0x99) -> BGR: B=0x99, G=0x66, R=0x33
-        // = (0x99) | (0x66<<8) | (0x33<<16) = 0x00336699
+        // 0x336699 = RGB(0x33, 0x66, 0x99) -> 0x00996633 in COLORREF byte layout
         let hex = ShapeColor::from_hex(0x336699);
         assert_eq!(hex.r, 0x33);
         assert_eq!(hex.g, 0x66);
         assert_eq!(hex.b, 0x99);
-        assert_eq!(hex.to_rgbx(), 0x00336699);
+        assert_eq!(hex.to_rgbx(), 0x00996633);
 
         let scheme = ShapeColor::scheme_fill();
         assert!(scheme.use_scheme);

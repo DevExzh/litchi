@@ -102,6 +102,21 @@ pub fn color_hex(c: u32) -> String {
     s
 }
 
+/// Write XML-escaped text directly to a buffer.
+#[inline]
+pub fn write_xml_escaped(buf: &mut String, text: &str) {
+    for ch in text.chars() {
+        match ch {
+            '&' => buf.push_str("&amp;"),
+            '<' => buf.push_str("&lt;"),
+            '>' => buf.push_str("&gt;"),
+            '"' => buf.push_str("&quot;"),
+            '\'' => buf.push_str("&apos;"),
+            _ => buf.push(ch),
+        }
+    }
+}
+
 /// Write SVG stroke attributes for a pen directly to a buffer.
 ///
 /// # Arguments

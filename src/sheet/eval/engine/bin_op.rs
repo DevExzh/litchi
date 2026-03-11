@@ -80,3 +80,196 @@ fn eval_comparison(op: BinaryOp, left: CellValue, right: CellValue) -> CellValue
 
     CellValue::Bool(result)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::CellValue;
+    use crate::sheet::eval::parser::BinaryOp;
+
+    #[test]
+    fn test_eval_binary_op_add() {
+        let result = eval_binary_op(BinaryOp::Add, CellValue::Int(5), CellValue::Int(3));
+        match result {
+            CellValue::Float(v) => assert_eq!(v, 8.0),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[test]
+    fn test_eval_binary_op_sub() {
+        let result = eval_binary_op(BinaryOp::Sub, CellValue::Int(10), CellValue::Int(4));
+        match result {
+            CellValue::Float(v) => assert_eq!(v, 6.0),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[test]
+    fn test_eval_binary_op_mul() {
+        let result = eval_binary_op(BinaryOp::Mul, CellValue::Int(6), CellValue::Int(7));
+        match result {
+            CellValue::Float(v) => assert_eq!(v, 42.0),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[test]
+    fn test_eval_binary_op_div() {
+        let result = eval_binary_op(BinaryOp::Div, CellValue::Int(15), CellValue::Int(3));
+        match result {
+            CellValue::Float(v) => assert_eq!(v, 5.0),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[test]
+    fn test_eval_binary_op_div_by_zero() {
+        let result = eval_binary_op(BinaryOp::Div, CellValue::Int(10), CellValue::Int(0));
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "Division by zero"),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[test]
+    fn test_eval_binary_op_non_numeric_left() {
+        let result = eval_binary_op(
+            BinaryOp::Add,
+            CellValue::String("abc".to_string()),
+            CellValue::Int(5),
+        );
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "Left operand is not numeric"),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[test]
+    fn test_eval_binary_op_non_numeric_right() {
+        let result = eval_binary_op(
+            BinaryOp::Add,
+            CellValue::Int(5),
+            CellValue::String("abc".to_string()),
+        );
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "Right operand is not numeric"),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[test]
+    fn test_eval_comparison_eq_numbers() {
+        let result = eval_binary_op(BinaryOp::Eq, CellValue::Int(5), CellValue::Int(5));
+        match result {
+            CellValue::Bool(v) => assert!(v),
+            _ => panic!("Expected Bool result"),
+        }
+    }
+
+    #[test]
+    fn test_eval_comparison_ne_numbers() {
+        let result = eval_binary_op(BinaryOp::Ne, CellValue::Int(5), CellValue::Int(3));
+        match result {
+            CellValue::Bool(v) => assert!(v),
+            _ => panic!("Expected Bool result"),
+        }
+    }
+
+    #[test]
+    fn test_eval_comparison_gt_numbers() {
+        let result = eval_binary_op(BinaryOp::Gt, CellValue::Int(10), CellValue::Int(5));
+        match result {
+            CellValue::Bool(v) => assert!(v),
+            _ => panic!("Expected Bool result"),
+        }
+    }
+
+    #[test]
+    fn test_eval_comparison_lt_numbers() {
+        let result = eval_binary_op(BinaryOp::Lt, CellValue::Int(3), CellValue::Int(7));
+        match result {
+            CellValue::Bool(v) => assert!(v),
+            _ => panic!("Expected Bool result"),
+        }
+    }
+
+    #[test]
+    fn test_eval_comparison_ge_numbers() {
+        let result = eval_binary_op(BinaryOp::Ge, CellValue::Int(5), CellValue::Int(5));
+        match result {
+            CellValue::Bool(v) => assert!(v),
+            _ => panic!("Expected Bool result"),
+        }
+    }
+
+    #[test]
+    fn test_eval_comparison_le_numbers() {
+        let result = eval_binary_op(BinaryOp::Le, CellValue::Int(3), CellValue::Int(5));
+        match result {
+            CellValue::Bool(v) => assert!(v),
+            _ => panic!("Expected Bool result"),
+        }
+    }
+
+    #[test]
+    fn test_eval_comparison_eq_strings() {
+        let result = eval_binary_op(
+            BinaryOp::Eq,
+            CellValue::String("hello".to_string()),
+            CellValue::String("hello".to_string()),
+        );
+        match result {
+            CellValue::Bool(v) => assert!(v),
+            _ => panic!("Expected Bool result"),
+        }
+    }
+
+    #[test]
+    fn test_eval_comparison_gt_strings() {
+        let result = eval_binary_op(
+            BinaryOp::Gt,
+            CellValue::String("zebra".to_string()),
+            CellValue::String("apple".to_string()),
+        );
+        match result {
+            CellValue::Bool(v) => assert!(v),
+            _ => panic!("Expected Bool result"),
+        }
+    }
+
+    #[test]
+    fn test_eval_comparison_mixed_types() {
+        let result = eval_binary_op(BinaryOp::Eq, CellValue::Int(5), CellValue::Float(5.0));
+        match result {
+            CellValue::Bool(v) => assert!(v),
+            _ => panic!("Expected Bool result"),
+        }
+    }
+
+    #[test]
+    fn test_eval_comparison_with_error_left() {
+        let result = eval_binary_op(
+            BinaryOp::Eq,
+            CellValue::Error("#REF!".to_string()),
+            CellValue::Int(5),
+        );
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "#REF!"),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[test]
+    fn test_eval_comparison_with_error_right() {
+        let result = eval_binary_op(
+            BinaryOp::Eq,
+            CellValue::Int(5),
+            CellValue::Error("#VALUE!".to_string()),
+        );
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "#VALUE!"),
+            _ => panic!("Expected Error result"),
+        }
+    }
+}

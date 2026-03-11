@@ -565,3 +565,206 @@ async fn eval_find_like(
     }
     Ok(CellValue::Error(format!("{name} could not find the text")))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::parser::Expr;
+
+    fn str_expr(s: &str) -> Expr {
+        Expr::Literal(CellValue::String(s.to_string()))
+    }
+
+    fn num_expr(n: f64) -> Expr {
+        if n == n.floor() {
+            Expr::Literal(CellValue::Int(n as i64))
+        } else {
+            Expr::Literal(CellValue::Float(n))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_char() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(65.0)];
+        let result = eval_char(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "A"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_char_invalid() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(300.0)];
+        let result = eval_char(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("between 1 and 255")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_code() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("A")];
+        let result = eval_code(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Int(v) => assert_eq!(v, 65),
+            _ => panic!("Expected Int(65)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_code_empty() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("")];
+        let result = eval_code(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("must not be empty")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_clean() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello\x00world")];
+        let result = eval_clean(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "helloworld"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_left() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello"), num_expr(3.0)];
+        let result = eval_left(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "hel"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_left_default() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello")];
+        let result = eval_left(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "h"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_right() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello"), num_expr(3.0)];
+        let result = eval_right(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "llo"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_mid() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello world"), num_expr(7.0), num_expr(5.0)];
+        let result = eval_mid(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "world"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_mid_start_at_1() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("hello"), num_expr(1.0), num_expr(3.0)];
+        let result = eval_mid(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "hel"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_replace() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            str_expr("hello world"),
+            num_expr(7.0),
+            num_expr(5.0),
+            str_expr("universe"),
+        ];
+        let result = eval_replace(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "hello universe"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_find() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("world"), str_expr("hello world")];
+        let result = eval_find(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Int(v) => assert_eq!(v, 7),
+            _ => panic!("Expected Int(7)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_find_case_sensitive() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("WORLD"), str_expr("hello world")];
+        let result = eval_find(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("could not find")),
+            _ => panic!("Expected Error - FIND is case sensitive"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_search() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("world"), str_expr("hello world")];
+        let result = eval_search(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Int(v) => assert_eq!(v, 7),
+            _ => panic!("Expected Int(7)"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_search_case_insensitive() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("WORLD"), str_expr("hello world")];
+        let result = eval_search(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Int(v) => assert_eq!(v, 7),
+            _ => panic!("Expected Int(7) - SEARCH is case insensitive"),
+        }
+    }
+}

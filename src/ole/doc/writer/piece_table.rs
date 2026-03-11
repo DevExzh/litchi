@@ -138,6 +138,25 @@ mod tests {
     }
 
     #[test]
+    fn test_piece_empty() {
+        let piece = Piece::new(0, 0, 0, true);
+        assert_eq!(piece.len(), 0);
+        assert!(piece.is_empty());
+    }
+
+    #[test]
+    fn test_piece_unicode() {
+        let piece = Piece::new(0, 100, 0, true);
+        assert!(piece.is_unicode);
+    }
+
+    #[test]
+    fn test_piece_non_unicode() {
+        let piece = Piece::new(0, 100, 0, false);
+        assert!(!piece.is_unicode);
+    }
+
+    #[test]
     fn test_piece_table_generation() {
         let mut builder = PieceTableBuilder::new();
         builder.add_piece(Piece::new(0, 50, 0, true));
@@ -146,5 +165,42 @@ mod tests {
         let clx = builder.generate().unwrap();
         assert!(!clx.is_empty());
         assert_eq!(clx[0], 0x02); // Type: TEXT_PIECE_TABLE_TYPE (Apache POI)
+    }
+
+    #[test]
+    fn test_piece_table_empty() {
+        let builder = PieceTableBuilder::new();
+        let clx = builder.generate().unwrap();
+        assert!(!clx.is_empty());
+        assert_eq!(clx[0], 0x02);
+    }
+
+    #[test]
+    fn test_piece_table_single_piece() {
+        let mut builder = PieceTableBuilder::new();
+        builder.add_piece(Piece::new(0, 1000, 0, true));
+
+        let clx = builder.generate().unwrap();
+        assert!(!clx.is_empty());
+        assert_eq!(clx[0], 0x02);
+    }
+
+    #[test]
+    fn test_piece_table_multiple_pieces() {
+        let mut builder = PieceTableBuilder::new();
+        builder.add_piece(Piece::new(0, 100, 0, true));
+        builder.add_piece(Piece::new(100, 200, 200, true));
+        builder.add_piece(Piece::new(300, 150, 600, true));
+
+        let clx = builder.generate().unwrap();
+        assert!(!clx.is_empty());
+        assert_eq!(clx[0], 0x02);
+    }
+
+    #[test]
+    fn test_piece_table_builder_default() {
+        let builder: PieceTableBuilder = Default::default();
+        let clx = builder.generate().unwrap();
+        assert!(!clx.is_empty());
     }
 }

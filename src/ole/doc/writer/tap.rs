@@ -7,7 +7,7 @@
 use super::sprm::SprmBuilder;
 
 /// Table cell descriptor
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TableCell {
     /// Cell width (in twips)
     pub width: u16,
@@ -16,7 +16,7 @@ pub struct TableCell {
 }
 
 /// Table row properties
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TableRow {
     /// Cells in this row
     pub cells: Vec<TableCell>,
@@ -140,8 +140,63 @@ mod tests {
     }
 
     #[test]
+    fn test_tap_builder_empty() {
+        let builder = TapBuilder::new();
+        assert_eq!(builder.row_count(), 0);
+    }
+
+    #[test]
+    fn test_tap_builder_multiple_rows() {
+        let mut builder = TapBuilder::new();
+        for i in 0..5 {
+            builder.add_row(TableRow {
+                cells: vec![
+                    TableCell {
+                        width: 1000,
+                        merged: false,
+                    },
+                    TableCell {
+                        width: 1000,
+                        merged: false,
+                    },
+                    TableCell {
+                        width: 1000,
+                        merged: false,
+                    },
+                ],
+                height: 200 + (i as u16 * 50),
+                is_header: i == 0,
+            });
+        }
+
+        assert_eq!(builder.row_count(), 5);
+        let sprms = builder.generate_row_sprms(0);
+        assert!(!sprms.is_empty());
+    }
+
+    #[test]
     fn test_create_simple_table() {
         let table = create_simple_table(3, 4, 1440); // 3 rows, 4 cols, 1 inch cells
         assert_eq!(table.row_count(), 3);
+    }
+
+    #[test]
+    fn test_create_simple_table_single_cell() {
+        let table = create_simple_table(1, 1, 1000);
+        assert_eq!(table.row_count(), 1);
+        assert_eq!(table.rows[0].cells.len(), 1);
+    }
+
+    #[test]
+    fn test_create_simple_table_large() {
+        let table = create_simple_table(10, 10, 500);
+        assert_eq!(table.row_count(), 10);
+        assert_eq!(table.rows[0].cells.len(), 10);
+    }
+
+    #[test]
+    fn test_table_row_count() {
+        let table = create_simple_table(5, 3, 1000);
+        assert_eq!(table.row_count(), 5);
     }
 }

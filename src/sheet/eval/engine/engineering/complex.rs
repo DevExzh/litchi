@@ -522,3 +522,398 @@ where
         None => Ok(CellValue::Error("#VALUE!".to_string())),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::parser::Expr;
+
+    fn num_expr(n: f64) -> Expr {
+        if n == n.floor() {
+            Expr::Literal(CellValue::Int(n as i64))
+        } else {
+            Expr::Literal(CellValue::Float(n))
+        }
+    }
+
+    fn str_expr(s: &str) -> Expr {
+        Expr::Literal(CellValue::String(s.to_string()))
+    }
+
+    #[test]
+    fn test_parse_complex_real_only() {
+        let c = parse_complex("5").unwrap();
+        assert!((c.re - 5.0).abs() < 1e-9);
+        assert!(c.im.abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_parse_complex_imaginary_only() {
+        let c = parse_complex("3i").unwrap();
+        assert!(c.re.abs() < 1e-9);
+        assert!((c.im - 3.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_parse_complex_both_parts() {
+        let c = parse_complex("3+4i").unwrap();
+        assert!((c.re - 3.0).abs() < 1e-9);
+        assert!((c.im - 4.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_parse_complex_negative() {
+        let c = parse_complex("-3-4i").unwrap();
+        assert!((c.re - (-3.0)).abs() < 1e-9);
+        assert!((c.im - (-4.0)).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_parse_complex_just_i() {
+        let c = parse_complex("i").unwrap();
+        assert!(c.re.abs() < 1e-9);
+        assert!((c.im - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_parse_complex_negative_i() {
+        let c = parse_complex("-i").unwrap();
+        assert!(c.re.abs() < 1e-9);
+        assert!((c.im - (-1.0)).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_parse_complex_with_j() {
+        let c = parse_complex("2+3j").unwrap();
+        assert!((c.re - 2.0).abs() < 1e-9);
+        assert!((c.im - 3.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_parse_complex_invalid() {
+        assert!(parse_complex("invalid").is_none());
+        assert!(parse_complex("").is_none());
+    }
+
+    #[test]
+    fn test_format_complex_real_only() {
+        assert_eq!(format_complex(Complex64::new(5.0, 0.0), "i"), "5");
+    }
+
+    #[test]
+    fn test_format_complex_imaginary_only() {
+        assert_eq!(format_complex(Complex64::new(0.0, 3.0), "i"), "3i");
+        assert_eq!(format_complex(Complex64::new(0.0, -3.0), "i"), "-3i");
+    }
+
+    #[test]
+    fn test_format_complex_both_parts() {
+        assert_eq!(format_complex(Complex64::new(3.0, 4.0), "i"), "3+4i");
+        assert_eq!(format_complex(Complex64::new(3.0, -4.0), "i"), "3-4i");
+    }
+
+    #[test]
+    fn test_format_complex_unit_imaginary() {
+        assert_eq!(format_complex(Complex64::new(0.0, 1.0), "i"), "i");
+        assert_eq!(format_complex(Complex64::new(0.0, -1.0), "i"), "-i");
+    }
+
+    #[tokio::test]
+    async fn test_eval_complex_basic() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(3.0), num_expr(4.0)];
+        let result = eval_complex(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "3+4i"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_complex_with_j() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(3.0), num_expr(4.0), str_expr("j")];
+        let result = eval_complex(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "3+4j"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_complex_wrong_args() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(3.0)];
+        let result = eval_complex(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 2 or 3")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_imabs() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // |3+4i| = 5
+        let args = vec![str_expr("3+4i")];
+        let result = eval_imabs(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 5.0).abs() < 1e-9),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_imreal() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("3+4i")];
+        let result = eval_imreal(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 3.0).abs() < 1e-9),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_imaginary() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("3+4i")];
+        let result = eval_imaginary(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 4.0).abs() < 1e-9),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_imargument() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // arg(1+0i) = 0
+        let args = vec![str_expr("1")];
+        let result = eval_imargument(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v.abs() < 1e-9),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_imconjugate() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // conj(3+4i) = 3-4i
+        let args = vec![str_expr("3+4i")];
+        let result = eval_imconjugate(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "3-4i"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_imsum() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // (3+4i) + (1+2i) = 4+6i
+        let args = vec![str_expr("3+4i"), str_expr("1+2i")];
+        let result = eval_imsum(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "4+6i"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_imsub() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // (3+4i) - (1+2i) = 2+2i
+        let args = vec![str_expr("3+4i"), str_expr("1+2i")];
+        let result = eval_imsub(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "2+2i"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_improduct() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // (3+4i) * (1+2i) = -5+10i
+        let args = vec![str_expr("3+4i"), str_expr("1+2i")];
+        let result = eval_improduct(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => {
+                // The result should be -5+10i
+                assert!(s.contains("-5") && s.contains("10"));
+            },
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_imdiv() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // (5+10i) / (1+2i) = 5
+        let args = vec![str_expr("5+10i"), str_expr("1+2i")];
+        let result = eval_imdiv(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert_eq!(s, "5"),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_imdiv_by_zero() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("3+4i"), str_expr("0")];
+        let result = eval_imdiv(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#NUM!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_imsin() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("0")];
+        let result = eval_imsin(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert!(s.contains("0")),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_imcos() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("0")];
+        let result = eval_imcos(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert!(s.contains("1")),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_imsqrt() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // sqrt(4) = 2
+        let args = vec![str_expr("4")];
+        let result = eval_imsqrt(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert!(s.contains("2")),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_imexp() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // exp(0) = 1
+        let args = vec![str_expr("0")];
+        let result = eval_imexp(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert!(s.contains("1")),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_impower() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // (3+4i)^2 = -7+24i
+        let args = vec![str_expr("3+4i"), num_expr(2.0)];
+        let result = eval_impower(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => {
+                // Result should be approximately -7+24i
+                // Due to floating point, it may be formatted like -6.999999999999998+24.000000000000004i
+                assert!(
+                    s.contains("24")
+                        && (s.contains("-7") || s.contains("-6.99") || s.contains("-6.9"))
+                );
+            },
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_imln() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // ln(1) = 0
+        let args = vec![str_expr("1")];
+        let result = eval_imln(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert!(s.contains("0")),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_imlog10() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // log10(10) = 1
+        let args = vec![str_expr("10")];
+        let result = eval_imlog10(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert!(s.contains("1")),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_imlog2() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // log2(2) = 1
+        let args = vec![str_expr("2")];
+        let result = eval_imlog2(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::String(s) => assert!(s.contains("1")),
+            _ => panic!("Expected String"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_complex_invalid_suffix() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(3.0), num_expr(4.0), str_expr("k")];
+        let result = eval_complex(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#VALUE!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_imabs_invalid() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("invalid")];
+        let result = eval_imabs(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("#VALUE!")),
+            _ => panic!("Expected Error"),
+        }
+    }
+}

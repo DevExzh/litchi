@@ -330,3 +330,521 @@ where
     };
     Ok(CellValue::Float(f(n)))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::parser::Expr;
+
+    fn num_expr(n: f64) -> Expr {
+        if n == n.floor() {
+            Expr::Literal(CellValue::Int(n as i64))
+        } else {
+            Expr::Literal(CellValue::Float(n))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_sin() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_sin(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v.abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_sin_pi_over_2() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(std::f64::consts::FRAC_PI_2)];
+        let result = eval_sin(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_cos() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_cos(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_cos_pi() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(std::f64::consts::PI)];
+        let result = eval_cos(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - (-1.0)).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_tan() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_tan(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v.abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_tan_pi_over_4() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(std::f64::consts::FRAC_PI_4)];
+        let result = eval_tan(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_cot() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(std::f64::consts::FRAC_PI_4)];
+        let result = eval_cot(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_cot_undefined() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_cot(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("undefined")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_csc() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(std::f64::consts::FRAC_PI_2)];
+        let result = eval_csc(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_csc_undefined() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_csc(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("undefined")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_sec() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_sec(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_sec_undefined() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(std::f64::consts::FRAC_PI_2)];
+        let result = eval_sec(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("undefined")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_asin() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_asin(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v.abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_asin_one() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0)];
+        let result = eval_asin(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - std::f64::consts::FRAC_PI_2).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_acos() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0)];
+        let result = eval_acos(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v.abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_acos_zero() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_acos(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - std::f64::consts::FRAC_PI_2).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_atan() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_atan(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v.abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_atan_one() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0)];
+        let result = eval_atan(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - std::f64::consts::FRAC_PI_4).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_atan2() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0), num_expr(1.0)];
+        let result = eval_atan2(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - std::f64::consts::FRAC_PI_4).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_atan2_zero_x() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0), num_expr(0.0)];
+        let result = eval_atan2(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - std::f64::consts::FRAC_PI_2).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_sinh() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_sinh(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v.abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_cosh() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_cosh(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_tanh() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_tanh(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v.abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_csch() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0)];
+        let result = eval_csch(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.0 / 1.0_f64.sinh()).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_csch_undefined() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_csch(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("undefined")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_sech() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_sech(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_coth() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0)];
+        let result = eval_coth(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => {
+                let expected = 1.0_f64.cosh() / 1.0_f64.sinh();
+                assert!((v - expected).abs() < 1e-9)
+            },
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_coth_undefined() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_coth(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("undefined")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_acot() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0)];
+        let result = eval_acot(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - std::f64::consts::FRAC_PI_4).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_asinh() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_asinh(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v.abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_acosh() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0)];
+        let result = eval_acosh(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v.abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_atanh() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.0)];
+        let result = eval_atanh(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!(v.abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_acoth() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(2.0)];
+        let result = eval_acoth(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => {
+                let expected = 0.5 * ((2.0_f64 + 1.0) / (2.0 - 1.0)).ln();
+                assert!((v - expected).abs() < 1e-9)
+            },
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_acoth_invalid() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.5)];
+        let result = eval_acoth(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("|x| > 1")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_radians() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(180.0)];
+        let result = eval_radians(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - std::f64::consts::PI).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_degrees() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(std::f64::consts::PI)];
+        let result = eval_degrees(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 180.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_sin_wrong_args() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![];
+        let result = eval_sin(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 1 argument")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_sin_non_numeric() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![Expr::Literal(CellValue::String("abc".to_string()))];
+        let result = eval_sin(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("non-numeric")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_atan2_wrong_args() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0)];
+        let result = eval_atan2(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 2 arguments")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_atan2_non_numeric_y() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            Expr::Literal(CellValue::String("abc".to_string())),
+            num_expr(1.0),
+        ];
+        let result = eval_atan2(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("y is not numeric")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_atan2_non_numeric_x() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            num_expr(1.0),
+            Expr::Literal(CellValue::String("abc".to_string())),
+        ];
+        let result = eval_atan2(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("x is not numeric")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+}

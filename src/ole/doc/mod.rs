@@ -26,7 +26,7 @@
 /// use litchi::ole::doc::Package;
 ///
 /// // Open a document
-/// let package = Package::open("document.doc")?;
+/// let mut package = Package::open("document.doc")?;
 /// let doc = package.document()?;
 ///
 /// // Extract all text

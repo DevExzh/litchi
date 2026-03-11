@@ -13,7 +13,9 @@ use litchi::ooxml::pptx::Package as PptxPackage;
 use litchi::ooxml::xlsx::Workbook;
 use litchi::sheet::WorkbookTrait;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+type ExampleResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
+fn main() -> ExampleResult<()> {
     println!("=== Office Document CRUD Demo ===\n");
 
     // Demonstrate DOCX operations
@@ -34,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Demonstrate Word document (DOCX) operations
-fn demo_docx_operations() -> Result<(), Box<dyn std::error::Error>> {
+fn demo_docx_operations() -> ExampleResult<()> {
     println!("--- DOCX Operations ---");
 
     // CREATE: Create a new document
@@ -120,7 +122,7 @@ fn demo_docx_operations() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Demonstrate Excel spreadsheet (XLSX) operations
-fn demo_xlsx_operations() -> Result<(), Box<dyn std::error::Error>> {
+fn demo_xlsx_operations() -> ExampleResult<()> {
     println!("--- XLSX Operations ---");
 
     // CREATE: Create a new workbook
@@ -211,7 +213,7 @@ fn demo_xlsx_operations() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Demonstrate PowerPoint presentation (PPTX) operations
-fn demo_pptx_operations() -> Result<(), Box<dyn std::error::Error>> {
+fn demo_pptx_operations() -> ExampleResult<()> {
     println!("--- PPTX Operations ---");
 
     // CREATE: Create a new presentation

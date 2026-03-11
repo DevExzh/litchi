@@ -236,3 +236,185 @@ where
     };
     Ok(CellValue::Float(f(n)))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Helper function to create a simple numeric expression
+    fn num_expr(n: f64) -> Expr {
+        if n == n.floor() {
+            Expr::Literal(CellValue::Int(n as i64))
+        } else {
+            Expr::Literal(CellValue::Float(n))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_abs_int() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(-42.0)];
+        let result = eval_abs(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Int(v) => assert_eq!(v, 42),
+            _ => panic!("Expected Int result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_abs_float() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(-std::f64::consts::PI)];
+        let result = eval_abs(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - std::f64::consts::PI).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_power() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(2.0), num_expr(3.0)];
+        let result = eval_power(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 8.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_sqrt() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(16.0)];
+        let result = eval_sqrt(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 4.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_ln() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(std::f64::consts::E)];
+        let result = eval_ln(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_log10() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1000.0)];
+        let result = eval_log10(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 3.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_exp() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0)];
+        let result = eval_exp(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - std::f64::consts::E).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_int() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(3.7)];
+        let result = eval_int(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Int(v) => assert_eq!(v, 3),
+            _ => panic!("Expected Int result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_int_negative() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(-3.7)];
+        let result = eval_int(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Int(v) => assert_eq!(v, -4),
+            _ => panic!("Expected Int result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_delta_equal() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(5.0)];
+        let result = eval_delta(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Int(v) => assert_eq!(v, 0), // 5 != 0
+            _ => panic!("Expected Int result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_delta_with_comparison() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(5.0), num_expr(5.0)];
+        let result = eval_delta(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Int(v) => assert_eq!(v, 1), // 5 == 5
+            _ => panic!("Expected Int result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_gestep() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(5.0), num_expr(3.0)];
+        let result = eval_gestep(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Int(v) => assert_eq!(v, 1), // 5 >= 3
+            _ => panic!("Expected Int result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_gestep_default() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(5.0)];
+        let result = eval_gestep(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Int(v) => assert_eq!(v, 1), // 5 >= 0
+            _ => panic!("Expected Int result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_sqrtpi() {
+        let engine = crate::sheet::eval::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(2.0)];
+        let result = eval_sqrtpi(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - (2.0 * std::f64::consts::PI).sqrt()).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+}

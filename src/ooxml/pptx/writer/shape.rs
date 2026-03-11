@@ -939,3 +939,408 @@ impl MutableShape {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::super::format::{ImageFormat, TextFormat};
+    use super::*;
+
+    #[test]
+    fn test_shape_rel_ids_default() {
+        let rel_ids: ShapeRelIds<'_> = Default::default();
+        assert!(rel_ids.image_rel_id.is_none());
+        assert!(rel_ids.chart_rel_id.is_none());
+        assert!(rel_ids.smartart_rel_ids.is_none());
+    }
+
+    #[test]
+    fn test_shape_rel_ids_with_values() {
+        let rel_ids = ShapeRelIds {
+            image_rel_id: Some("rId1"),
+            chart_rel_id: Some("rId2"),
+            smartart_rel_ids: Some(("rId3", "rId4", "rId5", "rId6")),
+        };
+        assert_eq!(rel_ids.image_rel_id, Some("rId1"));
+        assert_eq!(rel_ids.chart_rel_id, Some("rId2"));
+        assert_eq!(
+            rel_ids.smartart_rel_ids,
+            Some(("rId3", "rId4", "rId5", "rId6"))
+        );
+    }
+
+    #[test]
+    fn test_new_text_box() {
+        let shape =
+            MutableShape::new_text_box(3, "Hello World".to_string(), 1000, 2000, 3000, 4000);
+        assert_eq!(shape.shape_id, 3);
+        match &shape.shape_type {
+            ShapeType::TextBox {
+                text,
+                x,
+                y,
+                width,
+                height,
+                format,
+            } => {
+                assert_eq!(text, "Hello World");
+                assert_eq!(*x, 1000);
+                assert_eq!(*y, 2000);
+                assert_eq!(*width, 3000);
+                assert_eq!(*height, 4000);
+                // Default format should have no special settings
+                assert!(format.font.is_none());
+                assert!(format.size.is_none());
+            },
+            _ => panic!("Expected TextBox shape"),
+        }
+    }
+
+    #[test]
+    fn test_new_rectangle() {
+        let shape =
+            MutableShape::new_rectangle(4, 1000, 2000, 3000, 4000, Some("FF0000".to_string()));
+        assert_eq!(shape.shape_id, 4);
+        match &shape.shape_type {
+            ShapeType::Rectangle {
+                x,
+                y,
+                width,
+                height,
+                fill_color,
+            } => {
+                assert_eq!(*x, 1000);
+                assert_eq!(*y, 2000);
+                assert_eq!(*width, 3000);
+                assert_eq!(*height, 4000);
+                assert_eq!(fill_color.as_ref().unwrap(), "FF0000");
+            },
+            _ => panic!("Expected Rectangle shape"),
+        }
+    }
+
+    #[test]
+    fn test_new_rectangle_no_fill() {
+        let shape = MutableShape::new_rectangle(4, 1000, 2000, 3000, 4000, None);
+        match &shape.shape_type {
+            ShapeType::Rectangle { fill_color, .. } => {
+                assert!(fill_color.is_none());
+            },
+            _ => panic!("Expected Rectangle shape"),
+        }
+    }
+
+    #[test]
+    fn test_new_ellipse() {
+        let shape =
+            MutableShape::new_ellipse(5, 1000, 2000, 3000, 3000, Some("00FF00".to_string()));
+        assert_eq!(shape.shape_id, 5);
+        match &shape.shape_type {
+            ShapeType::Ellipse {
+                x,
+                y,
+                width,
+                height,
+                fill_color,
+            } => {
+                assert_eq!(*x, 1000);
+                assert_eq!(*y, 2000);
+                assert_eq!(*width, 3000);
+                assert_eq!(*height, 3000);
+                assert_eq!(fill_color.as_ref().unwrap(), "00FF00");
+            },
+            _ => panic!("Expected Ellipse shape"),
+        }
+    }
+
+    #[test]
+    fn test_new_picture() {
+        let data = vec![0x89, 0x50, 0x4E, 0x47]; // PNG header
+        let shape = MutableShape::new_picture(
+            6,
+            data.clone(),
+            ImageFormat::Png,
+            1000,
+            2000,
+            3000,
+            4000,
+            "Test image".to_string(),
+        )
+        .unwrap();
+        assert_eq!(shape.shape_id, 6);
+        match &shape.shape_type {
+            ShapeType::Picture {
+                x,
+                y,
+                width,
+                height,
+                description,
+                format,
+                ..
+            } => {
+                assert_eq!(*x, 1000);
+                assert_eq!(*y, 2000);
+                assert_eq!(*width, 3000);
+                assert_eq!(*height, 4000);
+                assert_eq!(description, "Test image");
+                assert_eq!(*format, ImageFormat::Png);
+            },
+            _ => panic!("Expected Picture shape"),
+        }
+    }
+
+    #[test]
+    fn test_new_table() {
+        let data = vec![
+            vec!["A1".to_string(), "B1".to_string()],
+            vec!["A2".to_string(), "B2".to_string()],
+        ];
+        let shape =
+            MutableShape::new_table(7, 1000, 2000, 3000, 2000, data, None, None, true, true);
+        assert_eq!(shape.shape_id, 7);
+        match &shape.shape_type {
+            ShapeType::Table {
+                x,
+                y,
+                width,
+                height,
+                data,
+                first_row,
+                band_row,
+                ..
+            } => {
+                assert_eq!(*x, 1000);
+                assert_eq!(*y, 2000);
+                assert_eq!(*width, 3000);
+                assert_eq!(*height, 2000);
+                assert_eq!(data.len(), 2);
+                assert!(first_row);
+                assert!(band_row);
+            },
+            _ => panic!("Expected Table shape"),
+        }
+    }
+
+    #[test]
+    fn test_new_group() {
+        let children = vec![MutableShape::new_rectangle(
+            100,
+            0,
+            0,
+            1000,
+            1000,
+            Some("FF0000".to_string()),
+        )];
+        let shape = MutableShape::new_group(8, 1000, 2000, 3000, 4000, children);
+        assert_eq!(shape.shape_id, 8);
+        match &shape.shape_type {
+            ShapeType::GroupShape {
+                x,
+                y,
+                width,
+                height,
+                children,
+            } => {
+                assert_eq!(*x, 1000);
+                assert_eq!(*y, 2000);
+                assert_eq!(*width, 3000);
+                assert_eq!(*height, 4000);
+                assert_eq!(children.len(), 1);
+            },
+            _ => panic!("Expected GroupShape shape"),
+        }
+    }
+
+    #[test]
+    fn test_set_text_format() {
+        let mut shape = MutableShape::new_text_box(3, "Test".to_string(), 0, 0, 1000, 1000);
+        let format = TextFormat {
+            font: Some("Arial".to_string()),
+            size: Some(12.0),
+            bold: Some(true),
+            italic: Some(false),
+            underline: Some(true),
+            color: Some("FF0000".to_string()),
+        };
+        shape.set_text_format(format.clone());
+        match &shape.shape_type {
+            ShapeType::TextBox { format: f, .. } => {
+                assert_eq!(f.font, Some("Arial".to_string()));
+                assert_eq!(f.size, Some(12.0));
+                assert_eq!(f.bold, Some(true));
+                assert_eq!(f.underline, Some(true));
+            },
+            _ => panic!("Expected TextBox shape"),
+        }
+    }
+
+    #[test]
+    fn test_text_format_builder_methods() {
+        let mut shape = MutableShape::new_text_box(3, "Test".to_string(), 0, 0, 1000, 1000);
+        shape
+            .font("Times New Roman")
+            .font_size(14.0)
+            .bold(true)
+            .italic(true)
+            .underline(true)
+            .color("0000FF");
+
+        match &shape.shape_type {
+            ShapeType::TextBox { format: f, .. } => {
+                assert_eq!(f.font, Some("Times New Roman".to_string()));
+                assert_eq!(f.size, Some(14.0));
+                assert_eq!(f.bold, Some(true));
+                assert_eq!(f.italic, Some(true));
+                assert_eq!(f.underline, Some(true));
+                assert_eq!(f.color, Some("0000FF".to_string()));
+            },
+            _ => panic!("Expected TextBox shape"),
+        }
+    }
+
+    #[test]
+    fn test_text_format_builder_only_affects_textbox() {
+        // Test that builder methods don't affect non-textbox shapes
+        let mut rect = MutableShape::new_rectangle(4, 0, 0, 1000, 1000, Some("FF0000".to_string()));
+        rect.font("Arial").font_size(12.0).bold(true);
+        // Should have no effect since it's a rectangle
+        match &rect.shape_type {
+            ShapeType::Rectangle { .. } => {},
+            _ => panic!("Expected Rectangle shape"),
+        }
+    }
+
+    #[test]
+    fn test_get_image_data() {
+        let data = vec![0x89, 0x50, 0x4E, 0x47];
+        let shape = MutableShape::new_picture(
+            6,
+            data.clone(),
+            ImageFormat::Png,
+            0,
+            0,
+            1000,
+            1000,
+            "Test".to_string(),
+        )
+        .unwrap();
+
+        let result = shape.get_image_data();
+        assert!(result.is_some());
+        let (got_data, got_format) = result.unwrap();
+        assert_eq!(got_data, data.as_slice());
+        assert_eq!(got_format, ImageFormat::Png);
+    }
+
+    #[test]
+    fn test_get_image_data_non_picture() {
+        let shape = MutableShape::new_rectangle(4, 0, 0, 1000, 1000, None);
+        assert!(shape.get_image_data().is_none());
+    }
+
+    #[test]
+    fn test_get_children() {
+        let child = MutableShape::new_rectangle(100, 0, 0, 1000, 1000, None);
+        let group = MutableShape::new_group(8, 0, 0, 2000, 2000, vec![child]);
+
+        let children = group.get_children();
+        assert!(children.is_some());
+        assert_eq!(children.unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_get_children_non_group() {
+        let shape = MutableShape::new_rectangle(4, 0, 0, 1000, 1000, None);
+        assert!(shape.get_children().is_none());
+    }
+
+    #[test]
+    fn test_get_children_mut() {
+        let child = MutableShape::new_rectangle(100, 0, 0, 1000, 1000, None);
+        let mut group = MutableShape::new_group(8, 0, 0, 2000, 2000, vec![child]);
+
+        let children = group.get_children_mut();
+        assert!(children.is_some());
+        assert_eq!(children.unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_get_children_mut_non_group() {
+        let mut shape = MutableShape::new_rectangle(4, 0, 0, 1000, 1000, None);
+        assert!(shape.get_children_mut().is_none());
+    }
+
+    #[test]
+    fn test_new_chart() {
+        let shape = MutableShape {
+            shape_id: 9,
+            shape_type: ShapeType::Chart {
+                x: 1000,
+                y: 2000,
+                width: 4000,
+                height: 3000,
+                chart_rel_id: "rIdChart1".to_string(),
+                chart_idx: 1,
+            },
+        };
+        match &shape.shape_type {
+            ShapeType::Chart {
+                x,
+                y,
+                width,
+                height,
+                chart_rel_id,
+                chart_idx,
+            } => {
+                assert_eq!(*x, 1000);
+                assert_eq!(*y, 2000);
+                assert_eq!(*width, 4000);
+                assert_eq!(*height, 3000);
+                assert_eq!(chart_rel_id, "rIdChart1");
+                assert_eq!(*chart_idx, 1);
+            },
+            _ => panic!("Expected Chart shape"),
+        }
+    }
+
+    #[test]
+    fn test_new_smartart() {
+        let shape = MutableShape {
+            shape_id: 10,
+            shape_type: ShapeType::SmartArt {
+                x: 1000,
+                y: 2000,
+                width: 4000,
+                height: 3000,
+                data_rel_id: "rIdData1".to_string(),
+                layout_rel_id: "rIdLayout1".to_string(),
+                style_rel_id: "rIdStyle1".to_string(),
+                colors_rel_id: "rIdColors1".to_string(),
+                diagram_idx: 1,
+            },
+        };
+        match &shape.shape_type {
+            ShapeType::SmartArt {
+                x,
+                y,
+                width,
+                height,
+                data_rel_id,
+                layout_rel_id,
+                style_rel_id,
+                colors_rel_id,
+                diagram_idx,
+            } => {
+                assert_eq!(*x, 1000);
+                assert_eq!(*y, 2000);
+                assert_eq!(*width, 4000);
+                assert_eq!(*height, 3000);
+                assert_eq!(data_rel_id, "rIdData1");
+                assert_eq!(layout_rel_id, "rIdLayout1");
+                assert_eq!(style_rel_id, "rIdStyle1");
+                assert_eq!(colors_rel_id, "rIdColors1");
+                assert_eq!(*diagram_idx, 1);
+            },
+            _ => panic!("Expected SmartArt shape"),
+        }
+    }
+}

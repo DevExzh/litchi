@@ -154,3 +154,152 @@ pub struct XlsDataValidation {
     pub error_title: Option<String>,
     pub error_message: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_xls_data_validation_operator_to_biff_code() {
+        assert_eq!(XlsDataValidationOperator::Between.to_biff_code(), 0);
+        assert_eq!(XlsDataValidationOperator::NotBetween.to_biff_code(), 1);
+        assert_eq!(XlsDataValidationOperator::Equal.to_biff_code(), 2);
+        assert_eq!(XlsDataValidationOperator::NotEqual.to_biff_code(), 3);
+        assert_eq!(XlsDataValidationOperator::GreaterThan.to_biff_code(), 4);
+        assert_eq!(XlsDataValidationOperator::LessThan.to_biff_code(), 5);
+        assert_eq!(
+            XlsDataValidationOperator::GreaterThanOrEqual.to_biff_code(),
+            6
+        );
+        assert_eq!(XlsDataValidationOperator::LessThanOrEqual.to_biff_code(), 7);
+    }
+
+    #[test]
+    fn test_whole_to_biff_payload_greater_than() {
+        let validation = XlsDataValidationType::Whole {
+            operator: XlsDataValidationOperator::GreaterThan,
+            value1: 10,
+            value2: None,
+        };
+        let payload = validation.to_biff_payload().unwrap();
+        assert_eq!(payload.data_type, 0x01);
+        assert_eq!(payload.operator, 4);
+        assert!(!payload.is_explicit_list);
+        assert!(payload.formula1.is_some());
+        assert!(payload.formula2.is_none());
+    }
+
+    #[test]
+    fn test_whole_to_biff_payload_between() {
+        let validation = XlsDataValidationType::Whole {
+            operator: XlsDataValidationOperator::Between,
+            value1: 1,
+            value2: Some(100),
+        };
+        let payload = validation.to_biff_payload().unwrap();
+        assert_eq!(payload.data_type, 0x01);
+        assert_eq!(payload.operator, 0);
+        assert!(!payload.is_explicit_list);
+        assert!(payload.formula1.is_some());
+        assert!(payload.formula2.is_some());
+    }
+
+    #[test]
+    fn test_whole_to_biff_payload_between_missing_value2() {
+        let validation = XlsDataValidationType::Whole {
+            operator: XlsDataValidationOperator::Between,
+            value1: 1,
+            value2: None,
+        };
+        let result = validation.to_biff_payload();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_list_to_biff_payload() {
+        let validation = XlsDataValidationType::List {
+            values: vec!["Yes".to_string(), "No".to_string(), "Maybe".to_string()],
+        };
+        let payload = validation.to_biff_payload().unwrap();
+        assert_eq!(payload.data_type, 0x03);
+        assert_eq!(payload.operator, 0);
+        assert!(payload.is_explicit_list);
+        assert!(payload.formula1.is_some());
+        assert!(payload.formula2.is_none());
+    }
+
+    #[test]
+    fn test_list_to_biff_payload_empty() {
+        let validation = XlsDataValidationType::List { values: vec![] };
+        let result = validation.to_biff_payload();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_list_to_biff_payload_non_ascii() {
+        let validation = XlsDataValidationType::List {
+            values: vec!["是".to_string(), "否".to_string()],
+        };
+        let result = validation.to_biff_payload();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_list_to_biff_payload_too_long() {
+        let long_value = "a".repeat(256);
+        let validation = XlsDataValidationType::List {
+            values: vec![long_value],
+        };
+        let result = validation.to_biff_payload();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_xls_data_validation_struct() {
+        let dv = XlsDataValidation {
+            first_row: 0,
+            last_row: 9,
+            first_col: 0,
+            last_col: 1,
+            validation_type: XlsDataValidationType::List {
+                values: vec!["A".to_string(), "B".to_string()],
+            },
+            show_input_message: true,
+            input_title: Some("Input".to_string()),
+            input_message: Some("Choose A or B".to_string()),
+            show_error_alert: true,
+            error_title: Some("Error".to_string()),
+            error_message: Some("Invalid choice".to_string()),
+        };
+        assert_eq!(dv.first_row, 0);
+        assert_eq!(dv.last_row, 9);
+        assert_eq!(dv.first_col, 0);
+        assert_eq!(dv.last_col, 1);
+        assert!(dv.show_input_message);
+        assert!(dv.show_error_alert);
+    }
+
+    #[test]
+    fn test_xls_data_validation_clone() {
+        let dv = XlsDataValidation {
+            first_row: 0,
+            last_row: 9,
+            first_col: 0,
+            last_col: 1,
+            validation_type: XlsDataValidationType::Whole {
+                operator: XlsDataValidationOperator::GreaterThan,
+                value1: 10,
+                value2: None,
+            },
+            show_input_message: false,
+            input_title: None,
+            input_message: None,
+            show_error_alert: true,
+            error_title: None,
+            error_message: None,
+        };
+        let cloned = dv.clone();
+        assert_eq!(cloned.first_row, dv.first_row);
+        assert_eq!(cloned.last_row, dv.last_row);
+    }
+}

@@ -435,16 +435,16 @@ impl SpreadsheetBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::{SpreadsheetBuilder, Cell, CellValue};
+    /// use litchi::odf::{CellValue, SCell, SpreadsheetBuilder};
     ///
     /// # fn main() -> litchi::Result<()> {
     /// let mut builder = SpreadsheetBuilder::new();
     /// builder.add_sheet("Sheet1")?;
     ///
     /// let cells = vec![
-    ///     Cell {
-    ///         text: "100".to_string(),
+    ///     SCell {
     ///         value: CellValue::Number(100.0),
+    ///         text: "100".to_string(),
     ///         formula: None,
     ///         row: 0,
     ///         col: 0,
@@ -739,5 +739,390 @@ impl SpreadsheetBuilder {
         let bytes = self.build()?;
         std::fs::write(path, bytes)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_spreadsheet_builder_new() {
+        let builder = SpreadsheetBuilder::new();
+        assert_eq!(builder.sheets.len(), 0);
+    }
+
+    #[test]
+    fn test_spreadsheet_builder_default() {
+        let builder: SpreadsheetBuilder = Default::default();
+        assert_eq!(builder.sheets.len(), 0);
+    }
+
+    #[test]
+    fn test_add_sheet() {
+        let mut builder = SpreadsheetBuilder::new();
+        let result = builder.add_sheet("TestSheet");
+        assert!(result.is_ok());
+        assert_eq!(builder.sheets.len(), 1);
+        assert_eq!(builder.sheets[0].name, "TestSheet");
+    }
+
+    #[test]
+    fn test_add_multiple_sheets() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        builder.add_sheet("Sheet2").unwrap();
+        builder.add_sheet("Sheet3").unwrap();
+        assert_eq!(builder.sheets.len(), 3);
+    }
+
+    #[test]
+    fn test_add_row_with_values() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        builder.add_row_with_values(&["A", "B", "C"]).unwrap();
+
+        assert_eq!(builder.sheets[0].rows.len(), 1);
+        assert_eq!(builder.sheets[0].rows[0].cells.len(), 3);
+        assert_eq!(builder.sheets[0].rows[0].cells[0].text, "A");
+        assert_eq!(builder.sheets[0].rows[0].cells[1].text, "B");
+        assert_eq!(builder.sheets[0].rows[0].cells[2].text, "C");
+    }
+
+    #[test]
+    fn test_add_row_with_values_auto_sheet() {
+        let mut builder = SpreadsheetBuilder::new();
+        // No sheet added explicitly - should auto-create Sheet1
+        builder.add_row_with_values(&["A", "B"]).unwrap();
+
+        assert_eq!(builder.sheets.len(), 1);
+        assert_eq!(builder.sheets[0].name, "Sheet1");
+        assert_eq!(builder.sheets[0].rows.len(), 1);
+    }
+
+    #[test]
+    fn test_add_row_with_numbers() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        builder.add_row_with_numbers(&[1.0, 2.5, 3.14]).unwrap();
+
+        assert_eq!(builder.sheets[0].rows[0].cells.len(), 3);
+        match &builder.sheets[0].rows[0].cells[0].value {
+            CellValue::Number(n) => assert!((n - 1.0).abs() < f64::EPSILON),
+            _ => panic!("Expected Number"),
+        }
+        match &builder.sheets[0].rows[0].cells[1].value {
+            CellValue::Number(n) => assert!((n - 2.5).abs() < f64::EPSILON),
+            _ => panic!("Expected Number"),
+        }
+    }
+
+    #[test]
+    fn test_add_row_with_cell_values() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        builder
+            .add_row_with_cell_values(&[
+                CellValue::Text("Product".to_string()),
+                CellValue::Number(99.99),
+                CellValue::Boolean(true),
+            ])
+            .unwrap();
+
+        assert_eq!(builder.sheets[0].rows[0].cells.len(), 3);
+        match &builder.sheets[0].rows[0].cells[0].value {
+            CellValue::Text(t) => assert_eq!(t, "Product"),
+            _ => panic!("Expected Text"),
+        }
+        match &builder.sheets[0].rows[0].cells[2].value {
+            CellValue::Boolean(b) => assert!(*b),
+            _ => panic!("Expected Boolean"),
+        }
+    }
+
+    #[test]
+    fn test_set_cell() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        builder.set_cell(0, 0, CellValue::Number(42.0)).unwrap();
+        builder
+            .set_cell(0, 1, CellValue::Text("Hello".to_string()))
+            .unwrap();
+        builder.set_cell(5, 2, CellValue::Boolean(false)).unwrap();
+
+        // Verify cells
+        match &builder.sheets[0].rows[0].cells[0].value {
+            CellValue::Number(n) => assert!((n - 42.0).abs() < f64::EPSILON),
+            _ => panic!("Expected Number"),
+        }
+        assert_eq!(builder.sheets[0].rows[0].cells[1].text, "Hello");
+
+        // Row 5 should exist with row index 5
+        assert_eq!(builder.sheets[0].rows.len(), 6);
+        assert_eq!(builder.sheets[0].rows[5].index, 5);
+    }
+
+    #[test]
+    fn test_set_cell_auto_sheet() {
+        let mut builder = SpreadsheetBuilder::new();
+        // No sheet added - should auto-create
+        builder
+            .set_cell(0, 0, CellValue::Text("Auto".to_string()))
+            .unwrap();
+        assert_eq!(builder.sheets.len(), 1);
+        assert_eq!(builder.sheets[0].name, "Sheet1");
+    }
+
+    #[test]
+    fn test_set_cell_formula() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        builder.set_cell_formula(0, 0, "=SUM(A2:A10)").unwrap();
+        builder.set_cell_formula(1, 0, "=A1+B1").unwrap();
+
+        assert_eq!(
+            builder.sheets[0].rows[0].cells[0].formula,
+            Some("=SUM(A2:A10)".to_string())
+        );
+        assert_eq!(
+            builder.sheets[0].rows[1].cells[0].formula,
+            Some("=A1+B1".to_string())
+        );
+    }
+
+    #[test]
+    fn test_select_sheet() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        builder.add_sheet("Sheet2").unwrap();
+        builder.add_row_with_values(&["Data for Sheet2"]).unwrap();
+
+        // Select Sheet1 (index 0)
+        builder.select_sheet(0).unwrap();
+        builder.add_row_with_values(&["Data for Sheet1"]).unwrap();
+
+        // Sheet1 should now be at index 1 (last position after move)
+        assert_eq!(builder.sheets[1].name, "Sheet1");
+        assert_eq!(builder.sheets[1].rows.len(), 1);
+    }
+
+    #[test]
+    fn test_select_sheet_out_of_bounds() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        let result = builder.select_sheet(5);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_add_row() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+
+        let cells = vec![
+            Cell {
+                value: CellValue::Number(100.0),
+                text: "100".to_string(),
+                formula: None,
+                row: 0,
+                col: 0,
+            },
+            Cell {
+                value: CellValue::Text("Test".to_string()),
+                text: "Test".to_string(),
+                formula: None,
+                row: 0,
+                col: 1,
+            },
+        ];
+        builder.add_row(cells).unwrap();
+
+        assert_eq!(builder.sheets[0].rows.len(), 1);
+        assert_eq!(builder.sheets[0].rows[0].cells.len(), 2);
+    }
+
+    #[test]
+    fn test_add_sheet_element() {
+        let mut builder = SpreadsheetBuilder::new();
+        let sheet = Sheet {
+            name: "CustomSheet".to_string(),
+            rows: vec![],
+        };
+        builder.add_sheet_element(sheet).unwrap();
+
+        assert_eq!(builder.sheets.len(), 1);
+        assert_eq!(builder.sheets[0].name, "CustomSheet");
+    }
+
+    #[test]
+    fn test_set_metadata() {
+        let mut builder = SpreadsheetBuilder::new();
+        let metadata = Metadata {
+            title: Some("Test Title".to_string()),
+            author: Some("Test Author".to_string()),
+            ..Default::default()
+        };
+        builder.set_metadata(metadata);
+
+        assert_eq!(builder.metadata.title, Some("Test Title".to_string()));
+        assert_eq!(builder.metadata.author, Some("Test Author".to_string()));
+    }
+
+    #[test]
+    fn test_has_formulas() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        assert!(!builder.has_formulas());
+
+        builder.set_cell_formula(0, 0, "=A1+B1").unwrap();
+        assert!(builder.has_formulas());
+    }
+
+    #[test]
+    fn test_sheet_max_cols() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        builder.add_row_with_values(&["A", "B", "C", "D"]).unwrap();
+        builder.add_row_with_values(&["X", "Y"]).unwrap();
+
+        let max_cols = SpreadsheetBuilder::sheet_max_cols(&builder.sheets[0]);
+        assert_eq!(max_cols, 4);
+    }
+
+    #[test]
+    fn test_generate_content_body() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("TestSheet").unwrap();
+        builder.add_row_with_values(&["A", "B"]).unwrap();
+
+        let content = builder.generate_content_body();
+        assert!(content.contains("TestSheet"));
+        assert!(content.contains("table:table"));
+        assert!(content.contains("table:table-row"));
+    }
+
+    #[test]
+    fn test_generate_content_xml() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        builder.add_row_with_numbers(&[42.0]).unwrap();
+
+        let xml = builder.generate_content_xml();
+        assert!(xml.starts_with(r#"<?xml version="1.0" encoding="UTF-8"?>"#));
+        assert!(xml.contains("office:document-content"));
+        assert!(xml.contains("Sheet1"));
+        assert!(xml.contains("42")); // Check number value
+    }
+
+    #[test]
+    fn test_generate_content_xml_with_formula() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        builder.set_cell_formula(0, 0, "=SUM(A1:A10)").unwrap();
+
+        let xml = builder.generate_content_xml();
+        assert!(xml.contains("xmlns:of="));
+        assert!(xml.contains("table:formula"));
+        assert!(xml.contains("=SUM(A1:A10)"));
+    }
+
+    #[test]
+    fn test_generate_meta_xml() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        builder.metadata.title = Some("Test Document".to_string());
+        builder.metadata.author = Some("John Doe".to_string());
+
+        let meta_xml = builder.generate_meta_xml();
+        assert!(meta_xml.contains("office:document-meta"));
+        assert!(meta_xml.contains("Litchi/"));
+        assert!(meta_xml.contains("Test Document"));
+        assert!(meta_xml.contains("John Doe"));
+    }
+
+    #[test]
+    fn test_build() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        builder.add_row_with_values(&["Test"]).unwrap();
+
+        let result = builder.build();
+        assert!(result.is_ok());
+        let bytes = result.unwrap();
+        assert!(!bytes.is_empty());
+        // Check it's a valid ZIP (starts with PK)
+        assert_eq!(&bytes[0..2], b"PK");
+    }
+
+    #[test]
+    fn test_save() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.ods");
+
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        builder.add_row_with_values(&["A", "B", "C"]).unwrap();
+
+        let result = builder.save(&path);
+        assert!(result.is_ok());
+        assert!(path.exists());
+
+        // Verify the file is a valid ZIP
+        let bytes = std::fs::read(&path).unwrap();
+        assert_eq!(&bytes[0..2], b"PK");
+    }
+
+    #[test]
+    fn test_chained_builder_api() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder
+            .add_sheet("Data")
+            .unwrap()
+            .add_row_with_values(&["Name", "Age"])
+            .unwrap()
+            .add_row_with_values(&["Alice", "30"])
+            .unwrap()
+            .add_row_with_numbers(&[25.0, 35.0])
+            .unwrap();
+
+        assert_eq!(builder.sheets[0].rows.len(), 3);
+    }
+
+    #[test]
+    fn test_cell_value_types_in_content() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        builder
+            .add_row_with_cell_values(&[
+                CellValue::Text("Text".to_string()),
+                CellValue::Number(123.45),
+                CellValue::Currency(100.0, "USD".to_string()),
+                CellValue::Percentage(0.5),
+                CellValue::Boolean(true),
+                CellValue::Date("2024-03-15".to_string()),
+                CellValue::Time("PT12H30M00S".to_string()),
+            ])
+            .unwrap();
+
+        let xml = builder.generate_content_xml();
+        assert!(xml.contains(r#"office:value-type="string""#));
+        assert!(xml.contains(r#"office:value-type="float""#));
+        assert!(xml.contains(r#"office:value-type="currency""#));
+        assert!(xml.contains(r#"office:value-type="percentage""#));
+        assert!(xml.contains(r#"office:value-type="boolean""#));
+        assert!(xml.contains(r#"office:value-type="date""#));
+        assert!(xml.contains(r#"office:value-type="time""#));
+    }
+
+    #[test]
+    fn test_empty_cell_with_formula() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        builder.set_cell_formula(0, 0, "=IF(TRUE,1,0)").unwrap();
+
+        let xml = builder.generate_content_xml();
+        // Empty cell with formula should have value type
+        assert!(xml.contains("office:value-type="));
     }
 }

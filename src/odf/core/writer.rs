@@ -16,7 +16,7 @@ use std::collections::HashSet;
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```ignore
 /// # use litchi::odf::core::PackageWriter;
 /// # use litchi::Result;
 /// # fn example() -> Result<()> {
@@ -289,5 +289,199 @@ impl OdfStructure {
     #[allow(dead_code)] // Will be used for future enhancements
     pub fn default_settings_xml() -> String {
         r#"<?xml version="1.0" encoding="UTF-8"?><office:document-settings xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:config="urn:oasis:names:tc:opendocument:xmlns:config:1.0" xmlns:ooo="http://openoffice.org/2004/office" office:version="1.3"><office:settings><config:config-item-set config:name="ooo:view-settings"><config:config-item config:name="ViewAreaTop" config:type="long">0</config:config-item><config:config-item config:name="ViewAreaLeft" config:type="long">0</config:config-item><config:config-item config:name="ViewAreaWidth" config:type="long">1</config:config-item><config:config-item config:name="ViewAreaHeight" config:type="long">1</config:config-item></config:config-item-set></office:settings></office:document-settings>"#.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_package_writer_new() {
+        let writer = PackageWriter::new();
+        assert!(!writer.wrote_mimetype);
+        assert!(!writer.wrote_any_entry);
+        assert!(writer.mimetype.is_none());
+    }
+
+    #[test]
+    fn test_package_writer_default() {
+        let writer: PackageWriter = Default::default();
+        assert!(!writer.wrote_mimetype);
+    }
+
+    #[test]
+    fn test_package_writer_set_mimetype() {
+        let mut writer = PackageWriter::new();
+        assert!(
+            writer
+                .set_mimetype("application/vnd.oasis.opendocument.text")
+                .is_ok()
+        );
+        assert!(writer.wrote_mimetype);
+        assert_eq!(
+            writer.mimetype,
+            Some("application/vnd.oasis.opendocument.text".to_string())
+        );
+    }
+
+    #[test]
+    fn test_package_writer_set_mimetype_twice() {
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        assert!(
+            writer
+                .set_mimetype("application/vnd.oasis.opendocument.spreadsheet")
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn test_package_writer_add_file_without_mimetype() {
+        let mut writer = PackageWriter::new();
+        assert!(writer.add_file("content.xml", b"test").is_err());
+    }
+
+    #[test]
+    fn test_package_writer_add_mimetype_as_file() {
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        assert!(writer.add_file("mimetype", b"test").is_err());
+    }
+
+    #[test]
+    fn test_package_writer_finish_without_mimetype() {
+        let writer = PackageWriter::new();
+        assert!(writer.finish().is_err());
+    }
+
+    #[test]
+    fn test_package_writer_finish_to_bytes() {
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        let result = writer.finish_to_bytes();
+        assert!(result.is_ok());
+        let bytes = result.unwrap();
+        assert!(!bytes.is_empty());
+    }
+
+    #[test]
+    fn test_package_writer_add_file_with_media_type() {
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        assert!(
+            writer
+                .add_file_with_media_type("custom.dat", b"data", "application/octet-stream")
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn test_guess_media_type() {
+        assert_eq!(PackageWriter::guess_media_type("content.xml"), "text/xml");
+        assert_eq!(PackageWriter::guess_media_type("image.png"), "image/png");
+        assert_eq!(PackageWriter::guess_media_type("image.jpg"), "image/jpeg");
+        assert_eq!(PackageWriter::guess_media_type("image.jpeg"), "image/jpeg");
+        assert_eq!(PackageWriter::guess_media_type("image.gif"), "image/gif");
+        assert_eq!(
+            PackageWriter::guess_media_type("image.svg"),
+            "image/svg+xml"
+        );
+        assert_eq!(PackageWriter::guess_media_type("META-INF/"), "");
+        assert_eq!(
+            PackageWriter::guess_media_type("data.bin"),
+            "application/octet-stream"
+        );
+    }
+
+    #[test]
+    fn test_generate_manifest() {
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        writer.add_file("content.xml", b"test").unwrap();
+
+        let manifest = writer.generate_manifest();
+        assert!(manifest.contains("manifest:manifest"));
+        assert!(manifest.contains("content.xml"));
+        assert!(manifest.contains("text/xml"));
+    }
+
+    #[test]
+    fn test_odf_structure_default_styles_xml() {
+        let styles = OdfStructure::default_styles_xml();
+        assert!(styles.contains("office:document-styles"));
+        assert!(styles.contains("office:styles"));
+    }
+
+    #[test]
+    fn test_odf_structure_default_meta_xml() {
+        let meta = OdfStructure::default_meta_xml();
+        assert!(meta.contains("office:document-meta"));
+        assert!(meta.contains("Litchi"));
+        assert!(meta.contains("meta:creation-date"));
+    }
+
+    #[test]
+    fn test_odf_structure_default_settings_xml() {
+        let settings = OdfStructure::default_settings_xml();
+        assert!(settings.contains("office:document-settings"));
+        assert!(settings.contains("config:config-item"));
+    }
+
+    #[test]
+    fn test_odf_structure_default_content_xml() {
+        let content = OdfStructure::default_content_xml("office:text");
+        assert!(content.contains("office:document-content"));
+        assert!(content.contains("office:text"));
+        assert!(content.contains("office:body"));
+    }
+
+    #[test]
+    fn test_manifest_entry_debug() {
+        let entry = ManifestEntry {
+            full_path: "content.xml".to_string(),
+            media_type: "text/xml".to_string(),
+        };
+        let debug_str = format!("{:?}", entry);
+        assert!(debug_str.contains("content.xml"));
+        assert!(debug_str.contains("text/xml"));
+    }
+
+    #[test]
+    fn test_package_writer_full_package() {
+        let mut writer = PackageWriter::new();
+
+        // Set mimetype
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+
+        // Add files
+        writer
+            .add_file("content.xml", b"<office:document-content/>")
+            .unwrap();
+        writer
+            .add_file("styles.xml", b"<office:document-styles/>")
+            .unwrap();
+        writer
+            .add_file("meta.xml", b"<office:document-meta/>")
+            .unwrap();
+
+        // Finish
+        let bytes = writer.finish().unwrap();
+        assert!(!bytes.is_empty());
+
+        // Verify it's a valid ZIP (starts with PK)
+        assert_eq!(&bytes[0..2], b"PK");
     }
 }

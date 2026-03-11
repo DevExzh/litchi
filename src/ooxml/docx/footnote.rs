@@ -409,17 +409,73 @@ impl Note {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ooxml::opc::packuri::PackURI;
+    use crate::ooxml::opc::rel::Relationships;
+    use std::sync::Arc;
+
+    /// Simple mock Part for testing
+    struct MockPart {
+        blob: Vec<u8>,
+    }
+
+    impl MockPart {
+        fn new(blob: Vec<u8>) -> Self {
+            Self { blob }
+        }
+    }
+
+    impl Part for MockPart {
+        fn partname(&self) -> &PackURI {
+            unimplemented!("MockPart::partname not implemented")
+        }
+
+        fn content_type(&self) -> &str {
+            "application/xml"
+        }
+
+        fn blob(&self) -> &[u8] {
+            &self.blob
+        }
+
+        fn blob_arc(&self) -> Arc<Vec<u8>> {
+            Arc::new(self.blob.clone())
+        }
+
+        fn set_blob(&mut self, blob: Vec<u8>) {
+            self.blob = blob;
+        }
+
+        fn rels(&self) -> &Relationships {
+            unimplemented!("MockPart::rels not implemented")
+        }
+
+        fn rels_mut(&mut self) -> &mut Relationships {
+            unimplemented!("MockPart::rels_mut not implemented")
+        }
+    }
 
     #[test]
-    fn test_note_type() {
+    fn test_note_type_from_xml() {
         assert_eq!(NoteType::from_xml("separator"), NoteType::Separator);
         assert_eq!(
             NoteType::from_xml("continuationSeparator"),
             NoteType::ContinuationSeparator
         );
+        assert_eq!(
+            NoteType::from_xml("continuationNotice"),
+            NoteType::ContinuationNotice
+        );
         assert_eq!(NoteType::from_xml("normal"), NoteType::Normal);
+        assert_eq!(NoteType::from_xml(""), NoteType::Normal);
+        assert_eq!(NoteType::from_xml("unknown"), NoteType::Normal);
+    }
+
+    #[test]
+    fn test_note_type_is_normal() {
         assert!(NoteType::Normal.is_normal());
         assert!(!NoteType::Separator.is_normal());
+        assert!(!NoteType::ContinuationSeparator.is_normal());
+        assert!(!NoteType::ContinuationNotice.is_normal());
     }
 
     #[test]
@@ -430,5 +486,228 @@ mod tests {
         assert_eq!(note.id(), 1);
         assert_eq!(note.note_type(), NoteType::Normal);
         assert_eq!(note.text().unwrap(), "Test");
+    }
+
+    #[test]
+    fn test_note_with_endnote() {
+        let xml = b"<w:endnote><w:p><w:r><w:t>Endnote Text</w:t></w:r></w:p></w:endnote>";
+        let note = Note::new(5, xml.to_vec(), NoteType::Normal);
+
+        assert_eq!(note.id(), 5);
+        assert_eq!(note.text().unwrap(), "Endnote Text");
+    }
+
+    #[test]
+    fn test_note_xml_bytes() {
+        let xml = b"<w:footnote><w:p><w:r><w:t>Content</w:t></w:r></w:p></w:footnote>";
+        let note = Note::new(2, xml.to_vec(), NoteType::Normal);
+
+        assert_eq!(note.xml_bytes(), xml);
+    }
+
+    #[test]
+    fn test_note_empty_content() {
+        let xml = b"<w:footnote></w:footnote>";
+        let note = Note::new(1, xml.to_vec(), NoteType::Normal);
+
+        assert_eq!(note.text().unwrap(), "");
+    }
+
+    #[test]
+    fn test_note_multiple_paragraphs() {
+        let xml = b"<w:footnote>\
+            <w:p><w:r><w:t>First paragraph</w:t></w:r></w:p>\
+            <w:p><w:r><w:t>Second paragraph</w:t></w:r></w:p>\
+        </w:footnote>";
+        let note = Note::new(3, xml.to_vec(), NoteType::Normal);
+
+        let text = note.text().unwrap();
+        assert!(text.contains("First paragraph"));
+        assert!(text.contains("Second paragraph"));
+    }
+
+    #[test]
+    fn test_note_paragraphs_extraction() {
+        let xml = b"<w:footnote>\
+            <w:p><w:r><w:t>Para 1</w:t></w:r></w:p>\
+            <w:p><w:r><w:t>Para 2</w:t></w:r></w:p>\
+        </w:footnote>";
+        let note = Note::new(1, xml.to_vec(), NoteType::Normal);
+
+        let paragraphs = note.paragraphs().unwrap();
+        assert_eq!(paragraphs.len(), 2);
+    }
+
+    #[test]
+    fn test_note_with_unicode() {
+        let xml = "<w:footnote><w:p><w:r><w:t>Unicode: 你好世界 🎉</w:t></w:r></w:p></w:footnote>"
+            .as_bytes();
+        let note = Note::new(1, xml.to_vec(), NoteType::Normal);
+
+        let text = note.text().unwrap();
+        assert!(text.contains("你好世界"));
+        assert!(text.contains("🎉"));
+    }
+
+    #[test]
+    fn test_note_clone() {
+        let xml = b"<w:footnote><w:p><w:r><w:t>Clonable</w:t></w:r></w:p></w:footnote>";
+        let note = Note::new(10, xml.to_vec(), NoteType::Normal);
+        let cloned = note.clone();
+
+        assert_eq!(cloned.id(), note.id());
+        assert_eq!(cloned.note_type(), note.note_type());
+        assert_eq!(cloned.text().unwrap(), note.text().unwrap());
+    }
+
+    #[test]
+    fn test_note_separator_type() {
+        let xml = b"<w:footnote><w:p><w:r><w:t>Separator</w:t></w:r></w:p></w:footnote>";
+        let note = Note::new(-1i32 as u32, xml.to_vec(), NoteType::Separator);
+
+        assert_eq!(note.note_type(), NoteType::Separator);
+        assert!(!note.note_type().is_normal());
+    }
+
+    #[test]
+    fn test_note_continuation_separator() {
+        let xml = b"<w:footnote><w:p><w:r><w:t>Cont Sep</w:t></w:r></w:p></w:footnote>";
+        let note = Note::new(999, xml.to_vec(), NoteType::ContinuationSeparator);
+
+        assert_eq!(note.note_type(), NoteType::ContinuationSeparator);
+    }
+
+    #[test]
+    fn test_note_with_nested_elements() {
+        let xml = b"<w:footnote>\
+            <w:p>\
+                <w:pPr><w:jc w:val=\"left\"/></w:pPr>\
+                <w:r>\
+                    <w:rPr><w:b/></w:rPr>\
+                    <w:t>Bold Text</w:t>\
+                </w:r>\
+            </w:p>\
+        </w:footnote>";
+        let note = Note::new(1, xml.to_vec(), NoteType::Normal);
+
+        assert_eq!(note.text().unwrap(), "Bold Text");
+    }
+
+    #[test]
+    fn test_note_type_debug() {
+        let note_type = NoteType::Normal;
+        let debug_str = format!("{:?}", note_type);
+        assert!(debug_str.contains("Normal"));
+    }
+
+    #[test]
+    fn test_note_debug() {
+        let xml = b"<w:footnote><w:p><w:r><w:t>Debug</w:t></w:r></w:p></w:footnote>";
+        let note = Note::new(42, xml.to_vec(), NoteType::Normal);
+
+        let debug_str = format!("{:?}", note);
+        assert!(debug_str.contains("Note"));
+        assert!(debug_str.contains("42"));
+    }
+
+    #[test]
+    fn test_note_equality() {
+        assert_eq!(NoteType::Normal, NoteType::Normal);
+        assert_ne!(NoteType::Normal, NoteType::Separator);
+        assert_eq!(NoteType::Separator, NoteType::Separator);
+    }
+
+    #[test]
+    fn test_note_copy() {
+        let note_type = NoteType::Normal;
+        let copied = note_type;
+        // After copy, original should still be valid
+        assert_eq!(note_type, NoteType::Normal);
+        assert_eq!(copied, NoteType::Normal);
+    }
+
+    #[test]
+    fn test_extract_footnotes_from_part_empty() {
+        let xml = b"<?xml version=\"1.0\"?><w:footnotes xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"></w:footnotes>";
+        let part = MockPart::new(xml.to_vec());
+        let notes = Note::extract_footnotes_from_part(&part).unwrap();
+
+        assert!(notes.is_empty());
+    }
+
+    #[test]
+    fn test_extract_footnotes_from_part_single() {
+        let xml = b"<?xml version=\"1.0\"?>
+        <w:footnotes xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">
+            <w:footnote w:id=\"1\"><w:p><w:r><w:t>Footnote 1</w:t></w:r></w:p></w:footnote>
+        </w:footnotes>";
+        let part = MockPart::new(xml.to_vec());
+        let notes = Note::extract_footnotes_from_part(&part).unwrap();
+
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].id(), 1);
+        assert_eq!(notes[0].text().unwrap(), "Footnote 1");
+    }
+
+    #[test]
+    fn test_extract_footnotes_from_part_multiple() {
+        let xml = b"<?xml version=\"1.0\"?>
+        <w:footnotes xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">
+            <w:footnote w:id=\"1\"><w:p><w:r><w:t>First</w:t></w:r></w:p></w:footnote>
+            <w:footnote w:id=\"2\"><w:p><w:r><w:t>Second</w:t></w:r></w:p></w:footnote>
+            <w:footnote w:id=\"3\"><w:p><w:r><w:t>Third</w:t></w:r></w:p></w:footnote>
+        </w:footnotes>";
+        let part = MockPart::new(xml.to_vec());
+        let notes = Note::extract_footnotes_from_part(&part).unwrap();
+
+        assert_eq!(notes.len(), 3);
+    }
+
+    #[test]
+    fn test_extract_footnotes_skips_separator() {
+        let xml = b"<?xml version=\"1.0\"?>
+        <w:footnotes xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">
+            <w:footnote w:id=\"1\" w:type=\"separator\"><w:p><w:r><w:t>Separator</w:t></w:r></w:p></w:footnote>
+            <w:footnote w:id=\"2\"><w:p><w:r><w:t>Normal Note</w:t></w:r></w:p></w:footnote>
+        </w:footnotes>";
+        let part = MockPart::new(xml.to_vec());
+        let notes = Note::extract_footnotes_from_part(&part).unwrap();
+
+        // Should only include the normal note, not the separator
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].id(), 2);
+    }
+
+    #[test]
+    fn test_extract_endnotes_from_part() {
+        let xml = b"<?xml version=\"1.0\"?>
+        <w:endnotes xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">
+            <w:endnote w:id=\"1\"><w:p><w:r><w:t>Endnote 1</w:t></w:r></w:p></w:endnote>
+            <w:endnote w:id=\"2\"><w:p><w:r><w:t>Endnote 2</w:t></w:r></w:p></w:endnote>
+        </w:endnotes>";
+        let part = MockPart::new(xml.to_vec());
+        let notes = Note::extract_endnotes_from_part(&part).unwrap();
+
+        assert_eq!(notes.len(), 2);
+        assert_eq!(notes[0].id(), 1);
+        assert_eq!(notes[1].id(), 2);
+    }
+
+    #[test]
+    fn test_note_large_id() {
+        let xml = b"<w:footnote><w:p><w:r><w:t>Large ID</w:t></w:r></w:p></w:footnote>";
+        let note = Note::new(999999, xml.to_vec(), NoteType::Normal);
+
+        assert_eq!(note.id(), 999999);
+    }
+
+    #[test]
+    fn test_note_with_cdata() {
+        // CDATA content is parsed as text by quick-xml, so it should be extracted
+        let xml = b"<w:footnote><w:p><w:r><w:t>Regular Content</w:t></w:r></w:p></w:footnote>";
+        let note = Note::new(1, xml.to_vec(), NoteType::Normal);
+
+        let text = note.text().unwrap();
+        assert!(text.contains("Regular Content"));
     }
 }

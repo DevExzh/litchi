@@ -248,4 +248,160 @@ mod tests {
         assert_eq!(numbering.abstract_num_count(), 0);
         assert_eq!(numbering.num_count(), 0);
     }
+
+    #[test]
+    fn test_numbering_default() {
+        let numbering: Numbering = Default::default();
+        assert_eq!(numbering.abstract_num_count(), 0);
+        assert_eq!(numbering.num_count(), 0);
+    }
+
+    #[test]
+    fn test_numbering_empty_accessors() {
+        let numbering = Numbering::new();
+        assert!(numbering.abstract_nums().is_empty());
+        assert!(numbering.nums().is_empty());
+        assert!(numbering.get_abstract_num(0).is_none());
+        assert!(numbering.get_num(0).is_none());
+    }
+
+    #[test]
+    fn test_numbering_with_abstract_nums() {
+        let mut numbering = Numbering::new();
+        numbering.abstract_nums.push(AbstractNum {
+            id: 1,
+            num_type: Some("hybridMultilevel".to_string()),
+        });
+        numbering.abstract_nums.push(AbstractNum {
+            id: 2,
+            num_type: Some("arabicPeriod".to_string()),
+        });
+
+        assert_eq!(numbering.abstract_num_count(), 2);
+        assert_eq!(numbering.get_abstract_num(1).unwrap().id(), 1);
+        assert_eq!(numbering.get_abstract_num(2).unwrap().id(), 2);
+        assert!(numbering.get_abstract_num(3).is_none());
+    }
+
+    #[test]
+    fn test_numbering_with_nums() {
+        let mut numbering = Numbering::new();
+        numbering.nums.push(Num {
+            id: 10,
+            abstract_num_id: 1,
+        });
+        numbering.nums.push(Num {
+            id: 11,
+            abstract_num_id: 2,
+        });
+
+        assert_eq!(numbering.num_count(), 2);
+        assert_eq!(numbering.get_num(10).unwrap().abstract_num_id(), 1);
+        assert_eq!(numbering.get_num(11).unwrap().abstract_num_id(), 2);
+        assert!(numbering.get_num(99).is_none());
+    }
+
+    #[test]
+    fn test_abstract_num_accessors() {
+        let abstract_num = AbstractNum {
+            id: 5,
+            num_type: Some("bullet".to_string()),
+        };
+
+        assert_eq!(abstract_num.id(), 5);
+        assert_eq!(abstract_num.num_type(), Some("bullet"));
+    }
+
+    #[test]
+    fn test_abstract_num_no_type() {
+        let abstract_num = AbstractNum {
+            id: 3,
+            num_type: None,
+        };
+
+        assert_eq!(abstract_num.id(), 3);
+        assert_eq!(abstract_num.num_type(), None);
+    }
+
+    #[test]
+    fn test_abstract_num_clone() {
+        let abstract_num = AbstractNum {
+            id: 7,
+            num_type: Some("roman".to_string()),
+        };
+        let cloned = abstract_num.clone();
+
+        assert_eq!(cloned.id(), abstract_num.id());
+        assert_eq!(cloned.num_type(), abstract_num.num_type());
+    }
+
+    #[test]
+    fn test_abstract_num_debug() {
+        let abstract_num = AbstractNum {
+            id: 1,
+            num_type: Some("test".to_string()),
+        };
+        let debug_str = format!("{:?}", abstract_num);
+        assert!(debug_str.contains("AbstractNum"));
+        assert!(debug_str.contains("1"));
+    }
+
+    #[test]
+    fn test_num_accessors() {
+        let num = Num {
+            id: 15,
+            abstract_num_id: 3,
+        };
+
+        assert_eq!(num.id(), 15);
+        assert_eq!(num.abstract_num_id(), 3);
+    }
+
+    #[test]
+    fn test_num_clone() {
+        let num = Num {
+            id: 20,
+            abstract_num_id: 5,
+        };
+        let cloned = num.clone();
+
+        assert_eq!(cloned.id(), num.id());
+        assert_eq!(cloned.abstract_num_id(), num.abstract_num_id());
+    }
+
+    #[test]
+    fn test_num_debug() {
+        let num = Num {
+            id: 1,
+            abstract_num_id: 2,
+        };
+        let debug_str = format!("{:?}", num);
+        assert!(debug_str.contains("Num"));
+        assert!(debug_str.contains("1"));
+        assert!(debug_str.contains("2"));
+    }
+
+    #[test]
+    fn test_numbering_clone() {
+        let mut numbering = Numbering::new();
+        numbering.abstract_nums.push(AbstractNum {
+            id: 1,
+            num_type: Some("type1".to_string()),
+        });
+        numbering.nums.push(Num {
+            id: 10,
+            abstract_num_id: 1,
+        });
+
+        let cloned = numbering.clone();
+        assert_eq!(cloned.abstract_num_count(), 1);
+        assert_eq!(cloned.num_count(), 1);
+    }
+
+    #[test]
+    fn test_numbering_debug() {
+        let numbering = Numbering::new();
+        let debug_str = format!("{:?}", numbering);
+        assert!(debug_str.contains("Numbering"));
+    }
 }

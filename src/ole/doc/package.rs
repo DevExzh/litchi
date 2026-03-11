@@ -57,10 +57,10 @@ pub type Result<T> = std::result::Result<T, DocError>;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::doc::Package;
+/// use litchi::ole::doc::Package;
 ///
 /// // Open an existing document
-/// let pkg = Package::open("document.doc")?;
+/// let mut pkg = Package::open("document.doc")?;
 ///
 /// // Get the main document
 /// let doc = pkg.document()?;
@@ -85,7 +85,7 @@ impl Package<File> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::doc::Package;
+    /// use litchi::ole::doc::Package;
     ///
     /// let pkg = Package::open("document.doc")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -165,9 +165,9 @@ impl<R: Read + Seek> Package<R> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::doc::Package;
+    /// use litchi::ole::doc::Package;
     ///
-    /// let pkg = Package::open("document.doc")?;
+    /// let mut pkg = Package::open("document.doc")?;
     /// let doc = pkg.document()?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```

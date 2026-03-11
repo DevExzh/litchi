@@ -58,6 +58,10 @@ impl<R: Read> DifParser<R> {
             let trimmed = line.trim();
 
             if trimmed == "DATA" {
+                line.clear();
+                self.reader.read_line(&mut line)?;
+                line.clear();
+                self.reader.read_line(&mut line)?;
                 in_data_section = true;
                 line.clear();
                 break;
@@ -69,11 +73,11 @@ impl<R: Read> DifParser<R> {
                 if let Some((type_val, _)) = Self::parse_dif_line(&line)
                     && type_val == 0
                 {
+                    self.vectors = Self::parse_dif_line(&line)
+                        .map(|(_, numeric_val)| numeric_val.max(0.0) as usize)
+                        .unwrap_or(0);
                     line.clear();
                     self.reader.read_line(&mut line)?;
-                    if let Ok(vec_count) = line.trim().trim_matches('"').parse::<usize>() {
-                        self.vectors = vec_count;
-                    }
                 }
             } else if trimmed == "TUPLES" {
                 line.clear();
@@ -81,11 +85,11 @@ impl<R: Read> DifParser<R> {
                 if let Some((type_val, _)) = Self::parse_dif_line(&line)
                     && type_val == 0
                 {
+                    self.tuples = Self::parse_dif_line(&line)
+                        .map(|(_, numeric_val)| numeric_val.max(0.0) as usize)
+                        .unwrap_or(0);
                     line.clear();
                     self.reader.read_line(&mut line)?;
-                    if let Ok(tup_count) = line.trim().trim_matches('"').parse::<usize>() {
-                        self.tuples = tup_count;
-                    }
                 }
             }
 

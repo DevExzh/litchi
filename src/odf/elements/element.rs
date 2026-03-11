@@ -459,3 +459,194 @@ impl ElementFactory {
         Element::new("table:table-cell")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_element_new() {
+        let element = Element::new("text:p");
+        assert_eq!(element.tag_name(), "text:p");
+        assert_eq!(element.local_name(), "p");
+        assert_eq!(element.text(), "");
+        assert!(element.attributes().is_empty());
+    }
+
+    #[test]
+    fn test_element_with_attributes() {
+        let mut element = Element::new("text:p");
+        element.set_attribute("class", "body");
+        element.set_attribute("id", "para1");
+
+        assert_eq!(element.get_attribute("class"), Some("body"));
+        assert_eq!(element.get_attribute("id"), Some("para1"));
+        assert_eq!(element.get_attribute("missing"), None);
+
+        assert!(element.has_attribute("class"));
+        assert!(!element.has_attribute("missing"));
+    }
+
+    #[test]
+    fn test_element_remove_attribute() {
+        let mut element = Element::new("text:p");
+        element.set_attribute("class", "body");
+        assert!(element.has_attribute("class"));
+
+        element.remove_attribute("class");
+        assert!(!element.has_attribute("class"));
+    }
+
+    #[test]
+    fn test_element_text() {
+        let mut element = Element::new("text:p");
+        element.set_text("Hello World");
+        assert_eq!(element.text(), "Hello World");
+    }
+
+    #[test]
+    fn test_element_children() {
+        let mut parent = Element::new("text:p");
+        let child1 = Element::new("text:span");
+        let child2 = Element::new("text:span");
+
+        parent.add_child(child1);
+        parent.add_child(child2);
+
+        let children = parent.get_children();
+        assert_eq!(children.len(), 2);
+        assert_eq!(children[0].tag_name(), "text:span");
+    }
+
+    #[test]
+    fn test_element_get_text_recursive() {
+        let mut parent = Element::new("text:p");
+        parent.set_text("Hello ");
+
+        let mut child = Element::new("text:span");
+        child.set_text("World");
+
+        parent.add_child(child);
+
+        assert_eq!(parent.get_text_recursive(), "Hello World");
+    }
+
+    #[test]
+    fn test_element_bool_attribute() {
+        let mut element = Element::new("text:p");
+        element.set_attribute("bold", "true");
+        element.set_attribute("italic", "1");
+        element.set_attribute("underline", "false");
+
+        assert_eq!(element.get_bool_attribute("bold"), Some(true));
+        assert_eq!(element.get_bool_attribute("italic"), Some(true));
+        assert_eq!(element.get_bool_attribute("underline"), Some(false));
+        assert_eq!(element.get_bool_attribute("missing"), None);
+    }
+
+    #[test]
+    fn test_element_numeric_attribute() {
+        let mut element = Element::new("table:table-cell");
+        element.set_attribute("table:number-columns-spanned", "3");
+
+        assert_eq!(
+            element.get_numeric_attribute("table:number-columns-spanned"),
+            Some(3.0)
+        );
+        assert_eq!(element.get_numeric_attribute("missing"), None);
+    }
+
+    #[test]
+    fn test_element_int_attribute() {
+        let mut element = Element::new("text:h");
+        element.set_attribute("text:outline-level", "2");
+
+        assert_eq!(element.get_int_attribute("text:outline-level"), Some(2));
+        assert_eq!(element.get_int_attribute("missing"), None);
+    }
+
+    #[test]
+    fn test_element_from_bytes() {
+        let xml = b"<text:p class='body'>Hello World</text:p>";
+        let element = Element::from_bytes(xml).unwrap();
+
+        assert_eq!(element.tag_name(), "text:p");
+        assert_eq!(element.get_attribute("class"), Some("body"));
+        assert_eq!(element.text(), "Hello World");
+    }
+
+    #[test]
+    fn test_element_from_bytes_with_children() {
+        let xml = b"<text:p>Hello <text:span>World</text:span></text:p>";
+        let element = Element::from_bytes(xml).unwrap();
+
+        assert_eq!(element.tag_name(), "text:p");
+        assert_eq!(element.text(), "Hello ");
+        assert_eq!(element.get_children().len(), 1);
+        assert_eq!(element.get_children()[0].tag_name(), "text:span");
+    }
+
+    #[test]
+    fn test_element_to_xml_string() {
+        let mut element = Element::new("text:p");
+        element.set_attribute("class", "body");
+        element.set_text("Hello World");
+
+        let xml = element.to_xml_string();
+        assert!(xml.contains("<text:p"));
+        assert!(xml.contains('>'));
+        assert!(xml.contains("class=\"body\""));
+        assert!(xml.contains("Hello World"));
+        assert!(xml.contains("</text:p>"));
+    }
+
+    #[test]
+    fn test_element_to_xml_self_closing() {
+        let element = Element::new("text:line-break");
+        let xml = element.to_xml_string();
+        assert!(xml.contains("/>"));
+    }
+
+    #[test]
+    fn test_element_xml_escaping() {
+        let mut element = Element::new("text:p");
+        element.set_text("Hello <World> & \"Friends\"");
+
+        let xml = element.to_xml_string();
+        assert!(xml.contains("&lt;World&gt;"));
+        assert!(xml.contains("&amp;"));
+    }
+
+    #[test]
+    fn test_element_namespace_uri() {
+        let xml =
+            b"<text:p xmlns:text='urn:oasis:names:tc:opendocument:xmlns:text:1.0'>Content</text:p>";
+        let element = Element::from_bytes(xml).unwrap();
+        assert_eq!(
+            element.namespace_uri(),
+            Some("urn:oasis:names:tc:opendocument:xmlns:text:1.0")
+        );
+    }
+
+    #[test]
+    fn test_element_factory() {
+        let para = ElementFactory::paragraph();
+        assert_eq!(para.tag_name(), "text:p");
+
+        let span = ElementFactory::span();
+        assert_eq!(span.tag_name(), "text:span");
+
+        let heading = ElementFactory::heading(2);
+        assert_eq!(heading.tag_name(), "text:h");
+        assert_eq!(heading.get_attribute("text:outline-level"), Some("2"));
+
+        let table = ElementFactory::table();
+        assert_eq!(table.tag_name(), "table:table");
+
+        let row = ElementFactory::table_row();
+        assert_eq!(row.tag_name(), "table:table-row");
+
+        let cell = ElementFactory::table_cell();
+        assert_eq!(cell.tag_name(), "table:table-cell");
+    }
+}

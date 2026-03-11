@@ -555,3 +555,255 @@ impl StyleElements {
         StyleRegistry::from_xml(xml_content)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_style_family_from_str() {
+        assert_eq!(
+            "paragraph".parse::<StyleFamily>().unwrap(),
+            StyleFamily::Paragraph
+        );
+        assert_eq!("text".parse::<StyleFamily>().unwrap(), StyleFamily::Text);
+        assert_eq!("table".parse::<StyleFamily>().unwrap(), StyleFamily::Table);
+        assert_eq!(
+            "table-column".parse::<StyleFamily>().unwrap(),
+            StyleFamily::TableColumn
+        );
+        assert_eq!(
+            "table-row".parse::<StyleFamily>().unwrap(),
+            StyleFamily::TableRow
+        );
+        assert_eq!(
+            "table-cell".parse::<StyleFamily>().unwrap(),
+            StyleFamily::TableCell
+        );
+        assert_eq!(
+            "page-layout".parse::<StyleFamily>().unwrap(),
+            StyleFamily::PageLayout
+        );
+        assert_eq!(
+            "master-page".parse::<StyleFamily>().unwrap(),
+            StyleFamily::MasterPage
+        );
+        assert_eq!(
+            "graphic".parse::<StyleFamily>().unwrap(),
+            StyleFamily::Graphic
+        );
+
+        // Invalid family
+        assert!("invalid".parse::<StyleFamily>().is_err());
+    }
+
+    #[test]
+    fn test_style_family_as_str() {
+        assert_eq!(StyleFamily::Paragraph.as_str(), "paragraph");
+        assert_eq!(StyleFamily::Text.as_str(), "text");
+        assert_eq!(StyleFamily::Table.as_str(), "table");
+        assert_eq!(StyleFamily::TableColumn.as_str(), "table-column");
+        assert_eq!(StyleFamily::TableRow.as_str(), "table-row");
+        assert_eq!(StyleFamily::TableCell.as_str(), "table-cell");
+        assert_eq!(StyleFamily::PageLayout.as_str(), "page-layout");
+        assert_eq!(StyleFamily::MasterPage.as_str(), "master-page");
+        assert_eq!(StyleFamily::Graphic.as_str(), "graphic");
+    }
+
+    #[test]
+    fn test_style_family_roundtrip() {
+        let families = [
+            StyleFamily::Paragraph,
+            StyleFamily::Text,
+            StyleFamily::Table,
+            StyleFamily::TableColumn,
+            StyleFamily::TableRow,
+            StyleFamily::TableCell,
+            StyleFamily::PageLayout,
+            StyleFamily::MasterPage,
+            StyleFamily::Graphic,
+        ];
+
+        for family in &families {
+            let s = family.as_str();
+            let parsed: StyleFamily = s.parse().unwrap();
+            assert_eq!(*family, parsed);
+        }
+    }
+
+    #[test]
+    fn test_style_new() {
+        let style = Style::new();
+        assert!(style.name().is_none());
+        assert!(style.family().is_none());
+        assert!(style.parent_style_name().is_none());
+        assert!(!style.is_default());
+    }
+
+    #[test]
+    fn test_style_with_name_and_family() {
+        let style = Style::with_name_and_family("Heading1", "paragraph");
+        assert_eq!(style.name(), Some("Heading1"));
+        assert_eq!(style.family(), Some(StyleFamily::Paragraph));
+    }
+
+    #[test]
+    fn test_style_set_text_property() {
+        let mut style = Style::new();
+        style.set_text_property("fo:font-size", "12pt");
+
+        // Property should be stored in element
+        let text_props = style
+            .element
+            .children
+            .iter()
+            .find(|c| c.tag_name() == "style:text-properties");
+        assert!(text_props.is_some());
+        assert_eq!(
+            text_props.unwrap().get_attribute("fo:font-size"),
+            Some("12pt")
+        );
+    }
+
+    #[test]
+    fn test_style_set_paragraph_property() {
+        let mut style = Style::new();
+        style.set_paragraph_property("fo:text-align", "center");
+
+        let para_props = style
+            .element
+            .children
+            .iter()
+            .find(|c| c.tag_name() == "style:paragraph-properties");
+        assert!(para_props.is_some());
+        assert_eq!(
+            para_props.unwrap().get_attribute("fo:text-align"),
+            Some("center")
+        );
+    }
+
+    #[test]
+    fn test_style_set_table_property() {
+        let mut style = Style::new();
+        style.set_table_property("style:width", "10cm");
+
+        let table_props = style
+            .element
+            .children
+            .iter()
+            .find(|c| c.tag_name() == "style:table-properties");
+        assert!(table_props.is_some());
+        assert_eq!(
+            table_props.unwrap().get_attribute("style:width"),
+            Some("10cm")
+        );
+    }
+
+    #[test]
+    fn test_style_registry_default() {
+        let registry = StyleRegistry::default();
+        assert!(registry.styles.is_empty());
+    }
+
+    #[test]
+    fn test_style_registry_add_style() {
+        let mut registry = StyleRegistry::default();
+        let style = Style::with_name_and_family("TestStyle", "text");
+        registry.add_style(style);
+
+        assert_eq!(registry.styles.len(), 1);
+        assert!(registry.get_style("TestStyle").is_some());
+    }
+
+    #[test]
+    fn test_style_registry_get_style() {
+        let mut registry = StyleRegistry::default();
+        let style = Style::with_name_and_family("MyStyle", "paragraph");
+        registry.add_style(style);
+
+        let retrieved = registry.get_style("MyStyle").unwrap();
+        assert_eq!(retrieved.name(), Some("MyStyle"));
+
+        assert!(registry.get_style("NonExistent").is_none());
+    }
+
+    #[test]
+    fn test_style_registry_get_resolved_properties() {
+        let mut registry = StyleRegistry::default();
+
+        // Create parent style with properties set directly
+        let mut parent = Style::with_name_and_family("Parent", "text");
+        parent.properties.text.font_size = Some(Cow::Owned("12pt".to_string()));
+        registry.add_style(parent);
+
+        // Create child style with parent reference
+        let mut child = Style::with_name_and_family("Child", "text");
+        child
+            .element
+            .set_attribute("style:parent-style-name", "Parent");
+        child.properties.text.color = Some(Cow::Owned("#ff0000".to_string()));
+        registry.add_style(child);
+
+        let resolved = registry.get_resolved_properties("Child");
+        // Child properties take precedence
+        assert_eq!(resolved.text.color.as_deref(), Some("#ff0000"));
+        // Parent properties are inherited
+        assert_eq!(resolved.text.font_size.as_deref(), Some("12pt"));
+    }
+
+    #[test]
+    fn test_style_registry_from_xml() {
+        // Note: The current implementation parses style attributes but not nested properties
+        let xml = r#"
+        <office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                               xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0">
+            <style:style style:name="Heading1" style:family="paragraph"></style:style>
+            <style:style style:name="TextBody" style:family="paragraph"></style:style>
+        </office:document-styles>"#;
+
+        let registry = StyleRegistry::from_xml(xml).unwrap();
+        assert_eq!(registry.styles.len(), 2);
+        assert!(registry.get_style("Heading1").is_some());
+        assert!(registry.get_style("TextBody").is_some());
+    }
+
+    #[test]
+    fn test_style_elements_parse_styles() {
+        let xml = r#"
+        <office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                               xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0">
+            <style:style style:name="CustomStyle" style:family="text"></style:style>
+        </office:document-styles>"#;
+
+        let registry = StyleElements::parse_styles(xml).unwrap();
+        assert_eq!(registry.styles.len(), 1);
+        assert!(registry.get_style("CustomStyle").is_some());
+    }
+
+    #[test]
+    fn test_style_properties_default() {
+        let props = StyleProperties::default();
+        assert!(props.text.font_name.is_none());
+        assert!(props.text.font_size.is_none());
+        assert!(props.paragraph.text_align.is_none());
+        assert!(props.table.width.is_none());
+        assert!(props.graphic.background_color.is_none());
+    }
+
+    #[test]
+    fn test_style_is_default() {
+        let style = Style::new();
+        assert!(!style.is_default());
+
+        let style = Style::with_name_and_family("", "paragraph");
+        assert!(style.is_default());
+    }
+
+    #[test]
+    fn test_style_into_element() {
+        let style = Style::with_name_and_family("Test", "text");
+        let element: Element = style.into();
+        assert_eq!(element.tag_name(), "style:style");
+        assert_eq!(element.get_attribute("style:name"), Some("Test"));
+    }
+}

@@ -224,7 +224,6 @@ impl Default for ElementBuffer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::images::svg_utils::fmt_num;
 
     #[test]

@@ -146,3 +146,85 @@ pub fn refine_workbook_format<R: Read + Seek>(
 
     Ok(WorkbookFormat::Xlsx)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn test_workbook_format_variants() {
+        assert_eq!(WorkbookFormat::Xls, WorkbookFormat::Xls);
+        assert_eq!(WorkbookFormat::Xlsx, WorkbookFormat::Xlsx);
+        assert_eq!(WorkbookFormat::Xlsb, WorkbookFormat::Xlsb);
+        assert_eq!(WorkbookFormat::Ods, WorkbookFormat::Ods);
+        assert_eq!(WorkbookFormat::Numbers, WorkbookFormat::Numbers);
+    }
+
+    #[test]
+    fn test_workbook_format_inequality() {
+        assert_ne!(WorkbookFormat::Xls, WorkbookFormat::Xlsx);
+        assert_ne!(WorkbookFormat::Xlsx, WorkbookFormat::Xlsb);
+        assert_ne!(WorkbookFormat::Ods, WorkbookFormat::Numbers);
+    }
+
+    #[test]
+    fn test_detect_workbook_format_from_signature_xls() {
+        // OLE2 signature for XLS files
+        let data = b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1";
+        let mut cursor = Cursor::new(data);
+        let result = detect_workbook_format_from_signature(&mut cursor);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), WorkbookFormat::Xls);
+    }
+
+    #[test]
+    fn test_detect_workbook_format_from_signature_xlsx() {
+        // ZIP signature for XLSX files (needs at least 8 bytes for the detection function)
+        let data = b"PK\x03\x04extra_data_here";
+        let mut cursor = Cursor::new(data);
+        let result = detect_workbook_format_from_signature(&mut cursor);
+        assert!(result.is_ok());
+        // Returns Xlsx by default for ZIP files
+        assert_eq!(result.unwrap(), WorkbookFormat::Xlsx);
+    }
+
+    #[test]
+    fn test_detect_workbook_format_from_signature_invalid() {
+        // Invalid signature
+        let data = b"NOTVALID";
+        let mut cursor = Cursor::new(data);
+        let result = detect_workbook_format_from_signature(&mut cursor);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_detect_workbook_format_from_signature_empty() {
+        // Empty data
+        let data = b"";
+        let mut cursor = Cursor::new(data);
+        let result = detect_workbook_format_from_signature(&mut cursor);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_workbook_format_debug() {
+        let format = WorkbookFormat::Xlsx;
+        let debug_str = format!("{:?}", format);
+        assert!(debug_str.contains("Xlsx"));
+    }
+
+    #[test]
+    fn test_workbook_format_clone() {
+        let format = WorkbookFormat::Xls;
+        let cloned = format.clone();
+        assert_eq!(format, cloned);
+    }
+
+    #[test]
+    fn test_workbook_format_copy() {
+        let format = WorkbookFormat::Ods;
+        let copied = format;
+        assert_eq!(format, copied);
+    }
+}

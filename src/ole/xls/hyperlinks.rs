@@ -407,4 +407,238 @@ mod tests {
         assert_eq!(link.label.as_deref(), Some("place"));
         assert_eq!(link.address(), "Sheet1!A1");
     }
+
+    #[test]
+    fn test_parse_url_link() {
+        // Build a URL hyperlink record
+        let mut data = Vec::new();
+        // Ref8U: row 5, col 2
+        data.extend_from_slice(&5u16.to_le_bytes()); // rwFirst
+        data.extend_from_slice(&5u16.to_le_bytes()); // rwLast
+        data.extend_from_slice(&2u16.to_le_bytes()); // colFirst
+        data.extend_from_slice(&2u16.to_le_bytes()); // colLast
+        // STD_MONIKER GUID
+        data.extend_from_slice(&[
+            0xD0, 0xC9, 0xEA, 0x79, 0xF9, 0xBA, 0xCE, 0x11, 0x8C, 0x82, 0x00, 0xAA, 0x00, 0x4B,
+            0xA9, 0x0B,
+        ]);
+        // streamVersion = 2
+        data.extend_from_slice(&2u32.to_le_bytes());
+        // flags: HLINK_URL | HLINK_LABEL = 0x0001 | 0x0014 = 0x0015
+        data.extend_from_slice(&0x0000_0015u32.to_le_bytes());
+        // Label: "Example" (7 chars, not including NUL in count)
+        data.extend_from_slice(&7u32.to_le_bytes());
+        for c in "Example".encode_utf16() {
+            data.extend_from_slice(&c.to_le_bytes());
+        }
+        // URL_MONIKER GUID
+        data.extend_from_slice(&URL_MONIKER);
+        // URL address - length in bytes including any tail
+        // The URL is "https://example.com" (19 chars, 38 bytes) + 24 byte tail = 62 bytes
+        let url = "https://example.com";
+        let url_bytes = url.len() * 2; // UTF-16LE bytes
+        let total_len = url_bytes + 24; // include tail
+        data.extend_from_slice(&(total_len as u32).to_le_bytes());
+        // Write the URL in UTF-16LE
+        for c in url.encode_utf16() {
+            data.extend_from_slice(&c.to_le_bytes());
+        }
+        // Write 24-byte tail
+        data.extend_from_slice(&[0u8; 24]);
+
+        let link = parse_hlink_record(&data).unwrap();
+        assert_eq!(link.first_row, 5);
+        assert_eq!(link.last_row, 5);
+        assert_eq!(link.first_col, 2);
+        assert_eq!(link.last_col, 2);
+        assert_eq!(link.label.as_deref(), Some("Example"));
+        assert_eq!(link.address(), "https://example.com");
+        assert!(matches!(link.target, HyperlinkTarget::Url(_)));
+    }
+
+    #[test]
+    fn test_parse_hlink_record_too_short() {
+        let data = vec![0u8; 10];
+        let result = parse_hlink_record(&data);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            XlsError::InvalidLength {
+                expected: 32,
+                found: 10,
+            } => (),
+            other => panic!("Expected InvalidLength error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_hlink_record_invalid_version() {
+        let mut data = Vec::new();
+        // Ref8U
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&0u16.to_le_bytes());
+        // STD_MONIKER GUID
+        data.extend_from_slice(&[
+            0xD0, 0xC9, 0xEA, 0x79, 0xF9, 0xBA, 0xCE, 0x11, 0x8C, 0x82, 0x00, 0xAA, 0x00, 0x4B,
+            0xA9, 0x0B,
+        ]);
+        // streamVersion = 99 (invalid)
+        data.extend_from_slice(&99u32.to_le_bytes());
+        // flags
+        data.extend_from_slice(&0u32.to_le_bytes());
+
+        let result = parse_hlink_record(&data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_hyperlink_target_url() {
+        let target = HyperlinkTarget::Url("https://example.com".to_string());
+        let link = XlsHyperlink {
+            first_row: 0,
+            last_row: 0,
+            first_col: 0,
+            last_col: 0,
+            label: None,
+            target_frame: None,
+            target,
+            text_mark: None,
+        };
+        assert_eq!(link.address(), "https://example.com");
+    }
+
+    #[test]
+    fn test_hyperlink_target_document() {
+        let target = HyperlinkTarget::Document("Sheet1!A1".to_string());
+        let link = XlsHyperlink {
+            first_row: 0,
+            last_row: 0,
+            first_col: 0,
+            last_col: 0,
+            label: None,
+            target_frame: None,
+            target,
+            text_mark: None,
+        };
+        assert_eq!(link.address(), "Sheet1!A1");
+    }
+
+    #[test]
+    fn test_hyperlink_target_unc() {
+        let target = HyperlinkTarget::Unc("\\\\server\\share\\file.txt".to_string());
+        let link = XlsHyperlink {
+            first_row: 0,
+            last_row: 0,
+            first_col: 0,
+            last_col: 0,
+            label: None,
+            target_frame: None,
+            target,
+            text_mark: None,
+        };
+        assert_eq!(link.address(), "\\\\server\\share\\file.txt");
+    }
+
+    #[test]
+    fn test_hyperlink_target_file_with_long_name() {
+        let target = HyperlinkTarget::File {
+            short_filename: "SHORT~1.TXT".to_string(),
+            long_filename: Some("long_filename.txt".to_string()),
+        };
+        let link = XlsHyperlink {
+            first_row: 0,
+            last_row: 0,
+            first_col: 0,
+            last_col: 0,
+            label: None,
+            target_frame: None,
+            target,
+            text_mark: None,
+        };
+        assert_eq!(link.address(), "long_filename.txt");
+    }
+
+    #[test]
+    fn test_hyperlink_target_file_without_long_name() {
+        let target = HyperlinkTarget::File {
+            short_filename: "FILE.TXT".to_string(),
+            long_filename: None,
+        };
+        let link = XlsHyperlink {
+            first_row: 0,
+            last_row: 0,
+            first_col: 0,
+            last_col: 0,
+            label: None,
+            target_frame: None,
+            target,
+            text_mark: None,
+        };
+        assert_eq!(link.address(), "FILE.TXT");
+    }
+
+    #[test]
+    fn test_hyperlink_target_clone() {
+        let target = HyperlinkTarget::Url("https://clone.test".to_string());
+        let cloned = target.clone();
+        assert!(matches!(cloned, HyperlinkTarget::Url(ref s) if s == "https://clone.test"));
+    }
+
+    #[test]
+    fn test_hyperlink_target_equality() {
+        let url1 = HyperlinkTarget::Url("http://example.com".to_string());
+        let url2 = HyperlinkTarget::Url("http://example.com".to_string());
+        let url3 = HyperlinkTarget::Url("http://other.com".to_string());
+        let doc = HyperlinkTarget::Document("Sheet1!A1".to_string());
+
+        assert_eq!(url1, url2);
+        assert_ne!(url1, url3);
+        assert_ne!(url1, doc);
+    }
+
+    #[test]
+    fn test_xls_hyperlink_clone() {
+        let link = XlsHyperlink {
+            first_row: 1,
+            last_row: 2,
+            first_col: 3,
+            last_col: 4,
+            label: Some("Label".to_string()),
+            target_frame: Some("_blank".to_string()),
+            target: HyperlinkTarget::Url("https://example.com".to_string()),
+            text_mark: Some("mark".to_string()),
+        };
+        let cloned = link.clone();
+
+        assert_eq!(cloned.first_row, link.first_row);
+        assert_eq!(cloned.last_row, link.last_row);
+        assert_eq!(cloned.first_col, link.first_col);
+        assert_eq!(cloned.last_col, link.last_col);
+        assert_eq!(cloned.label, link.label);
+        assert_eq!(cloned.target_frame, link.target_frame);
+        assert_eq!(cloned.text_mark, link.text_mark);
+    }
+
+    #[test]
+    fn test_xls_hyperlink_debug() {
+        let link = XlsHyperlink {
+            first_row: 1,
+            last_row: 1,
+            first_col: 0,
+            last_col: 0,
+            label: Some("Test".to_string()),
+            target_frame: None,
+            target: HyperlinkTarget::Url("https://test.com".to_string()),
+            text_mark: None,
+        };
+        let debug_str = format!("{:?}", link);
+        assert!(debug_str.contains("XlsHyperlink"));
+        assert!(debug_str.contains("https://test.com"));
+    }
+
+    #[test]
+    fn test_record_type_constant() {
+        assert_eq!(RECORD_TYPE, 0x01B8);
+    }
 }

@@ -526,3 +526,242 @@ impl Presentation {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn test_data_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-data")
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_open_pptx() {
+        let path = test_data_path().join("ooxml/pptx/sample.pptx");
+        let pres = Presentation::open(&path);
+        assert!(pres.is_ok(), "Failed to open PPTX file: {:?}", pres.err());
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_open_ppt() {
+        let path = test_data_path().join("ole/ppt/SampleShow.ppt");
+        let pres = Presentation::open(&path);
+        assert!(pres.is_ok(), "Failed to open PPT file: {:?}", pres.err());
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_from_bytes_pptx() {
+        let path = test_data_path().join("ooxml/pptx/sample.pptx");
+        let bytes = std::fs::read(&path).expect("Failed to read file");
+        let pres = Presentation::from_bytes(bytes);
+        assert!(
+            pres.is_ok(),
+            "Failed to load PPTX from bytes: {:?}",
+            pres.err()
+        );
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_from_bytes_ppt() {
+        let path = test_data_path().join("ole/ppt/SampleShow.ppt");
+        let bytes = std::fs::read(&path).expect("Failed to read file");
+        let pres = Presentation::from_bytes(bytes);
+        assert!(
+            pres.is_ok(),
+            "Failed to load PPT from bytes: {:?}",
+            pres.err()
+        );
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_text_pptx() {
+        let path = test_data_path().join("ooxml/pptx/sample.pptx");
+        let pres = Presentation::open(&path).expect("Failed to open PPTX");
+        let _text = pres.text().expect("Failed to extract text");
+        // Text may be empty for some presentations
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_text_ppt() {
+        let path = test_data_path().join("ole/ppt/SampleShow.ppt");
+        let pres = Presentation::open(&path).expect("Failed to open PPT");
+        let _text = pres.text().expect("Failed to extract text");
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_slide_count_pptx() {
+        let path = test_data_path().join("ooxml/pptx/sample.pptx");
+        let pres = Presentation::open(&path).expect("Failed to open PPTX");
+        let count = pres.slide_count().expect("Failed to get slide count");
+        assert!(count > 0, "Expected at least one slide");
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_slide_count_ppt() {
+        let path = test_data_path().join("ole/ppt/SampleShow.ppt");
+        let pres = Presentation::open(&path).expect("Failed to open PPT");
+        let count = pres.slide_count().expect("Failed to get slide count");
+        assert!(count > 0, "Expected at least one slide");
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_slides_pptx() {
+        let path = test_data_path().join("ooxml/pptx/sample.pptx");
+        let pres = Presentation::open(&path).expect("Failed to open PPTX");
+        let slides = pres.slides().expect("Failed to get slides");
+        assert!(!slides.is_empty(), "Expected at least one slide");
+
+        // Test that we can access text from slides
+        for slide in slides {
+            let _text = slide.text().expect("Failed to get slide text");
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_slides_ppt() {
+        let path = test_data_path().join("ole/ppt/SampleShow.ppt");
+        let pres = Presentation::open(&path).expect("Failed to open PPT");
+        let slides = pres.slides().expect("Failed to get slides");
+        assert!(!slides.is_empty(), "Expected at least one slide");
+
+        for slide in slides {
+            let _text = slide.text().expect("Failed to get slide text");
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_slide_dimensions_pptx() {
+        let path = test_data_path().join("ooxml/pptx/sample.pptx");
+        let pres = Presentation::open(&path).expect("Failed to open PPTX");
+        let _width = pres.slide_width().expect("Failed to get slide width");
+        let _height = pres.slide_height().expect("Failed to get slide height");
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_metadata_pptx() {
+        let path = test_data_path().join("ooxml/pptx/sample.pptx");
+        let pres = Presentation::open(&path).expect("Failed to open PPTX");
+        let metadata = pres.metadata().expect("Failed to get metadata");
+        // Metadata may or may not be present
+        let _ = metadata.map(|m| m.title);
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_metadata_ppt() {
+        let path = test_data_path().join("ole/ppt/SampleShow.ppt");
+        let pres = Presentation::open(&path).expect("Failed to open PPT");
+        let metadata = pres.metadata().expect("Failed to get metadata");
+        let _ = metadata.map(|m| m.title);
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_open_nonexistent_file() {
+        let path = test_data_path().join("nonexistent_file.pptx");
+        let result = Presentation::open(&path);
+        assert!(result.is_err(), "Expected error for nonexistent file");
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_from_bytes_invalid_data() {
+        let bytes = b"This is not a valid presentation file".to_vec();
+        let result = Presentation::from_bytes(bytes);
+        assert!(result.is_err(), "Expected error for invalid data");
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_charts_pptx() {
+        // Test presentations with various chart types
+        let chart_files = [
+            "ooxml/pptx/line-chart.pptx",
+            "ooxml/pptx/pie-chart.pptx",
+            "ooxml/pptx/radar-chart.pptx",
+            "ooxml/pptx/scatter-chart.pptx",
+        ];
+
+        for file in &chart_files {
+            let path = test_data_path().join(file);
+            if path.exists() {
+                let pres = Presentation::open(&path);
+                assert!(pres.is_ok(), "Failed to open {}", file);
+
+                if let Ok(p) = pres {
+                    let count = p.slide_count().expect("Failed to get slide count");
+                    assert!(count > 0, "Expected at least one slide in {}", file);
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_connectors_pptx() {
+        let test_files = [
+            "ooxml/pptx/connectorConnection.pptx",
+            "ooxml/pptx/curvedConnectors.pptx",
+            "ooxml/pptx/elbowConnectors.pptx",
+        ];
+
+        for file in &test_files {
+            let path = test_data_path().join(file);
+            if path.exists() {
+                let pres = Presentation::open(&path);
+                assert!(pres.is_ok(), "Failed to open {}", file);
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_text_shapes_ppt() {
+        // Use SampleShow.ppt to avoid metadata overflow issues in some test files
+        let path = test_data_path().join("ole/ppt/SampleShow.ppt");
+        let pres = Presentation::open(&path).expect("Failed to open PPT");
+        let slides = pres.slides().expect("Failed to get slides");
+        assert!(!slides.is_empty(), "Expected at least one slide");
+
+        for slide in slides {
+            // shape_count is only available for PPT format
+            let _ = slide.shape_count();
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_extract_text_for_markdown_ppt() {
+        let path = test_data_path().join("ole/ppt/SampleShow.ppt");
+        let pres = Presentation::open(&path).expect("Failed to open PPT");
+        let slides_text = pres
+            .extract_text_for_markdown()
+            .expect("Failed to extract text");
+        // Verify we got text for each slide
+        assert!(!slides_text.is_empty(), "Expected text extraction results");
+    }
+
+    #[test]
+    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    fn test_presentation_extract_text_for_markdown_pptx() {
+        let path = test_data_path().join("ooxml/pptx/sample.pptx");
+        let pres = Presentation::open(&path).expect("Failed to open PPTX");
+        let slides_text = pres
+            .extract_text_for_markdown()
+            .expect("Failed to extract text");
+        assert!(!slides_text.is_empty(), "Expected text extraction results");
+    }
+}

@@ -37,3 +37,22 @@ impl Default for Meta {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_meta_new() {
+        let meta = Meta::new();
+        assert!(meta.title().is_none());
+        assert!(meta.creator().is_none());
+    }
+
+    #[test]
+    fn test_meta_default() {
+        let meta: Meta = Default::default();
+        assert!(meta.title().is_none());
+        assert!(meta.creator().is_none());
+    }
+}

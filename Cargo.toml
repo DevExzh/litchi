@@ -144,6 +144,7 @@ prost-build = { version = "0.14", optional = true }
 clap = { version = "4", features = ["derive"] }
 proptest = "1.5"
 tempfile = "3"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [profile.release]
 lto = true

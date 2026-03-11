@@ -1218,3 +1218,353 @@ impl MutableSlide {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ooxml::pptx::animations::{AnimationEffect, AnimationTrigger};
+
+    #[test]
+    fn test_mutable_slide_new() {
+        let slide = MutableSlide::new(256);
+        assert_eq!(slide.slide_id(), 256);
+        assert!(slide.title().is_none());
+        assert!(slide.notes().is_none());
+        assert!(!slide.has_notes());
+        assert_eq!(slide.shape_count(), 0);
+        assert!(!slide.is_modified());
+        assert!(slide.transition().is_none());
+        assert!(slide.background().is_none());
+        assert_eq!(slide.comment_count(), 0);
+        assert_eq!(slide.media_count(), 0);
+        assert_eq!(slide.animation_count(), 0);
+    }
+
+    #[test]
+    fn test_set_and_get_title() {
+        let mut slide = MutableSlide::new(256);
+        assert!(!slide.is_modified());
+
+        slide.set_title("Test Title");
+        assert_eq!(slide.title(), Some("Test Title"));
+        assert!(slide.is_modified());
+    }
+
+    #[test]
+    fn test_set_slide_id() {
+        let mut slide = MutableSlide::new(256);
+        slide.set_slide_id(512);
+        assert_eq!(slide.slide_id(), 512);
+        assert!(slide.is_modified());
+    }
+
+    #[test]
+    fn test_set_and_get_notes() {
+        let mut slide = MutableSlide::new(256);
+        slide.set_notes("Speaker notes here");
+        assert_eq!(slide.notes(), Some("Speaker notes here"));
+        assert!(slide.has_notes());
+    }
+
+    #[test]
+    fn test_add_text_box() {
+        let mut slide = MutableSlide::new(256);
+        slide.add_text_box("Hello", 1000, 2000, 3000, 1000);
+        assert_eq!(slide.shape_count(), 1);
+        assert!(slide.is_modified());
+        // Shape ID should be 3 (first user shape)
+        assert_eq!(slide.shapes[0].shape_id, 3);
+    }
+
+    #[test]
+    fn test_add_rectangle() {
+        let mut slide = MutableSlide::new(256);
+        slide.add_rectangle(1000, 2000, 3000, 2000, Some("FF0000".to_string()));
+        assert_eq!(slide.shape_count(), 1);
+    }
+
+    #[test]
+    fn test_add_ellipse() {
+        let mut slide = MutableSlide::new(256);
+        slide.add_ellipse(1000, 2000, 3000, 2000, Some("00FF00".to_string()));
+        assert_eq!(slide.shape_count(), 1);
+    }
+
+    #[test]
+    fn test_add_table() {
+        let mut slide = MutableSlide::new(256);
+        let data = vec![
+            vec!["A1".to_string(), "B1".to_string()],
+            vec!["A2".to_string(), "B2".to_string()],
+        ];
+        slide.add_table(data, 1000, 2000, 4000, 2000);
+        assert_eq!(slide.shape_count(), 1);
+    }
+
+    #[test]
+    fn test_add_table_with_options() {
+        let mut slide = MutableSlide::new(256);
+        let data = vec![vec!["A1".to_string(), "B1".to_string()]];
+        slide.add_table_with_options(
+            data,
+            1000,
+            2000,
+            4000,
+            2000,
+            Some(vec![2000, 2000]),
+            Some(vec![1000]),
+            false, // No header
+            false, // No band rows
+        );
+        assert_eq!(slide.shape_count(), 1);
+    }
+
+    #[test]
+    fn test_add_and_remove_transition() {
+        let mut slide = MutableSlide::new(256);
+        assert!(slide.transition().is_none());
+
+        let transition = crate::ooxml::pptx::transitions::SlideTransition::new(
+            crate::ooxml::pptx::transitions::TransitionType::Fade,
+        );
+        slide.set_transition(transition);
+        assert!(slide.transition().is_some());
+        assert!(slide.is_modified());
+
+        slide.remove_transition();
+        assert!(slide.transition().is_none());
+    }
+
+    #[test]
+    fn test_set_and_remove_background() {
+        let mut slide = MutableSlide::new(256);
+        assert!(slide.background().is_none());
+
+        let background = crate::ooxml::pptx::backgrounds::SlideBackground::solid("4472C4");
+        slide.set_background(background);
+        assert!(slide.background().is_some());
+        assert!(slide.is_modified());
+
+        slide.remove_background();
+        assert!(slide.background().is_none());
+    }
+
+    #[test]
+    fn test_add_comment() {
+        let mut slide = MutableSlide::new(256);
+        slide.add_comment(0, "Test comment", 1000, 2000);
+        assert_eq!(slide.comment_count(), 1);
+        assert!(slide.is_modified());
+
+        let comments = slide.comments();
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].text, "Test comment");
+    }
+
+    #[test]
+    fn test_add_comment_with_options() {
+        let mut slide = MutableSlide::new(256);
+        slide.add_comment_with_options(
+            1,
+            "Another comment",
+            2000,
+            3000,
+            Some("2024-01-01T00:00:00Z"),
+            Some(5),
+        );
+        assert_eq!(slide.comment_count(), 1);
+    }
+
+    #[test]
+    fn test_add_audio() {
+        let mut slide = MutableSlide::new(256);
+        let audio_data = vec![0x00; 100];
+        slide.add_audio(audio_data, 1000, 2000, 1000, 1000);
+        assert_eq!(slide.media_count(), 1);
+        assert!(slide.is_modified());
+    }
+
+    #[test]
+    fn test_add_video() {
+        let mut slide = MutableSlide::new(256);
+        let video_data = vec![0x00; 100];
+        slide.add_video(video_data, 1000, 2000, 4000, 3000);
+        assert_eq!(slide.media_count(), 1);
+    }
+
+    #[test]
+    fn test_add_media_with_format() {
+        let mut slide = MutableSlide::new(256);
+        let data = vec![0x00; 100];
+        slide.add_media_with_format(
+            data,
+            crate::ooxml::pptx::media::MediaFormat::Mp3,
+            1000,
+            2000,
+            1000,
+            1000,
+        );
+        assert_eq!(slide.media_count(), 1);
+    }
+
+    #[test]
+    fn test_add_animation() {
+        let mut slide = MutableSlide::new(256);
+        slide.add_text_box("Animated", 1000, 2000, 3000, 1000);
+        slide.add_animation(3, AnimationEffect::Fade);
+        assert_eq!(slide.animation_count(), 1);
+        assert!(slide.is_modified());
+    }
+
+    #[test]
+    fn test_add_animation_with_options() {
+        let mut slide = MutableSlide::new(256);
+        slide.add_text_box("Animated", 1000, 2000, 3000, 1000);
+        slide.add_animation_with_options(
+            3,
+            AnimationEffect::FlyIn,
+            AnimationTrigger::OnClick,
+            500,
+            100,
+        );
+        assert_eq!(slide.animation_count(), 1);
+    }
+
+    #[test]
+    fn test_clear_animations() {
+        let mut slide = MutableSlide::new(256);
+        slide.add_text_box("Animated", 1000, 2000, 3000, 1000);
+        slide.add_animation(3, AnimationEffect::Fade);
+        assert_eq!(slide.animation_count(), 1);
+
+        slide.clear_animations();
+        assert_eq!(slide.animation_count(), 0);
+        assert!(slide.is_modified());
+    }
+
+    #[test]
+    fn test_add_group() {
+        let mut slide = MutableSlide::new(256);
+        let group_idx = slide.add_group(1000, 2000, 4000, 4000);
+        assert_eq!(group_idx, 0);
+        assert_eq!(slide.shape_count(), 1);
+    }
+
+    #[test]
+    fn test_add_shapes_to_group() {
+        let mut slide = MutableSlide::new(256);
+        let group_idx = slide.add_group(1000, 2000, 4000, 4000);
+
+        let result1 = slide.add_text_box_to_group(group_idx, "Group text", 0, 0, 1000, 500);
+        assert!(result1);
+
+        let result2 =
+            slide.add_rectangle_to_group(group_idx, 0, 500, 1000, 1000, Some("FF0000".to_string()));
+        assert!(result2);
+
+        let result3 =
+            slide.add_ellipse_to_group(group_idx, 1000, 0, 1000, 1000, Some("00FF00".to_string()));
+        assert!(result3);
+    }
+
+    #[test]
+    fn test_add_shapes_to_invalid_group() {
+        let mut slide = MutableSlide::new(256);
+
+        // Try to add to non-existent group
+        let result = slide.add_text_box_to_group(0, "Text", 0, 0, 1000, 500);
+        assert!(!result);
+
+        let result = slide.add_rectangle_to_group(0, 0, 0, 1000, 1000, None);
+        assert!(!result);
+
+        let result = slide.add_ellipse_to_group(0, 0, 0, 1000, 1000, None);
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_add_chart_shape() {
+        let mut slide = MutableSlide::new(256);
+        let shape_id = slide.add_chart_shape(1, 1000, 2000, 4000, 3000);
+        assert_eq!(shape_id, 3);
+        assert_eq!(slide.shape_count(), 1);
+    }
+
+    #[test]
+    fn test_add_smartart_shape() {
+        let mut slide = MutableSlide::new(256);
+        let shape_id = slide.add_smartart_shape(1, 1000, 2000, 4000, 3000);
+        assert_eq!(shape_id, 3);
+        assert_eq!(slide.shape_count(), 1);
+    }
+
+    #[test]
+    fn test_collect_images_empty() {
+        let slide = MutableSlide::new(256);
+        let images = slide.collect_images();
+        assert!(images.is_empty());
+    }
+
+    #[test]
+    fn test_collect_media_empty() {
+        let slide = MutableSlide::new(256);
+        let media = slide.collect_media();
+        assert!(media.is_empty());
+    }
+
+    #[test]
+    fn test_get_background_image_none() {
+        let slide = MutableSlide::new(256);
+        assert!(slide.get_background_image().is_none());
+    }
+
+    #[test]
+    fn test_generate_notes_xml_none() {
+        let slide = MutableSlide::new(256);
+        assert!(slide.generate_notes_xml().is_none());
+    }
+
+    #[test]
+    fn test_generate_notes_xml_some() {
+        let mut slide = MutableSlide::new(256);
+        slide.set_notes("Test notes");
+        let result = slide.generate_notes_xml();
+        assert!(result.is_some());
+        let xml = result.unwrap().unwrap();
+        assert!(xml.contains("Test notes"));
+        assert!(xml.contains("<p:notes"));
+    }
+
+    #[test]
+    fn test_to_xml_basic() {
+        let mut slide = MutableSlide::new(256);
+        slide.set_title("Slide Title");
+        slide.add_text_box("Body text", 1000, 2000, 3000, 1000);
+
+        let xml = slide.to_xml().unwrap();
+        assert!(xml.contains("<?xml version="));
+        assert!(xml.contains("<p:sld"));
+        assert!(xml.contains("Slide Title"));
+        assert!(xml.contains("Body text"));
+        assert!(xml.contains("</p:sld>"));
+    }
+
+    #[test]
+    fn test_to_xml_empty() {
+        let slide = MutableSlide::new(256);
+        let xml = slide.to_xml().unwrap();
+        assert!(xml.contains("<p:sld"));
+        assert!(xml.contains("</p:sld>"));
+    }
+
+    #[test]
+    fn test_multiple_shapes_increment_ids() {
+        let mut slide = MutableSlide::new(256);
+        slide.add_text_box("First", 1000, 2000, 3000, 1000);
+        slide.add_rectangle(1000, 3000, 2000, 1000, None);
+        slide.add_ellipse(3000, 3000, 1000, 1000, None);
+
+        assert_eq!(slide.shape_count(), 3);
+        // Shape IDs should be 3, 4, 5
+    }
+}

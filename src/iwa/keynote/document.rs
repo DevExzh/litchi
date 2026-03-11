@@ -513,12 +513,14 @@ impl KeynoteDocument {
     /// ```rust,no_run
     /// use litchi::iwa::keynote::KeynoteDocument;
     ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let doc = KeynoteDocument::open("presentation.key")?;
     /// let show = doc.show()?;
     ///
-    /// println!("Presentation: {}", show.title.unwrap_or_default());
+    /// println!("Presentation: {}", show.title.as_deref().unwrap_or_default());
     /// println!("Slides: {}", show.slide_count());
     /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # }
     /// ```
     pub fn show(&self) -> Result<KeynoteShow> {
         let mut show = KeynoteShow::new();

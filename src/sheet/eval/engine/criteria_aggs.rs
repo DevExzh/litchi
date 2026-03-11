@@ -401,3 +401,415 @@ pub(crate) async fn eval_averageifs(
 
     Ok(CellValue::Float(total / count as f64))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::engine::test_helpers::TestEngine;
+    use crate::sheet::eval::parser::Expr;
+    use crate::sheet::eval::parser::ast::RangeRef;
+
+    fn num_expr(n: f64) -> Expr {
+        if n == n.floor() {
+            Expr::Literal(CellValue::Int(n as i64))
+        } else {
+            Expr::Literal(CellValue::Float(n))
+        }
+    }
+
+    fn str_expr(s: &str) -> Expr {
+        Expr::Literal(CellValue::String(s.to_string()))
+    }
+
+    fn range_expr(sheet: &str, start_row: u32, start_col: u32, end_row: u32, end_col: u32) -> Expr {
+        Expr::Range(RangeRef {
+            sheet: sheet.to_string(),
+            start_row,
+            start_col,
+            end_row,
+            end_col,
+        })
+    }
+
+    #[tokio::test]
+    async fn test_eval_sumif() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        // Data: [10, 20, 30, 40]
+        let values = vec![
+            CellValue::Int(10),
+            CellValue::Int(20),
+            CellValue::Int(30),
+            CellValue::Int(40),
+        ];
+        engine.add_range("Sheet1", 1, 1, 1, 4, values);
+
+        // SUMIF(Sheet1!A1:D1, ">20") should sum 30 + 40 = 70
+        let args = vec![range_expr("Sheet1", 1, 1, 1, 4), str_expr(">20")];
+        let result = eval_sumif(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 70.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_sumif_with_sum_range() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        // Criteria range: ["A", "B", "A", "B"]
+        let criteria = vec![
+            CellValue::String("A".to_string()),
+            CellValue::String("B".to_string()),
+            CellValue::String("A".to_string()),
+            CellValue::String("B".to_string()),
+        ];
+        // Sum range: [10, 20, 30, 40]
+        let sums = vec![
+            CellValue::Int(10),
+            CellValue::Int(20),
+            CellValue::Int(30),
+            CellValue::Int(40),
+        ];
+        engine.add_range("Sheet1", 1, 1, 1, 4, criteria);
+        engine.add_range("Sheet1", 2, 1, 1, 4, sums);
+
+        // SUMIF(Sheet1!A1:D1, "A", Sheet1!A2:D2) should sum 10 + 30 = 40
+        let args = vec![
+            range_expr("Sheet1", 1, 1, 1, 4),
+            str_expr("A"),
+            range_expr("Sheet1", 2, 1, 2, 4),
+        ];
+        let result = eval_sumif(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 40.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_countif() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        // Data: [10, 20, 30, 40]
+        let values = vec![
+            CellValue::Int(10),
+            CellValue::Int(20),
+            CellValue::Int(30),
+            CellValue::Int(40),
+        ];
+        engine.add_range("Sheet1", 1, 1, 1, 4, values);
+
+        // COUNTIF(Sheet1!A1:D1, ">20") should count 30, 40 = 2
+        let args = vec![range_expr("Sheet1", 1, 1, 1, 4), str_expr(">20")];
+        let result = eval_countif(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(2));
+    }
+
+    #[tokio::test]
+    async fn test_eval_countif_text() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        // Data: ["Apple", "Banana", "Apricot", "Cherry"]
+        let values = vec![
+            CellValue::String("Apple".to_string()),
+            CellValue::String("Banana".to_string()),
+            CellValue::String("Apricot".to_string()),
+            CellValue::String("Cherry".to_string()),
+        ];
+        engine.add_range("Sheet1", 1, 1, 1, 4, values);
+
+        // COUNTIF(Sheet1!A1:D1, "A*") should count Apple, Apricot = 2
+        let args = vec![range_expr("Sheet1", 1, 1, 1, 4), str_expr("A*")];
+        let result = eval_countif(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(2));
+    }
+
+    #[tokio::test]
+    async fn test_eval_averageif() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        // Data: [10, 20, 30, 40]
+        let values = vec![
+            CellValue::Int(10),
+            CellValue::Int(20),
+            CellValue::Int(30),
+            CellValue::Int(40),
+        ];
+        engine.add_range("Sheet1", 1, 1, 1, 4, values);
+
+        // AVERAGEIF(Sheet1!A1:D1, ">20") should average 30, 40 = 35
+        let args = vec![range_expr("Sheet1", 1, 1, 1, 4), str_expr(">20")];
+        let result = eval_averageif(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 35.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_averageif_no_match() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        let values = vec![CellValue::Int(10), CellValue::Int(20)];
+        engine.add_range("Sheet1", 1, 1, 1, 2, values);
+
+        // AVERAGEIF(Sheet1!A1:B1, ">100") - no matches
+        let args = vec![range_expr("Sheet1", 1, 1, 1, 2), str_expr(">100")];
+        let result = eval_averageif(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("no matching")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_sumifs() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        // Sum range: [10, 20, 30, 40]
+        let sums = vec![
+            CellValue::Int(10),
+            CellValue::Int(20),
+            CellValue::Int(30),
+            CellValue::Int(40),
+        ];
+        // Criteria 1: ["A", "B", "A", "B"]
+        let crit1 = vec![
+            CellValue::String("A".to_string()),
+            CellValue::String("B".to_string()),
+            CellValue::String("A".to_string()),
+            CellValue::String("B".to_string()),
+        ];
+        engine.add_range("Sheet1", 1, 1, 1, 4, sums);
+        engine.add_range("Sheet1", 2, 1, 1, 4, crit1);
+
+        // SUMIFS(Sheet1!A1:D1, Sheet1!A2:D2, "A") should sum 10 + 30 = 40
+        let args = vec![
+            range_expr("Sheet1", 1, 1, 1, 4),
+            range_expr("Sheet1", 2, 1, 2, 4),
+            str_expr("A"),
+        ];
+        let result = eval_sumifs(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 40.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_sumifs_multiple_criteria() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        // Sum range: [10, 20, 30, 40]
+        let sums = vec![
+            CellValue::Int(10),
+            CellValue::Int(20),
+            CellValue::Int(30),
+            CellValue::Int(40),
+        ];
+        // Criteria 1: ["A", "B", "A", "B"]
+        let crit1 = vec![
+            CellValue::String("A".to_string()),
+            CellValue::String("B".to_string()),
+            CellValue::String("A".to_string()),
+            CellValue::String("B".to_string()),
+        ];
+        // Criteria 2: [1, 1, 2, 2]
+        let crit2 = vec![
+            CellValue::Int(1),
+            CellValue::Int(1),
+            CellValue::Int(2),
+            CellValue::Int(2),
+        ];
+        engine.add_range("Sheet1", 1, 1, 1, 4, sums);
+        engine.add_range("Sheet1", 2, 1, 1, 4, crit1);
+        engine.add_range("Sheet1", 3, 1, 1, 4, crit2);
+
+        // SUMIFS(Sheet1!A1:D1, Sheet1!A2:D2, "A", Sheet1!A3:D3, 2) should sum 30
+        let args = vec![
+            range_expr("Sheet1", 1, 1, 1, 4),
+            range_expr("Sheet1", 2, 1, 2, 4),
+            str_expr("A"),
+            range_expr("Sheet1", 3, 1, 3, 4),
+            num_expr(2.0),
+        ];
+        let result = eval_sumifs(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 30.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_countifs() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        // Criteria 1: ["A", "B", "A", "B"]
+        let crit1 = vec![
+            CellValue::String("A".to_string()),
+            CellValue::String("B".to_string()),
+            CellValue::String("A".to_string()),
+            CellValue::String("B".to_string()),
+        ];
+        // Criteria 2: [1, 1, 2, 2]
+        let crit2 = vec![
+            CellValue::Int(1),
+            CellValue::Int(1),
+            CellValue::Int(2),
+            CellValue::Int(2),
+        ];
+        engine.add_range("Sheet1", 1, 1, 1, 4, crit1);
+        engine.add_range("Sheet1", 2, 1, 1, 4, crit2);
+
+        // COUNTIFS(Sheet1!A1:D1, "A", Sheet1!A2:D2, 2) should count 1 (only position 3)
+        let args = vec![
+            range_expr("Sheet1", 1, 1, 1, 4),
+            str_expr("A"),
+            range_expr("Sheet1", 2, 1, 2, 4),
+            num_expr(2.0),
+        ];
+        let result = eval_countifs(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(1));
+    }
+
+    #[tokio::test]
+    async fn test_eval_averageifs() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        // Average range: [10, 20, 30, 40]
+        let avg_range = vec![
+            CellValue::Int(10),
+            CellValue::Int(20),
+            CellValue::Int(30),
+            CellValue::Int(40),
+        ];
+        // Criteria: ["A", "B", "A", "B"]
+        let crit = vec![
+            CellValue::String("A".to_string()),
+            CellValue::String("B".to_string()),
+            CellValue::String("A".to_string()),
+            CellValue::String("B".to_string()),
+        ];
+        engine.add_range("Sheet1", 1, 1, 1, 4, avg_range);
+        engine.add_range("Sheet1", 2, 1, 1, 4, crit);
+
+        // AVERAGEIFS(Sheet1!A1:D1, Sheet1!A2:D2, "A") should average 10, 30 = 20
+        let args = vec![
+            range_expr("Sheet1", 1, 1, 1, 4),
+            range_expr("Sheet1", 2, 1, 2, 4),
+            str_expr("A"),
+        ];
+        let result = eval_averageifs(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 20.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_minifs() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        // Min range: [10, 20, 30, 40]
+        let min_range = vec![
+            CellValue::Int(10),
+            CellValue::Int(20),
+            CellValue::Int(30),
+            CellValue::Int(40),
+        ];
+        // Criteria: ["A", "B", "A", "B"]
+        let crit = vec![
+            CellValue::String("A".to_string()),
+            CellValue::String("B".to_string()),
+            CellValue::String("A".to_string()),
+            CellValue::String("B".to_string()),
+        ];
+        engine.add_range("Sheet1", 1, 1, 1, 4, min_range);
+        engine.add_range("Sheet1", 2, 1, 1, 4, crit);
+
+        // MINIFS(Sheet1!A1:D1, Sheet1!A2:D2, "A") should return 10
+        let args = vec![
+            range_expr("Sheet1", 1, 1, 1, 4),
+            range_expr("Sheet1", 2, 1, 2, 4),
+            str_expr("A"),
+        ];
+        let result = eval_minifs(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 10.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_maxifs() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        // Max range: [10, 20, 30, 40]
+        let max_range = vec![
+            CellValue::Int(10),
+            CellValue::Int(20),
+            CellValue::Int(30),
+            CellValue::Int(40),
+        ];
+        // Criteria: ["A", "B", "A", "B"]
+        let crit = vec![
+            CellValue::String("A".to_string()),
+            CellValue::String("B".to_string()),
+            CellValue::String("A".to_string()),
+            CellValue::String("B".to_string()),
+        ];
+        engine.add_range("Sheet1", 1, 1, 1, 4, max_range);
+        engine.add_range("Sheet1", 2, 1, 1, 4, crit);
+
+        // MAXIFS(Sheet1!A1:D1, Sheet1!A2:D2, "A") should return 30
+        let args = vec![
+            range_expr("Sheet1", 1, 1, 1, 4),
+            range_expr("Sheet1", 2, 1, 2, 4),
+            str_expr("A"),
+        ];
+        let result = eval_maxifs(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 30.0).abs() < 1e-9),
+            _ => panic!("Expected Float result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_sumif_wrong_args() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        let args = vec![num_expr(1.0)];
+        let result = eval_sumif(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 2 or 3 arguments")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_countif_wrong_args() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+
+        let args = vec![num_expr(1.0)];
+        let result = eval_countif(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 2 arguments")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+}

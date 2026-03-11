@@ -499,3 +499,410 @@ fn matching_records<'a>(
     }
     rows
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheet::eval::engine::test_helpers::TestEngine;
+    use crate::sheet::eval::parser::{Expr, RangeRef};
+
+    fn create_database_range() -> Expr {
+        // Create a database with headers: Name, Age, Score
+        // Records: Alice(25, 85), Bob(30, 90), Carol(25, 78), Dave(35, 92)
+        Expr::Range(RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_col: 0,
+            start_row: 0,
+            end_col: 2,
+            end_row: 4,
+        })
+    }
+
+    fn setup_database(engine: &TestEngine) {
+        // Header row
+        engine.set_cell("Sheet1", 0, 0, CellValue::String("Name".to_string()));
+        engine.set_cell("Sheet1", 0, 1, CellValue::String("Age".to_string()));
+        engine.set_cell("Sheet1", 0, 2, CellValue::String("Score".to_string()));
+        // Data rows
+        engine.set_cell("Sheet1", 1, 0, CellValue::String("Alice".to_string()));
+        engine.set_cell("Sheet1", 1, 1, CellValue::Int(25));
+        engine.set_cell("Sheet1", 1, 2, CellValue::Int(85));
+        engine.set_cell("Sheet1", 2, 0, CellValue::String("Bob".to_string()));
+        engine.set_cell("Sheet1", 2, 1, CellValue::Int(30));
+        engine.set_cell("Sheet1", 2, 2, CellValue::Int(90));
+        engine.set_cell("Sheet1", 3, 0, CellValue::String("Carol".to_string()));
+        engine.set_cell("Sheet1", 3, 1, CellValue::Int(25));
+        engine.set_cell("Sheet1", 3, 2, CellValue::Int(78));
+        engine.set_cell("Sheet1", 4, 0, CellValue::String("Dave".to_string()));
+        engine.set_cell("Sheet1", 4, 1, CellValue::Int(35));
+        engine.set_cell("Sheet1", 4, 2, CellValue::Int(92));
+    }
+
+    fn create_criteria_range(criteria_col: u32, criteria_row: u32) -> Expr {
+        Expr::Range(RangeRef {
+            sheet: "Sheet1".to_string(),
+            start_col: criteria_col,
+            start_row: criteria_row,
+            end_col: criteria_col + 2,
+            end_row: criteria_row + 1,
+        })
+    }
+
+    fn setup_age_criteria(
+        engine: &TestEngine,
+        criteria_col: u32,
+        criteria_row: u32,
+        age_value: i64,
+    ) {
+        // Criteria header
+        engine.set_cell(
+            "Sheet1",
+            criteria_row,
+            criteria_col,
+            CellValue::String("Age".to_string()),
+        );
+        // Criteria value
+        engine.set_cell(
+            "Sheet1",
+            criteria_row + 1,
+            criteria_col,
+            CellValue::Int(age_value),
+        );
+    }
+
+    #[tokio::test]
+    async fn test_dget_single_match() {
+        let engine = TestEngine::new();
+        setup_database(&engine);
+        setup_age_criteria(&engine, 10, 0, 30); // Age = 30
+
+        let ctx = engine.ctx();
+        let database = create_database_range();
+        let field = Expr::Literal(CellValue::String("Score".to_string()));
+        let criteria = create_criteria_range(10, 0);
+
+        let args = vec![database, field, criteria];
+        let result = eval_dget(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(90)); // Bob's score
+    }
+
+    #[tokio::test]
+    async fn test_dget_no_match() {
+        let engine = TestEngine::new();
+        setup_database(&engine);
+        setup_age_criteria(&engine, 10, 0, 99); // Age = 99 (no match)
+
+        let ctx = engine.ctx();
+        let database = create_database_range();
+        let field = Expr::Literal(CellValue::String("Score".to_string()));
+        let criteria = create_criteria_range(10, 0);
+
+        let args = vec![database, field, criteria];
+        let result = eval_dget(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("found no rows")),
+            _ => panic!("Expected Error result, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_dget_multiple_matches() {
+        let engine = TestEngine::new();
+        setup_database(&engine);
+        setup_age_criteria(&engine, 10, 0, 25); // Age = 25 (Alice and Carol)
+
+        let ctx = engine.ctx();
+        let database = create_database_range();
+        let field = Expr::Literal(CellValue::String("Score".to_string()));
+        let criteria = create_criteria_range(10, 0);
+
+        let args = vec![database, field, criteria];
+        let result = eval_dget(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("multiple rows")),
+            _ => panic!("Expected Error result, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_dget_field_by_index() {
+        let engine = TestEngine::new();
+        setup_database(&engine);
+        setup_age_criteria(&engine, 10, 0, 30);
+
+        let ctx = engine.ctx();
+        let database = create_database_range();
+        let field = Expr::Literal(CellValue::Int(3)); // 3rd column (Score)
+        let criteria = create_criteria_range(10, 0);
+
+        let args = vec![database, field, criteria];
+        let result = eval_dget(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(90));
+    }
+
+    #[tokio::test]
+    async fn test_dsum() {
+        let engine = TestEngine::new();
+        setup_database(&engine);
+        setup_age_criteria(&engine, 10, 0, 25); // Age = 25 (Alice=85, Carol=78)
+
+        let ctx = engine.ctx();
+        let database = create_database_range();
+        let field = Expr::Literal(CellValue::String("Score".to_string()));
+        let criteria = create_criteria_range(10, 0);
+
+        let args = vec![database, field, criteria];
+        let result = eval_dsum(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Float(163.0)); // 85 + 78
+    }
+
+    #[tokio::test]
+    async fn test_daverage() {
+        let engine = TestEngine::new();
+        setup_database(&engine);
+        setup_age_criteria(&engine, 10, 0, 25); // Age = 25
+
+        let ctx = engine.ctx();
+        let database = create_database_range();
+        let field = Expr::Literal(CellValue::String("Score".to_string()));
+        let criteria = create_criteria_range(10, 0);
+
+        let args = vec![database, field, criteria];
+        let result = eval_daverage(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Float(81.5)); // (85 + 78) / 2
+    }
+
+    #[tokio::test]
+    async fn test_dcount() {
+        let engine = TestEngine::new();
+        setup_database(&engine);
+        setup_age_criteria(&engine, 10, 0, 25);
+
+        let ctx = engine.ctx();
+        let database = create_database_range();
+        let field = Expr::Literal(CellValue::String("Score".to_string()));
+        let criteria = create_criteria_range(10, 0);
+
+        let args = vec![database, field, criteria];
+        let result = eval_dcount(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(2)); // 2 numeric scores
+    }
+
+    #[tokio::test]
+    async fn test_dcounta() {
+        let engine = TestEngine::new();
+        setup_database(&engine);
+        // Add criteria to match all rows (using Score > 0)
+        engine.set_cell("Sheet1", 0, 10, CellValue::String("Score".to_string()));
+        engine.set_cell("Sheet1", 1, 10, CellValue::String(">0".to_string()));
+
+        let ctx = engine.ctx();
+        let database = create_database_range();
+        let field = Expr::Literal(CellValue::String("Name".to_string()));
+        let criteria = create_criteria_range(10, 0);
+
+        let args = vec![database, field, criteria];
+        let result = eval_dcounta(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(4)); // 4 names match Score > 0
+    }
+
+    #[tokio::test]
+    async fn test_dmax() {
+        let engine = TestEngine::new();
+        setup_database(&engine);
+        // Match all by using criteria with blank value
+        engine.set_cell("Sheet1", 0, 10, CellValue::String("Score".to_string()));
+        engine.set_cell("Sheet1", 1, 10, CellValue::String(">0".to_string()));
+
+        let ctx = engine.ctx();
+        let database = create_database_range();
+        let field = Expr::Literal(CellValue::String("Score".to_string()));
+        let criteria = create_criteria_range(10, 0);
+
+        let args = vec![database, field, criteria];
+        let result = eval_dmax(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(92)); // Dave's score
+    }
+
+    #[tokio::test]
+    async fn test_dmin() {
+        let engine = TestEngine::new();
+        setup_database(&engine);
+        engine.set_cell("Sheet1", 0, 10, CellValue::String("Score".to_string()));
+        engine.set_cell("Sheet1", 1, 10, CellValue::String(">0".to_string()));
+
+        let ctx = engine.ctx();
+        let database = create_database_range();
+        let field = Expr::Literal(CellValue::String("Score".to_string()));
+        let criteria = create_criteria_range(10, 0);
+
+        let args = vec![database, field, criteria];
+        let result = eval_dmin(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Int(78)); // Carol's score
+    }
+
+    #[tokio::test]
+    async fn test_dproduct() {
+        let engine = TestEngine::new();
+        setup_database(&engine);
+        setup_age_criteria(&engine, 10, 0, 25); // Age = 25 (scores 85, 78)
+
+        let ctx = engine.ctx();
+        let database = create_database_range();
+        let field = Expr::Literal(CellValue::String("Score".to_string()));
+        let criteria = create_criteria_range(10, 0);
+
+        let args = vec![database, field, criteria];
+        let result = eval_dproduct(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::Float(6630.0)); // 85 * 78
+    }
+
+    #[tokio::test]
+    async fn test_dstddev() {
+        let engine = TestEngine::new();
+        setup_database(&engine);
+        engine.set_cell("Sheet1", 0, 10, CellValue::String("Score".to_string()));
+        engine.set_cell("Sheet1", 1, 10, CellValue::String(">0".to_string()));
+
+        let ctx = engine.ctx();
+        let database = create_database_range();
+        let field = Expr::Literal(CellValue::String("Score".to_string()));
+        let criteria = create_criteria_range(10, 0);
+
+        let args = vec![database, field, criteria];
+        let result = eval_dstdev(ctx, "Sheet1", &args).await.unwrap();
+        // Sample standard deviation of [85, 90, 78, 92]
+        // mean = 86.25, variance = 38.916667, stddev = 6.238322
+        match result {
+            CellValue::Float(v) => {
+                let expected = 6.23832242407;
+                assert!(
+                    (v - expected).abs() < 0.001,
+                    "Expected ~{}, got {}",
+                    expected,
+                    v
+                );
+            },
+            _ => panic!("Expected Float result, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_dstddevp() {
+        let engine = TestEngine::new();
+        setup_database(&engine);
+        engine.set_cell("Sheet1", 0, 10, CellValue::String("Score".to_string()));
+        engine.set_cell("Sheet1", 1, 10, CellValue::String(">0".to_string()));
+
+        let ctx = engine.ctx();
+        let database = create_database_range();
+        let field = Expr::Literal(CellValue::String("Score".to_string()));
+        let criteria = create_criteria_range(10, 0);
+
+        let args = vec![database, field, criteria];
+        let result = eval_dstdevp(ctx, "Sheet1", &args).await.unwrap();
+        // Population standard deviation of [85, 90, 78, 92]
+        // mean = 86.25, variance = 29.1875, stddev = 5.402546
+        match result {
+            CellValue::Float(v) => {
+                let expected = 5.40254569624;
+                assert!(
+                    (v - expected).abs() < 0.001,
+                    "Expected ~{}, got {}",
+                    expected,
+                    v
+                );
+            },
+            _ => panic!("Expected Float result, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_dvar() {
+        let engine = TestEngine::new();
+        setup_database(&engine);
+        engine.set_cell("Sheet1", 0, 10, CellValue::String("Score".to_string()));
+        engine.set_cell("Sheet1", 1, 10, CellValue::String(">0".to_string()));
+
+        let ctx = engine.ctx();
+        let database = create_database_range();
+        let field = Expr::Literal(CellValue::String("Score".to_string()));
+        let criteria = create_criteria_range(10, 0);
+
+        let args = vec![database, field, criteria];
+        let result = eval_dvar(ctx, "Sheet1", &args).await.unwrap();
+        // Sample variance of [85, 90, 78, 92] = 38.916667
+        match result {
+            CellValue::Float(v) => {
+                let expected = 38.9166666667;
+                assert!(
+                    (v - expected).abs() < 0.001,
+                    "Expected ~{}, got {}",
+                    expected,
+                    v
+                );
+            },
+            _ => panic!("Expected Float result, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_dvarp() {
+        let engine = TestEngine::new();
+        setup_database(&engine);
+        engine.set_cell("Sheet1", 0, 10, CellValue::String("Score".to_string()));
+        engine.set_cell("Sheet1", 1, 10, CellValue::String(">0".to_string()));
+
+        let ctx = engine.ctx();
+        let database = create_database_range();
+        let field = Expr::Literal(CellValue::String("Score".to_string()));
+        let criteria = create_criteria_range(10, 0);
+
+        let args = vec![database, field, criteria];
+        let result = eval_dvarp(ctx, "Sheet1", &args).await.unwrap();
+        // Population variance of [85, 90, 78, 92] = 29.1875
+        match result {
+            CellValue::Float(v) => {
+                let expected = 29.1875;
+                assert!(
+                    (v - expected).abs() < 0.001,
+                    "Expected ~{}, got {}",
+                    expected,
+                    v
+                );
+            },
+            _ => panic!("Expected Float result, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_dget_wrong_args() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![];
+        let result = eval_dget(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 3 arguments")),
+            _ => panic!("Expected Error result"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_dget_invalid_field() {
+        let engine = TestEngine::new();
+        setup_database(&engine);
+        setup_age_criteria(&engine, 10, 0, 30);
+
+        let ctx = engine.ctx();
+        let database = create_database_range();
+        let field = Expr::Literal(CellValue::String("InvalidField".to_string()));
+        let criteria = create_criteria_range(10, 0);
+
+        let args = vec![database, field, criteria];
+        let result = eval_dget(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("valid column header")),
+            _ => panic!("Expected Error result, got {:?}", result),
+        }
+    }
+}

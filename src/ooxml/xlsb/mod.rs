@@ -42,6 +42,7 @@
 //!
 //! ```rust,no_run
 //! use litchi::ooxml::xlsb::XlsbWorkbook;
+//! use litchi::sheet::WorkbookTrait;
 //! use std::fs::File;
 //!
 //! // Open an XLSB file
@@ -59,7 +60,7 @@
 //!
 //! ```rust,no_run
 //! use litchi::ooxml::xlsb::writer::{XlsbWorkbookWriter, MutableXlsbWorksheet};
-//! use litchi::ooxml::xlsb::advanced_features::MergedCell;
+//! use litchi::ooxml::xlsb::merged_cells::MergedCell;
 //! use std::fs::File;
 //!
 //! // Create a new workbook

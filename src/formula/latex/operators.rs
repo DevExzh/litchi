@@ -222,3 +222,102 @@ pub fn is_standard_function(name: &str) -> bool {
             | "ker"
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_operator_to_latex() {
+        assert_eq!(operator_to_latex(Operator::Plus), "+");
+        assert_eq!(operator_to_latex(Operator::Minus), "-");
+        assert_eq!(operator_to_latex(Operator::Multiply), "\\cdot");
+        assert_eq!(operator_to_latex(Operator::Divide), "\\div");
+        assert_eq!(operator_to_latex(Operator::Equals), "=");
+        assert_eq!(operator_to_latex(Operator::NotEquals), "\\neq");
+        assert_eq!(operator_to_latex(Operator::LessThan), "<");
+        assert_eq!(operator_to_latex(Operator::GreaterThan), ">");
+        assert_eq!(operator_to_latex(Operator::LessThanOrEqual), "\\leq");
+        assert_eq!(operator_to_latex(Operator::GreaterThanOrEqual), "\\geq");
+        assert_eq!(operator_to_latex(Operator::PlusMinus), "\\pm");
+        assert_eq!(operator_to_latex(Operator::Times), "\\times");
+        assert_eq!(operator_to_latex(Operator::Infinity), "\\infty");
+        assert_eq!(operator_to_latex(Operator::Partial), "\\partial");
+        assert_eq!(operator_to_latex(Operator::Nabla), "\\nabla");
+    }
+
+    #[test]
+    fn test_fence_to_latex() {
+        assert_eq!(fence_to_latex(Fence::Paren, true), "\\left(");
+        assert_eq!(fence_to_latex(Fence::Paren, false), "\\right)");
+        assert_eq!(fence_to_latex(Fence::Bracket, true), "\\left[");
+        assert_eq!(fence_to_latex(Fence::Bracket, false), "\\right]");
+        assert_eq!(fence_to_latex(Fence::Brace, true), "\\left\\{");
+        assert_eq!(fence_to_latex(Fence::Brace, false), "\\right\\}");
+        assert_eq!(fence_to_latex(Fence::Pipe, true), "\\left|");
+        assert_eq!(fence_to_latex(Fence::Pipe, false), "\\right|");
+    }
+
+    #[test]
+    fn test_large_operator_to_latex() {
+        assert_eq!(large_operator_to_latex(LargeOperator::Sum), "\\sum");
+        assert_eq!(large_operator_to_latex(LargeOperator::Product), "\\prod");
+        assert_eq!(large_operator_to_latex(LargeOperator::Integral), "\\int");
+        assert_eq!(
+            large_operator_to_latex(LargeOperator::DoubleIntegral),
+            "\\iint"
+        );
+        assert_eq!(
+            large_operator_to_latex(LargeOperator::ContourIntegral),
+            "\\oint"
+        );
+        assert_eq!(large_operator_to_latex(LargeOperator::Limit), "\\lim");
+        assert_eq!(large_operator_to_latex(LargeOperator::Max), "\\max");
+        assert_eq!(large_operator_to_latex(LargeOperator::Min), "\\min");
+    }
+
+    #[test]
+    fn test_accent_to_latex() {
+        assert_eq!(accent_to_latex(AccentType::Hat), "\\hat");
+        assert_eq!(accent_to_latex(AccentType::Tilde), "\\tilde");
+        assert_eq!(accent_to_latex(AccentType::Bar), "\\bar");
+        assert_eq!(accent_to_latex(AccentType::Vec), "\\vec");
+        assert_eq!(accent_to_latex(AccentType::Dot), "\\dot");
+        assert_eq!(accent_to_latex(AccentType::DoubleDot), "\\ddot");
+    }
+
+    #[test]
+    fn test_space_to_latex() {
+        assert_eq!(space_to_latex(SpaceType::Thin), "\\,");
+        assert_eq!(space_to_latex(SpaceType::Medium), "\\:");
+        assert_eq!(space_to_latex(SpaceType::Thick), "\\;");
+        assert_eq!(space_to_latex(SpaceType::Quad), "\\quad");
+        assert_eq!(space_to_latex(SpaceType::Negative), "\\!");
+    }
+
+    #[test]
+    fn test_style_to_latex() {
+        assert_eq!(style_to_latex(StyleType::Normal), "\\mathrm");
+        assert_eq!(style_to_latex(StyleType::Bold), "\\mathbf");
+        assert_eq!(style_to_latex(StyleType::Italic), "\\mathit");
+        assert_eq!(style_to_latex(StyleType::Monospace), "\\mathtt");
+        assert_eq!(style_to_latex(StyleType::Script), "\\mathcal");
+        assert_eq!(style_to_latex(StyleType::Fraktur), "\\mathfrak");
+        assert_eq!(style_to_latex(StyleType::DoubleStruck), "\\mathbb");
+    }
+
+    #[test]
+    fn test_is_standard_function() {
+        assert!(is_standard_function("sin"));
+        assert!(is_standard_function("cos"));
+        assert!(is_standard_function("tan"));
+        assert!(is_standard_function("log"));
+        assert!(is_standard_function("ln"));
+        assert!(is_standard_function("exp"));
+        assert!(is_standard_function("max"));
+        assert!(is_standard_function("min"));
+        assert!(is_standard_function("lim"));
+        assert!(!is_standard_function("foo"));
+        assert!(!is_standard_function("bar"));
+    }
+}

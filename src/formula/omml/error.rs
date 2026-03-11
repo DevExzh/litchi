@@ -55,3 +55,65 @@ impl From<quick_xml::Error> for OmmlError {
         OmmlError::XmlError(format!("Quick XML error: {}", err))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_omml_error_display() {
+        let err = OmmlError::XmlError("xml test".to_string());
+        assert!(err.to_string().contains("XML parsing error"));
+        assert!(err.to_string().contains("xml test"));
+
+        let err = OmmlError::ParseError("parse test".to_string());
+        assert!(err.to_string().contains("OMML parse error"));
+        assert!(err.to_string().contains("parse test"));
+
+        let err = OmmlError::InvalidStructure("structure test".to_string());
+        assert!(err.to_string().contains("Invalid OMML structure"));
+
+        let err = OmmlError::ValidationError("validation test".to_string());
+        assert!(err.to_string().contains("OMML validation error"));
+
+        let err = OmmlError::UnsupportedFeature("feature test".to_string());
+        assert!(err.to_string().contains("Unsupported OMML feature"));
+
+        let err = OmmlError::EncodingError("encoding test".to_string());
+        assert!(err.to_string().contains("Text encoding error"));
+
+        let err = OmmlError::DepthLimitExceeded(100);
+        assert!(err.to_string().contains("XML depth limit exceeded"));
+        assert!(err.to_string().contains("100"));
+
+        let err = OmmlError::MalformedElement("malformed test".to_string());
+        assert!(err.to_string().contains("Malformed element"));
+
+        let err = OmmlError::MissingRequiredElement("missing test".to_string());
+        assert!(err.to_string().contains("Missing required element"));
+
+        let err = OmmlError::InvalidAttribute("invalid attr".to_string());
+        assert!(err.to_string().contains("Invalid attribute"));
+
+        let err = OmmlError::ArenaAllocationError("arena test".to_string());
+        assert!(err.to_string().contains("Arena allocation error"));
+    }
+
+    #[test]
+    fn test_omml_error_from_utf8_error() {
+        // Create an invalid UTF-8 sequence
+        let invalid_utf8 = vec![0x80, 0x81, 0x82];
+        let utf8_err = std::str::from_utf8(&invalid_utf8).unwrap_err();
+        let err: OmmlError = utf8_err.into();
+        assert!(matches!(err, OmmlError::EncodingError(_)));
+        assert!(err.to_string().contains("UTF-8"));
+    }
+
+    #[test]
+    fn test_omml_error_debug() {
+        let err = OmmlError::ParseError("test".to_string());
+        let debug_str = format!("{:?}", err);
+        assert!(debug_str.contains("ParseError"));
+        assert!(debug_str.contains("test"));
+    }
+}

@@ -146,3 +146,215 @@ pub(crate) fn matches_criteria(value: &CellValue, criteria: &Criteria) -> bool {
         },
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_criteria_empty() {
+        let result = parse_criteria("");
+        assert!(result.is_some());
+        let crit = result.unwrap();
+        match crit.rhs {
+            CriteriaValue::Text(s) => assert_eq!(s, ""),
+            _ => panic!("Expected empty text"),
+        }
+    }
+
+    #[test]
+    fn test_parse_criteria_number() {
+        let crit = parse_criteria("42").unwrap();
+        match crit.rhs {
+            CriteriaValue::Number(n) => assert_eq!(n, 42.0),
+            _ => panic!("Expected number"),
+        }
+    }
+
+    #[test]
+    fn test_parse_criteria_text() {
+        let crit = parse_criteria("hello").unwrap();
+        match crit.rhs {
+            CriteriaValue::Text(s) => assert_eq!(s, "hello"),
+            _ => panic!("Expected text"),
+        }
+    }
+
+    #[test]
+    fn test_parse_criteria_eq() {
+        let crit = parse_criteria("=5").unwrap();
+        match crit.op {
+            CriteriaOperator::Eq => {},
+            _ => panic!("Expected Eq operator"),
+        }
+        match crit.rhs {
+            CriteriaValue::Number(n) => assert_eq!(n, 5.0),
+            _ => panic!("Expected number"),
+        }
+    }
+
+    #[test]
+    fn test_parse_criteria_gt() {
+        let crit = parse_criteria(">10").unwrap();
+        match crit.op {
+            CriteriaOperator::Gt => {},
+            _ => panic!("Expected Gt operator"),
+        }
+        match crit.rhs {
+            CriteriaValue::Number(n) => assert_eq!(n, 10.0),
+            _ => panic!("Expected number"),
+        }
+    }
+
+    #[test]
+    fn test_parse_criteria_lt() {
+        let crit = parse_criteria("<5").unwrap();
+        match crit.op {
+            CriteriaOperator::Lt => {},
+            _ => panic!("Expected Lt operator"),
+        }
+    }
+
+    #[test]
+    fn test_parse_criteria_ge() {
+        let crit = parse_criteria(">=100").unwrap();
+        match crit.op {
+            CriteriaOperator::Ge => {},
+            _ => panic!("Expected Ge operator"),
+        }
+        match crit.rhs {
+            CriteriaValue::Number(n) => assert_eq!(n, 100.0),
+            _ => panic!("Expected number"),
+        }
+    }
+
+    #[test]
+    fn test_parse_criteria_le() {
+        let crit = parse_criteria("<=50").unwrap();
+        match crit.op {
+            CriteriaOperator::Le => {},
+            _ => panic!("Expected Le operator"),
+        }
+    }
+
+    #[test]
+    fn test_parse_criteria_ne() {
+        let crit = parse_criteria("<>0").unwrap();
+        match crit.op {
+            CriteriaOperator::Ne => {},
+            _ => panic!("Expected Ne operator"),
+        }
+    }
+
+    #[test]
+    fn test_wildcard_match_exact() {
+        assert!(wildcard_match("hello", "hello"));
+        assert!(!wildcard_match("hello", "world"));
+    }
+
+    #[test]
+    fn test_wildcard_match_star() {
+        assert!(wildcard_match("*", "anything"));
+        assert!(wildcard_match("h*o", "hello"));
+        assert!(wildcard_match("h*", "hello"));
+        assert!(wildcard_match("*o", "hello"));
+        assert!(!wildcard_match("h*z", "hello"));
+    }
+
+    #[test]
+    fn test_wildcard_match_question() {
+        assert!(wildcard_match("h?llo", "hello"));
+        assert!(wildcard_match("?????", "hello"));
+        assert!(!wildcard_match("????", "hello"));
+    }
+
+    #[test]
+    fn test_wildcard_match_mixed() {
+        assert!(wildcard_match("h*l?o", "hello"));
+        assert!(wildcard_match("*e?lo", "hello"));
+    }
+
+    #[test]
+    fn test_matches_criteria_number_eq() {
+        let crit = Criteria {
+            op: CriteriaOperator::Eq,
+            rhs: CriteriaValue::Number(10.0),
+        };
+        assert!(matches_criteria(&CellValue::Int(10), &crit));
+        assert!(matches_criteria(&CellValue::Float(10.0), &crit));
+        assert!(!matches_criteria(&CellValue::Int(5), &crit));
+    }
+
+    #[test]
+    fn test_matches_criteria_number_gt() {
+        let crit = Criteria {
+            op: CriteriaOperator::Gt,
+            rhs: CriteriaValue::Number(10.0),
+        };
+        assert!(matches_criteria(&CellValue::Int(15), &crit));
+        assert!(!matches_criteria(&CellValue::Int(10), &crit));
+        assert!(!matches_criteria(&CellValue::Int(5), &crit));
+    }
+
+    #[test]
+    fn test_matches_criteria_text_eq() {
+        let crit = Criteria {
+            op: CriteriaOperator::Eq,
+            rhs: CriteriaValue::Text("apple".to_string()),
+        };
+        assert!(matches_criteria(
+            &CellValue::String("apple".to_string()),
+            &crit
+        ));
+        assert!(!matches_criteria(
+            &CellValue::String("banana".to_string()),
+            &crit
+        ));
+    }
+
+    #[test]
+    fn test_matches_criteria_text_wildcard() {
+        let crit = Criteria {
+            op: CriteriaOperator::Eq,
+            rhs: CriteriaValue::Text("a*e".to_string()),
+        };
+        assert!(matches_criteria(
+            &CellValue::String("apple".to_string()),
+            &crit
+        ));
+        assert!(matches_criteria(
+            &CellValue::String("axe".to_string()),
+            &crit
+        ));
+        assert!(!matches_criteria(
+            &CellValue::String("banana".to_string()),
+            &crit
+        ));
+    }
+
+    #[test]
+    fn test_matches_criteria_text_gt() {
+        let crit = Criteria {
+            op: CriteriaOperator::Gt,
+            rhs: CriteriaValue::Text("m".to_string()),
+        };
+        assert!(matches_criteria(&CellValue::String("z".to_string()), &crit));
+        assert!(!matches_criteria(
+            &CellValue::String("a".to_string()),
+            &crit
+        ));
+    }
+
+    #[test]
+    fn test_matches_criteria_non_number() {
+        let crit = Criteria {
+            op: CriteriaOperator::Eq,
+            rhs: CriteriaValue::Number(10.0),
+        };
+        assert!(!matches_criteria(
+            &CellValue::String("hello".to_string()),
+            &crit
+        ));
+        assert!(!matches_criteria(&CellValue::Bool(true), &crit));
+    }
+}

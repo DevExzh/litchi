@@ -22,7 +22,7 @@ pub mod autoshape;
 /// # Example
 ///
 /// ```rust,no_run
-/// use litchi::ppt::Package;
+/// use litchi::ole::ppt::{Package, shapes::ShapeEnum};
 ///
 /// let mut pkg = Package::open("presentation.ppt")?;
 /// let pres = pkg.presentation()?;
@@ -30,10 +30,10 @@ pub mod autoshape;
 /// for slide in pres.slides()? {
 ///     for shape in slide.shapes()? {
 ///         match shape {
-///             Shape::TextBox(textbox) => {
-///                 println!("Text box: {}", textbox.text()?);
+///             ShapeEnum::TextBox(textbox) => {
+///                 println!("Text box: {}", textbox.text());
 ///             }
-///             Shape::Placeholder(placeholder) => {
+///             ShapeEnum::Placeholder(placeholder) => {
 ///                 println!("Placeholder type: {:?}", placeholder.placeholder_type());
 ///             }
 ///             _ => {}

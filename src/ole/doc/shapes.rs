@@ -99,3 +99,241 @@ pub fn count_shapes<R: Read + Seek>(ole: &mut OleFile<R>) -> std::io::Result<usi
 
     Ok(EscherShapeFactory::count_shapes_in_drawing(&data_stream))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_doc_shape(
+        shape_type: crate::ole::escher::EscherShapeType,
+        shape_id: u32,
+        text: Option<String>,
+        is_group: bool,
+        children: Vec<DocShape>,
+    ) -> DocShape {
+        DocShape {
+            shape_type,
+            shape_id,
+            text,
+            is_group,
+            children,
+        }
+    }
+
+    #[test]
+    fn test_doc_shape_creation() {
+        let doc_shape = create_test_doc_shape(
+            crate::ole::escher::EscherShapeType::Rectangle,
+            100,
+            Some("Shape text".to_string()),
+            false,
+            vec![],
+        );
+
+        assert_eq!(doc_shape.shape_id, 100);
+        assert_eq!(doc_shape.text, Some("Shape text".to_string()));
+        assert!(!doc_shape.is_group);
+        assert!(doc_shape.children.is_empty());
+    }
+
+    #[test]
+    fn test_doc_shape_group() {
+        let child = create_test_doc_shape(
+            crate::ole::escher::EscherShapeType::Rectangle,
+            101,
+            None,
+            false,
+            vec![],
+        );
+
+        let parent = create_test_doc_shape(
+            crate::ole::escher::EscherShapeType::Group,
+            100,
+            None,
+            true,
+            vec![child],
+        );
+
+        assert!(parent.is_group);
+        assert_eq!(parent.children.len(), 1);
+        assert_eq!(parent.children[0].shape_id, 101);
+    }
+
+    #[test]
+    fn test_doc_shape_clone() {
+        let doc_shape = create_test_doc_shape(
+            crate::ole::escher::EscherShapeType::Ellipse,
+            50,
+            Some("Clonable".to_string()),
+            false,
+            vec![],
+        );
+        let cloned = doc_shape.clone();
+
+        assert_eq!(cloned.shape_id, doc_shape.shape_id);
+        assert_eq!(cloned.text, doc_shape.text);
+        assert_eq!(cloned.is_group, doc_shape.is_group);
+    }
+
+    #[test]
+    fn test_doc_shape_debug() {
+        let doc_shape = create_test_doc_shape(
+            crate::ole::escher::EscherShapeType::Rectangle,
+            1,
+            Some("Debug test".to_string()),
+            false,
+            vec![],
+        );
+        let debug_str = format!("{:?}", doc_shape);
+
+        assert!(debug_str.contains("DocShape"));
+    }
+
+    #[test]
+    fn test_nested_groups() {
+        let inner_child = create_test_doc_shape(
+            crate::ole::escher::EscherShapeType::Rectangle,
+            3,
+            Some("Inner".to_string()),
+            false,
+            vec![],
+        );
+
+        let middle = create_test_doc_shape(
+            crate::ole::escher::EscherShapeType::Group,
+            2,
+            None,
+            true,
+            vec![inner_child],
+        );
+
+        let outer = create_test_doc_shape(
+            crate::ole::escher::EscherShapeType::Group,
+            1,
+            None,
+            true,
+            vec![middle],
+        );
+
+        assert!(outer.is_group);
+        assert_eq!(outer.children.len(), 1);
+        assert!(outer.children[0].is_group);
+        assert_eq!(outer.children[0].children.len(), 1);
+        assert_eq!(outer.children[0].children[0].shape_id, 3);
+    }
+
+    #[test]
+    fn test_doc_shape_variants() {
+        use crate::ole::escher::EscherShapeType;
+
+        let shape_types = vec![
+            EscherShapeType::Rectangle,
+            EscherShapeType::Ellipse,
+            EscherShapeType::Line,
+            EscherShapeType::Group,
+            EscherShapeType::Picture,
+            EscherShapeType::TextBox,
+            EscherShapeType::Polygon,
+            EscherShapeType::AutoShape,
+            EscherShapeType::Connector,
+            EscherShapeType::Unknown,
+        ];
+
+        for (i, shape_type) in shape_types.iter().enumerate() {
+            let doc_shape = create_test_doc_shape(*shape_type, i as u32, None, false, vec![]);
+            assert_eq!(doc_shape.shape_id, i as u32);
+            assert_eq!(doc_shape.shape_type, *shape_type);
+        }
+    }
+
+    #[test]
+    fn test_doc_shape_empty_text() {
+        let doc_shape = create_test_doc_shape(
+            crate::ole::escher::EscherShapeType::TextBox,
+            1,
+            None,
+            false,
+            vec![],
+        );
+        assert!(doc_shape.text.is_none());
+    }
+
+    #[test]
+    fn test_doc_shape_unicode_text() {
+        let doc_shape = create_test_doc_shape(
+            crate::ole::escher::EscherShapeType::TextBox,
+            1,
+            Some("Unicode: 你好世界 🎉".to_string()),
+            false,
+            vec![],
+        );
+        assert_eq!(doc_shape.text.unwrap(), "Unicode: 你好世界 🎉");
+    }
+
+    #[test]
+    fn test_deeply_nested_groups() {
+        let level4 = create_test_doc_shape(
+            crate::ole::escher::EscherShapeType::Rectangle,
+            4,
+            None,
+            false,
+            vec![],
+        );
+        let level3 = create_test_doc_shape(
+            crate::ole::escher::EscherShapeType::Group,
+            3,
+            None,
+            true,
+            vec![level4],
+        );
+        let level2 = create_test_doc_shape(
+            crate::ole::escher::EscherShapeType::Group,
+            2,
+            None,
+            true,
+            vec![level3],
+        );
+        let level1 = create_test_doc_shape(
+            crate::ole::escher::EscherShapeType::Group,
+            1,
+            None,
+            true,
+            vec![level2],
+        );
+
+        assert!(level1.is_group);
+        assert!(level1.children[0].is_group);
+        assert!(level1.children[0].children[0].is_group);
+        assert!(!level1.children[0].children[0].children[0].is_group);
+        assert_eq!(level1.children[0].children[0].children[0].shape_id, 4);
+    }
+
+    #[test]
+    fn test_multiple_children() {
+        let children: Vec<DocShape> = (1..=5)
+            .map(|i| {
+                create_test_doc_shape(
+                    crate::ole::escher::EscherShapeType::Rectangle,
+                    i,
+                    Some(format!("Child {}", i)),
+                    false,
+                    vec![],
+                )
+            })
+            .collect();
+
+        let parent = create_test_doc_shape(
+            crate::ole::escher::EscherShapeType::Group,
+            0,
+            None,
+            true,
+            children,
+        );
+
+        assert_eq!(parent.children.len(), 5);
+        for (i, child) in parent.children.iter().enumerate() {
+            assert_eq!(child.shape_id, (i + 1) as u32);
+            assert_eq!(child.text, Some(format!("Child {}", i + 1)));
+        }
+    }
+}

@@ -183,3 +183,315 @@ pub fn format_excel_f64(value: f64, format: Option<&CellFormat>, is_1904: bool) 
         _ => FormattedData::Float(value),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ===== CellFormat enum tests =====
+
+    #[test]
+    fn test_cell_format_equality() {
+        assert_eq!(CellFormat::Other, CellFormat::Other);
+        assert_eq!(CellFormat::DateTime, CellFormat::DateTime);
+        assert_eq!(CellFormat::TimeDelta, CellFormat::TimeDelta);
+        assert_ne!(CellFormat::Other, CellFormat::DateTime);
+    }
+
+    #[test]
+    fn test_excel_datetime_type_equality() {
+        assert_eq!(ExcelDateTimeType::DateTime, ExcelDateTimeType::DateTime);
+        assert_eq!(ExcelDateTimeType::TimeDelta, ExcelDateTimeType::TimeDelta);
+        assert_ne!(ExcelDateTimeType::DateTime, ExcelDateTimeType::TimeDelta);
+    }
+
+    // ===== ExcelDateTime::new tests =====
+
+    #[test]
+    fn test_excel_datetime_new() {
+        let dt = ExcelDateTime::new(44561.5, ExcelDateTimeType::DateTime, false);
+        assert_eq!(dt.value, 44561.5);
+        assert_eq!(dt.datetime_type, ExcelDateTimeType::DateTime);
+        assert!(!dt.is_1904);
+
+        let dt = ExcelDateTime::new(100.0, ExcelDateTimeType::TimeDelta, true);
+        assert_eq!(dt.value, 100.0);
+        assert_eq!(dt.datetime_type, ExcelDateTimeType::TimeDelta);
+        assert!(dt.is_1904);
+    }
+
+    // ===== ExcelDateTime::to_ymd_hms_milli tests - 1900 date system =====
+
+    #[test]
+    fn test_to_ymd_hms_milli_1900_epoch() {
+        // Day 0 in 1900 system actually returns 1899-12-31 (implementation detail)
+        let dt = ExcelDateTime::new(0.0, ExcelDateTimeType::DateTime, false);
+        let (year, month, day, hour, min, sec, milli) = dt.to_ymd_hms_milli();
+        assert_eq!(year, 1899);
+        assert_eq!(month, 12);
+        assert_eq!(day, 31);
+        assert_eq!(hour, 0);
+        assert_eq!(min, 0);
+        assert_eq!(sec, 0);
+        assert_eq!(milli, 0);
+    }
+
+    #[test]
+    fn test_to_ymd_hms_milli_1900_day1() {
+        // Day 1 is 1900-01-01
+        let dt = ExcelDateTime::new(1.0, ExcelDateTimeType::DateTime, false);
+        let (year, month, day, hour, min, sec, milli) = dt.to_ymd_hms_milli();
+        assert_eq!(year, 1900);
+        assert_eq!(month, 1);
+        assert_eq!(day, 1);
+        assert_eq!(hour, 0);
+        assert_eq!(min, 0);
+        assert_eq!(sec, 0);
+        assert_eq!(milli, 0);
+    }
+
+    #[test]
+    fn test_to_ymd_hms_milli_1900_with_time() {
+        // 44561.5 = 2021-12-31 12:00:00 (noon)
+        let dt = ExcelDateTime::new(44561.5, ExcelDateTimeType::DateTime, false);
+        let (year, month, day, hour, min, sec, milli) = dt.to_ymd_hms_milli();
+        assert_eq!(year, 2021);
+        assert_eq!(month, 12);
+        assert_eq!(day, 31);
+        assert_eq!(hour, 12);
+        assert_eq!(min, 0);
+        assert_eq!(sec, 0);
+        assert_eq!(milli, 0);
+    }
+
+    #[test]
+    fn test_to_ymd_hms_milli_1900_feb_1900() {
+        // Excel treats 1900 as a leap year (incorrectly)
+        // Day 60 is 1900-02-29 in Excel
+        let dt = ExcelDateTime::new(60.0, ExcelDateTimeType::DateTime, false);
+        let (year, month, day, _, _, _, _) = dt.to_ymd_hms_milli();
+        assert_eq!(year, 1900);
+        assert_eq!(month, 2);
+        assert_eq!(day, 29);
+    }
+
+    // ===== ExcelDateTime::to_ymd_hms_milli tests - 1904 date system =====
+
+    #[test]
+    fn test_to_ymd_hms_milli_1904_epoch() {
+        // 1904 system: day 0 is 1904-01-01
+        let dt = ExcelDateTime::new(0.0, ExcelDateTimeType::DateTime, true);
+        let (year, month, day, hour, min, sec, milli) = dt.to_ymd_hms_milli();
+        assert_eq!(year, 1904);
+        assert_eq!(month, 1);
+        assert_eq!(day, 1);
+        assert_eq!(hour, 0);
+        assert_eq!(min, 0);
+        assert_eq!(sec, 0);
+        assert_eq!(milli, 0);
+    }
+
+    #[test]
+    fn test_to_ymd_hms_milli_1904_with_time() {
+        // 44561.5 adjusted for 1904 system
+        let dt = ExcelDateTime::new(44561.5, ExcelDateTimeType::DateTime, true);
+        let (year, month, day, hour, min, sec, milli) = dt.to_ymd_hms_milli();
+        assert_eq!(year, 2026); // 4 years later than 1900 system
+        assert_eq!(month, 1);
+        assert_eq!(day, 1);
+        assert_eq!(hour, 12);
+        assert_eq!(min, 0);
+        assert_eq!(sec, 0);
+        assert_eq!(milli, 0);
+    }
+
+    #[test]
+    fn test_to_ymd_hms_milli_with_milliseconds() {
+        // 0.5 days = 12 hours, with fractional milliseconds
+        let dt = ExcelDateTime::new(1.000011574, ExcelDateTimeType::DateTime, false);
+        let (year, month, day, hour, min, sec, milli) = dt.to_ymd_hms_milli();
+        assert_eq!(year, 1900);
+        assert_eq!(month, 1);
+        assert_eq!(day, 1);
+        // Small time fraction should give us some milliseconds
+        assert!(milli > 0 || hour > 0 || min > 0 || sec > 0);
+    }
+
+    // ===== detect_custom_number_format tests =====
+
+    #[test]
+    fn test_detect_custom_number_format_date() {
+        assert_eq!(
+            detect_custom_number_format("yyyy-mm-dd"),
+            CellFormat::DateTime
+        );
+        assert_eq!(
+            detect_custom_number_format("dd/mm/yyyy"),
+            CellFormat::DateTime
+        );
+        assert_eq!(detect_custom_number_format("m/d/yy"), CellFormat::DateTime);
+    }
+
+    #[test]
+    fn test_detect_custom_number_format_time() {
+        assert_eq!(
+            detect_custom_number_format("hh:mm:ss"),
+            CellFormat::DateTime
+        );
+        assert_eq!(
+            detect_custom_number_format("h:mm AM/PM"),
+            CellFormat::DateTime
+        );
+    }
+
+    #[test]
+    fn test_detect_custom_number_format_datetime() {
+        assert_eq!(
+            detect_custom_number_format("yyyy-mm-dd hh:mm:ss"),
+            CellFormat::DateTime
+        );
+    }
+
+    #[test]
+    fn test_detect_custom_number_format_timedelta() {
+        assert_eq!(
+            detect_custom_number_format("[h]:mm:ss"),
+            CellFormat::TimeDelta
+        );
+        assert_eq!(
+            detect_custom_number_format("[hh]:mm:ss"),
+            CellFormat::TimeDelta
+        );
+        assert_eq!(detect_custom_number_format("[m]:ss"), CellFormat::TimeDelta);
+    }
+
+    #[test]
+    fn test_detect_custom_number_format_other() {
+        assert_eq!(detect_custom_number_format("0.00"), CellFormat::Other);
+        assert_eq!(detect_custom_number_format("#,##0"), CellFormat::Other);
+        assert_eq!(
+            detect_custom_number_format("0.00%;[Red]-0.00%"),
+            CellFormat::Other
+        );
+    }
+
+    #[test]
+    fn test_detect_custom_number_format_with_quotes() {
+        // Quotes should not affect detection
+        assert_eq!(
+            detect_custom_number_format("\"Date: \"yyyy-mm-dd"),
+            CellFormat::DateTime
+        );
+        assert_eq!(
+            detect_custom_number_format("\"Number: \"0.00"),
+            CellFormat::Other
+        );
+    }
+
+    #[test]
+    fn test_detect_custom_number_format_with_escapes() {
+        // Escaped characters should be ignored
+        assert_eq!(
+            detect_custom_number_format("\\dyyyy-mm-dd"),
+            CellFormat::DateTime
+        );
+    }
+
+    #[test]
+    fn test_detect_custom_number_format_empty() {
+        assert_eq!(detect_custom_number_format(""), CellFormat::Other);
+    }
+
+    // ===== format_excel_f64 tests =====
+
+    #[test]
+    fn test_format_excel_f64_datetime() {
+        let value = 44561.5;
+        let format = CellFormat::DateTime;
+        let result = format_excel_f64(value, Some(&format), false);
+        match result {
+            FormattedData::DateTime(dt) => {
+                assert_eq!(dt.value, 44561.5);
+                assert_eq!(dt.datetime_type, ExcelDateTimeType::DateTime);
+                assert!(!dt.is_1904);
+            },
+            _ => panic!("Expected DateTime"),
+        }
+    }
+
+    #[test]
+    fn test_format_excel_f64_timedelta() {
+        let value = 1.5; // 1.5 days
+        let format = CellFormat::TimeDelta;
+        let result = format_excel_f64(value, Some(&format), false);
+        match result {
+            FormattedData::DateTime(dt) => {
+                assert_eq!(dt.value, 1.5);
+                assert_eq!(dt.datetime_type, ExcelDateTimeType::TimeDelta);
+                assert!(!dt.is_1904);
+            },
+            _ => panic!("Expected DateTime"),
+        }
+    }
+
+    #[test]
+    fn test_format_excel_f64_float() {
+        let value = 123.456;
+        let result = format_excel_f64(value, Some(&CellFormat::Other), false);
+        match result {
+            FormattedData::Float(v) => assert_eq!(v, 123.456),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[test]
+    fn test_format_excel_f64_none_format() {
+        let value = 123.456;
+        let result = format_excel_f64(value, None, false);
+        match result {
+            FormattedData::Float(v) => assert_eq!(v, 123.456),
+            _ => panic!("Expected Float when format is None"),
+        }
+    }
+
+    #[test]
+    fn test_format_excel_f64_int_value() {
+        // Integer values should be preserved
+        let value = 100.0;
+        let result = format_excel_f64(value, None, false);
+        match result {
+            FormattedData::Float(v) => assert_eq!(v, 100.0),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    // ===== FormattedData enum tests =====
+
+    #[test]
+    fn test_formatted_data_variants() {
+        let int_data = FormattedData::Int(42);
+        let float_data = FormattedData::Float(3.14);
+        let datetime_data = FormattedData::DateTime(ExcelDateTime::new(
+            44561.0,
+            ExcelDateTimeType::DateTime,
+            false,
+        ));
+
+        match int_data {
+            FormattedData::Int(v) => assert_eq!(v, 42),
+            _ => panic!("Expected Int"),
+        }
+
+        match float_data {
+            FormattedData::Float(v) => assert_eq!(v, 3.14),
+            _ => panic!("Expected Float"),
+        }
+
+        match datetime_data {
+            FormattedData::DateTime(dt) => {
+                assert_eq!(dt.value, 44561.0);
+            },
+            _ => panic!("Expected DateTime"),
+        }
+    }
+}

@@ -547,7 +547,7 @@ mod tests {
 
     #[test]
     fn test_hatched_brush_creation() {
-        let brush = Brush::from_emr_data(2, 0xFF0000, 4); // Red cross-hatched brush
+        let brush = Brush::from_emr_data(2, 0x0000FF, 4); // Red cross-hatched brush
         assert_eq!(brush.style, BrushStyle::Hatched);
         assert_eq!(brush.color, "#FF0000");
         assert_eq!(brush.hatch_style, Some(HatchStyle::Cross));
@@ -565,13 +565,13 @@ mod tests {
         assert_eq!(null.to_svg_fill(), "none");
 
         // Hatched brush without pattern ID (fallback)
-        let hatched = Brush::from_emr_data(2, 0xFF0000, 0);
+        let hatched = Brush::from_emr_data(2, 0x0000FF, 0);
         assert_eq!(hatched.to_svg_fill(), "#FF0000");
     }
 
     #[test]
     fn test_hatch_pattern_generation() {
-        let mut brush = Brush::from_emr_data(2, 0xFF0000, 0); // Horizontal hatch
+        let mut brush = Brush::from_emr_data(2, 0x0000FF, 0); // Horizontal hatch
         let pattern = brush.generate_svg_pattern("pattern-1".to_string(), "#FFFFFF");
         assert!(pattern.is_some());
 
