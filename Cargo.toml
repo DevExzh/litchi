@@ -121,7 +121,7 @@ ryu = "1.0" # Fast float-to-string conversion with minimal allocations
 serde = { version = "1", features = ["derive"] } # Serialization/deserialization framework
 serde-saphyr = "0" # YAML serialization support
 sha1 = { version = "0.10", optional = true } # SHA-1 hashing for Standard 2007 and Agile OOXML encryption
-sha2 = "0.10" # SHA-512 hashing for OOXML password protection
+sha2 = "0.11" # SHA-512 hashing for OOXML password protection
 smallvec = "1.15" # Stack-allocated vectors for small collections to avoid heap allocations
 snap = { version = "1", optional = true } # Snappy compression used in iWork file formats (.pages, .numbers, .key)
 soapberry-zip = { path = "soapberry-zip", optional = true } # High-performance ZIP archive handling for modern Office formats
