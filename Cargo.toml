@@ -100,7 +100,7 @@ fast-float2 = "0.2" # Fast string-to-float conversion with correct rounding
 fixedbitset = "0.5" # Fixed-size bitset for efficient visited tracking with better cache locality
 flate2 = { version = "1", features = ["zlib-rs"], default-features = false } # Compression/decompression for Office file formats
 font-kit = { version = "0.14", optional = true } # Font discovery and loading
-hmac = { version = "0.12", optional = true } # HMAC for Agile OOXML encryption integrity
+hmac = { version = "0.13", optional = true } # HMAC for Agile OOXML encryption integrity
 image = { version = "0.25", features = ["default-formats", "rayon"], optional = true } # Image format decoding/encoding for embedded media
 itoa = "1.0" # Fast integer-to-string conversion
 memchr = "2.7" # SIMD-accelerated string searching for fast byte pattern matching
