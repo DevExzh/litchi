@@ -1,5 +1,5 @@
 use crate::common::simd::fmt::hex_encode_to_string;
-use rand::Rng;
+use rand::RngExt;
 
 /// Generate a random RFC4122 v4 GUID as raw 16 bytes
 pub fn generate_guid_bytes() -> [u8; 16] {

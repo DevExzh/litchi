@@ -8,8 +8,8 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_ENGINE;
 use quick_xml::Reader;
 use quick_xml::events::Event;
-use rand::TryRngCore;
-use rand::rngs::OsRng;
+use rand::TryRng;
+use rand::rngs::SysRng;
 use sha2::{Digest, Sha512};
 
 /// Type of protection applied to a presentation.
@@ -161,7 +161,7 @@ impl PresentationProtection {
 
         // Generate random salt (16 bytes, as commonly used by Office)
         let mut salt = [0u8; 16];
-        let mut rng = OsRng;
+        let mut rng = SysRng;
         rng.try_fill_bytes(&mut salt).map_err(|e| {
             OoxmlError::Other(format!(
                 "failed to generate random salt for modify password: {e}"
