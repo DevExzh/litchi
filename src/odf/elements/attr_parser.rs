@@ -22,7 +22,7 @@
 //! - odfpy: `3rdparty/odfpy/odf/attrconverters.py`
 //! - odfdo: `3rdparty/odfdo/src/odfdo/element.py`
 use crate::common::{Error, Result};
-use atoi_simd::parse_skipped;
+use atoi_simd::parse;
 use fast_float2::parse_partial;
 use phf::{Map, Set, phf_map, phf_set};
 use std::borrow::Cow;
@@ -250,7 +250,7 @@ pub fn parse_bool(value: &[u8]) -> Result<bool> {
 /// ```
 #[inline]
 pub fn parse_int(value: &[u8]) -> Result<i64> {
-    parse_skipped::<i64>(value).ok().ok_or_else(|| {
+    parse::<i64, true, true>(value).ok().ok_or_else(|| {
         Error::InvalidFormat(format!(
             "Invalid integer value: {}",
             String::from_utf8_lossy(value)
@@ -271,7 +271,7 @@ pub fn parse_int(value: &[u8]) -> Result<i64> {
 /// The parsed unsigned integer value, or error if invalid
 #[inline]
 pub fn parse_uint(value: &[u8]) -> Result<u64> {
-    parse_skipped::<u64>(value).ok().ok_or_else(|| {
+    parse::<u64, true, true>(value).ok().ok_or_else(|| {
         Error::InvalidFormat(format!(
             "Invalid unsigned integer value: {}",
             String::from_utf8_lossy(value)

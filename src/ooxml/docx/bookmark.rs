@@ -82,7 +82,8 @@ impl Bookmark {
                             match attr.key.local_name().as_ref() {
                                 b"id" => {
                                     let id_str = String::from_utf8_lossy(&attr.value);
-                                    id = atoi_simd::parse::<u32>(id_str.as_bytes()).ok();
+                                    id = atoi_simd::parse::<u32, false, false>(id_str.as_bytes())
+                                        .ok();
                                 },
                                 b"name" => {
                                     name = String::from_utf8_lossy(&attr.value).into_owned();

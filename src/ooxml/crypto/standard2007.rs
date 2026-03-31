@@ -1,8 +1,8 @@
 use crate::ooxml::error::{OoxmlError, Result};
 use aes::Aes128;
 use aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit, generic_array::GenericArray};
-use rand::TryRngCore;
-use rand::rngs::OsRng;
+use rand::TryRng;
+use rand::rngs::SysRng;
 use sha1::{Digest, Sha1};
 
 use super::ole_encrypted_package::build_ole_encrypted_package;
@@ -27,7 +27,7 @@ pub fn encrypt_ooxml_package_standard_2007(
 
     let mut salt = [0u8; 16];
     let mut verifier = [0u8; 16];
-    let mut rng = OsRng;
+    let mut rng = SysRng;
 
     rng.try_fill_bytes(&mut salt)
         .map_err(|e| OoxmlError::Other(format!("failed to generate encryption salt: {e}")))?;

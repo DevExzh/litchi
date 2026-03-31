@@ -1,7 +1,7 @@
 use crate::sheet::eval::engine::{EvalCtx, evaluate_expression, for_each_value_in_expr, to_number};
 use crate::sheet::eval::parser::Expr;
 use crate::sheet::{CellValue, Result};
-use rand::Rng;
+use rand::RngExt;
 
 use super::helpers::flatten_numeric_values;
 

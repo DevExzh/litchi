@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand::RngExt;
 
 use crate::sheet::eval::engine::{EvalCtx, evaluate_expression, to_number};
 use crate::sheet::eval::parser::Expr;

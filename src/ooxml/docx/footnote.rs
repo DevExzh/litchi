@@ -322,7 +322,9 @@ impl Note {
                             match attr.key.local_name().as_ref() {
                                 b"id" => {
                                     let id_str = String::from_utf8_lossy(&attr.value);
-                                    current_id = atoi_simd::parse::<u32>(id_str.as_bytes()).ok();
+                                    current_id =
+                                        atoi_simd::parse::<u32, false, false>(id_str.as_bytes())
+                                            .ok();
                                 },
                                 b"type" => {
                                     let type_str = String::from_utf8_lossy(&attr.value);

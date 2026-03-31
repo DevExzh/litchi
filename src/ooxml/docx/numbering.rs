@@ -129,7 +129,8 @@ impl Numbering {
                                 if attr.key.local_name().as_ref() == b"abstractNumId" {
                                     let id_str = String::from_utf8_lossy(&attr.value);
                                     current_abstract_id =
-                                        atoi_simd::parse::<u32>(id_str.as_bytes()).ok();
+                                        atoi_simd::parse::<u32, false, false>(id_str.as_bytes())
+                                            .ok();
                                 }
                             }
                         },
@@ -151,7 +152,8 @@ impl Numbering {
                                 if attr.key.local_name().as_ref() == b"numId" {
                                     let id_str = String::from_utf8_lossy(&attr.value);
                                     current_num_id =
-                                        atoi_simd::parse::<u32>(id_str.as_bytes()).ok();
+                                        atoi_simd::parse::<u32, false, false>(id_str.as_bytes())
+                                            .ok();
                                 }
                             }
                         },
@@ -161,7 +163,8 @@ impl Numbering {
                                 if attr.key.local_name().as_ref() == b"val" {
                                     let id_str = String::from_utf8_lossy(&attr.value);
                                     current_abstract_num_id =
-                                        atoi_simd::parse::<u32>(id_str.as_bytes()).ok();
+                                        atoi_simd::parse::<u32, false, false>(id_str.as_bytes())
+                                            .ok();
                                 }
                             }
                         },

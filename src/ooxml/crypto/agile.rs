@@ -7,11 +7,11 @@ use aes::cipher::{
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use cbc::{Decryptor, Encryptor};
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, Mac, digest::KeyInit};
 use quick_xml::Reader;
 use quick_xml::events::Event;
-use rand::TryRngCore;
-use rand::rngs::OsRng;
+use rand::TryRng;
+use rand::rngs::SysRng;
 use sha1::{Digest, Sha1};
 
 use super::ole_encrypted_package::build_ole_encrypted_package;
@@ -44,8 +44,8 @@ pub fn encrypt_ooxml_package_agile(package_bytes: &[u8], password: &str) -> Resu
         ));
     }
 
-    // 1) Generate random salts/keys (all OsRng)
-    let mut rng = OsRng;
+    // 1) Generate random salts/keys (all SysRng)
+    let mut rng = SysRng;
 
     let mut verifier_salt = [0u8; AGILE_BLOCK_SIZE];
     let mut verifier = [0u8; AGILE_BLOCK_SIZE];
