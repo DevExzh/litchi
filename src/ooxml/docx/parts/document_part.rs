@@ -401,7 +401,7 @@ impl<'a> DocumentPart<'a> {
 /// Optimized to minimize capacity checks by calculating total size upfront.
 #[inline(always)]
 fn write_start_tag(out: &mut Vec<u8>, e: &quick_xml::events::BytesStart<'_>) {
-    let raw = e.as_ref();
+    let raw: &[u8] = e.as_ref();
     let needed = raw.len() + 2; // '<' + raw + '>'
     out.reserve(needed);
     // SAFETY: We just reserved enough space, so these writes won't reallocate.
@@ -427,7 +427,7 @@ fn write_start_tag_dynamic(out: &mut Vec<u8>, e: &quick_xml::events::BytesStart<
 /// Optimized to minimize capacity checks by calculating total size upfront.
 #[inline(always)]
 fn write_empty_tag(out: &mut Vec<u8>, e: &quick_xml::events::BytesStart<'_>) {
-    let raw = e.as_ref();
+    let raw: &[u8] = e.as_ref();
     let needed = raw.len() + 3; // '<' + raw + '/>'
     out.reserve(needed);
     let old_len = out.len();
