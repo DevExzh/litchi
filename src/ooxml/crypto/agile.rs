@@ -7,7 +7,7 @@ use aes::cipher::{
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use cbc::{Decryptor, Encryptor};
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, Mac, digest::KeyInit};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use rand::TryRngCore;
