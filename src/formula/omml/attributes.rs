@@ -7,7 +7,7 @@ use crate::formula::omml::lookup::*;
 /// SIMD-accelerated numeric parsing functions
 /// Fast integer parsing using atoi_simd
 pub fn parse_int_simd(value: &str) -> Option<i32> {
-    atoi_simd::parse(value.as_bytes()).ok()
+    atoi_simd::parse::<_, false, false>(value.as_bytes()).ok()
 }
 
 /// Fast float parsing using fast_float2

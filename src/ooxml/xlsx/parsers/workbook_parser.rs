@@ -58,7 +58,9 @@ pub fn parse_workbook_xml(content: &str) -> Result<(Vec<WorksheetInfo>, usize, b
             let active_tab_content = &book_views_content[active_tab_start + 11..];
             if let Some(quote_pos) = memchr::memchr(b'"', active_tab_content.as_bytes()) {
                 // Performance: Use atoi_simd for fast integer parsing
-                if let Ok(tab) = atoi_simd::parse(&active_tab_content.as_bytes()[..quote_pos]) {
+                if let Ok(tab) =
+                    atoi_simd::parse::<_, false, false>(&active_tab_content.as_bytes()[..quote_pos])
+                {
                     active_sheet_id = tab;
                 }
             }
@@ -118,7 +120,7 @@ pub fn parse_sheet_xml(sheet_xml: &str) -> Result<Option<WorksheetInfo>> {
         let id_content = &sheet_xml[id_start + 9..];
         if let Some(quote_pos) = memchr::memchr(b'"', id_content.as_bytes()) {
             // Performance: Use atoi_simd for fast integer parsing
-            atoi_simd::parse(&id_content.as_bytes()[..quote_pos]).ok()
+            atoi_simd::parse::<_, false, false>(&id_content.as_bytes()[..quote_pos]).ok()
         } else {
             None
         }

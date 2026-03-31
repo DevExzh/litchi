@@ -184,7 +184,9 @@ impl Comment {
                             match attr.key.local_name().as_ref() {
                                 b"id" => {
                                     let id_str = String::from_utf8_lossy(&attr.value);
-                                    current_id = atoi_simd::parse::<u32>(id_str.as_bytes()).ok();
+                                    current_id =
+                                        atoi_simd::parse::<u32, false, false>(id_str.as_bytes())
+                                            .ok();
                                 },
                                 b"author" => {
                                     current_author =

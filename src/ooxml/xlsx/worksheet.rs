@@ -567,7 +567,7 @@ impl<'a> Worksheet<'a> {
             },
             (_, Some(v)) => {
                 // Try to parse as number - use fast parsing
-                if let Ok(int_val) = atoi_simd::parse(v.as_bytes()) {
+                if let Ok(int_val) = atoi_simd::parse::<_, false, false>(v.as_bytes()) {
                     CellValue::Int(int_val)
                 } else if let Ok(float_val) = fast_float2::parse(v) {
                     CellValue::Float(float_val)
@@ -1191,7 +1191,7 @@ impl<'a> Worksheet<'a> {
             CellValue::String(s) if s.starts_with("SHARED_STRING_") => {
                 // Extract the index from the shared string reference
                 if let Some(index_str) = s.strip_prefix("SHARED_STRING_")
-                    && let Ok(index) = atoi_simd::parse(index_str.as_bytes())
+                    && let Ok(index) = atoi_simd::parse::<_, false, false>(index_str.as_bytes())
                     && let Some(shared_string) = self.workbook.shared_strings().get(index)
                 {
                     return CellValue::String(shared_string.to_string());
@@ -1879,7 +1879,7 @@ impl<'a> Worksheet<'a> {
             ) -> Option<&'a [RichTextRun]> {
                 if let CellValue::String(s) = value
                     && let Some(index_str) = s.strip_prefix("SHARED_STRING_")
-                    && let Ok(index) = atoi_simd::parse(index_str.as_bytes())
+                    && let Ok(index) = atoi_simd::parse::<_, false, false>(index_str.as_bytes())
                 {
                     return workbook.shared_strings().rich_text_runs(index);
                 }

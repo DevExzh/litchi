@@ -75,7 +75,7 @@ pub fn parse_row_xml(row_content: &str) -> Result<Option<(u32, Vec<(u32, CellVal
         let r_content = &row_content[r_start + 3..];
         if let Some(quote_pos) = memchr::memchr(b'"', r_content.as_bytes()) {
             // Performance: Use atoi_simd for fast integer parsing
-            atoi_simd::parse(&r_content.as_bytes()[..quote_pos]).ok()
+            atoi_simd::parse::<_, false, false>(&r_content.as_bytes()[..quote_pos]).ok()
         } else {
             None
         }
@@ -159,7 +159,7 @@ pub fn parse_cell_xml(cell_content: &str) -> Result<Option<(u32, CellValue)>> {
         },
         (_, Some(v)) => {
             // Try to parse as number - use fast parsing
-            if let Ok(int_val) = atoi_simd::parse(v.as_bytes()) {
+            if let Ok(int_val) = atoi_simd::parse::<_, false, false>(v.as_bytes()) {
                 CellValue::Int(int_val)
             } else if let Ok(float_val) = fast_float2::parse(v) {
                 CellValue::Float(float_val)
@@ -201,7 +201,7 @@ pub fn reference_to_coords(reference: &str) -> Result<(u32, u32)> {
 
     // Parse row number using fast integer parsing
     let row_part = &bytes[col_str_end..];
-    let row_num = atoi_simd::parse(row_part)
+    let row_num = atoi_simd::parse::<_, false, false>(row_part)
         .map_err(|_| format!("Invalid row number in reference: {}", reference))?;
 
     Ok((col_num, row_num))

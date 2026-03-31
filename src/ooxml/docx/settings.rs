@@ -167,7 +167,7 @@ impl DocumentSettings {
                                 if attr.key.local_name().as_ref() == b"percent" {
                                     let val = String::from_utf8_lossy(&attr.value);
                                     settings.zoom_percent =
-                                        atoi_simd::parse::<u32>(val.as_bytes()).ok();
+                                        atoi_simd::parse::<u32, false, false>(val.as_bytes()).ok();
                                 }
                             }
                         },
