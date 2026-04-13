@@ -92,7 +92,7 @@ base64 = "0.22" # Base64 encoding/decoding for embedded binary data in XML
 bitflags = { version = "2.10", features = ["std", "serde"] } # Bit flags for efficient flag combinations
 bumpalo = { version = "3", features = ["collections"], optional = true } # Fast bump allocator for temporary formula parsing data
 bytes = { version = "1", features = ["serde"] } # Efficient byte buffer operations with zero-copy slicing
-cbc = { version = "0.1", features = ["alloc"], optional = true } # CBC mode for AES-based OOXML encryption
+cbc = { version = "0.2", features = ["alloc"], optional = true } # CBC mode for AES-based OOXML encryption
 chrono = { version = "0", features = ["serde"] } # Date and time types for Office timestamps
 crc-fast = { version = "1.8", features = ["optimize_crc32_auto"], optional = true } # Fast CRC32 implementation for verifying file integrity
 encoding_rs = { version = "0.8", optional = true } # Used by both OLE (.doc, .xls, .ppt) and OOXML (.xlsb) formats for UTF-16LE decoding
