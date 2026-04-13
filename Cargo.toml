@@ -84,7 +84,7 @@ eval_engine_web_functions = [
 ]
 
 [dependencies]
-aes = { version = "0.8", optional = true } # AES block cipher for OOXML file encryption
+aes = { version = "0.9", optional = true } # AES block cipher for OOXML file encryption
 aho-corasick = "1.1" # Fast string searching for fast byte pattern matching
 allsorts = { version = "0.16", optional = true } # Font subsetting and layout
 atoi_simd = "0.18" # SIMD-optimized conversion of byte slices to integers
