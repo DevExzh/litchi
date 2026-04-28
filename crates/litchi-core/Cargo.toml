@@ -22,6 +22,7 @@ rtf     = ["dep:encoding_rs"]
 aho-corasick    = { workspace = true }
 chrono          = { workspace = true }
 encoding_rs     = { workspace = true, optional = true }
+fast-float2     = { workspace = true }
 once_cell       = { workspace = true }
 quick-xml       = { workspace = true }
 rand            = { workspace = true }

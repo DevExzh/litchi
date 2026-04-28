@@ -45,11 +45,13 @@
 
 // Submodule declarations
 #[cfg(feature = "eval_engine")]
-pub mod eval;
+pub mod eval {
+    pub use litchi_eval::*;
+}
 pub mod functions;
 pub mod text;
-pub mod traits;
-pub mod types;
+pub use litchi_core::sheet::traits;
+pub use litchi_core::sheet::types;
 mod workbook;
 mod workbook_types;
 

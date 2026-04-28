@@ -17,6 +17,7 @@ pub mod encoding;
 pub mod error;
 pub mod metadata;
 pub mod shapes;
+pub mod sheet;
 pub mod simd;
 pub mod style;
 /// Common unit conversion utilities (length units used across all formats)
