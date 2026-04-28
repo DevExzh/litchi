@@ -443,7 +443,7 @@ impl MarkdownWriter {
         para: &Paragraph,
         display_formulas: Vec<String>,
     ) -> Result<()> {
-        use crate::formula::omml_to_latex;
+        use litchi_formula::omml_to_latex;
 
         // For display formulas, we'll write each formula on its own line
         // and interleave with any text content from runs
@@ -1505,8 +1505,8 @@ impl MarkdownWriter {
 
     /// Convert MTEF AST nodes to LaTeX string
     #[cfg(feature = "formula")]
-    fn convert_mtef_to_latex(&self, nodes: &[crate::formula::MathNode]) -> String {
-        use crate::formula::latex::LatexConverter;
+    fn convert_mtef_to_latex(&self, nodes: &[litchi_formula::MathNode]) -> String {
+        use litchi_formula::latex::LatexConverter;
 
         let mut converter = LatexConverter::new();
         match converter.convert_nodes(nodes) {
@@ -1526,7 +1526,7 @@ impl MarkdownWriter {
     #[cfg(all(feature = "ooxml", feature = "formula"))]
     #[allow(dead_code)] // Used conditionally based on feature flags
     fn convert_omml_to_latex(&self, omml_xml: &str) -> String {
-        use crate::formula::omml_to_latex;
+        use litchi_formula::omml_to_latex;
 
         // Use the high-level conversion function
         match omml_to_latex(omml_xml) {

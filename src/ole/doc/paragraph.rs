@@ -174,7 +174,7 @@ pub struct Run {
     /// Parsed MTEF formula AST (if this run contains a formula)
     /// Using Arc to share AST across multiple runs without cloning (thread-safe)
     #[cfg(feature = "formula")]
-    mtef_formula_ast: Option<Arc<Vec<crate::formula::MathNode<'static>>>>,
+    mtef_formula_ast: Option<Arc<Vec<litchi_formula::MathNode<'static>>>>,
     /// Parsed MTEF formula AST placeholder (when formula feature is disabled)
     #[cfg(not(feature = "formula"))]
     mtef_formula_ast: Option<Arc<Vec<()>>>,
@@ -198,7 +198,7 @@ impl Run {
     pub(crate) fn with_mtef_formula(
         text: String,
         properties: CharacterProperties,
-        mtef_ast: Arc<Vec<crate::formula::MathNode<'static>>>,
+        mtef_ast: Arc<Vec<litchi_formula::MathNode<'static>>>,
     ) -> Self {
         Self {
             text,
@@ -335,7 +335,7 @@ impl Run {
     /// Returns the parsed MTEF formula as AST nodes if this run contains a MathType equation,
     /// None otherwise.
     #[cfg(feature = "formula")]
-    pub fn mtef_formula_ast(&self) -> Option<&Arc<Vec<crate::formula::MathNode<'static>>>> {
+    pub fn mtef_formula_ast(&self) -> Option<&Arc<Vec<litchi_formula::MathNode<'static>>>> {
         self.mtef_formula_ast.as_ref()
     }
 
@@ -350,7 +350,7 @@ impl Run {
     #[cfg(feature = "formula")]
     pub fn mtef_formula_ast_mut(
         &mut self,
-    ) -> &mut Option<Arc<Vec<crate::formula::MathNode<'static>>>> {
+    ) -> &mut Option<Arc<Vec<litchi_formula::MathNode<'static>>>> {
         &mut self.mtef_formula_ast
     }
 
@@ -375,7 +375,7 @@ impl Run {
     #[cfg(feature = "formula")]
     pub fn formula_as_latex(&self) -> Result<Option<String>> {
         if let Some(ast) = &self.mtef_formula_ast {
-            use crate::formula::LatexConverter;
+            use litchi_formula::LatexConverter;
             let mut converter = LatexConverter::new();
             // Dereference Rc to access the Vec
             match converter.convert_nodes(ast.as_ref()) {

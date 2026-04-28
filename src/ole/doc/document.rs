@@ -24,9 +24,9 @@ use std::sync::Arc;
 /// Type alias for parsed MTEF formula data with arena allocations
 #[cfg(feature = "formula")]
 type ParsedMtefData = (
-    Vec<crate::formula::Formula<'static>>,
+    Vec<litchi_formula::Formula<'static>>,
     Vec<Box<[u8]>>,
-    HashMap<String, Arc<Vec<crate::formula::MathNode<'static>>>>,
+    HashMap<String, Arc<Vec<litchi_formula::MathNode<'static>>>>,
 );
 
 /// A Word document (.doc).
@@ -87,7 +87,7 @@ pub struct Document {
     /// These must be stored to keep the arena allocations alive for the lifetime of Document
     #[cfg(feature = "formula")]
     #[allow(dead_code)] // Stored for arena lifetime management, not directly accessed
-    formula_arenas: Vec<crate::formula::Formula<'static>>,
+    formula_arenas: Vec<litchi_formula::Formula<'static>>,
     /// Data buffers that store the MTEF binary data with 'static lifetime
     /// These must be stored to keep the buffer allocations alive for the lifetime of Document
     #[cfg(feature = "formula")]
@@ -96,7 +96,7 @@ pub struct Document {
     /// Parsed MTEF formulas (stream_name -> parsed_ast)
     /// Using Arc to share AST nodes across multiple runs without cloning (thread-safe)
     #[cfg(feature = "formula")]
-    parsed_mtef: std::collections::HashMap<String, Arc<Vec<crate::formula::MathNode<'static>>>>,
+    parsed_mtef: std::collections::HashMap<String, Arc<Vec<litchi_formula::MathNode<'static>>>>,
     /// Parsed MTEF formulas placeholder (when formula feature is disabled)
     #[cfg(not(feature = "formula"))]
     parsed_mtef: std::collections::HashMap<String, Arc<Vec<()>>>,
@@ -294,7 +294,7 @@ impl Document {
 
         for (stream_name, data) in mtef_data {
             // Create a formula arena for parsing
-            let formula = crate::formula::Formula::new();
+            let formula = litchi_formula::Formula::new();
 
             // Clone data into a boxed slice - we'll store this to avoid leaking
             let data_box = data.clone().into_boxed_slice();
@@ -309,7 +309,7 @@ impl Document {
                 unsafe { std::mem::transmute::<&[u8], &'static [u8]>(data_box.as_ref()) };
 
             // Parse the MTEF data
-            let mut parser = crate::formula::MtefParser::new(arena_ref, data_ptr);
+            let mut parser = litchi_formula::MtefParser::new(arena_ref, data_ptr);
 
             if parser.is_valid() {
                 match parser.parse() {
@@ -328,7 +328,7 @@ impl Document {
                             arena_ref.alloc_str(&format!("[Formula parsing error: {}]", e));
                         parsed_mtef.insert(
                             stream_name.clone(),
-                            Arc::new(vec![crate::formula::MathNode::Text(
+                            Arc::new(vec![litchi_formula::MathNode::Text(
                                 std::borrow::Cow::Borrowed(error_text),
                             )]),
                         );
@@ -342,7 +342,7 @@ impl Document {
                     arena_ref.alloc_str(&format!("[Invalid MTEF format ({} bytes)]", data.len()));
                 parsed_mtef.insert(
                     stream_name.clone(),
-                    Arc::new(vec![crate::formula::MathNode::Text(
+                    Arc::new(vec![litchi_formula::MathNode::Text(
                         std::borrow::Cow::Borrowed(error_text),
                     )]),
                 );
@@ -380,7 +380,7 @@ impl Document {
     fn parse_mtef_for_text(
         &self,
         _text: &str,
-    ) -> Option<Arc<Vec<crate::formula::MathNode<'static>>>> {
+    ) -> Option<Arc<Vec<litchi_formula::MathNode<'static>>>> {
         // For now, try to find any parsed MTEF data
         // In a more sophisticated implementation, we'd match specific text patterns
         // to specific MTEF streams

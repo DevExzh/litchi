@@ -9,8 +9,8 @@
 // - 5 bytes: MTEF header (version, platform, product, version major, version minor)
 // - N bytes: MTEF byte stream (formula data)
 
-use crate::formula::{MathNode, MtefParser};
 use crate::ole::file::OleFile;
+use litchi_formula::{MathNode, MtefParser};
 use std::io::{Read, Seek};
 
 /// MTEF extractor for OLE documents
@@ -328,8 +328,8 @@ impl From<std::io::Error> for MtefExtractionError {
     }
 }
 
-impl From<crate::formula::MtefError> for MtefExtractionError {
-    fn from(e: crate::formula::MtefError) -> Self {
+impl From<litchi_formula::MtefError> for MtefExtractionError {
+    fn from(e: litchi_formula::MtefError) -> Self {
         MtefExtractionError::ParseError(e.to_string())
     }
 }
@@ -337,7 +337,7 @@ impl From<crate::formula::MtefError> for MtefExtractionError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::formula::ast::Formula;
+    use litchi_formula::ast::Formula;
 
     #[test]
     fn test_ole_header_validation() {

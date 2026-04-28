@@ -291,7 +291,9 @@ pub mod ooxml;
 ///
 /// **Note**: This requires the `formula` feature to be enabled.
 #[cfg(feature = "formula")]
-pub mod formula;
+pub mod formula {
+    pub use litchi_formula::*;
+}
 
 /// iWork Archive Format Support
 ///

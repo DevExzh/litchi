@@ -47,6 +47,7 @@ resolver = "3"
 members = [
     "crates/litchi-core",
     "crates/litchi-eval",
+    "crates/litchi-formula",
     "crates/litchi-rtf",
     "crates/pyo3-litchi",
     "crates/soapberry-zip",
@@ -161,7 +162,7 @@ ooxml = ["dep:soapberry-zip", "dep:quick-xml", "dep:encoding_rs"]
 ooxml_encryption = ["ooxml", "ole", "dep:aes", "dep:cbc", "dep:hmac", "dep:sha1"]
 rtf = ["dep:litchi-rtf", "litchi-core/rtf"]
 # Additional functionality features
-formula = ["dep:rowan", "dep:bumpalo", "dep:quick-xml"]
+formula = ["dep:litchi-formula"]
 imgconv = ["dep:image"]
 fonts = ["dep:allsorts", "dep:font-kit"]
 eval_engine = ["dep:litchi-eval"]
@@ -188,6 +189,7 @@ image = { version = "0.25", features = ["default-formats", "rayon"], optional = 
 itoa = "1.0" # Fast integer-to-string conversion
 litchi-core = { workspace = true } # Common types, traits, and utilities (carved out in workspace split)
 litchi-eval = { workspace = true, optional = true } # Formula evaluator engine (carved out in workspace split, gated by `eval_engine` feature)
+litchi-formula = { workspace = true, optional = true } # Formula parser/converter (carved out in workspace split, gated by `formula` feature)
 litchi-rtf = { workspace = true, optional = true } # RTF parser and writer (carved out in workspace split, gated by `rtf` feature)
 memchr = "2.7" # SIMD-accelerated string searching for fast byte pattern matching
 once_cell = "1" # Lazy statics and one-time initialization for global state
@@ -200,7 +202,6 @@ quick-xml = { version = "0.39", optional = true } # High-performance XML parser 
 rand = "0.10" # Cryptographically secure random numbers for salts in protection hashes
 rayon = "1.11" # Data parallelism library for parallel iterators and work-stealing
 roaring = "0" # Compressed bitmap data structure for efficient set operations
-rowan = { version = "0.16", optional = true } # Lossless syntax tree library for formula parsing (AST)
 ryu = "1.0" # Fast float-to-string conversion with minimal allocations
 serde = { version = "1", features = ["derive"] } # Serialization/deserialization framework
 serde-saphyr = "0" # YAML serialization support

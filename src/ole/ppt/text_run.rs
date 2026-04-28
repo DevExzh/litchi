@@ -53,7 +53,7 @@ pub struct TextRun {
     pub length: usize,
     /// Parsed MTEF formula AST (if this run contains a formula)
     #[cfg(feature = "formula")]
-    mtef_formula_ast: Option<Vec<crate::formula::MathNode<'static>>>,
+    mtef_formula_ast: Option<Vec<litchi_formula::MathNode<'static>>>,
     /// Parsed MTEF formula AST placeholder (when formula feature is disabled)
     #[cfg(not(feature = "formula"))]
     mtef_formula_ast: Option<Vec<()>>,
@@ -94,7 +94,7 @@ impl TextRun {
         text: String,
         start_index: usize,
         formatting: TextRunFormatting,
-        mtef_ast: Vec<crate::formula::MathNode<'static>>,
+        mtef_ast: Vec<litchi_formula::MathNode<'static>>,
     ) -> Self {
         let length = text.chars().count();
         Self {
@@ -136,7 +136,7 @@ impl TextRun {
     /// Returns the parsed MTEF formula as AST nodes if this run contains a MathType equation,
     /// None otherwise.
     #[cfg(feature = "formula")]
-    pub fn mtef_formula_ast(&self) -> Option<&Vec<crate::formula::MathNode<'static>>> {
+    pub fn mtef_formula_ast(&self) -> Option<&Vec<litchi_formula::MathNode<'static>>> {
         self.mtef_formula_ast.as_ref()
     }
 
@@ -149,7 +149,7 @@ impl TextRun {
     ///
     /// This allows for modification of the formula AST if needed.
     #[cfg(feature = "formula")]
-    pub fn mtef_formula_ast_mut(&mut self) -> &mut Option<Vec<crate::formula::MathNode<'static>>> {
+    pub fn mtef_formula_ast_mut(&mut self) -> &mut Option<Vec<litchi_formula::MathNode<'static>>> {
         &mut self.mtef_formula_ast
     }
 

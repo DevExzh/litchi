@@ -1,0 +1,21 @@
+[package]
+name        = "litchi-formula"
+description = "MathType/MathML to LaTeX formula conversion for the Litchi office-formats library."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+atoi_simd       = { workspace = true }
+bumpalo         = { workspace = true }
+fast-float2     = { workspace = true }
+memchr          = { workspace = true }
+phf             = { workspace = true }
+quick-xml       = { workspace = true }
+rowan           = { workspace = true }
+smallvec        = { workspace = true }
+zerocopy        = { workspace = true }
+zerocopy-derive = { workspace = true }
