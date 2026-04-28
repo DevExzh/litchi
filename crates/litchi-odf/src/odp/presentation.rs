@@ -1,7 +1,7 @@
 //! Main Presentation structure and implementation.
 
 use super::Slide;
-use crate::odf::core::{Content, Meta, OwnedPackage, Styles};
+use crate::core::{Content, Meta, OwnedPackage, Styles};
 use litchi_core::{Error, Metadata, Result};
 use std::path::Path;
 
@@ -241,7 +241,7 @@ impl Presentation {
     /// # }
     /// ```
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        use crate::odf::core::PackageWriter;
+        use crate::core::PackageWriter;
 
         let mut writer = PackageWriter::new();
 

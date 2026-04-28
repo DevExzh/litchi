@@ -197,7 +197,7 @@ impl Document {
             },
             #[cfg(feature = "odf")]
             DetectedFormat::Odt(data) => {
-                let doc = crate::odf::Document::from_bytes(data).map_err(|e| {
+                let doc = litchi_odf::Document::from_bytes(data).map_err(|e| {
                     Error::ParseError(format!("Failed to parse ODT document from bytes: {}", e))
                 })?;
 
@@ -532,8 +532,8 @@ impl Document {
             #[cfg(feature = "odf")]
             DocumentImpl::Odt(doc) => {
                 use super::DocumentElement;
-                use crate::odf::elements::parser::DocumentOrderElement;
-                use crate::odf::elements::text::Paragraph as ElementParagraph;
+                use litchi_odf::elements::parser::DocumentOrderElement;
+                use litchi_odf::elements::text::Paragraph as ElementParagraph;
 
                 // Get ODF-specific elements and convert to unified API types
                 let odf_elements = doc

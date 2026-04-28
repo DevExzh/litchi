@@ -51,6 +51,7 @@ members = [
     "crates/litchi-fonts",
     "crates/litchi-formula",
     "crates/litchi-imgconv",
+    "crates/litchi-odf",
     "crates/litchi-opc",
     "crates/litchi-rtf",
     "crates/pyo3-litchi",
@@ -160,7 +161,7 @@ iwa = [
     "dep:soapberry-zip",
     "dep:prost-build",
 ]
-odf = ["dep:soapberry-zip", "dep:quick-xml", "litchi-core/odf"]
+odf = ["dep:litchi-odf", "litchi-core/odf"]
 ole = ["dep:encoding_rs", "dep:bumpalo", "dep:litchi-cfb", "litchi-core/ole"]
 ooxml = ["dep:soapberry-zip", "dep:quick-xml", "dep:encoding_rs", "dep:litchi-opc"]
 ooxml_encryption = [
@@ -203,6 +204,7 @@ litchi-eval = { workspace = true, optional = true } # Formula evaluator engine (
 litchi-fonts = { workspace = true, optional = true } # Font discovery, loading, and subsetting (carved out in workspace split, gated by `fonts` feature)
 litchi-formula = { workspace = true, optional = true } # Formula parser/converter (carved out in workspace split, gated by `formula` feature)
 litchi-imgconv = { workspace = true, optional = true } # EMF/WMF/PICT image conversion (carved out in workspace split, gated by `imgconv` feature)
+litchi-odf = { workspace = true, optional = true } # OpenDocument Format (.odt, .ods, .odp) parser (carved out in workspace split, gated by odf feature)
 litchi-opc = { workspace = true, optional = true } # OPC (Open Packaging Conventions) substrate (carved out in workspace split, gated by `ooxml` feature)
 litchi-rtf = { workspace = true, optional = true } # RTF parser and writer (carved out in workspace split, gated by `rtf` feature)
 memchr = "2.7" # SIMD-accelerated string searching for fast byte pattern matching

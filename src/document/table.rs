@@ -20,7 +20,7 @@ pub enum Table {
     #[cfg(feature = "rtf")]
     Rtf(litchi_rtf::Table<'static>),
     #[cfg(feature = "odf")]
-    Odt(crate::odf::Table),
+    Odt(litchi_odf::Table),
 }
 
 impl Table {
@@ -115,7 +115,7 @@ pub enum Row {
     #[cfg(feature = "rtf")]
     Rtf(litchi_rtf::Row<'static>),
     #[cfg(feature = "odf")]
-    Odt(crate::odf::Row),
+    Odt(litchi_odf::Row),
 }
 
 impl Row {
@@ -210,7 +210,7 @@ pub enum Cell {
     #[cfg(feature = "rtf")]
     Rtf(litchi_rtf::Cell<'static>),
     #[cfg(feature = "odf")]
-    Odt(crate::odf::Cell),
+    Odt(litchi_odf::Cell),
 }
 
 impl Cell {

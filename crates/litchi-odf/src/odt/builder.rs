@@ -2,9 +2,9 @@
 //!
 //! This module provides a builder pattern for creating new ODT documents from scratch.
 
-use crate::odf::core::PackageWriter;
-use crate::odf::elements::table::Table;
-use crate::odf::elements::text::{Heading, List, ListItem, Paragraph, Span};
+use crate::core::PackageWriter;
+use crate::elements::table::Table;
+use crate::elements::text::{Heading, List, ListItem, Paragraph, Span};
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
 
@@ -130,7 +130,7 @@ impl DocumentBuilder {
     /// ```
     pub fn add_heading(&mut self, text: &str, level: u8) -> Result<&mut Self> {
         if !(1..=6).contains(&level) {
-            return Err(crate::Error::Other(
+            return Err(litchi_core::Error::Other(
                 "Heading level must be between 1 and 6".to_string(),
             ));
         }
@@ -367,19 +367,19 @@ impl DocumentBuilder {
         for element in &self.elements {
             match element {
                 DocumentElement::Paragraph(para) => {
-                    let elem: crate::odf::elements::element::Element = para.clone().into();
+                    let elem: crate::elements::element::Element = para.clone().into();
                     body.push_str(&elem.to_xml_string());
                 },
                 DocumentElement::Heading(heading) => {
-                    let elem: crate::odf::elements::element::Element = heading.clone().into();
+                    let elem: crate::elements::element::Element = heading.clone().into();
                     body.push_str(&elem.to_xml_string());
                 },
                 DocumentElement::Table(table) => {
-                    let elem: crate::odf::elements::element::Element = table.clone().into();
+                    let elem: crate::elements::element::Element = table.clone().into();
                     body.push_str(&elem.to_xml_string());
                 },
                 DocumentElement::List(list) => {
-                    let elem: crate::odf::elements::element::Element = list.clone().into();
+                    let elem: crate::elements::element::Element = list.clone().into();
                     body.push_str(&elem.to_xml_string());
                 },
             }

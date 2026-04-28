@@ -3,10 +3,10 @@
 //! This module provides a mutable wrapper around ODT documents that allows
 //! for in-place modification of content, styles, and metadata.
 
-use crate::odf::core::{OdfStructure, PackageWriter};
-use crate::odf::elements::table::Table;
-use crate::odf::elements::text::Paragraph;
-use crate::odf::odt::Document;
+use crate::core::{OdfStructure, PackageWriter};
+use crate::elements::table::Table;
+use crate::elements::text::Paragraph;
+use crate::odt::Document;
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
 
@@ -475,11 +475,11 @@ impl MutableDocument {
         for element in &self.elements {
             match element {
                 DocumentElement::Paragraph(para) => {
-                    let elem: crate::odf::elements::element::Element = para.clone().into();
+                    let elem: crate::elements::element::Element = para.clone().into();
                     body.push_str(&elem.to_xml_string());
                 },
                 DocumentElement::Table(table) => {
-                    let elem: crate::odf::elements::element::Element = table.clone().into();
+                    let elem: crate::elements::element::Element = table.clone().into();
                     body.push_str(&elem.to_xml_string());
                 },
             }

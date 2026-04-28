@@ -16,7 +16,7 @@
 //!
 //! - odfdo: `3rdparty/odfdo/src/odfdo/utils/coordinates.py`
 
-use crate::Result;
+use litchi_core::Result;
 use std::fmt;
 use std::str::FromStr;
 
@@ -42,7 +42,7 @@ use std::str::FromStr;
 /// ```
 pub fn alpha_to_digit(alpha: &str) -> Result<usize> {
     if alpha.is_empty() || !alpha.chars().all(|c| c.is_ascii_alphabetic()) {
-        return Err(crate::Error::Other(format!(
+        return Err(litchi_core::Error::Other(format!(
             "Column value '{}' is malformed, must contain only letters",
             alpha
         )));
@@ -156,7 +156,7 @@ impl CellCoord {
 }
 
 impl FromStr for CellCoord {
-    type Err = crate::Error;
+    type Err = litchi_core::Error;
 
     /// Parse cell coordinate from A1 notation
     ///
@@ -192,7 +192,7 @@ impl FromStr for CellCoord {
         }
 
         if alpha.is_empty() {
-            return Err(crate::Error::Other(format!(
+            return Err(litchi_core::Error::Other(format!(
                 "No column letter found in '{}'",
                 s
             )));
@@ -201,7 +201,7 @@ impl FromStr for CellCoord {
         // Extract numeric part
         let numeric = &s[rest_start..];
         if numeric.is_empty() {
-            return Err(crate::Error::Other(format!(
+            return Err(litchi_core::Error::Other(format!(
                 "No row number found in '{}'",
                 s
             )));
@@ -209,11 +209,13 @@ impl FromStr for CellCoord {
 
         let column = alpha_to_digit(&alpha)?;
         let row: usize = numeric.parse().map_err(|_| {
-            crate::Error::Other(format!("Failed to parse row number from '{}'", numeric))
+            litchi_core::Error::Other(format!("Failed to parse row number from '{}'", numeric))
         })?;
 
         if row == 0 {
-            return Err(crate::Error::Other("Row number must be >= 1".to_string()));
+            return Err(litchi_core::Error::Other(
+                "Row number must be >= 1".to_string(),
+            ));
         }
 
         Ok(Self::new(column, row - 1))
@@ -315,7 +317,7 @@ impl CellRange {
 }
 
 impl FromStr for CellRange {
-    type Err = crate::Error;
+    type Err = litchi_core::Error;
 
     /// Parse cell range from A1:B3 notation
     ///
@@ -334,7 +336,7 @@ impl FromStr for CellRange {
         let parts: Vec<&str> = s.split(':').collect();
 
         if parts.len() != 2 {
-            return Err(crate::Error::Other(format!(
+            return Err(litchi_core::Error::Other(format!(
                 "Invalid range format '{}', expected 'A1:B3'",
                 s
             )));

@@ -23,7 +23,7 @@ pub enum Paragraph {
     #[cfg(feature = "rtf")]
     Rtf(litchi_rtf::ParagraphContent<'static>),
     #[cfg(feature = "odf")]
-    Odt(crate::odf::Paragraph),
+    Odt(litchi_odf::Paragraph),
 }
 
 impl Paragraph {

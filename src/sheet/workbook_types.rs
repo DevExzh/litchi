@@ -33,7 +33,7 @@ pub(super) enum WorkbookImpl {
 
     // OpenDocument Spreadsheet
     #[cfg(feature = "odf")]
-    Ods(std::cell::RefCell<crate::odf::Spreadsheet>),
+    Ods(std::cell::RefCell<litchi_odf::Spreadsheet>),
 
     // For other formats, we just indicate they're not yet fully unified
     #[cfg(any(feature = "ole", feature = "ooxml"))]

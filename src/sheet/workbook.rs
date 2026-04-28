@@ -150,7 +150,7 @@ impl Workbook {
 
             #[cfg(feature = "odf")]
             DetectedFormat::Ods(data) => {
-                let ods = crate::odf::Spreadsheet::from_bytes(data)
+                let ods = litchi_odf::Spreadsheet::from_bytes(data)
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
                 let metadata = ods.metadata().unwrap_or_default();
                 (WorkbookImpl::Ods(std::cell::RefCell::new(ods)), metadata)

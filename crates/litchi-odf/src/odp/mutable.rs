@@ -3,8 +3,8 @@
 //! This module provides a mutable wrapper around ODP presentations that allows
 //! for in-place modification of slides, shapes, and content.
 
-use crate::odf::core::{OdfStructure, PackageWriter};
-use crate::odf::odp::{Presentation, Shape, Slide};
+use crate::core::{OdfStructure, PackageWriter};
+use crate::odp::{Presentation, Shape, Slide};
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
 

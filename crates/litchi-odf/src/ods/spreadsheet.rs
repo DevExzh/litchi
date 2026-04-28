@@ -1,7 +1,7 @@
 //! Main Spreadsheet structure and implementation.
 
 use super::Sheet;
-use crate::odf::core::{Content, Meta, OwnedPackage, Styles};
+use crate::core::{Content, Meta, OwnedPackage, Styles};
 use litchi_core::{Error, Metadata, Result};
 use std::path::Path;
 
@@ -316,7 +316,7 @@ impl Spreadsheet {
     /// # }
     /// ```
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        use crate::odf::core::PackageWriter;
+        use crate::core::PackageWriter;
 
         let mut writer = PackageWriter::new();
 

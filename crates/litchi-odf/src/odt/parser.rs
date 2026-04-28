@@ -2,7 +2,7 @@
 //!
 //! This module provides parsing functionality that is specific to OpenDocument Text
 //! documents (.odt). For generic ODF element parsing (paragraphs, tables, lists, etc.)
-//! that works across all ODF formats, see `crate::odf::elements::parser::DocumentParser`.
+//! that works across all ODF formats, see `crate::elements::parser::DocumentParser`.
 
 use litchi_core::Result;
 
@@ -15,7 +15,7 @@ use litchi_core::Result;
 /// - Headers and footers
 ///
 /// For generic element parsing (paragraphs, tables, etc.), use `DocumentParser`
-/// from `crate::odf::elements::parser` instead.
+/// from `crate::elements::parser` instead.
 pub(crate) struct OdtParser;
 
 /// Represents a tracked change in the document

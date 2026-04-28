@@ -217,7 +217,7 @@ impl Presentation {
             },
             #[cfg(feature = "odf")]
             DetectedFormat::Odp(data) => {
-                let doc = crate::odf::Presentation::from_bytes(data).map_err(|e| {
+                let doc = litchi_odf::Presentation::from_bytes(data).map_err(|e| {
                     Error::ParseError(format!(
                         "Failed to parse ODP presentation from bytes: {}",
                         e

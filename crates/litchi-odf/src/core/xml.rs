@@ -51,7 +51,7 @@ impl Content {
 
     /// Extract paragraphs from the document body
     #[allow(dead_code)]
-    pub fn extract_paragraphs(&self) -> Result<Vec<crate::odf::elements::text::Paragraph>> {
+    pub fn extract_paragraphs(&self) -> Result<Vec<crate::elements::text::Paragraph>> {
         use quick_xml::Reader;
         use quick_xml::events::Event;
 
@@ -102,7 +102,7 @@ impl Content {
                             in_paragraph = false;
                             let trimmed_text = current_para_text.trim().to_string();
                             if !trimmed_text.is_empty() {
-                                let mut para = crate::odf::elements::text::Paragraph::new();
+                                let mut para = crate::elements::text::Paragraph::new();
                                 para.set_text(&trimmed_text);
                                 if is_current_heading {
                                     // For headings, we could set a style or attribute here
@@ -164,7 +164,7 @@ impl Meta {
     /// Extract basic metadata
     pub fn extract_metadata(&self) -> litchi_core::Metadata {
         // Parse ODF metadata from meta.xml content
-        match crate::odf::core::metadata::OdfMetadata::from_xml(self.xml.content()) {
+        match crate::core::metadata::OdfMetadata::from_xml(self.xml.content()) {
             Ok(odf_meta) => odf_meta.into(),
             Err(_) => litchi_core::Metadata::default(), // Fall back to default on parse error
         }

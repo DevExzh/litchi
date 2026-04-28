@@ -313,7 +313,9 @@ pub mod iwa;
 ///
 /// **Note**: This requires the `odf` feature to be enabled.
 #[cfg(feature = "odf")]
-pub mod odf;
+pub mod odf {
+    pub use litchi_odf::*;
+}
 
 /// RTF (Rich Text Format) Support
 ///

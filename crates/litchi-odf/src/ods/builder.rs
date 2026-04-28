@@ -2,8 +2,8 @@
 //!
 //! This module provides a builder pattern for creating new ODS spreadsheets from scratch.
 
-use crate::odf::core::{OdfStructure, PackageWriter};
-use crate::odf::ods::{Cell, CellValue, Row, Sheet};
+use crate::core::{OdfStructure, PackageWriter};
+use crate::ods::{Cell, CellValue, Row, Sheet};
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
 
@@ -412,7 +412,7 @@ impl SpreadsheetBuilder {
     /// ```
     pub fn select_sheet(&mut self, index: usize) -> Result<&mut Self> {
         if index >= self.sheets.len() {
-            return Err(crate::Error::Other(format!(
+            return Err(litchi_core::Error::Other(format!(
                 "Sheet index {} out of bounds (have {} sheets)",
                 index,
                 self.sheets.len()

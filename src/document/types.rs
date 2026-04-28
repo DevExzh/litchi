@@ -32,7 +32,7 @@ pub(super) enum DocumentImpl {
     Rtf(litchi_rtf::RtfDocument<'static>),
     /// OpenDocument Text format
     #[cfg(feature = "odf")]
-    Odt(crate::odf::Document),
+    Odt(litchi_odf::Document),
 }
 
 /// Document format detection.

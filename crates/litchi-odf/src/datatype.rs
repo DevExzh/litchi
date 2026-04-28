@@ -14,8 +14,8 @@
 //!
 //! - odfdo: `3rdparty/odfdo/src/odfdo/datatype.py`
 
-use crate::Result;
 use chrono::{DateTime, Duration, FixedOffset, NaiveDate, NaiveDateTime, Utc};
+use litchi_core::Result;
 
 // ============================================================================
 // BOOLEAN CONVERSION
@@ -51,7 +51,7 @@ impl Boolean {
         match data {
             "true" => Ok(true),
             "false" => Ok(false),
-            _ => Err(crate::Error::Other(format!(
+            _ => Err(litchi_core::Error::Other(format!(
                 "boolean '{}' is invalid, expected 'true' or 'false'",
                 data
             ))),
@@ -113,8 +113,9 @@ impl Date {
     /// assert_eq!(date, NaiveDate::from_ymd_opt(2024, 1, 31).unwrap());
     /// ```
     pub fn decode(data: &str) -> Result<NaiveDate> {
-        NaiveDate::parse_from_str(data, "%Y-%m-%d")
-            .map_err(|e| crate::Error::Other(format!("Failed to parse ODF date '{}': {}", data, e)))
+        NaiveDate::parse_from_str(data, "%Y-%m-%d").map_err(|e| {
+            litchi_core::Error::Other(format!("Failed to parse ODF date '{}': {}", data, e))
+        })
     }
 
     /// Encode chrono::NaiveDate to ODF date string
@@ -197,7 +198,7 @@ impl DateTimeOdf {
             return Ok(DateTime::<Utc>::from_naive_utc_and_offset(naive_dt, Utc).fixed_offset());
         }
 
-        Err(crate::Error::Other(format!(
+        Err(litchi_core::Error::Other(format!(
             "Failed to parse ODF datetime '{}'",
             data
         )))
@@ -277,7 +278,7 @@ impl DurationOdf {
         };
 
         if !data.starts_with('P') {
-            return Err(crate::Error::Other(format!(
+            return Err(litchi_core::Error::Other(format!(
                 "Invalid duration format '{}', must start with 'P'",
                 data
             )));
@@ -296,9 +297,9 @@ impl DurationOdf {
             match c {
                 '0'..='9' => buffer.push(c),
                 'D' => {
-                    days = buffer
-                        .parse()
-                        .map_err(|_| crate::Error::Other("Invalid days in duration".to_string()))?;
+                    days = buffer.parse().map_err(|_| {
+                        litchi_core::Error::Other("Invalid days in duration".to_string())
+                    })?;
                     buffer.clear();
                 },
                 'T' => {
@@ -306,23 +307,23 @@ impl DurationOdf {
                 },
                 'H' => {
                     if !in_time {
-                        return Err(crate::Error::Other(
+                        return Err(litchi_core::Error::Other(
                             "Hours must come after 'T' in duration".to_string(),
                         ));
                     }
                     hours = buffer.parse().map_err(|_| {
-                        crate::Error::Other("Invalid hours in duration".to_string())
+                        litchi_core::Error::Other("Invalid hours in duration".to_string())
                     })?;
                     buffer.clear();
                 },
                 'M' => {
                     if in_time {
                         minutes = buffer.parse().map_err(|_| {
-                            crate::Error::Other("Invalid minutes in duration".to_string())
+                            litchi_core::Error::Other("Invalid minutes in duration".to_string())
                         })?;
                     } else {
                         // Months not supported in chrono::Duration
-                        return Err(crate::Error::Other(
+                        return Err(litchi_core::Error::Other(
                             "Months in duration not supported".to_string(),
                         ));
                     }
@@ -330,17 +331,17 @@ impl DurationOdf {
                 },
                 'S' => {
                     if !in_time {
-                        return Err(crate::Error::Other(
+                        return Err(litchi_core::Error::Other(
                             "Seconds must come after 'T' in duration".to_string(),
                         ));
                     }
                     seconds = buffer.parse().map_err(|_| {
-                        crate::Error::Other("Invalid seconds in duration".to_string())
+                        litchi_core::Error::Other("Invalid seconds in duration".to_string())
                     })?;
                     buffer.clear();
                 },
                 _ => {
-                    return Err(crate::Error::Other(format!(
+                    return Err(litchi_core::Error::Other(format!(
                         "Invalid character '{}' in duration",
                         c
                     )));

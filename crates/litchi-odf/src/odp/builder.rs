@@ -2,8 +2,8 @@
 //!
 //! This module provides a builder pattern for creating new ODP presentations from scratch.
 
-use crate::odf::core::{OdfStructure, PackageWriter};
-use crate::odf::odp::Slide;
+use crate::core::{OdfStructure, PackageWriter};
+use crate::odp::Slide;
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
 
@@ -152,7 +152,7 @@ impl PresentationBuilder {
     }
 
     /// Generate XML for a shape
-    fn generate_shape_xml(shape: &crate::odf::odp::Shape, idx: usize) -> String {
+    fn generate_shape_xml(shape: &crate::odp::Shape, idx: usize) -> String {
         use litchi_core::ShapeType;
 
         // Determine default position and size if not provided

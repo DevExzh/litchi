@@ -44,7 +44,7 @@ pub(super) enum PresentationImpl {
     Keynote(crate::iwa::keynote::KeynoteDocument),
     /// OpenDocument Presentation format
     #[cfg(feature = "odf")]
-    Odp(crate::odf::Presentation),
+    Odp(litchi_odf::Presentation),
 }
 
 /// Presentation format detection.

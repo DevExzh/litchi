@@ -3,8 +3,8 @@
 //! This module provides a mutable wrapper around ODS spreadsheets that allows
 //! for in-place modification of sheets, rows, and cells.
 
-use crate::odf::core::{OdfStructure, PackageWriter};
-use crate::odf::ods::{Cell, CellValue, Row, Sheet, Spreadsheet};
+use crate::core::{OdfStructure, PackageWriter};
+use crate::ods::{Cell, CellValue, Row, Sheet, Spreadsheet};
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
 

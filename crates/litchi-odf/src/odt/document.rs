@@ -1,9 +1,9 @@
 //! OpenDocument Text document structure and API.
 
-use crate::odf::core::{Content, Meta, OwnedPackage, Styles};
-use crate::odf::elements::style::{StyleElements, StyleRegistry};
-use crate::odf::elements::table::Table as ElementTable;
-use crate::odf::elements::text::{Paragraph as ElementParagraph, TextElements};
+use crate::core::{Content, Meta, OwnedPackage, Styles};
+use crate::elements::style::{StyleElements, StyleRegistry};
+use crate::elements::table::Table as ElementTable;
+use crate::elements::text::{Paragraph as ElementParagraph, TextElements};
 use litchi_core::{Error, Metadata, Result};
 use std::path::Path;
 
@@ -265,7 +265,7 @@ impl Document {
     /// # }
     /// ```
     pub fn tables(&self) -> Result<Vec<ElementTable>> {
-        use crate::odf::elements::table::TableElements;
+        use crate::elements::table::TableElements;
         TableElements::parse_tables_from_content(self.content.xml_content())
     }
 
@@ -310,8 +310,8 @@ impl Document {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn elements(&self) -> Result<Vec<crate::odf::elements::parser::DocumentOrderElement>> {
-        use crate::odf::elements::parser::DocumentParser;
+    pub fn elements(&self) -> Result<Vec<crate::elements::parser::DocumentOrderElement>> {
+        use crate::elements::parser::DocumentParser;
 
         // Parse all elements in document order using the generic ODF parser
         DocumentParser::parse_elements_in_order(self.content.xml_content())
@@ -408,7 +408,7 @@ impl Document {
     pub fn get_style_properties(
         &self,
         style_name: &str,
-    ) -> crate::odf::elements::style::StyleProperties<'_> {
+    ) -> crate::elements::style::StyleProperties<'_> {
         self.style_registry.get_resolved_properties(style_name)
     }
 
@@ -500,8 +500,8 @@ impl Document {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn bookmarks(&self) -> Result<Vec<crate::odf::elements::bookmark::Bookmark>> {
-        use crate::odf::elements::bookmark::BookmarkParser;
+    pub fn bookmarks(&self) -> Result<Vec<crate::elements::bookmark::Bookmark>> {
+        use crate::elements::bookmark::BookmarkParser;
         BookmarkParser::parse_bookmarks(self.content.xml_content())
     }
 
@@ -526,8 +526,8 @@ impl Document {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn bookmark_ranges(&self) -> Result<Vec<crate::odf::elements::bookmark::BookmarkRange>> {
-        use crate::odf::elements::bookmark::BookmarkParser;
+    pub fn bookmark_ranges(&self) -> Result<Vec<crate::elements::bookmark::BookmarkRange>> {
+        use crate::elements::bookmark::BookmarkParser;
         BookmarkParser::parse_bookmark_ranges(self.content.xml_content())
     }
 
@@ -550,8 +550,8 @@ impl Document {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn fields(&self) -> Result<Vec<crate::odf::elements::field::Field>> {
-        use crate::odf::elements::field::FieldParser;
+    pub fn fields(&self) -> Result<Vec<crate::elements::field::Field>> {
+        use crate::elements::field::FieldParser;
         FieldParser::parse_fields(self.content.xml_content())
     }
 
@@ -575,8 +575,8 @@ impl Document {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn tables_expanded(&self) -> Result<Vec<crate::odf::elements::table::Table>> {
-        use crate::odf::elements::table_expansion::TableExpander;
+    pub fn tables_expanded(&self) -> Result<Vec<crate::elements::table::Table>> {
+        use crate::elements::table_expansion::TableExpander;
         let tables = self.tables()?;
         TableExpander::expand_tables(tables)
     }
@@ -635,7 +635,7 @@ impl Document {
     /// # }
     /// ```
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        use crate::odf::core::PackageWriter;
+        use crate::core::PackageWriter;
 
         let mut writer = PackageWriter::new();
 
