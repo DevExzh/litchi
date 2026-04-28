@@ -4,7 +4,6 @@
 //! for Excel (.xlsx) files using the Office Open XML format.
 
 use crate::ooxml::common::DocumentProperties;
-use crate::ooxml::opc::{OpcPackage, PackURI};
 use crate::ooxml::pivot::PivotTable;
 use crate::ooxml::xlsx::writer::workbook::{
     generate_pivot_cache_definition_xml, generate_pivot_cache_records_xml,
@@ -15,6 +14,7 @@ use crate::ooxml::xlsx::{SharedStrings, Styles};
 use crate::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator,
 };
+use litchi_opc::{OpcPackage, PackURI};
 use std::collections::HashMap;
 
 use super::parsers::workbook_parser;
@@ -59,10 +59,10 @@ impl Workbook {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn create() -> SheetResult<Self> {
-        use crate::ooxml::opc::constants::content_type as ct;
-        use crate::ooxml::opc::constants::relationship_type as rt;
-        use crate::ooxml::opc::part::BlobPart;
         use crate::ooxml::xlsx::template;
+        use litchi_opc::constants::content_type as ct;
+        use litchi_opc::constants::relationship_type as rt;
+        use litchi_opc::part::BlobPart;
 
         let mut package = OpcPackage::new();
 
@@ -222,7 +222,7 @@ impl Workbook {
     /// Load worksheet print settings (print area, repeating rows/columns)
     /// from workbook-level defined names.
     fn load_print_settings(&mut self) -> SheetResult<()> {
-        use crate::ooxml::opc::PackURI as Uri;
+        use litchi_opc::PackURI as Uri;
 
         let workbook_uri = Uri::new("/xl/workbook.xml")?;
         let workbook_part = match self.package.get_part(&workbook_uri) {
@@ -857,9 +857,9 @@ impl Workbook {
 
     /// Update workbook parts with modified data.
     fn update_workbook_parts(&mut self, data: &mut MutableWorkbookData) -> SheetResult<()> {
-        use crate::ooxml::opc::constants::content_type as ct;
-        use crate::ooxml::opc::constants::relationship_type as rt;
-        use crate::ooxml::opc::part::{BlobPart, Part};
+        use litchi_opc::constants::content_type as ct;
+        use litchi_opc::constants::relationship_type as rt;
+        use litchi_opc::part::{BlobPart, Part};
 
         let workbook_uri = PackURI::new("/xl/workbook.xml")?;
 
@@ -1298,8 +1298,8 @@ impl Workbook {
 
     /// Update the core.xml properties part.
     fn update_core_properties(&mut self) -> SheetResult<()> {
-        use crate::ooxml::opc::constants::content_type as ct;
-        use crate::ooxml::opc::part::BlobPart;
+        use litchi_opc::constants::content_type as ct;
+        use litchi_opc::part::BlobPart;
 
         let core_uri = PackURI::new("/docProps/core.xml")?;
 
@@ -1320,8 +1320,8 @@ impl Workbook {
 
     /// Update the app.xml properties part with current worksheet information.
     fn update_app_properties(&mut self) -> SheetResult<()> {
-        use crate::ooxml::opc::constants::content_type as ct;
-        use crate::ooxml::opc::part::BlobPart;
+        use litchi_opc::constants::content_type as ct;
+        use litchi_opc::part::BlobPart;
         use std::fmt::Write;
 
         let app_uri = PackURI::new("/docProps/app.xml")?;

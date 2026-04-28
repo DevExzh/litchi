@@ -173,8 +173,8 @@ impl From<crate::ole::OleError> for XlsbError {
     }
 }
 
-impl From<crate::ooxml::opc::error::OpcError> for XlsbError {
-    fn from(err: crate::ooxml::opc::error::OpcError) -> Self {
+impl From<litchi_opc::error::OpcError> for XlsbError {
+    fn from(err: litchi_opc::error::OpcError) -> Self {
         XlsbError::Encoding(format!("OPC error: {}", err))
     }
 }

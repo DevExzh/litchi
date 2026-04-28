@@ -4,10 +4,10 @@
 //! content type mapping, relationship resolution, and part loading. It uses
 //! efficient algorithms for parsing and minimal memory allocation.
 
-use crate::ooxml::opc::constants::target_mode;
-use crate::ooxml::opc::error::{OpcError, Result};
-use crate::ooxml::opc::packuri::{PACKAGE_URI, PackURI};
-use crate::ooxml::opc::phys_pkg::PhysPkgReader;
+use crate::constants::target_mode;
+use crate::error::{OpcError, Result};
+use crate::packuri::{PACKAGE_URI, PackURI};
+use crate::phys_pkg::PhysPkgReader;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use smallvec::SmallVec;
@@ -250,8 +250,7 @@ impl PackageReader {
         let archive = phys_reader.archive();
 
         // Phase 1: Decompress and parse content types (on-demand)
-        let content_types_path =
-            crate::ooxml::opc::packuri::CONTENT_TYPES_URI.trim_start_matches('/');
+        let content_types_path = crate::packuri::CONTENT_TYPES_URI.trim_start_matches('/');
         let content_types_xml = archive
             .read(content_types_path)
             .map_err(|_| OpcError::PartNotFound("[Content_Types].xml".to_string()))?;

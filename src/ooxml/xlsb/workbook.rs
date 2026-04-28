@@ -1,10 +1,10 @@
 //! Workbook implementation for XLSB files
 
-use crate::ooxml::opc::OpcPackage;
 use crate::ooxml::xlsb::error::XlsbResult;
 use crate::ooxml::xlsb::records::{XlsbRecordIter, record_types};
 use crate::ooxml::xlsb::worksheet::XlsbWorksheet;
 use crate::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
+use litchi_opc::OpcPackage;
 use std::io::{BufReader, Cursor, Read, Seek};
 
 /// XLSB workbook implementation
@@ -70,7 +70,7 @@ impl XlsbWorkbook {
 
     /// Load workbook information from workbook.bin
     fn load_workbook_info(&mut self) -> XlsbResult<()> {
-        let workbook_uri = crate::ooxml::opc::PackURI::new("/xl/workbook.bin")?;
+        let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
         let workbook_part = self.package.get_part(&workbook_uri)?;
 
         let blob = workbook_part.blob();
@@ -82,7 +82,7 @@ impl XlsbWorkbook {
 
     /// Load shared strings from xl/sharedStrings.bin
     fn load_shared_strings(&mut self) -> XlsbResult<()> {
-        let shared_strings_uri = crate::ooxml::opc::PackURI::new("/xl/sharedStrings.bin")?;
+        let shared_strings_uri = litchi_opc::PackURI::new("/xl/sharedStrings.bin")?;
         if let Ok(shared_strings_part) = self.package.get_part(&shared_strings_uri) {
             let blob = shared_strings_part.blob();
             let mut iter = XlsbRecordIter::new(BufReader::new(blob));
@@ -105,7 +105,7 @@ impl XlsbWorkbook {
         let name = &self.worksheet_names[index];
         // For now, assume worksheets are at xl/worksheets/sheet1.bin, sheet2.bin, etc.
         let sheet_path = format!("/xl/worksheets/sheet{}.bin", index + 1);
-        let sheet_uri = crate::ooxml::opc::PackURI::new(&sheet_path)?;
+        let sheet_uri = litchi_opc::PackURI::new(&sheet_path)?;
 
         let sheet_part = self.package.get_part(&sheet_uri)?;
         let blob = sheet_part.blob();

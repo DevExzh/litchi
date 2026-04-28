@@ -5,9 +5,9 @@ use crate::ooxml::docx::parts::DocumentPart;
 use crate::ooxml::docx::writer::MutableDocument;
 /// Package implementation for Word documents.
 use crate::ooxml::error::{OoxmlError, Result};
-use crate::ooxml::opc::OpcPackage;
-use crate::ooxml::opc::constants::content_type as ct;
-use crate::ooxml::opc::packuri::PackURI;
+use litchi_opc::OpcPackage;
+use litchi_opc::constants::content_type as ct;
+use litchi_opc::packuri::PackURI;
 use std::io::{Read, Seek, Write};
 use std::path::Path;
 
@@ -202,10 +202,10 @@ impl Package {
     /// ```
     pub fn new() -> Result<Self> {
         use crate::ooxml::docx::template;
-        use crate::ooxml::opc::constants::content_type as ct;
-        use crate::ooxml::opc::constants::relationship_type as rt;
-        use crate::ooxml::opc::packuri::PackURI;
-        use crate::ooxml::opc::part::BlobPart;
+        use litchi_opc::constants::content_type as ct;
+        use litchi_opc::constants::relationship_type as rt;
+        use litchi_opc::packuri::PackURI;
+        use litchi_opc::part::BlobPart;
 
         let mut opc = OpcPackage::new();
 
@@ -662,7 +662,7 @@ impl Package {
     /// ```
     pub fn to_stream<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
         use crate::ooxml::docx::writer::relmap::RelationshipMapper;
-        use crate::ooxml::opc::constants::relationship_type as rt;
+        use litchi_opc::constants::relationship_type as rt;
 
         // If we have a mutable document, update the document.xml part
         if let Some(mut mutable_doc) = self.mutable_doc.take() {
@@ -691,7 +691,7 @@ impl Package {
                     .unwrap_or_else(|_| ct::WML_DOCUMENT_MAIN.to_string());
 
                 // Create new temporary part for relationships
-                use crate::ooxml::opc::part::{BlobPart, Part};
+                use litchi_opc::part::{BlobPart, Part};
                 let mut temp_part =
                     BlobPart::new(doc_uri.clone(), content_type.clone(), Vec::new());
 
@@ -1006,7 +1006,7 @@ impl Package {
 
     /// Update the core.xml properties part.
     fn update_core_properties(&mut self) -> Result<()> {
-        use crate::ooxml::opc::part::BlobPart;
+        use litchi_opc::part::BlobPart;
 
         let core_uri = PackURI::new("/docProps/core.xml")
             .map_err(|e| OoxmlError::InvalidUri(format!("core.xml URI: {}", e)))?;
@@ -1028,8 +1028,8 @@ impl Package {
 
     /// Update the custom.xml properties part.
     fn update_custom_properties(&mut self) -> Result<()> {
-        use crate::ooxml::opc::constants::relationship_type as rt;
-        use crate::ooxml::opc::part::BlobPart;
+        use litchi_opc::constants::relationship_type as rt;
+        use litchi_opc::part::BlobPart;
 
         // Only create custom properties part if there are custom properties
         if self.custom_properties.is_empty() {
@@ -1061,9 +1061,9 @@ impl Package {
     /// Update the footnotes.xml part with new content.
     #[allow(unused)] // Kept for future use
     fn update_footnotes_part(&mut self, xml: String) -> Result<()> {
-        use crate::ooxml::opc::constants::content_type as ct;
-        use crate::ooxml::opc::constants::relationship_type as rt;
-        use crate::ooxml::opc::part::BlobPart;
+        use litchi_opc::constants::content_type as ct;
+        use litchi_opc::constants::relationship_type as rt;
+        use litchi_opc::part::BlobPart;
 
         let footnotes_uri = PackURI::new("/word/footnotes.xml")
             .map_err(|e| OoxmlError::InvalidUri(format!("footnotes URI: {}", e)))?;
@@ -1088,9 +1088,9 @@ impl Package {
     /// Update the endnotes.xml part with new content.
     #[allow(unused)] // Kept for future use
     fn update_endnotes_part(&mut self, xml: String) -> Result<()> {
-        use crate::ooxml::opc::constants::content_type as ct;
-        use crate::ooxml::opc::constants::relationship_type as rt;
-        use crate::ooxml::opc::part::BlobPart;
+        use litchi_opc::constants::content_type as ct;
+        use litchi_opc::constants::relationship_type as rt;
+        use litchi_opc::part::BlobPart;
 
         let endnotes_uri = PackURI::new("/word/endnotes.xml")
             .map_err(|e| OoxmlError::InvalidUri(format!("endnotes URI: {}", e)))?;
@@ -1114,9 +1114,9 @@ impl Package {
 
     /// Update or create the comments part with the given XML content.
     fn update_comments_part(&mut self, xml: String) -> Result<()> {
-        use crate::ooxml::opc::constants::content_type as ct;
-        use crate::ooxml::opc::constants::relationship_type as rt;
-        use crate::ooxml::opc::part::BlobPart;
+        use litchi_opc::constants::content_type as ct;
+        use litchi_opc::constants::relationship_type as rt;
+        use litchi_opc::part::BlobPart;
 
         let comments_uri = PackURI::new("/word/comments.xml")
             .map_err(|e| OoxmlError::InvalidUri(format!("comments URI: {}", e)))?;
@@ -1140,8 +1140,8 @@ impl Package {
 
     /// Update the settings.xml part with new content.
     fn update_settings_part(&mut self, xml: String) -> Result<()> {
-        use crate::ooxml::opc::constants::content_type as ct;
-        use crate::ooxml::opc::part::BlobPart;
+        use litchi_opc::constants::content_type as ct;
+        use litchi_opc::part::BlobPart;
 
         let settings_uri = PackURI::new("/word/settings.xml")
             .map_err(|e| OoxmlError::InvalidUri(format!("settings URI: {}", e)))?;
@@ -1156,7 +1156,7 @@ impl Package {
     }
 
     fn update_theme_part(&mut self, xml: String) -> Result<()> {
-        use crate::ooxml::opc::part::BlobPart;
+        use litchi_opc::part::BlobPart;
 
         let theme_uri = PackURI::new("/word/theme/theme1.xml")
             .map_err(|e| OoxmlError::InvalidUri(format!("theme URI: {}", e)))?;
@@ -1194,9 +1194,9 @@ impl Package {
         &mut self,
         mutable_doc: &crate::ooxml::docx::writer::MutableDocument,
     ) -> Result<()> {
-        use crate::ooxml::opc::constants::content_type as ct;
-        use crate::ooxml::opc::constants::relationship_type as rt;
-        use crate::ooxml::opc::part::BlobPart;
+        use litchi_opc::constants::content_type as ct;
+        use litchi_opc::constants::relationship_type as rt;
+        use litchi_opc::part::BlobPart;
 
         // Get watermark if present
         // Access watermark through a temporary reference

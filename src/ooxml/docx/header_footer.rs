@@ -7,7 +7,7 @@ use crate::ooxml::docx::enums::WdHeaderFooter;
 use crate::ooxml::docx::paragraph::Paragraph;
 use crate::ooxml::docx::table::Table;
 use crate::ooxml::error::{OoxmlError, Result};
-use crate::ooxml::opc::part::Part;
+use litchi_opc::part::Part;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 

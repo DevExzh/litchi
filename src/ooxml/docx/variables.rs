@@ -3,7 +3,7 @@
 /// Document variables are custom properties that can be referenced
 /// in fields and used for mail merge and other operations.
 use crate::ooxml::error::{OoxmlError, Result};
-use crate::ooxml::opc::part::Part;
+use litchi_opc::part::Part;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::collections::HashMap;

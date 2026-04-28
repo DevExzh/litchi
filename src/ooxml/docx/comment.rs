@@ -3,7 +3,7 @@
 /// This module provides types and methods for accessing comments in Word documents.
 /// Comments contain author information, text content, and timestamps.
 use crate::ooxml::error::{OoxmlError, Result};
-use crate::ooxml::opc::part::Part;
+use litchi_opc::part::Part;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 

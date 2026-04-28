@@ -2,7 +2,7 @@
 ///
 /// Custom XML parts allow storing arbitrary XML data within a Word document.
 use crate::ooxml::error::Result;
-use crate::ooxml::opc::part::Part;
+use litchi_opc::part::Part;
 use std::collections::HashMap;
 
 /// A custom XML part in a Word document.

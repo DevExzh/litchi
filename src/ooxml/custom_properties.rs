@@ -48,9 +48,9 @@
 //! ```
 
 use crate::ooxml::error::{OoxmlError, Result};
-use crate::ooxml::opc::constants::content_type as ct;
-use crate::ooxml::opc::{OpcPackage, PackURI};
 use chrono::{DateTime, Utc};
+use litchi_opc::constants::content_type as ct;
+use litchi_opc::{OpcPackage, PackURI};
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
 use std::collections::HashMap;
@@ -617,7 +617,7 @@ pub fn extract_custom_properties(package: &OpcPackage) -> Result<CustomPropertie
 }
 
 /// Find the custom properties part in an OOXML package.
-fn find_custom_properties_part(package: &OpcPackage) -> Result<&dyn crate::ooxml::opc::part::Part> {
+fn find_custom_properties_part(package: &OpcPackage) -> Result<&dyn litchi_opc::part::Part> {
     // Try the standard location first
     let standard_uri = PackURI::new("/docProps/custom.xml")
         .map_err(|e| OoxmlError::Other(format!("Invalid custom properties URI: {}", e)))?;

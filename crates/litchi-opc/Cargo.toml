@@ -1,0 +1,19 @@
+[package]
+name        = "litchi-opc"
+description = "Open Packaging Conventions (OPC) implementation for the Litchi office-formats library."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+atoi_simd     = { workspace = true }
+itoa          = { workspace = true }
+litchi-core   = { workspace = true }
+memchr        = { workspace = true }
+quick-xml     = { workspace = true }
+smallvec      = { workspace = true }
+soapberry-zip = { workspace = true }
+thiserror     = { workspace = true }

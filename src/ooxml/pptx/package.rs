@@ -1,13 +1,13 @@
 /// Package implementation for PowerPoint presentations.
 use crate::ooxml::common::DocumentProperties;
 use crate::ooxml::error::{OoxmlError, Result};
-use crate::ooxml::opc::OpcPackage;
-use crate::ooxml::opc::constants::content_type as ct;
-use crate::ooxml::opc::packuri::PackURI;
-use crate::ooxml::opc::part::Part;
 use crate::ooxml::pptx::parts::PresentationPart;
 use crate::ooxml::pptx::presentation::Presentation;
 use crate::ooxml::pptx::writer::MutablePresentation;
+use litchi_opc::OpcPackage;
+use litchi_opc::constants::content_type as ct;
+use litchi_opc::packuri::PackURI;
+use litchi_opc::part::Part;
 use std::io::{Read, Seek};
 use std::path::Path;
 
@@ -171,11 +171,11 @@ impl Package {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn new() -> Result<Self> {
-        use crate::ooxml::opc::constants::content_type as ct;
-        use crate::ooxml::opc::constants::relationship_type as rt;
-        use crate::ooxml::opc::packuri::PackURI;
-        use crate::ooxml::opc::part::BlobPart;
         use crate::ooxml::pptx::template;
+        use litchi_opc::constants::content_type as ct;
+        use litchi_opc::constants::relationship_type as rt;
+        use litchi_opc::packuri::PackURI;
+        use litchi_opc::part::BlobPart;
 
         let mut opc = OpcPackage::new();
 
@@ -658,8 +658,8 @@ impl Package {
                         use crate::ooxml::crypto::{
                             encrypt_ooxml_package_agile, encrypt_ooxml_package_standard_2007,
                         };
-                        use crate::ooxml::opc::pkgwriter::PackageWriter;
                         use crate::ooxml::pptx::OpenPasswordEncryption;
+                        use litchi_opc::pkgwriter::PackageWriter;
 
                         let pkg_bytes = PackageWriter::to_bytes(&self.opc)?;
 
@@ -695,13 +695,13 @@ impl Package {
 
     /// Update presentation parts with modified data.
     fn update_presentation_parts(&mut self, pres: &MutablePresentation) -> Result<()> {
-        use crate::ooxml::opc::constants::content_type as ct;
-        use crate::ooxml::opc::constants::relationship_type as rt;
-        use crate::ooxml::opc::part::{BlobPart, Part};
         use crate::ooxml::pptx::parts::CommentAuthor;
         use crate::ooxml::pptx::parts::{generate_comment_authors_xml, generate_comments_xml};
         use crate::ooxml::pptx::template;
         use crate::ooxml::pptx::writer::relmap::RelationshipMapper;
+        use litchi_opc::constants::content_type as ct;
+        use litchi_opc::constants::relationship_type as rt;
+        use litchi_opc::part::{BlobPart, Part};
 
         // Initialize relationship mapper
         let mut rel_mapper = RelationshipMapper::new();
@@ -1303,7 +1303,7 @@ impl Package {
 
     /// Update the core.xml properties part.
     fn update_core_properties(&mut self) -> Result<()> {
-        use crate::ooxml::opc::part::BlobPart;
+        use litchi_opc::part::BlobPart;
 
         let core_uri = PackURI::new("/docProps/core.xml")
             .map_err(|e| OoxmlError::InvalidUri(format!("core.xml URI: {}", e)))?;

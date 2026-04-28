@@ -3,8 +3,8 @@
 //! This module provides types for managing relationships between parts in an OPC package,
 //! including internal and external relationships.
 
-use crate::ooxml::opc::error::{OpcError, Result};
-use crate::ooxml::opc::packuri::PackURI;
+use crate::error::{OpcError, Result};
+use crate::packuri::PackURI;
 use litchi_core::xml::escape_xml;
 use std::collections::HashMap;
 

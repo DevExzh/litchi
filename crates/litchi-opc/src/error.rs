@@ -1,4 +1,4 @@
-/// Error types for OPC package operations
+//! Error types for OPC package operations
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -56,3 +56,25 @@ impl From<quick_xml::events::attributes::AttrError> for OpcError {
 }
 
 pub type Result<T> = std::result::Result<T, OpcError>;
+
+// ---------------------------------------------------------------------------
+// Bridge to the umbrella's unified `litchi_core::Error` type.
+//
+// This impl previously lived in `src/error_ext.rs` (umbrella crate). After the
+// litchi-opc carve-out (P3b), both `OpcError` and `litchi_core::Error` are
+// external to the umbrella crate, so the orphan rule (E0117) forbids the impl
+// at that location. We therefore relocate it here, where the target type's
+// crate (`litchi-core`) is a direct dependency of `litchi-opc`. The mapping
+// body is preserved verbatim from the original `from_opc_error` helper in
+// src/error_ext.rs lines 57-65.
+impl From<OpcError> for litchi_core::Error {
+    fn from(err: OpcError) -> Self {
+        match err {
+            OpcError::IoError(e) => litchi_core::Error::Io(e),
+            OpcError::ZipError(e) => litchi_core::Error::ZipError(e.to_string()),
+            OpcError::XmlError(s) => litchi_core::Error::XmlError(s),
+            OpcError::PartNotFound(s) => litchi_core::Error::ComponentNotFound(s),
+            _ => litchi_core::Error::Other(err.to_string()),
+        }
+    }
+}

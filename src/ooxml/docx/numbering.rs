@@ -3,7 +3,7 @@
 /// This module provides types and methods for accessing numbering (lists) in Word documents.
 /// Numbering defines how lists and outline numbering are formatted.
 use crate::ooxml::error::{OoxmlError, Result};
-use crate::ooxml::opc::part::Part;
+use litchi_opc::part::Part;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 

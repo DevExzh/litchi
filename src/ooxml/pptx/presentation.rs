@@ -1,9 +1,9 @@
 /// Main presentation object - the high-level API for working with presentations.
 use crate::ooxml::error::Result;
-use crate::ooxml::opc::OpcPackage;
-use crate::ooxml::opc::packuri::PackURI;
 use crate::ooxml::pptx::parts::{PresentationPart, SlideMasterPart, SlidePart};
 use crate::ooxml::pptx::slide::{Slide, SlideMaster};
+use litchi_opc::OpcPackage;
+use litchi_opc::packuri::PackURI;
 
 /// A PowerPoint presentation.
 ///

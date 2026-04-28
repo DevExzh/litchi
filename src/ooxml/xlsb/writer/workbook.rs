@@ -2,9 +2,6 @@
 //!
 //! This module provides functionality to create complete XLSB files with multiple worksheets,
 //! shared strings, styles, and advanced features.
-use crate::ooxml::opc::constants::relationship_type as rel;
-use crate::ooxml::opc::part::Part;
-use crate::ooxml::opc::{BlobPart, OpcPackage, PackURI};
 use crate::ooxml::xlsb::error::XlsbResult;
 use crate::ooxml::xlsb::named_ranges::NamedRange;
 use crate::ooxml::xlsb::records::record_types;
@@ -12,6 +9,9 @@ use crate::ooxml::xlsb::writer::{
     MutableSharedStringsWriter, MutableXlsbWorksheet, RecordWriter, StylesWriter,
 };
 use litchi_core::xml::escape_xml;
+use litchi_opc::constants::relationship_type as rel;
+use litchi_opc::part::Part;
+use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use std::io::{Seek, Write};
 
 /// XLSB workbook writer

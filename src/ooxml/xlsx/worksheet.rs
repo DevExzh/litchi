@@ -6,11 +6,11 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use crate::ooxml::opc::PackURI;
 use crate::sheet::{
     Cell as CellTrait, CellIterator, CellValue, Result, RowIterator, Worksheet as WorksheetTrait,
 };
 use litchi_core::xml::unescape_xml;
+use litchi_opc::PackURI;
 
 use super::RichTextRun;
 use super::cell::{Cell, CellIterator as XlsxCellIterator, RowIterator as XlsxRowIterator};

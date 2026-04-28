@@ -3,7 +3,7 @@
 /// This module provides types and methods for accessing hyperlinks in Word documents.
 /// Hyperlinks can point to external URLs, email addresses, or internal document locations (bookmarks).
 use crate::ooxml::error::{OoxmlError, Result};
-use crate::ooxml::opc::rel::Relationships;
+use litchi_opc::rel::Relationships;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 

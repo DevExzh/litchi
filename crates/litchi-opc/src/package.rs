@@ -4,13 +4,13 @@
 //! Convention package in memory. It manages parts, relationships, and provides
 //! high-level operations for working with office documents.
 
-use crate::ooxml::opc::constants::relationship_type;
-use crate::ooxml::opc::error::{OpcError, Result};
-use crate::ooxml::opc::packuri::{PACKAGE_URI, PackURI};
-use crate::ooxml::opc::part::{Part, PartFactory};
-use crate::ooxml::opc::phys_pkg::{OwnedPhysPkgReader, PhysPkgReader};
-use crate::ooxml::opc::pkgreader::PackageReader;
-use crate::ooxml::opc::rel::Relationships;
+use crate::constants::relationship_type;
+use crate::error::{OpcError, Result};
+use crate::packuri::{PACKAGE_URI, PackURI};
+use crate::part::{Part, PartFactory};
+use crate::phys_pkg::{OwnedPhysPkgReader, PhysPkgReader};
+use crate::pkgreader::PackageReader;
+use crate::rel::Relationships;
 use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;
@@ -355,7 +355,7 @@ impl OpcPackage {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        crate::ooxml::opc::pkgwriter::PackageWriter::write(path, self)
+        crate::pkgwriter::PackageWriter::write(path, self)
     }
 
     /// Save the package to a stream.
@@ -378,7 +378,7 @@ impl OpcPackage {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn to_stream<W: std::io::Write + std::io::Seek>(&self, writer: W) -> Result<()> {
-        crate::ooxml::opc::pkgwriter::PackageWriter::write_to_stream(writer, self)
+        crate::pkgwriter::PackageWriter::write_to_stream(writer, self)
     }
 }
 

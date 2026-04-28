@@ -34,9 +34,9 @@
 /// ```
 use crate::ooxml::docx::format::ImageFormat;
 use crate::ooxml::error::{OoxmlError, Result};
-use crate::ooxml::opc::OpcPackage;
-use crate::ooxml::opc::rel::Relationships;
 use litchi_core::unit::{emu_to_pt_f64, emu_to_px_96};
+use litchi_opc::OpcPackage;
+use litchi_opc::rel::Relationships;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use smallvec::SmallVec;

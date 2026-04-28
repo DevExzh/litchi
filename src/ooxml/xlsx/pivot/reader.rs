@@ -1,10 +1,10 @@
-use crate::ooxml::opc::constants::relationship_type as rt;
-use crate::ooxml::opc::{OpcPackage, PackURI};
 use crate::ooxml::pivot::{
     PivotAxis, PivotDataField, PivotFieldRole, PivotTable, PivotValueFunction,
 };
 use crate::ooxml::xlsx::parsers::workbook_parser;
 use crate::sheet::Result as SheetResult;
+use litchi_opc::constants::relationship_type as rt;
+use litchi_opc::{OpcPackage, PackURI};
 
 use super::cache::{PivotCacheDefinition, PivotCacheField, SharedItem};
 

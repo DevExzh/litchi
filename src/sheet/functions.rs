@@ -8,7 +8,7 @@ use super::types::Result;
 /// **Note**: This requires the `ooxml` feature to be enabled.
 #[cfg(feature = "ooxml")]
 pub fn open_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn WorkbookTrait>> {
-    let package = crate::ooxml::opc::OpcPackage::open(path)?;
+    let package = litchi_opc::OpcPackage::open(path)?;
     let workbook = crate::ooxml::xlsx::Workbook::new(package)?;
     Ok(Box::new(workbook))
 }
@@ -20,7 +20,7 @@ pub fn open_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn Workb
 pub fn open_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
     use std::io::Cursor;
     let cursor = Cursor::new(bytes);
-    let package = crate::ooxml::opc::OpcPackage::from_reader(cursor)?;
+    let package = litchi_opc::OpcPackage::from_reader(cursor)?;
     let workbook = crate::ooxml::xlsx::Workbook::new(package)?;
     Ok(Box::new(workbook))
 }

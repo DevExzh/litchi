@@ -2,11 +2,11 @@
 //!
 //! This module provides functionality to serialize and write OPC packages to disk,
 //! including writing the [Content_Types].xml, relationships, and all parts.
-use crate::ooxml::opc::constants::content_type as ct;
-use crate::ooxml::opc::error::Result;
-use crate::ooxml::opc::package::OpcPackage;
-use crate::ooxml::opc::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI};
-use crate::ooxml::opc::phys_pkg::PhysPkgWriter;
+use crate::constants::content_type as ct;
+use crate::error::Result;
+use crate::package::OpcPackage;
+use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI};
+use crate::phys_pkg::PhysPkgWriter;
 use litchi_core::xml::escape_xml;
 use std::collections::HashMap;
 use std::path::Path;
@@ -84,8 +84,8 @@ impl PackageWriter {
         let cti = ContentTypesItem::from_package(package);
         let blob = cti.to_xml();
 
-        let content_types_uri = PackURI::new(CONTENT_TYPES_URI)
-            .map_err(crate::ooxml::opc::error::OpcError::InvalidPackUri)?;
+        let content_types_uri =
+            PackURI::new(CONTENT_TYPES_URI).map_err(crate::error::OpcError::InvalidPackUri)?;
         phys_writer.write(&content_types_uri, blob.as_bytes())?;
 
         Ok(())
@@ -93,11 +93,11 @@ impl PackageWriter {
 
     /// Write package-level relationships.
     fn write_pkg_rels(phys_writer: &mut PhysPkgWriter, package: &OpcPackage) -> Result<()> {
-        let package_uri = PackURI::new(PACKAGE_URI)
-            .map_err(crate::ooxml::opc::error::OpcError::InvalidPackUri)?;
+        let package_uri =
+            PackURI::new(PACKAGE_URI).map_err(crate::error::OpcError::InvalidPackUri)?;
         let rels_uri = package_uri
             .rels_uri()
-            .map_err(crate::ooxml::opc::error::OpcError::InvalidPackUri)?;
+            .map_err(crate::error::OpcError::InvalidPackUri)?;
         let rels_xml = package.rels().to_xml();
         phys_writer.write(&rels_uri, rels_xml.as_bytes())?;
 
@@ -116,7 +116,7 @@ impl PackageWriter {
                 let rels_uri = part
                     .partname()
                     .rels_uri()
-                    .map_err(crate::ooxml::opc::error::OpcError::InvalidPackUri)?;
+                    .map_err(crate::error::OpcError::InvalidPackUri)?;
                 let rels_xml = part.rels().to_xml();
                 phys_writer.write(&rels_uri, rels_xml.as_bytes())?;
             }

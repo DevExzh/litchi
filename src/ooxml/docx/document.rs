@@ -22,8 +22,8 @@ use crate::ooxml::docx::table::Table;
 use crate::ooxml::docx::theme::Theme;
 use crate::ooxml::docx::variables::DocumentVariables;
 use crate::ooxml::error::{OoxmlError, Result};
-use crate::ooxml::opc::OpcPackage;
-use crate::ooxml::opc::constants::relationship_type;
+use litchi_opc::OpcPackage;
+use litchi_opc::constants::relationship_type;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 

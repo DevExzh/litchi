@@ -1,6 +1,4 @@
 use crate::ooxml::error::{OoxmlError, Result};
-use crate::ooxml::opc::constants::content_type as ct;
-use crate::ooxml::opc::{OpcPackage, PackURI};
 use chrono::{DateTime, Utc};
 /// OOXML core properties/metadata extraction.
 ///
@@ -11,6 +9,8 @@ use chrono::{DateTime, Utc};
 /// Core properties are stored in the "docProps/core.xml" part of OOXML packages
 /// and contain standard document metadata like title, author, creation date, etc.
 use litchi_core::Metadata;
+use litchi_opc::constants::content_type as ct;
+use litchi_opc::{OpcPackage, PackURI};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
@@ -41,7 +41,7 @@ pub fn extract_metadata(package: &OpcPackage) -> Result<Metadata> {
 ///
 /// Core properties are typically located at "/docProps/core.xml" and have
 /// the content type "application/vnd.openxmlformats-package.core-properties+xml".
-fn find_core_properties_part(package: &OpcPackage) -> Result<&dyn crate::ooxml::opc::part::Part> {
+fn find_core_properties_part(package: &OpcPackage) -> Result<&dyn litchi_opc::part::Part> {
     // Try the standard location first
     let standard_uri = PackURI::new("/docProps/core.xml")
         .map_err(|e| OoxmlError::Other(format!("Invalid core properties URI: {}", e)))?;

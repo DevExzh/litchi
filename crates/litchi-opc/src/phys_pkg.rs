@@ -5,8 +5,8 @@
 //!
 //! Uses the high-performance soapberry-zip library for zero-copy ZIP parsing.
 
-use crate::ooxml::opc::error::{OpcError, Result};
-use crate::ooxml::opc::packuri::PackURI;
+use crate::error::{OpcError, Result};
+use crate::packuri::PackURI;
 use soapberry_zip::office::LazyArchiveReader;
 use std::io::Read;
 use std::path::Path;
@@ -168,8 +168,8 @@ impl<'data> PhysPkgReader<'data> {
     ///
     /// This is a required part of every OPC package that maps parts to content types.
     pub fn content_types_xml(&self) -> Result<Vec<u8>> {
-        let content_types_uri = PackURI::new(crate::ooxml::opc::packuri::CONTENT_TYPES_URI)
-            .map_err(OpcError::InvalidPackUri)?;
+        let content_types_uri =
+            PackURI::new(crate::packuri::CONTENT_TYPES_URI).map_err(OpcError::InvalidPackUri)?;
         self.blob_for(&content_types_uri)
     }
 

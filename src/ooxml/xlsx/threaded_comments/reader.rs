@@ -1,8 +1,8 @@
 //! Reader module for threaded comments XML parsing.
 
-use crate::ooxml::opc::constants::relationship_type as rt;
-use crate::ooxml::opc::{OpcPackage, PackURI};
 use crate::sheet::Result as SheetResult;
+use litchi_opc::constants::relationship_type as rt;
+use litchi_opc::{OpcPackage, PackURI};
 
 use super::person::{Mention, Person, PersonList};
 use super::{ThreadedComment, ThreadedComments};

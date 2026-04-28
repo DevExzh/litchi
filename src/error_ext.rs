@@ -49,27 +49,10 @@ impl From<crate::ole::ppt::package::PptError> for Error {
 // OOXML error conversions
 // ---------------------------------------------------------------------------
 
-/// Convert an OOXML OPC error into the unified `Error` type.
-///
-/// Inlined here because litchi-core's previous `Error::from_opc_error` helper
-/// was `pub(crate)` and is no longer reachable across the crate boundary.
-#[cfg(feature = "ooxml")]
-fn from_opc_error(err: crate::ooxml::opc::error::OpcError) -> Error {
-    match err {
-        crate::ooxml::opc::error::OpcError::IoError(e) => Error::Io(e),
-        crate::ooxml::opc::error::OpcError::ZipError(e) => Error::ZipError(e.to_string()),
-        crate::ooxml::opc::error::OpcError::XmlError(s) => Error::XmlError(s),
-        crate::ooxml::opc::error::OpcError::PartNotFound(s) => Error::ComponentNotFound(s),
-        _ => Error::Other(err.to_string()),
-    }
-}
-
-#[cfg(feature = "ooxml")]
-impl From<crate::ooxml::opc::error::OpcError> for Error {
-    fn from(err: crate::ooxml::opc::error::OpcError) -> Self {
-        from_opc_error(err)
-    }
-}
+// `impl From<OpcError> for litchi_core::Error` (and the private `from_opc_error`
+// helper it delegated to) moved to `crates/litchi-opc/src/error.rs` to satisfy
+// the orphan rule after the litchi-opc carve-out (P3b). Keep this comment for
+// grep traceability.
 
 #[cfg(feature = "ooxml")]
 impl From<crate::ooxml::error::OoxmlError> for Error {
@@ -83,7 +66,7 @@ impl From<crate::ooxml::error::OoxmlError> for Error {
             },
             crate::ooxml::error::OoxmlError::InvalidRelationship(s) => Error::Other(s),
             crate::ooxml::error::OoxmlError::InvalidFormat(s) => Error::InvalidFormat(s),
-            crate::ooxml::error::OoxmlError::Opc(e) => from_opc_error(e),
+            crate::ooxml::error::OoxmlError::Opc(e) => Error::from(e),
             crate::ooxml::error::OoxmlError::IoError(e) => Error::Io(e),
             crate::ooxml::error::OoxmlError::InvalidUri(s) => Error::Other(s),
             crate::ooxml::error::OoxmlError::Other(s) => Error::Other(s),

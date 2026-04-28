@@ -9,7 +9,7 @@ pub type Result<T> = std::result::Result<T, OoxmlError>;
 pub enum OoxmlError {
     /// OPC package error
     #[error("OPC error: {0}")]
-    Opc(#[from] crate::ooxml::opc::error::OpcError),
+    Opc(#[from] litchi_opc::error::OpcError),
 
     /// XML parsing error
     #[error("XML error: {0}")]

@@ -1,7 +1,7 @@
 /// Styles - document styles and formatting definitions.
 use crate::ooxml::docx::enums::WdStyleType;
 use crate::ooxml::error::{OoxmlError, Result};
-use crate::ooxml::opc::part::Part;
+use litchi_opc::part::Part;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use smallvec::SmallVec;

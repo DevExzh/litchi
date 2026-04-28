@@ -1,6 +1,6 @@
-use crate::ooxml::opc::error::{OpcError, Result};
-use crate::ooxml::opc::packuri::PackURI;
-use crate::ooxml::opc::rel::Relationships;
+use crate::error::{OpcError, Result};
+use crate::packuri::PackURI;
+use crate::rel::Relationships;
 use memchr::memmem;
 use quick_xml::Reader;
 use quick_xml::events::Event;

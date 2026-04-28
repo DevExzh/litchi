@@ -42,7 +42,12 @@ pub mod docx;
 pub mod drawings;
 pub mod error;
 pub mod metadata;
-pub mod opc;
+// OPC implementation moved to the litchi-opc crate. Re-export the public
+// surface so existing `crate::ooxml::opc::*` paths from outside-the-ooxml-tree
+// callers (e.g. user code via `litchi::ooxml::opc::*`) keep resolving.
+pub mod opc {
+    pub use litchi_opc::*;
+}
 pub mod pivot;
 pub mod pptx;
 pub mod xlsb;

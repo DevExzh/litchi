@@ -1,8 +1,8 @@
 /// Slide-related objects, including Slide, SlideLayout, and SlideMaster.
 use crate::ooxml::error::Result;
-use crate::ooxml::opc::packuri::PackURI;
 use crate::ooxml::pptx::parts::{SlideLayoutPart, SlideMasterPart, SlidePart};
 use crate::ooxml::pptx::shapes::base::BaseShape;
+use litchi_opc::packuri::PackURI;
 
 /// A slide in a presentation.
 ///
@@ -27,7 +27,7 @@ pub struct Slide<'a> {
     /// The underlying slide part
     part: SlidePart<'a>,
     /// Reference to the OPC package (for accessing notes)
-    package: Option<&'a crate::ooxml::opc::OpcPackage>,
+    package: Option<&'a litchi_opc::OpcPackage>,
 }
 
 #[allow(dead_code)] // Part of the public API for future use
@@ -47,10 +47,7 @@ impl<'a> Slide<'a> {
     ///
     /// This allows accessing related parts like notes.
     #[inline]
-    pub(crate) fn with_package(
-        part: SlidePart<'a>,
-        package: &'a crate::ooxml::opc::OpcPackage,
-    ) -> Self {
+    pub(crate) fn with_package(part: SlidePart<'a>, package: &'a litchi_opc::OpcPackage) -> Self {
         Self {
             part,
             package: Some(package),

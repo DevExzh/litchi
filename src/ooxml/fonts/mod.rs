@@ -7,12 +7,6 @@ pub use obfuscation::*;
 #[cfg(feature = "fonts")]
 use crate::ooxml::error::{OoxmlError, Result};
 #[cfg(feature = "fonts")]
-use crate::ooxml::opc::constants::relationship_type as rt;
-#[cfg(feature = "fonts")]
-use crate::ooxml::opc::part::BlobPart;
-#[cfg(feature = "fonts")]
-use crate::ooxml::opc::{OpcPackage, PackURI};
-#[cfg(feature = "fonts")]
 use allsorts::{
     binary::read::ReadScope,
     tables::{
@@ -24,6 +18,12 @@ use allsorts::{
 use litchi_core::id::{format_guid_braced, generate_guid_bytes};
 #[cfg(feature = "fonts")]
 use litchi_fonts::{AllsortsSubsetter, CollectGlyphs, FontData, FontSubsetter};
+#[cfg(feature = "fonts")]
+use litchi_opc::constants::relationship_type as rt;
+#[cfg(feature = "fonts")]
+use litchi_opc::part::BlobPart;
+#[cfg(feature = "fonts")]
+use litchi_opc::{OpcPackage, PackURI};
 #[cfg(feature = "fonts")]
 use roaring::RoaringBitmap;
 #[cfg(feature = "fonts")]

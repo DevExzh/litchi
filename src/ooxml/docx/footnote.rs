@@ -5,7 +5,7 @@
 /// appear at the end of the document or section.
 use crate::ooxml::docx::paragraph::Paragraph;
 use crate::ooxml::error::{OoxmlError, Result};
-use crate::ooxml::opc::part::Part;
+use litchi_opc::part::Part;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
@@ -395,8 +395,8 @@ impl Note {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ooxml::opc::packuri::PackURI;
-    use crate::ooxml::opc::rel::Relationships;
+    use litchi_opc::packuri::PackURI;
+    use litchi_opc::rel::Relationships;
     use std::sync::Arc;
 
     /// Simple mock Part for testing
