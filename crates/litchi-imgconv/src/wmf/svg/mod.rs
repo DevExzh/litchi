@@ -72,7 +72,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use litchi::images::wmf::convert_wmf_to_svg;
+//! use litchi_imgconv::wmf::convert_wmf_to_svg;
 //!
 //! let wmf_data = std::fs::read("drawing.wmf")?;
 //! let svg = convert_wmf_to_svg(&wmf_data)?;
@@ -94,7 +94,7 @@ mod style;
 mod transform;
 
 use super::parser::WmfParser;
-use crate::images::svg_utils::write_num;
+use crate::svg_utils::write_num;
 use litchi_core::error::Result;
 use std::fmt::Write;
 

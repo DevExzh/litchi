@@ -3,10 +3,10 @@
 // This module provides high-level functionality to extract all images
 // from Microsoft Office documents (PPT, DOC) using the Escher drawing layer.
 
-use crate::images::{Blip, BlipStore, BlipStoreEntry};
 use crate::ole::escher::EscherRecord;
 use crate::ole::ppt::escher::{EscherContainer, EscherParser, EscherRecordType};
 use litchi_core::error::Result;
+use litchi_imgconv::{Blip, BlipStore, BlipStoreEntry};
 use std::borrow::Cow;
 
 /// Extracted image with metadata
@@ -27,7 +27,7 @@ impl<'data> ExtractedImage<'data> {
     }
 
     /// Get the BLIP type
-    pub fn blip_type(&self) -> Option<crate::images::BlipType> {
+    pub fn blip_type(&self) -> Option<litchi_imgconv::BlipType> {
         self.blip.blip_type()
     }
 
@@ -42,7 +42,7 @@ impl<'data> ExtractedImage<'data> {
     /// - PICT: Converted to PNG (SVG not yet implemented)
     /// - Bitmaps (PNG, JPEG, etc.): Keep their original extension
     pub fn output_extension(&self) -> &'static str {
-        use crate::images::BlipType;
+        use litchi_imgconv::BlipType;
 
         if let Some(blip_type) = self.blip_type() {
             match blip_type {
@@ -86,13 +86,13 @@ impl<'data> ExtractedImage<'data> {
     /// Convert to PNG format
     #[cfg(feature = "imgconv")]
     pub fn to_png(&self, width: Option<u32>, height: Option<u32>) -> Result<Vec<u8>> {
-        crate::images::convert_blip_to_png(&self.blip, width, height)
+        litchi_imgconv::convert_blip_to_png(&self.blip, width, height)
     }
 
     /// Convert to JPEG format
     #[cfg(feature = "imgconv")]
     pub fn to_jpeg(&self, width: Option<u32>, height: Option<u32>) -> Result<Vec<u8>> {
-        crate::images::convert_blip_to_jpeg(&self.blip, width, height)
+        litchi_imgconv::convert_blip_to_jpeg(&self.blip, width, height)
     }
 
     /// Convert metafile to SVG format
@@ -102,15 +102,15 @@ impl<'data> ExtractedImage<'data> {
     /// Returns an error if the image is not a metafile.
     #[cfg(feature = "imgconv")]
     pub fn to_svg(&self) -> Result<String> {
-        use crate::images::BlipType;
+        use litchi_imgconv::BlipType;
 
         // For WMF, we need to add the placeable header using BLIP metadata
         // For EMF and others, just use decompressed data
         let data = self.blip.get_picture_data_for_conversion()?;
 
         match self.blip_type() {
-            Some(BlipType::Emf) => crate::images::emf::convert_emf_to_svg(&data),
-            Some(BlipType::Wmf) => crate::images::wmf::convert_wmf_to_svg(&data),
+            Some(BlipType::Emf) => litchi_imgconv::emf::convert_emf_to_svg(&data),
+            Some(BlipType::Wmf) => litchi_imgconv::wmf::convert_wmf_to_svg(&data),
             Some(BlipType::Pict) => {
                 // PICT to SVG conversion is not yet implemented
                 // Fall back to error for now
@@ -134,7 +134,7 @@ impl<'data> ExtractedImage<'data> {
     /// vector graphics as vectors and bitmaps as bitmaps.
     #[cfg(feature = "imgconv")]
     pub fn extract(&self) -> Result<Vec<u8>> {
-        use crate::images::BlipType;
+        use litchi_imgconv::BlipType;
 
         if let Some(blip_type) = self.blip_type() {
             match blip_type {
@@ -297,7 +297,17 @@ impl ImageExtractor {
             | EscherRecordType::BlipPng
             | EscherRecordType::BlipDib
             | EscherRecordType::BlipTiff => {
-                let blip = Blip::try_from_escher_record(record)?;
+                // Reconstruct full BLIP record from the Escher record. This
+                // bridge used to live as `Blip::try_from_escher_record` but
+                // moved to the umbrella when `litchi-imgconv` was carved out
+                // (`Blip` cannot depend on `EscherRecord` from a leaf crate).
+                let mut full_data = Vec::with_capacity(8 + record.data.len());
+                let ver_inst = (record.instance << 4) | (record.version as u16);
+                full_data.extend_from_slice(&ver_inst.to_le_bytes());
+                full_data.extend_from_slice(&record.record_type_raw.to_le_bytes());
+                full_data.extend_from_slice(&record.length.to_le_bytes());
+                full_data.extend_from_slice(record.data);
+                let blip = Blip::parse(&full_data).map(|b| b.into_owned())?;
                 Ok(ExtractedImage::new(blip, None, 0))
             },
 

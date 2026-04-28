@@ -112,7 +112,7 @@ impl CoordinateTransform {
         buffer: &mut String,
         separator: char,
     ) {
-        use crate::images::svg_utils::write_num;
+        use crate::svg_utils::write_num;
 
         let len = xs.len().min(ys.len());
         if len == 0 {

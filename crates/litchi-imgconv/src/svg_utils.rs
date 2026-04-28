@@ -20,7 +20,7 @@ use std::fmt::Write;
 /// # Examples
 ///
 /// ```
-/// use litchi::images::svg_utils::write_num;
+/// use litchi_imgconv::svg_utils::write_num;
 ///
 /// let mut buf = String::new();
 /// write_num(&mut buf, 10.0);  // writes "10"
@@ -75,7 +75,7 @@ pub fn fmt_num(n: f64) -> String {
 /// # Examples
 ///
 /// ```
-/// use litchi::images::svg_utils::write_color_hex;
+/// use litchi_imgconv::svg_utils::write_color_hex;
 ///
 /// let mut buf = String::new();
 /// write_color_hex(&mut buf, 0x0000FF); // writes "#ff0000" (red in COLORREF is 0x0000FF)

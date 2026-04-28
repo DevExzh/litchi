@@ -1,0 +1,19 @@
+[package]
+name        = "litchi-imgconv"
+description = "EMF/WMF/PICT image format conversion for the Litchi office-formats library."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+base64       = { workspace = true }
+bytes        = { workspace = true }
+flate2       = { workspace = true }
+image        = { workspace = true }
+litchi-core  = { workspace = true }
+ryu          = { workspace = true }
+xml-minifier = { workspace = true }
+zerocopy     = { workspace = true }

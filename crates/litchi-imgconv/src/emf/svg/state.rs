@@ -2,11 +2,11 @@
 ///
 /// Manages device context stack, transforms, clipping, and graphics state
 use super::path::PathBuilder;
-use crate::images::emf::records::*;
-use crate::images::svg_utils::write_num;
+use crate::emf::records::*;
+use crate::svg_utils::write_num;
 
 // Import hatch style constants
-use crate::images::emf::records::hatch_style;
+use crate::emf::records::hatch_style;
 
 use xml_minifier::minified_xml_format;
 

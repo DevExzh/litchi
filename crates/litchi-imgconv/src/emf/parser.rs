@@ -426,7 +426,7 @@ impl EmfParser {
     ///
     /// # Example
     /// ```no_run
-    /// # use litchi::images::emf::parser::EmfParser;
+    /// # use litchi_imgconv::emf::parser::EmfParser;
     /// # let data = &[0u8; 100];
     /// let parser = EmfParser::new_lazy(data)?;
     /// for record_ref in parser.iter_record_refs() {

@@ -4,7 +4,7 @@
 // objects, transforms, colors, and modes.
 
 use super::gdi_objects::{Brush, Font, Pen};
-use crate::images::svg::color::colorref_to_hex;
+use crate::svg::color::colorref_to_hex;
 
 /// Text alignment modes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

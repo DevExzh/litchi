@@ -37,7 +37,7 @@ use litchi_core::error::Result;
 ///
 /// # Example
 /// ```no_run
-/// use litchi::images::wmf::convert_wmf;
+/// use litchi_imgconv::wmf::convert_wmf;
 /// use image::ImageFormat;
 ///
 /// let wmf_data = std::fs::read("image.wmf")?;
@@ -100,7 +100,7 @@ pub fn convert_wmf_to_webp(
 ///
 /// # Example
 /// ```no_run
-/// use litchi::images::wmf::convert_wmf_to_svg;
+/// use litchi_imgconv::wmf::convert_wmf_to_svg;
 ///
 /// let wmf_data = std::fs::read("image.wmf")?;
 /// let svg = convert_wmf_to_svg(&wmf_data)?;

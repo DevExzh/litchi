@@ -1,4 +1,4 @@
-use crate::images::emf::records::types::*;
+use crate::emf::records::types::*;
 /// Performance-optimized EMF record parsing utilities
 ///
 /// This module provides high-performance parsing helpers that minimize allocations

@@ -3,7 +3,7 @@
 /// This module provides buffering and optimization of SVG elements during conversion
 /// to minimize output size without post-processing.
 use super::state::DeviceContext;
-use crate::images::svg_utils::write_num;
+use crate::svg_utils::write_num;
 
 /// Buffer for grouping and optimizing SVG elements
 pub struct ElementBuffer {
@@ -224,7 +224,7 @@ impl Default for ElementBuffer {
 
 #[cfg(test)]
 mod tests {
-    use crate::images::svg_utils::fmt_num;
+    use crate::svg_utils::fmt_num;
 
     #[test]
     fn test_number_formatting() {

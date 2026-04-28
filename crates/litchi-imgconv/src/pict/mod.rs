@@ -38,7 +38,7 @@ use litchi_core::error::Result;
 ///
 /// # Example
 /// ```no_run
-/// use litchi::images::pict::convert_pict;
+/// use litchi_imgconv::pict::convert_pict;
 /// use image::ImageFormat;
 ///
 /// let pict_data = std::fs::read("image.pict")?;

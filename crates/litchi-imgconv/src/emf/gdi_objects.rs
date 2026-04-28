@@ -3,7 +3,7 @@
 // This module manages GDI objects (pens, brushes, fonts) that are created,
 // selected, and deleted during EMF playback.
 
-use crate::images::svg::color::colorref_to_hex;
+use crate::svg::color::colorref_to_hex;
 use std::collections::HashMap;
 use xml_minifier::minified_xml_format;
 

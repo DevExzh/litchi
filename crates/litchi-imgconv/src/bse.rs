@@ -8,7 +8,7 @@
 // - [MS-ODRAW] 2.2.32: OfficeArtBStoreContainerFileBlock
 // - [MS-ODRAW] 2.2.33: OfficeArtBSE
 
-use crate::images::BlipType;
+use crate::BlipType;
 use litchi_core::binary::read_u32_le;
 use litchi_core::error::{Error, Result};
 use std::borrow::Cow;
@@ -127,7 +127,7 @@ impl<'data> BlipStoreEntry<'data> {
 
             // Name is stored as UTF-16 LE (2 bytes per character)
             let name_bytes = &data[name_start..name_end];
-            if !name_len.is_multiple_of(2) {
+            if name_len % 2 != 0 {
                 return Err(Error::ParseError(
                     "Invalid BSE name length (not UTF-16)".into(),
                 ));

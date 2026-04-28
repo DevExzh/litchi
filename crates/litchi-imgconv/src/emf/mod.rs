@@ -41,7 +41,7 @@ use litchi_core::error::Result;
 ///
 /// # Example
 /// ```no_run
-/// use litchi::images::emf::convert_emf;
+/// use litchi_imgconv::emf::convert_emf;
 /// use image::ImageFormat;
 ///
 /// let emf_data = std::fs::read("image.emf")?;
@@ -130,7 +130,7 @@ pub fn convert_emf_to_webp(
 ///
 /// # Example
 /// ```no_run
-/// use litchi::images::emf::convert_emf_to_svg;
+/// use litchi_imgconv::emf::convert_emf_to_svg;
 ///
 /// let emf_data = std::fs::read("image.emf")?;
 /// let svg = convert_emf_to_svg(&emf_data)?;

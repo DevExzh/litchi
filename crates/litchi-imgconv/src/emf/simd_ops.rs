@@ -7,7 +7,7 @@
 /// - Point transformations: 4-8x faster
 /// - Bounding box calculations: 3-5x faster
 /// - Color conversions: 2-4x faster
-use crate::images::emf::records::types::{PointL, XForm};
+use crate::emf::records::types::{PointL, XForm};
 
 /// Transform multiple points using SIMD (when available)
 ///
