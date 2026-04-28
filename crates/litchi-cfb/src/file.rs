@@ -134,6 +134,27 @@ impl std::fmt::Display for OleError {
 
 impl std::error::Error for OleError {}
 
+// Convert CFB-substrate errors into the unified `litchi_core::Error`.
+//
+// The reverse direction (`OleError -> litchi_core::Error`) used to live in the
+// umbrella crate's `error_ext.rs`, but the orphan rule forbids implementing
+// `From<external> for external` outside the crate that defines either side.
+// This impl is local to `litchi-cfb` because `OleError` is defined here.
+impl From<OleError> for litchi_core::Error {
+    fn from(err: OleError) -> Self {
+        match err {
+            OleError::Io(e) => litchi_core::Error::Io(e),
+            OleError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
+            OleError::InvalidData(s) => litchi_core::Error::InvalidFormat(s),
+            OleError::NotOleFile => litchi_core::Error::NotOfficeFile,
+            OleError::CorruptedFile(s) => litchi_core::Error::CorruptedFile(s),
+            OleError::StreamNotFound => {
+                litchi_core::Error::ComponentNotFound("Stream not found".to_string())
+            },
+        }
+    }
+}
+
 impl<R: Read + Seek> OleFile<R> {
     /// Open and parse an OLE file from a reader
     ///

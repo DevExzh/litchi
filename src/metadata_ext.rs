@@ -45,33 +45,12 @@ impl MetadataYaml for Metadata {
 }
 
 #[cfg(feature = "ole")]
-impl From<crate::ole::OleMetadata> for Metadata {
-    fn from(ole_metadata: crate::ole::OleMetadata) -> Self {
-        Metadata {
-            title: ole_metadata.title,
-            subject: ole_metadata.subject,
-            author: ole_metadata.author,
-            keywords: ole_metadata.keywords,
-            description: ole_metadata.comments,
-            template: ole_metadata.template,
-            last_modified_by: ole_metadata.last_saved_by,
-            revision: ole_metadata.revision_number,
-            created: ole_metadata.create_time,
-            modified: ole_metadata.last_saved_time,
-            page_count: ole_metadata.num_pages,
-            word_count: ole_metadata.num_words,
-            character_count: ole_metadata.num_chars,
-            application: ole_metadata.creating_application,
-            category: ole_metadata.category,
-            company: ole_metadata.company,
-            manager: ole_metadata.manager,
-            content_status: None, // OLE doesn't have this field
-            last_printed_time: ole_metadata.last_printed_time,
-            security: ole_metadata.security,
-            codepage: ole_metadata.codepage,
-        }
-    }
-}
+// Note: `From<crate::ole::OleMetadata> for Metadata` is provided by the
+// `litchi-cfb` crate itself (since `OleMetadata` was carved out into that
+// crate, the orphan rule forbids us from implementing the conversion at the
+// umbrella). The conversion is still reachable via `.into()` thanks to the
+// re-export shim at `crate::ole::OleMetadata`.
+const _: () = ();
 
 #[cfg(test)]
 mod tests {

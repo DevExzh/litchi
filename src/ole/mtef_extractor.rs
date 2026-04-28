@@ -9,7 +9,7 @@
 // - 5 bytes: MTEF header (version, platform, product, version major, version minor)
 // - N bytes: MTEF byte stream (formula data)
 
-use crate::ole::file::OleFile;
+use litchi_cfb::OleFile;
 use litchi_formula::{MathNode, MtefParser};
 use std::io::{Read, Seek};
 

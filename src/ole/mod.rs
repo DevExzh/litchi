@@ -1,14 +1,15 @@
 /// Constants for OLE file format
 pub mod consts;
 
-/// Main OLE file parsing implementation
-mod file;
+// CFB substrate — moved to the litchi-cfb crate. Re-exports preserved for
+// backward compatibility through the umbrella `litchi::ole` namespace.
+pub use litchi_cfb::{
+    DirectoryEntry, OleError, OleFile, OleMetadata, OleWriter, PropertyValue, is_ole_file,
+};
 
-/// OLE file writing and modification
-pub mod writer;
-
-/// Metadata extraction from OLE property streams
-mod metadata;
+// CFB writer module retained as a re-export so `crate::ole::writer::*` paths
+// inside the format parsers keep resolving until P4c moves litchi-ole out.
+pub use litchi_cfb::writer;
 
 /// MTEF extractor for OLE documents (internal use only)
 #[cfg(feature = "formula")]
@@ -56,8 +57,4 @@ pub mod ppt;
 /// in the legacy binary format (.xls files), which are OLE2-based files.
 pub mod xls;
 
-// Re-export public types for convenient access
-pub use file::{DirectoryEntry, OleError, OleFile, is_ole_file};
-pub use metadata::{OleMetadata, PropertyValue};
-pub use writer::OleWriter;
 pub use xls::{XlsError, XlsWorkbook};

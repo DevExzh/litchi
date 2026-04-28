@@ -45,6 +45,7 @@ exclude = [
 [workspace]
 resolver = "3"
 members = [
+    "crates/litchi-cfb",
     "crates/litchi-core",
     "crates/litchi-eval",
     "crates/litchi-fonts",
@@ -159,9 +160,17 @@ iwa = [
     "dep:prost-build",
 ]
 odf = ["dep:soapberry-zip", "dep:quick-xml", "litchi-core/odf"]
-ole = ["dep:encoding_rs", "dep:bumpalo", "litchi-core/ole"]
+ole = ["dep:encoding_rs", "dep:bumpalo", "dep:litchi-cfb", "litchi-core/ole"]
 ooxml = ["dep:soapberry-zip", "dep:quick-xml", "dep:encoding_rs"]
-ooxml_encryption = ["ooxml", "ole", "dep:aes", "dep:cbc", "dep:hmac", "dep:sha1"]
+ooxml_encryption = [
+    "ooxml",
+    "ole",
+    "dep:aes",
+    "dep:cbc",
+    "dep:hmac",
+    "dep:sha1",
+    "dep:litchi-cfb",
+]
 rtf = ["dep:litchi-rtf", "litchi-core/rtf"]
 # Additional functionality features
 formula = ["dep:litchi-formula"]
@@ -187,6 +196,7 @@ fixedbitset = "0.5" # Fixed-size bitset for efficient visited tracking with bett
 flate2 = { version = "1", features = ["zlib-rs"], default-features = false } # Compression/decompression for Office file formats
 hmac = { version = "0.13", optional = true } # HMAC for Agile OOXML encryption integrity
 itoa = "1.0" # Fast integer-to-string conversion
+litchi-cfb = { workspace = true, optional = true } # CFB / OLE2 container substrate (carved out in workspace split, gated by `ole` or `ooxml_encryption` features)
 litchi-core = { workspace = true } # Common types, traits, and utilities (carved out in workspace split)
 litchi-eval = { workspace = true, optional = true } # Formula evaluator engine (carved out in workspace split, gated by `eval_engine` feature)
 litchi-fonts = { workspace = true, optional = true } # Font discovery, loading, and subsetting (carved out in workspace split, gated by `fonts` feature)

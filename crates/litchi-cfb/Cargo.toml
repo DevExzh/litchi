@@ -1,0 +1,22 @@
+[package]
+name        = "litchi-cfb"
+description = "Microsoft Compound File Binary (CFB / OLE2) container parser and writer for the Litchi office-formats library."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+default = []
+# Writing/mutation support. Without this feature only reading is available.
+write = []
+
+[dependencies]
+chrono          = { workspace = true }
+fixedbitset     = { workspace = true }
+litchi-core     = { workspace = true }
+smallvec        = { workspace = true }
+zerocopy        = { workspace = true }
+zerocopy-derive = { workspace = true }

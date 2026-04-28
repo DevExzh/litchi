@@ -4,7 +4,7 @@
 //! format (Escher) within the "Data" stream. This module provides access to these shapes.
 
 use crate::ole::escher::{EscherShape, EscherShapeFactory, extract_text_from_escher};
-use crate::ole::file::OleFile;
+use litchi_cfb::OleFile;
 use std::io::{Read, Seek};
 
 /// Shape information extracted from a Word document.

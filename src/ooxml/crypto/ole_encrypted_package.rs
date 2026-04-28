@@ -1,6 +1,6 @@
 use crate::ole::OleFile;
-use crate::ole::writer::OleWriter;
 use crate::ooxml::error::{OoxmlError, Result};
+use litchi_cfb::writer::OleWriter;
 
 /// Build an OLE compound file that wraps the given OOXML `EncryptionInfo`
 /// and `EncryptedPackage` streams with the standard StrongEncryptionDataSpace

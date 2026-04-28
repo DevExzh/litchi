@@ -62,7 +62,7 @@ use super::slide_timing::SlideTiming;
 use super::spec::{BinaryTagData, ColorScheme, Ppt10Tag, SlideLayoutType, slide_flags};
 use super::text_format::{FontEntity, Paragraph};
 use crate::ole::ppt::animation::AnimationInfo;
-use crate::ole::writer::OleWriter;
+use litchi_cfb::writer::OleWriter;
 use litchi_core::unit::pt_to_emu_i32;
 use std::collections::HashMap;
 

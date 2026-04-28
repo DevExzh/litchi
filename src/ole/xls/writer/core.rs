@@ -32,7 +32,7 @@
 use super::super::error::{XlsError, XlsResult};
 use super::biff::AutoFilterConditionWrite;
 use super::formatting::{CellStyle, ExtendedFormat, FormattingManager};
-use crate::ole::writer::OleWriter;
+use litchi_cfb::writer::OleWriter;
 use std::collections::HashMap;
 
 mod conditional_format;

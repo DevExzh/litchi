@@ -11,7 +11,7 @@ pub enum XlsError {
     /// I/O error
     Io(std::io::Error),
     /// CFB (Compound File Binary) error
-    Cfb(crate::ole::file::OleError),
+    Cfb(litchi_cfb::OleError),
     /// Invalid BIFF record
     InvalidRecord {
         /// Record type
@@ -131,8 +131,8 @@ impl From<std::io::Error> for XlsError {
     }
 }
 
-impl From<crate::ole::file::OleError> for XlsError {
-    fn from(err: crate::ole::file::OleError) -> Self {
+impl From<litchi_cfb::OleError> for XlsError {
+    fn from(err: litchi_cfb::OleError) -> Self {
         XlsError::Cfb(err)
     }
 }
@@ -318,7 +318,7 @@ mod tests {
     #[test]
     fn test_xls_error_cfb_source() {
         // Test that CFB errors properly return source
-        let cfb_err = crate::ole::file::OleError::StreamNotFound;
+        let cfb_err = litchi_cfb::OleError::StreamNotFound;
         let err = XlsError::Cfb(cfb_err);
         // The CFB error doesn't have a source (unit variant), but test the variant
         let display = format!("{}", err);

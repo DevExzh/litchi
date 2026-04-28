@@ -463,3 +463,36 @@ fn extract_string(value: &PropertyValue, codepage: Option<u32>) -> Option<String
         _ => None,
     }
 }
+
+// Convert CFB-substrate metadata into the unified `litchi_core::Metadata`.
+//
+// Used to live in the umbrella crate's `metadata_ext.rs`, but the orphan rule
+// forbids implementing `From<external> for external`. This impl is local to
+// `litchi-cfb` because `OleMetadata` is defined here.
+impl From<OleMetadata> for litchi_core::Metadata {
+    fn from(ole_metadata: OleMetadata) -> Self {
+        litchi_core::Metadata {
+            title: ole_metadata.title,
+            subject: ole_metadata.subject,
+            author: ole_metadata.author,
+            keywords: ole_metadata.keywords,
+            description: ole_metadata.comments,
+            template: ole_metadata.template,
+            last_modified_by: ole_metadata.last_saved_by,
+            revision: ole_metadata.revision_number,
+            created: ole_metadata.create_time,
+            modified: ole_metadata.last_saved_time,
+            page_count: ole_metadata.num_pages,
+            word_count: ole_metadata.num_words,
+            character_count: ole_metadata.num_chars,
+            application: ole_metadata.creating_application,
+            category: ole_metadata.category,
+            company: ole_metadata.company,
+            manager: ole_metadata.manager,
+            content_status: None, // OLE doesn't have this field
+            last_printed_time: ole_metadata.last_printed_time,
+            security: ole_metadata.security,
+            codepage: ole_metadata.codepage,
+        }
+    }
+}

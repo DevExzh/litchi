@@ -77,7 +77,7 @@ use super::footnotes::FootnoteEntry;
 use super::numbering::{ListFormatOverride, ListStructure, NumberingWriter};
 use super::piece_table::{Piece, PieceTableBuilder};
 use crate::ole::sprm_operations::*;
-use crate::ole::writer::OleWriter;
+use litchi_cfb::writer::OleWriter;
 use std::collections::HashMap;
 
 /// Error type for DOC writing

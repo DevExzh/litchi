@@ -12,22 +12,12 @@ use litchi_core::Error;
 // ---------------------------------------------------------------------------
 // OLE error conversions
 // ---------------------------------------------------------------------------
-
-#[cfg(feature = "ole")]
-impl From<crate::ole::OleError> for Error {
-    fn from(err: crate::ole::OleError) -> Self {
-        match err {
-            crate::ole::OleError::Io(e) => Error::Io(e),
-            crate::ole::OleError::InvalidFormat(s) => Error::InvalidFormat(s),
-            crate::ole::OleError::InvalidData(s) => Error::InvalidFormat(s),
-            crate::ole::OleError::NotOleFile => Error::NotOfficeFile,
-            crate::ole::OleError::CorruptedFile(s) => Error::CorruptedFile(s),
-            crate::ole::OleError::StreamNotFound => {
-                Error::ComponentNotFound("Stream not found".to_string())
-            },
-        }
-    }
-}
+//
+// Note: `From<crate::ole::OleError> for Error` is provided by the `litchi-cfb`
+// crate itself (since `OleError` was carved out into that crate, the orphan
+// rule forbids us from implementing the conversion at the umbrella). The doc/
+// ppt package-level conversions below remain here because their source types
+// (`DocError`, `PptError`) are still local to the umbrella.
 
 #[cfg(feature = "ole")]
 impl From<crate::ole::doc::package::DocError> for Error {

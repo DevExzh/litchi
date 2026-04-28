@@ -1,6 +1,5 @@
 //! Workbook implementation for XLS files
 
-use crate::ole::file::OleFile;
 use crate::ole::xls::cell::XlsCell;
 use crate::ole::xls::error::{XlsError, XlsResult};
 use crate::ole::xls::pivot_table::PivotTable;
@@ -11,6 +10,7 @@ use crate::ole::xls::records::{
 use crate::ole::xls::worksheet::XlsWorksheet;
 use crate::ole::xls::{autofilter, comments, hyperlinks, merged_cells, pivot_table, protection};
 use crate::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
+use litchi_cfb::OleFile;
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
