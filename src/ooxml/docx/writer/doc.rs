@@ -59,7 +59,7 @@ pub struct DocumentProtection {
 }
 
 #[cfg(feature = "fonts")]
-use crate::fonts::CollectGlyphs;
+use litchi_fonts::CollectGlyphs;
 #[cfg(feature = "fonts")]
 use roaring::RoaringBitmap;
 #[cfg(feature = "fonts")]

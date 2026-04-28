@@ -3,7 +3,7 @@ use font_kit::handle::Handle;
 use font_kit::properties::Properties;
 use font_kit::source::SystemSource;
 
-use crate::fonts::{FontData, FontError, FontProperties};
+use crate::{FontData, FontError, FontProperties};
 
 pub struct FontLoader {
     source: SystemSource,

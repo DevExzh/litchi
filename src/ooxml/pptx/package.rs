@@ -56,9 +56,9 @@ pub struct Package {
 }
 
 #[cfg(feature = "fonts")]
-use crate::fonts::CollectGlyphs;
-#[cfg(feature = "fonts")]
 use crate::ooxml::fonts::{EmbedFonts, embed_fonts_in_package};
+#[cfg(feature = "fonts")]
+use litchi_fonts::CollectGlyphs;
 #[cfg(feature = "fonts")]
 use roaring::RoaringBitmap;
 #[cfg(feature = "fonts")]

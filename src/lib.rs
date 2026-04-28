@@ -334,7 +334,9 @@ pub mod rtf {
 ///
 /// **Note**: This requires the `fonts` feature to be enabled.
 #[cfg(feature = "fonts")]
-pub mod fonts;
+pub mod fonts {
+    pub use litchi_fonts::*;
+}
 
 // Re-export high-level APIs
 pub use common::{Error, Result};

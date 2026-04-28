@@ -4,7 +4,7 @@ use allsorts::{
     subset::{CmapTarget, SubsetProfile, subset},
 };
 
-use crate::fonts::{FontData, FontError, FontSubsetter};
+use crate::{FontData, FontError, FontSubsetter};
 
 pub struct AllsortsSubsetter;
 

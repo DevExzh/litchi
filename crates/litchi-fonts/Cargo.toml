@@ -1,0 +1,16 @@
+[package]
+name        = "litchi-fonts"
+description = "Font discovery, loading, and subsetting for the Litchi office-formats library."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+allsorts    = { workspace = true }
+font-kit    = { workspace = true }
+litchi-core = { workspace = true }
+roaring     = { workspace = true }
+thiserror   = { workspace = true }

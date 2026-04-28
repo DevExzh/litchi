@@ -47,6 +47,7 @@ resolver = "3"
 members = [
     "crates/litchi-core",
     "crates/litchi-eval",
+    "crates/litchi-fonts",
     "crates/litchi-formula",
     "crates/litchi-imgconv",
     "crates/litchi-rtf",
@@ -165,7 +166,7 @@ rtf = ["dep:litchi-rtf", "litchi-core/rtf"]
 # Additional functionality features
 formula = ["dep:litchi-formula"]
 imgconv = ["dep:litchi-imgconv"]
-fonts = ["dep:allsorts", "dep:font-kit"]
+fonts = ["dep:allsorts", "dep:litchi-fonts"]
 eval_engine = ["dep:litchi-eval"]
 eval_engine_web_functions = ["eval_engine", "litchi-eval/web_functions"]
 
@@ -184,11 +185,11 @@ encoding_rs = { version = "0.8", optional = true } # Used by both OLE (.doc, .xl
 fast-float2 = "0.2" # Fast string-to-float conversion with correct rounding
 fixedbitset = "0.5" # Fixed-size bitset for efficient visited tracking with better cache locality
 flate2 = { version = "1", features = ["zlib-rs"], default-features = false } # Compression/decompression for Office file formats
-font-kit = { version = "0.14", optional = true } # Font discovery and loading
 hmac = { version = "0.13", optional = true } # HMAC for Agile OOXML encryption integrity
 itoa = "1.0" # Fast integer-to-string conversion
 litchi-core = { workspace = true } # Common types, traits, and utilities (carved out in workspace split)
 litchi-eval = { workspace = true, optional = true } # Formula evaluator engine (carved out in workspace split, gated by `eval_engine` feature)
+litchi-fonts = { workspace = true, optional = true } # Font discovery, loading, and subsetting (carved out in workspace split, gated by `fonts` feature)
 litchi-formula = { workspace = true, optional = true } # Formula parser/converter (carved out in workspace split, gated by `formula` feature)
 litchi-imgconv = { workspace = true, optional = true } # EMF/WMF/PICT image conversion (carved out in workspace split, gated by `imgconv` feature)
 litchi-rtf = { workspace = true, optional = true } # RTF parser and writer (carved out in workspace split, gated by `rtf` feature)

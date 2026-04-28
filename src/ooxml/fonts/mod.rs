@@ -5,8 +5,6 @@ pub mod obfuscation;
 pub use obfuscation::*;
 
 #[cfg(feature = "fonts")]
-use crate::fonts::{AllsortsSubsetter, CollectGlyphs, FontData, FontSubsetter};
-#[cfg(feature = "fonts")]
 use crate::ooxml::error::{OoxmlError, Result};
 #[cfg(feature = "fonts")]
 use crate::ooxml::opc::constants::relationship_type as rt;
@@ -24,6 +22,8 @@ use allsorts::{
 };
 #[cfg(feature = "fonts")]
 use litchi_core::id::{format_guid_braced, generate_guid_bytes};
+#[cfg(feature = "fonts")]
+use litchi_fonts::{AllsortsSubsetter, CollectGlyphs, FontData, FontSubsetter};
 #[cfg(feature = "fonts")]
 use roaring::RoaringBitmap;
 #[cfg(feature = "fonts")]
@@ -102,7 +102,7 @@ fn map_codepoints_to_glyph_ids(font_data: &FontData, codepoints: &[u32]) -> Resu
 pub struct EmbeddedFontInfo {
     pub relationship_id: String,
     pub font_key: String,
-    pub properties: Option<crate::fonts::FontProperties>,
+    pub properties: Option<litchi_fonts::FontProperties>,
 }
 
 #[cfg(feature = "fonts")]
@@ -123,7 +123,7 @@ pub fn embed_fonts_in_package(
         return Ok(embedded_fonts);
     }
 
-    let loader = crate::fonts::loader::FontLoader::new();
+    let loader = litchi_fonts::loader::FontLoader::new();
     let subsetter = AllsortsSubsetter::new();
 
     for (font_name, glyphs) in &used_glyphs {
