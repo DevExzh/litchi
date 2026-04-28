@@ -1,0 +1,18 @@
+[package]
+name        = "litchi-rtf"
+description = "RTF (Rich Text Format) parser and writer for the Litchi office-formats library."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+bumpalo         = { workspace = true }
+crc-fast        = { workspace = true }
+encoding_rs     = { workspace = true }
+litchi-core     = { workspace = true, features = ["rtf"] }
+smallvec        = { workspace = true }
+zerocopy        = { workspace = true }
+zerocopy-derive = { workspace = true }

@@ -29,7 +29,7 @@ pub(super) enum DocumentImpl {
     Pages(crate::iwa::pages::PagesDocument),
     /// RTF format
     #[cfg(feature = "rtf")]
-    Rtf(crate::rtf::RtfDocument<'static>),
+    Rtf(litchi_rtf::RtfDocument<'static>),
     /// OpenDocument Text format
     #[cfg(feature = "odf")]
     Odt(crate::odf::Document),

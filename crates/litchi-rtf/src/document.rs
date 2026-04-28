@@ -57,12 +57,12 @@ impl<'a> RtfDocument<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::rtf::RtfDocument;
+    /// use litchi_rtf::RtfDocument;
     ///
     /// let rtf = r#"{\rtf1\ansi Hello World!\par}"#;
     /// let doc = RtfDocument::parse(rtf)?;
     /// let text = doc.text();
-    /// # Ok::<(), litchi::rtf::RtfError>(())
+    /// # Ok::<(), litchi_rtf::RtfError>(())
     /// ```
     pub fn parse(input: &str) -> RtfResult<RtfDocument<'static>> {
         Self::parse_internal(input.as_bytes())
@@ -206,11 +206,11 @@ impl<'a> RtfDocument<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::rtf::RtfDocument;
+    /// use litchi_rtf::RtfDocument;
     ///
     /// let doc = RtfDocument::open("document.rtf")?;
     /// let text = doc.text();
-    /// # Ok::<(), litchi::rtf::RtfError>(())
+    /// # Ok::<(), litchi_rtf::RtfError>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> RtfResult<RtfDocument<'static>> {
         let bytes = std::fs::read(path)
@@ -225,7 +225,7 @@ impl<'a> RtfDocument<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::rtf::RtfDocument;
+    /// use litchi_rtf::RtfDocument;
     ///
     /// let bytes = std::fs::read("document.rtf").map_err(|e| format!("IO error: {}", e))?;
     /// let doc = RtfDocument::from_bytes(&bytes)?;
@@ -370,20 +370,20 @@ impl<'a> RtfDocument<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::rtf::RtfDocument;
+    /// use litchi_rtf::RtfDocument;
     ///
     /// let doc = RtfDocument::open("document.rtf")?;
     /// for element in doc.elements() {
     ///     match element {
-    ///         litchi::rtf::DocumentElement::Paragraph(para) => {
+    ///         litchi_rtf::DocumentElement::Paragraph(para) => {
     ///             println!("Paragraph: {}", para.text());
     ///         }
-    ///         litchi::rtf::DocumentElement::Table(table) => {
+    ///         litchi_rtf::DocumentElement::Table(table) => {
     ///             println!("Table with {} rows", table.row_count());
     ///         }
     ///     }
     /// }
-    /// # Ok::<(), litchi::rtf::RtfError>(())
+    /// # Ok::<(), litchi_rtf::RtfError>(())
     /// ```
     pub fn elements(&self) -> Vec<super::DocumentElement<'_>> {
         let mut elements = Vec::new();
@@ -423,13 +423,13 @@ impl<'a> RtfDocument<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::rtf::RtfDocument;
+    /// use litchi_rtf::RtfDocument;
     ///
     /// let doc = RtfDocument::open("document.rtf")?;
     /// for (i, picture) in doc.pictures().iter().enumerate() {
     ///     println!("Picture {}: {:?}, {} bytes", i, picture.image_type, picture.data().len());
     /// }
-    /// # Ok::<(), litchi::rtf::RtfError>(())
+    /// # Ok::<(), litchi_rtf::RtfError>(())
     /// ```
     pub fn pictures(&self) -> &[super::picture::Picture<'_>] {
         &self.pictures
@@ -442,7 +442,7 @@ impl<'a> RtfDocument<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::rtf::{RtfDocument, FieldType};
+    /// use litchi_rtf::{RtfDocument, FieldType};
     ///
     /// let doc = RtfDocument::open("document.rtf")?;
     /// for field in doc.fields() {
@@ -452,7 +452,7 @@ impl<'a> RtfDocument<'a> {
     ///         }
     ///     }
     /// }
-    /// # Ok::<(), litchi::rtf::RtfError>(())
+    /// # Ok::<(), litchi_rtf::RtfError>(())
     /// ```
     pub fn fields(&self) -> &[super::field::Field<'_>] {
         &self.fields

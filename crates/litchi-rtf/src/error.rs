@@ -7,6 +7,7 @@ pub type RtfResult<T> = Result<T, RtfError>;
 
 /// RTF parsing errors.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum RtfError {
     /// Lexer error during tokenization
     LexerError(String),

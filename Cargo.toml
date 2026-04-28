@@ -46,6 +46,7 @@ exclude = [
 resolver = "3"
 members = [
     "crates/litchi-core",
+    "crates/litchi-rtf",
     "crates/pyo3-litchi",
     "crates/soapberry-zip",
     "crates/xml-minifier",
@@ -156,7 +157,7 @@ odf = ["dep:soapberry-zip", "dep:quick-xml", "litchi-core/odf"]
 ole = ["dep:encoding_rs", "dep:bumpalo", "litchi-core/ole"]
 ooxml = ["dep:soapberry-zip", "dep:quick-xml", "dep:encoding_rs"]
 ooxml_encryption = ["ooxml", "ole", "dep:aes", "dep:cbc", "dep:hmac", "dep:sha1"]
-rtf = ["dep:bumpalo", "dep:crc-fast", "dep:encoding_rs", "litchi-core/rtf"]
+rtf = ["dep:litchi-rtf", "litchi-core/rtf"]
 # Additional functionality features
 formula = ["dep:rowan", "dep:bumpalo", "dep:quick-xml"]
 imgconv = ["dep:image"]
@@ -181,7 +182,6 @@ bumpalo = { version = "3", features = ["collections"], optional = true } # Fast 
 bytes = { version = "1", features = ["serde"] } # Efficient byte buffer operations with zero-copy slicing
 cbc = { version = "0.1", features = ["alloc"], optional = true } # CBC mode for AES-based OOXML encryption
 chrono = { version = "0", features = ["serde"] } # Date and time types for Office timestamps
-crc-fast = { version = "1.8", features = ["optimize_crc32_auto"], optional = true } # Fast CRC32 implementation for verifying file integrity
 encoding_rs = { version = "0.8", optional = true } # Used by both OLE (.doc, .xls, .ppt) and OOXML (.xlsb) formats for UTF-16LE decoding
 fast-float2 = "0.2" # Fast string-to-float conversion with correct rounding
 fixedbitset = "0.5" # Fixed-size bitset for efficient visited tracking with better cache locality
@@ -191,6 +191,7 @@ hmac = { version = "0.13", optional = true } # HMAC for Agile OOXML encryption i
 image = { version = "0.25", features = ["default-formats", "rayon"], optional = true } # Image format decoding/encoding for embedded media
 itoa = "1.0" # Fast integer-to-string conversion
 litchi-core = { workspace = true } # Common types, traits, and utilities (carved out in workspace split)
+litchi-rtf = { workspace = true, optional = true } # RTF parser and writer (carved out in workspace split, gated by `rtf` feature)
 memchr = "2.7" # SIMD-accelerated string searching for fast byte pattern matching
 num-complex = { version = "0.4", optional = true } # Complex number arithmetic for engineering functions
 once_cell = "1" # Lazy statics and one-time initialization for global state

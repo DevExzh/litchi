@@ -148,7 +148,7 @@ impl Document {
                 let text = String::from_utf8(bytes)
                     .map_err(|e| Error::ParseError(format!("Invalid UTF-8 in RTF: {}", e)))?;
 
-                let doc = crate::rtf::RtfDocument::parse(&text).map_err(|e| {
+                let doc = litchi_rtf::RtfDocument::parse(&text).map_err(|e| {
                     Error::ParseError(format!("Failed to parse RTF document: {}", e))
                 })?;
 
@@ -332,12 +332,12 @@ impl Document {
                 let paras: Vec<_> = paras
                     .into_iter()
                     .map(|p| {
-                        crate::rtf::ParagraphContent::new(
+                        litchi_rtf::ParagraphContent::new(
                             p.properties,
                             p.runs
                                 .into_iter()
                                 .map(|r| {
-                                    crate::rtf::Run::new(
+                                    litchi_rtf::Run::new(
                                         std::borrow::Cow::Owned(r.text.into_owned()),
                                         r.formatting,
                                     )
@@ -399,11 +399,11 @@ impl Document {
                     .iter()
                     .map(|t| {
                         // Convert RTF table to owned Table
-                        let mut owned_table = crate::rtf::Table::new();
+                        let mut owned_table = litchi_rtf::Table::new();
                         for row in t.rows() {
-                            let mut owned_row = crate::rtf::Row::new();
+                            let mut owned_row = litchi_rtf::Row::new();
                             for cell in row.cells() {
-                                let owned_cell = crate::rtf::Cell::new(std::borrow::Cow::Owned(
+                                let owned_cell = litchi_rtf::Cell::new(std::borrow::Cow::Owned(
                                     cell.text().to_string(),
                                 ));
                                 owned_row.add_cell(owned_cell);
@@ -492,13 +492,13 @@ impl Document {
                 // Convert to owned elements with static lifetime
                 for element in rtf_elements {
                     match element {
-                        crate::rtf::DocumentElement::Paragraph(para) => {
-                            let owned_para = crate::rtf::ParagraphContent::new(
+                        litchi_rtf::DocumentElement::Paragraph(para) => {
+                            let owned_para = litchi_rtf::ParagraphContent::new(
                                 para.properties,
                                 para.runs
                                     .into_iter()
                                     .map(|r| {
-                                        crate::rtf::Run::new(
+                                        litchi_rtf::Run::new(
                                             std::borrow::Cow::Owned(r.text.into_owned()),
                                             r.formatting,
                                         )
@@ -509,12 +509,12 @@ impl Document {
                                 owned_para,
                             ))));
                         },
-                        crate::rtf::DocumentElement::Table(table) => {
-                            let mut owned_table = crate::rtf::Table::new();
+                        litchi_rtf::DocumentElement::Table(table) => {
+                            let mut owned_table = litchi_rtf::Table::new();
                             for row in table.rows() {
-                                let mut owned_row = crate::rtf::Row::new();
+                                let mut owned_row = litchi_rtf::Row::new();
                                 for cell in row.cells() {
-                                    let owned_cell = crate::rtf::Cell::new(
+                                    let owned_cell = litchi_rtf::Cell::new(
                                         std::borrow::Cow::Owned(cell.text().to_string()),
                                     );
                                     owned_row.add_cell(owned_cell);

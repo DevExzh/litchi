@@ -20,7 +20,7 @@ pub enum Run {
     #[cfg(feature = "iwa")]
     Pages(String),
     #[cfg(feature = "rtf")]
-    Rtf(crate::rtf::Run<'static>),
+    Rtf(litchi_rtf::Run<'static>),
     #[cfg(feature = "odf")]
     Odt(crate::odf::Run),
 }

@@ -321,7 +321,9 @@ pub mod odf;
 ///
 /// **Note**: This requires the `rtf` feature to be enabled.
 #[cfg(feature = "rtf")]
-pub mod rtf;
+pub mod rtf {
+    pub use litchi_rtf::*;
+}
 
 /// Shared font embedding and subsetting module
 ///

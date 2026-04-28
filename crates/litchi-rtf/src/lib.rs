@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 //! RTF (Rich Text Format) parser module.
 //!
 //! This module provides high-performance parsing of RTF documents with support
@@ -14,13 +16,13 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi::rtf::RtfDocument;
+//! use litchi_rtf::RtfDocument;
 //!
-//! # fn main() -> Result<(), litchi::rtf::RtfError> {
+//! # fn main() -> Result<(), litchi_rtf::RtfError> {
 //! let rtf_text = r#"{\rtf1\ansi{\fonttbl\f0\fswiss Helvetica;}\f0\pard Hello World!\par}"#;
 //! let doc = RtfDocument::parse(rtf_text)?;
 //! let text = doc.text();
-//! # Ok::<(), litchi::rtf::RtfError>(())
+//! # Ok::<(), litchi_rtf::RtfError>(())
 //! # }
 //! ```
 

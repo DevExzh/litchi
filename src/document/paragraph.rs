@@ -21,7 +21,7 @@ pub enum Paragraph {
     #[cfg(feature = "iwa")]
     Pages(String),
     #[cfg(feature = "rtf")]
-    Rtf(crate::rtf::ParagraphContent<'static>),
+    Rtf(litchi_rtf::ParagraphContent<'static>),
     #[cfg(feature = "odf")]
     Odt(crate::odf::Paragraph),
 }

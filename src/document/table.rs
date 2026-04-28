@@ -18,7 +18,7 @@ pub enum Table {
     #[cfg(feature = "ooxml")]
     Docx(Box<ooxml::docx::Table>),
     #[cfg(feature = "rtf")]
-    Rtf(crate::rtf::Table<'static>),
+    Rtf(litchi_rtf::Table<'static>),
     #[cfg(feature = "odf")]
     Odt(crate::odf::Table),
 }
@@ -113,7 +113,7 @@ pub enum Row {
     #[cfg(feature = "ooxml")]
     Docx(Box<ooxml::docx::Row>),
     #[cfg(feature = "rtf")]
-    Rtf(crate::rtf::Row<'static>),
+    Rtf(litchi_rtf::Row<'static>),
     #[cfg(feature = "odf")]
     Odt(crate::odf::Row),
 }
@@ -208,7 +208,7 @@ pub enum Cell {
     #[cfg(feature = "ooxml")]
     Docx(ooxml::docx::Cell),
     #[cfg(feature = "rtf")]
-    Rtf(crate::rtf::Cell<'static>),
+    Rtf(litchi_rtf::Cell<'static>),
     #[cfg(feature = "odf")]
     Odt(crate::odf::Cell),
 }
