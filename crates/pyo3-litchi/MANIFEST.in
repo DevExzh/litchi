@@ -1,0 +1,6 @@
+# Include type stubs
+include python/litchi_py/__init__.pyi
+include python/litchi_py/py.typed
+
+# Include documentation
+include README.md

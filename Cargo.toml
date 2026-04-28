@@ -1,3 +1,4 @@
+
 [package]
 name = "litchi"
 version = "0.0.1"
@@ -41,6 +42,87 @@ exclude = [
     ".git/*",
     ".gitignore",
 ]
+[workspace]
+resolver = "3"
+members = ["crates/pyo3-litchi", "crates/soapberry-zip", "crates/xml-minifier"]
+
+[workspace.package]
+version      = "0.0.1"
+edition      = "2024"
+authors      = ["Ryker Zhu <ryker.zhu@outlook.com>"]
+license      = "Apache-2.0"
+repository   = "https://github.com/DevExzh/litchi"
+rust-version = "1.85"
+
+[workspace.dependencies]
+aes           = "0.8"
+aho-corasick  = "1.1"
+allsorts      = "0.16"
+atoi_simd     = "0.18"
+base64        = "0.22"
+bitflags      = { version = "2.10", features = ["std", "serde"] }
+bumpalo       = { version = "3", features = ["collections"] }
+bytes         = { version = "1", features = ["serde"] }
+cbc           = { version = "0.1", features = ["alloc"] }
+chrono        = { version = "0", features = ["serde"] }
+crc-fast      = { version = "1.8", features = ["optimize_crc32_auto"] }
+encoding_rs   = "0.8"
+fast-float2   = "0.2"
+fixedbitset   = "0.5"
+flate2        = { version = "1", features = ["zlib-rs"], default-features = false }
+font-kit      = "0.14"
+hmac          = "0.13"
+image         = { version = "0.25", features = ["default-formats", "rayon"] }
+itoa          = "1.0"
+litchi-cfb       = { version = "0.0.1", path = "crates/litchi-cfb" }
+# Path deps to internal crates.
+litchi-core      = { version = "0.0.1", path = "crates/litchi-core" }
+litchi-eval      = { version = "0.0.1", path = "crates/litchi-eval" }
+litchi-fonts     = { version = "0.0.1", path = "crates/litchi-fonts" }
+litchi-formula   = { version = "0.0.1", path = "crates/litchi-formula" }
+litchi-imgconv   = { version = "0.0.1", path = "crates/litchi-imgconv" }
+litchi-iwa       = { version = "0.0.1", path = "crates/litchi-iwa" }
+litchi-markdown  = { version = "0.0.1", path = "crates/litchi-markdown" }
+litchi-odf       = { version = "0.0.1", path = "crates/litchi-odf" }
+litchi-ole       = { version = "0.0.1", path = "crates/litchi-ole" }
+litchi-ooxml     = { version = "0.0.1", path = "crates/litchi-ooxml" }
+litchi-opc       = { version = "0.0.1", path = "crates/litchi-opc" }
+litchi-rtf       = { version = "0.0.1", path = "crates/litchi-rtf" }
+memchr        = "2.7"
+num-complex   = "0.4"
+once_cell     = "1"
+parking_lot   = { version = "0.12", features = ["hardware-lock-elision"] }
+phf           = { version = "0.13", features = ["macros"] }
+plist         = "1"
+prost         = { version = "0.14", features = ["derive"] }
+prost-build   = "0.14"
+prost-types   = "0.14"
+quick-xml     = "0.39"
+rand          = "0.10"
+rayon         = "1.11"
+reqwest       = { version = "0.13", features = ["json"] }
+roaring       = "0"
+rowan         = "0.16"
+ryu           = "1.0"
+serde         = { version = "1", features = ["derive"] }
+serde-saphyr  = "0"
+sha1          = "0.11"
+sha2          = "0.11"
+smallvec      = "1.15"
+snap          = "1"
+soapberry-zip    = { path = "crates/soapberry-zip" }
+statrs        = "0.18"
+sxd-document  = "0.3"
+sxd-xpath     = "0.4"
+
+# External deps used by ≥2 crates — declared once, inherited by members.
+# VERSIONS PRESERVED VERBATIM FROM CURRENT root Cargo.toml.
+thiserror     = "2.0"
+tokio         = { version = "1", features = ["full"] }
+urlencoding   = "2.1"
+xml-minifier     = { path = "crates/xml-minifier" }
+zerocopy      = { version = "0.8", features = ["std"] }
+zerocopy-derive = "0.8"
 
 [features]
 default = ["ole", "ooxml", "ooxml_encryption", "eval_engine"]
@@ -124,14 +206,14 @@ sha1 = { version = "0.11", optional = true } # SHA-1 hashing for Standard 2007 a
 sha2 = "0.11" # SHA-512 hashing for OOXML password protection
 smallvec = "1.15" # Stack-allocated vectors for small collections to avoid heap allocations
 snap = { version = "1", optional = true } # Snappy compression used in iWork file formats (.pages, .numbers, .key)
-soapberry-zip = { path = "soapberry-zip", optional = true } # High-performance ZIP archive handling for modern Office formats
+soapberry-zip = { path = "crates/soapberry-zip", optional = true } # High-performance ZIP archive handling for modern Office formats
 statrs = { version = "0.18", optional = true } # Statistics library for statistical functions
 sxd-document = { version = "0.3", optional = true }
 sxd-xpath = { version = "0.4", optional = true }
 thiserror = "2.0" # Convenient derive macros for error types
 tokio = { version = "1", features = ["full"] }
 urlencoding = { version = "2.1", optional = true }
-xml-minifier = { path = "xml-minifier" }
+xml-minifier = { path = "crates/xml-minifier" }
 zerocopy = { version = "0.8", features = ["std"] } # Safe zero-cost type conversions between bytes and structured data
 zerocopy-derive = "0.8" # Derive macros for zerocopy traits
 
