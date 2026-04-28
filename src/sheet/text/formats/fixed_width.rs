@@ -4,8 +4,8 @@
 //! - Delimited (space/semicolon separated) - handled by delimited module
 //! - Fixed-width columns - handled by this module
 
-use crate::common::{BomKind, strip_bom, write_bom};
 use crate::sheet::{CellValue, Result as SheetResult};
+use litchi_core::{BomKind, strip_bom, write_bom};
 use std::io::{BufRead, BufReader, Read, Seek, Write};
 
 #[derive(Debug, Clone)]

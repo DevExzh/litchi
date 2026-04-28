@@ -3,8 +3,8 @@
 //! This module provides document metadata properties that are shared across
 //! DOCX, XLSX, and PPTX formats.
 
-use crate::common::xml::escape_xml;
 use chrono::{DateTime, Utc};
+use litchi_core::xml::escape_xml;
 
 /// Document core properties (metadata).
 ///

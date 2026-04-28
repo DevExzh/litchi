@@ -2,9 +2,9 @@
 
 use super::types::Result;
 use super::workbook_types::WorkbookImpl;
-use crate::common::{Error, Metadata};
 #[allow(unused_imports)] // Used by sheet implementations
 use crate::sheet::WorkbookTrait;
+use litchi_core::{Error, Metadata};
 use std::path::Path;
 
 /// A unified workbook interface for Apple Numbers spreadsheets.
@@ -91,7 +91,7 @@ impl Workbook {
     /// - Ideal for network data, streams, or in-memory content
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         // Use smart detection to parse only once
-        use crate::common::detection::{DetectedFormat, detect_format_smart};
+        use crate::detection_smart::{DetectedFormat, detect_format_smart};
 
         let detected = detect_format_smart(bytes).ok_or_else(|| {
             Box::new(Error::NotOfficeFile) as Box<dyn std::error::Error + Send + Sync>

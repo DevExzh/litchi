@@ -2,7 +2,7 @@
 //
 // Parses Macintosh PICT format records and extracts relevant information
 
-use crate::common::error::{Error, Result};
+use litchi_core::error::{Error, Result};
 use zerocopy::{BE, FromBytes, I16, U16};
 
 /// PICT file version

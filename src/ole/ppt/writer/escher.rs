@@ -6,7 +6,7 @@ use std::io::Write;
 use zerocopy::IntoBytes;
 use zerocopy_derive::*;
 
-use crate::common::unit::emu_i32_to_ppt_master_i16_round;
+use litchi_core::unit::emu_i32_to_ppt_master_i16_round;
 
 /// Error type for PPT operations
 pub type PptError = std::io::Error;

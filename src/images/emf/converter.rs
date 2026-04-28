@@ -9,8 +9,8 @@
 // 3. A foundation for future full rendering support
 
 use super::parser::EmfParser;
-use crate::common::error::{Error, Result};
 use image::{DynamicImage, ImageBuffer, ImageFormat, Rgba, RgbaImage};
+use litchi_core::error::{Error, Result};
 use std::io::Cursor;
 
 /// Options for EMF to raster conversion

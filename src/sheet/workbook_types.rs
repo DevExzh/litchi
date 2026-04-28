@@ -1,6 +1,6 @@
 //! Unified workbook types and format detection.
 
-use crate::common::Error;
+use litchi_core::Error;
 use std::io::{Read, Seek, SeekFrom};
 
 // soapberry-zip is used for refining detection of OOXML, iWork and ODF containers

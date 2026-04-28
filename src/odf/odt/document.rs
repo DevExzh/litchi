@@ -1,10 +1,10 @@
 //! OpenDocument Text document structure and API.
 
-use crate::common::{Error, Metadata, Result};
 use crate::odf::core::{Content, Meta, OwnedPackage, Styles};
 use crate::odf::elements::style::{StyleElements, StyleRegistry};
 use crate::odf::elements::table::Table as ElementTable;
 use crate::odf::elements::text::{Paragraph as ElementParagraph, TextElements};
+use litchi_core::{Error, Metadata, Result};
 use std::path::Path;
 
 /// An OpenDocument text document (.odt).

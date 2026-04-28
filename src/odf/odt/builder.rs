@@ -2,10 +2,10 @@
 //!
 //! This module provides a builder pattern for creating new ODT documents from scratch.
 
-use crate::common::{Metadata, Result, xml::escape_xml};
 use crate::odf::core::PackageWriter;
 use crate::odf::elements::table::Table;
 use crate::odf::elements::text::{Heading, List, ListItem, Paragraph, Span};
+use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
 
 /// Builder for creating new ODT documents.

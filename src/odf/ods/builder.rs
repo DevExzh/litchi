@@ -2,9 +2,9 @@
 //!
 //! This module provides a builder pattern for creating new ODS spreadsheets from scratch.
 
-use crate::common::{Metadata, Result, xml::escape_xml};
 use crate::odf::core::{OdfStructure, PackageWriter};
 use crate::odf::ods::{Cell, CellValue, Row, Sheet};
+use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
 
 /// Builder for creating new ODS spreadsheets.

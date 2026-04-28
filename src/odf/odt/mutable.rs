@@ -3,11 +3,11 @@
 //! This module provides a mutable wrapper around ODT documents that allows
 //! for in-place modification of content, styles, and metadata.
 
-use crate::common::{Metadata, Result, xml::escape_xml};
 use crate::odf::core::{OdfStructure, PackageWriter};
 use crate::odf::elements::table::Table;
 use crate::odf::elements::text::Paragraph;
 use crate::odf::odt::Document;
+use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
 
 /// Document element type for tracking insertion order
@@ -249,7 +249,7 @@ impl MutableDocument {
                 .insert(index, DocumentElement::Paragraph(para));
             Ok(())
         } else {
-            Err(crate::common::Error::InvalidFormat(format!(
+            Err(litchi_core::Error::InvalidFormat(format!(
                 "Index {} out of bounds (length: {})",
                 index,
                 self.elements.len()
@@ -298,7 +298,7 @@ impl MutableDocument {
                 unreachable!()
             }
         } else {
-            Err(crate::common::Error::InvalidFormat(format!(
+            Err(litchi_core::Error::InvalidFormat(format!(
                 "Paragraph index {} out of bounds (found {} paragraphs)",
                 index, para_count
             )))
@@ -347,7 +347,7 @@ impl MutableDocument {
                 unreachable!()
             }
         } else {
-            Err(crate::common::Error::InvalidFormat(format!(
+            Err(litchi_core::Error::InvalidFormat(format!(
                 "Paragraph index {} out of bounds (found {} paragraphs)",
                 index, para_count
             )))
@@ -439,7 +439,7 @@ impl MutableDocument {
                 unreachable!()
             }
         } else {
-            Err(crate::common::Error::InvalidFormat(format!(
+            Err(litchi_core::Error::InvalidFormat(format!(
                 "Table index {} out of bounds (found {} tables)",
                 index, table_count
             )))

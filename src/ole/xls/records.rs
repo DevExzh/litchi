@@ -7,9 +7,9 @@
 use std::io::{Read, Seek, SeekFrom};
 use zerocopy::{FromBytes, LE, U16};
 
-use crate::common::binary;
 use crate::ole::xls::error::{XlsError, XlsResult};
 use crate::ole::xls::utils;
+use litchi_core::binary;
 
 /// BIFF record header (4 bytes: type + length)
 #[derive(Debug, Clone)]
@@ -318,11 +318,11 @@ impl XlsEncoding {
         match self {
             XlsEncoding::Utf16Le => {
                 // Use shared UTF-16 LE decoder
-                Ok(crate::common::encoding::decode_utf16le(data))
+                Ok(litchi_core::encoding::decode_utf16le(data))
             },
             XlsEncoding::Codepage(cp) => {
                 // Use shared codepage decoder
-                crate::common::encoding::decode_bytes(data, Some(*cp as u32))
+                litchi_core::encoding::decode_bytes(data, Some(*cp as u32))
                     .ok_or_else(|| XlsError::Encoding(format!("Unsupported codepage: {}", cp)))
             },
         }

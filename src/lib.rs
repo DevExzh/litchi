@@ -162,8 +162,60 @@
 //! Most users should use the high-level API and only access low-level modules
 //! when format-specific features are needed.
 
-/// Common types, traits, and utilities shared across formats
-pub mod common;
+/// Common types, traits, and utilities shared across formats.
+///
+/// Re-export of the `litchi-core` crate under the historical `common` path.
+///
+/// Smart-detection items (`DetectedFormat`, `detect_format_smart`) live in
+/// the umbrella's `detection_smart` module; this shim re-exports them
+/// under `common::detection` to preserve API compat.
+pub mod common {
+    pub use litchi_core::*;
+
+    // Re-export top-level smart-detection entry points so legacy callers like
+    // `litchi::common::detect_file_format(...)` keep working.
+    #[cfg(any(
+        feature = "ole",
+        feature = "ooxml",
+        feature = "iwa",
+        feature = "odf",
+        feature = "rtf"
+    ))]
+    pub use crate::detection_smart::{detect_file_format, detect_file_format_from_bytes};
+
+    /// Detection re-exports — merges `litchi-core`'s signature detection with
+    /// the umbrella's smart-detection entry points.
+    pub mod detection {
+        #[cfg(any(
+            feature = "ole",
+            feature = "ooxml",
+            feature = "iwa",
+            feature = "odf",
+            feature = "rtf"
+        ))]
+        pub use crate::detection_smart::{
+            DetectedFormat, detect_file_format, detect_file_format_from_bytes,
+            detect_format_from_reader, detect_format_smart, detect_iwork_format_from_path,
+        };
+        pub use litchi_core::detection::*;
+    }
+}
+
+// Smart format detection (depends on per-format crates; can't live in litchi-core).
+#[cfg(any(
+    feature = "ole",
+    feature = "ooxml",
+    feature = "iwa",
+    feature = "odf",
+    feature = "rtf"
+))]
+pub mod detection_smart;
+
+// Internal extension modules — register orphan-rule impls on litchi_core types.
+mod error_ext;
+mod metadata_ext;
+
+pub use metadata_ext::MetadataYaml;
 
 /// Unified Word document API
 ///
@@ -296,7 +348,13 @@ pub use document::{Document, DocumentElement};
 pub use presentation::Presentation;
 
 // Re-export commonly used types
-pub use common::{
-    FileFormat, Length, PlaceholderType, RGBColor, ShapeType, detect_file_format,
-    detect_file_format_from_bytes,
-};
+pub use common::{FileFormat, Length, PlaceholderType, RGBColor, ShapeType};
+
+#[cfg(any(
+    feature = "ole",
+    feature = "ooxml",
+    feature = "iwa",
+    feature = "odf",
+    feature = "rtf"
+))]
+pub use common::{detect_file_format, detect_file_format_from_bytes};

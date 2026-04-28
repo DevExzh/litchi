@@ -1,8 +1,8 @@
 //! Table implementation for Word documents.
 
 #[cfg(any(feature = "ole", feature = "ooxml", feature = "odf"))]
-use crate::common::Error;
-use crate::common::Result;
+use litchi_core::Error;
+use litchi_core::Result;
 
 #[cfg(feature = "ole")]
 use crate::ole;

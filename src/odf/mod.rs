@@ -226,8 +226,8 @@ mod odt;
 
 // Re-export common utilities for convenience
 // These are used across all Office formats, not ODF-specific
-pub use crate::common::RGBColor as Color;
-pub use crate::common::unit::{Length, LengthUnit};
+pub use litchi_core::RGBColor as Color;
+pub use litchi_core::unit::{Length, LengthUnit};
 
 // Re-export main types for convenience
 pub use odp::{MutablePresentation, Presentation, PresentationBuilder};

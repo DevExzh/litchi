@@ -21,8 +21,8 @@ pub use converter::{WmfConverter, WmfToRasterOptions};
 pub use parser::WmfParser;
 pub use svg::WmfConverter as WmfSvgConverter;
 
-use crate::common::error::Result;
 use image::ImageFormat;
+use litchi_core::error::Result;
 
 /// Convert WMF data to a raster image in the specified format
 ///

@@ -15,7 +15,7 @@
 //!
 //! - OpenFormula 1.2 Specification
 //! - odfdo: `3rdparty/odfdo/src/odfdo/utils/formula.py`
-use crate::common::{Error, Result};
+use litchi_core::{Error, Result};
 use phf::{Set, phf_set};
 use smallvec::SmallVec;
 

@@ -1,3 +1,7 @@
+use crate::ooxml::error::{OoxmlError, Result};
+use crate::ooxml::opc::constants::content_type as ct;
+use crate::ooxml::opc::{OpcPackage, PackURI};
+use chrono::{DateTime, Utc};
 /// OOXML core properties/metadata extraction.
 ///
 /// This module provides functionality to extract document metadata from
@@ -6,11 +10,7 @@
 ///
 /// Core properties are stored in the "docProps/core.xml" part of OOXML packages
 /// and contain standard document metadata like title, author, creation date, etc.
-use crate::common::Metadata;
-use crate::ooxml::error::{OoxmlError, Result};
-use crate::ooxml::opc::constants::content_type as ct;
-use crate::ooxml::opc::{OpcPackage, PackURI};
-use chrono::{DateTime, Utc};
+use litchi_core::Metadata;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 

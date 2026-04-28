@@ -1,14 +1,14 @@
 use super::config::MarkdownOptions;
 use super::traits::ToMarkdown;
 use super::writer::MarkdownWriter;
+use crate::document::{Document, Paragraph, Run, Table};
 /// ToMarkdown implementations for Document types.
 ///
 /// This module implements the `ToMarkdown` trait for Word document types,
 /// including Document, Paragraph, Run, and Table.
 ///
 /// **Note**: This module is only available when the `ole` or `ooxml` feature is enabled.
-use crate::common::Result;
-use crate::document::{Document, Paragraph, Run, Table};
+use litchi_core::Result;
 use rayon::prelude::*;
 
 /// Minimum number of elements to justify parallel processing overhead.

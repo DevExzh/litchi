@@ -4,11 +4,11 @@
 //! all the formatting information (fonts, fills, borders, number formats, and
 //! cell formats) used in an Excel workbook.
 
-use crate::common::xml::escape_xml;
 use crate::ooxml::xlsx::format::{
     CellBorder, CellBorderSide, CellFill, CellFillPatternType, CellFont, CellFormat,
 };
 use crate::sheet::Result as SheetResult;
+use litchi_core::xml::escape_xml;
 use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
 

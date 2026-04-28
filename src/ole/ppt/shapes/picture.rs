@@ -5,12 +5,12 @@
 
 use super::shape::{Shape, ShapeProperties, ShapeType};
 #[cfg(feature = "imgconv")]
-use crate::common::error::Result;
-#[cfg(feature = "imgconv")]
 use crate::images::{Blip, ExtractedImage};
 #[cfg(feature = "imgconv")]
 use crate::ole::ppt::escher::EscherContainer;
 use crate::ole::ppt::package::PptError;
+#[cfg(feature = "imgconv")]
+use litchi_core::error::Result;
 
 /// Picture shape containing an embedded image
 ///
@@ -140,7 +140,7 @@ impl PictureShape {
         // Try to extract from Pictures stream using BLIP ID
         if let Some(blip_id) = self.blip_id {
             return presentation.extract_image_by_blip_id(blip_id).map_err(|e| {
-                crate::common::error::Error::ParseError(format!(
+                litchi_core::error::Error::ParseError(format!(
                     "Failed to extract image by BLIP ID: {}",
                     e
                 ))

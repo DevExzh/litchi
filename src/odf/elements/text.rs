@@ -4,7 +4,7 @@
 //! headings, and other text content elements.
 
 use super::element::{Element, ElementBase};
-use crate::common::{Error, Result};
+use litchi_core::{Error, Result};
 
 /// A text paragraph element
 #[derive(Debug, Clone)]
@@ -169,7 +169,7 @@ impl Span {
     /// Get the vertical position (superscript/subscript).
     ///
     /// Returns `None` if the text is in normal position.
-    pub fn vertical_position(&self) -> Option<crate::common::style::text::pos::VerticalPosition> {
+    pub fn vertical_position(&self) -> Option<litchi_core::style::text::pos::VerticalPosition> {
         // In ODF, vertical position is typically in styles
         None
     }

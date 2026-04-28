@@ -1,5 +1,5 @@
-use crate::common::xml::escape_xml;
 use crate::sheet::Result as SheetResult;
+use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 use super::cache::{PivotCacheDefinition, PivotCacheField, PivotCacheRecords, SharedItem};

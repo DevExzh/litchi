@@ -5,8 +5,8 @@ use std::io::{BufReader, Read, Seek, Write};
 use std::path::Path;
 
 use super::iterators::TextWorksheetIterator;
-use crate::common::{BomKind, strip_bom, write_bom};
 use crate::sheet::{CellValue, Result as SheetResult, WorkbookTrait, Worksheet, WorksheetIterator};
+use litchi_core::{BomKind, strip_bom, write_bom};
 
 /// Configuration for parsing text-based spreadsheet files
 #[derive(Debug, Clone)]

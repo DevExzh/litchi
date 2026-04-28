@@ -380,11 +380,11 @@ impl<'a> Run<'a> {
 
     /// Get the vertical position of this run (superscript/subscript).
     #[inline]
-    pub fn vertical_position(&self) -> Option<crate::common::style::text::pos::VerticalPosition> {
+    pub fn vertical_position(&self) -> Option<litchi_core::style::text::pos::VerticalPosition> {
         if self.formatting.superscript {
-            Some(crate::common::style::text::pos::VerticalPosition::Superscript)
+            Some(litchi_core::style::text::pos::VerticalPosition::Superscript)
         } else if self.formatting.subscript {
-            Some(crate::common::style::text::pos::VerticalPosition::Subscript)
+            Some(litchi_core::style::text::pos::VerticalPosition::Subscript)
         } else {
             None
         }
@@ -696,7 +696,7 @@ mod tests {
         let run = Run::new(Cow::Borrowed("Super"), fmt);
         assert!(matches!(
             run.vertical_position(),
-            Some(crate::common::style::text::pos::VerticalPosition::Superscript)
+            Some(litchi_core::style::text::pos::VerticalPosition::Superscript)
         ));
     }
 
@@ -707,7 +707,7 @@ mod tests {
         let run = Run::new(Cow::Borrowed("Sub"), fmt);
         assert!(matches!(
             run.vertical_position(),
-            Some(crate::common::style::text::pos::VerticalPosition::Subscript)
+            Some(litchi_core::style::text::pos::VerticalPosition::Subscript)
         ));
     }
 

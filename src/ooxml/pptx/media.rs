@@ -2,8 +2,8 @@
 //!
 //! This module provides types for embedding and referencing audio and video
 //! content in PowerPoint presentations.
-use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
+use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 /// Media type enumeration.

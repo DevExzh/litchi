@@ -21,9 +21,9 @@
 //! - ODF 1.2 Specification: Attribute types and valid values
 //! - odfpy: `3rdparty/odfpy/odf/attrconverters.py`
 //! - odfdo: `3rdparty/odfdo/src/odfdo/element.py`
-use crate::common::{Error, Result};
 use atoi_simd::parse;
 use fast_float2::parse_partial;
+use litchi_core::{Error, Result};
 use phf::{Map, Set, phf_map, phf_set};
 use std::borrow::Cow;
 

@@ -83,6 +83,12 @@ impl From<litchi::FileFormat> for FileFormat {
             litchi::FileFormat::Keynote => FileFormat::Keynote,
             litchi::FileFormat::Numbers => FileFormat::Numbers,
             litchi::FileFormat::Rtf => FileFormat::Rtf,
+            // `litchi::FileFormat` is `#[non_exhaustive]`; map any future
+            // variants we don't yet expose in Python bindings to the closest
+            // match. Until a binding is added, fall back to `Doc` rather than
+            // panicking — callers can disambiguate via the format-specific
+            // detection APIs.
+            _ => FileFormat::Doc,
         }
     }
 }

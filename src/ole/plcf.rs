@@ -3,8 +3,8 @@
 //! PLCF is a data structure used extensively in legacy Office binary formats
 //! to map character positions to properties or data.
 
-use crate::common::binary;
 use bytes::Bytes;
+use litchi_core::binary;
 
 /// Property List with Character Positions (PLCF) parser.
 ///

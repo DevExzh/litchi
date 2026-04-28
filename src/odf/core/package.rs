@@ -5,7 +5,7 @@
 //!
 //! Uses soapberry-zip for high-performance zero-copy ZIP parsing.
 
-use crate::common::{Error, Result};
+use litchi_core::{Error, Result};
 use soapberry_zip::office::ArchiveReader;
 use std::io::Read;
 

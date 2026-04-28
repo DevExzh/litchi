@@ -3,9 +3,9 @@
 use super::error::{RtfError, RtfResult};
 use super::lexer::{ControlWord, Token};
 use super::types::*;
-use crate::common::encoding::codepage_to_encoding;
 use bumpalo::Bump;
 use encoding_rs::Encoding;
+use litchi_core::encoding::codepage_to_encoding;
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -1101,7 +1101,7 @@ impl<'a> Parser<'a> {
         // Decode hex data to binary
         if !hex_data.is_empty()
             && let Ok(hex_str) = std::str::from_utf8(&hex_data)
-            && let Ok(decoded) = crate::common::encoding::decode_hex_data(hex_str)
+            && let Ok(decoded) = litchi_core::encoding::decode_hex_data(hex_str)
         {
             // If type not specified, try to detect from data
             if image_type == super::picture::ImageType::Unknown {

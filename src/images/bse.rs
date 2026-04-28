@@ -8,9 +8,9 @@
 // - [MS-ODRAW] 2.2.32: OfficeArtBStoreContainerFileBlock
 // - [MS-ODRAW] 2.2.33: OfficeArtBSE
 
-use crate::common::binary::read_u32_le;
-use crate::common::error::{Error, Result};
 use crate::images::BlipType;
+use litchi_core::binary::read_u32_le;
+use litchi_core::error::{Error, Result};
 use std::borrow::Cow;
 
 /// BlipStoreEntry - metadata and index for a BLIP record

@@ -9,7 +9,7 @@
 // - SIMD-friendly data layouts
 // - Cache-friendly iteration patterns
 
-use crate::common::error::{Error, Result};
+use litchi_core::error::{Error, Result};
 use zerocopy::FromBytes;
 
 /// EMF record types

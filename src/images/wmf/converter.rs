@@ -6,8 +6,8 @@
 // This implementation provides extraction and placeholder generation.
 
 use super::parser::WmfParser;
-use crate::common::error::{Error, Result};
 use image::{DynamicImage, ImageBuffer, ImageFormat, Rgba, RgbaImage};
+use litchi_core::error::{Error, Result};
 use std::io::Cursor;
 
 /// Options for WMF to raster conversion

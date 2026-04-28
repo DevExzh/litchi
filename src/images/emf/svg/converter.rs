@@ -13,11 +13,11 @@ use super::{
     path::PathBuilder,
     state::{DeviceContext, RenderState},
 };
-use crate::common::error::Result;
-use crate::common::xml::escape::escape_xml;
 use crate::images::emf::parser::EmfParser;
 use crate::images::emf::records::*;
 use crate::images::svg_utils::write_num;
+use litchi_core::error::Result;
+use litchi_core::xml::escape::escape_xml;
 use std::fmt::Write;
 use zerocopy::FromBytes;
 

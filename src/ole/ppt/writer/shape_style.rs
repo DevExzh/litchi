@@ -7,7 +7,7 @@
 
 // Shape styling structures don't need zerocopy for now
 
-use crate::common::unit::{EMUS_PER_PT, pt_f32_to_emu_u32};
+use litchi_core::unit::{EMUS_PER_PT, pt_f32_to_emu_u32};
 
 // =============================================================================
 // Escher Property IDs for Shape Styling (MS-ODRAW 2.3)

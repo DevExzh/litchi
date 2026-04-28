@@ -1,6 +1,6 @@
 //! Slide and shape structures for ODP presentations.
 
-use crate::common::Result;
+use litchi_core::Result;
 
 /// A slide in an ODP presentation.
 ///
@@ -62,7 +62,7 @@ impl Slide {
 #[derive(Debug, Clone)]
 pub struct Shape {
     /// Shape type (text box, image, frame, etc.)
-    pub shape_type: crate::common::ShapeType,
+    pub shape_type: litchi_core::ShapeType,
     /// Text content if the shape contains text
     pub text: String,
     /// Shape name/ID
@@ -83,7 +83,7 @@ impl Shape {
     /// Create a new empty shape
     pub fn new() -> Self {
         Self {
-            shape_type: crate::common::ShapeType::AutoShape,
+            shape_type: litchi_core::ShapeType::AutoShape,
             text: String::new(),
             name: None,
             x: None,
@@ -100,7 +100,7 @@ impl Shape {
     }
 
     /// Get the shape type.
-    pub fn shape_type(&self) -> crate::common::ShapeType {
+    pub fn shape_type(&self) -> litchi_core::ShapeType {
         self.shape_type
     }
 
@@ -202,7 +202,7 @@ mod tests {
     #[test]
     fn test_slide_shapes_method() {
         let shapes = vec![Shape {
-            shape_type: crate::common::ShapeType::TextBox,
+            shape_type: litchi_core::ShapeType::TextBox,
             text: "Shape 1".to_string(),
             name: Some("Shape1".to_string()),
             x: Some("0cm".to_string()),
@@ -275,7 +275,7 @@ mod tests {
     #[test]
     fn test_shape_new() {
         let shape = Shape::new();
-        assert_eq!(shape.shape_type, crate::common::ShapeType::AutoShape);
+        assert_eq!(shape.shape_type, litchi_core::ShapeType::AutoShape);
         assert!(shape.text.is_empty());
         assert!(shape.name.is_none());
         assert!(shape.x.is_none());
@@ -288,14 +288,14 @@ mod tests {
     #[test]
     fn test_shape_default() {
         let shape: Shape = Default::default();
-        assert_eq!(shape.shape_type, crate::common::ShapeType::AutoShape);
+        assert_eq!(shape.shape_type, litchi_core::ShapeType::AutoShape);
         assert!(shape.text.is_empty());
     }
 
     #[test]
     fn test_shape_text_method() {
         let shape = Shape {
-            shape_type: crate::common::ShapeType::TextBox,
+            shape_type: litchi_core::ShapeType::TextBox,
             text: "Hello".to_string(),
             name: None,
             x: None,
@@ -310,7 +310,7 @@ mod tests {
     #[test]
     fn test_shape_shape_type_method() {
         let shape = Shape {
-            shape_type: crate::common::ShapeType::Picture,
+            shape_type: litchi_core::ShapeType::Picture,
             text: String::new(),
             name: None,
             x: None,
@@ -319,7 +319,7 @@ mod tests {
             height: None,
             style_name: None,
         };
-        assert_eq!(shape.shape_type(), crate::common::ShapeType::Picture);
+        assert_eq!(shape.shape_type(), litchi_core::ShapeType::Picture);
     }
 
     #[test]
@@ -337,7 +337,7 @@ mod tests {
     #[test]
     fn test_shape_name_method() {
         let shape = Shape {
-            shape_type: crate::common::ShapeType::TextBox,
+            shape_type: litchi_core::ShapeType::TextBox,
             text: String::new(),
             name: Some("MyShape".to_string()),
             x: None,
@@ -352,7 +352,7 @@ mod tests {
     #[test]
     fn test_shape_name_none() {
         let shape = Shape {
-            shape_type: crate::common::ShapeType::TextBox,
+            shape_type: litchi_core::ShapeType::TextBox,
             text: String::new(),
             name: None,
             x: None,
@@ -367,7 +367,7 @@ mod tests {
     #[test]
     fn test_shape_position() {
         let shape = Shape {
-            shape_type: crate::common::ShapeType::TextBox,
+            shape_type: litchi_core::ShapeType::TextBox,
             text: String::new(),
             name: None,
             x: Some("10cm".to_string()),
@@ -384,7 +384,7 @@ mod tests {
     #[test]
     fn test_shape_dimensions() {
         let shape = Shape {
-            shape_type: crate::common::ShapeType::TextBox,
+            shape_type: litchi_core::ShapeType::TextBox,
             text: String::new(),
             name: None,
             x: None,
@@ -401,7 +401,7 @@ mod tests {
     #[test]
     fn test_shape_clone() {
         let shape = Shape {
-            shape_type: crate::common::ShapeType::Placeholder,
+            shape_type: litchi_core::ShapeType::Placeholder,
             text: "Content".to_string(),
             name: Some("Shape1".to_string()),
             x: Some("1cm".to_string()),

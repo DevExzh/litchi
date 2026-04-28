@@ -18,8 +18,8 @@
 //! | SCENPROTECT      | 0x00DD | 0 = unprotected, 1 = protected      |
 //! | PASSWORD         | 0x0013 | 16-bit hash (0 = no password)       |
 
-use crate::common::binary;
 use crate::ole::xls::error::{XlsError, XlsResult};
+use litchi_core::binary;
 
 /// PROTECT record type.
 pub const PROTECT_TYPE: u16 = 0x0012;

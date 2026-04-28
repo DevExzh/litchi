@@ -1,8 +1,8 @@
 //! Shape types and implementation for PPTX presentations.
-use crate::common::xml::escape_xml;
 use crate::ooxml::drawings::blip::write_a_blip_embed;
 use crate::ooxml::drawings::fill::write_a_stretch_fill_rect;
 use crate::ooxml::error::{OoxmlError, Result};
+use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 // Import shared format types

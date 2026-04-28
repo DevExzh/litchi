@@ -4,10 +4,10 @@
 //! including fonts, fills, borders, number formats, and cell formats.
 //! Reference: [MS-XLSB] Section 2.4 - Styles Part
 
-use crate::common::binary;
 use crate::ooxml::xlsb::error::{XlsbError, XlsbResult};
 use crate::ooxml::xlsb::records::{XlsbRecordIter, record_types, wide_str_with_len};
 use crate::ooxml::xlsb::styles::{Alignment, Border};
+use litchi_core::binary;
 use std::collections::HashMap;
 use std::io::Read;
 

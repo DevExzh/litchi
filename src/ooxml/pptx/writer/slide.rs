@@ -1,11 +1,11 @@
-/// Slide types and implementation for PPTX presentations.
-use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::pptx::animations::{
     Animation, AnimationEffect, AnimationSequence, AnimationTrigger,
 };
 use crate::ooxml::pptx::media::{Media, MediaFormat};
 use crate::ooxml::pptx::parts::Comment;
+/// Slide types and implementation for PPTX presentations.
+use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 // Import shared format types

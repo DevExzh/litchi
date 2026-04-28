@@ -5,8 +5,6 @@ pub mod obfuscation;
 pub use obfuscation::*;
 
 #[cfg(feature = "fonts")]
-use crate::common::id::{format_guid_braced, generate_guid_bytes};
-#[cfg(feature = "fonts")]
 use crate::fonts::{AllsortsSubsetter, CollectGlyphs, FontData, FontSubsetter};
 #[cfg(feature = "fonts")]
 use crate::ooxml::error::{OoxmlError, Result};
@@ -24,6 +22,8 @@ use allsorts::{
         cmap::{Cmap, CmapSubtable},
     },
 };
+#[cfg(feature = "fonts")]
+use litchi_core::id::{format_guid_braced, generate_guid_bytes};
 #[cfg(feature = "fonts")]
 use roaring::RoaringBitmap;
 #[cfg(feature = "fonts")]

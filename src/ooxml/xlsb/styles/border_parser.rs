@@ -3,8 +3,8 @@
 //! This module implements parsing for BrtBorder records according to the MS-XLSB specification.
 //! Reference: [MS-XLSB] Section 2.4.55 - BrtBorder
 
-use crate::common::binary;
 use crate::ooxml::xlsb::error::XlsbResult;
+use litchi_core::binary;
 
 /// Border side information
 #[derive(Debug, Clone)]

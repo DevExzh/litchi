@@ -3,10 +3,10 @@
 // This module provides high-level functionality to extract all images
 // from Microsoft Office documents (PPT, DOC) using the Escher drawing layer.
 
-use crate::common::error::Result;
 use crate::images::{Blip, BlipStore, BlipStoreEntry};
 use crate::ole::escher::EscherRecord;
 use crate::ole::ppt::escher::{EscherContainer, EscherParser, EscherRecordType};
+use litchi_core::error::Result;
 use std::borrow::Cow;
 
 /// Extracted image with metadata
@@ -114,11 +114,11 @@ impl<'data> ExtractedImage<'data> {
             Some(BlipType::Pict) => {
                 // PICT to SVG conversion is not yet implemented
                 // Fall back to error for now
-                Err(crate::common::error::Error::ParseError(
+                Err(litchi_core::error::Error::ParseError(
                     "PICT to SVG conversion is not yet implemented".into(),
                 ))
             },
-            _ => Err(crate::common::error::Error::ParseError(
+            _ => Err(litchi_core::error::Error::ParseError(
                 "Image is not a metafile format (EMF/WMF/PICT)".into(),
             )),
         }
@@ -226,20 +226,20 @@ impl ImageExtractor {
         let is_in_delayed_stream = bse.is_delay_loaded() && bse_record.length <= 36;
         let blip_data = if is_in_delayed_stream {
             let stream = delay_stream.ok_or_else(|| {
-                crate::common::error::Error::ParseError(
+                litchi_core::error::Error::ParseError(
                     "BSE record is delay-loaded but no data stream was provided".into(),
                 )
             })?;
             let offset = bse.offset as usize;
             if offset >= stream.len() {
-                return Err(crate::common::error::Error::ParseError(
+                return Err(litchi_core::error::Error::ParseError(
                     "BSE delay stream offset is out of bounds".into(),
                 ));
             }
             &stream[offset..]
         } else {
             if bse_record.data.len() <= 36 {
-                return Err(crate::common::error::Error::ParseError(
+                return Err(litchi_core::error::Error::ParseError(
                     "BSE record data is too short for embedded BLIP".into(),
                 ));
             }
@@ -247,7 +247,7 @@ impl ImageExtractor {
         };
 
         if blip_data.len() < 8 {
-            return Err(crate::common::error::Error::ParseError(
+            return Err(litchi_core::error::Error::ParseError(
                 "Insufficient data for BLIP".into(),
             ));
         }
@@ -308,7 +308,7 @@ impl ImageExtractor {
                 let blip = Self::blip_from_bse(&bse, record, delay_stream)?;
                 Ok(ExtractedImage::new(blip, name, 0))
             },
-            _ => Err(crate::common::error::Error::ParseError(format!(
+            _ => Err(litchi_core::error::Error::ParseError(format!(
                 "Record type 0x{:04X} is not a supported image record",
                 record.record_type_raw
             ))),

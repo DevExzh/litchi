@@ -781,7 +781,7 @@ impl Workbook {
     fn generate_bridge_comments_xml(
         threaded_comments: &crate::ooxml::xlsx::ThreadedComments,
     ) -> String {
-        use crate::common::xml::escape::escape_xml;
+        use litchi_core::xml::escape::escape_xml;
         use std::collections::HashMap;
 
         let mut xml = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");

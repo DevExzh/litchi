@@ -4,7 +4,7 @@
 //! such as page numbers, dates, cross-references, etc.
 
 use super::element::{Element, ElementBase};
-use crate::common::{Error, Result};
+use litchi_core::{Error, Result};
 
 /// Represents a text field in the document
 #[derive(Debug, Clone)]

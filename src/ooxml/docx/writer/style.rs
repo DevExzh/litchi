@@ -1,9 +1,9 @@
 //! Style writer support for DOCX documents.
 //!
 //! This module provides functionality for creating and writing document styles.
-use crate::common::xml::escape_xml;
 use crate::ooxml::docx::enums::WdStyleType;
 use crate::ooxml::error::Result;
+use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 /// A mutable style definition for writing.

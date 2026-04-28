@@ -2,8 +2,8 @@
 
 use super::field::MutableField;
 use super::run::MutableRun;
-use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
+use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 /// Elements that can appear in a hyperlink.

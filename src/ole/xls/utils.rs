@@ -1,8 +1,8 @@
 //! Utility functions for XLS parsing
 
-use crate::common::binary;
 use crate::ole::xls::error::{XlsError, XlsResult};
 use crate::ole::xls::records::{FormulaValue, XlsEncoding};
+use litchi_core::binary;
 use zerocopy::{FromBytes, LE, U16};
 
 /// Parse a BIFF8 `ShortXLUnicodeString`.

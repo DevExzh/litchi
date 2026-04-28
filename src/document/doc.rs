@@ -2,7 +2,7 @@
 
 use super::types::DocumentImpl;
 use super::{Paragraph, Table};
-use crate::common::{Error, Result};
+use litchi_core::{Error, Result};
 
 #[cfg(feature = "ole")]
 use crate::ole;
@@ -118,7 +118,7 @@ impl Document {
     /// - **Single-pass parsing**: Format detection reuses the parsed structure (40-60% faster)
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         // Use smart detection to parse only once
-        use crate::common::detection::{DetectedFormat, detect_format_smart};
+        use crate::detection_smart::{DetectedFormat, detect_format_smart};
 
         let detected = detect_format_smart(bytes).ok_or(Error::NotOfficeFile)?;
 
@@ -176,7 +176,7 @@ impl Document {
 
                 // Extract metadata from OOXML core properties
                 let metadata = crate::ooxml::metadata::extract_metadata(package.opc_package())
-                    .unwrap_or_else(|_| crate::common::Metadata::default());
+                    .unwrap_or_else(|_| litchi_core::Metadata::default());
 
                 Ok(Self {
                     inner: DocumentImpl::Docx(Box::new(doc_ref), metadata),
@@ -593,7 +593,7 @@ impl Document {
     /// }
     /// # Ok::<(), litchi::common::Error>(())
     /// ```
-    pub fn metadata(&self) -> Result<crate::common::Metadata> {
+    pub fn metadata(&self) -> Result<litchi_core::Metadata> {
         match &self.inner {
             #[cfg(feature = "ole")]
             DocumentImpl::Doc(_, metadata) => Ok(metadata.clone()),
@@ -603,7 +603,7 @@ impl Document {
             DocumentImpl::Pages(doc) => {
                 // Extract metadata from Pages bundle metadata
                 let bundle_metadata = doc.bundle().metadata();
-                let mut metadata = crate::common::Metadata::default();
+                let mut metadata = litchi_core::Metadata::default();
 
                 // Extract title from properties
                 if let Some(title) = bundle_metadata.get_property_string("Title") {
@@ -626,7 +626,7 @@ impl Document {
             DocumentImpl::Rtf(_doc) => {
                 // RTF doesn't have standard metadata in the same way
                 // Metadata would need to be parsed from \info group
-                Ok(crate::common::Metadata::default())
+                Ok(litchi_core::Metadata::default())
             },
             #[cfg(feature = "odf")]
             DocumentImpl::Odt(doc) => doc

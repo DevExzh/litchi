@@ -4,7 +4,7 @@
 //! documents (.odt). For generic ODF element parsing (paragraphs, tables, lists, etc.)
 //! that works across all ODF formats, see `crate::odf::elements::parser::DocumentParser`.
 
-use crate::common::Result;
+use litchi_core::Result;
 
 /// Parser for ODT-specific structures.
 ///

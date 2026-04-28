@@ -17,8 +17,8 @@
 //! 11      var   author - Comment author name
 //! ```
 
-use crate::common::binary;
 use crate::ole::xls::error::{XlsError, XlsResult};
+use litchi_core::binary;
 use std::collections::HashMap;
 
 /// NOTE record type identifier.

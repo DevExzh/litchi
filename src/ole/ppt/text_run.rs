@@ -5,7 +5,7 @@ use super::super::consts::PptRecordType;
 /// provides proper text extraction with formatting from PPT files.
 use super::package::Result;
 use super::records::PptRecord;
-use crate::common::binary::{parse_utf16le_string, parse_windows1252_string_len};
+use litchi_core::binary::{parse_utf16le_string, parse_windows1252_string_len};
 
 /// Text formatting properties for a text run.
 ///

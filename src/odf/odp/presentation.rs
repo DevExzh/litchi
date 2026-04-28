@@ -1,8 +1,8 @@
 //! Main Presentation structure and implementation.
 
 use super::Slide;
-use crate::common::{Error, Metadata, Result};
 use crate::odf::core::{Content, Meta, OwnedPackage, Styles};
+use litchi_core::{Error, Metadata, Result};
 use std::path::Path;
 
 /// An OpenDocument presentation (.odp).

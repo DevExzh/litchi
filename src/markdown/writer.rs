@@ -1,12 +1,13 @@
 use super::config::{MarkdownOptions, TableStyle};
+use crate::MetadataYaml;
+use crate::document::{Cell, Paragraph, Run, Table};
 /// Low-level writer for Markdown generation.
 ///
 /// This module provides the `MarkdownWriter` struct which handles the actual
 /// conversion of document elements to Markdown format.
 ///
 /// **Note**: Some functionality requires the `ole` or `ooxml` feature to be enabled.
-use crate::common::{Error, Metadata, Result};
-use crate::document::{Cell, Paragraph, Run, Table};
+use litchi_core::{Error, Metadata, Result};
 use memchr::memchr;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::fmt::Write as FmtWrite;
@@ -651,7 +652,7 @@ impl MarkdownWriter {
         // Note: vertical_position() is available when ole or ooxml features are enabled
         #[cfg(any(feature = "ole", feature = "ooxml"))]
         {
-            use crate::common::VerticalPosition;
+            use litchi_core::VerticalPosition;
 
             // Pre-calculate buffer size needed to minimize reallocations
             let mut needed_capacity = text.len();

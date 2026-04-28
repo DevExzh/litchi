@@ -11,7 +11,7 @@ use super::super::package::{DocError, Result};
 #[inline]
 fn read_byte(data: &[u8], offset: usize) -> BinaryResult<u8> {
     if offset >= data.len() {
-        return Err(crate::common::binary::BinaryError::InsufficientData {
+        return Err(litchi_core::binary::BinaryError::InsufficientData {
             expected: offset + 1,
             available: data.len(),
         });
@@ -28,10 +28,10 @@ use super::tap::{
     BorderStyle, BorderType, CellMergeStatus, CellProperties, TableJustification, TableProperties,
     TableWidth, TextDirection, VerticalAlignment, WidthType,
 };
-use crate::common::binary::{BinaryResult, read_i16_le, read_u16_le};
 use crate::ole::sprm::{Sprm, parse_sprms};
 use crate::ole::sprm_operations::get_sprm_operation;
 use bumpalo::Bump;
+use litchi_core::binary::{BinaryResult, read_i16_le, read_u16_le};
 
 /// TAP parser with arena allocation for temporary structures.
 ///

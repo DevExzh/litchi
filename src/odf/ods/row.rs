@@ -1,7 +1,7 @@
 //! Row structures for ODS spreadsheets.
 
 use super::Cell;
-use crate::common::Result;
+use litchi_core::Result;
 
 /// A row in an ODS spreadsheet.
 ///

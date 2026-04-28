@@ -1,12 +1,12 @@
 //! XLSB cells reader implementation
 
-use crate::common::binary;
 use crate::ooxml::xlsb::cell::XlsbCell;
 use crate::ooxml::xlsb::error::XlsbResult;
 use crate::ooxml::xlsb::hyperlinks::Hyperlink;
 use crate::ooxml::xlsb::merged_cells::MergedCell;
 use crate::ooxml::xlsb::records::RecordIter;
 use crate::sheet::CellValue;
+use litchi_core::binary;
 use std::io::{Read, Seek};
 
 /// Dimensions of a worksheet

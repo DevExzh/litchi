@@ -24,7 +24,7 @@ use super::tx_style::{
     TX_MASTER_STYLE_QUARTER_BODY, TX_MASTER_STYLE_TITLE, tx_style_instance,
 };
 
-use crate::common::unit::emu_u32_to_ppt_master_u32;
+use litchi_core::unit::emu_u32_to_ppt_master_u32;
 
 /// Error type for PPT operations
 pub type PptError = std::io::Error;

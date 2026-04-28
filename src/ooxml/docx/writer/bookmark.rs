@@ -1,6 +1,6 @@
-use crate::common::xml::escape_xml;
 /// Bookmark writer support for DOCX documents.
 use crate::ooxml::error::Result;
+use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 /// A mutable bookmark in a Word document.

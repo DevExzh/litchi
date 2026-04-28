@@ -94,8 +94,8 @@ mod style;
 mod transform;
 
 use super::parser::WmfParser;
-use crate::common::error::Result;
 use crate::images::svg_utils::write_num;
+use litchi_core::error::Result;
 use std::fmt::Write;
 
 pub use bounds::BoundsCalculator;

@@ -25,8 +25,8 @@ pub use parser::{EmfParser, EmfRecord, EmfRecordRef, RecordRefIterator};
 pub use record_parser::*;
 pub use svg::EmfSvgConverter;
 
-use crate::common::error::Result;
 use image::ImageFormat;
+use litchi_core::error::Result;
 
 /// Convert EMF data to a raster image in the specified format
 ///

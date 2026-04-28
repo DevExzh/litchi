@@ -1,6 +1,6 @@
 //! Run types and implementation for DOCX documents.
-use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
+use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 // Import shared format types

@@ -14,8 +14,8 @@
 //! Multiple MERGECELLS records may appear per worksheet; all are aggregated.
 //! Each record holds at most 1027 ranges (enforced by the 8224-byte BIFF limit).
 
-use crate::common::binary;
 use crate::ole::xls::error::{XlsError, XlsResult};
+use litchi_core::binary;
 
 /// MERGECELLS record type identifier.
 pub const RECORD_TYPE: u16 = 0x00E5;

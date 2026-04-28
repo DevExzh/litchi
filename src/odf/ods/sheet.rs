@@ -1,7 +1,7 @@
 //! Sheet structures for ODS spreadsheets.
 
 use super::Row;
-use crate::common::Result;
+use litchi_core::Result;
 
 /// A sheet (worksheet) in an ODS spreadsheet.
 ///

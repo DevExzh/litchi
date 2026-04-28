@@ -7,10 +7,10 @@
 //! For format-specific parsing (e.g., ODT track changes, ODP animations), see the
 //! format-specific parsers in `odt/parser.rs`, `ods/parser.rs`, etc.
 
-use crate::common::Result;
 use crate::odf::elements::element::ElementBase;
 use crate::odf::elements::table::Table;
 use crate::odf::elements::text::{Heading, List, Paragraph};
+use litchi_core::Result;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 

@@ -4,7 +4,7 @@
 //! including parsing, inheritance, and property resolution.
 
 use super::element::{Element, ElementBase};
-use crate::common::Result;
+use litchi_core::Result;
 use std::borrow::Cow;
 use std::collections::HashMap;
 

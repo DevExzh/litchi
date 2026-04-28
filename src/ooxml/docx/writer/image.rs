@@ -1,7 +1,7 @@
 //! Image support for DOCX documents.
-use crate::common::unit::{EMUS_PER_INCH, pt_to_emu_f64, px_to_emu_96};
-use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
+use litchi_core::unit::{EMUS_PER_INCH, pt_to_emu_f64, px_to_emu_96};
+use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 // Import shared format types

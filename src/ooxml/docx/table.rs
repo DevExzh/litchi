@@ -1,7 +1,7 @@
-use crate::common::XmlSlice;
 /// Table, Row, and Cell structures for Word documents.
 use crate::ooxml::docx::paragraph::Paragraph;
 use crate::ooxml::error::{OoxmlError, Result};
+use litchi_core::XmlSlice;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use smallvec::SmallVec;

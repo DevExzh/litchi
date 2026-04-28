@@ -1,6 +1,6 @@
 //! Cell data structures for ODS spreadsheets.
 
-use crate::common::Result;
+use litchi_core::Result;
 
 /// Cell data types supported by ODF spreadsheets.
 ///

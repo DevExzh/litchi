@@ -1,4 +1,3 @@
-use crate::common::unit::{EMUS_PER_INCH, emu_to_pt_f64, emu_to_px_96};
 /// Drawing objects support for DOCX documents.
 ///
 /// This module provides structures and functions for extracting drawing objects
@@ -40,6 +39,7 @@ use crate::common::unit::{EMUS_PER_INCH, emu_to_pt_f64, emu_to_px_96};
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 use crate::ooxml::error::{OoxmlError, Result};
+use litchi_core::unit::{EMUS_PER_INCH, emu_to_pt_f64, emu_to_px_96};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use smallvec::SmallVec;

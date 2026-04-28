@@ -1,9 +1,7 @@
-use crate::common::unit::{
-    EMUS_PER_CM, EMUS_PER_INCH, EMUS_PER_PT, EMUS_PER_TWIP, emu_to_twip_i64,
-};
 /// Section - document section with page setup and layout properties.
 use crate::ooxml::docx::enums::{WdOrientation, WdSectionStart};
 use crate::ooxml::error::Result;
+use litchi_core::unit::{EMUS_PER_CM, EMUS_PER_INCH, EMUS_PER_PT, EMUS_PER_TWIP, emu_to_twip_i64};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 

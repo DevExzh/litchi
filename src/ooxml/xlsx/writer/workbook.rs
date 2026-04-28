@@ -1,9 +1,9 @@
 //! Workbook data structure for XLSX.
-use crate::common::xml::escape_xml;
 use crate::ooxml::pivot::{PivotDataField, PivotFieldRole, PivotTable, PivotValueFunction};
 use crate::ooxml::xlsx::Cell;
 use crate::sheet::CellValue;
 use crate::sheet::Result as SheetResult;
+use litchi_core::xml::escape_xml;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Write as FmtWrite;

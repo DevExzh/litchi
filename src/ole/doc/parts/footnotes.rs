@@ -22,7 +22,7 @@ impl FootnoteDescriptor {
 
         // FRD structure (2 bytes):
         // Bit 0-15: nAuto (auto-number or custom number mark)
-        let number = crate::common::binary::read_u16_le(data, 0).ok()?;
+        let number = litchi_core::binary::read_u16_le(data, 0).ok()?;
 
         Some(Self { number })
     }
@@ -136,7 +136,7 @@ impl FootnotesTable {
 
         let mut text_cps = Vec::with_capacity(cp_count);
         for i in 0..cp_count {
-            if let Ok(cp) = crate::common::binary::read_u32_le(txt_plcf_data, i * 4) {
+            if let Ok(cp) = litchi_core::binary::read_u32_le(txt_plcf_data, i * 4) {
                 text_cps.push(cp);
             }
         }

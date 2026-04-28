@@ -422,7 +422,7 @@ impl MutablePresentation {
     /// ```
     pub fn add_section(&mut self, name: impl Into<String>, slide_ids: Vec<u32>) {
         let section =
-            Section::new(name, crate::common::id::generate_guid_braced()).with_slides(slide_ids);
+            Section::new(name, litchi_core::id::generate_guid_braced()).with_slides(slide_ids);
         self.sections.add_section(section);
         self.modified = true;
     }

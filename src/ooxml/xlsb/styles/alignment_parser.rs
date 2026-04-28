@@ -4,8 +4,8 @@
 //! according to the MS-XLSB specification.
 //! Reference: [MS-XLSB] Section 2.5.148 - XFProps
 
-use crate::common::binary;
 use crate::ooxml::xlsb::error::XlsbResult;
+use litchi_core::binary;
 
 /// Horizontal alignment values
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -3,9 +3,9 @@
 //! This module provides a mutable wrapper around ODS spreadsheets that allows
 //! for in-place modification of sheets, rows, and cells.
 
-use crate::common::{Metadata, Result, xml::escape_xml};
 use crate::odf::core::{OdfStructure, PackageWriter};
 use crate::odf::ods::{Cell, CellValue, Row, Sheet, Spreadsheet};
+use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
 
 /// A mutable ODS spreadsheet that supports in-place modifications.
@@ -213,7 +213,7 @@ impl MutableSpreadsheet {
         if index < self.sheets.len() {
             Ok(self.sheets.remove(index))
         } else {
-            Err(crate::common::Error::InvalidFormat(format!(
+            Err(litchi_core::Error::InvalidFormat(format!(
                 "Sheet index {} out of bounds",
                 index
             )))
@@ -231,7 +231,7 @@ impl MutableSpreadsheet {
             self.sheets[sheet_index].rows.push(row);
             Ok(())
         } else {
-            Err(crate::common::Error::InvalidFormat(format!(
+            Err(litchi_core::Error::InvalidFormat(format!(
                 "Sheet index {} out of bounds",
                 sheet_index
             )))
@@ -245,13 +245,13 @@ impl MutableSpreadsheet {
             if row_index < sheet.rows.len() {
                 Ok(sheet.rows.remove(row_index))
             } else {
-                Err(crate::common::Error::InvalidFormat(format!(
+                Err(litchi_core::Error::InvalidFormat(format!(
                     "Row index {} out of bounds",
                     row_index
                 )))
             }
         } else {
-            Err(crate::common::Error::InvalidFormat(format!(
+            Err(litchi_core::Error::InvalidFormat(format!(
                 "Sheet index {} out of bounds",
                 sheet_index
             )))
@@ -327,7 +327,7 @@ impl MutableSpreadsheet {
 
             Ok(())
         } else {
-            Err(crate::common::Error::InvalidFormat(format!(
+            Err(litchi_core::Error::InvalidFormat(format!(
                 "Sheet index {} out of bounds",
                 sheet_index
             )))
@@ -358,19 +358,19 @@ impl MutableSpreadsheet {
                     row_data.cells[col].text = String::new();
                     Ok(())
                 } else {
-                    Err(crate::common::Error::InvalidFormat(format!(
+                    Err(litchi_core::Error::InvalidFormat(format!(
                         "Column index {} out of bounds",
                         col
                     )))
                 }
             } else {
-                Err(crate::common::Error::InvalidFormat(format!(
+                Err(litchi_core::Error::InvalidFormat(format!(
                     "Row index {} out of bounds",
                     row
                 )))
             }
         } else {
-            Err(crate::common::Error::InvalidFormat(format!(
+            Err(litchi_core::Error::InvalidFormat(format!(
                 "Sheet index {} out of bounds",
                 sheet_index
             )))
@@ -396,7 +396,7 @@ impl MutableSpreadsheet {
             self.sheets[sheet_index].rows.clear();
             Ok(())
         } else {
-            Err(crate::common::Error::InvalidFormat(format!(
+            Err(litchi_core::Error::InvalidFormat(format!(
                 "Sheet index {} out of bounds",
                 sheet_index
             )))

@@ -2,8 +2,8 @@
 //!
 //! Themes define the color scheme, fonts, and effects used in a document.
 //! Based on Apache POI's XWPFTheme implementation.
-use crate::common::xml::escape_xml;
 use crate::ooxml::error::Result;
+use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 /// A mutable theme for document styling.

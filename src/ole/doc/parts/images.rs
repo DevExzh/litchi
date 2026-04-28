@@ -5,7 +5,7 @@
 /// - Inline pictures (in character runs with picf special character 0x01)
 /// - Floating pictures (in Data stream with Escher BLIP records)
 use super::super::package::{DocError, Result};
-use crate::common::binary;
+use litchi_core::binary;
 
 /// Picture format types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

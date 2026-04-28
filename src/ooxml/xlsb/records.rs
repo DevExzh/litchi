@@ -4,9 +4,9 @@
 //! the older XLS BIFF format. Records are stored in a ZIP container
 //! and use a binary record format with variable-length encoding.
 
-use crate::common::binary;
 use crate::ooxml::xlsb::error::{XlsbError, XlsbResult};
 use bytes::Bytes;
+use litchi_core::binary;
 use std::io::Read;
 
 /// XLSB record header (variable length encoding)

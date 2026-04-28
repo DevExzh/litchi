@@ -3,8 +3,8 @@
 //! SmartArt graphics are represented as diagrams in OOXML. This module provides
 //! read support for extracting diagram information from presentations.
 
-use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
+use litchi_core::xml::escape_xml;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 

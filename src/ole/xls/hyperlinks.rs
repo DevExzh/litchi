@@ -14,8 +14,8 @@
 //! 32      var   Optional label, target frame, moniker, address, textMark
 //! ```
 
-use crate::common::binary;
 use crate::ole::xls::error::{XlsError, XlsResult};
+use litchi_core::binary;
 
 /// HLINK record type identifier.
 pub const RECORD_TYPE: u16 = 0x01B8;

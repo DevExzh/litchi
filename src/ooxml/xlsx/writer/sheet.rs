@@ -1,4 +1,3 @@
-use crate::common::{id::generate_guid_braced, xml::escape::escape_xml};
 use crate::ooxml::drawings::blip::write_a_blip_embed_rid_num;
 use crate::ooxml::drawings::ext::write_a16_creation_id_extlst;
 use crate::ooxml::drawings::fill::write_a_stretch_fill_rect;
@@ -8,6 +7,7 @@ use crate::ooxml::xlsx::table::Table;
 use crate::ooxml::xlsx::views::SheetView;
 /// Writer module for creating and modifying Excel worksheets.
 use crate::sheet::{CellValue, Result as SheetResult};
+use litchi_core::{id::generate_guid_braced, xml::escape::escape_xml};
 use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
 

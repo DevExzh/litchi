@@ -2,8 +2,8 @@
 //!
 //! Custom slide shows allow defining named subsets of slides that can be
 //! presented independently of the full presentation.
-use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
+use litchi_core::xml::escape_xml;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::collections::HashMap;

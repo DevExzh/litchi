@@ -1,8 +1,8 @@
 //! Watermark support for DOCX documents.
 //!
 //! Based on Apache POI's XWPFHeaderFooterPolicy watermark implementation.
-use crate::common::xml::escape_xml;
 use crate::ooxml::error::Result;
+use litchi_core::xml::escape_xml;
 
 /// A watermark for a Word document.
 ///

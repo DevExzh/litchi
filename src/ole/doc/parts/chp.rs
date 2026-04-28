@@ -131,7 +131,7 @@ pub enum HighlightColor {
 }
 
 // Re-export common VerticalPosition type
-pub use crate::common::VerticalPosition;
+pub use litchi_core::VerticalPosition;
 
 impl CharacterProperties {
     /// Create a new CharacterProperties with default values.

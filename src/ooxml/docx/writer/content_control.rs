@@ -1,10 +1,10 @@
-use crate::common::xml::escape_xml;
 /// Content control writer support for DOCX documents.
 ///
 /// Content controls are structured document regions that can contain text, dates,
 /// drop-down lists, and other content types. They're commonly used in templates
 /// and forms.
 use crate::ooxml::error::Result;
+use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 /// A mutable content control in a Word document.

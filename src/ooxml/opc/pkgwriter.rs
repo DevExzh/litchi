@@ -2,12 +2,12 @@
 //!
 //! This module provides functionality to serialize and write OPC packages to disk,
 //! including writing the [Content_Types].xml, relationships, and all parts.
-use crate::common::xml::escape_xml;
 use crate::ooxml::opc::constants::content_type as ct;
 use crate::ooxml::opc::error::Result;
 use crate::ooxml::opc::package::OpcPackage;
 use crate::ooxml::opc::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI};
 use crate::ooxml::opc::phys_pkg::PhysPkgWriter;
+use litchi_core::xml::escape_xml;
 use std::collections::HashMap;
 use std::path::Path;
 

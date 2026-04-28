@@ -1,8 +1,8 @@
 //! Tests for all text format handlers
 
 use super::*;
-use crate::common::BomKind;
 use crate::sheet::CellValue;
+use litchi_core::BomKind;
 use std::io::Cursor;
 
 #[test]

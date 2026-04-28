@@ -1,7 +1,7 @@
 //! Pivot table support for XLSB
 
-use crate::common::binary;
 use crate::ooxml::xlsb::error::{XlsbError, XlsbResult};
+use litchi_core::binary;
 
 /// Pivot field item
 #[derive(Debug, Clone)]

@@ -100,7 +100,7 @@ impl RecordHeader {
     /// The parsed header or an error
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 8 {
-            return Err(crate::common::error::Error::ParseError(
+            return Err(litchi_core::error::Error::ParseError(
                 "Insufficient data for record header".into(),
             ));
         }
@@ -168,7 +168,7 @@ impl<'data> MetafileBlip<'data> {
 
         // Parse primary UID
         if offset + 16 > data.len() {
-            return Err(crate::common::error::Error::ParseError(
+            return Err(litchi_core::error::Error::ParseError(
                 "Insufficient data for UID".into(),
             ));
         }
@@ -181,7 +181,7 @@ impl<'data> MetafileBlip<'data> {
         let has_secondary = (header.options() ^ signature) == 0x10;
         let secondary_uid = if has_secondary {
             if offset + 16 > data.len() {
-                return Err(crate::common::error::Error::ParseError(
+                return Err(litchi_core::error::Error::ParseError(
                     "Insufficient data for secondary UID".into(),
                 ));
             }
@@ -202,7 +202,7 @@ impl<'data> MetafileBlip<'data> {
         // - compression: 1 byte
         // - filter: 1 byte
         if offset + 34 > data.len() {
-            return Err(crate::common::error::Error::ParseError(
+            return Err(litchi_core::error::Error::ParseError(
                 "Insufficient data for metafile metadata".into(),
             ));
         }
@@ -401,7 +401,7 @@ impl<'data> BitmapBlip<'data> {
 
         // Parse UID
         if offset + 16 > data.len() {
-            return Err(crate::common::error::Error::ParseError(
+            return Err(litchi_core::error::Error::ParseError(
                 "Insufficient data for UID".into(),
             ));
         }
@@ -411,7 +411,7 @@ impl<'data> BitmapBlip<'data> {
 
         // Parse marker
         if offset >= data.len() {
-            return Err(crate::common::error::Error::ParseError(
+            return Err(litchi_core::error::Error::ParseError(
                 "Insufficient data for marker".into(),
             ));
         }
@@ -463,14 +463,14 @@ impl<'data> Blip<'data> {
     /// ```
     pub fn parse(data: &'data [u8]) -> Result<Self> {
         if data.len() < 8 {
-            return Err(crate::common::error::Error::ParseError(
+            return Err(litchi_core::error::Error::ParseError(
                 "Insufficient data for BLIP record".into(),
             ));
         }
 
         let header = RecordHeader::parse(data)?;
         let blip_type = BlipType::from_record_id(header.record_type).ok_or_else(|| {
-            crate::common::error::Error::ParseError(format!(
+            litchi_core::error::Error::ParseError(format!(
                 "Unknown BLIP record type: 0x{:04X}",
                 header.record_type
             ))

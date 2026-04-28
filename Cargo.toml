@@ -44,7 +44,12 @@ exclude = [
 ]
 [workspace]
 resolver = "3"
-members = ["crates/pyo3-litchi", "crates/soapberry-zip", "crates/xml-minifier"]
+members = [
+    "crates/litchi-core",
+    "crates/pyo3-litchi",
+    "crates/soapberry-zip",
+    "crates/xml-minifier",
+]
 
 [workspace.package]
 version      = "0.0.1"
@@ -147,11 +152,11 @@ iwa = [
     "dep:soapberry-zip",
     "dep:prost-build",
 ]
-odf = ["dep:soapberry-zip", "dep:quick-xml"]
-ole = ["dep:encoding_rs", "dep:bumpalo"]
+odf = ["dep:soapberry-zip", "dep:quick-xml", "litchi-core/odf"]
+ole = ["dep:encoding_rs", "dep:bumpalo", "litchi-core/ole"]
 ooxml = ["dep:soapberry-zip", "dep:quick-xml", "dep:encoding_rs"]
 ooxml_encryption = ["ooxml", "ole", "dep:aes", "dep:cbc", "dep:hmac", "dep:sha1"]
-rtf = ["dep:bumpalo", "dep:crc-fast", "dep:encoding_rs"]
+rtf = ["dep:bumpalo", "dep:crc-fast", "dep:encoding_rs", "litchi-core/rtf"]
 # Additional functionality features
 formula = ["dep:rowan", "dep:bumpalo", "dep:quick-xml"]
 imgconv = ["dep:image"]
@@ -185,6 +190,7 @@ font-kit = { version = "0.14", optional = true } # Font discovery and loading
 hmac = { version = "0.13", optional = true } # HMAC for Agile OOXML encryption integrity
 image = { version = "0.25", features = ["default-formats", "rayon"], optional = true } # Image format decoding/encoding for embedded media
 itoa = "1.0" # Fast integer-to-string conversion
+litchi-core = { workspace = true } # Common types, traits, and utilities (carved out in workspace split)
 memchr = "2.7" # SIMD-accelerated string searching for fast byte pattern matching
 num-complex = { version = "0.4", optional = true } # Complex number arithmetic for engineering functions
 once_cell = "1" # Lazy statics and one-time initialization for global state

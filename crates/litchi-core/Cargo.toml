@@ -1,0 +1,32 @@
+[package]
+name        = "litchi-core"
+description = "Common types, traits, and utilities for the Litchi office-formats library."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+# These features mirror the umbrella's per-format features only because
+# `src/common/encoding.rs` is feature-gated on `ole|rtf` today, and
+# `src/common/detection/odf.rs` is feature-gated on `odf`. The umbrella
+# enables these on `litchi-core` to preserve the existing gating.
+default = []
+odf     = []
+ole     = ["dep:encoding_rs"]
+rtf     = ["dep:encoding_rs"]
+
+[dependencies]
+aho-corasick    = { workspace = true }
+chrono          = { workspace = true }
+encoding_rs     = { workspace = true, optional = true }
+once_cell       = { workspace = true }
+quick-xml       = { workspace = true }
+rand            = { workspace = true }
+serde           = { workspace = true }
+smallvec        = { workspace = true }
+soapberry-zip   = { workspace = true }
+thiserror       = { workspace = true }
+zerocopy        = { workspace = true }

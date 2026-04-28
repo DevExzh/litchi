@@ -1,8 +1,8 @@
 //! Text run implementation for Word documents.
 
 #[cfg(any(feature = "ole", feature = "ooxml", feature = "odf"))]
-use crate::common::Error;
-use crate::common::Result;
+use litchi_core::Error;
+use litchi_core::Result;
 
 #[cfg(feature = "ole")]
 use crate::ole;
@@ -98,8 +98,8 @@ impl Run {
     ///
     /// **Note**: This method requires the `ole` or `ooxml` feature to be enabled.
     #[cfg(any(feature = "ole", feature = "ooxml", feature = "iwa"))]
-    pub fn vertical_position(&self) -> Result<Option<crate::common::VerticalPosition>> {
-        use crate::common::VerticalPosition;
+    pub fn vertical_position(&self) -> Result<Option<litchi_core::VerticalPosition>> {
+        use litchi_core::VerticalPosition;
 
         match self {
             #[cfg(feature = "ole")]
@@ -112,7 +112,7 @@ impl Run {
             },
             #[cfg(feature = "ooxml")]
             Run::Docx(r) => {
-                // Now ooxml::docx::Run also uses crate::common::VerticalPosition
+                // Now ooxml::docx::Run also uses litchi_core::VerticalPosition
                 match r.vertical_position().map_err(Error::from)? {
                     Some(VerticalPosition::Superscript) => Ok(Some(VerticalPosition::Superscript)),
                     Some(VerticalPosition::Subscript) => Ok(Some(VerticalPosition::Subscript)),

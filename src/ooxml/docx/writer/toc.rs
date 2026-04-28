@@ -1,8 +1,8 @@
 //! Table of Contents support for DOCX documents.
 //!
 //! A TOC is implemented using a complex field with switches to control its behavior.
-use crate::common::xml::escape_xml;
 use crate::ooxml::error::Result;
+use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 /// A table of contents (TOC) field.

@@ -151,7 +151,7 @@ impl HeadersTable {
 
         let mut cps = Vec::with_capacity(cp_count);
         for i in 0..cp_count {
-            if let Ok(cp) = crate::common::binary::read_u32_le(data, i * 4) {
+            if let Ok(cp) = litchi_core::binary::read_u32_le(data, i * 4) {
                 cps.push(cp);
             } else {
                 break;

@@ -1,14 +1,14 @@
 use super::config::MarkdownOptions;
 use super::traits::ToMarkdown;
 use super::writer::MarkdownWriter;
+use crate::presentation::{Presentation, Slide};
 /// ToMarkdown implementations for Presentation types.
 ///
 /// This module implements the `ToMarkdown` trait for PowerPoint presentation types,
 /// including Presentation and Slide.
 ///
 /// **Note**: This module is only available when the `ole` or `ooxml` feature is enabled.
-use crate::common::Result;
-use crate::presentation::{Presentation, Slide};
+use litchi_core::Result;
 use rayon::prelude::*;
 
 /// Minimum number of slides to justify parallel processing overhead.

@@ -4,7 +4,7 @@
 //! images, and other graphical content.
 
 use super::element::{Element, ElementBase};
-use crate::common::Result;
+use litchi_core::Result;
 
 /// A drawing page (slide) element
 #[derive(Debug, Clone)]

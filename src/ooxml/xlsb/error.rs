@@ -145,8 +145,8 @@ impl From<quick_xml::Error> for XlsbError {
     }
 }
 
-impl From<crate::common::binary::BinaryError> for XlsbError {
-    fn from(err: crate::common::binary::BinaryError) -> Self {
+impl From<litchi_core::binary::BinaryError> for XlsbError {
+    fn from(err: litchi_core::binary::BinaryError) -> Self {
         XlsbError::Encoding(err.to_string())
     }
 }

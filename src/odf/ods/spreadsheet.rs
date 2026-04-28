@@ -1,8 +1,8 @@
 //! Main Spreadsheet structure and implementation.
 
 use super::Sheet;
-use crate::common::{Error, Metadata, Result};
 use crate::odf::core::{Content, Meta, OwnedPackage, Styles};
+use litchi_core::{Error, Metadata, Result};
 use std::path::Path;
 
 /// An OpenDocument spreadsheet (.ods).

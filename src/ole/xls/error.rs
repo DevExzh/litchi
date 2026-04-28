@@ -137,8 +137,8 @@ impl From<crate::ole::file::OleError> for XlsError {
     }
 }
 
-impl From<crate::common::binary::BinaryError> for XlsError {
-    fn from(err: crate::common::binary::BinaryError) -> Self {
+impl From<litchi_core::binary::BinaryError> for XlsError {
+    fn from(err: litchi_core::binary::BinaryError) -> Self {
         XlsError::InvalidData(err.to_string())
     }
 }

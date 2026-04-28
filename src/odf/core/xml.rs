@@ -3,7 +3,7 @@
 //! This module provides common XML parsing functionality used across
 //! different ODF document types.
 
-use crate::common::{Error, Result};
+use litchi_core::{Error, Result};
 
 /// XML content parser for ODF parts
 #[derive(Debug)]
@@ -162,11 +162,11 @@ impl Meta {
     }
 
     /// Extract basic metadata
-    pub fn extract_metadata(&self) -> crate::common::Metadata {
+    pub fn extract_metadata(&self) -> litchi_core::Metadata {
         // Parse ODF metadata from meta.xml content
         match crate::odf::core::metadata::OdfMetadata::from_xml(self.xml.content()) {
             Ok(odf_meta) => odf_meta.into(),
-            Err(_) => crate::common::Metadata::default(), // Fall back to default on parse error
+            Err(_) => litchi_core::Metadata::default(), // Fall back to default on parse error
         }
     }
 }

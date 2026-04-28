@@ -1,6 +1,6 @@
-use crate::common::encoding::decode_hex_data;
-use crate::common::simd::xor::xor_32_bytes_inplace;
 use crate::ooxml::error::{OoxmlError, Result};
+use litchi_core::encoding::decode_hex_data;
+use litchi_core::simd::xor::xor_32_bytes_inplace;
 
 /// Obfuscates font data according to OOXML specification (ISO/IEC 29500-1:2016, 15.2.14).
 ///

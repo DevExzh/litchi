@@ -3,8 +3,8 @@
 //! This module provides comprehensive parsing of ODF metadata from meta.xml,
 //! including document properties, statistics, and user information.
 
-use crate::common::{Error, Metadata, Result};
 use chrono::{DateTime, Utc};
+use litchi_core::{Error, Metadata, Result};
 use quick_xml::events::Event;
 use std::collections::HashMap;
 

@@ -1,7 +1,7 @@
 //! Slide implementation for PowerPoint presentations.
 
 use super::types::{PptSlideData, PptxSlideData};
-use crate::common::Result;
+use litchi_core::Result;
 
 /// A slide in a PowerPoint presentation.
 pub enum Slide {
@@ -50,7 +50,7 @@ impl Slide {
             },
             #[cfg(feature = "odf")]
             Slide::Odp(slide) => slide.text().map(|s| s.to_string()).map_err(|e| {
-                crate::common::Error::ParseError(format!("Failed to get ODP slide text: {}", e))
+                litchi_core::Error::ParseError(format!("Failed to get ODP slide text: {}", e))
             }),
         }
     }

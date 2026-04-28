@@ -1,4 +1,3 @@
-use crate::common::unit::{emu_to_pt_f64, emu_to_px_96};
 /// Image reading support for DOCX documents.
 ///
 /// This module provides structures and functions for extracting images from Word documents.
@@ -37,6 +36,7 @@ use crate::ooxml::docx::format::ImageFormat;
 use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::opc::OpcPackage;
 use crate::ooxml::opc::rel::Relationships;
+use litchi_core::unit::{emu_to_pt_f64, emu_to_px_96};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use smallvec::SmallVec;

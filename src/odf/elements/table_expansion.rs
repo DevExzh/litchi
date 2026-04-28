@@ -5,7 +5,7 @@
 //! their full representation.
 
 use super::table::{Table, TableCell, TableRow};
-use crate::common::Result;
+use litchi_core::Result;
 
 /// Utilities for expanding repeated table elements
 pub struct TableExpander;

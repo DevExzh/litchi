@@ -3,7 +3,7 @@
 //! Provides functions for decompressing and manipulating binary data,
 //! particularly for PICT format processing.
 
-use crate::common::error::{Error, Result};
+use litchi_core::error::{Error, Result};
 
 /// UnpackBits decompression algorithm
 ///

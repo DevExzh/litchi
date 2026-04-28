@@ -1,9 +1,9 @@
+use crate::images::emf::records::types::*;
 /// Performance-optimized EMF record parsing utilities
 ///
 /// This module provides high-performance parsing helpers that minimize allocations
 /// and maximize cache efficiency.
-use crate::common::error::{Error, Result};
-use crate::images::emf::records::types::*;
+use litchi_core::error::{Error, Result};
 use zerocopy::FromBytes;
 
 /// Fast parser for point arrays (POINTL)

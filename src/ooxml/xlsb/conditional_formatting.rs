@@ -1,7 +1,7 @@
 //! Conditional formatting support for XLSB
 
-use crate::common::binary;
 use crate::ooxml::xlsb::error::{XlsbError, XlsbResult};
+use litchi_core::binary;
 
 /// Conditional formatting rule type (CFType per MS-XLSB 2.5.18)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

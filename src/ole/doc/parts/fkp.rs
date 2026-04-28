@@ -9,7 +9,7 @@
 //! - org.apache.poi.hwpf.model.PAPFormattedDiskPage
 //! - [MS-DOC] 2.4.3 PnFkp* (Page Number FKP)
 
-use crate::common::binary::{read_i32_le, read_u16_le, read_u32_le};
+use litchi_core::binary::{read_i32_le, read_u16_le, read_u32_le};
 
 /// Size of an FKP page in bytes (always 512)
 const FKP_PAGE_SIZE: usize = 512;

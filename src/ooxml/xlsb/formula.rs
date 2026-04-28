@@ -22,8 +22,8 @@
 //! - [MS-XLSB] Section 2.5.97 - Formulas
 //! - [MS-XLS] Section 2.5.198 - Ptg (for token details, largely compatible)
 
-use crate::common::binary;
 use crate::ooxml::xlsb::error::XlsbResult;
+use litchi_core::binary;
 
 /// Parse Tree Generator (Ptg) token types
 ///

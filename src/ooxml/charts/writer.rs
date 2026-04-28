@@ -2,7 +2,6 @@
 //!
 //! This module provides functionality to generate chart XML for OOXML packages.
 
-use crate::common::xml::escape_xml;
 use crate::ooxml::charts::axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
 use crate::ooxml::charts::chart::{Chart, View3D, WallFloor};
 use crate::ooxml::charts::legend::Legend;
@@ -14,6 +13,7 @@ use crate::ooxml::charts::plot_area::{
     TypeGroup,
 };
 use crate::ooxml::charts::series::Series;
+use litchi_core::xml::escape_xml;
 use std::io::Write;
 
 /// Write a chart to XML.

@@ -3,8 +3,8 @@
 //! Sections are used to organize slides into logical groups within a presentation.
 //! This module provides both reading and writing support for sections.
 
-use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
+use litchi_core::xml::escape_xml;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::fmt::Write as FmtWrite;

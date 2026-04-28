@@ -1,7 +1,7 @@
 //! ODP-specific parsing utilities.
 
 use super::{Shape, Slide};
-use crate::common::{Error, Result, ShapeType};
+use litchi_core::{Error, Result, ShapeType};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 

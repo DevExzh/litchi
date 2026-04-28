@@ -9,8 +9,8 @@ use super::super::parser::WmfRecord;
 use super::state::{Brush, Font, GdiObject, GraphicsState, Pen};
 use super::style::{fill_attr, map_font_family, stroke_attrs};
 use super::transform::CoordinateTransform;
-use crate::common::binary::{read_i16_le, read_u16_le};
 use crate::images::svg_utils::{write_color_hex, write_num};
+use litchi_core::binary::{read_i16_le, read_u16_le};
 
 /// Type of arc rendering
 #[derive(Debug, Clone, Copy)]

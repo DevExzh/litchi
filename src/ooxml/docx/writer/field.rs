@@ -1,6 +1,6 @@
-use crate::common::xml::escape_xml;
 /// Field writer support for DOCX documents.
 use crate::ooxml::error::Result;
+use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 /// A mutable field in a Word document.

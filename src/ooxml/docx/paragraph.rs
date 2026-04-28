@@ -1,12 +1,12 @@
-/// Paragraph and Run structures for Word documents.
-use crate::common::VerticalPosition;
-use crate::common::XmlSlice;
 use crate::ooxml::docx::drawing::{DrawingObject, parse_drawing_objects};
 use crate::ooxml::docx::hyperlink::Hyperlink;
 use crate::ooxml::docx::image::{InlineImage, parse_inline_images};
 use crate::ooxml::docx::revision::{Revision, parse_revisions};
 use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::opc::rel::Relationships;
+/// Paragraph and Run structures for Word documents.
+use litchi_core::VerticalPosition;
+use litchi_core::XmlSlice;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use smallvec::SmallVec;

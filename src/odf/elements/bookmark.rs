@@ -4,7 +4,7 @@
 //! by cross-references and hyperlinks.
 
 use super::element::{Element, ElementBase};
-use crate::common::{Error, Result};
+use litchi_core::{Error, Result};
 
 /// Represents a bookmark in the document
 #[derive(Debug, Clone)]

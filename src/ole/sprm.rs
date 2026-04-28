@@ -4,7 +4,7 @@
 /// to modify properties. This module provides common SPRM parsing logic
 /// based on Apache POI's SPRM handling.
 /// SPRM operation types based on size code (from POI's SprmOperation).
-use crate::common::binary::{read_i16_le, read_u16_le, read_u32_le};
+use litchi_core::binary::{read_i16_le, read_u16_le, read_u32_le};
 use smallvec::SmallVec;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SprmOperation {

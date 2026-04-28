@@ -1,7 +1,7 @@
 //! Merged cell range support for XLSB
 
-use crate::common::binary;
 use crate::ooxml::xlsb::error::{XlsbError, XlsbResult};
+use litchi_core::binary;
 
 /// Merged cell range
 ///

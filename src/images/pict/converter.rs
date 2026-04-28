@@ -5,8 +5,8 @@
 use super::data::{get_bitmap_pixel, stretch_coordinates, unpack_bits};
 use super::parser::PictParser;
 use super::types::{PictBitmap, PictRect};
-use crate::common::error::{Error, Result};
 use image::{DynamicImage, ImageBuffer, ImageFormat, Rgba, RgbaImage};
+use litchi_core::error::{Error, Result};
 use std::io::Cursor;
 
 /// Options for PICT to raster conversion

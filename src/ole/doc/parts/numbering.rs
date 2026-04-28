@@ -7,7 +7,7 @@
 /// - List Level Format (LVL) structures
 use super::super::package::{DocError, Result};
 use super::fib::FileInformationBlock;
-use crate::common::binary;
+use litchi_core::binary;
 
 /// Number format for list levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,7 +1,8 @@
 //! Internal types for presentation format detection and implementation.
 
-use crate::common::detection::{self, FileFormat};
-use crate::common::{Error, Result};
+use crate::detection_smart as detection;
+use litchi_core::detection::FileFormat;
+use litchi_core::{Error, Result};
 use std::io::{Read, Seek};
 
 #[cfg(feature = "ole")]

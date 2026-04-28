@@ -1,8 +1,8 @@
 //! Table XML serialization for XLSX.
 
-use crate::common::xml::escape::escape_xml;
 use crate::ooxml::xlsx::table::{Table, TableColumn, TableFormula, TableStyleInfo};
 use crate::sheet::Result as SheetResult;
+use litchi_core::xml::escape::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 /// Serialize a table to XML.

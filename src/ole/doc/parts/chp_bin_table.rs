@@ -12,7 +12,7 @@ use super::chp::CharacterProperties;
 /// - [MS-DOC] 2.8.5 PlcfBteChpx
 use super::fkp::ChpxFkp;
 use super::piece_table::PieceTable;
-use crate::common::binary::read_u32_le;
+use litchi_core::binary::read_u32_le;
 
 /// A character run with properties.
 ///

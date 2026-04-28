@@ -113,8 +113,8 @@ impl From<io::Error> for OleError {
     }
 }
 
-impl From<crate::common::binary::BinaryError> for OleError {
-    fn from(err: crate::common::binary::BinaryError) -> Self {
+impl From<litchi_core::binary::BinaryError> for OleError {
+    fn from(err: litchi_core::binary::BinaryError) -> Self {
         OleError::InvalidData(err.to_string())
     }
 }
@@ -893,8 +893,8 @@ fn decode_utf16le(bytes: &[u8]) -> String {
 /// - **Pre-allocated buffer**: Exact capacity to avoid reallocation
 /// - **2-4x faster** than standard formatting on modern CPUs
 fn format_clsid(bytes: &[u8]) -> String {
-    use crate::common::simd::cmp::is_all_zero;
-    use crate::common::simd::fmt::hex_encode_to_string;
+    use litchi_core::simd::cmp::is_all_zero;
+    use litchi_core::simd::fmt::hex_encode_to_string;
 
     if bytes.len() != 16 {
         return String::new();

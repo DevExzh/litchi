@@ -22,8 +22,8 @@
 // These optimizations significantly reduce calls to `_platform_memmove`,
 // `alloc::raw_vec::RawVec::grow_one`, and `szone_malloc_should_clear`.
 
-use crate::common::error::{Error, Result};
 use bytes::Bytes;
+use litchi_core::error::{Error, Result};
 
 /// WMF file type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

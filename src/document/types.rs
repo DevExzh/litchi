@@ -1,7 +1,8 @@
 //! Internal types for document format detection and implementation.
 
-use crate::common::detection::{self, FileFormat};
-use crate::common::{Error, Result};
+use crate::detection_smart as detection;
+use litchi_core::detection::FileFormat;
+use litchi_core::{Error, Result};
 use std::io::{Read, Seek};
 
 #[cfg(feature = "ole")]
@@ -19,10 +20,10 @@ use crate::ooxml;
 pub(super) enum DocumentImpl {
     /// Legacy .doc format
     #[cfg(feature = "ole")]
-    Doc(ole::doc::Document, crate::common::Metadata),
+    Doc(ole::doc::Document, litchi_core::Metadata),
     /// Modern .docx format
     #[cfg(feature = "ooxml")]
-    Docx(Box<ooxml::docx::Document<'static>>, crate::common::Metadata),
+    Docx(Box<ooxml::docx::Document<'static>>, litchi_core::Metadata),
     /// Apple Pages format
     #[cfg(feature = "iwa")]
     Pages(crate::iwa::pages::PagesDocument),

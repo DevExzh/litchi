@@ -412,11 +412,11 @@ impl KeynoteDocument {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     #[allow(unused_assignments)] // has_data is intentionally reassigned to track if any field was set
-    pub fn metadata(&self) -> Result<Option<crate::common::Metadata>> {
+    pub fn metadata(&self) -> Result<Option<litchi_core::Metadata>> {
         let bundle_metadata = self.bundle.metadata();
 
         // Extract standard metadata fields from Properties.plist and bundle structure
-        let mut metadata = crate::common::Metadata::default();
+        let mut metadata = litchi_core::Metadata::default();
         let mut has_data = false;
 
         // Extract title (Keynote may store in show structure, try there first)

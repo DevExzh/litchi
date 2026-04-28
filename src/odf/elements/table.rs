@@ -4,8 +4,8 @@
 //! and other table-related content.
 
 use super::element::{Element, ElementBase};
-use crate::common::{Error, Result};
 use crate::odf::ods::CellValue;
+use litchi_core::{Error, Result};
 
 /// A table element
 #[derive(Debug, Clone)]

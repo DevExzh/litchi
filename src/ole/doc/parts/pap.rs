@@ -10,9 +10,9 @@
 ///
 /// Based on Apache POI's ParagraphSprmUncompressor and ParagraphProperties.
 use super::super::package::Result;
-use crate::common::binary::{read_i16_le, read_u16_le, read_u32_le};
 use crate::ole::sprm::{Sprm, parse_sprms};
 use crate::ole::sprm_operations::*;
+use litchi_core::binary::{read_i16_le, read_u16_le, read_u32_le};
 
 /// Paragraph Properties structure.
 ///

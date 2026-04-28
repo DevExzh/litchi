@@ -3,7 +3,7 @@
 //! The manifest.xml file contains metadata about all files in the ODF package,
 //! including their MIME types, sizes, and encryption status.
 
-use crate::common::{Error, Result};
+use litchi_core::{Error, Result};
 use soapberry_zip::office::ArchiveReader;
 use std::collections::HashMap;
 

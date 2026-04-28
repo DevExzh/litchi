@@ -22,8 +22,8 @@ mod data;
 pub use converter::{PictConverter, PictToRasterOptions};
 pub use parser::{PictParser, PictVersion};
 
-use crate::common::error::Result;
 use image::ImageFormat;
+use litchi_core::error::Result;
 
 /// Convert PICT data to a raster image in the specified format
 ///

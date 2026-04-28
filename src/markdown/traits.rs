@@ -3,7 +3,7 @@ use super::config::MarkdownOptions;
 ///
 /// This module defines the `ToMarkdown` trait that enables types to be
 /// converted to Markdown format.
-use crate::common::Result;
+use litchi_core::Result;
 
 /// Core trait for types that can be converted to Markdown.
 ///

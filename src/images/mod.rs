@@ -102,11 +102,11 @@ pub mod svg;
 pub mod svg_utils;
 pub mod wmf;
 
-use crate::common::error::Result;
 pub use blip::{BitmapBlip, Blip, BlipType, MetafileBlip, RecordHeader};
 pub use bse::{BlipStore, BlipStoreEntry};
 pub use extractor::{ExtractedImage, ImageExtractor};
 use image::ImageFormat;
+use litchi_core::error::Result;
 
 /// Convert a BLIP record to a raster image format
 ///
@@ -134,7 +134,7 @@ pub fn convert_blip_to_format<'data>(
                 Some(BlipType::Emf) => emf::convert_emf(&data, format, width, height),
                 Some(BlipType::Wmf) => wmf::convert_wmf(&data, format, width, height),
                 Some(BlipType::Pict) => pict::convert_pict(&data, format, width, height),
-                _ => Err(crate::common::error::Error::ParseError(
+                _ => Err(litchi_core::error::Error::ParseError(
                     "Unknown metafile BLIP type".into(),
                 )),
             }
@@ -143,7 +143,7 @@ pub fn convert_blip_to_format<'data>(
             // For bitmap formats that are already in a modern format, we may just need
             // to re-encode or pass through
             let img = image::load_from_memory(&bitmap.picture_data[..]).map_err(|e| {
-                crate::common::error::Error::ParseError(format!("Failed to load bitmap: {}", e))
+                litchi_core::error::Error::ParseError(format!("Failed to load bitmap: {}", e))
             })?;
 
             // Resize if requested
@@ -182,7 +182,7 @@ pub fn convert_blip_to_format<'data>(
             // Encode to target format
             let mut buffer = std::io::Cursor::new(Vec::new());
             img.write_to(&mut buffer, format).map_err(|e| {
-                crate::common::error::Error::ParseError(format!("Failed to encode image: {}", e))
+                litchi_core::error::Error::ParseError(format!("Failed to encode image: {}", e))
             })?;
 
             Ok(buffer.into_inner())
@@ -263,9 +263,9 @@ pub fn extract_images_from_ppt<P: AsRef<std::path::Path>>(
     use crate::ole::OleFile;
     use std::fs::File;
 
-    let file = File::open(path).map_err(crate::common::error::Error::Io)?;
+    let file = File::open(path).map_err(litchi_core::error::Error::Io)?;
     let mut ole = OleFile::open(file).map_err(|e| {
-        crate::common::error::Error::ParseError(format!("Failed to open OLE file: {}", e))
+        litchi_core::error::Error::ParseError(format!("Failed to open OLE file: {}", e))
     })?;
 
     ImageExtractor::extract_from_ppt(&mut ole)
@@ -298,9 +298,9 @@ pub fn extract_images_from_doc<P: AsRef<std::path::Path>>(
     use crate::ole::OleFile;
     use std::fs::File;
 
-    let file = File::open(path).map_err(crate::common::error::Error::Io)?;
+    let file = File::open(path).map_err(litchi_core::error::Error::Io)?;
     let mut ole = OleFile::open(file).map_err(|e| {
-        crate::common::error::Error::ParseError(format!("Failed to open OLE file: {}", e))
+        litchi_core::error::Error::ParseError(format!("Failed to open OLE file: {}", e))
     })?;
 
     ImageExtractor::extract_from_doc(&mut ole)

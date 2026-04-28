@@ -2,7 +2,7 @@
 
 use super::Slide;
 use super::types::PresentationImpl;
-use crate::common::{Error, Result};
+use litchi_core::{Error, Result};
 
 #[cfg(feature = "ole")]
 use crate::ole;
@@ -55,7 +55,7 @@ pub struct Presentation {
     ///
     /// Metadata is extracted once during `open()` or `from_bytes()` and cached here
     /// for efficient access. This avoids needing mutable access during `metadata()` calls.
-    pub(super) cached_metadata: Option<crate::common::Metadata>,
+    pub(super) cached_metadata: Option<litchi_core::Metadata>,
 }
 
 impl Presentation {
@@ -123,7 +123,7 @@ impl Presentation {
     /// - **Single-pass parsing**: Format detection reuses the parsed structure (40-60% faster)
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         // Use smart detection to parse only once
-        use crate::common::detection::{DetectedFormat, detect_format_smart};
+        use crate::detection_smart::{DetectedFormat, detect_format_smart};
 
         let detected = detect_format_smart(bytes).ok_or(Error::NotOfficeFile)?;
 
@@ -141,7 +141,7 @@ impl Presentation {
                         .get_metadata()
                         .ok()
                         .and_then(|ole_metadata| {
-                            let metadata: crate::common::Metadata = ole_metadata.into();
+                            let metadata: litchi_core::Metadata = ole_metadata.into();
                             if metadata.has_data() {
                                 Some(metadata)
                             } else {
@@ -226,7 +226,7 @@ impl Presentation {
 
                 Ok(Self {
                     inner: PresentationImpl::Odp(doc),
-                    cached_metadata: Some(crate::common::Metadata::default()),
+                    cached_metadata: Some(litchi_core::Metadata::default()),
                     #[cfg(feature = "ooxml")]
                     _pptx_package: None,
                 })
@@ -469,7 +469,7 @@ impl Presentation {
     /// }
     /// # Ok::<(), litchi::common::Error>(())
     /// ```
-    pub fn metadata(&self) -> Result<Option<crate::common::Metadata>> {
+    pub fn metadata(&self) -> Result<Option<litchi_core::Metadata>> {
         // Return cached metadata that was extracted during presentation creation
         Ok(self.cached_metadata.clone())
     }

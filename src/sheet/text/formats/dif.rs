@@ -11,8 +11,8 @@
 //!   - 1,0 = String (followed by quoted string on next line)
 //!   - 1,0 with V = Boolean TRUE/FALSE
 
-use crate::common::{BomKind, strip_bom, write_bom};
 use crate::sheet::{CellValue, Result as SheetResult};
+use litchi_core::{BomKind, strip_bom, write_bom};
 use std::io::{BufRead, BufReader, Read, Seek, Write};
 
 #[derive(Debug, Clone)]

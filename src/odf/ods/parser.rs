@@ -1,7 +1,7 @@
 //! ODS-specific parsing utilities.
 
 use super::{Cell, CellValue, Row, Sheet};
-use crate::common::{Error, Result};
+use litchi_core::{Error, Result};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 

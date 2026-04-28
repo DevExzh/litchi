@@ -3,9 +3,9 @@
 //! This module provides a mutable wrapper around ODP presentations that allows
 //! for in-place modification of slides, shapes, and content.
 
-use crate::common::{Metadata, Result, xml::escape_xml};
 use crate::odf::core::{OdfStructure, PackageWriter};
 use crate::odf::odp::{Presentation, Shape, Slide};
+use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
 
 /// A mutable ODP presentation that supports in-place modifications.
@@ -188,7 +188,7 @@ impl MutablePresentation {
 
             Ok(())
         } else {
-            Err(crate::common::Error::InvalidFormat(format!(
+            Err(litchi_core::Error::InvalidFormat(format!(
                 "Index {} out of bounds (length: {})",
                 index,
                 self.slides.len()
@@ -226,7 +226,7 @@ impl MutablePresentation {
 
             Ok(slide)
         } else {
-            Err(crate::common::Error::InvalidFormat(format!(
+            Err(litchi_core::Error::InvalidFormat(format!(
                 "Index {} out of bounds (length: {})",
                 index,
                 self.slides.len()
@@ -260,7 +260,7 @@ impl MutablePresentation {
             self.slides[index].text = text.to_string();
             Ok(())
         } else {
-            Err(crate::common::Error::InvalidFormat(format!(
+            Err(litchi_core::Error::InvalidFormat(format!(
                 "Index {} out of bounds (length: {})",
                 index,
                 self.slides.len()
@@ -314,7 +314,7 @@ impl MutablePresentation {
             self.slides[slide_index].shapes.push(shape);
             Ok(())
         } else {
-            Err(crate::common::Error::InvalidFormat(format!(
+            Err(litchi_core::Error::InvalidFormat(format!(
                 "Slide index {} out of bounds",
                 slide_index
             )))
@@ -347,13 +347,13 @@ impl MutablePresentation {
             if shape_index < slide.shapes.len() {
                 Ok(slide.shapes.remove(shape_index))
             } else {
-                Err(crate::common::Error::InvalidFormat(format!(
+                Err(litchi_core::Error::InvalidFormat(format!(
                     "Shape index {} out of bounds",
                     shape_index
                 )))
             }
         } else {
-            Err(crate::common::Error::InvalidFormat(format!(
+            Err(litchi_core::Error::InvalidFormat(format!(
                 "Slide index {} out of bounds",
                 slide_index
             )))
@@ -380,7 +380,7 @@ impl MutablePresentation {
             self.slides[slide_index].shapes.clear();
             Ok(())
         } else {
-            Err(crate::common::Error::InvalidFormat(format!(
+            Err(litchi_core::Error::InvalidFormat(format!(
                 "Slide index {} out of bounds",
                 slide_index
             )))
@@ -440,7 +440,7 @@ impl MutablePresentation {
 
             // Add shapes
             for (shape_idx, shape) in slide.shapes.iter().enumerate() {
-                use crate::common::ShapeType;
+                use litchi_core::ShapeType;
 
                 let x = shape.x.as_deref().unwrap_or("2cm");
                 let y = shape.y.as_deref().unwrap_or("8cm");

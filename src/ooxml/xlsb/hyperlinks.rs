@@ -1,8 +1,8 @@
 //! Hyperlink support for XLSB
 
-use crate::common::binary;
 use crate::ooxml::xlsb::error::{XlsbError, XlsbResult};
 use crate::ooxml::xlsb::records::wide_str_with_len;
+use litchi_core::binary;
 
 /// Hyperlink information
 ///

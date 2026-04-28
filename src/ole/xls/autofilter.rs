@@ -25,8 +25,8 @@
 //!         var   string2 - String for condition 2 (if applicable)
 //! ```
 
-use crate::common::binary;
 use crate::ole::xls::error::{XlsError, XlsResult};
+use litchi_core::binary;
 
 /// AUTOFILTERINFO record type identifier.
 pub const AUTOFILTERINFO_TYPE: u16 = 0x009D;

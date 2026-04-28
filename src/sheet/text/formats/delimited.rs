@@ -1,7 +1,7 @@
 //! Delimited text (CSV/TSV/PRN) handler.
 
-use crate::common::{BomKind, strip_bom, write_bom};
 use crate::sheet::{CellValue, Result as SheetResult};
+use litchi_core::{BomKind, strip_bom, write_bom};
 use std::io::{Read, Seek, Write};
 
 #[derive(Debug, Clone)]

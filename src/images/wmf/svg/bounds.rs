@@ -14,7 +14,7 @@
 
 use super::super::constants::record;
 use super::super::parser::WmfRecord;
-use crate::common::binary::{read_i16_le, read_u16_le};
+use litchi_core::binary::{read_i16_le, read_u16_le};
 
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;

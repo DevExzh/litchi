@@ -1,3 +1,4 @@
+use crate::ole::plcf::PlcfParser;
 /// Piece Table parser for DOC files.
 ///
 /// Based on Apache POI's ComplexFileTable and TextPieceTable.
@@ -11,8 +12,7 @@
 /// - org.apache.poi.hwpf.model.PieceDescriptor
 /// - [MS-DOC] 2.4.1 Clx (Complex file information)
 /// - [MS-DOC] 2.9.179 Pcd (Piece Descriptor)
-use crate::common::binary::{read_u16_le, read_u32_le};
-use crate::ole::plcf::PlcfParser;
+use litchi_core::binary::{read_u16_le, read_u32_le};
 
 /// A text piece - maps a range of CPs to an FC in the WordDocument stream.
 ///

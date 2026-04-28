@@ -134,13 +134,13 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 0x0042
                     // CodePage
                     if record.data.len() >= 2 => {
-                        let codepage = crate::common::binary::read_u16_le_at(&record.data, 0)?;
+                        let codepage = litchi_core::binary::read_u16_le_at(&record.data, 0)?;
                         *encoding = XlsEncoding::from_codepage(codepage)?;
                     },
                 0x0022
                     // Date1904
                     if record.data.len() >= 2 => {
-                        let flag = crate::common::binary::read_u16_le_at(&record.data, 0)?;
+                        let flag = litchi_core::binary::read_u16_le_at(&record.data, 0)?;
                         self.is_1904_date_system = flag == 1;
                     },
                 0x0085 => {

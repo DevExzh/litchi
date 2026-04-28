@@ -5,7 +5,7 @@
 //!
 //! Uses soapberry-zip for high-performance ZIP writing.
 
-use crate::common::{Error, Result, xml::escape_xml};
+use litchi_core::{Error, Result, xml::escape_xml};
 use soapberry_zip::office::StreamingArchiveWriter;
 use std::collections::HashSet;
 

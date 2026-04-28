@@ -4,9 +4,9 @@
 //! in PowerPoint presentations. The generated files are valid Excel workbooks
 //! that PowerPoint can read to display chart data.
 
-use crate::common::xml::escape_xml;
 use crate::ooxml::error::{OoxmlError, Result};
 use crate::ooxml::pptx::parts::chart::ChartData;
+use litchi_core::xml::escape_xml;
 
 /// Generate a minimal Excel workbook containing chart data.
 ///

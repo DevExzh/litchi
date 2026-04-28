@@ -14,8 +14,8 @@
 //! - MS-XLS sections 2.4.271–2.4.283
 //! - Apache POI `org.apache.poi.hssf.record.pivottable.*`
 
-use crate::common::binary;
 use crate::ole::xls::error::{XlsError, XlsResult};
+use litchi_core::binary;
 
 // ---------------------------------------------------------------------------
 // Record type constants

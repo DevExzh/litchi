@@ -9,7 +9,7 @@ use std::io::Write;
 use zerocopy::IntoBytes;
 use zerocopy_derive::*;
 
-use crate::common::unit::ppt_master_i64_to_emu_i32;
+use litchi_core::unit::ppt_master_i64_to_emu_i32;
 
 use super::text_format::Paragraph;
 

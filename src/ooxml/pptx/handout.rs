@@ -3,8 +3,8 @@
 //! Handout masters define the layout for printed handouts that show
 //! multiple slides per page.
 
-use crate::common::id::generate_guid_braced;
 use crate::ooxml::error::{OoxmlError, Result};
+use litchi_core::id::generate_guid_braced;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::str::FromStr;
