@@ -3003,7 +3003,7 @@ mod tests {
         let args = vec![range1, range2, int_expr(2), int_expr(1)];
         let result = eval_t_test(ctx, "Sheet1", &args).await.unwrap();
         match result {
-            CellValue::Float(v) => assert!(v >= 0.0 && v <= 1.0),
+            CellValue::Float(v) => assert!((0.0..=1.0).contains(&v)),
             _ => panic!("Expected Float, got {:?}", result),
         }
     }
@@ -3039,7 +3039,7 @@ mod tests {
         let args = vec![num_expr(6.0), num_expr(0.5), num_expr(0.75)];
         let result = eval_binom_inv(ctx, "Sheet1", &args).await.unwrap();
         match result {
-            CellValue::Int(v) => assert!(v >= 0 && v <= 6),
+            CellValue::Int(v) => assert!((0..=6).contains(&v)),
             _ => panic!("Expected Int, got {:?}", result),
         }
     }

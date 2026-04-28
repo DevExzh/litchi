@@ -462,10 +462,8 @@ impl<'a> Slide<'a> {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"t" {
-                        in_text_element = true;
-                    }
+                Ok(Event::Start(e)) if e.local_name().as_ref() == b"t" => {
+                    in_text_element = true;
                 },
                 Ok(Event::Text(e)) if in_text_element => {
                     let t = std::str::from_utf8(e.as_ref())
@@ -475,10 +473,8 @@ impl<'a> Slide<'a> {
                     }
                     text.push_str(t);
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"t" {
-                        in_text_element = false;
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
+                    in_text_element = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(crate::ooxml::error::OoxmlError::Xml(e.to_string())),

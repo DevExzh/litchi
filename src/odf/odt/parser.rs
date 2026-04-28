@@ -605,7 +605,7 @@ mod tests {
     #[test]
     fn test_change_type_clone() {
         let t1 = ChangeType::Insertion;
-        let t2 = t1.clone();
+        let t2 = t1;
         assert_eq!(t1, t2);
     }
 

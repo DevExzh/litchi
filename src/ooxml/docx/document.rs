@@ -336,19 +336,17 @@ impl<'a> Document<'a> {
                         sect_pr_content.extend_from_slice(b">");
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if in_sect_pr {
-                        if e.local_name().as_ref() == b"sectPr" && depth == 1 {
-                            // End of sectPr element
-                            sect_pr_content.extend_from_slice(b"</w:sectPr>");
-                            sections_xml.push(Section::from_xml_bytes(sect_pr_content.clone())?);
-                            in_sect_pr = false;
-                        } else {
-                            depth -= 1;
-                            sect_pr_content.extend_from_slice(b"</");
-                            sect_pr_content.extend_from_slice(e.name().as_ref());
-                            sect_pr_content.extend_from_slice(b">");
-                        }
+                Ok(Event::End(e)) if in_sect_pr => {
+                    if e.local_name().as_ref() == b"sectPr" && depth == 1 {
+                        // End of sectPr element
+                        sect_pr_content.extend_from_slice(b"</w:sectPr>");
+                        sections_xml.push(Section::from_xml_bytes(sect_pr_content.clone())?);
+                        in_sect_pr = false;
+                    } else {
+                        depth -= 1;
+                        sect_pr_content.extend_from_slice(b"</");
+                        sect_pr_content.extend_from_slice(e.name().as_ref());
+                        sect_pr_content.extend_from_slice(b">");
                     }
                 },
                 Ok(Event::Empty(e)) if in_sect_pr => {

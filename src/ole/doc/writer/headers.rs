@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn test_header_footer_type_variants() {
         // Test all HeaderFooterType variants exist and are distinct
-        let types = vec![
+        let types = [
             HeaderFooterType::FirstPageHeader,
             HeaderFooterType::OddPageHeader,
             HeaderFooterType::EvenPageHeader,

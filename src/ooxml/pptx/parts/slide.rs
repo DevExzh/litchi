@@ -36,14 +36,12 @@ impl<'a> SlidePart<'a> {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    if e.local_name().as_ref() == b"cSld" {
-                        for attr in e.attributes().flatten() {
-                            if attr.key.as_ref() == b"name" {
-                                let name = std::str::from_utf8(&attr.value)
-                                    .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                                return Ok(name.to_string());
-                            }
+                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"cSld" => {
+                    for attr in e.attributes().flatten() {
+                        if attr.key.as_ref() == b"name" {
+                            let name = std::str::from_utf8(&attr.value)
+                                .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                            return Ok(name.to_string());
                         }
                     }
                 },
@@ -68,12 +66,11 @@ impl<'a> SlidePart<'a> {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) => {
+                Ok(Event::Start(e))
                     // Check if this is an a:t element (DrawingML text)
-                    if e.local_name().as_ref() == b"t" {
+                    if e.local_name().as_ref() == b"t" => {
                         in_text_element = true;
-                    }
-                },
+                    },
                 Ok(Event::Text(e)) if in_text_element => {
                     // Extract text content
                     let t = std::str::from_utf8(e.as_ref())
@@ -83,11 +80,10 @@ impl<'a> SlidePart<'a> {
                     }
                     text.push_str(t);
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"t" {
+                Ok(Event::End(e))
+                    if e.local_name().as_ref() == b"t" => {
                         in_text_element = false;
-                    }
-                },
+                    },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
@@ -256,14 +252,12 @@ impl<'a> SlideLayoutPart<'a> {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    if e.local_name().as_ref() == b"cSld" {
-                        for attr in e.attributes().flatten() {
-                            if attr.key.as_ref() == b"name" {
-                                let name = std::str::from_utf8(&attr.value)
-                                    .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                                return Ok(name.to_string());
-                            }
+                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"cSld" => {
+                    for attr in e.attributes().flatten() {
+                        if attr.key.as_ref() == b"name" {
+                            let name = std::str::from_utf8(&attr.value)
+                                .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                            return Ok(name.to_string());
                         }
                     }
                 },
@@ -310,14 +304,12 @@ impl<'a> SlideMasterPart<'a> {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    if e.local_name().as_ref() == b"cSld" {
-                        for attr in e.attributes().flatten() {
-                            if attr.key.as_ref() == b"name" {
-                                let name = std::str::from_utf8(&attr.value)
-                                    .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                                return Ok(name.to_string());
-                            }
+                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"cSld" => {
+                    for attr in e.attributes().flatten() {
+                        if attr.key.as_ref() == b"name" {
+                            let name = std::str::from_utf8(&attr.value)
+                                .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                            return Ok(name.to_string());
                         }
                     }
                 },
@@ -339,24 +331,23 @@ impl<'a> SlideMasterPart<'a> {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    if e.local_name().as_ref() == b"sldLayoutId" {
-                        for attr in e.attributes().flatten() {
-                            // Look for r:id attribute (can be r:id or just id with relationships namespace)
-                            let key = attr.key.as_ref();
-                            // Check if this is the relationship ID attribute
-                            if key == b"r:id"
-                                || (key.starts_with(b"r:")
-                                    && attr.key.local_name().as_ref() == b"id")
-                                || attr.key.local_name().as_ref() == b"id"
-                            {
-                                let rid = std::str::from_utf8(&attr.value)
-                                    .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                                // Only push if it looks like a relationship ID (starts with "rId")
-                                if rid.starts_with("rId") {
-                                    rids.push(rid.to_string());
-                                    break;
-                                }
+                Ok(Event::Start(e)) | Ok(Event::Empty(e))
+                    if e.local_name().as_ref() == b"sldLayoutId" =>
+                {
+                    for attr in e.attributes().flatten() {
+                        // Look for r:id attribute (can be r:id or just id with relationships namespace)
+                        let key = attr.key.as_ref();
+                        // Check if this is the relationship ID attribute
+                        if key == b"r:id"
+                            || (key.starts_with(b"r:") && attr.key.local_name().as_ref() == b"id")
+                            || attr.key.local_name().as_ref() == b"id"
+                        {
+                            let rid = std::str::from_utf8(&attr.value)
+                                .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                            // Only push if it looks like a relationship ID (starts with "rId")
+                            if rid.starts_with("rId") {
+                                rids.push(rid.to_string());
+                                break;
                             }
                         }
                     }

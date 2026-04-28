@@ -132,7 +132,7 @@ mod tests {
     #[test]
     fn test_hyperlink_type_variants() {
         // Test all hyperlink types are distinct
-        let types = vec![
+        let types = [
             HyperlinkType::Url,
             HyperlinkType::Email,
             HyperlinkType::File,

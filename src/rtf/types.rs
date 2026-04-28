@@ -495,7 +495,7 @@ mod tests {
     #[test]
     fn test_color_clone() {
         let color = Color::new(100, 150, 200);
-        let cloned = color.clone();
+        let cloned = color;
         assert_eq!(cloned.red, color.red);
         assert_eq!(cloned.green, color.green);
         assert_eq!(cloned.blue, color.blue);
@@ -737,7 +737,7 @@ mod tests {
     fn test_paragraph_content_text() {
         let fmt = Formatting::default();
         let runs = vec![
-            Run::new(Cow::Borrowed("Hello "), fmt.clone()),
+            Run::new(Cow::Borrowed("Hello "), fmt),
             Run::new(Cow::Borrowed("World"), fmt),
         ];
         let content = ParagraphContent::new(Paragraph::default(), runs);

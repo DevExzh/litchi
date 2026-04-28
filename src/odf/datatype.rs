@@ -397,8 +397,8 @@ mod tests {
 
     #[test]
     fn test_boolean_decode() {
-        assert_eq!(Boolean::decode("true").unwrap(), true);
-        assert_eq!(Boolean::decode("false").unwrap(), false);
+        assert!(Boolean::decode("true").unwrap());
+        assert!(!Boolean::decode("false").unwrap());
         assert!(Boolean::decode("invalid").is_err());
         assert!(Boolean::decode("TRUE").is_err());
         assert!(Boolean::decode("1").is_err());

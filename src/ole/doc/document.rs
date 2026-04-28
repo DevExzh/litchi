@@ -453,7 +453,7 @@ impl Document {
             if let Some(plcf) = PlcfParser::parse(&pap_data[..pap_len], 4) {
                 // PLCF count represents the number of paragraph boundaries
                 // The actual paragraph count is the number of intervals
-                return Ok(plcf.count().saturating_sub(1).max(0));
+                return Ok(plcf.count().saturating_sub(1));
             }
         }
 

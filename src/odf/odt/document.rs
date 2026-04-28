@@ -789,21 +789,20 @@ impl Document {
 
         loop {
             match reader.read_event_into(&mut buf) {
-                Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e)) => {
-                    if e.name().as_ref() == b"text:bookmark"
+                Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e))
+                    if (e.name().as_ref() == b"text:bookmark"
                         || e.name().as_ref() == b"text:bookmark-start"
-                        || e.name().as_ref() == b"text:bookmark-end"
-                    {
-                        // Extract name attribute
-                        for attr in e.attributes().filter_map(|a| a.ok()) {
-                            if attr.key.as_ref() == b"text:name" {
-                                if let Ok(name) = String::from_utf8(attr.value.to_vec())
-                                    && !bookmarks.contains(&name)
-                                {
-                                    bookmarks.push(name);
-                                }
-                                break;
+                        || e.name().as_ref() == b"text:bookmark-end") =>
+                {
+                    // Extract name attribute
+                    for attr in e.attributes().filter_map(|a| a.ok()) {
+                        if attr.key.as_ref() == b"text:name" {
+                            if let Ok(name) = String::from_utf8(attr.value.to_vec())
+                                && !bookmarks.contains(&name)
+                            {
+                                bookmarks.push(name);
                             }
+                            break;
                         }
                     }
                 },
@@ -848,17 +847,17 @@ impl Document {
 
         loop {
             match reader.read_event_into(&mut buf) {
-                Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e)) => {
-                    if e.name().as_ref() == b"draw:image" {
-                        // Extract href attribute
-                        if let Some(href) = e
-                            .attributes()
-                            .filter_map(|a| a.ok())
-                            .find(|attr| attr.key.as_ref() == b"xlink:href")
-                            .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok())
-                        {
-                            images.push(href);
-                        }
+                Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e))
+                    if e.name().as_ref() == b"draw:image" =>
+                {
+                    // Extract href attribute
+                    if let Some(href) = e
+                        .attributes()
+                        .filter_map(|a| a.ok())
+                        .find(|attr| attr.key.as_ref() == b"xlink:href")
+                        .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok())
+                    {
+                        images.push(href);
                     }
                 },
                 Ok(Event::Eof) => break,

@@ -157,10 +157,8 @@ impl OdfMetadata {
                 Ok(Event::Start(_)) => {
                     depth += 1;
                 },
-                Ok(Event::Text(ref t)) => {
-                    if depth == 0 {
-                        content.push_str(&String::from_utf8(t.to_vec()).unwrap_or_default());
-                    }
+                Ok(Event::Text(ref t)) if depth == 0 => {
+                    content.push_str(&String::from_utf8(t.to_vec()).unwrap_or_default());
                 },
                 Ok(Event::End(_)) => {
                     if depth == 0 {

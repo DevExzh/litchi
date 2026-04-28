@@ -72,33 +72,32 @@ impl Bookmark {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"bookmarkStart" {
-                        let mut id: Option<u32> = None;
-                        let mut name = String::new();
+                Ok(Event::Empty(e)) | Ok(Event::Start(e))
+                    if e.local_name().as_ref() == b"bookmarkStart" =>
+                {
+                    let mut id: Option<u32> = None;
+                    let mut name = String::new();
 
-                        // Parse attributes
-                        for attr in e.attributes().flatten() {
-                            match attr.key.local_name().as_ref() {
-                                b"id" => {
-                                    let id_str = String::from_utf8_lossy(&attr.value);
-                                    id = atoi_simd::parse::<u32, false, false>(id_str.as_bytes())
-                                        .ok();
-                                },
-                                b"name" => {
-                                    name = String::from_utf8_lossy(&attr.value).into_owned();
-                                },
-                                _ => {},
-                            }
+                    // Parse attributes
+                    for attr in e.attributes().flatten() {
+                        match attr.key.local_name().as_ref() {
+                            b"id" => {
+                                let id_str = String::from_utf8_lossy(&attr.value);
+                                id = atoi_simd::parse::<u32, false, false>(id_str.as_bytes()).ok();
+                            },
+                            b"name" => {
+                                name = String::from_utf8_lossy(&attr.value).into_owned();
+                            },
+                            _ => {},
                         }
+                    }
 
-                        // Skip system bookmarks (starting with _)
-                        if let Some(bookmark_id) = id
-                            && !name.is_empty()
-                            && !name.starts_with('_')
-                        {
-                            bookmarks.push(Bookmark::new(bookmark_id, name));
-                        }
+                    // Skip system bookmarks (starting with _)
+                    if let Some(bookmark_id) = id
+                        && !name.is_empty()
+                        && !name.starts_with('_')
+                    {
+                        bookmarks.push(Bookmark::new(bookmark_id, name));
                     }
                 },
                 Ok(Event::Eof) => break,

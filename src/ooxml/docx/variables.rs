@@ -88,26 +88,26 @@ impl DocumentVariables {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"docVar" {
-                        let mut name = None;
-                        let mut value = None;
+                Ok(Event::Empty(e)) | Ok(Event::Start(e))
+                    if e.local_name().as_ref() == b"docVar" =>
+                {
+                    let mut name = None;
+                    let mut value = None;
 
-                        for attr in e.attributes().flatten() {
-                            match attr.key.local_name().as_ref() {
-                                b"name" => {
-                                    name = Some(String::from_utf8_lossy(&attr.value).into_owned());
-                                },
-                                b"val" => {
-                                    value = Some(String::from_utf8_lossy(&attr.value).into_owned());
-                                },
-                                _ => {},
-                            }
+                    for attr in e.attributes().flatten() {
+                        match attr.key.local_name().as_ref() {
+                            b"name" => {
+                                name = Some(String::from_utf8_lossy(&attr.value).into_owned());
+                            },
+                            b"val" => {
+                                value = Some(String::from_utf8_lossy(&attr.value).into_owned());
+                            },
+                            _ => {},
                         }
+                    }
 
-                        if let (Some(n), Some(v)) = (name, value) {
-                            variables.insert(n, v);
-                        }
+                    if let (Some(n), Some(v)) = (name, value) {
+                        variables.insert(n, v);
                     }
                 },
                 Ok(Event::Eof) => break,

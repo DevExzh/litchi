@@ -186,21 +186,19 @@ impl ContentControl {
                         _ => {},
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"sdtPr" {
-                        // End of content control properties
-                        if let Some(id) = current_id {
-                            controls.push(ContentControl::new(
-                                id,
-                                current_tag.clone(),
-                                current_title.clone(),
-                                current_type.clone(),
-                                current_lock_delete,
-                                current_lock_content,
-                            ));
-                        }
-                        in_sdt_pr = false;
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"sdtPr" => {
+                    // End of content control properties
+                    if let Some(id) = current_id {
+                        controls.push(ContentControl::new(
+                            id,
+                            current_tag.clone(),
+                            current_title.clone(),
+                            current_type.clone(),
+                            current_lock_delete,
+                            current_lock_content,
+                        ));
                     }
+                    in_sdt_pr = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),

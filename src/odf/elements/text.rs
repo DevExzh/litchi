@@ -719,16 +719,15 @@ impl TextElements {
                             // Sections are transparent containers, just continue
                         },
                         // Text boxes and frames
-                        "draw:text-box" => {
+                        "draw:text-box"
                             // Text boxes should contribute their text content
-                            if !paragraph_text.is_empty() {
+                            if !paragraph_text.is_empty() => {
                                 if !text.is_empty() {
                                     text.push('\n');
                                 }
                                 text.push_str(&paragraph_text);
                                 paragraph_text.clear();
-                            }
-                        },
+                            },
                         // Annotations (comments)
                         "office:annotation" => {
                             // Optionally include annotations
@@ -736,19 +735,17 @@ impl TextElements {
                             // skip_depth = 1;
                         },
                         // Line breaks and formatting
-                        "text:line-break" => {
-                            if in_text_context {
+                        "text:line-break"
+                            if in_text_context => {
                                 paragraph_text.push('\n');
-                            }
-                        },
-                        "text:tab" => {
-                            if in_text_context {
+                            },
+                        "text:tab"
+                            if in_text_context => {
                                 paragraph_text.push('\t');
-                            }
-                        },
-                        "text:s" => {
+                            },
+                        "text:s"
                             // Repeated space element
-                            if in_text_context {
+                            if in_text_context => {
                                 // Get the count attribute (defaults to 1)
                                 let count = e
                                     .attributes()
@@ -768,18 +765,16 @@ impl TextElements {
                                 for _ in 0..count {
                                     paragraph_text.push(' ');
                                 }
-                            }
-                        },
-                        "text:soft-page-break" => {
+                            },
+                        "text:soft-page-break"
                             // Soft page breaks can be treated as paragraph breaks
-                            if in_text_context && !paragraph_text.is_empty() {
+                            if in_text_context && !paragraph_text.is_empty() => {
                                 if !text.is_empty() {
                                     text.push('\n');
                                 }
                                 text.push_str(&paragraph_text);
                                 paragraph_text.clear();
-                            }
-                        },
+                            },
                         _ => {}, // Ignore other elements
                     }
                 },
@@ -793,19 +788,17 @@ impl TextElements {
                     }
 
                     match tag_name.as_str() {
-                        "text:line-break" => {
-                            if in_text_context {
+                        "text:line-break"
+                            if in_text_context => {
                                 paragraph_text.push('\n');
-                            }
-                        },
-                        "text:tab" => {
-                            if in_text_context {
+                            },
+                        "text:tab"
+                            if in_text_context => {
                                 paragraph_text.push('\t');
-                            }
-                        },
-                        "text:s" => {
+                            },
+                        "text:s"
                             // Repeated space element
-                            if in_text_context {
+                            if in_text_context => {
                                 let count = e
                                     .attributes()
                                     .find_map(|attr| {
@@ -824,8 +817,7 @@ impl TextElements {
                                 for _ in 0..count {
                                     paragraph_text.push(' ');
                                 }
-                            }
-                        },
+                            },
                         _ => {},
                     }
                 },

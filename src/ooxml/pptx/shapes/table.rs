@@ -67,16 +67,14 @@ impl Table {
                         table_xml.push(b'>');
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if in_table {
-                        table_xml.extend_from_slice(b"</");
-                        table_xml.extend_from_slice(e.name().as_ref());
-                        table_xml.push(b'>');
+                Ok(Event::End(e)) if in_table => {
+                    table_xml.extend_from_slice(b"</");
+                    table_xml.extend_from_slice(e.name().as_ref());
+                    table_xml.push(b'>');
 
-                        depth -= 1;
-                        if depth == 0 && e.local_name().as_ref() == b"tbl" {
-                            return Ok(Table::new(table_xml));
-                        }
+                    depth -= 1;
+                    if depth == 0 && e.local_name().as_ref() == b"tbl" {
+                        return Ok(Table::new(table_xml));
                     }
                 },
                 Ok(Event::Text(e)) if in_table => {
@@ -114,12 +112,11 @@ impl Table {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) => {
+                Ok(Event::Start(e))
                     // DrawingML table rows are <a:tr>
-                    if e.local_name().as_ref() == b"tr" {
+                    if e.local_name().as_ref() == b"tr" => {
                         count += 1;
-                    }
-                },
+                    },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
@@ -173,17 +170,15 @@ impl Table {
                         current_row_xml.push(b'>');
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if in_row {
-                        current_row_xml.extend_from_slice(b"</");
-                        current_row_xml.extend_from_slice(e.name().as_ref());
-                        current_row_xml.push(b'>');
+                Ok(Event::End(e)) if in_row => {
+                    current_row_xml.extend_from_slice(b"</");
+                    current_row_xml.extend_from_slice(e.name().as_ref());
+                    current_row_xml.push(b'>');
 
-                        depth -= 1;
-                        if depth == 0 && e.local_name().as_ref() == b"tr" {
-                            rows.push(TableRow::new(current_row_xml.clone()));
-                            in_row = false;
-                        }
+                    depth -= 1;
+                    if depth == 0 && e.local_name().as_ref() == b"tr" {
+                        rows.push(TableRow::new(current_row_xml.clone()));
+                        in_row = false;
                     }
                 },
                 Ok(Event::Text(e)) if in_row => {
@@ -246,12 +241,11 @@ impl TableRow {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) => {
+                Ok(Event::Start(e))
                     // DrawingML table cells are <a:tc>
-                    if e.local_name().as_ref() == b"tc" {
+                    if e.local_name().as_ref() == b"tc" => {
                         count += 1;
-                    }
-                },
+                    },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
@@ -293,17 +287,15 @@ impl TableRow {
                         current_cell_xml.push(b'>');
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if in_cell {
-                        current_cell_xml.extend_from_slice(b"</");
-                        current_cell_xml.extend_from_slice(e.name().as_ref());
-                        current_cell_xml.push(b'>');
+                Ok(Event::End(e)) if in_cell => {
+                    current_cell_xml.extend_from_slice(b"</");
+                    current_cell_xml.extend_from_slice(e.name().as_ref());
+                    current_cell_xml.push(b'>');
 
-                        depth -= 1;
-                        if depth == 0 && e.local_name().as_ref() == b"tc" {
-                            cells.push(TableCell::new(current_cell_xml.clone()));
-                            in_cell = false;
-                        }
+                    depth -= 1;
+                    if depth == 0 && e.local_name().as_ref() == b"tc" {
+                        cells.push(TableCell::new(current_cell_xml.clone()));
+                        in_cell = false;
                     }
                 },
                 Ok(Event::Text(e)) if in_cell => {
@@ -354,10 +346,8 @@ impl TableCell {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"t" {
-                        in_text_element = true;
-                    }
+                Ok(Event::Start(e)) if e.local_name().as_ref() == b"t" => {
+                    in_text_element = true;
                 },
                 Ok(Event::Text(e)) if in_text_element => {
                     let t = std::str::from_utf8(e.as_ref())
@@ -367,10 +357,8 @@ impl TableCell {
                     }
                     text.push_str(t);
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"t" {
-                        in_text_element = false;
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
+                    in_text_element = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),

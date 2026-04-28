@@ -139,19 +139,15 @@ impl Note {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    if e.local_name().as_ref() == b"t" {
-                        in_text_element = true;
-                    }
+                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"t" => {
+                    in_text_element = true;
                 },
                 Ok(Event::Text(e)) if in_text_element => {
                     let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
                     result.push_str(text);
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"t" {
-                        in_text_element = false;
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
+                    in_text_element = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -223,33 +219,29 @@ impl Note {
                         current_para_xml.extend_from_slice(b">");
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if in_para {
-                        current_para_xml.extend_from_slice(b"</");
-                        current_para_xml.extend_from_slice(e.name().as_ref());
-                        current_para_xml.extend_from_slice(b">");
+                Ok(Event::End(e)) if in_para => {
+                    current_para_xml.extend_from_slice(b"</");
+                    current_para_xml.extend_from_slice(e.name().as_ref());
+                    current_para_xml.extend_from_slice(b">");
 
-                        if e.local_name().as_ref() == b"p" && depth == 1 {
-                            paragraphs.push(Paragraph::new(current_para_xml.clone()));
-                            in_para = false;
-                        } else {
-                            depth -= 1;
-                        }
+                    if e.local_name().as_ref() == b"p" && depth == 1 {
+                        paragraphs.push(Paragraph::new(current_para_xml.clone()));
+                        in_para = false;
+                    } else {
+                        depth -= 1;
                     }
                 },
-                Ok(Event::Empty(e)) => {
-                    if in_para {
-                        current_para_xml.extend_from_slice(b"<");
-                        current_para_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_para_xml.extend_from_slice(b" ");
-                            current_para_xml.extend_from_slice(attr.key.as_ref());
-                            current_para_xml.extend_from_slice(b"=\"");
-                            current_para_xml.extend_from_slice(&attr.value);
-                            current_para_xml.extend_from_slice(b"\"");
-                        }
-                        current_para_xml.extend_from_slice(b"/>");
+                Ok(Event::Empty(e)) if in_para => {
+                    current_para_xml.extend_from_slice(b"<");
+                    current_para_xml.extend_from_slice(e.name().as_ref());
+                    for attr in e.attributes().flatten() {
+                        current_para_xml.extend_from_slice(b" ");
+                        current_para_xml.extend_from_slice(attr.key.as_ref());
+                        current_para_xml.extend_from_slice(b"=\"");
+                        current_para_xml.extend_from_slice(&attr.value);
+                        current_para_xml.extend_from_slice(b"\"");
                     }
+                    current_para_xml.extend_from_slice(b"/>");
                 },
                 Ok(Event::Text(e)) if in_para => {
                     current_para_xml.extend_from_slice(e.as_ref());
@@ -352,43 +344,35 @@ impl Note {
                         current_note_xml.extend_from_slice(b">");
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if in_note {
-                        current_note_xml.extend_from_slice(b"</");
-                        current_note_xml.extend_from_slice(e.name().as_ref());
-                        current_note_xml.extend_from_slice(b">");
+                Ok(Event::End(e)) if in_note => {
+                    current_note_xml.extend_from_slice(b"</");
+                    current_note_xml.extend_from_slice(e.name().as_ref());
+                    current_note_xml.extend_from_slice(b">");
 
-                        if e.local_name().as_ref() == note_tag && depth == 1 {
-                            // End of note element
-                            if let Some(id) = current_id {
-                                // Skip separator notes (negative IDs or special types)
-                                if id > 0 && current_type.is_normal() {
-                                    notes.push(Note::new(
-                                        id,
-                                        current_note_xml.clone(),
-                                        current_type,
-                                    ));
-                                }
+                    if e.local_name().as_ref() == note_tag && depth == 1 {
+                        // End of note element
+                        if let Some(id) = current_id {
+                            // Skip separator notes (negative IDs or special types)
+                            if id > 0 && current_type.is_normal() {
+                                notes.push(Note::new(id, current_note_xml.clone(), current_type));
                             }
-                            in_note = false;
-                        } else {
-                            depth -= 1;
                         }
+                        in_note = false;
+                    } else {
+                        depth -= 1;
                     }
                 },
-                Ok(Event::Empty(e)) => {
-                    if in_note {
-                        current_note_xml.extend_from_slice(b"<");
-                        current_note_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_note_xml.extend_from_slice(b" ");
-                            current_note_xml.extend_from_slice(attr.key.as_ref());
-                            current_note_xml.extend_from_slice(b"=\"");
-                            current_note_xml.extend_from_slice(&attr.value);
-                            current_note_xml.extend_from_slice(b"\"");
-                        }
-                        current_note_xml.extend_from_slice(b"/>");
+                Ok(Event::Empty(e)) if in_note => {
+                    current_note_xml.extend_from_slice(b"<");
+                    current_note_xml.extend_from_slice(e.name().as_ref());
+                    for attr in e.attributes().flatten() {
+                        current_note_xml.extend_from_slice(b" ");
+                        current_note_xml.extend_from_slice(attr.key.as_ref());
+                        current_note_xml.extend_from_slice(b"=\"");
+                        current_note_xml.extend_from_slice(&attr.value);
+                        current_note_xml.extend_from_slice(b"\"");
                     }
+                    current_note_xml.extend_from_slice(b"/>");
                 },
                 Ok(Event::Text(e)) if in_note => {
                     current_note_xml.extend_from_slice(e.as_ref());

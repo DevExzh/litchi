@@ -149,10 +149,8 @@ impl OdpParser {
                                 shape_depth += 1;
                             }
                         },
-                        b"draw:text-box" => {
-                            if current_shape.is_some() {
-                                in_text_box = true;
-                            }
+                        b"draw:text-box" if current_shape.is_some() => {
+                            in_text_box = true;
                         },
                         b"text:p" | b"text:span" => {
                             // Text will be collected in Text event
@@ -443,7 +441,7 @@ mod tests {
     #[test]
     fn test_shape_type_clone() {
         let t1 = ShapeType::Placeholder;
-        let t2 = t1.clone();
+        let t2 = t1;
         assert_eq!(t1, t2);
     }
 

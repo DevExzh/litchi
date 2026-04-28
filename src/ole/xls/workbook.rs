@@ -131,20 +131,18 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     self.biff_version = bof.version;
                     self.is_1904_date_system = bof.is_1904_date_system;
                 },
-                0x0042 => {
+                0x0042
                     // CodePage
-                    if record.data.len() >= 2 {
+                    if record.data.len() >= 2 => {
                         let codepage = crate::common::binary::read_u16_le_at(&record.data, 0)?;
                         *encoding = XlsEncoding::from_codepage(codepage)?;
-                    }
-                },
-                0x0022 => {
+                    },
+                0x0022
                     // Date1904
-                    if record.data.len() >= 2 {
+                    if record.data.len() >= 2 => {
                         let flag = crate::common::binary::read_u16_le_at(&record.data, 0)?;
                         self.is_1904_date_system = flag == 1;
-                    }
-                },
+                    },
                 0x0085 => {
                     // BoundSheet8
                     let sheet = BoundSheetRecord::parse(&record.data, encoding)?;

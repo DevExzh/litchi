@@ -2013,26 +2013,6 @@ impl<'a> WorksheetTrait for Worksheet<'a> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::Worksheet;
-
-    #[test]
-    fn extract_inline_string_single_t() {
-        let xml = r#"<c r=\"A1\" t=\"inlineStr\"><is><t>Hello</t></is></c>"#;
-        let text = Worksheet::extract_inline_string_text(xml).unwrap();
-        assert_eq!(text, "Hello");
-    }
-
-    #[test]
-    fn extract_inline_string_multiple_runs() {
-        let xml =
-            r#"<c r=\"A1\" t=\"inlineStr\"><is><r><t>Hello </t></r><r><t>World</t></r></is></c>"#;
-        let text = Worksheet::extract_inline_string_text(xml).unwrap();
-        assert_eq!(text, "Hello World");
-    }
-}
-
 /// Iterator over worksheets in a workbook
 pub struct WorksheetIterator<'a> {
     worksheets: Vec<WorksheetInfo>,
@@ -2071,3 +2051,23 @@ impl<'a> crate::sheet::WorksheetIterator<'a> for WorksheetIterator<'a> {
 
 // Import Workbook from the workbook module
 use super::workbook::Workbook;
+
+#[cfg(test)]
+mod tests {
+    use super::Worksheet;
+
+    #[test]
+    fn extract_inline_string_single_t() {
+        let xml = r#"<c r=\"A1\" t=\"inlineStr\"><is><t>Hello</t></is></c>"#;
+        let text = Worksheet::extract_inline_string_text(xml).unwrap();
+        assert_eq!(text, "Hello");
+    }
+
+    #[test]
+    fn extract_inline_string_multiple_runs() {
+        let xml =
+            r#"<c r=\"A1\" t=\"inlineStr\"><is><r><t>Hello </t></r><r><t>World</t></r></is></c>"#;
+        let text = Worksheet::extract_inline_string_text(xml).unwrap();
+        assert_eq!(text, "Hello World");
+    }
+}

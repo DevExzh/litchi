@@ -122,20 +122,16 @@ impl Paragraph {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    if e.local_name().as_ref() == b"t" {
-                        in_text_element = true;
-                    }
+                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"t" => {
+                    in_text_element = true;
                 },
                 Ok(Event::Text(e)) if in_text_element => {
                     // Use unsafe conversion for better performance (safe since we validate XML)
                     let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
                     result.push_str(text);
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"t" {
-                        in_text_element = false;
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
+                    in_text_element = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -652,10 +648,8 @@ impl Run {
                     let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
                     result.push_str(text);
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"t" {
-                        in_text_element = false;
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
+                    in_text_element = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -707,10 +701,8 @@ impl Run {
                         return Ok(Some(true));
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"rPr" {
-                        in_r_pr = false;
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"rPr" => {
+                    in_r_pr = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -838,11 +830,9 @@ impl Run {
                         }
                     }
                 },
-                Ok(Event::Text(e)) => {
-                    if in_text_element {
-                        let text_str = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
-                        text.push_str(text_str);
-                    }
+                Ok(Event::Text(e)) if in_text_element => {
+                    let text_str = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
+                    text.push_str(text_str);
                 },
                 Ok(Event::End(e)) => {
                     let name = e.local_name();
@@ -964,11 +954,9 @@ impl Run {
                         }
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"rPr" {
-                        // Exit early once we've finished parsing rPr
-                        return Ok(props);
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"rPr" => {
+                    // Exit early once we've finished parsing rPr
+                    return Ok(props);
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -1009,10 +997,8 @@ impl Run {
                         }
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"rPr" {
-                        in_r_pr = false;
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"rPr" => {
+                    in_r_pr = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -1049,10 +1035,8 @@ impl Run {
                         }
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"rPr" {
-                        break;
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"rPr" => {
+                    break;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -1090,10 +1074,8 @@ impl Run {
                         }
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"rPr" {
-                        break;
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"rPr" => {
+                    break;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -1345,10 +1327,8 @@ impl Run {
                         return Ok(Some(true));
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"rPr" {
-                        in_r_pr = false;
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"rPr" => {
+                    in_r_pr = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),

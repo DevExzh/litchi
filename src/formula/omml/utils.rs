@@ -430,12 +430,10 @@ pub fn validate_math_nodes(nodes: &[super::MathNode]) -> Result<(), super::OmmlE
                     ));
                 }
             },
-            super::MathNode::Root { base, .. } => {
-                if base.is_empty() {
-                    return Err(super::OmmlError::MissingRequiredElement(
-                        "Root base is empty".to_string(),
-                    ));
-                }
+            super::MathNode::Root { base, .. } if base.is_empty() => {
+                return Err(super::OmmlError::MissingRequiredElement(
+                    "Root base is empty".to_string(),
+                ));
             },
             super::MathNode::Power { base, exponent } => {
                 if base.is_empty() {
@@ -473,12 +471,10 @@ pub fn validate_math_nodes(nodes: &[super::MathNode]) -> Result<(), super::OmmlE
                     ));
                 }
             },
-            super::MathNode::Fenced { content, .. } => {
-                if content.is_empty() {
-                    return Err(super::OmmlError::ValidationError(
-                        "Fenced content is empty".to_string(),
-                    ));
-                }
+            super::MathNode::Fenced { content, .. } if content.is_empty() => {
+                return Err(super::OmmlError::ValidationError(
+                    "Fenced content is empty".to_string(),
+                ));
             },
             super::MathNode::Matrix { rows, .. } => {
                 if rows.is_empty() {
@@ -509,28 +505,25 @@ pub fn validate_element_nesting(
     parent_type: Option<&ElementType>,
 ) -> Result<(), super::OmmlError> {
     match element_type {
-        ElementType::Math => {
+        ElementType::Math
             // Math element should be root or not have a parent
-            if parent_type.is_some() {
+            if parent_type.is_some() => {
                 return Err(super::OmmlError::InvalidStructure(
                     "Math element should be root".to_string(),
                 ));
-            }
-        },
-        ElementType::Numerator | ElementType::Denominator => {
-            if !matches!(parent_type, Some(ElementType::Fraction)) {
+            },
+        ElementType::Numerator | ElementType::Denominator
+            if !matches!(parent_type, Some(ElementType::Fraction)) => {
                 return Err(super::OmmlError::InvalidStructure(
                     "Numerator/denominator must be inside fraction".to_string(),
                 ));
-            }
-        },
-        ElementType::Degree => {
-            if !matches!(parent_type, Some(ElementType::Radical)) {
+            },
+        ElementType::Degree
+            if !matches!(parent_type, Some(ElementType::Radical)) => {
                 return Err(super::OmmlError::InvalidStructure(
                     "Degree must be inside radical".to_string(),
                 ));
-            }
-        },
+            },
         ElementType::Base => {
             match parent_type {
                 Some(

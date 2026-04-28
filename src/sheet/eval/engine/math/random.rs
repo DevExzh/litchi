@@ -81,7 +81,7 @@ mod tests {
         match result {
             CellValue::Float(v) => {
                 // RAND should return a value between 0 and 1
-                assert!(v >= 0.0 && v < 1.0);
+                assert!((0.0..1.0).contains(&v));
             },
             _ => panic!("Expected Float"),
         }
@@ -108,7 +108,7 @@ mod tests {
         match result {
             CellValue::Int(v) => {
                 // RANDBETWEEN should return an integer in the range [1, 10]
-                assert!(v >= 1 && v <= 10);
+                assert!((1..=10).contains(&v));
             },
             _ => panic!("Expected Int"),
         }
@@ -135,7 +135,7 @@ mod tests {
         let result = eval_randbetween(ctx, "Sheet1", &args).await.unwrap();
         match result {
             CellValue::Int(v) => {
-                assert!(v >= -10 && v <= -1);
+                assert!((-10..=-1).contains(&v));
             },
             _ => panic!("Expected Int"),
         }
@@ -149,7 +149,7 @@ mod tests {
         let result = eval_randbetween(ctx, "Sheet1", &args).await.unwrap();
         match result {
             CellValue::Int(v) => {
-                assert!(v >= -5 && v <= 5);
+                assert!((-5..=5).contains(&v));
             },
             _ => panic!("Expected Int"),
         }

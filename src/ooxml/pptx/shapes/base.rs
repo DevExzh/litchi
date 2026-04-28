@@ -92,15 +92,14 @@ impl BaseShape {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"cNvPr" {
-                        for attr in e.attributes().flatten() {
-                            if attr.key.as_ref() == b"name" {
-                                let name =
-                                    std::str::from_utf8(&attr.value).unwrap_or("").to_string();
-                                self.name = Some(name.clone());
-                                return Ok(name);
-                            }
+                Ok(Event::Empty(e)) | Ok(Event::Start(e))
+                    if e.local_name().as_ref() == b"cNvPr" =>
+                {
+                    for attr in e.attributes().flatten() {
+                        if attr.key.as_ref() == b"name" {
+                            let name = std::str::from_utf8(&attr.value).unwrap_or("").to_string();
+                            self.name = Some(name.clone());
+                            return Ok(name);
                         }
                     }
                 },
@@ -144,10 +143,8 @@ impl BaseShape {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"ph" {
-                        return true;
-                    }
+                Ok(Event::Empty(e)) | Ok(Event::Start(e)) if e.local_name().as_ref() == b"ph" => {
+                    return true;
                 },
                 Ok(Event::Eof) => break,
                 Err(_) => break,
@@ -177,21 +174,17 @@ impl BaseShape {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"ph" {
-                        // Look for the type attribute
-                        for attr in e.attributes().flatten() {
-                            if attr.key.as_ref() == b"type" {
-                                return std::str::from_utf8(&attr.value)
-                                    .map(|s| s.to_string())
-                                    .map_err(|e| {
-                                        crate::ooxml::error::OoxmlError::Xml(e.to_string())
-                                    });
-                            }
+                Ok(Event::Empty(e)) | Ok(Event::Start(e)) if e.local_name().as_ref() == b"ph" => {
+                    // Look for the type attribute
+                    for attr in e.attributes().flatten() {
+                        if attr.key.as_ref() == b"type" {
+                            return std::str::from_utf8(&attr.value)
+                                .map(|s| s.to_string())
+                                .map_err(|e| crate::ooxml::error::OoxmlError::Xml(e.to_string()));
                         }
-                        // If no type attribute, it's usually a body placeholder
-                        return Ok("body".to_string());
                     }
+                    // If no type attribute, it's usually a body placeholder
+                    return Ok("body".to_string());
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(crate::ooxml::error::OoxmlError::Xml(e.to_string())),

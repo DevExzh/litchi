@@ -62,13 +62,12 @@ pub fn extract_shapes_from_workbook(workbook_data: &[u8]) -> std::io::Result<Vec
                     drawing_data.extend_from_slice(&record.data);
                 },
                 // MsoDrawingGroup (0x00EB) - contains drawing group Escher data
-                0x00EB => {
+                0x00EB
                     // Parse drawing group data if needed
-                    if !record.data.is_empty() {
+                    if !record.data.is_empty() => {
                         let shapes = EscherShapeFactory::extract_shapes_from_drawing(&record.data)?;
                         all_shapes.extend(shapes.iter().map(XlsShape::from_escher));
-                    }
-                },
+                    },
                 _ => {},
             }
         }

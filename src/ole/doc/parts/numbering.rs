@@ -456,7 +456,7 @@ mod tests {
     #[test]
     fn test_number_format_clone() {
         let fmt = NumberFormat::Bullet;
-        let cloned = fmt.clone();
+        let cloned = fmt;
         assert_eq!(fmt, cloned);
     }
 
@@ -489,7 +489,7 @@ mod tests {
     #[test]
     fn test_list_alignment_clone() {
         let align = ListAlignment::Center;
-        let cloned = align.clone();
+        let cloned = align;
         assert_eq!(align, cloned);
     }
 
@@ -876,7 +876,7 @@ mod tests {
     #[test]
     fn test_utf16le_ext_multiple_chars() {
         // "ABC" in UTF-16LE
-        let bytes = vec!['A' as u16, 'B' as u16, 'C' as u16]
+        let bytes = ['A' as u16, 'B' as u16, 'C' as u16]
             .iter()
             .flat_map(|c| c.to_le_bytes())
             .collect::<Vec<_>>();

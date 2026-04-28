@@ -172,7 +172,7 @@ mod tests {
 
     #[test]
     fn test_multiple_footnotes() {
-        let footnotes = vec![
+        let footnotes = [
             Footnote::new(10, 1, "First".to_string()),
             Footnote::new(50, 2, "Second".to_string()),
             Footnote::new(100, 3, "Third".to_string()),

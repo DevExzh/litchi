@@ -2254,7 +2254,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         let result = writer.write_to(&mut cursor);
         assert!(result.is_ok());
-        assert!(cursor.into_inner().len() > 0);
+        assert!(!cursor.into_inner().is_empty());
     }
 
     #[test]
@@ -2264,7 +2264,7 @@ mod tests {
         let result = writer.write_to(&mut cursor);
         assert!(result.is_ok());
         let data = cursor.into_inner();
-        assert!(data.len() > 0);
+        assert!(!data.is_empty());
     }
 
     #[test]

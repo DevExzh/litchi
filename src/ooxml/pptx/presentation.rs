@@ -740,32 +740,30 @@ impl<'a> Presentation<'a> {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
-                    if e.local_name().as_ref() == b"hlinkClick" {
-                        let mut action = None;
-                        let mut tooltip = None;
+                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e))
+                    if e.local_name().as_ref() == b"hlinkClick" =>
+                {
+                    let mut action = None;
+                    let mut tooltip = None;
 
-                        for attr in e.attributes().flatten() {
-                            match attr.key.as_ref() {
-                                b"action" => {
-                                    action = std::str::from_utf8(&attr.value)
-                                        .ok()
-                                        .map(|s| s.to_string());
-                                },
-                                b"tooltip" => {
-                                    tooltip = std::str::from_utf8(&attr.value)
-                                        .ok()
-                                        .map(|s| s.to_string());
-                                },
-                                _ => {},
-                            }
+                    for attr in e.attributes().flatten() {
+                        match attr.key.as_ref() {
+                            b"action" => {
+                                action =
+                                    std::str::from_utf8(&attr.value).ok().map(|s| s.to_string());
+                            },
+                            b"tooltip" => {
+                                tooltip =
+                                    std::str::from_utf8(&attr.value).ok().map(|s| s.to_string());
+                            },
+                            _ => {},
                         }
+                    }
 
-                        if let Some(action_str) = action
-                            && let Ok(hyperlink) = Hyperlink::from_xml(&action_str, tooltip)
-                        {
-                            hyperlinks.push(hyperlink);
-                        }
+                    if let Some(action_str) = action
+                        && let Ok(hyperlink) = Hyperlink::from_xml(&action_str, tooltip)
+                    {
+                        hyperlinks.push(hyperlink);
                     }
                 },
                 Ok(Event::Eof) => break,

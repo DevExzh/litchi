@@ -115,10 +115,8 @@ impl Table {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"tr" {
-                        count += 1;
-                    }
+                Ok(Event::Start(e)) if e.local_name().as_ref() == b"tr" => {
+                    count += 1;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -198,20 +196,18 @@ impl Table {
                         current_row_xml.push(b'>');
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if in_row {
-                        current_row_xml.extend_from_slice(b"</");
-                        current_row_xml.extend_from_slice(e.name().as_ref());
-                        current_row_xml.push(b'>');
+                Ok(Event::End(e)) if in_row => {
+                    current_row_xml.extend_from_slice(b"</");
+                    current_row_xml.extend_from_slice(e.name().as_ref());
+                    current_row_xml.push(b'>');
 
-                        depth -= 1;
-                        if depth == 0 && e.local_name().as_ref() == b"tr" {
-                            // Clone bytes and clear buffer (preserves capacity for next row)
-                            let row_xml = current_row_xml.clone();
-                            current_row_xml.clear();
-                            rows.push(Row::new(row_xml));
-                            in_row = false;
-                        }
+                    depth -= 1;
+                    if depth == 0 && e.local_name().as_ref() == b"tr" {
+                        // Clone bytes and clear buffer (preserves capacity for next row)
+                        let row_xml = current_row_xml.clone();
+                        current_row_xml.clear();
+                        rows.push(Row::new(row_xml));
+                        in_row = false;
                     }
                 },
                 Ok(Event::Text(e)) if in_row => {
@@ -297,10 +293,8 @@ impl Row {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"tc" {
-                        count += 1;
-                    }
+                Ok(Event::Start(e)) if e.local_name().as_ref() == b"tc" => {
+                    count += 1;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -368,20 +362,18 @@ impl Row {
                         current_cell_xml.push(b'>');
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if in_cell {
-                        current_cell_xml.extend_from_slice(b"</");
-                        current_cell_xml.extend_from_slice(e.name().as_ref());
-                        current_cell_xml.push(b'>');
+                Ok(Event::End(e)) if in_cell => {
+                    current_cell_xml.extend_from_slice(b"</");
+                    current_cell_xml.extend_from_slice(e.name().as_ref());
+                    current_cell_xml.push(b'>');
 
-                        depth -= 1;
-                        if depth == 0 && e.local_name().as_ref() == b"tc" {
-                            // Clone bytes and clear buffer (preserves capacity for next cell)
-                            let cell_xml = current_cell_xml.clone();
-                            current_cell_xml.clear();
-                            cells.push(Cell::new(cell_xml));
-                            in_cell = false;
-                        }
+                    depth -= 1;
+                    if depth == 0 && e.local_name().as_ref() == b"tc" {
+                        // Clone bytes and clear buffer (preserves capacity for next cell)
+                        let cell_xml = current_cell_xml.clone();
+                        current_cell_xml.clear();
+                        cells.push(Cell::new(cell_xml));
+                        in_cell = false;
                     }
                 },
                 Ok(Event::Text(e)) if in_cell => {
@@ -486,10 +478,8 @@ impl Cell {
                         return Ok(1);
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"tcPr" {
-                        in_tc_pr = false;
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"tcPr" => {
+                    in_tc_pr = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -555,10 +545,8 @@ impl Cell {
                         return Ok(Some(VMergeState::Continue));
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"tcPr" {
-                        in_tc_pr = false;
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"tcPr" => {
+                    in_tc_pr = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -600,19 +588,15 @@ impl Cell {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    if e.local_name().as_ref() == b"t" {
-                        in_text_element = true;
-                    }
+                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"t" => {
+                    in_text_element = true;
                 },
                 Ok(Event::Text(e)) if in_text_element => {
                     let text = std::str::from_utf8(e.as_ref()).unwrap_or("");
                     result.push_str(text);
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"t" {
-                        in_text_element = false;
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
+                    in_text_element = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -668,20 +652,18 @@ impl Cell {
                         current_para_xml.push(b'>');
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if in_para {
-                        current_para_xml.extend_from_slice(b"</");
-                        current_para_xml.extend_from_slice(e.name().as_ref());
-                        current_para_xml.push(b'>');
+                Ok(Event::End(e)) if in_para => {
+                    current_para_xml.extend_from_slice(b"</");
+                    current_para_xml.extend_from_slice(e.name().as_ref());
+                    current_para_xml.push(b'>');
 
-                        depth -= 1;
-                        if depth == 0 && e.local_name().as_ref() == b"p" {
-                            // Clone bytes and clear buffer (preserves capacity for next paragraph)
-                            let para_xml = current_para_xml.clone();
-                            current_para_xml.clear();
-                            paragraphs.push(Paragraph::new(para_xml));
-                            in_para = false;
-                        }
+                    depth -= 1;
+                    if depth == 0 && e.local_name().as_ref() == b"p" {
+                        // Clone bytes and clear buffer (preserves capacity for next paragraph)
+                        let para_xml = current_para_xml.clone();
+                        current_para_xml.clear();
+                        paragraphs.push(Paragraph::new(para_xml));
+                        in_para = false;
                     }
                 },
                 Ok(Event::Text(e)) if in_para => {

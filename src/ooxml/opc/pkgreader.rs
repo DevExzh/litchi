@@ -279,52 +279,52 @@ impl PackageReader {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e)) => {
-                    if e.local_name().as_ref() == b"Relationship" {
-                        let mut r_id = None;
-                        let mut reltype = None;
-                        let mut target_ref = None;
-                        let mut target_mode = target_mode::INTERNAL.to_string();
+                Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e))
+                    if e.local_name().as_ref() == b"Relationship" =>
+                {
+                    let mut r_id = None;
+                    let mut reltype = None;
+                    let mut target_ref = None;
+                    let mut target_mode = target_mode::INTERNAL.to_string();
 
-                        for attr in e.attributes() {
-                            let attr = attr?;
-                            match attr.key.as_ref() {
-                                b"Id" => {
-                                    r_id = Some(
-                                        attr.decode_and_unescape_value(reader.decoder())?
-                                            .to_string(),
-                                    )
-                                },
-                                b"Type" => {
-                                    reltype = Some(
-                                        attr.decode_and_unescape_value(reader.decoder())?
-                                            .to_string(),
-                                    )
-                                },
-                                b"Target" => {
-                                    target_ref = Some(
-                                        attr.decode_and_unescape_value(reader.decoder())?
-                                            .to_string(),
-                                    )
-                                },
-                                b"TargetMode" => {
-                                    target_mode = attr
-                                        .decode_and_unescape_value(reader.decoder())?
-                                        .to_string()
-                                },
-                                _ => {},
-                            }
+                    for attr in e.attributes() {
+                        let attr = attr?;
+                        match attr.key.as_ref() {
+                            b"Id" => {
+                                r_id = Some(
+                                    attr.decode_and_unescape_value(reader.decoder())?
+                                        .to_string(),
+                                )
+                            },
+                            b"Type" => {
+                                reltype = Some(
+                                    attr.decode_and_unescape_value(reader.decoder())?
+                                        .to_string(),
+                                )
+                            },
+                            b"Target" => {
+                                target_ref = Some(
+                                    attr.decode_and_unescape_value(reader.decoder())?
+                                        .to_string(),
+                                )
+                            },
+                            b"TargetMode" => {
+                                target_mode = attr
+                                    .decode_and_unescape_value(reader.decoder())?
+                                    .to_string()
+                            },
+                            _ => {},
                         }
+                    }
 
-                        if let (Some(id), Some(rt), Some(tr)) = (r_id, reltype, target_ref) {
-                            srels.push(SerializedRelationship {
-                                base_uri: base_uri.to_string(),
-                                r_id: id,
-                                reltype: rt,
-                                target_ref: tr,
-                                target_mode,
-                            });
-                        }
+                    if let (Some(id), Some(rt), Some(tr)) = (r_id, reltype, target_ref) {
+                        srels.push(SerializedRelationship {
+                            base_uri: base_uri.to_string(),
+                            r_id: id,
+                            reltype: rt,
+                            target_ref: tr,
+                            target_mode,
+                        });
                     }
                 },
                 Ok(Event::Eof) => break,

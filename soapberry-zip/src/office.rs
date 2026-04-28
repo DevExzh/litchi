@@ -597,7 +597,6 @@ const _: () = {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
 
     #[test]
     fn test_round_trip_stored() {

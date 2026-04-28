@@ -217,7 +217,7 @@ mod tests {
     #[test]
     fn test_workbook_format_clone() {
         let format = WorkbookFormat::Xls;
-        let cloned = format.clone();
+        let cloned = format;
         assert_eq!(format, cloned);
     }
 

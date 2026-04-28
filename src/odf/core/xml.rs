@@ -81,11 +81,9 @@ impl Content {
                         current_para_text.clear();
                     }
                 },
-                Ok(Event::Text(ref t)) => {
-                    if in_paragraph {
-                        let text_content = String::from_utf8(t.to_vec()).unwrap_or_default();
-                        current_para_text.push_str(&text_content);
-                    }
+                Ok(Event::Text(ref t)) if in_paragraph => {
+                    let text_content = String::from_utf8(t.to_vec()).unwrap_or_default();
+                    current_para_text.push_str(&text_content);
                 },
                 Ok(Event::End(ref e)) => {
                     // Copy the name bytes to avoid lifetime issues

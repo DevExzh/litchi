@@ -131,7 +131,7 @@ mod tests {
     #[test]
     fn test_add_multiple_strings() {
         let mut writer = MutableSharedStringsWriter::new();
-        let strings = vec!["A", "B", "C", "D", "E"];
+        let strings = ["A", "B", "C", "D", "E"];
 
         for (i, s) in strings.iter().enumerate() {
             let idx = writer.add_string(s.to_string());

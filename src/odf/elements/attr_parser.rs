@@ -553,8 +553,8 @@ mod tests {
 
     #[test]
     fn test_parse_bool() {
-        assert_eq!(parse_bool(b"true").unwrap(), true);
-        assert_eq!(parse_bool(b"false").unwrap(), false);
+        assert!(parse_bool(b"true").unwrap());
+        assert!(!parse_bool(b"false").unwrap());
         assert!(parse_bool(b"invalid").is_err());
     }
 

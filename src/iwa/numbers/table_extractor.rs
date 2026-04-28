@@ -395,40 +395,30 @@ impl<'a> TableDataExtractor<'a> {
 
             match ast_node_type {
                 // Arithmetic operators (binary)
-                AstNodeType::AdditionNode => {
-                    if expr_stack.len() >= 2 {
-                        let right = expr_stack.pop().unwrap();
-                        let left = expr_stack.pop().unwrap();
-                        expr_stack.push(format!("({}+{})", left, right));
-                    }
+                AstNodeType::AdditionNode if expr_stack.len() >= 2 => {
+                    let right = expr_stack.pop().unwrap();
+                    let left = expr_stack.pop().unwrap();
+                    expr_stack.push(format!("({}+{})", left, right));
                 },
-                AstNodeType::SubtractionNode => {
-                    if expr_stack.len() >= 2 {
-                        let right = expr_stack.pop().unwrap();
-                        let left = expr_stack.pop().unwrap();
-                        expr_stack.push(format!("({}-{})", left, right));
-                    }
+                AstNodeType::SubtractionNode if expr_stack.len() >= 2 => {
+                    let right = expr_stack.pop().unwrap();
+                    let left = expr_stack.pop().unwrap();
+                    expr_stack.push(format!("({}-{})", left, right));
                 },
-                AstNodeType::MultiplicationNode => {
-                    if expr_stack.len() >= 2 {
-                        let right = expr_stack.pop().unwrap();
-                        let left = expr_stack.pop().unwrap();
-                        expr_stack.push(format!("({}*{})", left, right));
-                    }
+                AstNodeType::MultiplicationNode if expr_stack.len() >= 2 => {
+                    let right = expr_stack.pop().unwrap();
+                    let left = expr_stack.pop().unwrap();
+                    expr_stack.push(format!("({}*{})", left, right));
                 },
-                AstNodeType::DivisionNode => {
-                    if expr_stack.len() >= 2 {
-                        let right = expr_stack.pop().unwrap();
-                        let left = expr_stack.pop().unwrap();
-                        expr_stack.push(format!("({}/{})", left, right));
-                    }
+                AstNodeType::DivisionNode if expr_stack.len() >= 2 => {
+                    let right = expr_stack.pop().unwrap();
+                    let left = expr_stack.pop().unwrap();
+                    expr_stack.push(format!("({}/{})", left, right));
                 },
-                AstNodeType::PowerNode => {
-                    if expr_stack.len() >= 2 {
-                        let right = expr_stack.pop().unwrap();
-                        let left = expr_stack.pop().unwrap();
-                        expr_stack.push(format!("({}^{})", left, right));
-                    }
+                AstNodeType::PowerNode if expr_stack.len() >= 2 => {
+                    let right = expr_stack.pop().unwrap();
+                    let left = expr_stack.pop().unwrap();
+                    expr_stack.push(format!("({}^{})", left, right));
                 },
 
                 // Note: Comparison operators are handled differently in Numbers AST
@@ -522,12 +512,10 @@ impl<'a> TableDataExtractor<'a> {
                 },
 
                 // Concatenation
-                AstNodeType::ConcatenationNode => {
-                    if expr_stack.len() >= 2 {
-                        let right = expr_stack.pop().unwrap();
-                        let left = expr_stack.pop().unwrap();
-                        expr_stack.push(format!("({}&{})", left, right));
-                    }
+                AstNodeType::ConcatenationNode if expr_stack.len() >= 2 => {
+                    let right = expr_stack.pop().unwrap();
+                    let left = expr_stack.pop().unwrap();
+                    expr_stack.push(format!("({}&{})", left, right));
                 },
 
                 // Other node types - handle gracefully

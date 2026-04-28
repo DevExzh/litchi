@@ -61,22 +61,20 @@ impl<'a> DocumentPart<'a> {
         // Use read_event() for zero-copy parsing from slice
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                Ok(Event::Start(e)) | Ok(Event::Empty(e))
                     // Check if this is a w:t element
-                    if e.local_name().as_ref() == b"t" {
+                    if e.local_name().as_ref() == b"t" => {
                         in_text_element = true;
-                    }
-                },
+                    },
                 Ok(Event::Text(e)) if in_text_element => {
                     // Extract text content - use unsafe conversion for better performance
                     let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
                     result.push_str(text);
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"t" {
+                Ok(Event::End(e))
+                    if e.local_name().as_ref() == b"t" => {
                         in_text_element = false;
-                    }
-                },
+                    },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
@@ -97,10 +95,8 @@ impl<'a> DocumentPart<'a> {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    if e.local_name().as_ref() == b"p" {
-                        count += 1;
-                    }
+                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"p" => {
+                    count += 1;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -122,10 +118,8 @@ impl<'a> DocumentPart<'a> {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"tbl" {
-                        count += 1;
-                    }
+                Ok(Event::Start(e)) if e.local_name().as_ref() == b"tbl" => {
+                    count += 1;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -171,17 +165,15 @@ impl<'a> DocumentPart<'a> {
                         write_start_tag_dynamic(&mut current_para_xml, &e);
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if in_para {
-                        write_end_tag(&mut current_para_xml, e.name().as_ref());
-                        depth -= 1;
-                        if depth == 0 && e.local_name().as_ref() == b"p" {
-                            // Clone bytes and clear buffer (preserves capacity for next element)
-                            let para_xml = current_para_xml.clone();
-                            current_para_xml.clear();
-                            paragraphs.push(Paragraph::new(para_xml));
-                            in_para = false;
-                        }
+                Ok(Event::End(e)) if in_para => {
+                    write_end_tag(&mut current_para_xml, e.name().as_ref());
+                    depth -= 1;
+                    if depth == 0 && e.local_name().as_ref() == b"p" {
+                        // Clone bytes and clear buffer (preserves capacity for next element)
+                        let para_xml = current_para_xml.clone();
+                        current_para_xml.clear();
+                        paragraphs.push(Paragraph::new(para_xml));
+                        in_para = false;
                     }
                 },
                 Ok(Event::Text(e)) if in_para => {
@@ -231,17 +223,15 @@ impl<'a> DocumentPart<'a> {
                         write_start_tag_dynamic(&mut current_table_xml, &e);
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if in_table {
-                        write_end_tag(&mut current_table_xml, e.name().as_ref());
-                        depth -= 1;
-                        if depth == 0 && e.local_name().as_ref() == b"tbl" {
-                            // Clone bytes and clear buffer (preserves capacity for next element)
-                            let table_xml = current_table_xml.clone();
-                            current_table_xml.clear();
-                            tables.push(Table::new(table_xml));
-                            in_table = false;
-                        }
+                Ok(Event::End(e)) if in_table => {
+                    write_end_tag(&mut current_table_xml, e.name().as_ref());
+                    depth -= 1;
+                    if depth == 0 && e.local_name().as_ref() == b"tbl" {
+                        // Clone bytes and clear buffer (preserves capacity for next element)
+                        let table_xml = current_table_xml.clone();
+                        current_table_xml.clear();
+                        tables.push(Table::new(table_xml));
+                        in_table = false;
                     }
                 },
                 Ok(Event::Text(e)) if in_table => {

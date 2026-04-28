@@ -523,42 +523,36 @@ impl ParagraphProperties {
                 }
             },
             // Operation 0x24: sprmPBrcTop - Top border
-            0x24 => {
+            0x24
                 // Parse BorderCode structure (4 bytes)
-                if sprm.operand.len() >= 4 {
+                if sprm.operand.len() >= 4 => {
                     pap.borders.top = Self::parse_border(&sprm.operand);
-                }
-            },
+                },
             // Operation 0x25: sprmPBrcLeft - Left border
-            0x25 => {
-                if sprm.operand.len() >= 4 {
+            0x25
+                if sprm.operand.len() >= 4 => {
                     pap.borders.left = Self::parse_border(&sprm.operand);
-                }
-            },
+                },
             // Operation 0x26: sprmPBrcBottom - Bottom border
-            0x26 => {
-                if sprm.operand.len() >= 4 {
+            0x26
+                if sprm.operand.len() >= 4 => {
                     pap.borders.bottom = Self::parse_border(&sprm.operand);
-                }
-            },
+                },
             // Operation 0x27: sprmPBrcRight - Right border
-            0x27 => {
-                if sprm.operand.len() >= 4 {
+            0x27
+                if sprm.operand.len() >= 4 => {
                     pap.borders.right = Self::parse_border(&sprm.operand);
-                }
-            },
+                },
             // Operation 0x28: sprmPBrcBetween - Between border
-            0x28 => {
-                if sprm.operand.len() >= 4 {
+            0x28
+                if sprm.operand.len() >= 4 => {
                     pap.borders.between = Self::parse_border(&sprm.operand);
-                }
-            },
+                },
             // Operation 0x29: sprmPBrcBar - Bar border
-            0x29 => {
-                if sprm.operand.len() >= 4 {
+            0x29
+                if sprm.operand.len() >= 4 => {
                     pap.borders.bar = Self::parse_border(&sprm.operand);
-                }
-            },
+                },
             // Operation 0x2A: sprmPFNoAutoHyph - No auto hyphenation
             0x2A => {
                 if let Some(val) = sprm.operand_byte() {
@@ -722,12 +716,11 @@ impl ParagraphProperties {
                 }
             },
             // Operation 0x4D: sprmPShd - Shading (Word 2002+)
-            0x4D => {
+            0x4D
                 // Parse ShadingDescriptor structure
-                if sprm.operand.len() >= 10 {
+                if sprm.operand.len() >= 10 => {
                     pap.shading = Self::parse_shading_descriptor(&sprm.operand);
-                }
-            },
+                },
             // Operations 0x4E-0x53: Borders v80
             0x4E..=0x53 => {
                 // BrcXXX80 - Word 97-2000 borders

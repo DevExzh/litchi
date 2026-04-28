@@ -2022,8 +2022,7 @@ mod tests {
 
     #[test]
     fn test_ppt_write_error_display() {
-        let io_err =
-            PptWriteError::Io(std::io::Error::new(std::io::ErrorKind::Other, "test error"));
+        let io_err = PptWriteError::Io(std::io::Error::other("test error"));
         let err_str = format!("{}", io_err);
         assert!(err_str.contains("I/O error"));
 
@@ -2082,7 +2081,7 @@ mod tests {
         let mut buffer = Cursor::new(Vec::new());
         let result = writer.write_to(&mut buffer);
         assert!(result.is_ok());
-        assert!(buffer.get_ref().len() > 0);
+        assert!(!buffer.get_ref().is_empty());
     }
 
     #[test]
@@ -2091,7 +2090,7 @@ mod tests {
         let mut buffer = Cursor::new(Vec::new());
         let result = writer.write_to(&mut buffer);
         assert!(result.is_ok());
-        assert!(buffer.get_ref().len() > 0);
+        assert!(!buffer.get_ref().is_empty());
     }
 
     #[test]
@@ -2112,7 +2111,7 @@ mod tests {
         let mut buffer = Cursor::new(Vec::new());
         let result = writer.write_to(&mut buffer);
         assert!(result.is_ok());
-        assert!(buffer.get_ref().len() > 0);
+        assert!(!buffer.get_ref().is_empty());
     }
 
     #[test]

@@ -120,19 +120,15 @@ impl Comment {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    if e.local_name().as_ref() == b"t" {
-                        in_text_element = true;
-                    }
+                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"t" => {
+                    in_text_element = true;
                 },
                 Ok(Event::Text(e)) if in_text_element => {
                     let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
                     result.push_str(text);
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"t" {
-                        in_text_element = false;
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
+                    in_text_element = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -219,41 +215,37 @@ impl Comment {
                         current_comment_xml.extend_from_slice(b">");
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if in_comment {
-                        current_comment_xml.extend_from_slice(b"</");
-                        current_comment_xml.extend_from_slice(e.name().as_ref());
-                        current_comment_xml.extend_from_slice(b">");
+                Ok(Event::End(e)) if in_comment => {
+                    current_comment_xml.extend_from_slice(b"</");
+                    current_comment_xml.extend_from_slice(e.name().as_ref());
+                    current_comment_xml.extend_from_slice(b">");
 
-                        if e.local_name().as_ref() == b"comment" && depth == 1 {
-                            if let Some(id) = current_id {
-                                comments.push(Comment::new(
-                                    id,
-                                    current_author.clone(),
-                                    current_initials.clone(),
-                                    current_date.clone(),
-                                    current_comment_xml.clone(),
-                                ));
-                            }
-                            in_comment = false;
-                        } else {
-                            depth -= 1;
+                    if e.local_name().as_ref() == b"comment" && depth == 1 {
+                        if let Some(id) = current_id {
+                            comments.push(Comment::new(
+                                id,
+                                current_author.clone(),
+                                current_initials.clone(),
+                                current_date.clone(),
+                                current_comment_xml.clone(),
+                            ));
                         }
+                        in_comment = false;
+                    } else {
+                        depth -= 1;
                     }
                 },
-                Ok(Event::Empty(e)) => {
-                    if in_comment {
-                        current_comment_xml.extend_from_slice(b"<");
-                        current_comment_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_comment_xml.extend_from_slice(b" ");
-                            current_comment_xml.extend_from_slice(attr.key.as_ref());
-                            current_comment_xml.extend_from_slice(b"=\"");
-                            current_comment_xml.extend_from_slice(&attr.value);
-                            current_comment_xml.extend_from_slice(b"\"");
-                        }
-                        current_comment_xml.extend_from_slice(b"/>");
+                Ok(Event::Empty(e)) if in_comment => {
+                    current_comment_xml.extend_from_slice(b"<");
+                    current_comment_xml.extend_from_slice(e.name().as_ref());
+                    for attr in e.attributes().flatten() {
+                        current_comment_xml.extend_from_slice(b" ");
+                        current_comment_xml.extend_from_slice(attr.key.as_ref());
+                        current_comment_xml.extend_from_slice(b"=\"");
+                        current_comment_xml.extend_from_slice(&attr.value);
+                        current_comment_xml.extend_from_slice(b"\"");
                     }
+                    current_comment_xml.extend_from_slice(b"/>");
                 },
                 Ok(Event::Text(e)) if in_comment => {
                     current_comment_xml.extend_from_slice(e.as_ref());

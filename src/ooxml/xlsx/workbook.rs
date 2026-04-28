@@ -368,15 +368,11 @@ impl Workbook {
             // row or column reference.
             let mut chars = range.chars().skip_while(|c| *c == '$');
             match chars.next() {
-                Some(ch) if ch.is_ascii_digit() => {
-                    if rows.is_none() {
-                        rows = Some(range.to_string());
-                    }
+                Some(ch) if ch.is_ascii_digit() && rows.is_none() => {
+                    rows = Some(range.to_string());
                 },
-                Some(ch) if ch.is_ascii_alphabetic() => {
-                    if cols.is_none() {
-                        cols = Some(range.to_string());
-                    }
+                Some(ch) if ch.is_ascii_alphabetic() && cols.is_none() => {
+                    cols = Some(range.to_string());
                 },
                 _ => {},
             }

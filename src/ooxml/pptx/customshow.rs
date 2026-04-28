@@ -124,27 +124,24 @@ impl CustomShowList {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"custShow" {
-                        let mut name = String::new();
-                        let mut id = 0u32;
-                        for attr in e.attributes().flatten() {
-                            match attr.key.as_ref() {
-                                b"name" => {
-                                    name =
-                                        std::str::from_utf8(&attr.value).unwrap_or("").to_string();
-                                },
-                                b"id" => {
-                                    id = std::str::from_utf8(&attr.value)
-                                        .ok()
-                                        .and_then(|s| s.parse().ok())
-                                        .unwrap_or(0);
-                                },
-                                _ => {},
-                            }
+                Ok(Event::Start(e)) if e.local_name().as_ref() == b"custShow" => {
+                    let mut name = String::new();
+                    let mut id = 0u32;
+                    for attr in e.attributes().flatten() {
+                        match attr.key.as_ref() {
+                            b"name" => {
+                                name = std::str::from_utf8(&attr.value).unwrap_or("").to_string();
+                            },
+                            b"id" => {
+                                id = std::str::from_utf8(&attr.value)
+                                    .ok()
+                                    .and_then(|s| s.parse().ok())
+                                    .unwrap_or(0);
+                            },
+                            _ => {},
                         }
-                        current_show = Some(CustomShow::new(id, name));
                     }
+                    current_show = Some(CustomShow::new(id, name));
                 },
                 Ok(Event::Empty(e)) => {
                     if e.local_name().as_ref() == b"sld"

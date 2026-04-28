@@ -588,14 +588,14 @@ mod tests {
     #[test]
     fn test_sr_kinsoku_atom_clone() {
         let atom = SrKinsokuAtom { kinsoku_type: 2 };
-        let cloned = atom.clone();
+        let cloned = atom;
         assert_eq!(atom.kinsoku_type, cloned.kinsoku_type);
     }
 
     #[test]
     fn test_tx_cf_style_atom_clone() {
         let atom = TxCFStyleAtom::DEFAULT;
-        let cloned = atom.clone();
+        let cloned = atom;
         assert_eq!(atom.cf_mask, cloned.cf_mask);
         assert_eq!(atom.font_ref, cloned.font_ref);
     }
@@ -603,7 +603,7 @@ mod tests {
     #[test]
     fn test_tx_pf_style_atom_clone() {
         let atom = TxPFStyleAtom::DEFAULT;
-        let cloned = atom.clone();
+        let cloned = atom;
         assert_eq!(atom.pf_mask, cloned.pf_mask);
         assert_eq!(atom.bullet_char, cloned.bullet_char);
     }
@@ -611,7 +611,7 @@ mod tests {
     #[test]
     fn test_tx_si_style_atom_clone() {
         let atom = TxSIStyleAtom::DEFAULT;
-        let cloned = atom.clone();
+        let cloned = atom;
         assert_eq!(atom.lang, cloned.lang);
         assert_eq!(atom.alt_lang, cloned.alt_lang);
     }
@@ -619,7 +619,7 @@ mod tests {
     #[test]
     fn test_sheet_properties_atom_clone() {
         let atom = SheetPropertiesAtom::DEFAULT;
-        let cloned = atom.clone();
+        let cloned = atom;
         assert_eq!(atom.creation_time, cloned.creation_time);
         assert_eq!(atom.flags, cloned.flags);
     }
@@ -627,7 +627,7 @@ mod tests {
     #[test]
     fn test_slide_view_info_atom_clone() {
         let atom = SlideViewInfoAtom::DEFAULT;
-        let cloned = atom.clone();
+        let cloned = atom;
         assert_eq!(atom.snap_to_grid, cloned.snap_to_grid);
         assert_eq!(atom.snap_to_shape, cloned.snap_to_shape);
     }
@@ -635,7 +635,7 @@ mod tests {
     #[test]
     fn test_vba_info_atom_clone() {
         let atom = VBAInfoAtom::DEFAULT;
-        let cloned = atom.clone();
+        let cloned = atom;
         assert_eq!(atom.persist_id_ref, cloned.persist_id_ref);
         assert_eq!(atom.flags, cloned.flags);
     }

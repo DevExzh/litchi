@@ -32,40 +32,30 @@ impl OdsParser {
                         let name = Self::extract_table_name(e)?;
                         current_sheet = Some(SheetBuilder::new(name));
                     },
-                    b"table:table-row" => {
-                        if current_sheet.is_some() {
-                            current_row = Some(RowBuilder::new());
-                        }
+                    b"table:table-row" if current_sheet.is_some() => {
+                        current_row = Some(RowBuilder::new());
                     },
-                    b"table:table-cell" => {
-                        if current_row.is_some() {
-                            let cell_builder = Self::parse_cell_attributes(e)?;
-                            current_cell = Some(cell_builder);
+                    b"table:table-cell" if current_row.is_some() => {
+                        let cell_builder = Self::parse_cell_attributes(e)?;
+                        current_cell = Some(cell_builder);
+                        text_content.clear();
+                    },
+                    b"text:p" | b"text:span" if current_cell.is_some() => {
+                        in_text_element = true;
+                        if e.name().as_ref() == b"text:p" {
                             text_content.clear();
-                        }
-                    },
-                    b"text:p" | b"text:span" => {
-                        if current_cell.is_some() {
-                            in_text_element = true;
-                            if e.name().as_ref() == b"text:p" {
-                                text_content.clear();
-                            }
                         }
                     },
                     _ => {},
                 },
-                Ok(Event::Text(ref t)) => {
-                    if in_text_element && current_cell.is_some() {
-                        let text = String::from_utf8(t.to_vec()).unwrap_or_default();
-                        text_content.push_str(&text);
-                    }
+                Ok(Event::Text(ref t)) if in_text_element && current_cell.is_some() => {
+                    let text = String::from_utf8(t.to_vec()).unwrap_or_default();
+                    text_content.push_str(&text);
                 },
                 Ok(Event::End(ref e)) => {
                     match e.name().as_ref() {
-                        b"text:p" | b"text:span" => {
-                            if in_text_element {
-                                in_text_element = false;
-                            }
+                        b"text:p" | b"text:span" if in_text_element => {
+                            in_text_element = false;
                         },
                         b"table:table-cell" => {
                             if let Some(cell_builder) = current_cell.take() {

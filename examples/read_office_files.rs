@@ -118,17 +118,17 @@ fn demo_docx_reading() -> Result<(), Box<dyn std::error::Error>> {
             println!("  Found '{}' in {} paragraphs", search_term, matches.len());
 
             // Table analysis
-            if doc.has_tables()? {
-                if let Some(table) = doc.table(0)? {
-                    let rows = table.rows()?;
-                    println!(
-                        "  First table: {}x{} (rows x cols)",
-                        rows.len(),
-                        rows.first()
-                            .map(|r| r.cells().map(|c| c.len()).unwrap_or(0))
-                            .unwrap_or(0)
-                    );
-                }
+            if doc.has_tables()?
+                && let Some(table) = doc.table(0)?
+            {
+                let rows = table.rows()?;
+                println!(
+                    "  First table: {}x{} (rows x cols)",
+                    rows.len(),
+                    rows.first()
+                        .map(|r| r.cells().map(|c| c.len()).unwrap_or(0))
+                        .unwrap_or(0)
+                );
             }
 
             // Metadata
@@ -249,10 +249,10 @@ fn demo_pptx_reading() -> Result<(), Box<dyn std::error::Error>> {
                 println!("    Text preview: {}", preview);
 
                 // Search in this slide
-                if let Ok(matches) = slide.find_text("important") {
-                    if !matches.is_empty() {
-                        println!("    Contains 'important' in {} shapes", matches.len());
-                    }
+                if let Ok(matches) = slide.find_text("important")
+                    && !matches.is_empty()
+                {
+                    println!("    Contains 'important' in {} shapes", matches.len());
                 }
             }
 

@@ -166,10 +166,10 @@ fn parse_wall_floor<R: BufRead>(reader: &mut Reader<R>) -> Result<WallFloor> {
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
-                if e.local_name().as_ref() == b"c:thickness" {
-                    wall_floor.thickness = parse_u32_attr(e, b"val");
-                }
+            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e))
+                if e.local_name().as_ref() == b"c:thickness" =>
+            {
+                wall_floor.thickness = parse_u32_attr(e, b"val");
             },
             Ok(Event::End(ref e)) => {
                 let tag_name = e.local_name();

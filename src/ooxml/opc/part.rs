@@ -237,19 +237,18 @@ impl XmlPart {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e))
                     // Fast byte-level comparison
-                    if e.local_name().as_ref() == element_name_bytes {
+                    if e.local_name().as_ref() == element_name_bytes => {
                         in_target_element = true;
-                    }
-                },
+                    },
                 Ok(Event::Text(e)) if in_target_element => {
                     // Efficiently decode text without unnecessary allocation
                     let text = std::str::from_utf8(e.as_ref())?;
                     text_content.push_str(text);
                 },
-                Ok(Event::End(ref e)) => {
-                    if e.local_name().as_ref() == element_name_bytes {
+                Ok(Event::End(ref e))
+                    if e.local_name().as_ref() == element_name_bytes => {
                         in_target_element = false;
                         if !text_content.is_empty() {
                             // Cache the result
@@ -257,8 +256,7 @@ impl XmlPart {
                                 .insert(element_name.to_string(), text_content.clone());
                             return Ok(Some(text_content));
                         }
-                    }
-                },
+                    },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OpcError::XmlError(format!("XML parse error: {}", e))),
                 _ => {},
@@ -282,17 +280,17 @@ impl XmlPart {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
-                    if e.local_name().as_ref() == element_name_bytes {
-                        let mut attrs = HashMap::new();
-                        for attr in e.attributes() {
-                            let attr = attr?;
-                            let key = std::str::from_utf8(attr.key.as_ref())?;
-                            let value = attr.decode_and_unescape_value(reader.decoder())?;
-                            attrs.insert(key.to_string(), value.to_string());
-                        }
-                        results.push(attrs);
+                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e))
+                    if e.local_name().as_ref() == element_name_bytes =>
+                {
+                    let mut attrs = HashMap::new();
+                    for attr in e.attributes() {
+                        let attr = attr?;
+                        let key = std::str::from_utf8(attr.key.as_ref())?;
+                        let value = attr.decode_and_unescape_value(reader.decoder())?;
+                        attrs.insert(key.to_string(), value.to_string());
                     }
+                    results.push(attrs);
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OpcError::XmlError(format!("XML parse error: {}", e))),

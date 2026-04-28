@@ -151,13 +151,12 @@ impl Field {
                                             in_field_result = false;
                                         }
                                     },
-                                    "separate" => {
+                                    "separate"
                                         // Separator between instruction and result
-                                        if field_depth == 1 {
+                                        if field_depth == 1 => {
                                             in_instr_text = false;
                                             in_field_result = true;
-                                        }
-                                    },
+                                        },
                                     "end" => {
                                         // End of field
                                         if field_depth == 1 {
@@ -183,12 +182,11 @@ impl Field {
                                 }
                             }
                         },
-                        b"instrText" => {
+                        b"instrText"
                             // Field instruction text
-                            if field_depth > 0 {
+                            if field_depth > 0 => {
                                 in_instr_text = true;
-                            }
-                        },
+                            },
                         b"t" => {
                             // Text element - could be part of field result
                             // Will be handled in Text event
@@ -207,10 +205,8 @@ impl Field {
                         current_result.push_str(text);
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"instrText" {
-                        in_instr_text = false;
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"instrText" => {
+                    in_instr_text = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),

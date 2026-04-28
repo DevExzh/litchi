@@ -208,7 +208,7 @@ mod tests {
         builder.add_byte(chp::UNDERLINE, 1);
 
         let sprms = builder.build();
-        assert!(sprms.len() > 0);
+        assert!(!sprms.is_empty());
     }
 
     #[test]

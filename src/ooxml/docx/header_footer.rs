@@ -115,20 +115,16 @@ impl HeaderFooter {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    if e.local_name().as_ref() == b"t" {
-                        in_text_element = true;
-                    }
+                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"t" => {
+                    in_text_element = true;
                 },
                 Ok(Event::Text(e)) if in_text_element => {
                     // Use unsafe conversion for better performance (safe since XML is validated)
                     let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
                     result.push_str(text);
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"t" {
-                        in_text_element = false;
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
+                    in_text_element = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -201,33 +197,29 @@ impl HeaderFooter {
                         current_para_xml.extend_from_slice(b">");
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if in_para {
-                        current_para_xml.extend_from_slice(b"</");
-                        current_para_xml.extend_from_slice(e.name().as_ref());
-                        current_para_xml.extend_from_slice(b">");
+                Ok(Event::End(e)) if in_para => {
+                    current_para_xml.extend_from_slice(b"</");
+                    current_para_xml.extend_from_slice(e.name().as_ref());
+                    current_para_xml.extend_from_slice(b">");
 
-                        if e.local_name().as_ref() == b"p" && depth == 1 {
-                            paragraphs.push(Paragraph::new(current_para_xml.clone()));
-                            in_para = false;
-                        } else {
-                            depth -= 1;
-                        }
+                    if e.local_name().as_ref() == b"p" && depth == 1 {
+                        paragraphs.push(Paragraph::new(current_para_xml.clone()));
+                        in_para = false;
+                    } else {
+                        depth -= 1;
                     }
                 },
-                Ok(Event::Empty(e)) => {
-                    if in_para {
-                        current_para_xml.extend_from_slice(b"<");
-                        current_para_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_para_xml.extend_from_slice(b" ");
-                            current_para_xml.extend_from_slice(attr.key.as_ref());
-                            current_para_xml.extend_from_slice(b"=\"");
-                            current_para_xml.extend_from_slice(&attr.value);
-                            current_para_xml.extend_from_slice(b"\"");
-                        }
-                        current_para_xml.extend_from_slice(b"/>");
+                Ok(Event::Empty(e)) if in_para => {
+                    current_para_xml.extend_from_slice(b"<");
+                    current_para_xml.extend_from_slice(e.name().as_ref());
+                    for attr in e.attributes().flatten() {
+                        current_para_xml.extend_from_slice(b" ");
+                        current_para_xml.extend_from_slice(attr.key.as_ref());
+                        current_para_xml.extend_from_slice(b"=\"");
+                        current_para_xml.extend_from_slice(&attr.value);
+                        current_para_xml.extend_from_slice(b"\"");
                     }
+                    current_para_xml.extend_from_slice(b"/>");
                 },
                 Ok(Event::Text(e)) if in_para => {
                     current_para_xml.extend_from_slice(e.as_ref());
@@ -306,33 +298,29 @@ impl HeaderFooter {
                         current_table_xml.extend_from_slice(b">");
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if in_table {
-                        current_table_xml.extend_from_slice(b"</");
-                        current_table_xml.extend_from_slice(e.name().as_ref());
-                        current_table_xml.extend_from_slice(b">");
+                Ok(Event::End(e)) if in_table => {
+                    current_table_xml.extend_from_slice(b"</");
+                    current_table_xml.extend_from_slice(e.name().as_ref());
+                    current_table_xml.extend_from_slice(b">");
 
-                        if e.local_name().as_ref() == b"tbl" && depth == 1 {
-                            tables.push(Table::new(current_table_xml.clone()));
-                            in_table = false;
-                        } else {
-                            depth -= 1;
-                        }
+                    if e.local_name().as_ref() == b"tbl" && depth == 1 {
+                        tables.push(Table::new(current_table_xml.clone()));
+                        in_table = false;
+                    } else {
+                        depth -= 1;
                     }
                 },
-                Ok(Event::Empty(e)) => {
-                    if in_table {
-                        current_table_xml.extend_from_slice(b"<");
-                        current_table_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_table_xml.extend_from_slice(b" ");
-                            current_table_xml.extend_from_slice(attr.key.as_ref());
-                            current_table_xml.extend_from_slice(b"=\"");
-                            current_table_xml.extend_from_slice(&attr.value);
-                            current_table_xml.extend_from_slice(b"\"");
-                        }
-                        current_table_xml.extend_from_slice(b"/>");
+                Ok(Event::Empty(e)) if in_table => {
+                    current_table_xml.extend_from_slice(b"<");
+                    current_table_xml.extend_from_slice(e.name().as_ref());
+                    for attr in e.attributes().flatten() {
+                        current_table_xml.extend_from_slice(b" ");
+                        current_table_xml.extend_from_slice(attr.key.as_ref());
+                        current_table_xml.extend_from_slice(b"=\"");
+                        current_table_xml.extend_from_slice(&attr.value);
+                        current_table_xml.extend_from_slice(b"\"");
                     }
+                    current_table_xml.extend_from_slice(b"/>");
                 },
                 Ok(Event::Text(e)) if in_table => {
                     current_table_xml.extend_from_slice(e.as_ref());
@@ -360,10 +348,8 @@ impl HeaderFooter {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    if e.local_name().as_ref() == b"p" {
-                        count += 1;
-                    }
+                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"p" => {
+                    count += 1;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -383,10 +369,8 @@ impl HeaderFooter {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"tbl" {
-                        count += 1;
-                    }
+                Ok(Event::Start(e)) if e.local_name().as_ref() == b"tbl" => {
+                    count += 1;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),

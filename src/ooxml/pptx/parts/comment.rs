@@ -355,36 +355,36 @@ impl<'a> CommentAuthorsPart<'a> {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
-                    if e.local_name().as_ref() == b"cmAuthor" {
-                        let mut id = 0;
-                        let mut name = String::new();
-                        let mut initials = String::new();
+                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e))
+                    if e.local_name().as_ref() == b"cmAuthor" =>
+                {
+                    let mut id = 0;
+                    let mut name = String::new();
+                    let mut initials = String::new();
 
-                        for attr in e.attributes().flatten() {
-                            match attr.key.as_ref() {
-                                b"id" => {
-                                    id = std::str::from_utf8(&attr.value)
-                                        .ok()
-                                        .and_then(|s| s.parse().ok())
-                                        .unwrap_or(0);
-                                },
-                                b"name" => {
-                                    name = std::str::from_utf8(&attr.value)
-                                        .map(|s| s.to_string())
-                                        .unwrap_or_default();
-                                },
-                                b"initials" => {
-                                    initials = std::str::from_utf8(&attr.value)
-                                        .map(|s| s.to_string())
-                                        .unwrap_or_default();
-                                },
-                                _ => {},
-                            }
+                    for attr in e.attributes().flatten() {
+                        match attr.key.as_ref() {
+                            b"id" => {
+                                id = std::str::from_utf8(&attr.value)
+                                    .ok()
+                                    .and_then(|s| s.parse().ok())
+                                    .unwrap_or(0);
+                            },
+                            b"name" => {
+                                name = std::str::from_utf8(&attr.value)
+                                    .map(|s| s.to_string())
+                                    .unwrap_or_default();
+                            },
+                            b"initials" => {
+                                initials = std::str::from_utf8(&attr.value)
+                                    .map(|s| s.to_string())
+                                    .unwrap_or_default();
+                            },
+                            _ => {},
                         }
-
-                        authors.push(CommentAuthor { id, name, initials });
                     }
+
+                    authors.push(CommentAuthor { id, name, initials });
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),

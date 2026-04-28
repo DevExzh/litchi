@@ -584,13 +584,13 @@ impl OleWriter {
         // Write MiniFAT sectors (if any)
         if !minifat.is_empty() && minifat_start_sector != ENDOFCHAIN {
             let minifat_sectors = minifat.generate_minifat_sectors(self.sector_size);
-            let mut current_sector = minifat_start_sector;
 
-            for minifat_sector_data in &minifat_sectors {
+            for (current_sector, minifat_sector_data) in
+                (minifat_start_sector..).zip(minifat_sectors.iter())
+            {
                 let position = ((current_sector as u64) + 1) * (self.sector_size as u64);
                 writer.seek(SeekFrom::Start(position))?;
                 writer.write_all(minifat_sector_data)?;
-                current_sector += 1;
             }
         }
 
@@ -604,12 +604,12 @@ impl OleWriter {
 
         // Write DIFAT sectors (if any)
         if !difat_sectors.is_empty() {
-            let mut current_sector = difat_start_sector;
-            for difat_sector_data in &difat_sectors {
+            for (current_sector, difat_sector_data) in
+                (difat_start_sector..).zip(difat_sectors.iter())
+            {
                 let position = ((current_sector as u64) + 1) * (self.sector_size as u64);
                 writer.seek(SeekFrom::Start(position))?;
                 writer.write_all(difat_sector_data)?;
-                current_sector += 1;
             }
         }
 

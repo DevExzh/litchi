@@ -49,12 +49,11 @@ impl TextFrame {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) => {
+                Ok(Event::Start(e))
                     // Check if this is an a:t element (DrawingML text)
-                    if e.local_name().as_ref() == b"t" {
+                    if e.local_name().as_ref() == b"t" => {
                         in_text_element = true;
-                    }
-                },
+                    },
                 Ok(Event::Text(e)) if in_text_element => {
                     // Extract text content
                     let t = std::str::from_utf8(e.as_ref())
@@ -64,11 +63,10 @@ impl TextFrame {
                     }
                     text.push_str(t);
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"t" {
+                Ok(Event::End(e))
+                    if e.local_name().as_ref() == b"t" => {
                         in_text_element = false;
-                    }
-                },
+                    },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
                 _ => {},
@@ -113,17 +111,15 @@ impl TextFrame {
                         current_para_xml.push(b'>');
                     }
                 },
-                Ok(Event::End(e)) => {
-                    if in_para {
-                        current_para_xml.extend_from_slice(b"</");
-                        current_para_xml.extend_from_slice(e.name().as_ref());
-                        current_para_xml.push(b'>');
+                Ok(Event::End(e)) if in_para => {
+                    current_para_xml.extend_from_slice(b"</");
+                    current_para_xml.extend_from_slice(e.name().as_ref());
+                    current_para_xml.push(b'>');
 
-                        depth -= 1;
-                        if depth == 0 && e.local_name().as_ref() == b"p" {
-                            paragraphs.push(Paragraph::new(current_para_xml.clone()));
-                            in_para = false;
-                        }
+                    depth -= 1;
+                    if depth == 0 && e.local_name().as_ref() == b"p" {
+                        paragraphs.push(Paragraph::new(current_para_xml.clone()));
+                        in_para = false;
                     }
                 },
                 Ok(Event::Text(e)) if in_para => {
@@ -195,20 +191,16 @@ impl Paragraph {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"t" {
-                        in_text_element = true;
-                    }
+                Ok(Event::Start(e)) if e.local_name().as_ref() == b"t" => {
+                    in_text_element = true;
                 },
                 Ok(Event::Text(e)) if in_text_element => {
                     let t = std::str::from_utf8(e.as_ref())
                         .map_err(|e| OoxmlError::Xml(e.to_string()))?;
                     text.push_str(t);
                 },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"t" {
-                        in_text_element = false;
-                    }
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
+                    in_text_element = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),

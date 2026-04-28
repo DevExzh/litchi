@@ -126,6 +126,17 @@ impl NamedRange {
     }
 }
 
+/// Create a 3D area formula token stream for a workbook-local sheet range.
+pub fn create_area3d_formula(
+    sheet_id: u32,
+    first_row: u16,
+    last_row: u16,
+    first_col: u16,
+    last_col: u16,
+) -> Vec<u8> {
+    NamedRange::create_area3d_formula(sheet_id, first_row, last_row, first_col, last_col)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,15 +162,4 @@ mod tests {
         assert_eq!(u16::from_le_bytes([formula[7], formula[8]]), 1);
         assert_eq!(u16::from_le_bytes([formula[9], formula[10]]), 1);
     }
-}
-
-/// Create a 3D area formula token stream for a workbook-local sheet range.
-pub fn create_area3d_formula(
-    sheet_id: u32,
-    first_row: u16,
-    last_row: u16,
-    first_col: u16,
-    last_col: u16,
-) -> Vec<u8> {
-    NamedRange::create_area3d_formula(sheet_id, first_row, last_row, first_col, last_col)
 }

@@ -105,25 +105,23 @@ where
                     // BrtRowHdr
                     self.current_row = binary::read_u32_le_at(&self.buf, 0)?;
                 },
-                0x0001 => {
+                0x0001
                     // BrtCellBlank
-                    if self.buf.len() >= 4 {
+                    if self.buf.len() >= 4 => {
                         let col = binary::read_u32_le_at(&self.buf, 0)?;
                         return Ok(Some(XlsbCell::new(self.current_row, col, CellValue::Empty)));
-                    }
-                },
-                0x0002 => {
+                    },
+                0x0002
                     // BrtCellRk
-                    if self.buf.len() >= 12 {
+                    if self.buf.len() >= 12 => {
                         let col = binary::read_u32_le_at(&self.buf, 0)?;
                         let rk_val = binary::read_u32_le_at(&self.buf, 8)?;
                         let value = Self::parse_rk_value(rk_val);
                         return Ok(Some(XlsbCell::new(self.current_row, col, value)));
-                    }
-                },
-                0x0003 => {
+                    },
+                0x0003
                     // BrtCellError
-                    if self.buf.len() >= 9 {
+                    if self.buf.len() >= 9 => {
                         let col = binary::read_u32_le_at(&self.buf, 0)?;
                         let error_code = self.buf[8];
                         let error_msg = match error_code {
@@ -142,11 +140,10 @@ where
                             col,
                             CellValue::Error(error_msg.to_string()),
                         )));
-                    }
-                },
-                0x0004 => {
+                    },
+                0x0004
                     // BrtCellBool
-                    if self.buf.len() >= 9 {
+                    if self.buf.len() >= 9 => {
                         let col = binary::read_u32_le_at(&self.buf, 0)?;
                         let value = self.buf[8] != 0;
                         return Ok(Some(XlsbCell::new(
@@ -154,11 +151,10 @@ where
                             col,
                             CellValue::Bool(value),
                         )));
-                    }
-                },
-                0x0005 => {
+                    },
+                0x0005
                     // BrtCellReal
-                    if self.buf.len() >= 16 {
+                    if self.buf.len() >= 16 => {
                         let col = binary::read_u32_le_at(&self.buf, 0)?;
                         let value = binary::read_f64_le_at(&self.buf, 8)?;
                         return Ok(Some(XlsbCell::new(
@@ -166,11 +162,10 @@ where
                             col,
                             CellValue::Float(value),
                         )));
-                    }
-                },
-                0x0006 => {
+                    },
+                0x0006
                     // BrtCellSt
-                    if self.buf.len() >= 8 {
+                    if self.buf.len() >= 8 => {
                         let col = binary::read_u32_le_at(&self.buf, 0)?;
                         let (string, _) = super::records::wide_str_with_len(&self.buf[8..])?;
                         return Ok(Some(XlsbCell::new(
@@ -178,11 +173,10 @@ where
                             col,
                             CellValue::String(string),
                         )));
-                    }
-                },
-                0x0007 => {
+                    },
+                0x0007
                     // BrtCellIsst
-                    if self.buf.len() >= 12 {
+                    if self.buf.len() >= 12 => {
                         let col = binary::read_u32_le_at(&self.buf, 0)?;
                         let idx = binary::read_u32_le_at(&self.buf, 8)? as usize;
                         let value = if idx < self.shared_strings.len() {
@@ -191,11 +185,10 @@ where
                             CellValue::Error("Invalid SST index".to_string())
                         };
                         return Ok(Some(XlsbCell::new(self.current_row, col, value)));
-                    }
-                },
-                0x0008 => {
+                    },
+                0x0008
                     // BrtFmlaString - formula with string result
-                    if self.buf.len() >= 10 {
+                    if self.buf.len() >= 10 => {
                         let col = binary::read_u32_le_at(&self.buf, 0)?;
                         // Skip style (4 bytes) + flags (1 byte) + formula length (4 bytes)
                         let formula_len = binary::read_u32_le_at(&self.buf, 6)? as usize;
@@ -209,11 +202,10 @@ where
                                 CellValue::String(string),
                             )));
                         }
-                    }
-                },
-                0x0009 => {
+                    },
+                0x0009
                     // BrtFmlaNum - formula with numeric result
-                    if self.buf.len() >= 18 {
+                    if self.buf.len() >= 18 => {
                         let col = binary::read_u32_le_at(&self.buf, 0)?;
                         let formula_len = binary::read_u32_le_at(&self.buf, 6)? as usize;
                         if self.buf.len() >= 10 + formula_len + 8 {
@@ -224,11 +216,10 @@ where
                                 CellValue::Float(num_value),
                             )));
                         }
-                    }
-                },
-                0x000A => {
+                    },
+                0x000A
                     // BrtFmlaBool - formula with boolean result
-                    if self.buf.len() >= 11 {
+                    if self.buf.len() >= 11 => {
                         let col = binary::read_u32_le_at(&self.buf, 0)?;
                         let formula_len = binary::read_u32_le_at(&self.buf, 6)? as usize;
                         if self.buf.len() > 10 + formula_len {
@@ -239,11 +230,10 @@ where
                                 CellValue::Bool(bool_value),
                             )));
                         }
-                    }
-                },
-                0x000B => {
+                    },
+                0x000B
                     // BrtFmlaError - formula with error result
-                    if self.buf.len() >= 11 {
+                    if self.buf.len() >= 11 => {
                         let col = binary::read_u32_le_at(&self.buf, 0)?;
                         let formula_len = binary::read_u32_le_at(&self.buf, 6)? as usize;
                         if self.buf.len() > 10 + formula_len {
@@ -265,8 +255,7 @@ where
                                 CellValue::Error(error_msg.to_string()),
                             )));
                         }
-                    }
-                },
+                    },
                 _ => {
                     // Skip unknown records
                 },

@@ -330,10 +330,8 @@ impl SlideBackground {
                         }
                     }
                 },
-                Ok(Event::End(ref e)) => {
-                    if e.local_name().as_ref() == b"bg" {
-                        in_bg = false;
-                    }
+                Ok(Event::End(ref e)) if e.local_name().as_ref() == b"bg" => {
+                    in_bg = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -444,12 +442,10 @@ impl SlideBackground {
                         }
                     }
                 },
-                Ok(Event::End(ref e)) => {
-                    if e.local_name().as_ref() == b"gradFill" {
-                        depth -= 1;
-                        if depth == 0 {
-                            break;
-                        }
+                Ok(Event::End(ref e)) if e.local_name().as_ref() == b"gradFill" => {
+                    depth -= 1;
+                    if depth == 0 {
+                        break;
                     }
                 },
                 Ok(Event::Eof) => break,

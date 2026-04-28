@@ -248,50 +248,49 @@ impl PresentationProtection {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"modifyVerifier" {
-                        protection.modify_password_protected = true;
-                        for attr in e.attributes().flatten() {
-                            match attr.key.as_ref() {
-                                // ISO-style attributes
-                                b"hashValue" | b"hashData" => {
-                                    protection.modify_password_hash = Some(
-                                        std::str::from_utf8(&attr.value).unwrap_or("").to_string(),
-                                    );
-                                },
-                                b"saltValue" | b"saltData" => {
-                                    protection.modify_password_salt = Some(
-                                        std::str::from_utf8(&attr.value).unwrap_or("").to_string(),
-                                    );
-                                },
-                                b"spinCount" | b"spinValue" => {
-                                    protection.modify_spin_count = std::str::from_utf8(&attr.value)
-                                        .ok()
-                                        .and_then(|s| s.parse().ok())
-                                        .unwrap_or(100000);
-                                },
-                                b"algorithmName" | b"algIdExt" => {
-                                    if let Ok(uri) = std::str::from_utf8(&attr.value) {
-                                        protection.modify_algorithm =
-                                            CryptoAlgorithm::from_uri(uri);
-                                    }
-                                },
-                                // Legacy SID-based form
-                                b"cryptAlgorithmSid" => {
-                                    if let Ok(text) = std::str::from_utf8(&attr.value)
-                                        && let Ok(sid) = text.parse::<u32>()
-                                    {
-                                        protection.modify_algorithm = match sid {
-                                            4 => CryptoAlgorithm::Sha1,
-                                            12 => CryptoAlgorithm::Sha256,
-                                            13 => CryptoAlgorithm::Sha384,
-                                            14 => CryptoAlgorithm::Sha512,
-                                            _ => protection.modify_algorithm,
-                                        };
-                                    }
-                                },
-                                _ => {},
-                            }
+                Ok(Event::Empty(e)) | Ok(Event::Start(e))
+                    if e.local_name().as_ref() == b"modifyVerifier" =>
+                {
+                    protection.modify_password_protected = true;
+                    for attr in e.attributes().flatten() {
+                        match attr.key.as_ref() {
+                            // ISO-style attributes
+                            b"hashValue" | b"hashData" => {
+                                protection.modify_password_hash = Some(
+                                    std::str::from_utf8(&attr.value).unwrap_or("").to_string(),
+                                );
+                            },
+                            b"saltValue" | b"saltData" => {
+                                protection.modify_password_salt = Some(
+                                    std::str::from_utf8(&attr.value).unwrap_or("").to_string(),
+                                );
+                            },
+                            b"spinCount" | b"spinValue" => {
+                                protection.modify_spin_count = std::str::from_utf8(&attr.value)
+                                    .ok()
+                                    .and_then(|s| s.parse().ok())
+                                    .unwrap_or(100000);
+                            },
+                            b"algorithmName" | b"algIdExt" => {
+                                if let Ok(uri) = std::str::from_utf8(&attr.value) {
+                                    protection.modify_algorithm = CryptoAlgorithm::from_uri(uri);
+                                }
+                            },
+                            // Legacy SID-based form
+                            b"cryptAlgorithmSid" => {
+                                if let Ok(text) = std::str::from_utf8(&attr.value)
+                                    && let Ok(sid) = text.parse::<u32>()
+                                {
+                                    protection.modify_algorithm = match sid {
+                                        4 => CryptoAlgorithm::Sha1,
+                                        12 => CryptoAlgorithm::Sha256,
+                                        13 => CryptoAlgorithm::Sha384,
+                                        14 => CryptoAlgorithm::Sha512,
+                                        _ => protection.modify_algorithm,
+                                    };
+                                }
+                            },
+                            _ => {},
                         }
                     }
                 },

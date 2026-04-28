@@ -451,11 +451,12 @@ impl MutablePresentation {
                 let style_name = shape.style_name.as_deref().unwrap_or("gr3");
 
                 match shape.shape_type {
-                    ShapeType::TextBox | ShapeType::AutoShape | ShapeType::Placeholder => {
-                        if shape.has_text() {
-                            let escaped_name = escape_xml(name);
-                            let escaped_shape_text = escape_xml(&shape.text);
-                            body.push_str(&xml_minifier::minified_xml_format!(
+                    ShapeType::TextBox | ShapeType::AutoShape | ShapeType::Placeholder
+                        if shape.has_text() =>
+                    {
+                        let escaped_name = escape_xml(name);
+                        let escaped_shape_text = escape_xml(&shape.text);
+                        body.push_str(&xml_minifier::minified_xml_format!(
                                 r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
                                 escaped_name,
                                 style_name,
@@ -465,7 +466,6 @@ impl MutablePresentation {
                                 height,
                                 escaped_shape_text
                             ));
-                        }
                     },
                     _ => {},
                 }

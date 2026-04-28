@@ -535,6 +535,170 @@ impl From<TableColumn> for Element {
     }
 }
 
+/// Collection of table elements for easy parsing
+pub struct TableElements;
+
+impl TableElements {
+    /// Parse all tables from document content (content.xml)
+    pub fn parse_tables_from_content(xml_content: &str) -> Result<Vec<Table>> {
+        Self::parse_tables(xml_content)
+    }
+
+    /// Parse all tables from XML content
+    pub fn parse_tables(xml_content: &str) -> Result<Vec<Table>> {
+        let mut reader = quick_xml::Reader::from_str(xml_content);
+        let mut buf = Vec::new();
+        let mut tables = Vec::new();
+        let mut stack: Vec<Element> = Vec::new();
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(quick_xml::events::Event::Start(ref e)) => {
+                    let tag_name =
+                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
+
+                    if tag_name == "table:table" {
+                        let mut element = Element::new(&tag_name);
+
+                        // Parse attributes
+                        for attr_result in e.attributes() {
+                            if let Ok(attr) = attr_result
+                                && let (Ok(key), Ok(value)) = (
+                                    String::from_utf8(attr.key.as_ref().to_vec()),
+                                    String::from_utf8(attr.value.to_vec()),
+                                )
+                            {
+                                element.set_attribute(&key, &value);
+                            }
+                        }
+
+                        stack.push(element);
+                    } else if !stack.is_empty() {
+                        // Handle nested elements within table
+                        let mut element = Element::new(&tag_name);
+
+                        // Parse attributes
+                        for attr_result in e.attributes() {
+                            if let Ok(attr) = attr_result
+                                && let (Ok(key), Ok(value)) = (
+                                    String::from_utf8(attr.key.as_ref().to_vec()),
+                                    String::from_utf8(attr.value.to_vec()),
+                                )
+                            {
+                                element.set_attribute(&key, &value);
+                            }
+                        }
+
+                        stack.push(element);
+                    }
+                },
+                Ok(quick_xml::events::Event::Text(ref t)) => {
+                    if let Some(current) = stack.last_mut()
+                        && let Ok(text) = String::from_utf8(t.to_vec())
+                    {
+                        let current_text = current.text().to_string();
+                        current.set_text(&format!("{}{}", current_text, text));
+                    }
+                },
+                Ok(quick_xml::events::Event::End(ref e)) => {
+                    let tag_name =
+                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
+
+                    if tag_name == "table:table" {
+                        if let Some(table_element) = stack.pop()
+                            && let Ok(table) = Table::from_element(table_element)
+                        {
+                            tables.push(table);
+                        }
+                    } else if !stack.is_empty() {
+                        let element = stack.pop().unwrap();
+                        if let Some(parent) = stack.last_mut() {
+                            parent.add_child(element);
+                        }
+                    }
+                },
+                Ok(quick_xml::events::Event::Eof) => break,
+                Err(_) => break,
+                _ => {},
+            }
+            buf.clear();
+        }
+
+        Ok(tables)
+    }
+
+    /// Parse table from XML content with proper handling of repeated cells
+    #[allow(dead_code)]
+    pub fn parse_table_with_expansion(
+        xml_content: &str,
+        table_name: Option<&str>,
+    ) -> Result<Option<Table>> {
+        let tables = Self::parse_tables(xml_content)?;
+
+        for table in tables {
+            if table_name.is_none() || table.name() == table_name {
+                // Expand repeated cells
+                let mut expanded_table = Table::new();
+                if let Some(name) = table.name() {
+                    expanded_table.set_name(name);
+                }
+                if let Some(style) = table.style_name() {
+                    expanded_table.set_style_name(style);
+                }
+
+                for row in table.rows()? {
+                    let mut expanded_row = TableRow::new();
+                    if let Some(style) = row.style_name() {
+                        expanded_row.set_style_name(style);
+                    }
+
+                    for cell in row.cells()? {
+                        let repeated = cell
+                            .element
+                            .get_int_attribute("table:number-columns-repeated")
+                            .map(|n| n as usize)
+                            .unwrap_or(1);
+
+                        for _ in 0..repeated {
+                            let mut new_cell = TableCell::new();
+                            new_cell.set_text(cell.text()?.as_str());
+
+                            // Copy other attributes
+                            if let Some(formula) = cell.formula() {
+                                new_cell.set_formula(formula);
+                            }
+                            if let Some(style) = cell.style_name() {
+                                new_cell.set_style_name(style);
+                            }
+                            if cell.colspan() > 1 {
+                                new_cell.set_colspan(cell.colspan());
+                            }
+                            if cell.rowspan() > 1 {
+                                new_cell.set_rowspan(cell.rowspan());
+                            }
+
+                            // Copy value attributes
+                            for (key, value) in cell.element.attributes() {
+                                if key.starts_with("office:") {
+                                    new_cell.element.set_attribute(key, value);
+                                }
+                            }
+
+                            expanded_row.add_cell(new_cell);
+                        }
+                    }
+
+                    expanded_table.add_row(expanded_row);
+                }
+
+                return Ok(Some(expanded_table));
+            }
+        }
+
+        Ok(None)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1011,169 +1175,5 @@ mod tests {
         assert_eq!(col2.style_name(), Some("ColStyle"));
         assert_eq!(col2.default_cell_style_name(), Some("DefaultCell"));
         assert_eq!(col2.repeated(), 5);
-    }
-}
-
-/// Collection of table elements for easy parsing
-pub struct TableElements;
-
-impl TableElements {
-    /// Parse all tables from document content (content.xml)
-    pub fn parse_tables_from_content(xml_content: &str) -> Result<Vec<Table>> {
-        Self::parse_tables(xml_content)
-    }
-
-    /// Parse all tables from XML content
-    pub fn parse_tables(xml_content: &str) -> Result<Vec<Table>> {
-        let mut reader = quick_xml::Reader::from_str(xml_content);
-        let mut buf = Vec::new();
-        let mut tables = Vec::new();
-        let mut stack: Vec<Element> = Vec::new();
-
-        loop {
-            match reader.read_event_into(&mut buf) {
-                Ok(quick_xml::events::Event::Start(ref e)) => {
-                    let tag_name =
-                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
-
-                    if tag_name == "table:table" {
-                        let mut element = Element::new(&tag_name);
-
-                        // Parse attributes
-                        for attr_result in e.attributes() {
-                            if let Ok(attr) = attr_result
-                                && let (Ok(key), Ok(value)) = (
-                                    String::from_utf8(attr.key.as_ref().to_vec()),
-                                    String::from_utf8(attr.value.to_vec()),
-                                )
-                            {
-                                element.set_attribute(&key, &value);
-                            }
-                        }
-
-                        stack.push(element);
-                    } else if !stack.is_empty() {
-                        // Handle nested elements within table
-                        let mut element = Element::new(&tag_name);
-
-                        // Parse attributes
-                        for attr_result in e.attributes() {
-                            if let Ok(attr) = attr_result
-                                && let (Ok(key), Ok(value)) = (
-                                    String::from_utf8(attr.key.as_ref().to_vec()),
-                                    String::from_utf8(attr.value.to_vec()),
-                                )
-                            {
-                                element.set_attribute(&key, &value);
-                            }
-                        }
-
-                        stack.push(element);
-                    }
-                },
-                Ok(quick_xml::events::Event::Text(ref t)) => {
-                    if let Some(current) = stack.last_mut()
-                        && let Ok(text) = String::from_utf8(t.to_vec())
-                    {
-                        let current_text = current.text().to_string();
-                        current.set_text(&format!("{}{}", current_text, text));
-                    }
-                },
-                Ok(quick_xml::events::Event::End(ref e)) => {
-                    let tag_name =
-                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
-
-                    if tag_name == "table:table" {
-                        if let Some(table_element) = stack.pop()
-                            && let Ok(table) = Table::from_element(table_element)
-                        {
-                            tables.push(table);
-                        }
-                    } else if !stack.is_empty() {
-                        let element = stack.pop().unwrap();
-                        if let Some(parent) = stack.last_mut() {
-                            parent.add_child(element);
-                        }
-                    }
-                },
-                Ok(quick_xml::events::Event::Eof) => break,
-                Err(_) => break,
-                _ => {},
-            }
-            buf.clear();
-        }
-
-        Ok(tables)
-    }
-
-    /// Parse table from XML content with proper handling of repeated cells
-    #[allow(dead_code)]
-    pub fn parse_table_with_expansion(
-        xml_content: &str,
-        table_name: Option<&str>,
-    ) -> Result<Option<Table>> {
-        let tables = Self::parse_tables(xml_content)?;
-
-        for table in tables {
-            if table_name.is_none() || table.name() == table_name {
-                // Expand repeated cells
-                let mut expanded_table = Table::new();
-                if let Some(name) = table.name() {
-                    expanded_table.set_name(name);
-                }
-                if let Some(style) = table.style_name() {
-                    expanded_table.set_style_name(style);
-                }
-
-                for row in table.rows()? {
-                    let mut expanded_row = TableRow::new();
-                    if let Some(style) = row.style_name() {
-                        expanded_row.set_style_name(style);
-                    }
-
-                    for cell in row.cells()? {
-                        let repeated = cell
-                            .element
-                            .get_int_attribute("table:number-columns-repeated")
-                            .map(|n| n as usize)
-                            .unwrap_or(1);
-
-                        for _ in 0..repeated {
-                            let mut new_cell = TableCell::new();
-                            new_cell.set_text(cell.text()?.as_str());
-
-                            // Copy other attributes
-                            if let Some(formula) = cell.formula() {
-                                new_cell.set_formula(formula);
-                            }
-                            if let Some(style) = cell.style_name() {
-                                new_cell.set_style_name(style);
-                            }
-                            if cell.colspan() > 1 {
-                                new_cell.set_colspan(cell.colspan());
-                            }
-                            if cell.rowspan() > 1 {
-                                new_cell.set_rowspan(cell.rowspan());
-                            }
-
-                            // Copy value attributes
-                            for (key, value) in cell.element.attributes() {
-                                if key.starts_with("office:") {
-                                    new_cell.element.set_attribute(key, value);
-                                }
-                            }
-
-                            expanded_row.add_cell(new_cell);
-                        }
-                    }
-
-                    expanded_table.add_row(expanded_row);
-                }
-
-                return Ok(Some(expanded_table));
-            }
-        }
-
-        Ok(None)
     }
 }
