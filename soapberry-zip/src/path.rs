@@ -43,7 +43,7 @@
 //! ## Usage Examples
 //!
 //! ```rust
-//! use rawzip::path::ZipFilePath;
+//! use soapberry_zip::path::ZipFilePath;
 //!
 //! // From raw bytes
 //! let raw_path = ZipFilePath::from_bytes(b"../../../etc/passwd");

@@ -32,7 +32,7 @@ pub const RECOMMENDED_BUFFER_SIZE: usize = 1 << 16;
 /// # Examples
 ///
 /// ```rust
-/// use rawzip::{ZipArchive, ZipSliceArchive, Error};
+/// use soapberry_zip::{ZipArchive, ZipSliceArchive, Error};
 ///
 /// fn process_zip_slice(data: &[u8]) -> Result<(), Error> {
 ///     let archive = ZipArchive::from_slice(data)?;
@@ -349,7 +349,7 @@ impl<'data> Iterator for ZipSliceEntries<'data> {
 /// Creating from a file:
 ///
 /// ```rust
-/// # use rawzip::{ZipArchive, Error, RECOMMENDED_BUFFER_SIZE};
+/// # use soapberry_zip::{ZipArchive, Error, RECOMMENDED_BUFFER_SIZE};
 /// # use std::fs::File;
 /// # use std::io;
 /// fn example_from_file(file: File) -> Result<(), Error> {
@@ -398,7 +398,7 @@ impl ZipArchive<()> {
     /// reader in a mutex to support positioned io.
     ///
     /// ```rust
-    /// # use rawzip::{ZipArchive, Error, RECOMMENDED_BUFFER_SIZE, ZipFileHeaderRecord};
+    /// # use soapberry_zip::{ZipArchive, Error, RECOMMENDED_BUFFER_SIZE, ZipFileHeaderRecord};
     /// # use std::io::Cursor;
     /// fn example(zip_data: &[u8]) -> Result<(), Error> {
     ///     let mut buffer = vec![0u8; RECOMMENDED_BUFFER_SIZE];
@@ -443,7 +443,7 @@ impl<R> ZipArchive<R> {
     /// reader.
     ///
     /// ```rust
-    /// # use rawzip::{ZipArchive, Error, RECOMMENDED_BUFFER_SIZE, ZipFileHeaderRecord};
+    /// # use soapberry_zip::{ZipArchive, Error, RECOMMENDED_BUFFER_SIZE, ZipFileHeaderRecord};
     /// # use std::fs::File;
     /// fn example(file: File) -> Result<(), Error> {
     ///     let mut buffer = vec![0u8; RECOMMENDED_BUFFER_SIZE];
@@ -488,7 +488,7 @@ impl<R> ZipArchive<R> {
     /// # Examples
     ///
     /// ```rust
-    /// use rawzip::{ZipArchive, ZipStr, RECOMMENDED_BUFFER_SIZE};
+    /// use soapberry_zip::{ZipArchive, ZipStr, RECOMMENDED_BUFFER_SIZE};
     /// use std::io::Read;
     /// use std::fs::File;
     ///
@@ -521,7 +521,7 @@ impl<R> ZipArchive<R> {
     /// # Examples
     ///
     /// ```rust
-    /// # use rawzip::{ZipArchive, ZipLocator, RECOMMENDED_BUFFER_SIZE};
+    /// # use soapberry_zip::{ZipArchive, ZipLocator, RECOMMENDED_BUFFER_SIZE};
     /// # use std::fs::File;
     /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// # let file = File::open("assets/test.zip")?;
@@ -660,7 +660,7 @@ where
     /// data:
     ///
     /// ```rust
-    /// # use rawzip::{ZipArchive, Error};
+    /// # use soapberry_zip::{ZipArchive, Error};
     /// # fn example(data: &[u8]) -> Result<(), Error> {
     /// let archive = ZipArchive::from_slice(data)?;
     /// let mut ranges = Vec::new();
@@ -706,7 +706,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// # use rawzip::{ZipArchive, RECOMMENDED_BUFFER_SIZE, extra_fields::ExtraFieldId};
+    /// # use soapberry_zip::{ZipArchive, RECOMMENDED_BUFFER_SIZE, extra_fields::ExtraFieldId};
     /// # use std::fs::File;
     /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// // Test with filename mismatch test fixture
@@ -1547,7 +1547,7 @@ impl<'a> ZipFileHeaderRecord<'a> {
     ///
     /// # Example
     /// ```rust
-    /// # use rawzip::ZipArchive;
+    /// # use soapberry_zip::ZipArchive;
     /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// # let data = include_bytes!("../assets/test.zip");
     /// # let archive = ZipArchive::from_slice(data)?;
@@ -1629,7 +1629,7 @@ impl<'a> ZipFileHeaderRecord<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// # use rawzip::{ZipArchive, extra_fields::ExtraFieldId};
+    /// # use soapberry_zip::{ZipArchive, extra_fields::ExtraFieldId};
     /// # fn example(data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     /// let archive = ZipArchive::from_slice(data)?;
     /// for entry_result in archive.entries() {

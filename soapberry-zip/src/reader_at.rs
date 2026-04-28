@@ -272,7 +272,7 @@ impl<T: ReaderAt + ?Sized> ReaderAt for Box<T> {
 ///
 /// ```
 /// use std::io::Read;
-/// use rawzip::{ZipArchive, RangeReader, RECOMMENDED_BUFFER_SIZE};
+/// use soapberry_zip::{ZipArchive, RangeReader, RECOMMENDED_BUFFER_SIZE};
 /// use std::fs::File;
 ///
 /// let file = File::open("assets/test-prefix.zip")?;

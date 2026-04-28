@@ -26,7 +26,7 @@ pub fn to_py_err(err: litchi::Error) -> PyErr {
 }
 
 /// Converts a boxed error to a Python exception
-pub fn boxed_err_to_py_err(err: Box<dyn std::error::Error>) -> PyErr {
+pub fn boxed_err_to_py_err(err: Box<dyn std::error::Error + Send + Sync>) -> PyErr {
     PyException::new_err(err.to_string())
 }
 

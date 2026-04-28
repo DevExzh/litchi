@@ -50,7 +50,7 @@ impl ZipLocator {
     /// The search is performed backwards from the end of the data source.
     ///
     /// ```rust
-    /// use rawzip::ZipLocator;
+    /// use soapberry_zip::ZipLocator;
     ///
     /// let locator = ZipLocator::new().max_search_space(1024 * 64); // 64 KiB
     /// ```
@@ -136,7 +136,7 @@ impl ZipLocator {
     /// # Examples
     ///
     /// ```rust
-    /// use rawzip::ZipLocator;
+    /// use soapberry_zip::ZipLocator;
     /// use std::fs;
     /// use std::io::Read;
     ///
@@ -179,12 +179,12 @@ impl ZipLocator {
     /// # Examples
     ///
     /// ```rust
-    /// use rawzip::ZipLocator;
+    /// use soapberry_zip::ZipLocator;
     /// use std::fs::File;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let file = File::open("assets/readme.zip")?;
-    /// let mut buffer = vec![0; rawzip::RECOMMENDED_BUFFER_SIZE];
+    /// let mut buffer = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
     /// let locator = ZipLocator::new();
     ///
     /// match locator.locate_in_file(file, &mut buffer) {
@@ -229,14 +229,14 @@ impl ZipLocator {
     /// # Examples
     ///
     /// ```rust
-    /// use rawzip::{ZipLocator, FileReader};
+    /// use soapberry_zip::{ZipLocator, FileReader};
     /// use std::fs::File;
     /// use std::io::Seek;
     ///
-    /// # fn main() -> Result<(), rawzip::Error> {
+    /// # fn main() -> Result<(), soapberry_zip::Error> {
     /// let file = File::open("assets/test.zip").unwrap();
     /// let mut reader = FileReader::from(file);
-    /// let mut buffer = vec![0; rawzip::RECOMMENDED_BUFFER_SIZE];
+    /// let mut buffer = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
     /// let locator = ZipLocator::new();
     ///
     /// // An example of determining the end offset when you don't

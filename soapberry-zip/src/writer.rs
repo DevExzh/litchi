@@ -89,13 +89,13 @@ impl ZipArchiveWriterBuilder {
     /// let zip_start_offset = output.position();
     ///
     /// // Create ZIP archive starting after the prefix data
-    /// let mut archive = rawzip::ZipArchiveWriter::builder()
+    /// let mut archive = soapberry_zip::ZipArchiveWriter::builder()
     ///     .with_offset(zip_start_offset)  // Tell the archive where it starts
     ///     .build(&mut output);
     ///
     /// // Add files normally
     /// let mut file = archive.new_file("data.txt").create().unwrap();
-    /// let mut writer = rawzip::ZipDataWriter::new(&mut file);
+    /// let mut writer = soapberry_zip::ZipDataWriter::new(&mut file);
     /// writer.write_all(b"File content").unwrap();
     /// let (_, desc) = writer.finish().unwrap();
     /// file.finish(desc).unwrap();
@@ -127,7 +127,7 @@ impl ZipArchiveWriterBuilder {
 /// use std::io::Write;
 ///
 /// let mut output = std::io::Cursor::new(Vec::new());
-/// let mut archive = rawzip::ZipArchiveWriter::new(&mut output);
+/// let mut archive = soapberry_zip::ZipArchiveWriter::new(&mut output);
 /// let (mut entry, config) = archive.new_file("file.txt").start().unwrap();
 /// let mut writer = config.wrap(&mut entry);
 /// writer.write_all(b"Hello, world!").unwrap();
@@ -141,7 +141,7 @@ impl ZipArchiveWriterBuilder {
 /// use std::io::Write;
 ///
 /// let mut output = std::io::Cursor::new(Vec::<u8>::new());
-/// let mut _archive = rawzip::ZipArchiveWriter::builder()
+/// let mut _archive = soapberry_zip::ZipArchiveWriter::builder()
 ///     .with_capacity(1000)  // Optimize for 1000 anticipated files
 ///     .build(&mut output);
 /// // ... add files as usual
@@ -184,7 +184,7 @@ impl<W> ZipArchiveWriter<W> {
     /// use std::io::Write;
     ///
     /// let mut output = std::io::Cursor::new(Vec::new());
-    /// let mut archive = rawzip::ZipArchiveWriter::new(&mut output);
+    /// let mut archive = soapberry_zip::ZipArchiveWriter::new(&mut output);
     ///
     /// // 1. Get local header offset
     /// let local_header_offset = archive.stream_offset();
@@ -194,7 +194,7 @@ impl<W> ZipArchiveWriter<W> {
     /// let data_start_offset = file.stream_offset();
     ///
     /// // Write some data
-    /// let mut writer = rawzip::ZipDataWriter::new(&mut file);
+    /// let mut writer = soapberry_zip::ZipDataWriter::new(&mut file);
     /// writer.write_all(b"Hello World").unwrap();
     /// let (_, desc) = writer.finish().unwrap();
     ///
@@ -318,7 +318,7 @@ where
     ///
     /// ```rust
     /// # use std::io::{Cursor, Write};
-    /// # use rawzip::{ZipArchive, ZipArchiveWriter, ZipDataWriter, extra_fields::ExtraFieldId, Header};
+    /// # use soapberry_zip::{ZipArchive, ZipArchiveWriter, ZipDataWriter, extra_fields::ExtraFieldId, Header};
     /// let mut output = Cursor::new(Vec::new());
     /// let mut archive = ZipArchiveWriter::new(&mut output);
     ///
@@ -432,7 +432,7 @@ where
     /// ```
     /// # use std::io::Write;
     /// # let mut output = std::io::Cursor::new(Vec::new());
-    /// # let mut archive = rawzip::ZipArchiveWriter::new(&mut output);
+    /// # let mut archive = soapberry_zip::ZipArchiveWriter::new(&mut output);
     /// let (mut entry, config) = archive.new_file("file.txt").start().unwrap();
     /// let mut writer = config.wrap(&mut entry);
     /// writer.write_all(b"Hello").unwrap();
@@ -445,7 +445,7 @@ where
     /// ```
     /// # use std::io::Write;
     /// # let mut output = std::io::Cursor::new(Vec::new());
-    /// # let mut archive = rawzip::ZipArchiveWriter::new(&mut output);
+    /// # let mut archive = soapberry_zip::ZipArchiveWriter::new(&mut output);
     /// let (mut entry, config) = archive.new_file("file.txt").start().unwrap();
     /// let encoder = flate2::write::DeflateEncoder::new(&mut entry, flate2::Compression::default());
     /// let mut writer = config.wrap(encoder);
@@ -656,7 +656,7 @@ where
     /// ```rust
     /// # use std::io::Cursor;
     /// # let mut output = Cursor::new(Vec::new());
-    /// # let mut archive = rawzip::ZipArchiveWriter::new(&mut output);
+    /// # let mut archive = soapberry_zip::ZipArchiveWriter::new(&mut output);
     /// archive.new_dir("my-dir/")
     ///     .unix_permissions(0o755)
     ///     .create()?;
@@ -733,9 +733,9 @@ where
     /// ```rust
     /// # use std::io::{Cursor, Write};
     /// # let mut output = Cursor::new(Vec::new());
-    /// # let mut archive = rawzip::ZipArchiveWriter::new(&mut output);
+    /// # let mut archive = soapberry_zip::ZipArchiveWriter::new(&mut output);
     /// let (mut entry, config) = archive.new_file("my-file")
-    ///     .compression_method(rawzip::CompressionMethod::Deflate)
+    ///     .compression_method(soapberry_zip::CompressionMethod::Deflate)
     ///     .unix_permissions(0o644)
     ///     .start()?;
     /// let mut writer = config.wrap(&mut entry);

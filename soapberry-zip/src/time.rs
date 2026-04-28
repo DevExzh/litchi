@@ -15,8 +15,8 @@
 //! preserving modification times:
 //!
 //! ```
-//! use rawzip::{ZipArchive, ZipArchiveWriter, ZipDataWriter};
-//! use rawzip::time::{ZipDateTimeKind, UtcDateTime};
+//! use soapberry_zip::{ZipArchive, ZipArchiveWriter, ZipDataWriter};
+//! use soapberry_zip::time::{ZipDateTimeKind, UtcDateTime};
 //! use std::io::Write;
 //!
 //! // Read a test ZIP file with timestamps
@@ -276,7 +276,7 @@ impl<TZ: TimeZoneMarker> ZipDateTime<TZ> {
     /// # Examples
     ///
     /// ```
-    /// # use rawzip::time::{UtcDateTime, LocalDateTime};
+    /// # use soapberry_zip::time::{UtcDateTime, LocalDateTime};
     /// let utc_datetime = UtcDateTime::from_components(
     ///     2023, 6, 15, 14, 30, 45, 500_000_000
     /// ).unwrap();
