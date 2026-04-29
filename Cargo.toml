@@ -53,6 +53,7 @@ members = [
     "crates/litchi-imgconv",
     "crates/litchi-iwa",
     "crates/litchi-odf",
+    "crates/litchi-ole",
     "crates/litchi-opc",
     "crates/litchi-rtf",
     "crates/pyo3-litchi",
@@ -156,7 +157,7 @@ full = [
 # Format support features
 iwa = ["dep:litchi-iwa"]
 odf = ["dep:litchi-odf", "litchi-core/odf"]
-ole = ["dep:encoding_rs", "dep:bumpalo", "dep:litchi-cfb", "litchi-core/ole"]
+ole = ["dep:litchi-ole", "litchi-core/ole"]
 ooxml = ["dep:soapberry-zip", "dep:quick-xml", "dep:encoding_rs", "dep:litchi-opc"]
 ooxml_encryption = [
     "ooxml",
@@ -169,8 +170,8 @@ ooxml_encryption = [
 ]
 rtf = ["dep:litchi-rtf", "litchi-core/rtf"]
 # Additional functionality features
-formula = ["dep:litchi-formula"]
-imgconv = ["dep:litchi-imgconv"]
+formula = ["dep:litchi-formula", "litchi-ole?/formula"]
+imgconv = ["dep:litchi-imgconv", "litchi-ole?/imgconv"]
 fonts = ["dep:allsorts", "dep:litchi-fonts"]
 eval_engine = ["dep:litchi-eval"]
 eval_engine_web_functions = ["eval_engine", "litchi-eval/web_functions"]
@@ -182,7 +183,6 @@ allsorts = { version = "0.16", optional = true } # Font subsetting and layout
 atoi_simd = "0.18" # SIMD-optimized conversion of byte slices to integers
 base64 = "0.22" # Base64 encoding/decoding for embedded binary data in XML
 bitflags = { version = "2.10", features = ["std", "serde"] } # Bit flags for efficient flag combinations
-bumpalo = { version = "3", features = ["collections"], optional = true } # Fast bump allocator for temporary formula parsing data
 bytes = { version = "1", features = ["serde"] } # Efficient byte buffer operations with zero-copy slicing
 cbc = { version = "0.1", features = ["alloc"], optional = true } # CBC mode for AES-based OOXML encryption
 chrono = { version = "0", features = ["serde"] } # Date and time types for Office timestamps
@@ -200,6 +200,7 @@ litchi-formula = { workspace = true, optional = true } # Formula parser/converte
 litchi-imgconv = { workspace = true, optional = true } # EMF/WMF/PICT image conversion (carved out in workspace split, gated by `imgconv` feature)
 litchi-iwa = { workspace = true, optional = true } # Apple iWork (.pages, .numbers, .key) parser (carved out in workspace split, gated by `iwa` feature)
 litchi-odf = { workspace = true, optional = true } # OpenDocument Format (.odt, .ods, .odp) parser (carved out in workspace split, gated by odf feature)
+litchi-ole = { workspace = true, optional = true } # Legacy OLE2 binary office formats (.doc, .xls, .ppt) parser/writer (carved out in workspace split, gated by `ole` feature)
 litchi-opc = { workspace = true, optional = true } # OPC (Open Packaging Conventions) substrate (carved out in workspace split, gated by `ooxml` feature)
 litchi-rtf = { workspace = true, optional = true } # RTF parser and writer (carved out in workspace split, gated by `rtf` feature)
 memchr = "2.7" # SIMD-accelerated string searching for fast byte pattern matching

@@ -45,16 +45,15 @@
 
 pub use litchi_imgconv::*;
 
-// Integration glue between `crate::ole::escher` and `litchi_imgconv` lives
-// in the umbrella because it crosses two leaf crates that must remain
-// independent. Gated on `ole` so non-OLE builds skip the bridge.
-#[cfg(feature = "ole")]
-pub mod extractor;
+// Integration glue between `litchi_ole::escher` and `litchi_imgconv` lives
+// in the `litchi-ole` crate (relocated from the umbrella in P4c) because it
+// reaches into private `litchi-ole` Escher types. The umbrella re-exports
+// the public surface here so callers using `litchi::images::ImageExtractor`
+// keep resolving.
+#[cfg(all(feature = "ole", feature = "imgconv"))]
+pub use litchi_ole::extractor::{ExtractedImage, ImageExtractor};
 
-#[cfg(feature = "ole")]
-pub use extractor::{ExtractedImage, ImageExtractor};
-
-#[cfg(feature = "ole")]
+#[cfg(all(feature = "ole", feature = "imgconv"))]
 use litchi_core::error::Result;
 
 /// Extract all images from a PPT presentation file
@@ -76,7 +75,7 @@ use litchi_core::error::Result;
 /// }
 /// # Ok::<(), litchi::Error>(())
 /// ```
-#[cfg(feature = "ole")]
+#[cfg(all(feature = "ole", feature = "imgconv"))]
 pub fn extract_images_from_ppt<P: AsRef<std::path::Path>>(
     path: P,
 ) -> Result<Vec<ExtractedImage<'static>>> {
@@ -111,7 +110,7 @@ pub fn extract_images_from_ppt<P: AsRef<std::path::Path>>(
 /// }
 /// # Ok::<(), litchi::Error>(())
 /// ```
-#[cfg(feature = "ole")]
+#[cfg(all(feature = "ole", feature = "imgconv"))]
 pub fn extract_images_from_doc<P: AsRef<std::path::Path>>(
     path: P,
 ) -> Result<Vec<ExtractedImage<'static>>> {
@@ -136,7 +135,7 @@ pub fn extract_images_from_doc<P: AsRef<std::path::Path>>(
 ///
 /// # Returns
 /// Vector of extracted images
-#[cfg(feature = "ole")]
+#[cfg(all(feature = "ole", feature = "imgconv"))]
 pub fn extract_images_from_escher(escher_data: &[u8]) -> Result<Vec<ExtractedImage<'static>>> {
     ImageExtractor::extract_blips(escher_data)
 }
@@ -150,7 +149,7 @@ pub fn extract_images_from_escher(escher_data: &[u8]) -> Result<Vec<ExtractedIma
 ///
 /// # Returns
 /// BlipStore with all BSE entries
-#[cfg(feature = "ole")]
+#[cfg(all(feature = "ole", feature = "imgconv"))]
 pub fn parse_blip_store(escher_data: &[u8]) -> Result<BlipStore<'_>> {
     ImageExtractor::extract_blip_store(escher_data)
 }

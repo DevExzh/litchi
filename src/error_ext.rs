@@ -19,31 +19,15 @@ use litchi_core::Error;
 // ppt package-level conversions below remain here because their source types
 // (`DocError`, `PptError`) are still local to the umbrella.
 
-#[cfg(feature = "ole")]
-impl From<crate::ole::doc::package::DocError> for Error {
-    fn from(err: crate::ole::doc::package::DocError) -> Self {
-        match err {
-            crate::ole::doc::package::DocError::Io(e) => Error::Io(e),
-            crate::ole::doc::package::DocError::Ole(ole_err) => Error::from(ole_err),
-            crate::ole::doc::package::DocError::InvalidFormat(s) => Error::InvalidFormat(s),
-            crate::ole::doc::package::DocError::StreamNotFound(s) => Error::ComponentNotFound(s),
-            crate::ole::doc::package::DocError::Corrupted(s) => Error::CorruptedFile(s),
-        }
-    }
-}
+// `impl From<crate::ole::doc::package::DocError> for litchi_core::Error`
+// moved to `crates/litchi-ole/src/doc/package.rs` to satisfy the orphan rule
+// after the litchi-ole carve-out (P4c). Keep this comment for grep
+// traceability.
 
-#[cfg(feature = "ole")]
-impl From<crate::ole::ppt::package::PptError> for Error {
-    fn from(err: crate::ole::ppt::package::PptError) -> Self {
-        match err {
-            crate::ole::ppt::package::PptError::Io(e) => Error::Io(e),
-            crate::ole::ppt::package::PptError::Ole(ole_err) => Error::from(ole_err),
-            crate::ole::ppt::package::PptError::InvalidFormat(s) => Error::InvalidFormat(s),
-            crate::ole::ppt::package::PptError::StreamNotFound(s) => Error::ComponentNotFound(s),
-            crate::ole::ppt::package::PptError::Corrupted(s) => Error::CorruptedFile(s),
-        }
-    }
-}
+// `impl From<crate::ole::ppt::package::PptError> for litchi_core::Error`
+// moved to `crates/litchi-ole/src/ppt/package.rs` to satisfy the orphan rule
+// after the litchi-ole carve-out (P4c). Keep this comment for grep
+// traceability.
 
 // ---------------------------------------------------------------------------
 // OOXML error conversions

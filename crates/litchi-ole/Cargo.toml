@@ -1,0 +1,29 @@
+[package]
+name        = "litchi-ole"
+description = "Legacy OLE2 binary office formats (.doc, .xls, .ppt) parser/writer for the Litchi office-formats library."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+default = []
+formula = ["dep:litchi-formula"]
+imgconv = ["dep:litchi-imgconv"]
+
+[dependencies]
+bitflags        = { workspace = true }
+bumpalo         = { workspace = true }
+bytes           = { workspace = true }
+chrono          = { workspace = true }
+litchi-cfb      = { workspace = true }
+litchi-core     = { workspace = true }
+litchi-formula  = { workspace = true, optional = true }
+litchi-imgconv  = { workspace = true, optional = true }
+once_cell       = { workspace = true }
+smallvec        = { workspace = true }
+thiserror       = { workspace = true }
+zerocopy        = { workspace = true }
+zerocopy-derive = { workspace = true }

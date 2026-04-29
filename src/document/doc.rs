@@ -460,7 +460,22 @@ impl Document {
     pub fn elements(&self) -> Result<Vec<super::DocumentElement>> {
         match &self.inner {
             #[cfg(feature = "ole")]
-            DocumentImpl::Doc(doc, _) => doc.elements().map_err(Error::from),
+            DocumentImpl::Doc(doc, _) => {
+                use super::DocumentElement;
+                use litchi_ole::doc::DocElement;
+                let raw = doc.elements().map_err(Error::from)?;
+                Ok(raw
+                    .into_iter()
+                    .map(|el| match el {
+                        DocElement::Paragraph(p) => {
+                            DocumentElement::Paragraph(Box::new(super::Paragraph::Doc(*p)))
+                        },
+                        DocElement::Table(t) => {
+                            DocumentElement::Table(Box::new(super::Table::Doc(*t)))
+                        },
+                    })
+                    .collect())
+            },
             #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(doc, _) => doc.elements().map_err(Error::from),
             #[cfg(feature = "iwa")]

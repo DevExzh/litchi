@@ -273,7 +273,9 @@ pub mod markdown;
 ///
 /// **Note**: This requires the `ole` feature to be enabled.
 #[cfg(feature = "ole")]
-pub mod ole;
+pub mod ole {
+    pub use litchi_ole::*;
+}
 
 /// OOXML format parser (modern .docx, .pptx files)
 ///
