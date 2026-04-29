@@ -99,9 +99,6 @@
 /// # }
 /// ```
 // Module declarations
-mod config;
-mod traits;
-pub mod unicode;
 mod writer;
 
 // Document and presentation markdown implementations are only available when their respective features are enabled
@@ -117,6 +114,7 @@ mod document;
 #[cfg(any(feature = "ole", feature = "ooxml", feature = "odf", feature = "iwa"))]
 mod presentation;
 
-// Re-export public API
-pub use config::{FormulaStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle};
-pub use traits::ToMarkdown;
+// Re-export public API (format-agnostic helpers live in litchi-markdown)
+pub use litchi_markdown::{
+    FormulaStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle, ToMarkdown, unicode,
+};

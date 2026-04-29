@@ -1,4 +1,4 @@
-use super::config::MarkdownOptions;
+use crate::config::MarkdownOptions;
 /// Core trait for Markdown conversion.
 ///
 /// This module defines the `ToMarkdown` trait that enables types to be

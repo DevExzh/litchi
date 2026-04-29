@@ -52,6 +52,7 @@ members = [
     "crates/litchi-formula",
     "crates/litchi-imgconv",
     "crates/litchi-iwa",
+    "crates/litchi-markdown",
     "crates/litchi-odf",
     "crates/litchi-ole",
     "crates/litchi-ooxml",
@@ -187,6 +188,7 @@ litchi-fonts = { workspace = true, optional = true } # Font discovery, loading, 
 litchi-formula = { workspace = true, optional = true } # Formula parser/converter (carved out in workspace split, gated by `formula` feature)
 litchi-imgconv = { workspace = true, optional = true } # EMF/WMF/PICT image conversion (carved out in workspace split, gated by `imgconv` feature)
 litchi-iwa = { workspace = true, optional = true } # Apple iWork (.pages, .numbers, .key) parser (carved out in workspace split, gated by `iwa` feature)
+litchi-markdown = { workspace = true } # Format-agnostic Markdown emission helpers (carved out in workspace split)
 litchi-odf = { workspace = true, optional = true } # OpenDocument Format (.odt, .ods, .odp) parser (carved out in workspace split, gated by odf feature)
 litchi-ole = { workspace = true, optional = true } # Legacy OLE2 binary office formats (.doc, .xls, .ppt) parser/writer (carved out in workspace split, gated by `ole` feature)
 litchi-ooxml = { workspace = true, optional = true } # Modern Office Open XML formats (.docx, .xlsx, .xlsb, .pptx) parser/writer (carved out in workspace split, gated by `ooxml` feature)

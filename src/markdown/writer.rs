@@ -1,4 +1,3 @@
-use super::config::{MarkdownOptions, TableStyle};
 use crate::MetadataYaml;
 use crate::document::{Cell, Paragraph, Run, Table};
 /// Low-level writer for Markdown generation.
@@ -8,6 +7,7 @@ use crate::document::{Cell, Paragraph, Run, Table};
 ///
 /// **Note**: Some functionality requires the `ole` or `ooxml` feature to be enabled.
 use litchi_core::{Error, Metadata, Result};
+use litchi_markdown::{MarkdownOptions, TableStyle};
 use memchr::memchr;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::fmt::Write as FmtWrite;
@@ -674,7 +674,7 @@ impl MarkdownWriter {
             // For superscript/subscript, we apply them directly and skip other formatting
             if let Some(pos) = vertical_pos {
                 match self.options.script_style {
-                    super::config::ScriptStyle::Html => match pos {
+                    litchi_markdown::ScriptStyle::Html => match pos {
                         VerticalPosition::Superscript => {
                             self.buffer.push_str("<sup>");
                             self.buffer.push_str(&text);
@@ -689,14 +689,15 @@ impl MarkdownWriter {
                             self.buffer.push_str(&text);
                         },
                     },
-                    super::config::ScriptStyle::Unicode => {
+                    litchi_markdown::ScriptStyle::Unicode => {
                         // Convert to Unicode superscript/subscript characters
                         // Fall back to HTML tags for characters without Unicode equivalents
                         match pos {
                             VerticalPosition::Superscript => {
-                                if super::unicode::can_convert_to_superscript(&text) {
+                                if litchi_markdown::unicode::can_convert_to_superscript(&text) {
                                     // All characters can be converted to superscript
-                                    let converted = super::unicode::convert_to_superscript(&text);
+                                    let converted =
+                                        litchi_markdown::unicode::convert_to_superscript(&text);
                                     self.buffer.push_str(&converted);
                                 } else {
                                     // Fall back to HTML for partial support
@@ -706,9 +707,10 @@ impl MarkdownWriter {
                                 }
                             },
                             VerticalPosition::Subscript => {
-                                if super::unicode::can_convert_to_subscript(&text) {
+                                if litchi_markdown::unicode::can_convert_to_subscript(&text) {
                                     // All characters can be converted to subscript
-                                    let converted = super::unicode::convert_to_subscript(&text);
+                                    let converted =
+                                        litchi_markdown::unicode::convert_to_subscript(&text);
                                     self.buffer.push_str(&converted);
                                 } else {
                                     // Fall back to HTML for partial support
@@ -745,7 +747,7 @@ impl MarkdownWriter {
         // Apply formatting changes (only add/remove markers when formatting changes)
         // Note: For HTML strikethrough style, we need special handling since HTML
         // tags can't be left open across runs
-        if self.options.strikethrough_style == super::config::StrikethroughStyle::Html
+        if self.options.strikethrough_style == litchi_markdown::StrikethroughStyle::Html
             && strikethrough
         {
             // HTML strikethrough: must be self-contained per run
@@ -1550,13 +1552,13 @@ impl MarkdownWriter {
     fn format_formula(&self, formula: &str, inline: bool) -> String {
         if inline {
             match self.options.formula_style {
-                super::config::FormulaStyle::LaTeX => format!("\\({}\\)", formula),
-                super::config::FormulaStyle::Dollar => format!("${}$", formula),
+                litchi_markdown::FormulaStyle::LaTeX => format!("\\({}\\)", formula),
+                litchi_markdown::FormulaStyle::Dollar => format!("${}$", formula),
             }
         } else {
             match self.options.formula_style {
-                super::config::FormulaStyle::LaTeX => format!("\\[{}\\]", formula),
-                super::config::FormulaStyle::Dollar => format!("$${}$$", formula),
+                litchi_markdown::FormulaStyle::LaTeX => format!("\\[{}\\]", formula),
+                litchi_markdown::FormulaStyle::Dollar => format!("$${}$$", formula),
             }
         }
     }
