@@ -87,3 +87,4 @@ Backup of *.doc*
 test*
 !tests/
 !tests/**
+!crates/soapberry-zip/assets/test.zip
