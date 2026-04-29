@@ -38,7 +38,7 @@ impl CustomShow {
     /// # Example
     ///
     /// ```
-    /// use litchi::ole::ppt::writer::custom_shows::CustomShow;
+    /// use litchi_ole::ppt::writer::custom_shows::CustomShow;
     /// // Create a custom show with slides 0, 2, and 4
     /// let show = CustomShow::new("Executive Summary", &[0, 2, 4]);
     /// ```

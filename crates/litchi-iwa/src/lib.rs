@@ -6,7 +6,7 @@
 //! ## Quick Start
 //!
 //! ```rust,no_run
-//! use litchi::iwa::Document;
+//! use litchi_iwa::Document;
 //!
 //! // Open an iWork document
 //! let doc = Document::open("document.pages")?;
@@ -23,7 +23,7 @@
 //! // Extract structured data (tables, slides, sections)
 //! let structured = doc.extract_structured_data()?;
 //! println!("{}", structured.summary());
-//! # Ok::<(), litchi::iwa::Error>(())
+//! # Ok::<(), litchi_iwa::Error>(())
 //! ```
 //!
 //! ## iWork File Structure
@@ -69,7 +69,7 @@
 //! ### Parse from bytes
 //!
 //! ```rust,no_run
-//! use litchi::iwa::Document;
+//! use litchi_iwa::Document;
 //! use std::fs;
 //!
 //! let bytes = fs::read("document.pages")?;
@@ -81,7 +81,7 @@
 //! ### Extract media
 //!
 //! ```rust,no_run
-//! use litchi::iwa::Document;
+//! use litchi_iwa::Document;
 //!
 //! let doc = Document::open("presentation.key")?;
 //!
@@ -100,7 +100,7 @@
 //! ### Extract tables
 //!
 //! ```rust,no_run
-//! use litchi::iwa::Document;
+//! use litchi_iwa::Document;
 //!
 //! let doc = Document::open("spreadsheet.numbers")?;
 //! let structured = doc.extract_structured_data()?;

@@ -13,9 +13,9 @@ use std::path::Path;
 /// # Examples
 ///
 /// ```no_run
-/// use litchi::odf::Presentation;
+/// use litchi_odf::Presentation;
 ///
-/// # fn main() -> litchi::Result<()> {
+/// # fn main() -> litchi_core::Result<()> {
 /// let mut presentation = Presentation::open("slides.odp")?;
 ///
 /// // Get slide count
@@ -52,9 +52,9 @@ impl Presentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Presentation;
+    /// use litchi_odf::Presentation;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let presentation = Presentation::open("slides.odp")?;
     /// # Ok(())
     /// # }
@@ -77,9 +77,9 @@ impl Presentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Presentation;
+    /// use litchi_odf::Presentation;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let bytes = std::fs::read("slides.odp")?;
     /// let presentation = Presentation::from_bytes(bytes)?;
     /// # Ok(())
@@ -205,9 +205,9 @@ impl Presentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Presentation;
+    /// use litchi_odf::Presentation;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let presentation = Presentation::open("input.odp")?;
     /// presentation.save("output.odp")?;
     /// # Ok(())
@@ -232,9 +232,9 @@ impl Presentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Presentation;
+    /// use litchi_odf::Presentation;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let presentation = Presentation::open("slides.odp")?;
     /// let bytes = presentation.to_bytes()?;
     /// # Ok(())

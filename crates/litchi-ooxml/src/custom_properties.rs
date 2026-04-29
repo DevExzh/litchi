@@ -19,7 +19,7 @@
 //! # Example Usage
 //!
 //! ```rust,no_run
-//! use litchi::ooxml::custom_properties::{CustomProperties, PropertyValue};
+//! use litchi_ooxml::custom_properties::{CustomProperties, PropertyValue};
 //!
 //! let mut props = CustomProperties::new();
 //!
@@ -209,7 +209,7 @@ impl CustomProperties {
     /// # Example
     ///
     /// ```rust
-    /// use litchi::ooxml::custom_properties::CustomProperties;
+    /// use litchi_ooxml::custom_properties::CustomProperties;
     ///
     /// let props = CustomProperties::new();
     /// ```
@@ -237,7 +237,7 @@ impl CustomProperties {
     /// # Example
     ///
     /// ```rust
-    /// use litchi::ooxml::custom_properties::{CustomProperties, PropertyValue};
+    /// use litchi_ooxml::custom_properties::{CustomProperties, PropertyValue};
     ///
     /// let mut props = CustomProperties::new();
     /// props.add_property("Author", PropertyValue::String("John Doe".to_string()));
@@ -293,7 +293,7 @@ impl CustomProperties {
     /// # Example
     ///
     /// ```rust
-    /// use litchi::ooxml::custom_properties::{CustomProperties, PropertyValue};
+    /// use litchi_ooxml::custom_properties::{CustomProperties, PropertyValue};
     ///
     /// let mut props = CustomProperties::new();
     /// props.add_property("Version", PropertyValue::Integer(42));
@@ -319,7 +319,7 @@ impl CustomProperties {
     /// # Example
     ///
     /// ```rust
-    /// use litchi::ooxml::custom_properties::{CustomProperties, PropertyValue};
+    /// use litchi_ooxml::custom_properties::{CustomProperties, PropertyValue};
     ///
     /// let mut props = CustomProperties::new();
     /// props.add_property("TempData", PropertyValue::String("temp".to_string()));
@@ -358,7 +358,7 @@ impl CustomProperties {
     /// # Example
     ///
     /// ```rust
-    /// use litchi::ooxml::custom_properties::{CustomProperties, PropertyValue};
+    /// use litchi_ooxml::custom_properties::{CustomProperties, PropertyValue};
     ///
     /// let mut props = CustomProperties::new();
     /// props.add_property("Name", PropertyValue::String("Test".to_string()));
@@ -377,7 +377,7 @@ impl CustomProperties {
     /// # Example
     ///
     /// ```rust
-    /// use litchi::ooxml::custom_properties::{CustomProperties, PropertyValue};
+    /// use litchi_ooxml::custom_properties::{CustomProperties, PropertyValue};
     ///
     /// let mut props = CustomProperties::new();
     /// props.add_property("Name", PropertyValue::String("Test".to_string()));
@@ -589,8 +589,8 @@ impl CustomProperties {
 /// # Example
 ///
 /// ```rust,no_run
-/// use litchi::ooxml::OpcPackage;
-/// use litchi::ooxml::custom_properties::extract_custom_properties;
+/// use litchi_ooxml::OpcPackage;
+/// use litchi_ooxml::custom_properties::extract_custom_properties;
 ///
 /// let package = OpcPackage::open("document.docx")?;
 /// let custom_props = extract_custom_properties(&package)?;

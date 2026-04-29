@@ -14,7 +14,7 @@ use std::fmt::Write as FmtWrite;
 /// # Examples
 ///
 /// ```rust,ignore
-/// use litchi::ooxml::docx::writer::MutableTheme;
+/// use litchi_ooxml::docx::writer::MutableTheme;
 ///
 /// let mut theme = MutableTheme::new("Office Theme");
 /// theme.set_major_font("Calibri Light");

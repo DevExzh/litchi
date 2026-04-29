@@ -11,7 +11,7 @@ use std::fmt;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::ooxml::docx::enums::WdOrientation;
+/// use litchi_ooxml::docx::enums::WdOrientation;
 ///
 /// let orientation = WdOrientation::Landscape;
 /// assert_eq!(orientation.to_xml(), "landscape");
@@ -31,7 +31,7 @@ impl WdOrientation {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::enums::WdOrientation;
+    /// use litchi_ooxml::docx::enums::WdOrientation;
     ///
     /// assert_eq!(WdOrientation::Portrait.to_xml(), "portrait");
     /// assert_eq!(WdOrientation::Landscape.to_xml(), "landscape");
@@ -80,7 +80,7 @@ impl fmt::Display for WdOrientation {
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::ooxml::docx::enums::WdSectionStart;
+/// use litchi_ooxml::docx::enums::WdSectionStart;
 ///
 /// let start_type = WdSectionStart::NewPage;
 /// assert_eq!(start_type.to_xml(), "nextPage");
@@ -155,7 +155,7 @@ impl fmt::Display for WdSectionStart {
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::ooxml::docx::enums::WdHeaderFooter;
+/// use litchi_ooxml::docx::enums::WdHeaderFooter;
 ///
 /// let index = WdHeaderFooter::Primary;
 /// assert_eq!(index.to_xml(), "default");
@@ -220,7 +220,7 @@ impl fmt::Display for WdHeaderFooter {
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::ooxml::docx::enums::WdStyleType;
+/// use litchi_ooxml::docx::enums::WdStyleType;
 ///
 /// let style_type = WdStyleType::Paragraph;
 /// assert_eq!(style_type.to_xml(), "paragraph");

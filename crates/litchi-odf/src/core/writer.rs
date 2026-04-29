@@ -17,8 +17,8 @@ use std::collections::HashSet;
 /// # Examples
 ///
 /// ```ignore
-/// # use litchi::odf::core::PackageWriter;
-/// # use litchi::Result;
+/// # use litchi_odf::core::PackageWriter;
+/// # use litchi_core::Result;
 /// # fn example() -> Result<()> {
 /// let mut writer = PackageWriter::new();
 /// writer.set_mimetype("application/vnd.oasis.opendocument.text")?;

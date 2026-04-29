@@ -1,7 +1,6 @@
-// `missing_docs` is intentionally relaxed during the Phase 1 carve-out: the
-// items hosted in this crate were previously private/`pub(crate)` inside the
-// umbrella `litchi` crate and never had public doc coverage. A follow-up pass
-// can tighten this once Phase 1 stabilises.
+// Many items in this crate were previously private inside the umbrella
+// `litchi` crate and never had public doc coverage. Tighten this once a
+// docs pass lands.
 #![allow(missing_docs)]
 //! Common types, traits, and utilities shared across formats.
 //!

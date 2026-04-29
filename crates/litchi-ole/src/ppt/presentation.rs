@@ -22,7 +22,7 @@ use std::io::{Read, Seek};
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::ole::ppt::Package;
+/// use litchi_ole::ppt::Package;
 ///
 /// let mut pkg = Package::open("presentation.ppt")?;
 /// let pres = pkg.presentation()?;
@@ -217,7 +217,7 @@ impl Presentation {
     ///
     /// # Example
     /// ```no_run
-    /// use litchi::ole::ppt::Package;
+    /// use litchi_ole::ppt::Package;
     ///
     /// let mut pkg = Package::open("presentation.ppt")?;
     /// let pres = pkg.presentation()?;

@@ -31,7 +31,7 @@ use crate::{Error, Result};
 ///
 /// ```rust,no_run
 /// use soapberry_zip::office::ArchiveReader;
-/// use litchi::iwa::zip_utils::parse_iwa_files_from_archive;
+/// use litchi_iwa::zip_utils::parse_iwa_files_from_archive;
 ///
 /// let data = std::fs::read("document.pages")?;
 /// let archive = ArchiveReader::new(&data)?;
@@ -79,7 +79,7 @@ pub fn parse_iwa_files_from_archive(
 ///
 /// ```rust,no_run
 /// use soapberry_zip::office::ArchiveReader;
-/// use litchi::iwa::zip_utils::extract_message_types_from_archive;
+/// use litchi_iwa::zip_utils::extract_message_types_from_archive;
 ///
 /// let data = std::fs::read("document.pages")?;
 /// let archive = ArchiveReader::new(&data)?;

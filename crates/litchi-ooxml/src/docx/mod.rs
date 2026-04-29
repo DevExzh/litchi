@@ -18,7 +18,7 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi::ooxml::docx::Package;
+//! use litchi_ooxml::docx::Package;
 //!
 //! // Open a document
 //! let package = Package::open("document.docx")?;
@@ -116,10 +116,8 @@ pub use writer::{
 /// Crate-native ordered document element returned by [`Document::elements`].
 ///
 /// The umbrella `litchi` crate maps this into its public `DocumentElement`
-/// variants. Introduced in P4d (workspace-split) so that the inner
-/// `Document::elements` method does not need to reach back into the umbrella
-/// `crate::document::*` types, which would create a reverse-direction crate
-/// dependency.
+/// variants. Keeping it crate-local avoids a reverse dependency from
+/// `litchi-ooxml` back to the umbrella's `document` types.
 #[derive(Debug, Clone)]
 pub enum DocxElement {
     /// A paragraph element.

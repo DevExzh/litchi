@@ -28,7 +28,7 @@ impl NamedRange {
     /// # Example
     ///
     /// ```rust
-    /// use litchi::ooxml::xlsb::named_ranges::NamedRange;
+    /// use litchi_ooxml::xlsb::named_ranges::NamedRange;
     ///
     /// let range = NamedRange::new("MyRange".to_string(), None);
     /// ```

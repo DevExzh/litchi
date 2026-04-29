@@ -1,14 +1,12 @@
 /// Constants for OLE file format
 pub mod consts;
 
-// CFB substrate — moved to the litchi-cfb crate. Re-exports preserved for
-// backward compatibility through the umbrella `litchi::ole` namespace.
+// CFB substrate types re-exported so callers can reach them through the
+// `litchi::ole` namespace as well as `litchi_cfb` directly.
 pub use litchi_cfb::{
     DirectoryEntry, OleError, OleFile, OleMetadata, OleWriter, PropertyValue, is_ole_file,
 };
 
-// CFB writer module retained as a re-export so `crate::writer::*` paths
-// inside the format parsers keep resolving until P4c moves litchi-ole out.
 pub use litchi_cfb::writer;
 
 /// MTEF extractor for OLE documents (internal use only)
@@ -61,9 +59,8 @@ pub use xls::{XlsError, XlsWorkbook};
 
 /// Image extraction bridge between OLE Escher records and `litchi-imgconv`.
 ///
-/// Relocated into this crate from the umbrella `litchi::images` module
-/// during P4c (workspace-split) because the extractor depends on private
-/// `crate::escher` and `crate::ppt::escher` types that cannot be referenced
-/// across crate boundaries from the umbrella.
+/// Lives here rather than in the umbrella because it depends on private
+/// `crate::escher` and `crate::ppt::escher` types that cannot cross crate
+/// boundaries.
 #[cfg(feature = "imgconv")]
 pub mod extractor;

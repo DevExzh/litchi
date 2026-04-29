@@ -75,7 +75,7 @@ impl SlideComment {
     /// # Example
     ///
     /// ```
-    /// use litchi::ole::ppt::writer::comments::SlideComment;
+    /// use litchi_ole::ppt::writer::comments::SlideComment;
     /// let comment = SlideComment::new("John Doe", "Great slide!", 100, 50);
     /// ```
     pub fn new(author: &str, text: &str, x: i32, y: i32) -> Self {

@@ -60,10 +60,10 @@ impl From<std::fmt::Error> for OoxmlError {
     }
 }
 
-// Relocated from `src/error_ext.rs` in P4d (workspace-split) to satisfy the
-// orphan rule after `OoxmlError` was carved out into this crate. The umbrella
-// `litchi_core::Error` is the unified error type used by callers; converting
-// `OoxmlError` into it lets `?` propagate naturally across the umbrella seam.
+// `From<OoxmlError> for litchi_core::Error` lives here (not in the umbrella)
+// so the orphan rule is satisfied — both source and target crates are
+// external to the umbrella. Lets `?` propagate `OoxmlError` across the
+// umbrella seam.
 impl From<OoxmlError> for litchi_core::Error {
     fn from(err: OoxmlError) -> Self {
         match err {

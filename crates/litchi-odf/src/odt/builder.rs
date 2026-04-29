@@ -16,9 +16,9 @@ use std::path::Path;
 /// # Examples
 ///
 /// ```no_run
-/// use litchi::odf::DocumentBuilder;
+/// use litchi_odf::DocumentBuilder;
 ///
-/// # fn main() -> litchi::Result<()> {
+/// # fn main() -> litchi_core::Result<()> {
 /// let mut builder = DocumentBuilder::new();
 /// builder.add_paragraph("Hello, World!")?;
 /// builder.add_paragraph("This is a new document.")?;
@@ -52,7 +52,7 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::DocumentBuilder;
+    /// use litchi_odf::DocumentBuilder;
     ///
     /// let builder = DocumentBuilder::new();
     /// ```
@@ -72,8 +72,8 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::DocumentBuilder;
-    /// use litchi::common::Metadata;
+    /// use litchi_odf::DocumentBuilder;
+    /// use litchi_core::Metadata;
     ///
     /// let mut builder = DocumentBuilder::new();
     /// let mut metadata = Metadata::default();
@@ -94,9 +94,9 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::DocumentBuilder;
+    /// use litchi_odf::DocumentBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
     /// builder.add_paragraph("Hello, World!")?;
     /// # Ok(())
@@ -119,9 +119,9 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::DocumentBuilder;
+    /// use litchi_odf::DocumentBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
     /// builder.add_heading("Chapter 1", 1)?;
     /// builder.add_heading("Section 1.1", 2)?;
@@ -149,9 +149,9 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::DocumentBuilder;
+    /// use litchi_odf::DocumentBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
     /// builder.add_rich_paragraph(vec![
     ///     ("This is ", None),
@@ -188,9 +188,9 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::DocumentBuilder;
+    /// use litchi_odf::DocumentBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
     /// builder.add_bulleted_list(vec!["Item 1", "Item 2", "Item 3"])?;
     /// # Ok(())
@@ -220,9 +220,9 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::DocumentBuilder;
+    /// use litchi_odf::DocumentBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
     /// builder.add_numbered_list(vec!["First", "Second", "Third"])?;
     /// # Ok(())
@@ -254,9 +254,9 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::{DocumentBuilder, Paragraph};
+    /// use litchi_odf::{DocumentBuilder, Paragraph};
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
     /// let mut para = Paragraph::new();
     /// para.set_text("Styled paragraph");
@@ -279,10 +279,10 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::DocumentBuilder;
-    /// use litchi::odf::elements::text::Heading;
+    /// use litchi_odf::DocumentBuilder;
+    /// use litchi_odf::elements::text::Heading;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
     /// let mut heading = Heading::new(1);
     /// heading.set_text("Chapter Title");
@@ -304,10 +304,10 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::DocumentBuilder;
-    /// use litchi::odf::elements::text::{List, ListItem};
+    /// use litchi_odf::DocumentBuilder;
+    /// use litchi_odf::elements::text::{List, ListItem};
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
     /// let mut list = List::new();
     /// let mut item = ListItem::new();
@@ -331,9 +331,9 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::{DocumentBuilder, Table};
+    /// use litchi_odf::{DocumentBuilder, Table};
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
     /// let mut table = Table::new();
     /// table.set_name("Table1");
@@ -450,9 +450,9 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::DocumentBuilder;
+    /// use litchi_odf::DocumentBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
     /// builder.add_paragraph("Hello, World!")?;
     /// let bytes = builder.build()?;
@@ -490,9 +490,9 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::DocumentBuilder;
+    /// use litchi_odf::DocumentBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = DocumentBuilder::new();
     /// builder.add_paragraph("Hello, World!")?;
     /// builder.save("output.odt")?;

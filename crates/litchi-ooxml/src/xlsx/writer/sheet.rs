@@ -853,7 +853,7 @@ impl MutableWorksheet {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// let mut ws = wb.worksheet_mut(0)?;
@@ -912,7 +912,7 @@ impl MutableWorksheet {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// let mut ws = wb.worksheet_mut(0)?;
@@ -965,7 +965,7 @@ impl MutableWorksheet {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::{Workbook, ThreadedComment};
+    /// use litchi_ooxml::xlsx::{Workbook, ThreadedComment};
     ///
     /// let mut wb = Workbook::create()?;
     /// let mut ws = wb.worksheet_mut(0)?;
@@ -1253,7 +1253,7 @@ impl MutableWorksheet {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     /// use std::fs;
     ///
     /// let mut wb = Workbook::create()?;
@@ -1431,7 +1431,7 @@ impl MutableWorksheet {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::{Workbook, writer::ConditionalFormatType};
+    /// use litchi_ooxml::xlsx::{Workbook, writer::ConditionalFormatType};
     ///
     /// let mut wb = Workbook::create()?;
     /// let mut ws = wb.worksheet_mut(0)?;
@@ -1502,7 +1502,7 @@ impl MutableWorksheet {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// let mut ws = wb.worksheet_mut(0)?;
@@ -1560,7 +1560,7 @@ impl MutableWorksheet {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// let mut ws = wb.worksheet_mut(0)?;
@@ -1594,7 +1594,7 @@ impl MutableWorksheet {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::{Workbook, writer::HeaderFooter};
+    /// use litchi_ooxml::xlsx::{Workbook, writer::HeaderFooter};
     ///
     /// let mut wb = Workbook::create()?;
     /// let mut ws = wb.worksheet_mut(0)?;
@@ -1634,7 +1634,7 @@ impl MutableWorksheet {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// let mut ws = wb.worksheet_mut(0)?;
@@ -1666,7 +1666,7 @@ impl MutableWorksheet {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// let mut ws = wb.worksheet_mut(0)?;
@@ -1700,7 +1700,7 @@ impl MutableWorksheet {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// let mut ws = wb.worksheet_mut(0)?;
@@ -1867,7 +1867,7 @@ impl MutableWorksheet {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// let mut ws = wb.worksheet_mut(0)?;
@@ -1959,7 +1959,7 @@ impl MutableWorksheet {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// let mut ws = wb.worksheet_mut(0)?;
@@ -2000,7 +2000,7 @@ impl MutableWorksheet {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// let mut ws = wb.worksheet_mut(0)?;

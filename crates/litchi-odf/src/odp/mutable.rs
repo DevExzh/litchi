@@ -16,9 +16,9 @@ use std::path::Path;
 /// # Examples
 ///
 /// ```no_run
-/// use litchi::odf::{Presentation, MutablePresentation};
+/// use litchi_odf::{Presentation, MutablePresentation};
 ///
-/// # fn main() -> litchi::Result<()> {
+/// # fn main() -> litchi_core::Result<()> {
 /// // Open an existing presentation
 /// let presentation = Presentation::open("input.odp")?;
 /// let mut mutable = MutablePresentation::from_presentation(presentation)?;
@@ -55,9 +55,9 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::{Presentation, MutablePresentation};
+    /// use litchi_odf::{Presentation, MutablePresentation};
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let presentation = Presentation::open("slides.odp")?;
     /// let mut mutable = MutablePresentation::from_presentation(presentation)?;
     /// # Ok(())
@@ -85,7 +85,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::MutablePresentation;
+    /// use litchi_odf::MutablePresentation;
     ///
     /// let presentation = MutablePresentation::new();
     /// ```
@@ -128,9 +128,9 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutablePresentation;
+    /// use litchi_odf::MutablePresentation;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
     /// presentation.add_slide("Slide 1", "Content for slide 1")?;
     /// presentation.add_slide("Slide 2", "Content for slide 2")?;
@@ -160,9 +160,9 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutablePresentation;
+    /// use litchi_odf::MutablePresentation;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
     /// presentation.add_slide("First", "Content 1")?;
     /// presentation.add_slide("Third", "Content 3")?;
@@ -205,9 +205,9 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutablePresentation;
+    /// use litchi_odf::MutablePresentation;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
     /// presentation.add_slide("Slide 1", "Content 1")?;
     /// presentation.add_slide("Slide 2", "Content 2")?;
@@ -245,9 +245,9 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutablePresentation;
+    /// use litchi_odf::MutablePresentation;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
     /// presentation.add_slide("Old Title", "Old content")?;
     /// presentation.update_slide(0, "New Title", "New content")?;
@@ -273,9 +273,9 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutablePresentation;
+    /// use litchi_odf::MutablePresentation;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
     /// presentation.add_slide("Slide 1", "Content 1")?;
     /// presentation.add_slide("Slide 2", "Content 2")?;
@@ -298,9 +298,9 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::{MutablePresentation, Shape};
+    /// use litchi_odf::{MutablePresentation, Shape};
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
     /// presentation.add_slide("Slide 1", "Content")?;
     /// let mut shape = Shape::new();
@@ -331,9 +331,9 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutablePresentation;
+    /// use litchi_odf::MutablePresentation;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
     /// presentation.add_slide("Slide 1", "Content")?;
     /// // Add shape first, then remove it
@@ -365,9 +365,9 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutablePresentation;
+    /// use litchi_odf::MutablePresentation;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
     /// presentation.add_slide("Slide 1", "Content")?;
     /// presentation.clear_slide(0)?;
@@ -534,9 +534,9 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutablePresentation;
+    /// use litchi_odf::MutablePresentation;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
     /// presentation.add_slide("Slide 1", "Content")?;
     /// presentation.save("output.odp")?;
@@ -554,9 +554,9 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutablePresentation;
+    /// use litchi_odf::MutablePresentation;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut presentation = MutablePresentation::new();
     /// presentation.add_slide("Slide 1", "Content")?;
     /// let bytes = presentation.to_bytes()?;

@@ -25,12 +25,12 @@
 //! # Writing Archives
 //!
 //! ```rust,no_run
-//! use soapberry_zip::office::ArchiveWriter;
+//! use soapberry_zip::office::StreamingArchiveWriter;
 //!
-//! let mut writer = ArchiveWriter::new();
+//! let mut writer = StreamingArchiveWriter::new();
 //! writer.write_stored("mimetype", b"application/vnd.oasis.opendocument.text")?;
 //! writer.write_deflated("content.xml", b"<office:document-content>...</office:document-content>")?;
-//! let bytes = writer.finish()?;
+//! let bytes = writer.finish_to_bytes()?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 

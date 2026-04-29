@@ -41,7 +41,7 @@ impl Hyperlink {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::Hyperlink;
+    /// use litchi_ooxml::pptx::Hyperlink;
     ///
     /// let link = Hyperlink::url("https://example.com");
     /// ```

@@ -410,7 +410,7 @@ pub fn has_prefix(tag: &[u8], prefix: &[u8]) -> bool {
 /// # Examples
 ///
 /// ```
-/// # use litchi::odf::elements::tag_matcher::extract_prefix;
+/// # use litchi_odf::elements::tag_matcher::extract_prefix;
 /// assert_eq!(extract_prefix(b"text:p"), b"text");
 /// assert_eq!(extract_prefix(b"p"), b"");
 /// ```
@@ -431,7 +431,7 @@ pub fn extract_prefix(tag: &[u8]) -> &[u8] {
 /// # Examples
 ///
 /// ```
-/// # use litchi::odf::elements::tag_matcher::extract_local_name;
+/// # use litchi_odf::elements::tag_matcher::extract_local_name;
 /// assert_eq!(extract_local_name(b"text:p"), b"p");
 /// assert_eq!(extract_local_name(b"p"), b"p");
 /// ```
@@ -464,7 +464,7 @@ pub fn extract_local_name(tag: &[u8]) -> &[u8] {
 /// # Examples
 ///
 /// ```
-/// # use litchi::odf::elements::tag_matcher::{match_tag, OdfTag};
+/// # use litchi_odf::elements::tag_matcher::{match_tag, OdfTag};
 /// assert_eq!(match_tag(b"text:p"), OdfTag::TextP);
 /// assert_eq!(match_tag(b"table:table"), OdfTag::TableTable);
 /// assert_eq!(match_tag(b"unknown:tag"), OdfTag::Unknown);
@@ -488,7 +488,7 @@ pub fn match_tag(tag: &[u8]) -> OdfTag {
 /// # Examples
 ///
 /// ```
-/// # use litchi::odf::elements::tag_matcher::is_namespace;
+/// # use litchi_odf::elements::tag_matcher::is_namespace;
 /// assert!(is_namespace(b"text:p", b"text"));
 /// assert!(is_namespace(b"table:table-row", b"table"));
 /// assert!(!is_namespace(b"text:p", b"table"));

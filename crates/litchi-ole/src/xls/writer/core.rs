@@ -15,7 +15,7 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi::ole::xls::XlsWriter;
+//! use litchi_ole::xls::XlsWriter;
 //!
 //! let mut writer = XlsWriter::new();
 //! let sheet = writer.add_worksheet("Sheet1")?;
@@ -597,7 +597,7 @@ impl XlsWriter {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi::ole::xls::writer::biff::AutoFilterConditionWrite;
+    /// use litchi_ole::xls::writer::biff::AutoFilterConditionWrite;
     ///
     /// // Filter column 2: value > 100
     /// writer.add_filter_condition(

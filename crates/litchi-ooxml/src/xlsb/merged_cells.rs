@@ -25,7 +25,7 @@ impl MergedCell {
     /// # Example
     ///
     /// ```rust
-    /// use litchi::ooxml::xlsb::merged_cells::MergedCell;
+    /// use litchi_ooxml::xlsb::merged_cells::MergedCell;
     ///
     /// // Merge cells A1:B2
     /// let merged = MergedCell::new(0, 1, 0, 1);

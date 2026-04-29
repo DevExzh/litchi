@@ -33,7 +33,7 @@ use std::str::FromStr;
 /// # Examples
 ///
 /// ```
-/// use litchi::odf::coordinates::alpha_to_digit;
+/// use litchi_odf::coordinates::alpha_to_digit;
 ///
 /// assert_eq!(alpha_to_digit("A").unwrap(), 0);
 /// assert_eq!(alpha_to_digit("Z").unwrap(), 25);
@@ -70,7 +70,7 @@ pub fn alpha_to_digit(alpha: &str) -> Result<usize> {
 /// # Examples
 ///
 /// ```
-/// use litchi::odf::coordinates::digit_to_alpha;
+/// use litchi_odf::coordinates::digit_to_alpha;
 ///
 /// assert_eq!(digit_to_alpha(0), "A");
 /// assert_eq!(digit_to_alpha(25), "Z");
@@ -95,7 +95,7 @@ pub fn digit_to_alpha(mut digit: usize) -> String {
 /// # Examples
 ///
 /// ```
-/// use litchi::odf::coordinates::CellCoord;
+/// use litchi_odf::coordinates::CellCoord;
 ///
 /// let coord = CellCoord::new(0, 0); // A1
 /// assert_eq!(coord.to_string(), "A1");
@@ -142,7 +142,7 @@ impl CellCoord {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::coordinates::CellCoord;
+    /// use litchi_odf::coordinates::CellCoord;
     ///
     /// let coord = CellCoord::new(0, 0);
     /// assert_eq!(coord.to_a1(), "A1");
@@ -163,7 +163,7 @@ impl FromStr for CellCoord {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::coordinates::CellCoord;
+    /// use litchi_odf::coordinates::CellCoord;
     ///
     /// let coord: CellCoord = "A1".parse().unwrap();
     /// assert_eq!(coord.column(), 0);
@@ -233,7 +233,7 @@ impl fmt::Display for CellCoord {
 /// # Examples
 ///
 /// ```
-/// use litchi::odf::coordinates::{CellCoord, CellRange};
+/// use litchi_odf::coordinates::{CellCoord, CellRange};
 ///
 /// let range = CellRange::new(
 ///     CellCoord::new(0, 0),
@@ -282,7 +282,7 @@ impl CellRange {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::coordinates::CellRange;
+    /// use litchi_odf::coordinates::CellRange;
     ///
     /// let range: CellRange = "A1:C3".parse().unwrap();
     /// assert_eq!(range.width(), 3);
@@ -301,7 +301,7 @@ impl CellRange {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::coordinates::CellRange;
+    /// use litchi_odf::coordinates::CellRange;
     ///
     /// let range: CellRange = "A1:C3".parse().unwrap();
     /// assert_eq!(range.height(), 3);
@@ -324,7 +324,7 @@ impl FromStr for CellRange {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::coordinates::CellRange;
+    /// use litchi_odf::coordinates::CellRange;
     ///
     /// let range: CellRange = "A1:B3".parse().unwrap();
     /// assert_eq!(range.start().column(), 0);

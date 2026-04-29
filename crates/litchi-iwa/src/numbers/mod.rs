@@ -14,7 +14,7 @@
 //! ## Example
 //!
 //! ```rust,no_run
-//! use litchi::iwa::numbers::NumbersDocument;
+//! use litchi_iwa::numbers::NumbersDocument;
 //!
 //! let doc = NumbersDocument::open("spreadsheet.numbers")?;
 //! let sheets = doc.sheets()?;

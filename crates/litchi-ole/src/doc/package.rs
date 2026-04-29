@@ -57,7 +57,7 @@ pub type Result<T> = std::result::Result<T, DocError>;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::ole::doc::Package;
+/// use litchi_ole::doc::Package;
 ///
 /// // Open an existing document
 /// let mut pkg = Package::open("document.doc")?;
@@ -85,7 +85,7 @@ impl Package<File> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ole::doc::Package;
+    /// use litchi_ole::doc::Package;
     ///
     /// let pkg = Package::open("document.doc")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -107,7 +107,7 @@ impl<R: Read + Seek> Package<R> {
     ///
     /// ```rust,no_run
     /// use std::fs::File;
-    /// use litchi::ole::doc::Package;
+    /// use litchi_ole::doc::Package;
     ///
     /// let file = File::open("document.doc")?;
     /// let pkg = Package::from_reader(file)?;
@@ -138,7 +138,7 @@ impl<R: Read + Seek> Package<R> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ole::{OleFile, doc::Package};
+    /// use litchi_ole::{OleFile, doc::Package};
     /// use std::io::Cursor;
     ///
     /// let bytes = std::fs::read("document.doc")?;
@@ -165,7 +165,7 @@ impl<R: Read + Seek> Package<R> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ole::doc::Package;
+    /// use litchi_ole::doc::Package;
     ///
     /// let mut pkg = Package::open("document.doc")?;
     /// let doc = pkg.document()?;
@@ -206,10 +206,9 @@ mod tests {
     }
 }
 
-// Orphan-rule glue: relocated from `src/error_ext.rs` during P4c so that the
-// `From<DocError> for litchi_core::Error` impl lives in the same crate as
-// `DocError` (litchi-ole). Without this, the umbrella crate cannot implement
-// the conversion for a non-local error type after the carve-out.
+// `From<DocError> for litchi_core::Error` lives here (not in the umbrella) so
+// the orphan rule is satisfied — both source and target crates are external
+// to the umbrella.
 impl From<DocError> for litchi_core::Error {
     fn from(err: DocError) -> Self {
         match err {

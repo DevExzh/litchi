@@ -15,9 +15,9 @@ use std::path::Path;
 /// # Examples
 ///
 /// ```no_run
-/// use litchi::odf::PresentationBuilder;
+/// use litchi_odf::PresentationBuilder;
 ///
-/// # fn main() -> litchi::Result<()> {
+/// # fn main() -> litchi_core::Result<()> {
 /// let mut builder = PresentationBuilder::new();
 /// builder.add_slide_with_title("Welcome", "This is my presentation")?;
 /// builder.add_slide_with_title("Slide 2", "More content here")?;
@@ -42,7 +42,7 @@ impl PresentationBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::PresentationBuilder;
+    /// use litchi_odf::PresentationBuilder;
     ///
     /// let builder = PresentationBuilder::new();
     /// ```
@@ -72,9 +72,9 @@ impl PresentationBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::PresentationBuilder;
+    /// use litchi_odf::PresentationBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = PresentationBuilder::new();
     /// builder.add_slide_with_title("Introduction", "Welcome to our presentation")?;
     /// # Ok(())
@@ -101,9 +101,9 @@ impl PresentationBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::PresentationBuilder;
+    /// use litchi_odf::PresentationBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = PresentationBuilder::new();
     /// builder.add_slide("Simple slide content")?;
     /// # Ok(())
@@ -130,9 +130,9 @@ impl PresentationBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::{PresentationBuilder, Slide, Shape};
+    /// use litchi_odf::{PresentationBuilder, Slide, Shape};
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = PresentationBuilder::new();
     /// let slide = Slide {
     ///     title: Some("Custom Slide".to_string()),
@@ -335,9 +335,9 @@ impl PresentationBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::PresentationBuilder;
+    /// use litchi_odf::PresentationBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = PresentationBuilder::new();
     /// builder.add_slide("Slide content")?;
     /// let bytes = builder.build()?;
@@ -375,9 +375,9 @@ impl PresentationBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::PresentationBuilder;
+    /// use litchi_odf::PresentationBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = PresentationBuilder::new();
     /// builder.add_slide("Slide content")?;
     /// builder.save("output.odp")?;

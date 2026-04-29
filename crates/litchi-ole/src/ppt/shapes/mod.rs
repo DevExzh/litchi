@@ -22,7 +22,7 @@ pub mod autoshape;
 /// # Example
 ///
 /// ```rust,no_run
-/// use litchi::ole::ppt::{Package, shapes::ShapeEnum};
+/// use litchi_ole::ppt::{Package, shapes::ShapeEnum};
 ///
 /// let mut pkg = Package::open("presentation.ppt")?;
 /// let pres = pkg.presentation()?;

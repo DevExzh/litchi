@@ -113,7 +113,7 @@ impl MutableXlsbWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
+    /// use litchi_ooxml::xlsb::writer::MutableXlsbWorksheet;
     ///
     /// let sheet = MutableXlsbWorksheet::new("Sheet1");
     /// ```
@@ -150,7 +150,7 @@ impl MutableXlsbWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
+    /// use litchi_ooxml::xlsb::writer::MutableXlsbWorksheet;
     ///
     /// let mut sheet = MutableXlsbWorksheet::new("Sheet1");
     /// sheet.set_cell(0, 0, "Hello");
@@ -189,7 +189,7 @@ impl MutableXlsbWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
+    /// use litchi_ooxml::xlsb::writer::MutableXlsbWorksheet;
     ///
     /// let mut sheet = MutableXlsbWorksheet::new("Sheet1");
     /// sheet.set_cell(0, 0, "Hello");
@@ -271,8 +271,8 @@ impl MutableXlsbWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
-    /// use litchi::ooxml::xlsb::advanced_features::MergedCell;
+    /// use litchi_ooxml::xlsb::writer::MutableXlsbWorksheet;
+    /// use litchi_ooxml::xlsb::advanced_features::MergedCell;
     ///
     /// let mut sheet = MutableXlsbWorksheet::new("Sheet1");
     /// sheet.add_merged_cell(MergedCell::new(0, 1, 0, 1)); // Merge A1:B2
@@ -286,8 +286,8 @@ impl MutableXlsbWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
-    /// use litchi::ooxml::xlsb::advanced_features::Hyperlink;
+    /// use litchi_ooxml::xlsb::writer::MutableXlsbWorksheet;
+    /// use litchi_ooxml::xlsb::advanced_features::Hyperlink;
     ///
     /// let mut sheet = MutableXlsbWorksheet::new("Sheet1");
     /// let link = Hyperlink::new(0, 0, 0, 0, "rId1".to_string())
@@ -303,8 +303,8 @@ impl MutableXlsbWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
-    /// use litchi::ooxml::xlsb::advanced_features::Comment;
+    /// use litchi_ooxml::xlsb::writer::MutableXlsbWorksheet;
+    /// use litchi_ooxml::xlsb::advanced_features::Comment;
     ///
     /// let mut sheet = MutableXlsbWorksheet::new("Sheet1");
     /// let comment = Comment::new(0, 0, "John".to_string(), "Important note".to_string());
@@ -343,8 +343,8 @@ impl MutableXlsbWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
-    /// use litchi::ooxml::xlsb::data_validation::DataValidation;
+    /// use litchi_ooxml::xlsb::writer::MutableXlsbWorksheet;
+    /// use litchi_ooxml::xlsb::data_validation::DataValidation;
     ///
     /// let mut sheet = MutableXlsbWorksheet::new("Sheet1");
     /// let mut dv = DataValidation::new(3, "A1:A10".to_string()); // list
@@ -365,8 +365,8 @@ impl MutableXlsbWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
-    /// use litchi::ooxml::xlsb::conditional_formatting::{
+    /// use litchi_ooxml::xlsb::writer::MutableXlsbWorksheet;
+    /// use litchi_ooxml::xlsb::conditional_formatting::{
     ///     ConditionalFormatting, ConditionalFormattingRule, CfRuleType,
     /// };
     ///
@@ -404,7 +404,7 @@ impl MutableXlsbWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsb::writer::MutableXlsbWorksheet;
+    /// use litchi_ooxml::xlsb::writer::MutableXlsbWorksheet;
     ///
     /// let mut sheet = MutableXlsbWorksheet::new("Sheet1");
     /// sheet.set_cell(0, 0, "Row 0");

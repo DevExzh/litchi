@@ -13,7 +13,7 @@ use std::collections::HashMap;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::ooxml::docx::Package;
+/// use litchi_ooxml::docx::Package;
 ///
 /// let pkg = Package::open("document.docx")?;
 /// let doc = pkg.document()?;

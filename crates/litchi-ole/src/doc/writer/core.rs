@@ -49,7 +49,7 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi::ole::doc::DocWriter;
+//! use litchi_ole::doc::DocWriter;
 //!
 //! let mut writer = DocWriter::new();
 //!

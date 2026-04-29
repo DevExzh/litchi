@@ -14,7 +14,7 @@ use quick_xml::events::Event;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::ooxml::docx::Package;
+/// use litchi_ooxml::docx::Package;
 ///
 /// let pkg = Package::open("document.docx")?;
 /// let doc = pkg.document()?;
@@ -83,7 +83,7 @@ impl Field {
     /// # Examples
     ///
     /// ```
-    /// use litchi::ooxml::docx::Field;
+    /// use litchi_ooxml::docx::Field;
     ///
     /// let field = Field::new("PAGE".to_string(), Some("1".to_string()), false);
     /// assert_eq!(field.field_type(), "PAGE");

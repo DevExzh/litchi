@@ -203,7 +203,7 @@ impl SlideBackground {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::SlideBackground;
+    /// use litchi_ooxml::pptx::SlideBackground;
     ///
     /// let bg = SlideBackground::solid("4472C4"); // Blue background
     /// ```
@@ -222,7 +222,7 @@ impl SlideBackground {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::{SlideBackground, GradientStop};
+    /// use litchi_ooxml::pptx::{SlideBackground, GradientStop};
     ///
     /// let stops = vec![
     ///     GradientStop { position: 0.0, color: "4472C4".to_string() },

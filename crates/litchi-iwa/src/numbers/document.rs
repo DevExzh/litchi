@@ -26,7 +26,7 @@ impl NumbersDocument {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::iwa::numbers::NumbersDocument;
+    /// use litchi_iwa::numbers::NumbersDocument;
     ///
     /// let doc = NumbersDocument::open("spreadsheet.numbers")?;
     /// println!("Loaded Numbers document");
@@ -47,7 +47,7 @@ impl NumbersDocument {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::iwa::numbers::NumbersDocument;
+    /// use litchi_iwa::numbers::NumbersDocument;
     /// use std::fs;
     ///
     /// let data = fs::read("spreadsheet.numbers")?;
@@ -77,7 +77,7 @@ impl NumbersDocument {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::iwa::numbers::NumbersDocument;
+    /// use litchi_iwa::numbers::NumbersDocument;
     ///
     /// let doc = NumbersDocument::open("spreadsheet.numbers")?;
     /// let text = doc.text()?;
@@ -98,7 +98,7 @@ impl NumbersDocument {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::iwa::numbers::NumbersDocument;
+    /// use litchi_iwa::numbers::NumbersDocument;
     ///
     /// let doc = NumbersDocument::open("spreadsheet.numbers")?;
     /// let sheets = doc.sheets()?;

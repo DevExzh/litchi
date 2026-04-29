@@ -19,7 +19,7 @@
 //! # Example: Reading a Presentation
 //!
 //! ```rust,no_run
-//! use litchi::ooxml::pptx::Package;
+//! use litchi_ooxml::pptx::Package;
 //!
 //! // Open a presentation
 //! let pkg = Package::open("presentation.pptx")?;
@@ -42,7 +42,7 @@
 //! # Example: Accessing Slide Masters
 //!
 //! ```rust,no_run
-//! use litchi::ooxml::pptx::Package;
+//! use litchi_ooxml::pptx::Package;
 //!
 //! let pkg = Package::open("presentation.pptx")?;
 //! let mut pres = pkg.presentation()?;

@@ -1225,8 +1225,8 @@ impl<'a> Worksheet<'a> {
     /// # Examples
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsx::Workbook;
-    /// use litchi::sheet::WorkbookTrait;
+    /// use litchi_ooxml::xlsx::Workbook;
+    /// use litchi_core::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1258,8 +1258,8 @@ impl<'a> Worksheet<'a> {
     /// # Examples
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsx::Workbook;
-    /// use litchi::sheet::WorkbookTrait;
+    /// use litchi_ooxml::xlsx::Workbook;
+    /// use litchi_core::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1294,8 +1294,8 @@ impl<'a> Worksheet<'a> {
     /// # Examples
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsx::Workbook;
-    /// use litchi::sheet::WorkbookTrait;
+    /// use litchi_ooxml::xlsx::Workbook;
+    /// use litchi_core::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1356,8 +1356,8 @@ impl<'a> Worksheet<'a> {
     /// # Examples
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsx::Workbook;
-    /// use litchi::sheet::WorkbookTrait;
+    /// use litchi_ooxml::xlsx::Workbook;
+    /// use litchi_core::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1435,8 +1435,8 @@ impl<'a> Worksheet<'a> {
     /// # Examples
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsx::Workbook;
-    /// use litchi::sheet::WorkbookTrait;
+    /// use litchi_ooxml::xlsx::Workbook;
+    /// use litchi_core::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1602,8 +1602,8 @@ impl<'a> Worksheet<'a> {
     /// # Examples
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsx::Workbook;
-    /// use litchi::sheet::WorkbookTrait;
+    /// use litchi_ooxml::xlsx::Workbook;
+    /// use litchi_core::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1652,8 +1652,8 @@ impl<'a> Worksheet<'a> {
     /// # Examples
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsx::Workbook;
-    /// use litchi::sheet::WorkbookTrait;
+    /// use litchi_ooxml::xlsx::Workbook;
+    /// use litchi_core::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1684,8 +1684,8 @@ impl<'a> Worksheet<'a> {
     /// # Examples
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsx::Workbook;
-    /// use litchi::sheet::WorkbookTrait;
+    /// use litchi_ooxml::xlsx::Workbook;
+    /// use litchi_core::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1768,8 +1768,8 @@ impl<'a> Worksheet<'a> {
     /// # Examples
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsx::Workbook;
-    /// use litchi::sheet::WorkbookTrait;
+    /// use litchi_ooxml::xlsx::Workbook;
+    /// use litchi_core::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1790,8 +1790,8 @@ impl<'a> Worksheet<'a> {
     /// # Examples
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsx::Workbook;
-    /// use litchi::sheet::WorkbookTrait;
+    /// use litchi_ooxml::xlsx::Workbook;
+    /// use litchi_core::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1812,8 +1812,8 @@ impl<'a> Worksheet<'a> {
     /// # Examples
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsx::Workbook;
-    /// use litchi::sheet::WorkbookTrait;
+    /// use litchi_ooxml::xlsx::Workbook;
+    /// use litchi_core::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;
@@ -1835,8 +1835,8 @@ impl<'a> Worksheet<'a> {
     /// # Examples
     ///
     /// ```ignore
-    /// use litchi::ooxml::xlsx::Workbook;
-    /// use litchi::sheet::WorkbookTrait;
+    /// use litchi_ooxml::xlsx::Workbook;
+    /// use litchi_core::sheet::WorkbookTrait;
     ///
     /// let wb = Workbook::open("workbook.xlsx")?;
     /// let ws = wb.worksheet_by_index(0)?;

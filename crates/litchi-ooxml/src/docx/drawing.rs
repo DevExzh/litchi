@@ -14,7 +14,7 @@
 /// # Example
 ///
 /// ```rust,no_run
-/// use litchi::ooxml::docx::{Package, drawing::ShapeType};
+/// use litchi_ooxml::docx::{Package, drawing::ShapeType};
 ///
 /// let pkg = Package::open("document.docx")?;
 /// let doc = pkg.document()?;

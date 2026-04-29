@@ -61,7 +61,7 @@ impl SlideTiming {
     /// # Example
     ///
     /// ```
-    /// use litchi::ole::ppt::writer::slide_timing::SlideTiming;
+    /// use litchi_ole::ppt::writer::slide_timing::SlideTiming;
     /// // Auto-advance after 5 seconds, also allow click
     /// let timing = SlideTiming::auto_advance(5000);
     /// ```

@@ -37,7 +37,7 @@ type ParsedMtefData = (
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::ole::doc::Package;
+/// use litchi_ole::doc::Package;
 ///
 /// let mut pkg = Package::open("document.doc")?;
 /// let doc = pkg.document()?;
@@ -407,7 +407,7 @@ impl Document {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ole::doc::Package;
+    /// use litchi_ole::doc::Package;
     ///
     /// let mut pkg = Package::open("document.doc")?;
     /// let doc = pkg.document()?;
@@ -427,7 +427,7 @@ impl Document {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ole::doc::Package;
+    /// use litchi_ole::doc::Package;
     ///
     /// let mut pkg = Package::open("document.doc")?;
     /// let doc = pkg.document()?;
@@ -469,7 +469,7 @@ impl Document {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ole::doc::Package;
+    /// use litchi_ole::doc::Package;
     ///
     /// let mut pkg = Package::open("document.doc")?;
     /// let doc = pkg.document()?;
@@ -857,7 +857,7 @@ impl Document {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ole::doc::Package;
+    /// use litchi_ole::doc::Package;
     ///
     /// let mut pkg = Package::open("document.doc")?;
     /// let doc = pkg.document()?;
@@ -995,7 +995,7 @@ impl Document {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ole::doc::Package;
+    /// use litchi_ole::doc::Package;
     ///
     /// let mut pkg = Package::open("document.doc")?;
     /// let doc = pkg.document()?;
@@ -1019,8 +1019,8 @@ impl Document {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ole::doc::Package;
-    /// use litchi::DocumentElement;
+    /// use litchi_ole::doc::Package;
+    /// use litchi_ole::doc::DocElement as DocumentElement;
     ///
     /// let mut pkg = Package::open("document.doc")?;
     /// let doc = pkg.document()?;

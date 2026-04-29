@@ -143,7 +143,7 @@ impl MutableSlide {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::{MutablePresentation, TransitionType, TransitionSpeed, SlideTransition};
+    /// use litchi_ooxml::pptx::{MutablePresentation, TransitionType, TransitionSpeed, SlideTransition};
     ///
     /// let mut pres = MutablePresentation::new();
     /// let slide = pres.add_slide().unwrap();
@@ -180,7 +180,7 @@ impl MutableSlide {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::{MutablePresentation, SlideBackground};
+    /// use litchi_ooxml::pptx::{MutablePresentation, SlideBackground};
     ///
     /// let mut pres = MutablePresentation::new();
     /// let slide = pres.add_slide().unwrap();
@@ -314,7 +314,7 @@ impl MutableSlide {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::MutablePresentation;
+    /// use litchi_ooxml::pptx::MutablePresentation;
     ///
     /// let mut pres = MutablePresentation::new();
     /// let slide = pres.add_slide().unwrap();
@@ -395,7 +395,7 @@ impl MutableSlide {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::MutablePresentation;
+    /// use litchi_ooxml::pptx::MutablePresentation;
     ///
     /// let mut pres = MutablePresentation::new();
     /// let slide = pres.add_slide().unwrap();
@@ -539,7 +539,7 @@ impl MutableSlide {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::MutablePresentation;
+    /// use litchi_ooxml::pptx::MutablePresentation;
     ///
     /// let mut pres = MutablePresentation::new();
     /// let slide = pres.add_slide().unwrap();
@@ -600,7 +600,7 @@ impl MutableSlide {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::MutablePresentation;
+    /// use litchi_ooxml::pptx::MutablePresentation;
     /// use std::fs;
     ///
     /// let mut pres = MutablePresentation::new();
@@ -626,7 +626,7 @@ impl MutableSlide {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::MutablePresentation;
+    /// use litchi_ooxml::pptx::MutablePresentation;
     /// use std::fs;
     ///
     /// let mut pres = MutablePresentation::new();
@@ -678,7 +678,7 @@ impl MutableSlide {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::{MutablePresentation, AnimationEffect};
+    /// use litchi_ooxml::pptx::{MutablePresentation, AnimationEffect};
     ///
     /// let mut pres = MutablePresentation::new();
     /// let slide = pres.add_slide().unwrap();
@@ -752,7 +752,7 @@ impl MutableSlide {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::{MutablePresentation, ChartData, ChartSeries, ChartType};
+    /// use litchi_ooxml::pptx::{MutablePresentation, ChartData, ChartSeries, ChartType};
     ///
     /// let mut pres = MutablePresentation::new();
     /// let slide = pres.add_slide().unwrap();

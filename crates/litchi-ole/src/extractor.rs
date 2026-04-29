@@ -293,10 +293,9 @@ impl ImageExtractor {
             | EscherRecordType::BlipPng
             | EscherRecordType::BlipDib
             | EscherRecordType::BlipTiff => {
-                // Reconstruct full BLIP record from the Escher record. This
-                // bridge used to live as `Blip::try_from_escher_record` but
-                // moved to the umbrella when `litchi-imgconv` was carved out
-                // (`Blip` cannot depend on `EscherRecord` from a leaf crate).
+                // Reconstruct full BLIP record from the Escher record so
+                // `Blip::parse` can decode it without depending on Escher
+                // types from this crate.
                 let mut full_data = Vec::with_capacity(8 + record.data.len());
                 let ver_inst = (record.instance << 4) | (record.version as u16);
                 full_data.extend_from_slice(&ver_inst.to_le_bytes());

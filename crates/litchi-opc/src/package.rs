@@ -89,7 +89,7 @@ impl OpcPackage {
     ///
     /// # Example
     /// ```no_run
-    /// use litchi::ooxml::opc::package::OpcPackage;
+    /// use litchi_opc::package::OpcPackage;
     ///
     /// let pkg = OpcPackage::open("document.docx").unwrap();
     /// ```
@@ -291,7 +291,7 @@ impl OpcPackage {
     ///
     /// # Example
     /// ```no_run
-    /// # use litchi::ooxml::opc::package::OpcPackage;
+    /// # use litchi_opc::package::OpcPackage;
     /// # let mut pkg = OpcPackage::new();
     /// let next_image = pkg.next_partname("/word/media/image%d.png");
     /// ```
@@ -347,7 +347,7 @@ impl OpcPackage {
     ///
     /// # Example
     /// ```no_run
-    /// use litchi::ooxml::opc::package::OpcPackage;
+    /// use litchi_opc::package::OpcPackage;
     ///
     /// let mut pkg = OpcPackage::new();
     /// // ... add parts to package ...
@@ -368,7 +368,7 @@ impl OpcPackage {
     ///
     /// # Example
     /// ```no_run
-    /// use litchi::ooxml::opc::package::OpcPackage;
+    /// use litchi_opc::package::OpcPackage;
     /// use std::fs::File;
     ///
     /// let mut pkg = OpcPackage::new();

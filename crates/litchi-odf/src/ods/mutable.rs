@@ -13,9 +13,9 @@ use std::path::Path;
 /// # Examples
 ///
 /// ```no_run
-/// use litchi::odf::{Spreadsheet, MutableSpreadsheet};
+/// use litchi_odf::{Spreadsheet, MutableSpreadsheet};
 ///
-/// # fn main() -> litchi::Result<()> {
+/// # fn main() -> litchi_core::Result<()> {
 /// let spreadsheet = Spreadsheet::open("input.ods")?;
 /// let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet)?;
 ///
@@ -142,9 +142,9 @@ impl MutableSpreadsheet {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::{Spreadsheet, MutableSpreadsheet};
+    /// use litchi_odf::{Spreadsheet, MutableSpreadsheet};
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let spreadsheet = Spreadsheet::open("data.ods")?;
     /// let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet)?;
     /// mutable.add_sheet("NewSheet")?;
@@ -270,9 +270,9 @@ impl MutableSpreadsheet {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::{MutableSpreadsheet, CellValue};
+    /// use litchi_odf::{MutableSpreadsheet, CellValue};
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut spreadsheet = MutableSpreadsheet::new();
     /// spreadsheet.add_sheet("Sheet1")?;
     /// spreadsheet.set_cell(0, 0, 0, CellValue::Text("Hello".to_string()))?;
@@ -339,9 +339,9 @@ impl MutableSpreadsheet {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutableSpreadsheet;
+    /// use litchi_odf::MutableSpreadsheet;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut spreadsheet = MutableSpreadsheet::new();
     /// spreadsheet.add_sheet("Sheet1")?;
     /// spreadsheet.clear_cell(0, 0, 0)?;
@@ -382,9 +382,9 @@ impl MutableSpreadsheet {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutableSpreadsheet;
+    /// use litchi_odf::MutableSpreadsheet;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut spreadsheet = MutableSpreadsheet::new();
     /// spreadsheet.add_sheet("Sheet1")?;
     /// spreadsheet.clear_sheet(0)?;

@@ -40,7 +40,7 @@
 /// # Example
 ///
 /// ```rust,no_run
-/// use litchi::ole::writer::OleWriter;
+/// use litchi_cfb::writer::OleWriter;
 ///
 /// // Create a new OLE file
 /// let mut writer = OleWriter::new();
@@ -138,7 +138,7 @@ impl OleWriter {
     /// # Example
     ///
     /// ```rust
-    /// use litchi::ole::writer::OleWriter;
+    /// use litchi_cfb::writer::OleWriter;
     ///
     /// let writer = OleWriter::new();
     /// ```
@@ -200,13 +200,13 @@ impl OleWriter {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use litchi::ole::writer::OleWriter;
+    /// # use litchi_cfb::writer::OleWriter;
     /// let mut writer = OleWriter::new();
     /// // Word 97-2003 Document CLSID: {00020906-0000-0000-C000-000000000046}
     /// let word_clsid = [0x06, 0x09, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
     ///                   0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46];
     /// writer.set_root_clsid(word_clsid);
-    /// # Ok::<(), litchi::ole::OleError>(())
+    /// # Ok::<(), litchi_cfb::OleError>(())
     /// ```
     pub fn set_root_clsid(&mut self, clsid: [u8; 16]) {
         // Update the root entry (always at index 0)
@@ -231,10 +231,10 @@ impl OleWriter {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use litchi::ole::writer::OleWriter;
+    /// # use litchi_cfb::writer::OleWriter;
     /// let mut writer = OleWriter::new();
     /// writer.create_stream(&["MyStream"], b"Hello, World!")?;
-    /// # Ok::<(), litchi::ole::OleError>(())
+    /// # Ok::<(), litchi_cfb::OleError>(())
     /// ```
     pub fn create_stream(&mut self, path: &[&str], data: &[u8]) -> Result<(), OleError> {
         if path.is_empty() {
@@ -299,11 +299,11 @@ impl OleWriter {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use litchi::ole::writer::OleWriter;
+    /// # use litchi_cfb::writer::OleWriter;
     /// let mut writer = OleWriter::new();
     /// writer.create_storage(&["MyStorage"])?;
     /// writer.create_stream(&["MyStorage", "MyStream"], b"data")?;
-    /// # Ok::<(), litchi::ole::OleError>(())
+    /// # Ok::<(), litchi_cfb::OleError>(())
     /// ```
     pub fn create_storage(&mut self, path: &[&str]) -> Result<(), OleError> {
         if path.is_empty() {
@@ -631,11 +631,11 @@ impl OleWriter {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use litchi::ole::writer::OleWriter;
+    /// # use litchi_cfb::writer::OleWriter;
     /// let mut writer = OleWriter::new();
     /// writer.create_stream(&["Test"], b"Hello")?;
     /// writer.save("output.ole")?;
-    /// # Ok::<(), litchi::ole::OleError>(())
+    /// # Ok::<(), litchi_cfb::OleError>(())
     /// ```
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), OleError> {
         let file = std::fs::File::create(path)?;

@@ -1,9 +1,5 @@
-//! Umbrella-side extensions to `litchi_core::Metadata` that need deps not
-//! present in `litchi-core`:
-//!
-//! * `serde_saphyr` for YAML front-matter serialization.
-//! * Per-format error/metadata types (`crate::ole::OleMetadata`) for
-//!   conversions whose source type is not visible to `litchi-core`.
+//! YAML front-matter serialization for [`litchi_core::Metadata`]. Lives in the
+//! umbrella because `serde_saphyr` is not a dep of `litchi-core`.
 
 use litchi_core::Error;
 use litchi_core::Metadata;
@@ -43,14 +39,6 @@ impl MetadataYaml for Metadata {
         Ok(format!("---\n{}---\n\n", yaml_string))
     }
 }
-
-#[cfg(feature = "ole")]
-// Note: `From<crate::ole::OleMetadata> for Metadata` is provided by the
-// `litchi-cfb` crate itself (since `OleMetadata` was carved out into that
-// crate, the orphan rule forbids us from implementing the conversion at the
-// umbrella). The conversion is still reachable via `.into()` thanks to the
-// re-export shim at `crate::ole::OleMetadata`.
-const _: () = ();
 
 #[cfg(test)]
 mod tests {

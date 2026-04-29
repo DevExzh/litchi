@@ -41,7 +41,7 @@ impl Boolean {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::datatype::Boolean;
+    /// use litchi_odf::datatype::Boolean;
     ///
     /// assert_eq!(Boolean::decode("true").unwrap(), true);
     /// assert_eq!(Boolean::decode("false").unwrap(), false);
@@ -71,7 +71,7 @@ impl Boolean {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::datatype::Boolean;
+    /// use litchi_odf::datatype::Boolean;
     ///
     /// assert_eq!(Boolean::encode(true), "true");
     /// assert_eq!(Boolean::encode(false), "false");
@@ -106,7 +106,7 @@ impl Date {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::datatype::Date;
+    /// use litchi_odf::datatype::Date;
     /// use chrono::NaiveDate;
     ///
     /// let date = Date::decode("2024-01-31").unwrap();
@@ -131,7 +131,7 @@ impl Date {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::datatype::Date;
+    /// use litchi_odf::datatype::Date;
     /// use chrono::NaiveDate;
     ///
     /// let date = NaiveDate::from_ymd_opt(2024, 1, 31).unwrap();
@@ -169,7 +169,7 @@ impl DateTimeOdf {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::datatype::DateTimeOdf;
+    /// use litchi_odf::datatype::DateTimeOdf;
     ///
     /// let dt = DateTimeOdf::decode("2024-01-31T15:30:00").unwrap();
     /// let dt_with_tz = DateTimeOdf::decode("2024-01-31T15:30:00+01:00").unwrap();
@@ -217,7 +217,7 @@ impl DateTimeOdf {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::datatype::DateTimeOdf;
+    /// use litchi_odf::datatype::DateTimeOdf;
     /// use chrono::{DateTime, Utc, TimeZone};
     ///
     /// let dt = Utc.with_ymd_and_hms(2024, 1, 31, 15, 30, 0).unwrap();
@@ -261,7 +261,7 @@ impl DurationOdf {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::datatype::DurationOdf;
+    /// use litchi_odf::datatype::DurationOdf;
     /// use chrono::Duration;
     ///
     /// let dur = DurationOdf::decode("PT1H30M").unwrap();
@@ -366,7 +366,7 @@ impl DurationOdf {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::datatype::DurationOdf;
+    /// use litchi_odf::datatype::DurationOdf;
     /// use chrono::Duration;
     ///
     /// let dur = Duration::minutes(90);

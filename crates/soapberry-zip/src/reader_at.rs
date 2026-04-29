@@ -270,7 +270,7 @@ impl<T: ReaderAt + ?Sized> ReaderAt for Box<T> {
 ///
 /// Reading prelude data from a zip file:
 ///
-/// ```
+/// ```ignore
 /// use std::io::Read;
 /// use soapberry_zip::{ZipArchive, RangeReader, RECOMMENDED_BUFFER_SIZE};
 /// use std::fs::File;

@@ -19,7 +19,7 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi::ooxml::xlsx::Styles;
+//! use litchi_ooxml::xlsx::Styles;
 //!
 //! let styles_xml = std::fs::read_to_string("xl/styles.xml")?;
 //! let styles = Styles::parse(&styles_xml)?;
@@ -82,7 +82,7 @@ impl Styles {
     /// # Example
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Styles;
+    /// use litchi_ooxml::xlsx::Styles;
     ///
     /// let xml_content = std::fs::read_to_string("xl/styles.xml")?;
     /// let styles = Styles::parse(&xml_content)?;

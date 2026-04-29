@@ -27,9 +27,9 @@ enum DocumentElement {
 /// # Examples
 ///
 /// ```no_run
-/// use litchi::odf::{Document, MutableDocument};
+/// use litchi_odf::{Document, MutableDocument};
 ///
-/// # fn main() -> litchi::Result<()> {
+/// # fn main() -> litchi_core::Result<()> {
 /// // Open an existing document
 /// let doc = Document::open("input.odt")?;
 /// let mut mutable_doc = MutableDocument::from_document(doc)?;
@@ -68,9 +68,9 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::{Document, MutableDocument};
+    /// use litchi_odf::{Document, MutableDocument};
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let mut mutable_doc = MutableDocument::from_document(doc)?;
     /// # Ok(())
@@ -115,7 +115,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::MutableDocument;
+    /// use litchi_odf::MutableDocument;
     ///
     /// let doc = MutableDocument::new();
     /// ```
@@ -204,9 +204,9 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutableDocument;
+    /// use litchi_odf::MutableDocument;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
     /// doc.add_paragraph("Hello, World!")?;
     /// doc.add_paragraph("Second paragraph")?;
@@ -230,9 +230,9 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutableDocument;
+    /// use litchi_odf::MutableDocument;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
     /// doc.add_paragraph("First")?;
     /// doc.add_paragraph("Third")?;
@@ -266,9 +266,9 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutableDocument;
+    /// use litchi_odf::MutableDocument;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
     /// doc.add_paragraph("Paragraph 1")?;
     /// doc.add_paragraph("Paragraph 2")?;
@@ -315,9 +315,9 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutableDocument;
+    /// use litchi_odf::MutableDocument;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
     /// doc.add_paragraph("Old text")?;
     /// doc.update_paragraph(0, "New text")?;
@@ -359,9 +359,9 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutableDocument;
+    /// use litchi_odf::MutableDocument;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
     /// doc.add_paragraph("Paragraph 1")?;
     /// doc.add_paragraph("Paragraph 2")?;
@@ -384,9 +384,9 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::{MutableDocument, Table};
+    /// use litchi_odf::{MutableDocument, Table};
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
     /// let mut table = Table::new();
     /// table.set_name("Table1");
@@ -408,9 +408,9 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::{MutableDocument, Table};
+    /// use litchi_odf::{MutableDocument, Table};
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
     /// doc.add_table(Table::new())?;
     /// doc.remove_table(0)?;
@@ -569,9 +569,9 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutableDocument;
+    /// use litchi_odf::MutableDocument;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
     /// doc.add_paragraph("Hello!")?;
     /// doc.save("output.odt")?;
@@ -589,9 +589,9 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::MutableDocument;
+    /// use litchi_odf::MutableDocument;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
     /// doc.add_paragraph("Hello!")?;
     /// let bytes = doc.to_bytes()?;

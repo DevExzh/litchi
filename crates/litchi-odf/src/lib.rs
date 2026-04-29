@@ -188,9 +188,9 @@
 //! # Examples
 //!
 //! ```no_run
-//! use litchi::odf::{Document, Spreadsheet, Presentation};
+//! use litchi_odf::{Document, Spreadsheet, Presentation};
 //!
-//! # fn main() -> litchi::Result<()> {
+//! # fn main() -> litchi_core::Result<()> {
 //! // Open a text document
 //! let mut doc = Document::open("document.odt")?;
 //! let text = doc.text()?;

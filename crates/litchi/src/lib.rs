@@ -211,8 +211,6 @@ pub mod common {
 ))]
 pub mod detection_smart;
 
-// Internal extension modules — register orphan-rule impls on litchi_core types.
-mod error_ext;
 mod metadata_ext;
 
 pub use metadata_ext::MetadataYaml;

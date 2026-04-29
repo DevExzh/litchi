@@ -25,7 +25,7 @@ impl PagesDocument {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::iwa::pages::PagesDocument;
+    /// use litchi_iwa::pages::PagesDocument;
     ///
     /// let doc = PagesDocument::open("document.pages")?;
     /// println!("Loaded Pages document");
@@ -50,7 +50,7 @@ impl PagesDocument {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::iwa::pages::PagesDocument;
+    /// use litchi_iwa::pages::PagesDocument;
     /// use std::fs;
     ///
     /// let data = fs::read("document.pages")?;
@@ -104,7 +104,7 @@ impl PagesDocument {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::iwa::pages::PagesDocument;
+    /// use litchi_iwa::pages::PagesDocument;
     ///
     /// let doc = PagesDocument::open("document.pages")?;
     /// let text = doc.text()?;
@@ -125,7 +125,7 @@ impl PagesDocument {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::iwa::pages::PagesDocument;
+    /// use litchi_iwa::pages::PagesDocument;
     ///
     /// let doc = PagesDocument::open("document.pages")?;
     /// let sections = doc.sections()?;

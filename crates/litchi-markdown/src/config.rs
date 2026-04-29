@@ -10,7 +10,7 @@
 /// # Examples
 ///
 /// ```rust
-/// use litchi::markdown::{MarkdownOptions, TableStyle};
+/// use litchi_markdown::{MarkdownOptions, TableStyle};
 ///
 /// // Create with defaults
 /// let options = MarkdownOptions::default();
@@ -73,7 +73,7 @@ impl MarkdownOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::markdown::MarkdownOptions;
+    /// use litchi_markdown::MarkdownOptions;
     ///
     /// let options = MarkdownOptions::new();
     /// ```
@@ -90,7 +90,7 @@ impl MarkdownOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::markdown::MarkdownOptions;
+    /// use litchi_markdown::MarkdownOptions;
     ///
     /// let options = MarkdownOptions::new().with_styles(true);
     /// ```
@@ -108,7 +108,7 @@ impl MarkdownOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::markdown::MarkdownOptions;
+    /// use litchi_markdown::MarkdownOptions;
     ///
     /// let options = MarkdownOptions::new().with_metadata(true);
     /// ```
@@ -123,7 +123,7 @@ impl MarkdownOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::markdown::{MarkdownOptions, TableStyle};
+    /// use litchi_markdown::{MarkdownOptions, TableStyle};
     ///
     /// let options = MarkdownOptions::new()
     ///     .with_table_style(TableStyle::MinimalHtml);
@@ -141,7 +141,7 @@ impl MarkdownOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::markdown::MarkdownOptions;
+    /// use litchi_markdown::MarkdownOptions;
     ///
     /// let options = MarkdownOptions::new().with_html_table_indent(4);
     /// ```
@@ -156,7 +156,7 @@ impl MarkdownOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::markdown::{MarkdownOptions, FormulaStyle};
+    /// use litchi_markdown::{MarkdownOptions, FormulaStyle};
     ///
     /// let options = MarkdownOptions::new()
     ///     .with_formula_style(FormulaStyle::Dollar);
@@ -174,7 +174,7 @@ impl MarkdownOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::markdown::MarkdownOptions;
+    /// use litchi_markdown::MarkdownOptions;
     ///
     /// let options = MarkdownOptions::new().with_list_indent(4);
     /// ```
@@ -189,7 +189,7 @@ impl MarkdownOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::markdown::{MarkdownOptions, ScriptStyle};
+    /// use litchi_markdown::{MarkdownOptions, ScriptStyle};
     ///
     /// let options = MarkdownOptions::new()
     ///     .with_script_style(ScriptStyle::Unicode);
@@ -205,7 +205,7 @@ impl MarkdownOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::markdown::{MarkdownOptions, StrikethroughStyle};
+    /// use litchi_markdown::{MarkdownOptions, StrikethroughStyle};
     ///
     /// let options = MarkdownOptions::new()
     ///     .with_strikethrough_style(StrikethroughStyle::Html);
@@ -225,7 +225,7 @@ impl MarkdownOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::markdown::MarkdownOptions;
+    /// use litchi_markdown::MarkdownOptions;
     ///
     /// // Enable parallel processing (default)
     /// let options = MarkdownOptions::new()

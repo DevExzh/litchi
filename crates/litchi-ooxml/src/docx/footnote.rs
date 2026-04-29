@@ -17,7 +17,7 @@ use quick_xml::events::Event;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::ooxml::docx::Package;
+/// use litchi_ooxml::docx::Package;
 ///
 /// let pkg = Package::open("document.docx")?;
 /// let doc = pkg.document()?;
@@ -115,7 +115,7 @@ impl Note {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -167,7 +167,7 @@ impl Note {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;

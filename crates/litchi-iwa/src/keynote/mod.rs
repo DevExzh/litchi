@@ -14,7 +14,7 @@
 //! ## Example
 //!
 //! ```rust,no_run
-//! use litchi::iwa::keynote::KeynoteDocument;
+//! use litchi_iwa::keynote::KeynoteDocument;
 //!
 //! let doc = KeynoteDocument::open("presentation.key")?;
 //! let slides = doc.slides()?;

@@ -20,8 +20,8 @@ use litchi_imgconv::Blip;
 /// to extract the underlying BLIP data.
 ///
 /// # Example
-/// ```no_run
-/// use litchi::ole::ppt::Package;
+/// ```ignore
+/// use litchi_ole::ppt::Package;
 ///
 /// let mut pkg = Package::open("presentation.ppt")?;
 /// let mut pres = pkg.presentation()?;

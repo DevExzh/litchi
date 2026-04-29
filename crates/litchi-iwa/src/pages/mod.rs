@@ -14,7 +14,7 @@
 //! ## Example
 //!
 //! ```rust,no_run
-//! use litchi::iwa::pages::PagesDocument;
+//! use litchi_iwa::pages::PagesDocument;
 //!
 //! let doc = PagesDocument::open("document.pages")?;
 //! let text = doc.text()?;

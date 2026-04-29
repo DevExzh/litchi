@@ -1,7 +1,5 @@
-// CFB-substrate constants (sector IDs, directory IDs, STGTY_*, VT_*, MAGIC,
-// SECTOR_SIZE_V3/V4, ...) moved to the litchi-cfb crate. Re-exported here so
-// the in-tree format parsers (doc/, xls/, ppt/) keep resolving
-// `crate::consts::*` until they move out in P4c (litchi-ole).
+// CFB-substrate constants re-exported so the in-tree format parsers
+// (doc/, xls/, ppt/) can keep resolving `crate::consts::*`.
 pub use litchi_cfb::consts::*;
 
 /// Common document type: Microsoft Word

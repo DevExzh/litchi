@@ -89,9 +89,9 @@ impl Cell {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Spreadsheet;
+    /// use litchi_odf::Spreadsheet;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut spreadsheet = Spreadsheet::open("data.ods")?;
     /// let sheets = spreadsheet.sheets()?;
     /// if let Some(first_sheet) = sheets.first() {
@@ -120,9 +120,9 @@ impl Cell {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Spreadsheet;
+    /// use litchi_odf::Spreadsheet;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut spreadsheet = Spreadsheet::open("data.ods")?;
     /// let sheets = spreadsheet.sheets()?;
     /// if let Some(first_sheet) = sheets.first() {
@@ -148,9 +148,9 @@ impl Cell {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Spreadsheet;
+    /// use litchi_odf::Spreadsheet;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut spreadsheet = Spreadsheet::open("data.ods")?;
     /// let sheets = spreadsheet.sheets()?;
     /// if let Some(first_sheet) = sheets.first() {
@@ -181,9 +181,9 @@ impl Cell {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Spreadsheet;
+    /// use litchi_odf::Spreadsheet;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut spreadsheet = Spreadsheet::open("data.ods")?;
     /// let sheets = spreadsheet.sheets()?;
     /// if let Some(first_sheet) = sheets.first() {

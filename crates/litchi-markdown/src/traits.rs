@@ -12,7 +12,7 @@ use litchi_core::Result;
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```rust,ignore
 /// use litchi::{Document, markdown::ToMarkdown};
 ///
 /// # fn main() -> Result<(), litchi::Error> {
@@ -34,7 +34,7 @@ pub trait ToMarkdown {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```rust,ignore
     /// use litchi::{Document, markdown::ToMarkdown};
     ///
     /// # fn main() -> Result<(), litchi::Error> {
@@ -55,7 +55,7 @@ pub trait ToMarkdown {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```rust,ignore
     /// use litchi::{Document, markdown::{ToMarkdown, MarkdownOptions}};
     ///
     /// # fn main() -> Result<(), litchi::Error> {

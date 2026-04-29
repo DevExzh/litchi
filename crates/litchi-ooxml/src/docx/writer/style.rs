@@ -15,8 +15,8 @@ use std::fmt::Write as FmtWrite;
 /// # Examples
 ///
 /// ```rust,ignore
-/// use litchi::ooxml::docx::writer::MutableStyle;
-/// use litchi::ooxml::docx::enums::WdStyleType;
+/// use litchi_ooxml::docx::writer::MutableStyle;
+/// use litchi_ooxml::docx::enums::WdStyleType;
 ///
 /// // Create a custom paragraph style
 /// let mut style = MutableStyle::new("MyStyle", "My Custom Style", WdStyleType::Paragraph);

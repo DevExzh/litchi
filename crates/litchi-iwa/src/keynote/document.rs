@@ -26,7 +26,7 @@ impl KeynoteDocument {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::iwa::keynote::KeynoteDocument;
+    /// use litchi_iwa::keynote::KeynoteDocument;
     ///
     /// let doc = KeynoteDocument::open("presentation.key")?;
     /// println!("Loaded Keynote presentation");
@@ -47,7 +47,7 @@ impl KeynoteDocument {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::iwa::keynote::KeynoteDocument;
+    /// use litchi_iwa::keynote::KeynoteDocument;
     /// use std::fs;
     ///
     /// let data = fs::read("presentation.key")?;
@@ -77,7 +77,7 @@ impl KeynoteDocument {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::iwa::keynote::KeynoteDocument;
+    /// use litchi_iwa::keynote::KeynoteDocument;
     ///
     /// let doc = KeynoteDocument::open("presentation.key")?;
     /// let text = doc.text()?;
@@ -98,7 +98,7 @@ impl KeynoteDocument {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::iwa::keynote::KeynoteDocument;
+    /// use litchi_iwa::keynote::KeynoteDocument;
     ///
     /// let doc = KeynoteDocument::open("presentation.key")?;
     /// let slides = doc.slides()?;
@@ -393,7 +393,7 @@ impl KeynoteDocument {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::iwa::keynote::KeynoteDocument;
+    /// use litchi_iwa::keynote::KeynoteDocument;
     ///
     /// let doc = KeynoteDocument::open("presentation.key")?;
     /// if let Some(metadata) = doc.metadata()? {
@@ -506,7 +506,7 @@ impl KeynoteDocument {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::iwa::keynote::KeynoteDocument;
+    /// use litchi_iwa::keynote::KeynoteDocument;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let doc = KeynoteDocument::open("presentation.key")?;

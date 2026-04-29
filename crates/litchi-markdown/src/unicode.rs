@@ -20,7 +20,7 @@
 //! # Examples
 //!
 //! ```rust
-//! use litchi::markdown::unicode::{to_superscript, to_subscript};
+//! use litchi_markdown::unicode::{to_superscript, to_subscript};
 //!
 //! // Convert single character
 //! assert_eq!(to_superscript('2'), Some('²'));
@@ -170,7 +170,7 @@ static SUBSCRIPT_MAP: phf::Map<char, char> = phf_map! {
 /// # Examples
 ///
 /// ```rust
-/// use litchi::markdown::unicode::to_superscript;
+/// use litchi_markdown::unicode::to_superscript;
 ///
 /// assert_eq!(to_superscript('2'), Some('²'));
 /// assert_eq!(to_superscript('n'), Some('ⁿ'));
@@ -194,7 +194,7 @@ pub fn to_superscript(c: char) -> Option<char> {
 /// # Examples
 ///
 /// ```rust
-/// use litchi::markdown::unicode::to_subscript;
+/// use litchi_markdown::unicode::to_subscript;
 ///
 /// assert_eq!(to_subscript('0'), Some('₀'));
 /// assert_eq!(to_subscript('i'), Some('ᵢ'));
@@ -219,7 +219,7 @@ pub fn to_subscript(c: char) -> Option<char> {
 /// # Examples
 ///
 /// ```rust
-/// use litchi::markdown::unicode::convert_to_superscript;
+/// use litchi_markdown::unicode::convert_to_superscript;
 ///
 /// // 'x' has superscript, so it converts too
 /// assert_eq!(convert_to_superscript("x2"), "ˣ²");
@@ -255,7 +255,7 @@ pub fn convert_to_superscript(text: &str) -> String {
 /// # Examples
 ///
 /// ```rust
-/// use litchi::markdown::unicode::convert_to_subscript;
+/// use litchi_markdown::unicode::convert_to_subscript;
 ///
 /// // Uppercase 'H' and 'O' have no subscript (only lowercase letters have subscripts)
 /// assert_eq!(convert_to_subscript("H2O"), "H₂O");
@@ -289,7 +289,7 @@ pub fn convert_to_subscript(text: &str) -> String {
 /// # Examples
 ///
 /// ```rust
-/// use litchi::markdown::unicode::can_convert_to_superscript;
+/// use litchi_markdown::unicode::can_convert_to_superscript;
 ///
 /// assert!(can_convert_to_superscript("123"));
 /// assert!(can_convert_to_superscript("n+1"));
@@ -307,7 +307,7 @@ pub fn can_convert_to_superscript(text: &str) -> bool {
 /// # Examples
 ///
 /// ```rust
-/// use litchi::markdown::unicode::can_convert_to_subscript;
+/// use litchi_markdown::unicode::can_convert_to_subscript;
 ///
 /// assert!(can_convert_to_subscript("123"));
 /// assert!(can_convert_to_subscript("i+1"));

@@ -60,7 +60,7 @@ impl Bundle {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::iwa::Bundle;
+    /// use litchi_iwa::Bundle;
     /// use std::fs;
     ///
     /// let data = fs::read("document.pages")?;

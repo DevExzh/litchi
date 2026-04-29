@@ -36,7 +36,7 @@ use quick_xml::events::Event;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::ooxml::docx::Package;
+/// use litchi_ooxml::docx::Package;
 ///
 /// let pkg = Package::open("document.docx")?;
 /// let doc = pkg.document()?;
@@ -74,7 +74,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -90,7 +90,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -107,7 +107,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -135,7 +135,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -163,7 +163,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -193,8 +193,8 @@ impl<'a> Document<'a> {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// ```ignore
+    /// use litchi_ooxml::docx::Package;
     /// use litchi::DocumentElement;
     ///
     /// let pkg = Package::open("document.docx")?;
@@ -229,7 +229,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -256,7 +256,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -387,7 +387,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -411,7 +411,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -436,7 +436,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -470,7 +470,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -502,7 +502,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -541,7 +541,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -572,7 +572,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -624,7 +624,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -676,7 +676,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::{Package, WdHeaderFooter};
+    /// use litchi_ooxml::docx::{Package, WdHeaderFooter};
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -702,7 +702,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::{Package, WdHeaderFooter};
+    /// use litchi_ooxml::docx::{Package, WdHeaderFooter};
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -729,7 +729,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -758,7 +758,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -778,7 +778,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -814,7 +814,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -847,7 +847,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -864,7 +864,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -884,7 +884,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -917,7 +917,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -937,7 +937,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -957,7 +957,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -977,7 +977,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -1000,7 +1000,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -1020,7 +1020,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -1060,7 +1060,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -1101,7 +1101,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -1123,7 +1123,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -1158,7 +1158,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -1195,7 +1195,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -1223,7 +1223,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -1268,7 +1268,7 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;

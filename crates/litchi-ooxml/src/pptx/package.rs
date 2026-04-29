@@ -34,7 +34,7 @@ const DEFAULT_MEDIA_POSTER: &[u8] = &[
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::ooxml::pptx::Package;
+/// use litchi_ooxml::pptx::Package;
 ///
 /// // Open an existing presentation
 /// let pkg = Package::open("presentation.pptx")?;
@@ -163,7 +163,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let mut pkg = Package::new()?;
     /// // Add slides to the presentation...
@@ -363,7 +363,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
@@ -416,7 +416,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::{OpcPackage, pptx::Package};
+    /// use litchi_ooxml::{OpcPackage, pptx::Package};
     /// use std::io::Cursor;
     ///
     /// let bytes = std::fs::read("presentation.pptx")?;
@@ -459,7 +459,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     /// use std::io::Cursor;
     ///
     /// let data = std::fs::read("presentation.pptx")?;
@@ -503,7 +503,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -551,7 +551,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let mut pkg = Package::new()?;
     /// let mut pres = pkg.presentation_mut()?;
@@ -578,7 +578,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let props = pkg.properties();
@@ -593,7 +593,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let mut pkg = Package::new()?;
     /// pkg.properties_mut().title = Some("My Presentation".to_string());
@@ -616,7 +616,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let mut pkg = Package::new()?;
     /// // Modify presentation...

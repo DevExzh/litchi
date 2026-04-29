@@ -43,7 +43,7 @@ const SECONDS_PER_DAY: f64 = 86400.0;
 /// # Examples
 ///
 /// ```
-/// use litchi::ooxml::xlsb::date_utils::excel_serial_to_unix;
+/// use litchi_ooxml::xlsb::date_utils::excel_serial_to_unix;
 ///
 /// // January 1, 2000 at noon (1900 system)
 /// let serial = 36526.5;
@@ -79,7 +79,7 @@ pub fn excel_serial_to_unix(serial: f64, is_1904: bool) -> f64 {
 /// # Examples
 ///
 /// ```
-/// use litchi::ooxml::xlsb::date_utils::unix_to_excel_serial;
+/// use litchi_ooxml::xlsb::date_utils::unix_to_excel_serial;
 ///
 /// // January 1, 2000 at noon
 /// let timestamp = 946728000.0;

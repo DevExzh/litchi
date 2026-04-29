@@ -16,9 +16,9 @@ use std::path::Path;
 /// # Examples
 ///
 /// ```no_run
-/// use litchi::odf::Document;
+/// use litchi_odf::Document;
 ///
-/// # fn main() -> litchi::Result<()> {
+/// # fn main() -> litchi_core::Result<()> {
 /// // Open a document
 /// let mut doc = Document::open("document.odt")?;
 ///
@@ -75,9 +75,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("my_document.odt")?;
     /// # Ok(())
     /// # }
@@ -103,9 +103,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let bytes = std::fs::read("document.odt")?;
     /// let doc = Document::from_bytes(bytes)?;
     /// # Ok(())
@@ -191,9 +191,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let text = doc.text()?;
     /// println!("Text content:\n{}", text);
@@ -209,9 +209,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let count = doc.paragraph_count()?;
     /// println!("Paragraph count: {}", count);
@@ -230,9 +230,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let paragraphs = doc.paragraphs()?;
     ///
@@ -254,9 +254,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let tables = doc.tables()?;
     ///
@@ -284,10 +284,10 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
-    /// use litchi::odf::elements::parser::DocumentOrderElement;
+    /// use litchi_odf::Document;
+    /// use litchi_odf::elements::parser::DocumentOrderElement;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let elements = doc.elements()?;
     ///
@@ -330,9 +330,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let metadata = doc.metadata()?;
     ///
@@ -364,9 +364,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let styles = doc.styles();
     /// // Use the style registry to query styles...
@@ -393,9 +393,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let props = doc.get_style_properties("Heading1");
     ///
@@ -420,9 +420,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let changes = doc.track_changes()?;
     ///
@@ -441,9 +441,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let comments = doc.comments()?;
     ///
@@ -465,9 +465,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let sections = doc.sections()?;
     ///
@@ -486,9 +486,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let bookmarks = doc.bookmarks()?;
     ///
@@ -512,9 +512,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let ranges = doc.bookmark_ranges()?;
     ///
@@ -538,9 +538,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let fields = doc.fields()?;
     ///
@@ -563,9 +563,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let expanded_tables = doc.tables_expanded()?;
     ///
@@ -597,9 +597,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("input.odt")?;
     /// doc.save("output.odt")?;
     /// # Ok(())
@@ -625,9 +625,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let bytes = doc.to_bytes()?;
     /// // Use bytes for network transfer, etc.
@@ -692,9 +692,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let hyperlinks = doc.hyperlinks()?;
     /// for (text, url) in hyperlinks {
@@ -767,9 +767,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let bookmark_names = doc.bookmark_names()?;
     /// for bookmark in bookmark_names {
@@ -823,9 +823,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let images = doc.image_paths()?;
     /// for img_path in images {
@@ -879,9 +879,9 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Document;
+    /// use litchi_odf::Document;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
     /// let images = doc.image_paths()?;
     /// if let Some(first_image) = images.first() {

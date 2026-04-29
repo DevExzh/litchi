@@ -14,8 +14,8 @@
 //! # Example
 //!
 //! ```ignore
-//! use litchi::ooxml::xlsx::Workbook;
-//! use litchi::sheet::WorkbookTrait;
+//! use litchi_ooxml::xlsx::Workbook;
+//! use litchi_core::sheet::WorkbookTrait;
 //!
 //! // Open a workbook
 //! let workbook = Workbook::open("workbook.xlsx")?;

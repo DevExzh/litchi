@@ -23,7 +23,7 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi::ole::ppt::PptWriter;
+//! use litchi_ole::ppt::PptWriter;
 //!
 //! let mut writer = PptWriter::new();
 //!

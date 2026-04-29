@@ -11,7 +11,7 @@ use litchi_core::xml::escape_xml;
 /// # Examples
 ///
 /// ```rust,ignore
-/// use litchi::ooxml::docx::writer::Watermark;
+/// use litchi_ooxml::docx::writer::Watermark;
 ///
 /// let watermark = Watermark::text("CONFIDENTIAL");
 /// ```

@@ -13,7 +13,7 @@
 //! ## Example
 //!
 //! ```rust,ignore
-//! use litchi::iwa::charts::ChartMetadataExtractor;
+//! use litchi_iwa::charts::ChartMetadataExtractor;
 //!
 //! let extractor = ChartMetadataExtractor::new(&bundle, &index);
 //! let charts = extractor.extract_all_charts()?;

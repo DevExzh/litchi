@@ -51,7 +51,7 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut workbook = Workbook::create()?;
     /// // Add data to worksheets...
@@ -483,7 +483,7 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// let mut ws = wb.worksheet_mut(0)?;
@@ -579,7 +579,7 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// wb.add_worksheet("Sheet2");
@@ -608,7 +608,7 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// wb.define_name("TaxRate", "Sheet1!$A$1");
@@ -668,7 +668,7 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let wb = Workbook::create()?;
     /// let props = wb.properties();
@@ -683,7 +683,7 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// wb.properties_mut().title = Some("My Workbook".to_string());
@@ -705,7 +705,7 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::{Workbook, Person, PersonList};
+    /// use litchi_ooxml::xlsx::{Workbook, Person, PersonList};
     ///
     /// let mut wb = Workbook::create()?;
     /// let mut person_list = PersonList::default();
@@ -739,7 +739,7 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut workbook = Workbook::create()?;
     /// // Modify workbook...
@@ -1412,7 +1412,7 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// wb.hide_sheet(0)?; // Hide the first sheet
@@ -1469,7 +1469,7 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// wb.add_worksheet("Sheet2");
@@ -1508,7 +1508,7 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// wb.set_sheet_visibility(0, "hidden")?;
@@ -1557,7 +1557,7 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// wb.add_worksheet("Sheet2");
@@ -1588,7 +1588,7 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// wb.set_force_formula_recalculation(true);
@@ -1614,7 +1614,7 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// wb.set_calculation_mode("manual")?;
@@ -1658,7 +1658,7 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// wb.set_tab_color(0, "FF0000")?; // Set red tab color
@@ -1699,7 +1699,7 @@ impl Workbook {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsx::Workbook;
+    /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
     /// wb.protect_workbook(Some("password123"), true, false);

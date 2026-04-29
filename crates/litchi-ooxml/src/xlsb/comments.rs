@@ -23,7 +23,7 @@ impl Comment {
     /// # Example
     ///
     /// ```rust
-    /// use litchi::ooxml::xlsb::comments::Comment;
+    /// use litchi_ooxml::xlsb::comments::Comment;
     ///
     /// let comment = Comment::new(0, 0, "John".to_string(), "This is a note".to_string());
     /// ```

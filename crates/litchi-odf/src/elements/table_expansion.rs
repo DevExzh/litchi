@@ -28,8 +28,8 @@ impl TableExpander {
     /// # Example
     ///
     /// ```no_run
-    /// use litchi::odf::elements::table_expansion::TableExpander;
-    /// use litchi::odf::elements::table::Table;
+    /// use litchi_odf::elements::table_expansion::TableExpander;
+    /// use litchi_odf::elements::table::Table;
     ///
     /// let table = Table::new();
     /// // ... populate table with repeated cells/rows ...

@@ -16,7 +16,7 @@ use litchi_opc::packuri::PackURI;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::ooxml::pptx::Package;
+/// use litchi_ooxml::pptx::Package;
 ///
 /// let pkg = Package::open("presentation.pptx")?;
 /// let pres = pkg.presentation()?;
@@ -53,7 +53,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -72,7 +72,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -93,7 +93,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -114,7 +114,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -155,7 +155,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -213,7 +213,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -241,7 +241,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -270,7 +270,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -309,7 +309,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -346,7 +346,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -373,7 +373,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -396,7 +396,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -430,7 +430,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -483,7 +483,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -529,7 +529,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -584,7 +584,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -641,7 +641,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -677,7 +677,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -787,7 +787,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;
@@ -869,7 +869,7 @@ impl<'a> Presentation<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::Package;
+    /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
     /// let pres = pkg.presentation()?;

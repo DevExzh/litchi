@@ -13,9 +13,9 @@ use std::path::Path;
 /// # Examples
 ///
 /// ```no_run
-/// use litchi::odf::Spreadsheet;
+/// use litchi_odf::Spreadsheet;
 ///
-/// # fn main() -> litchi::Result<()> {
+/// # fn main() -> litchi_core::Result<()> {
 /// let mut spreadsheet = Spreadsheet::open("data.ods")?;
 ///
 /// // Get sheet count
@@ -55,9 +55,9 @@ impl Spreadsheet {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Spreadsheet;
+    /// use litchi_odf::Spreadsheet;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let spreadsheet = Spreadsheet::open("data.ods")?;
     /// # Ok(())
     /// # }
@@ -80,9 +80,9 @@ impl Spreadsheet {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Spreadsheet;
+    /// use litchi_odf::Spreadsheet;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let bytes = std::fs::read("data.ods")?;
     /// let spreadsheet = Spreadsheet::from_bytes(bytes)?;
     /// # Ok(())
@@ -206,9 +206,9 @@ impl Spreadsheet {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Spreadsheet;
+    /// use litchi_odf::Spreadsheet;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut spreadsheet = Spreadsheet::open("data.ods")?;
     /// let csv = spreadsheet.to_csv()?;
     /// std::fs::write("output.csv", csv)?;
@@ -280,9 +280,9 @@ impl Spreadsheet {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Spreadsheet;
+    /// use litchi_odf::Spreadsheet;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let spreadsheet = Spreadsheet::open("input.ods")?;
     /// spreadsheet.save("output.ods")?;
     /// # Ok(())
@@ -307,9 +307,9 @@ impl Spreadsheet {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::Spreadsheet;
+    /// use litchi_odf::Spreadsheet;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let spreadsheet = Spreadsheet::open("data.ods")?;
     /// let bytes = spreadsheet.to_bytes()?;
     /// # Ok(())

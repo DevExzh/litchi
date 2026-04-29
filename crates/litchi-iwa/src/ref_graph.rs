@@ -15,7 +15,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use litchi::iwa::ref_graph::ReferenceGraph;
+//! use litchi_iwa::ref_graph::ReferenceGraph;
 //!
 //! let mut graph = ReferenceGraph::new();
 //!

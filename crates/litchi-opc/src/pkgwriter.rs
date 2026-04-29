@@ -21,8 +21,8 @@ use std::path::Path;
 /// # Example
 ///
 /// ```no_run
-/// use litchi::ooxml::opc::package::OpcPackage;
-/// use litchi::ooxml::opc::pkgwriter::PackageWriter;
+/// use litchi_opc::package::OpcPackage;
+/// use litchi_opc::pkgwriter::PackageWriter;
 ///
 /// let mut pkg = OpcPackage::new();
 /// // ... add parts to package ...

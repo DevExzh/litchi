@@ -48,7 +48,7 @@ impl Hyperlink {
     /// # Example
     ///
     /// ```rust
-    /// use litchi::ooxml::xlsb::hyperlinks::Hyperlink;
+    /// use litchi_ooxml::xlsb::hyperlinks::Hyperlink;
     ///
     /// let link = Hyperlink::new(0, 0, 0, 0, "rId1".to_string());
     /// ```
@@ -78,7 +78,7 @@ impl Hyperlink {
     /// # Example
     ///
     /// ```rust
-    /// use litchi::ooxml::xlsb::hyperlinks::Hyperlink;
+    /// use litchi_ooxml::xlsb::hyperlinks::Hyperlink;
     ///
     /// // Hyperlink from A1 to A3 on the same sheet (0-based coordinates)
     /// let link = Hyperlink::new_internal(0, 0, 0, 0, "Sheet1!A3".to_string());

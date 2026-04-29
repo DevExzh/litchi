@@ -182,7 +182,7 @@ pub const ODF_CLASSES: [&str; 12] = [
 /// # Examples
 ///
 /// ```
-/// use litchi::odf::constants::get_mime_type_from_extension;
+/// use litchi_odf::constants::get_mime_type_from_extension;
 ///
 /// let mime = get_mime_type_from_extension("odt");
 /// assert_eq!(mime, Some("application/vnd.oasis.opendocument.text"));
@@ -205,7 +205,7 @@ pub fn get_mime_type_from_extension(extension: &str) -> Option<&'static str> {
 /// # Examples
 ///
 /// ```
-/// use litchi::odf::constants::get_extension_from_mime_type;
+/// use litchi_odf::constants::get_extension_from_mime_type;
 ///
 /// let ext = get_extension_from_mime_type("application/vnd.oasis.opendocument.text");
 /// assert_eq!(ext, Some("odt"));
@@ -228,7 +228,7 @@ pub fn get_extension_from_mime_type(mime_type: &str) -> Option<&'static str> {
 /// # Examples
 ///
 /// ```
-/// use litchi::odf::constants::is_odf_extension;
+/// use litchi_odf::constants::is_odf_extension;
 ///
 /// assert!(is_odf_extension("odt"));
 /// assert!(is_odf_extension("ods"));
@@ -252,7 +252,7 @@ pub fn is_odf_extension(extension: &str) -> bool {
 /// # Examples
 ///
 /// ```
-/// use litchi::odf::constants::is_odf_mime_type;
+/// use litchi_odf::constants::is_odf_mime_type;
 ///
 /// assert!(is_odf_mime_type("application/vnd.oasis.opendocument.text"));
 /// assert!(!is_odf_mime_type("text/plain"));

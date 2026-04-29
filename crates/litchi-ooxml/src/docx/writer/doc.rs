@@ -373,7 +373,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// use litchi::ooxml::docx::settings::ProtectionType;
+    /// use litchi_ooxml::docx::settings::ProtectionType;
     ///
     /// // Protect document as read-only
     /// doc.set_protection(ProtectionType::ReadOnly);
@@ -439,7 +439,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// use litchi::ooxml::docx::writer::MutableTheme;
+    /// use litchi_ooxml::docx::writer::MutableTheme;
     ///
     /// let theme = MutableTheme::office_theme();
     /// doc.set_theme(theme);
@@ -469,7 +469,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// use litchi::ooxml::docx::writer::Watermark;
+    /// use litchi_ooxml::docx::writer::Watermark;
     ///
     /// let watermark = Watermark::text("CONFIDENTIAL");
     /// doc.set_watermark(watermark);
@@ -501,7 +501,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// use litchi::ooxml::docx::writer::TableOfContents;
+    /// use litchi_ooxml::docx::writer::TableOfContents;
     ///
     /// let toc = TableOfContents::new()
     ///     .heading_levels(1, 3)

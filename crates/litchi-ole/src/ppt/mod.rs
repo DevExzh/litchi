@@ -21,7 +21,7 @@
 /// # Example
 ///
 /// ```rust,no_run
-/// use litchi::ole::ppt::{Package, shapes::ShapeEnum};
+/// use litchi_ole::ppt::{Package, shapes::ShapeEnum};
 ///
 /// // Open a presentation
 /// let mut package = Package::open("presentation.ppt")?;

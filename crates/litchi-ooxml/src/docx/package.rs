@@ -21,7 +21,7 @@ use std::path::Path;
 /// ## Reading an existing document
 ///
 /// ```rust,no_run
-/// use litchi::ooxml::docx::Package;
+/// use litchi_ooxml::docx::Package;
 ///
 /// // Open an existing document
 /// let pkg = Package::open("document.docx")?;
@@ -34,7 +34,7 @@ use std::path::Path;
 /// ## Creating a new document
 ///
 /// ```rust,no_run
-/// use litchi::ooxml::docx::Package;
+/// use litchi_ooxml::docx::Package;
 ///
 /// // Create a new document
 /// let mut pkg = Package::new()?;
@@ -193,7 +193,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let mut pkg = Package::new()?;
     /// // Add content to the document...
@@ -381,7 +381,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
@@ -434,7 +434,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::{OpcPackage, docx::Package};
+    /// use litchi_ooxml::{OpcPackage, docx::Package};
     /// use std::io::Cursor;
     ///
     /// let bytes = std::fs::read("document.docx")?;
@@ -477,7 +477,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     /// use std::io::Cursor;
     ///
     /// let data = std::fs::read("document.docx")?;
@@ -533,7 +533,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
@@ -576,7 +576,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let mut pkg = Package::new()?;
     /// let mut doc = pkg.document_mut()?;
@@ -624,7 +624,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let mut pkg = Package::new()?;
     /// // Modify document...
@@ -651,7 +651,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     /// use std::io::Cursor;
     ///
     /// let mut pkg = Package::new()?;
@@ -934,7 +934,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let props = pkg.properties();
@@ -949,7 +949,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let mut pkg = Package::new()?;
     /// pkg.properties_mut().title = Some("My Document".to_string());
@@ -968,7 +968,7 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
+    /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let custom_props = pkg.custom_properties();
@@ -987,8 +987,8 @@ impl Package {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::docx::Package;
-    /// use litchi::ooxml::custom_properties::PropertyValue;
+    /// use litchi_ooxml::docx::Package;
+    /// use litchi_ooxml::custom_properties::PropertyValue;
     ///
     /// let mut pkg = Package::new()?;
     /// let custom_props = pkg.custom_properties_mut();

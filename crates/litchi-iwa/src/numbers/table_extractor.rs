@@ -14,9 +14,9 @@
 //! ## Example
 //!
 //! ```rust,ignore
-//! use litchi::iwa::numbers::table_extractor::TableDataExtractor;
-//! use litchi::iwa::bundle::Bundle;
-//! use litchi::iwa::object_index::ObjectIndex;
+//! use litchi_iwa::numbers::table_extractor::TableDataExtractor;
+//! use litchi_iwa::bundle::Bundle;
+//! use litchi_iwa::object_index::ObjectIndex;
 //!
 //! let bundle = Bundle::open("document.numbers")?;
 //! let index = ObjectIndex::from_bundle(&bundle)?;

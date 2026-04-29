@@ -187,7 +187,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::MutablePresentation;
+    /// use litchi_ooxml::pptx::MutablePresentation;
     ///
     /// let mut pres = MutablePresentation::new();
     /// pres.add_slide().unwrap();
@@ -226,7 +226,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::MutablePresentation;
+    /// use litchi_ooxml::pptx::MutablePresentation;
     ///
     /// let mut pres = MutablePresentation::new();
     /// let slide = pres.add_slide().unwrap();
@@ -271,7 +271,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::MutablePresentation;
+    /// use litchi_ooxml::pptx::MutablePresentation;
     ///
     /// let mut pres = MutablePresentation::new();
     /// pres.add_slide().unwrap().set_title("First");
@@ -314,7 +314,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::MutablePresentation;
+    /// use litchi_ooxml::pptx::MutablePresentation;
     ///
     /// let mut pres = MutablePresentation::new();
     /// pres.add_slide().unwrap();
@@ -341,7 +341,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::MutablePresentation;
+    /// use litchi_ooxml::pptx::MutablePresentation;
     ///
     /// let mut pres = MutablePresentation::new();
     /// // Set to 16:9 aspect ratio (10" x 5.625")
@@ -360,7 +360,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::MutablePresentation;
+    /// use litchi_ooxml::pptx::MutablePresentation;
     ///
     /// let pres = MutablePresentation::new();
     /// let (width, height) = pres.slide_size();
@@ -375,7 +375,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::MutablePresentation;
+    /// use litchi_ooxml::pptx::MutablePresentation;
     ///
     /// let mut pres = MutablePresentation::new();
     /// pres.set_standard_slide_size();
@@ -390,7 +390,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::MutablePresentation;
+    /// use litchi_ooxml::pptx::MutablePresentation;
     ///
     /// let mut pres = MutablePresentation::new();
     /// pres.set_widescreen_slide_size();
@@ -413,7 +413,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::MutablePresentation;
+    /// use litchi_ooxml::pptx::MutablePresentation;
     ///
     /// let mut pres = MutablePresentation::new();
     /// pres.add_slide().unwrap();
@@ -452,7 +452,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::MutablePresentation;
+    /// use litchi_ooxml::pptx::MutablePresentation;
     ///
     /// let mut pres = MutablePresentation::new();
     /// pres.add_slide().unwrap();
@@ -493,7 +493,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::{MutablePresentation, PresentationProtection};
+    /// use litchi_ooxml::pptx::{MutablePresentation, PresentationProtection};
     ///
     /// let mut pres = MutablePresentation::new();
     /// pres.set_protection(
@@ -536,7 +536,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```rust
-    /// use litchi::ooxml::pptx::{MutablePresentation, HandoutMaster, HandoutLayout};
+    /// use litchi_ooxml::pptx::{MutablePresentation, HandoutMaster, HandoutLayout};
     ///
     /// let mut pres = MutablePresentation::new();
     /// pres.set_handout_master(
@@ -665,7 +665,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::{Package, ChartData, ChartSeries, ChartType};
+    /// use litchi_ooxml::pptx::{Package, ChartData, ChartSeries, ChartType};
     ///
     /// let mut pkg = Package::new().unwrap();
     /// let pres = pkg.presentation_mut().unwrap();
@@ -722,7 +722,7 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::pptx::{Package, SmartArtBuilder, DiagramType};
+    /// use litchi_ooxml::pptx::{Package, SmartArtBuilder, DiagramType};
     ///
     /// let mut pkg = Package::new().unwrap();
     /// let pres = pkg.presentation_mut().unwrap();

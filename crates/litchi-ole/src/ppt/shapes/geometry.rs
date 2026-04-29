@@ -83,8 +83,8 @@ impl GeometryRect {
 /// # Example
 ///
 /// ```ignore
-/// use litchi::ole::ppt::escher::EscherProperties;
-/// use litchi::ole::ppt::shapes::geometry::extract_geometry_rect;
+/// use litchi_ole::ppt::escher::EscherProperties;
+/// use litchi_ole::ppt::shapes::geometry::extract_geometry_rect;
 ///
 /// let props = EscherProperties::from_opt_record(&opt_record);
 /// if let Some(geom) = extract_geometry_rect(&props) {

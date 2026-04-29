@@ -74,7 +74,7 @@ impl Document {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::iwa::Document;
+    /// use litchi_iwa::Document;
     /// use std::fs;
     ///
     /// let data = fs::read("document.pages")?;

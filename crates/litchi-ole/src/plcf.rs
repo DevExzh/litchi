@@ -20,7 +20,7 @@ use litchi_core::binary;
 /// # Examples
 ///
 /// ```
-/// use litchi::ole::plcf::PlcfParser;
+/// use litchi_ole::plcf::PlcfParser;
 ///
 /// // Create a simple PLCF with 2 elements, element_size = 2
 /// // CPs: 0, 10, 20

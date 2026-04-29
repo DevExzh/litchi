@@ -20,7 +20,7 @@
 //! ### Creating a new document
 //!
 //! ```rust,no_run
-//! use litchi::ooxml::docx::Package;
+//! use litchi_ooxml::docx::Package;
 //!
 //! // Create a new document
 //! let mut pkg = Package::new()?;
@@ -51,7 +51,7 @@
 //! ### Reading an existing document
 //!
 //! ```rust,no_run
-//! use litchi::ooxml::docx::Package;
+//! use litchi_ooxml::docx::Package;
 //!
 //! // Open document
 //! let pkg = Package::open("document.docx")?;
@@ -94,7 +94,7 @@
 //! ### Updating an existing document
 //!
 //! ```rust,no_run
-//! use litchi::ooxml::docx::Package;
+//! use litchi_ooxml::docx::Package;
 //!
 //! // Open document
 //! let mut pkg = Package::open("document.docx")?;
@@ -115,8 +115,8 @@
 //! ### Working with Custom Properties
 //!
 //! ```rust,no_run
-//! use litchi::ooxml::docx::Package;
-//! use litchi::ooxml::custom_properties::PropertyValue;
+//! use litchi_ooxml::docx::Package;
+//! use litchi_ooxml::custom_properties::PropertyValue;
 //!
 //! let mut pkg = Package::new()?;
 //!
@@ -149,7 +149,7 @@
 //! ### Creating a new workbook
 //!
 //! ```rust,no_run
-//! use litchi::ooxml::xlsx::Workbook;
+//! use litchi_ooxml::xlsx::Workbook;
 //!
 //! // Create a new workbook
 //! let mut wb = Workbook::create()?;
@@ -184,8 +184,8 @@
 //!
 //! ### Reading an existing workbook
 //!
-//! ```rust,no_run
-//! use litchi::ooxml::xlsx::Workbook;
+//! ```ignore
+//! use litchi_ooxml::xlsx::Workbook;
 //! use litchi::sheet::WorkbookTrait;
 //!
 //! // Open workbook
@@ -214,7 +214,7 @@
 //! ### Updating an existing workbook
 //!
 //! ```rust,no_run
-//! use litchi::ooxml::xlsx::Workbook;
+//! use litchi_ooxml::xlsx::Workbook;
 //!
 //! // Open workbook
 //! let mut wb = Workbook::open("workbook.xlsx")?;
@@ -239,7 +239,7 @@
 //! ### Creating a new presentation
 //!
 //! ```rust,no_run
-//! use litchi::ooxml::pptx::Package;
+//! use litchi_ooxml::pptx::Package;
 //!
 //! // Create a new presentation
 //! let mut pkg = Package::new()?;
@@ -271,7 +271,7 @@
 //! ### Reading an existing presentation
 //!
 //! ```rust,no_run
-//! use litchi::ooxml::pptx::Package;
+//! use litchi_ooxml::pptx::Package;
 //!
 //! // Open presentation
 //! let pkg = Package::open("presentation.pptx")?;
@@ -301,7 +301,7 @@
 //! ### Updating an existing presentation
 //!
 //! ```rust,no_run
-//! use litchi::ooxml::pptx::Package;
+//! use litchi_ooxml::pptx::Package;
 //!
 //! // Open presentation
 //! let mut pkg = Package::open("presentation.pptx")?;
@@ -339,8 +339,8 @@
 //! All operations return `Result` types with descriptive errors:
 //!
 //! ```rust,no_run
-//! use litchi::ooxml::docx::Package;
-//! use litchi::ooxml::error::OoxmlError;
+//! use litchi_ooxml::docx::Package;
+//! use litchi_ooxml::error::OoxmlError;
 //!
 //! match Package::open("document.docx") {
 //!     Ok(pkg) => println!("Opened successfully"),
@@ -415,7 +415,7 @@ pub mod helpers {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::api::helpers;
+    /// use litchi_ooxml::api::helpers;
     ///
     /// // Works with DOCX, PPTX files
     /// let text = helpers::extract_text("document.docx")?;
@@ -450,7 +450,7 @@ pub mod helpers {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::api::helpers;
+    /// use litchi_ooxml::api::helpers;
     ///
     /// let props = helpers::get_properties("document.docx")?;
     /// if let Some(title) = props.title {

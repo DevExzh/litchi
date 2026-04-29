@@ -46,10 +46,8 @@
 pub use litchi_imgconv::*;
 
 // Integration glue between `litchi_ole::escher` and `litchi_imgconv` lives
-// in the `litchi-ole` crate (relocated from the umbrella in P4c) because it
-// reaches into private `litchi-ole` Escher types. The umbrella re-exports
-// the public surface here so callers using `litchi::images::ImageExtractor`
-// keep resolving.
+// in the `litchi-ole` crate because it reaches into private Escher types.
+// Re-exported here so `litchi::images::ImageExtractor` resolves.
 #[cfg(all(feature = "ole", feature = "imgconv"))]
 pub use litchi_ole::extractor::{ExtractedImage, ImageExtractor};
 

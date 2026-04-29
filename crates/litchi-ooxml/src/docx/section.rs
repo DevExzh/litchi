@@ -122,7 +122,7 @@ impl Default for PageSize {
 /// # Examples
 ///
 /// ```rust,ignore
-/// use litchi::ooxml::docx::Package;
+/// use litchi_ooxml::docx::Package;
 ///
 /// let pkg = Package::open("document.docx")?;
 /// let doc = pkg.document()?;
@@ -409,7 +409,7 @@ impl Section {
 /// # Examples
 ///
 /// ```rust,ignore
-/// use litchi::ooxml::docx::Package;
+/// use litchi_ooxml::docx::Package;
 ///
 /// let pkg = Package::open("document.docx")?;
 /// let doc = pkg.document()?;

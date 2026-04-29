@@ -15,9 +15,9 @@ use std::path::Path;
 /// # Examples
 ///
 /// ```no_run
-/// use litchi::odf::SpreadsheetBuilder;
+/// use litchi_odf::SpreadsheetBuilder;
 ///
-/// # fn main() -> litchi::Result<()> {
+/// # fn main() -> litchi_core::Result<()> {
 /// let mut builder = SpreadsheetBuilder::new();
 /// builder.add_sheet("Sheet1")?;
 /// builder.add_row_with_values(&["Name", "Age", "City"])?;
@@ -43,7 +43,7 @@ impl SpreadsheetBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::SpreadsheetBuilder;
+    /// use litchi_odf::SpreadsheetBuilder;
     ///
     /// let builder = SpreadsheetBuilder::new();
     /// ```
@@ -72,9 +72,9 @@ impl SpreadsheetBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::SpreadsheetBuilder;
+    /// use litchi_odf::SpreadsheetBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = SpreadsheetBuilder::new();
     /// builder.add_sheet("Sheet1")?;
     /// # Ok(())
@@ -98,9 +98,9 @@ impl SpreadsheetBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::SpreadsheetBuilder;
+    /// use litchi_odf::SpreadsheetBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = SpreadsheetBuilder::new();
     /// builder.add_sheet("Sheet1")?;
     /// builder.add_row_with_values(&["A", "B", "C"])?;
@@ -151,9 +151,9 @@ impl SpreadsheetBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::SpreadsheetBuilder;
+    /// use litchi_odf::SpreadsheetBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = SpreadsheetBuilder::new();
     /// builder.add_sheet("Sheet1")?;
     /// builder.add_row_with_numbers(&[1.0, 2.5, 3.14])?;
@@ -204,9 +204,9 @@ impl SpreadsheetBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::{SpreadsheetBuilder, CellValue};
+    /// use litchi_odf::{SpreadsheetBuilder, CellValue};
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = SpreadsheetBuilder::new();
     /// builder.add_sheet("Sheet1")?;
     /// builder.add_row_with_cell_values(&[
@@ -275,9 +275,9 @@ impl SpreadsheetBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::{SpreadsheetBuilder, CellValue};
+    /// use litchi_odf::{SpreadsheetBuilder, CellValue};
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = SpreadsheetBuilder::new();
     /// builder.add_sheet("Sheet1")?;
     /// builder.set_cell(0, 0, CellValue::Number(42.0))?;
@@ -347,9 +347,9 @@ impl SpreadsheetBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::SpreadsheetBuilder;
+    /// use litchi_odf::SpreadsheetBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = SpreadsheetBuilder::new();
     /// builder.add_sheet("Sheet1")?;
     /// builder.set_cell_formula(0, 0, "=SUM(A2:A10)")?;
@@ -399,9 +399,9 @@ impl SpreadsheetBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::SpreadsheetBuilder;
+    /// use litchi_odf::SpreadsheetBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = SpreadsheetBuilder::new();
     /// builder.add_sheet("Sheet1")?;
     /// builder.add_sheet("Sheet2")?;
@@ -435,9 +435,9 @@ impl SpreadsheetBuilder {
     /// # Examples
     ///
     /// ```
-    /// use litchi::odf::{CellValue, SCell, SpreadsheetBuilder};
+    /// use litchi_odf::{CellValue, SCell, SpreadsheetBuilder};
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = SpreadsheetBuilder::new();
     /// builder.add_sheet("Sheet1")?;
     ///
@@ -686,9 +686,9 @@ impl SpreadsheetBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::SpreadsheetBuilder;
+    /// use litchi_odf::SpreadsheetBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = SpreadsheetBuilder::new();
     /// builder.add_sheet("Sheet1")?;
     /// let bytes = builder.build()?;
@@ -726,9 +726,9 @@ impl SpreadsheetBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi::odf::SpreadsheetBuilder;
+    /// use litchi_odf::SpreadsheetBuilder;
     ///
-    /// # fn main() -> litchi::Result<()> {
+    /// # fn main() -> litchi_core::Result<()> {
     /// let mut builder = SpreadsheetBuilder::new();
     /// builder.add_sheet("Sheet1")?;
     /// builder.save("output.ods")?;

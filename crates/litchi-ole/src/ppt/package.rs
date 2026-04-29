@@ -57,7 +57,7 @@ pub type Result<T> = std::result::Result<T, PptError>;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::ole::ppt::Package;
+/// use litchi_ole::ppt::Package;
 ///
 /// // Open an existing presentation
 /// let mut pkg = Package::open("presentation.ppt")?;
@@ -85,7 +85,7 @@ impl Package<File> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ole::ppt::Package;
+    /// use litchi_ole::ppt::Package;
     ///
     /// let mut pkg = Package::open("presentation.ppt")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -107,7 +107,7 @@ impl<R: Read + Seek> Package<R> {
     ///
     /// ```rust,no_run
     /// use std::fs::File;
-    /// use litchi::ole::ppt::Package;
+    /// use litchi_ole::ppt::Package;
     ///
     /// let file = File::open("presentation.ppt")?;
     /// let pkg = Package::from_reader(file)?;
@@ -138,7 +138,7 @@ impl<R: Read + Seek> Package<R> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ole::{OleFile, ppt::Package};
+    /// use litchi_ole::{OleFile, ppt::Package};
     /// use std::io::Cursor;
     ///
     /// let bytes = std::fs::read("presentation.ppt")?;
@@ -165,7 +165,7 @@ impl<R: Read + Seek> Package<R> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::ole::ppt::Package;
+    /// use litchi_ole::ppt::Package;
     ///
     /// let mut pkg = Package::open("presentation.ppt")?;
     /// let pres = pkg.presentation()?;
@@ -216,10 +216,9 @@ mod tests {
     }
 }
 
-// Orphan-rule glue: relocated from `src/error_ext.rs` during P4c so that the
-// `From<PptError> for litchi_core::Error` impl lives in the same crate as
-// `PptError` (litchi-ole). Without this, the umbrella crate cannot implement
-// the conversion for a non-local error type after the carve-out.
+// `From<PptError> for litchi_core::Error` lives here (not in the umbrella) so
+// the orphan rule is satisfied — both source and target crates are external
+// to the umbrella.
 impl From<PptError> for litchi_core::Error {
     fn from(err: PptError) -> Self {
         match err {

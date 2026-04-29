@@ -57,7 +57,7 @@ impl DocumentParser {
     /// # Example
     ///
     /// ```no_run
-    /// use litchi::odf::elements::parser::DocumentParser;
+    /// use litchi_odf::elements::parser::DocumentParser;
     ///
     /// let xml = r#"<office:text>
     ///     <text:p>First paragraph</text:p>

@@ -15,7 +15,7 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi::ooxml::xlsb::writer::{XlsbWorkbookWriter, MutableXlsbWorksheet};
+//! use litchi_ooxml::xlsb::writer::{XlsbWorkbookWriter, MutableXlsbWorksheet};
 //! use std::fs::File;
 //!
 //! // Create a new workbook

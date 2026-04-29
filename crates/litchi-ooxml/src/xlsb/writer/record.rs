@@ -27,7 +27,7 @@ impl<W: Write> RecordWriter<W> {
     /// # Example
     ///
     /// ```rust,no_run
-    /// use litchi::ooxml::xlsb::writer::RecordWriter;
+    /// use litchi_ooxml::xlsb::writer::RecordWriter;
     /// use std::io::Cursor;
     ///
     /// let mut buffer = Vec::new();

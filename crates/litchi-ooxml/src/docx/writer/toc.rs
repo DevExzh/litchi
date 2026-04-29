@@ -12,7 +12,7 @@ use std::fmt::Write as FmtWrite;
 /// # Examples
 ///
 /// ```rust,ignore
-/// use litchi::ooxml::docx::writer::TableOfContents;
+/// use litchi_ooxml::docx::writer::TableOfContents;
 ///
 /// let toc = TableOfContents::new()
 ///     .heading_levels(1, 3)

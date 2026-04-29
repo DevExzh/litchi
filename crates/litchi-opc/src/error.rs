@@ -57,16 +57,9 @@ impl From<quick_xml::events::attributes::AttrError> for OpcError {
 
 pub type Result<T> = std::result::Result<T, OpcError>;
 
-// ---------------------------------------------------------------------------
-// Bridge to the umbrella's unified `litchi_core::Error` type.
-//
-// This impl previously lived in `src/error_ext.rs` (umbrella crate). After the
-// litchi-opc carve-out (P3b), both `OpcError` and `litchi_core::Error` are
-// external to the umbrella crate, so the orphan rule (E0117) forbids the impl
-// at that location. We therefore relocate it here, where the target type's
-// crate (`litchi-core`) is a direct dependency of `litchi-opc`. The mapping
-// body is preserved verbatim from the original `from_opc_error` helper in
-// src/error_ext.rs lines 57-65.
+// `From<OpcError> for litchi_core::Error` lives here (not in the umbrella)
+// so the orphan rule is satisfied — both source and target crates are
+// external to the umbrella.
 impl From<OpcError> for litchi_core::Error {
     fn from(err: OpcError) -> Self {
         match err {

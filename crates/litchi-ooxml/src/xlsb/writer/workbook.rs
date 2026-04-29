@@ -25,7 +25,7 @@ use std::io::{Seek, Write};
 /// # Example
 ///
 /// ```rust,no_run
-/// use litchi::ooxml::xlsb::writer::{XlsbWorkbookWriter, MutableXlsbWorksheet};
+/// use litchi_ooxml::xlsb::writer::{XlsbWorkbookWriter, MutableXlsbWorksheet};
 /// use std::fs::File;
 ///
 /// let mut workbook = XlsbWorkbookWriter::new();
@@ -91,7 +91,7 @@ impl XlsbWorkbookWriter {
     /// # Example
     ///
     /// ```rust
-    /// use litchi::ooxml::xlsb::writer::{XlsbWorkbookWriter, MutableXlsbWorksheet};
+    /// use litchi_ooxml::xlsb::writer::{XlsbWorkbookWriter, MutableXlsbWorksheet};
     ///
     /// let mut workbook = XlsbWorkbookWriter::new();
     /// let sheet = MutableXlsbWorksheet::new("Sheet1");
