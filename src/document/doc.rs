@@ -477,7 +477,22 @@ impl Document {
                     .collect())
             },
             #[cfg(feature = "ooxml")]
-            DocumentImpl::Docx(doc, _) => doc.elements().map_err(Error::from),
+            DocumentImpl::Docx(doc, _) => {
+                use super::DocumentElement;
+                use litchi_ooxml::docx::DocxElement;
+                let raw = doc.elements().map_err(Error::from)?;
+                Ok(raw
+                    .into_iter()
+                    .map(|el| match el {
+                        DocxElement::Paragraph(p) => {
+                            DocumentElement::Paragraph(Box::new(super::Paragraph::Docx(*p)))
+                        },
+                        DocxElement::Table(t) => {
+                            DocumentElement::Table(Box::new(super::Table::Docx(t)))
+                        },
+                    })
+                    .collect())
+            },
             #[cfg(feature = "iwa")]
             DocumentImpl::Pages(doc) => {
                 use super::DocumentElement;

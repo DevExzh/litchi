@@ -6,9 +6,6 @@
 //! permit this here because the *source* type of each `From` is local to the
 //! umbrella crate.
 
-#[cfg(any(feature = "ole", feature = "ooxml"))]
-use litchi_core::Error;
-
 // ---------------------------------------------------------------------------
 // OLE error conversions
 // ---------------------------------------------------------------------------
@@ -38,22 +35,6 @@ use litchi_core::Error;
 // the orphan rule after the litchi-opc carve-out (P3b). Keep this comment for
 // grep traceability.
 
-#[cfg(feature = "ooxml")]
-impl From<crate::ooxml::error::OoxmlError> for Error {
-    fn from(err: crate::ooxml::error::OoxmlError) -> Self {
-        match err {
-            crate::ooxml::error::OoxmlError::Io(e) => Error::Io(e),
-            crate::ooxml::error::OoxmlError::Xml(s) => Error::XmlError(s),
-            crate::ooxml::error::OoxmlError::PartNotFound(s) => Error::ComponentNotFound(s),
-            crate::ooxml::error::OoxmlError::InvalidContentType { expected, got } => {
-                Error::InvalidContentType { expected, got }
-            },
-            crate::ooxml::error::OoxmlError::InvalidRelationship(s) => Error::Other(s),
-            crate::ooxml::error::OoxmlError::InvalidFormat(s) => Error::InvalidFormat(s),
-            crate::ooxml::error::OoxmlError::Opc(e) => Error::from(e),
-            crate::ooxml::error::OoxmlError::IoError(e) => Error::Io(e),
-            crate::ooxml::error::OoxmlError::InvalidUri(s) => Error::Other(s),
-            crate::ooxml::error::OoxmlError::Other(s) => Error::Other(s),
-        }
-    }
-}
+// `impl From<crate::ooxml::error::OoxmlError> for litchi_core::Error` moved
+// to `crates/litchi-ooxml/src/error.rs` to satisfy the orphan rule after the
+// litchi-ooxml carve-out (P4d). Keep this comment for grep traceability.

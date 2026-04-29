@@ -1,0 +1,84 @@
+/// Error types for OOXML operations.
+use thiserror::Error;
+
+/// Result type for OOXML operations.
+pub type Result<T> = std::result::Result<T, OoxmlError>;
+
+/// Error types for OOXML operations.
+#[derive(Error, Debug)]
+pub enum OoxmlError {
+    /// OPC package error
+    #[error("OPC error: {0}")]
+    Opc(#[from] litchi_opc::error::OpcError),
+
+    /// XML parsing error
+    #[error("XML error: {0}")]
+    Xml(String),
+
+    /// Part not found
+    #[error("Part not found: {0}")]
+    PartNotFound(String),
+
+    /// Invalid content type
+    #[error("Invalid content type: expected {expected}, got {got}")]
+    InvalidContentType { expected: String, got: String },
+
+    /// Invalid relationship
+    #[error("Invalid relationship: {0}")]
+    InvalidRelationship(String),
+
+    /// Invalid format
+    #[error("Invalid format: {0}")]
+    InvalidFormat(String),
+
+    /// IO error
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    /// IO error (alternative form for compatibility)
+    #[error("IO error: {0}")]
+    IoError(std::io::Error),
+
+    /// Invalid URI
+    #[error("Invalid URI: {0}")]
+    InvalidUri(String),
+
+    /// Generic error
+    #[error("{0}")]
+    Other(String),
+}
+
+impl From<quick_xml::Error> for OoxmlError {
+    fn from(err: quick_xml::Error) -> Self {
+        OoxmlError::Xml(err.to_string())
+    }
+}
+
+impl From<std::fmt::Error> for OoxmlError {
+    fn from(err: std::fmt::Error) -> Self {
+        OoxmlError::Other(err.to_string())
+    }
+}
+
+// Relocated from `src/error_ext.rs` in P4d (workspace-split) to satisfy the
+// orphan rule after `OoxmlError` was carved out into this crate. The umbrella
+// `litchi_core::Error` is the unified error type used by callers; converting
+// `OoxmlError` into it lets `?` propagate naturally across the umbrella seam.
+impl From<OoxmlError> for litchi_core::Error {
+    fn from(err: OoxmlError) -> Self {
+        match err {
+            OoxmlError::Io(e) => litchi_core::Error::Io(e),
+            OoxmlError::Xml(s) => litchi_core::Error::XmlError(s),
+            OoxmlError::PartNotFound(s) => litchi_core::Error::ComponentNotFound(s),
+            OoxmlError::InvalidContentType { expected, got } => {
+                litchi_core::Error::InvalidContentType { expected, got }
+            },
+            OoxmlError::InvalidRelationship(s) => litchi_core::Error::Other(s),
+            OoxmlError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
+            OoxmlError::Opc(e) => litchi_core::Error::from(e),
+            OoxmlError::IoError(e) => litchi_core::Error::Io(e),
+            OoxmlError::InvalidUri(s) => litchi_core::Error::Other(s),
+            OoxmlError::Other(s) => litchi_core::Error::Other(s),
+        }
+    }
+}

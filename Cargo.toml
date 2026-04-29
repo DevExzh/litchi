@@ -54,6 +54,7 @@ members = [
     "crates/litchi-iwa",
     "crates/litchi-odf",
     "crates/litchi-ole",
+    "crates/litchi-ooxml",
     "crates/litchi-opc",
     "crates/litchi-rtf",
     "crates/pyo3-litchi",
@@ -155,19 +156,11 @@ full = [
     "fonts",
 ]
 # Format support features
-iwa = ["dep:litchi-iwa"]
-odf = ["dep:litchi-odf", "litchi-core/odf"]
+iwa = ["dep:litchi-iwa", "dep:soapberry-zip"]
+odf = ["dep:litchi-odf", "litchi-core/odf", "dep:soapberry-zip"]
 ole = ["dep:litchi-ole", "litchi-core/ole"]
-ooxml = ["dep:soapberry-zip", "dep:quick-xml", "dep:encoding_rs", "dep:litchi-opc"]
-ooxml_encryption = [
-    "ooxml",
-    "ole",
-    "dep:aes",
-    "dep:cbc",
-    "dep:hmac",
-    "dep:sha1",
-    "dep:litchi-cfb",
-]
+ooxml = ["dep:litchi-ooxml", "dep:soapberry-zip"]
+ooxml_encryption = ["ooxml", "ole", "litchi-ooxml/encryption"]
 rtf = ["dep:litchi-rtf", "litchi-core/rtf"]
 # Additional functionality features
 formula = ["dep:litchi-formula", "litchi-ole?/formula"]
@@ -177,22 +170,17 @@ eval_engine = ["dep:litchi-eval"]
 eval_engine_web_functions = ["eval_engine", "litchi-eval/web_functions"]
 
 [dependencies]
-aes = { version = "0.8", optional = true } # AES block cipher for OOXML file encryption
 aho-corasick = "1.1" # Fast string searching for fast byte pattern matching
 allsorts = { version = "0.16", optional = true } # Font subsetting and layout
 atoi_simd = "0.18" # SIMD-optimized conversion of byte slices to integers
 base64 = "0.22" # Base64 encoding/decoding for embedded binary data in XML
 bitflags = { version = "2.10", features = ["std", "serde"] } # Bit flags for efficient flag combinations
 bytes = { version = "1", features = ["serde"] } # Efficient byte buffer operations with zero-copy slicing
-cbc = { version = "0.1", features = ["alloc"], optional = true } # CBC mode for AES-based OOXML encryption
 chrono = { version = "0", features = ["serde"] } # Date and time types for Office timestamps
-encoding_rs = { version = "0.8", optional = true } # Used by both OLE (.doc, .xls, .ppt) and OOXML (.xlsb) formats for UTF-16LE decoding
 fast-float2 = "0.2" # Fast string-to-float conversion with correct rounding
 fixedbitset = "0.5" # Fixed-size bitset for efficient visited tracking with better cache locality
 flate2 = { version = "1", features = ["zlib-rs"], default-features = false } # Compression/decompression for Office file formats
-hmac = { version = "0.13", optional = true } # HMAC for Agile OOXML encryption integrity
 itoa = "1.0" # Fast integer-to-string conversion
-litchi-cfb = { workspace = true, optional = true } # CFB / OLE2 container substrate (carved out in workspace split, gated by `ole` or `ooxml_encryption` features)
 litchi-core = { workspace = true } # Common types, traits, and utilities (carved out in workspace split)
 litchi-eval = { workspace = true, optional = true } # Formula evaluator engine (carved out in workspace split, gated by `eval_engine` feature)
 litchi-fonts = { workspace = true, optional = true } # Font discovery, loading, and subsetting (carved out in workspace split, gated by `fonts` feature)
@@ -201,23 +189,21 @@ litchi-imgconv = { workspace = true, optional = true } # EMF/WMF/PICT image conv
 litchi-iwa = { workspace = true, optional = true } # Apple iWork (.pages, .numbers, .key) parser (carved out in workspace split, gated by `iwa` feature)
 litchi-odf = { workspace = true, optional = true } # OpenDocument Format (.odt, .ods, .odp) parser (carved out in workspace split, gated by odf feature)
 litchi-ole = { workspace = true, optional = true } # Legacy OLE2 binary office formats (.doc, .xls, .ppt) parser/writer (carved out in workspace split, gated by `ole` feature)
-litchi-opc = { workspace = true, optional = true } # OPC (Open Packaging Conventions) substrate (carved out in workspace split, gated by `ooxml` feature)
+litchi-ooxml = { workspace = true, optional = true } # Modern Office Open XML formats (.docx, .xlsx, .xlsb, .pptx) parser/writer (carved out in workspace split, gated by `ooxml` feature)
 litchi-rtf = { workspace = true, optional = true } # RTF parser and writer (carved out in workspace split, gated by `rtf` feature)
 memchr = "2.7" # SIMD-accelerated string searching for fast byte pattern matching
 once_cell = "1" # Lazy statics and one-time initialization for global state
 parking_lot = { version = "0.12", features = ["hardware-lock-elision"] } # Lock-free synchronization primitives for concurrent programming
 phf = { version = "0.13", features = ["macros"] } # Perfect hash functions for compile-time static maps
-quick-xml = { version = "0.39", optional = true } # High-performance XML parser for .docx, .xlsx, .pptx files
 rand = "0.10" # Cryptographically secure random numbers for salts in protection hashes
 rayon = "1.11" # Data parallelism library for parallel iterators and work-stealing
 roaring = "0" # Compressed bitmap data structure for efficient set operations
 ryu = "1.0" # Fast float-to-string conversion with minimal allocations
 serde = { version = "1", features = ["derive"] } # Serialization/deserialization framework
 serde-saphyr = "0" # YAML serialization support
-sha1 = { version = "0.11", optional = true } # SHA-1 hashing for Standard 2007 and Agile OOXML encryption
 sha2 = "0.11" # SHA-512 hashing for OOXML password protection
 smallvec = "1.15" # Stack-allocated vectors for small collections to avoid heap allocations
-soapberry-zip = { path = "crates/soapberry-zip", optional = true } # High-performance ZIP archive handling for modern Office formats
+soapberry-zip = { path = "crates/soapberry-zip", optional = true } # High-performance ZIP archive handling for modern Office formats (gated by ooxml/iwa/odf features)
 thiserror = "2.0" # Convenient derive macros for error types
 tokio = { version = "1", features = ["full"] }
 xml-minifier = { path = "crates/xml-minifier" }

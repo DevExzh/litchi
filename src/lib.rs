@@ -285,7 +285,9 @@ pub mod ole {
 ///
 /// **Note**: This requires the `ooxml` feature to be enabled.
 #[cfg(feature = "ooxml")]
-pub mod ooxml;
+pub mod ooxml {
+    pub use litchi_ooxml::*;
+}
 
 /// Formula module
 ///
