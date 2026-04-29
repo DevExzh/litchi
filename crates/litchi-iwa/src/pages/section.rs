@@ -2,7 +2,7 @@
 //!
 //! Pages documents are organized into sections, each with its own layout and content.
 
-use crate::iwa::text::TextStorage;
+use crate::text::TextStorage;
 
 /// Represents a section in a Pages document
 #[derive(Debug, Clone)]

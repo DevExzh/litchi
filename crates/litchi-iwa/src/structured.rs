@@ -7,12 +7,12 @@
 
 use std::collections::HashMap;
 
-use crate::iwa::Result;
-use crate::iwa::bundle::Bundle;
-use crate::iwa::charts::metadata_extractor::ChartMetadataExtractor;
-use crate::iwa::numbers::table_extractor::TableDataExtractor;
-use crate::iwa::object_index::ObjectIndex;
-use crate::iwa::shapes::text_extractor::ShapeTextExtractor;
+use crate::Result;
+use crate::bundle::Bundle;
+use crate::charts::metadata_extractor::ChartMetadataExtractor;
+use crate::numbers::table_extractor::TableDataExtractor;
+use crate::object_index::ObjectIndex;
+use crate::shapes::text_extractor::ShapeTextExtractor;
 
 /// Represents a table extracted from a Numbers document
 #[derive(Debug, Clone)]
@@ -205,8 +205,8 @@ pub fn extract_tables(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
 }
 
 /// Convert Numbers CellValue to structured CellValue
-fn convert_numbers_cell_to_structured(cell: crate::iwa::numbers::CellValue) -> CellValue {
-    use crate::iwa::numbers::CellValue as NC;
+fn convert_numbers_cell_to_structured(cell: crate::numbers::CellValue) -> CellValue {
+    use crate::numbers::CellValue as NC;
 
     match cell {
         NC::Empty => CellValue::Empty,
@@ -285,9 +285,7 @@ pub fn extract_sections(bundle: &Bundle, object_index: &ObjectIndex) -> Result<V
                                 .flat_map(|msg| {
                                     use prost::Message;
                                     if let Ok(storage) =
-                                        crate::iwa::protobuf::tswp::StorageArchive::decode(
-                                            &*msg.data,
-                                        )
+                                        crate::protobuf::tswp::StorageArchive::decode(&*msg.data)
                                     {
                                         storage.text.clone()
                                     } else {
@@ -384,7 +382,7 @@ pub fn extract_shape_text(bundle: &Bundle, object_index: &ObjectIndex) -> Result
 pub fn extract_chart_metadata(
     bundle: &Bundle,
     object_index: &ObjectIndex,
-) -> Result<Vec<crate::iwa::charts::ChartMetadata>> {
+) -> Result<Vec<crate::charts::ChartMetadata>> {
     let extractor = ChartMetadataExtractor::new(bundle, object_index);
     extractor.extract_all_charts()
 }

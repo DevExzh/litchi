@@ -13,9 +13,9 @@ use std::path::{Path, PathBuf};
 use plist::Value;
 use soapberry_zip::office::ArchiveReader;
 
-use crate::iwa::archive::{Archive, ArchiveObject};
-use crate::iwa::zip_utils::parse_iwa_files_from_archive;
-use crate::iwa::{Error, Result};
+use crate::archive::{Archive, ArchiveObject};
+use crate::zip_utils::parse_iwa_files_from_archive;
+use crate::{Error, Result};
 
 /// Represents an iWork document bundle
 #[derive(Debug)]

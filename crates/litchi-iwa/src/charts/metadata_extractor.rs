@@ -25,10 +25,10 @@
 //! }
 //! ```
 
-use crate::iwa::Result;
-use crate::iwa::bundle::Bundle;
-use crate::iwa::object_index::{ObjectIndex, ResolvedObject};
-use crate::iwa::protobuf::tsch;
+use crate::Result;
+use crate::bundle::Bundle;
+use crate::object_index::{ObjectIndex, ResolvedObject};
+use crate::protobuf::tsch;
 use prost::Message;
 
 /// Metadata extracted from a chart
@@ -166,7 +166,7 @@ impl<'a> ChartMetadataExtractor<'a> {
 
     /// Convert chart type enum to string
     fn chart_type_to_string(&self, chart_type: i32) -> String {
-        use crate::iwa::protobuf::tsch::ChartType;
+        use crate::protobuf::tsch::ChartType;
 
         match ChartType::try_from(chart_type) {
             Ok(ChartType::UndefinedChartType) => "Undefined".to_string(),
@@ -244,8 +244,7 @@ impl<'a> ChartMetadataExtractor<'a> {
                 // TSWP storage types
                 if msg.type_ >= 2001
                     && msg.type_ <= 2022
-                    && let Ok(storage) =
-                        crate::iwa::protobuf::tswp::StorageArchive::decode(&*msg.data)
+                    && let Ok(storage) = crate::protobuf::tswp::StorageArchive::decode(&*msg.data)
                     && !storage.text.is_empty()
                 {
                     return Ok(Some(storage.text.join(" ")));

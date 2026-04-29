@@ -10,9 +10,9 @@ use std::io::Cursor;
 
 use soapberry_zip::office::ArchiveReader;
 
-use crate::iwa::archive::Archive;
-use crate::iwa::snappy::SnappyStream;
-use crate::iwa::{Error, Result};
+use crate::archive::Archive;
+use crate::snappy::SnappyStream;
+use crate::{Error, Result};
 
 /// Parse all IWA files from a ZIP archive and return parsed Archives.
 ///

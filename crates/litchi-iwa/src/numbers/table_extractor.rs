@@ -31,10 +31,10 @@
 
 use super::cell::CellValue;
 use super::table::NumbersTable;
-use crate::iwa::bundle::Bundle;
-use crate::iwa::object_index::{ObjectIndex, ResolvedObject};
-use crate::iwa::protobuf::{tsce, tst};
-use crate::iwa::{Error, Result};
+use crate::bundle::Bundle;
+use crate::object_index::{ObjectIndex, ResolvedObject};
+use crate::protobuf::{tsce, tst};
+use crate::{Error, Result};
 use prost::Message;
 use std::collections::HashMap;
 
@@ -70,7 +70,7 @@ impl<'a> TableDataExtractor<'a> {
     /// Extract tables from object index entries
     fn extract_tables_from_entries(
         &self,
-        entries: Vec<&crate::iwa::object_index::ObjectIndexEntry>,
+        entries: Vec<&crate::object_index::ObjectIndexEntry>,
     ) -> Result<Vec<NumbersTable>> {
         let mut tables = Vec::new();
 
@@ -376,7 +376,7 @@ impl<'a> TableDataExtractor<'a> {
     /// O(n) where n is the number of AST nodes. Uses a stack-based algorithm
     /// for efficient conversion.
     fn extract_formula_string(&self, formula: &tsce::FormulaArchive) -> Result<String> {
-        use crate::iwa::protobuf::tsce::ast_node_array_archive::AstNodeType;
+        use crate::protobuf::tsce::ast_node_array_archive::AstNodeType;
 
         let ast_array = &formula.ast_node_array;
 
@@ -612,8 +612,7 @@ impl<'a> TableDataExtractor<'a> {
             for msg in &resolved.messages {
                 if msg.type_ >= 2001
                     && msg.type_ <= 2022
-                    && let Ok(storage) =
-                        crate::iwa::protobuf::tswp::StorageArchive::decode(&*msg.data)
+                    && let Ok(storage) = crate::protobuf::tswp::StorageArchive::decode(&*msg.data)
                     && !storage.text.is_empty()
                 {
                     return Ok(Some(storage.text.join("\n")));

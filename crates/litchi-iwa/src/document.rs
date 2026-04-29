@@ -8,20 +8,20 @@
 //! iWork formats. For application-specific features, use the specialized
 //! modules:
 //!
-//! - `crate::iwa::pages::PagesDocument` for Pages-specific features
-//! - `crate::iwa::numbers::NumbersDocument` for Numbers-specific features
-//! - `crate::iwa::keynote::KeynoteDocument` for Keynote-specific features
+//! - `crate::pages::PagesDocument` for Pages-specific features
+//! - `crate::numbers::NumbersDocument` for Numbers-specific features
+//! - `crate::keynote::KeynoteDocument` for Keynote-specific features
 
 use std::collections::HashMap;
 use std::path::Path;
 
-use crate::iwa::bundle::Bundle;
-use crate::iwa::media::{MediaManager, MediaStats};
-use crate::iwa::object_index::{ObjectIndex, ResolvedObject};
-use crate::iwa::registry::{Application, detect_application};
-use crate::iwa::structured::{self, StructuredData};
-use crate::iwa::text::TextExtractor;
-use crate::iwa::{Error, Result};
+use crate::bundle::Bundle;
+use crate::media::{MediaManager, MediaStats};
+use crate::object_index::{ObjectIndex, ResolvedObject};
+use crate::registry::{Application, detect_application};
+use crate::structured::{self, StructuredData};
+use crate::text::TextExtractor;
+use crate::{Error, Result};
 
 /// Unified iWork document interface
 #[derive(Debug)]
@@ -146,7 +146,7 @@ impl Document {
     }
 
     /// Get document metadata
-    pub fn metadata(&self) -> &crate::iwa::bundle::BundleMetadata {
+    pub fn metadata(&self) -> &crate::bundle::BundleMetadata {
         self.bundle.metadata()
     }
 
@@ -249,9 +249,9 @@ impl DocumentStats {
 }
 
 // Note: Application-specific document types have been moved to dedicated modules:
-// - crate::iwa::pages::PagesDocument
-// - crate::iwa::numbers::NumbersDocument
-// - crate::iwa::keynote::KeynoteDocument
+// - crate::pages::PagesDocument
+// - crate::numbers::NumbersDocument
+// - crate::keynote::KeynoteDocument
 //
 // The unified Document type above works with all formats and provides
 // common functionality. For application-specific features, use the

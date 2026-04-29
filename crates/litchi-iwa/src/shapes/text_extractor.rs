@@ -15,10 +15,10 @@
 //! referenced from the shape. The shape itself contains geometry and styling,
 //! while the actual text is stored separately.
 
-use crate::iwa::Result;
-use crate::iwa::bundle::Bundle;
-use crate::iwa::object_index::{ObjectIndex, ResolvedObject};
-use crate::iwa::protobuf::tsd;
+use crate::Result;
+use crate::bundle::Bundle;
+use crate::object_index::{ObjectIndex, ResolvedObject};
+use crate::protobuf::tsd;
 use prost::Message;
 
 /// Extractor for text content from shapes
@@ -168,7 +168,7 @@ impl<'a> ShapeTextExtractor<'a> {
             // TSWP storage types range from 2001-2022
             if msg.type_ >= 2001
                 && msg.type_ <= 2022
-                && let Ok(storage) = crate::iwa::protobuf::tswp::StorageArchive::decode(&*msg.data)
+                && let Ok(storage) = crate::protobuf::tswp::StorageArchive::decode(&*msg.data)
                 && !storage.text.is_empty()
             {
                 return Ok(Some(storage.text.join("\n")));

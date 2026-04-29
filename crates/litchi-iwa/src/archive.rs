@@ -5,9 +5,9 @@
 
 use std::io::Read;
 
-use crate::iwa::protobuf::{DecodedMessage, decode};
-use crate::iwa::varint;
-use crate::iwa::{Error, Result};
+use crate::protobuf::{DecodedMessage, decode};
+use crate::varint;
+use crate::{Error, Result};
 use prost::Message;
 
 /// Archive information header for each object in an IWA file
@@ -219,12 +219,12 @@ impl Archive {
                         // Message type not registered - try parsing as StorageArchive anyway
                         // since many message types might contain text
                         if let Ok(storage_msg) =
-                            crate::iwa::protobuf::tswp::StorageArchive::decode(&*message_data)
+                            crate::protobuf::tswp::StorageArchive::decode(&*message_data)
                         {
-                            let wrapper = crate::iwa::protobuf::StorageArchiveWrapper(storage_msg);
+                            let wrapper = crate::protobuf::StorageArchiveWrapper(storage_msg);
                             decoded_messages
                                 .push(Box::new(wrapper)
-                                    as Box<dyn crate::iwa::protobuf::DecodedMessage>);
+                                    as Box<dyn crate::protobuf::DecodedMessage>);
                         }
                     },
                 }

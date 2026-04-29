@@ -6,11 +6,11 @@ use std::path::Path;
 
 use super::sheet::NumbersSheet;
 use super::table::NumbersTable;
-use crate::iwa::Result;
-use crate::iwa::bundle::Bundle;
-use crate::iwa::object_index::ObjectIndex;
-use crate::iwa::registry::Application;
-use crate::iwa::text::TextExtractor;
+use crate::Result;
+use crate::bundle::Bundle;
+use crate::object_index::ObjectIndex;
+use crate::registry::Application;
+use crate::text::TextExtractor;
 
 /// High-level interface for Numbers documents
 pub struct NumbersDocument {
@@ -156,7 +156,7 @@ impl NumbersDocument {
     fn parse_sheet(
         &self,
         index: usize,
-        object: &crate::iwa::archive::ArchiveObject,
+        object: &crate::archive::ArchiveObject,
     ) -> Result<NumbersSheet> {
         use prost::Message;
 
@@ -171,8 +171,7 @@ impl NumbersDocument {
 
         // Parse the SheetArchive protobuf message to get table references
         if let Some(raw_message) = object.messages.first()
-            && let Ok(sheet_archive) =
-                crate::iwa::protobuf::tn::SheetArchive::decode(&*raw_message.data)
+            && let Ok(sheet_archive) = crate::protobuf::tn::SheetArchive::decode(&*raw_message.data)
         {
             // Extract table references from drawable_infos
             // Tables in Numbers are stored as drawables
@@ -212,9 +211,7 @@ impl NumbersDocument {
         {
             // Look for TableInfoArchive which wraps the table model
             for msg in &resolved.messages {
-                if let Ok(table_info) =
-                    crate::iwa::protobuf::tst::TableInfoArchive::decode(&*msg.data)
-                {
+                if let Ok(table_info) = crate::protobuf::tst::TableInfoArchive::decode(&*msg.data) {
                     // The table_model field contains a reference to the TableModelArchive
                     let table_model_id = table_info.table_model.identifier;
                     return self.extract_table_from_model(table_model_id);
@@ -222,7 +219,7 @@ impl NumbersDocument {
             }
         }
 
-        Err(crate::iwa::Error::ParseError(
+        Err(crate::Error::ParseError(
             "Could not extract table from drawable".to_string(),
         ))
     }
@@ -241,7 +238,7 @@ impl NumbersDocument {
             return Ok(table);
         }
 
-        Err(crate::iwa::Error::ParseError(
+        Err(crate::Error::ParseError(
             "Could not extract table from model".to_string(),
         ))
     }

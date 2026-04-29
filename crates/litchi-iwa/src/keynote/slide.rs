@@ -2,7 +2,7 @@
 //!
 //! Slides are the core content units in Keynote presentations.
 
-use crate::iwa::text::TextStorage;
+use crate::text::TextStorage;
 
 /// Represents a slide in a Keynote presentation
 #[derive(Debug, Clone)]

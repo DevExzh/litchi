@@ -5,11 +5,11 @@
 use std::path::Path;
 
 use super::section::{PagesSection, PagesSectionType};
-use crate::iwa::Result;
-use crate::iwa::bundle::Bundle;
-use crate::iwa::object_index::ObjectIndex;
-use crate::iwa::registry::Application;
-use crate::iwa::text::TextExtractor;
+use crate::Result;
+use crate::bundle::Bundle;
+use crate::object_index::ObjectIndex;
+use crate::registry::Application;
+use crate::text::TextExtractor;
 
 /// High-level interface for Pages documents
 pub struct PagesDocument {
@@ -178,7 +178,7 @@ impl PagesDocument {
     fn parse_section(
         &self,
         index: usize,
-        object: &crate::iwa::archive::ArchiveObject,
+        object: &crate::archive::ArchiveObject,
     ) -> Result<PagesSection> {
         let mut section = PagesSection::new(index, PagesSectionType::Body);
 

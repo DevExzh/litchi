@@ -3,7 +3,7 @@
 //! iWork documents store text in TSWP (Text Word Processing) storage objects
 //! that contain rich text with styling information.
 
-use crate::iwa::Result;
+use crate::Result;
 
 /// Represents a contiguous block of text storage
 #[derive(Debug, Clone)]

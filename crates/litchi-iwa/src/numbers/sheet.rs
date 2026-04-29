@@ -67,7 +67,7 @@ impl NumbersSheet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::iwa::numbers::cell::CellValue;
+    use crate::numbers::cell::CellValue;
 
     #[test]
     fn test_sheet_creation() {

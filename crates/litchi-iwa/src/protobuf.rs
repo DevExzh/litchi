@@ -3,7 +3,7 @@
 //! This module provides support for decoding Protocol Buffers messages
 //! used in iWork IWA (iWork Archive) files using the prost crate.
 
-use crate::iwa::{Error, Result};
+use crate::{Error, Result};
 use phf::phf_map;
 use prost::Message;
 

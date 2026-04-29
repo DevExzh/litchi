@@ -8,7 +8,7 @@
 use snap::raw::Decoder;
 use std::io::{self, Cursor, Read};
 
-use crate::iwa::Error;
+use crate::Error;
 
 /// Custom Snappy stream decompressor for iWork IWA files
 #[derive(Debug)]

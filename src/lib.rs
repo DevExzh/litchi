@@ -303,7 +303,9 @@ pub mod formula {
 ///
 /// **Note**: This requires the `iwa` feature to be enabled.
 #[cfg(feature = "iwa")]
-pub mod iwa;
+pub mod iwa {
+    pub use litchi_iwa::*;
+}
 
 /// OpenDocument Format (ODF) Support
 ///

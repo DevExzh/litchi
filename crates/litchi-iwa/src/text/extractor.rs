@@ -3,9 +3,9 @@
 //! Provides utilities for extracting text from iWork document objects.
 
 use super::storage::{TextStorage, parse_storage_archive};
-use crate::iwa::Result;
-use crate::iwa::archive::ArchiveObject;
-use crate::iwa::bundle::Bundle;
+use crate::Result;
+use crate::archive::ArchiveObject;
+use crate::bundle::Bundle;
 
 /// Text extractor for iWork documents
 pub struct TextExtractor {

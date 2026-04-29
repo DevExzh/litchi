@@ -6,10 +6,10 @@
 
 use std::collections::HashMap;
 
-use crate::iwa::archive::{Archive, ArchiveObject, RawMessage};
-use crate::iwa::bundle::Bundle;
-use crate::iwa::ref_graph::ReferenceGraph;
-use crate::iwa::{Error, Result};
+use crate::archive::{Archive, ArchiveObject, RawMessage};
+use crate::bundle::Bundle;
+use crate::ref_graph::ReferenceGraph;
+use crate::{Error, Result};
 
 /// Represents an entry in the object index
 #[derive(Debug, Clone)]
@@ -139,7 +139,7 @@ impl ObjectIndex {
                 6000 | 6001 => {
                     // TST.TableModelArchive contains multiple style and data references
                     if let Ok(table) =
-                        crate::iwa::protobuf::tst::TableModelArchive::decode(&*raw_msg.data)
+                        crate::protobuf::tst::TableModelArchive::decode(&*raw_msg.data)
                     {
                         // Extract style references
                         self.extract_reference(object_id, &table.table_style);
@@ -193,7 +193,7 @@ impl ObjectIndex {
                 2001..=2022 => {
                     // TSWP.StorageArchive contains text content and may reference styles
                     if let Ok(storage) =
-                        crate::iwa::protobuf::tswp::StorageArchive::decode(&*raw_msg.data)
+                        crate::protobuf::tswp::StorageArchive::decode(&*raw_msg.data)
                     {
                         // Extract stylesheet reference if present
                         if let Some(ref style_sheet) = storage.style_sheet {
@@ -208,9 +208,7 @@ impl ObjectIndex {
                 // KN (Keynote) types
                 5 | 6 => {
                     // KN.SlideArchive contains references to drawables, builds, and transitions
-                    if let Ok(slide) =
-                        crate::iwa::protobuf::kn::SlideArchive::decode(&*raw_msg.data)
-                    {
+                    if let Ok(slide) = crate::protobuf::kn::SlideArchive::decode(&*raw_msg.data) {
                         // Extract style reference
                         self.extract_reference(object_id, &slide.style);
 
@@ -251,8 +249,7 @@ impl ObjectIndex {
                 2 => {
                     // KN.ShowArchive (conflicts with TSP.MessageInfo, handle by context)
                     // Try to decode as ShowArchive for Keynote documents
-                    if let Ok(show) = crate::iwa::protobuf::kn::ShowArchive::decode(&*raw_msg.data)
-                    {
+                    if let Ok(show) = crate::protobuf::kn::ShowArchive::decode(&*raw_msg.data) {
                         // Extract theme and stylesheet references
                         self.extract_reference(object_id, &show.theme);
                         self.extract_reference(object_id, &show.stylesheet);
@@ -275,9 +272,7 @@ impl ObjectIndex {
                 // TN (Numbers) types
                 3 => {
                     // TN.SheetArchive / TN.FormBasedSheetArchive
-                    if let Ok(sheet) =
-                        crate::iwa::protobuf::tn::SheetArchive::decode(&*raw_msg.data)
-                    {
+                    if let Ok(sheet) = crate::protobuf::tn::SheetArchive::decode(&*raw_msg.data) {
                         // Extract drawable info references
                         for drawable_ref in &sheet.drawable_infos {
                             self.extract_reference(object_id, drawable_ref);
@@ -299,7 +294,7 @@ impl ObjectIndex {
                 3002 => {
                     // TSD.DrawableArchive - base type for all drawables
                     if let Ok(drawable) =
-                        crate::iwa::protobuf::tsd::DrawableArchive::decode(&*raw_msg.data)
+                        crate::protobuf::tsd::DrawableArchive::decode(&*raw_msg.data)
                     {
                         // Extract parent reference (drawable hierarchy)
                         if let Some(ref parent) = drawable.parent {
@@ -312,7 +307,7 @@ impl ObjectIndex {
                 3003 => {
                     // TSD.ContainerArchive - container for grouped objects
                     if let Ok(container) =
-                        crate::iwa::protobuf::tsd::ContainerArchive::decode(&*raw_msg.data)
+                        crate::protobuf::tsd::ContainerArchive::decode(&*raw_msg.data)
                     {
                         // Extract parent reference
                         if let Some(ref parent) = container.parent {
@@ -326,9 +321,7 @@ impl ObjectIndex {
                 },
                 3004 => {
                     // TSD.ShapeArchive - shapes (rectangles, circles, polygons, etc.)
-                    if let Ok(shape) =
-                        crate::iwa::protobuf::tsd::ShapeArchive::decode(&*raw_msg.data)
-                    {
+                    if let Ok(shape) = crate::protobuf::tsd::ShapeArchive::decode(&*raw_msg.data) {
                         // ShapeArchive embeds DrawableArchive in 'super' field (required)
                         // Extract parent from the super DrawableArchive
                         if let Some(ref parent) = shape.super_.parent {
@@ -344,9 +337,7 @@ impl ObjectIndex {
                 },
                 3005 => {
                     // TSD.ImageArchive - images
-                    if let Ok(image) =
-                        crate::iwa::protobuf::tsd::ImageArchive::decode(&*raw_msg.data)
-                    {
+                    if let Ok(image) = crate::protobuf::tsd::ImageArchive::decode(&*raw_msg.data) {
                         // Extract parent from super DrawableArchive (required field)
                         if let Some(ref parent) = image.super_.parent {
                             self.extract_reference(object_id, parent);
@@ -361,8 +352,7 @@ impl ObjectIndex {
                 },
                 3006 => {
                     // TSD.MaskArchive - image masks
-                    if let Ok(mask) = crate::iwa::protobuf::tsd::MaskArchive::decode(&*raw_msg.data)
-                    {
+                    if let Ok(mask) = crate::protobuf::tsd::MaskArchive::decode(&*raw_msg.data) {
                         // Extract parent from super DrawableArchive (required field)
                         if let Some(ref parent) = mask.super_.parent {
                             self.extract_reference(object_id, parent);
@@ -372,9 +362,7 @@ impl ObjectIndex {
                 },
                 3007 => {
                     // TSD.MovieArchive - video objects
-                    if let Ok(movie) =
-                        crate::iwa::protobuf::tsd::MovieArchive::decode(&*raw_msg.data)
-                    {
+                    if let Ok(movie) = crate::protobuf::tsd::MovieArchive::decode(&*raw_msg.data) {
                         // Extract parent from super DrawableArchive (required field)
                         if let Some(ref parent) = movie.super_.parent {
                             self.extract_reference(object_id, parent);
@@ -388,9 +376,7 @@ impl ObjectIndex {
                 },
                 3008 => {
                     // TSD.GroupArchive - grouped shapes/objects
-                    if let Ok(group) =
-                        crate::iwa::protobuf::tsd::GroupArchive::decode(&*raw_msg.data)
-                    {
+                    if let Ok(group) = crate::protobuf::tsd::GroupArchive::decode(&*raw_msg.data) {
                         // Extract parent from super DrawableArchive (required field)
                         if let Some(ref parent) = group.super_.parent {
                             self.extract_reference(object_id, parent);
@@ -404,7 +390,7 @@ impl ObjectIndex {
                 3009 => {
                     // TSD.ConnectionLineArchive - connector lines between shapes
                     if let Ok(conn_line) =
-                        crate::iwa::protobuf::tsd::ConnectionLineArchive::decode(&*raw_msg.data)
+                        crate::protobuf::tsd::ConnectionLineArchive::decode(&*raw_msg.data)
                     {
                         // Extract parent and style from super ShapeArchive (required field)
                         // ConnectionLineArchive.super_ is ShapeArchive
@@ -433,9 +419,7 @@ impl ObjectIndex {
                     // This is a pre-unified format chart, structure may vary
                     // Attempt basic reference extraction but may fail gracefully
                     if let Ok(chart_info) =
-                        crate::iwa::protobuf::tsch::pre_uff::ChartInfoArchive::decode(
-                            &*raw_msg.data,
-                        )
+                        crate::protobuf::tsch::pre_uff::ChartInfoArchive::decode(&*raw_msg.data)
                     {
                         // Extract chart style reference if present
                         if let Some(ref style) = chart_info.style {
@@ -448,7 +432,7 @@ impl ObjectIndex {
                 5004 => {
                     // TSCH.ChartMediatorArchive - mediator between chart and data
                     if let Ok(mediator) =
-                        crate::iwa::protobuf::tsch::ChartMediatorArchive::decode(&*raw_msg.data)
+                        crate::protobuf::tsch::ChartMediatorArchive::decode(&*raw_msg.data)
                     {
                         // Extract info reference (points to the chart drawable)
                         if let Some(ref info) = mediator.info {
@@ -461,7 +445,7 @@ impl ObjectIndex {
                 5020 => {
                     // TSCH.ChartStylePreset - preset styles for charts
                     if let Ok(preset) =
-                        crate::iwa::protobuf::tsch::ChartStylePreset::decode(&*raw_msg.data)
+                        crate::protobuf::tsch::ChartStylePreset::decode(&*raw_msg.data)
                     {
                         // Extract chart style reference
                         if let Some(ref chart_style) = preset.chart_style {
@@ -479,7 +463,7 @@ impl ObjectIndex {
                 5021 => {
                     // TSCH.ChartDrawableArchive - main chart drawable
                     if let Ok(chart_drawable) =
-                        crate::iwa::protobuf::tsch::ChartDrawableArchive::decode(&*raw_msg.data)
+                        crate::protobuf::tsch::ChartDrawableArchive::decode(&*raw_msg.data)
                     {
                         // Extract parent from super DrawableArchive
                         if let Some(ref drawable) = chart_drawable.super_
@@ -497,9 +481,7 @@ impl ObjectIndex {
                 // TP (Pages) types
                 10000 => {
                     // TP.DocumentArchive
-                    if let Ok(doc) =
-                        crate::iwa::protobuf::tp::DocumentArchive::decode(&*raw_msg.data)
-                    {
+                    if let Ok(doc) = crate::protobuf::tp::DocumentArchive::decode(&*raw_msg.data) {
                         // Extract theme reference
                         if let Some(ref theme) = doc.theme {
                             self.extract_reference(object_id, theme);
@@ -545,11 +527,7 @@ impl ObjectIndex {
     ///
     /// O(1) average case for HashMap insertion. Uses efficient deduplication
     /// to avoid storing duplicate references.
-    fn extract_reference(
-        &mut self,
-        source_id: u64,
-        reference: &crate::iwa::protobuf::tsp::Reference,
-    ) {
+    fn extract_reference(&mut self, source_id: u64, reference: &crate::protobuf::tsp::Reference) {
         let target_id = reference.identifier;
 
         // Ignore null/zero references (0 typically means "no reference")
@@ -886,7 +864,7 @@ pub struct ResolvedObject {
     /// Object identifier
     pub id: u64,
     /// Archive information
-    pub archive_info: crate::iwa::archive::ArchiveInfo,
+    pub archive_info: crate::archive::ArchiveInfo,
     /// Raw message data
     pub messages: Vec<RawMessage>,
 }

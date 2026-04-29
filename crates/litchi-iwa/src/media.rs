@@ -9,7 +9,7 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use crate::iwa::{Error, Result};
+use crate::{Error, Result};
 
 /// Types of media assets that can be found in iWork documents
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

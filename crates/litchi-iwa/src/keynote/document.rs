@@ -6,11 +6,11 @@ use std::path::Path;
 
 use super::show::KeynoteShow;
 use super::slide::KeynoteSlide;
-use crate::iwa::Result;
-use crate::iwa::bundle::Bundle;
-use crate::iwa::object_index::ObjectIndex;
-use crate::iwa::registry::Application;
-use crate::iwa::text::TextExtractor;
+use crate::Result;
+use crate::bundle::Bundle;
+use crate::object_index::ObjectIndex;
+use crate::registry::Application;
+use crate::text::TextExtractor;
 
 /// High-level interface for Keynote documents
 pub struct KeynoteDocument {
@@ -170,7 +170,7 @@ impl KeynoteDocument {
     fn parse_slide(
         &self,
         index: usize,
-        object: &crate::iwa::archive::ArchiveObject,
+        object: &crate::archive::ArchiveObject,
     ) -> Result<KeynoteSlide> {
         use prost::Message;
 
@@ -198,8 +198,7 @@ impl KeynoteDocument {
 
         if let Some(raw_message) = object.messages.first() {
             // Try to decode as SlideArchive
-            if let Ok(slide_archive) =
-                crate::iwa::protobuf::kn::SlideArchive::decode(&*raw_message.data)
+            if let Ok(slide_archive) = crate::protobuf::kn::SlideArchive::decode(&*raw_message.data)
             {
                 // Extract slide name if available
                 if let Some(ref name) = slide_archive.name
@@ -259,9 +258,7 @@ impl KeynoteDocument {
 
         if let Some(resolved) = self.object_index.resolve_object(&self.bundle, build_id)? {
             for msg in &resolved.messages {
-                if let Ok(build_archive) =
-                    crate::iwa::protobuf::kn::BuildArchive::decode(&*msg.data)
-                {
+                if let Ok(build_archive) = crate::protobuf::kn::BuildArchive::decode(&*msg.data) {
                     let animation_type = Self::parse_build_delivery(&build_archive.delivery);
                     let target_id = Some(build_archive.drawable.identifier);
                     let duration = build_archive.duration as f32;
@@ -300,7 +297,7 @@ impl KeynoteDocument {
     /// Parse transition archive into slide transition
     fn parse_transition(
         &self,
-        transition: &crate::iwa::protobuf::kn::TransitionArchive,
+        transition: &crate::protobuf::kn::TransitionArchive,
     ) -> Option<super::slide::SlideTransition> {
         use super::slide::{SlideTransition, TransitionType};
 
@@ -332,8 +329,7 @@ impl KeynoteDocument {
                 // Try to extract text from TSWP storage messages (types 2001-2022)
                 if msg.type_ >= 2001
                     && msg.type_ <= 2022
-                    && let Ok(storage) =
-                        crate::iwa::protobuf::tswp::StorageArchive::decode(&*msg.data)
+                    && let Ok(storage) = crate::protobuf::tswp::StorageArchive::decode(&*msg.data)
                     && !storage.text.is_empty()
                 {
                     return Ok(storage.text.join(" "));
@@ -342,7 +338,7 @@ impl KeynoteDocument {
 
             // Also try generic text extraction from the resolved object
             for msg in &resolved.messages {
-                if let Ok(storage) = crate::iwa::protobuf::tswp::StorageArchive::decode(&*msg.data)
+                if let Ok(storage) = crate::protobuf::tswp::StorageArchive::decode(&*msg.data)
                     && !storage.text.is_empty()
                 {
                     return Ok(storage.text.join(" "));
@@ -359,17 +355,16 @@ impl KeynoteDocument {
 
         if let Some(resolved) = self.object_index.resolve_object(&self.bundle, note_id)? {
             for msg in &resolved.messages {
-                if let Ok(note_archive) = crate::iwa::protobuf::kn::NoteArchive::decode(&*msg.data)
-                {
+                if let Ok(note_archive) = crate::protobuf::kn::NoteArchive::decode(&*msg.data) {
                     // The note contains a reference to a TSWP.StorageArchive
                     let storage_id = note_archive.contained_storage.identifier;
                     if let Some(storage_obj) =
                         self.object_index.resolve_object(&self.bundle, storage_id)?
                     {
                         for storage_msg in &storage_obj.messages {
-                            if let Ok(storage) = crate::iwa::protobuf::tswp::StorageArchive::decode(
-                                &*storage_msg.data,
-                            ) {
+                            if let Ok(storage) =
+                                crate::protobuf::tswp::StorageArchive::decode(&*storage_msg.data)
+                            {
                                 let notes_text = storage.text.join("\n");
                                 if !notes_text.is_empty() {
                                     return Ok(notes_text);
