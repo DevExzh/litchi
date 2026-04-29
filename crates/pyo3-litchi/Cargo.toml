@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 [dependencies]
 
 # The main litchi library
-litchi = { path = "../..", default-features = false, features = [
+litchi = { path = "../litchi", default-features = false, features = [
     "ole",
     "ooxml",
     "odf",
