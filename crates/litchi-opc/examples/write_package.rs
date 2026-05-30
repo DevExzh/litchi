@@ -19,8 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // --- 1. Build the package in memory --------------------------------
     let mut pkg = OpcPackage::new();
 
-    let partname = PackURI::new("/custom/data.xml")
-        .map_err(|e| format!("invalid PackURI: {e}"))?;
+    let partname = PackURI::new("/custom/data.xml").map_err(|e| format!("invalid PackURI: {e}"))?;
     let xml = br#"<?xml version="1.0" encoding="UTF-8"?>
 <root xmlns="urn:litchi-opc:example">
   <hello>world</hello>

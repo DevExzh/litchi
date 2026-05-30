@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     uri.ext(),
                     uri.idx(),
                 );
-            }
+            },
             Err(e) => println!("  {input:?} -> ERROR: {e}"),
         }
     }

@@ -46,11 +46,7 @@ fn main() -> ExampleResult<()> {
     };
     probe_buf.truncate(n);
     if !is_ole_file(&probe_buf) {
-        return Err(format!(
-            "Not a CFB/OLE2 file (magic mismatch): {}",
-            path.display()
-        )
-        .into());
+        return Err(format!("Not a CFB/OLE2 file (magic mismatch): {}", path.display()).into());
     }
     println!("Signature OK: D0 CF 11 E0 A1 B1 1A E1");
 

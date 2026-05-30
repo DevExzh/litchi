@@ -25,11 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             builder.add_heading("litchi-odf example", 1)?;
             builder.add_paragraph("This document was created by the read_odt example.")?;
             builder.add_paragraph("It demonstrates a simple build-then-read round trip.")?;
-            builder.add_bulleted_list(vec![
-                "First bullet",
-                "Second bullet",
-                "Third bullet",
-            ])?;
+            builder.add_bulleted_list(vec!["First bullet", "Second bullet", "Third bullet"])?;
             builder.add_heading("Conclusion", 2)?;
             builder.add_paragraph("Reading round-trips text content successfully.")?;
             // `save` consumes the builder, so use the tempfile path explicitly.

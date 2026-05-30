@@ -31,15 +31,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
             eprintln!("or point at any iWork bundle on disk.");
             return Ok(());
-        }
+        },
     };
 
     let path = Path::new(&path);
     if !path.exists() {
         eprintln!("file not found: {}", path.display());
-        eprintln!(
-            "iWork test fixtures are not committed; please supply a real document path."
-        );
+        eprintln!("iWork test fixtures are not committed; please supply a real document path.");
         return Ok(());
     }
 

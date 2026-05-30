@@ -28,10 +28,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pkg_path: PathBuf = args
         .next()
         .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            PathBuf::from("test-data/ooxml/docx/documentProperties.docx")
-        });
-    let partname_str = args.next().unwrap_or_else(|| "/word/document.xml".to_string());
+        .unwrap_or_else(|| PathBuf::from("test-data/ooxml/docx/documentProperties.docx"));
+    let partname_str = args
+        .next()
+        .unwrap_or_else(|| "/word/document.xml".to_string());
     let out_path: Option<PathBuf> = args.next().map(PathBuf::from);
 
     // Demonstrate PackURI parsing and inspection.
@@ -69,14 +69,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(path) => {
             std::fs::write(&path, blob)?;
             eprintln!("Wrote {} bytes to {}", blob.len(), path.display());
-        }
+        },
         None => {
             // Stream the blob to stdout. Use a locked handle for efficiency.
             let stdout = std::io::stdout();
             let mut handle = stdout.lock();
             handle.write_all(blob)?;
             handle.flush()?;
-        }
+        },
     }
 
     Ok(())

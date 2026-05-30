@@ -14,8 +14,7 @@
 //! No CLI arguments are required — the example is fully self-contained.
 
 use litchi_core::{
-    BomKind, UTF8_BOM, UTF16_BE_BOM, UTF16_LE_BOM, UTF32_BE_BOM, UTF32_LE_BOM, strip_bom,
-    write_bom,
+    BomKind, UTF8_BOM, UTF16_BE_BOM, UTF16_LE_BOM, UTF32_BE_BOM, UTF32_LE_BOM, strip_bom, write_bom,
 };
 use std::io::Cursor;
 
@@ -107,7 +106,7 @@ fn demo_round_trip(
                 found, consumed
             );
             assert_eq!(found, kind, "round trip mismatch for {:?}", kind);
-        }
+        },
         None => println!("  detected BOM     : <none>"),
     }
     println!(

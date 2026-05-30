@@ -42,7 +42,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("\n--- Sheet [{}]: {:?} ---", index, ws.name());
 
         let dims = ws.dimensions();
-        println!("dimensions (min_row, min_col, max_row, max_col): {:?}", dims);
+        println!(
+            "dimensions (min_row, min_col, max_row, max_col): {:?}",
+            dims
+        );
 
         let Some((min_r, min_c, max_r, max_c)) = dims else {
             println!("(empty sheet)");

@@ -17,9 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path: PathBuf = std::env::args()
         .nth(1)
         .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            PathBuf::from("test-data/ooxml/docx/documentProperties.docx")
-        });
+        .unwrap_or_else(|| PathBuf::from("test-data/ooxml/docx/documentProperties.docx"));
 
     println!("Opening OPC package: {}", path.display());
     let pkg = OpcPackage::open(&path)?;

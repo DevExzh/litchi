@@ -14,8 +14,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use litchi_core::sheet::{
-    Cell, CellIterator, CellValue, Result, RowIterator, WorkbookTrait, Worksheet,
-    WorksheetIterator,
+    Cell, CellIterator, CellValue, Result, RowIterator, WorkbookTrait, Worksheet, WorksheetIterator,
 };
 use litchi_eval::{FormulaEvaluator, TableConfig};
 
@@ -143,11 +142,7 @@ impl Worksheet for MemSheet {
 
     fn cell(&self, row: u32, column: u32) -> Result<Box<dyn Cell + '_>> {
         let value = self.cells.get(&(row, column)).unwrap_or(CellValue::EMPTY);
-        Ok(Box::new(MemCell {
-            row,
-            column,
-            value,
-        }))
+        Ok(Box::new(MemCell { row, column, value }))
     }
 
     fn cell_by_coordinate(&self, _coordinate: &str) -> Result<Box<dyn Cell + '_>> {
@@ -320,11 +315,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error + Send + Sy
 
     // Build the evaluator and register the "Sales" table on it.
     let mut evaluator = FormulaEvaluator::new(&workbook);
-    let headers = vec![
-        "Item".to_string(),
-        "Qty".to_string(),
-        "Price".to_string(),
-    ];
+    let headers = vec!["Item".to_string(), "Qty".to_string(), "Price".to_string()];
     evaluator.define_table(TableConfig {
         name: "Sales",
         sheet_name: "Sheet1",

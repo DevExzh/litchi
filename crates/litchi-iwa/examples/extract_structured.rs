@@ -30,15 +30,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
             eprintln!("or point at any Numbers document on disk.");
             return Ok(());
-        }
+        },
     };
 
     let path = Path::new(&path);
     if !path.exists() {
         eprintln!("file not found: {}", path.display());
-        eprintln!(
-            "Numbers test fixtures are not committed; please supply a real .numbers path."
-        );
+        eprintln!("Numbers test fixtures are not committed; please supply a real .numbers path.");
         return Ok(());
     }
 

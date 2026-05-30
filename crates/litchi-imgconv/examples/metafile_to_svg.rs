@@ -57,18 +57,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("wmf") => wmf::convert_wmf_to_svg(&bytes)?,
         Some("pict" | "pct") => {
             // The pict module currently has no convert_pict_to_svg; raster-only.
-            return Err(
-                "PICT to SVG conversion is not exposed by litchi-imgconv; \
+            return Err("PICT to SVG conversion is not exposed by litchi-imgconv; \
                  use convert_pict (raster) instead"
-                    .into(),
-            );
+                .into());
         },
         other => {
-            return Err(format!(
-                "unsupported extension {:?}; expected .emf or .wmf",
-                other
-            )
-            .into());
+            return Err(format!("unsupported extension {:?}; expected .emf or .wmf", other).into());
         },
     };
 

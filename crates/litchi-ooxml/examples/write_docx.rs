@@ -38,7 +38,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         para.add_run_with_text(", ");
         para.add_run_with_text("italic").italic(true);
         para.add_run_with_text(", and ");
-        para.add_run_with_text("bold-italic").bold(true).italic(true);
+        para.add_run_with_text("bold-italic")
+            .bold(true)
+            .italic(true);
         para.add_run_with_text(" runs.");
 
         // Small 2x2 table with a header row.

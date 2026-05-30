@@ -53,7 +53,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     print!("{}", preview);
     if bytes.len() > MAX_PRINT_BYTES {
         println!();
-        println!("... ({} more bytes truncated)", bytes.len() - MAX_PRINT_BYTES);
+        println!(
+            "... ({} more bytes truncated)",
+            bytes.len() - MAX_PRINT_BYTES
+        );
     } else {
         println!();
     }

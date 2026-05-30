@@ -48,11 +48,11 @@ impl ToMarkdown for MathSnippet {
             ScriptStyle::Html => {
                 writeln!(out, "x<sub>{}</sub>", self.subscript).unwrap();
                 writeln!(out, "x<sup>{}</sup>", self.superscript).unwrap();
-            }
+            },
             ScriptStyle::Unicode => {
                 writeln!(out, "x{}", convert_to_subscript(&self.subscript)).unwrap();
                 writeln!(out, "x{}", convert_to_superscript(&self.superscript)).unwrap();
-            }
+            },
         }
 
         // --- Formula rendering ------------------------------------------------
@@ -73,7 +73,7 @@ impl ToMarkdown for MathSnippet {
                 writeln!(out, "| Header |").unwrap();
                 writeln!(out, "|--------|").unwrap();
                 writeln!(out, "| {} |", self.cell).unwrap();
-            }
+            },
             TableStyle::MinimalHtml => {
                 writeln!(
                     out,
@@ -81,7 +81,7 @@ impl ToMarkdown for MathSnippet {
                     self.cell
                 )
                 .unwrap();
-            }
+            },
             TableStyle::StyledHtml => {
                 let pad = " ".repeat(options.html_table_indent);
                 writeln!(out, "<table>").unwrap();
@@ -92,7 +92,7 @@ impl ToMarkdown for MathSnippet {
                 writeln!(out, "{pad}{pad}<td>{}</td>", self.cell).unwrap();
                 writeln!(out, "{pad}</tr>").unwrap();
                 writeln!(out, "</table>").unwrap();
-            }
+            },
         }
 
         Ok(out)

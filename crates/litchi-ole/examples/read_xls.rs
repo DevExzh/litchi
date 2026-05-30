@@ -44,7 +44,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut shown = 0usize;
         let mut iter = sheet.cells();
         while let Some(cell_result) = iter.next() {
-            let cell = cell_result.map_err(|e| -> Box<dyn std::error::Error> { e.to_string().into() })?;
+            let cell =
+                cell_result.map_err(|e| -> Box<dyn std::error::Error> { e.to_string().into() })?;
             if cell.is_empty() {
                 continue;
             }

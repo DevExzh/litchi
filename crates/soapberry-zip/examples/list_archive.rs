@@ -40,10 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // sizes per entry, including directory entries.
     let slice_archive = ZipArchive::from_slice(&data)?;
     println!();
-    println!(
-        "{:<60}  {:>12}  {:>12}",
-        "name", "comp size", "uncomp size"
-    );
+    println!("{:<60}  {:>12}  {:>12}", "name", "comp size", "uncomp size");
     println!("{}", "-".repeat(90));
     for entry_result in slice_archive.entries() {
         let entry = entry_result?;

@@ -50,7 +50,10 @@ This text is repeated.\\par}";
     println!("\nUncompressed framing");
     println!("{}", "-".repeat(60));
     println!("Stored payload size: {} bytes", stored.len());
-    println!("is_compressed_rtf(stored) -> {}", is_compressed_rtf(&stored));
+    println!(
+        "is_compressed_rtf(stored) -> {}",
+        is_compressed_rtf(&stored)
+    );
 
     let stored_round_trip = decompress(&stored)?;
     assert_eq!(

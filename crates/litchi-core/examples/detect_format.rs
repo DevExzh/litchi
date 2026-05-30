@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         None => {
             eprintln!("usage: detect_format <file-or-directory>");
             std::process::exit(2);
-        }
+        },
     };
 
     let path = Path::new(&target);

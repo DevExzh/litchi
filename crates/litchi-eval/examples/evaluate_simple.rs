@@ -15,8 +15,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use litchi_core::sheet::{
-    Cell, CellIterator, CellValue, Result, RowIterator, WorkbookTrait, Worksheet,
-    WorksheetIterator,
+    Cell, CellIterator, CellValue, Result, RowIterator, WorkbookTrait, Worksheet, WorksheetIterator,
 };
 use litchi_eval::FormulaEvaluator;
 
@@ -162,11 +161,7 @@ impl Worksheet for MemSheet {
 
     fn cell(&self, row: u32, column: u32) -> Result<Box<dyn Cell + '_>> {
         let value = self.cells.get(&(row, column)).unwrap_or(CellValue::EMPTY);
-        Ok(Box::new(MemCell {
-            row,
-            column,
-            value,
-        }))
+        Ok(Box::new(MemCell { row, column, value }))
     }
 
     fn cell_by_coordinate(&self, _coordinate: &str) -> Result<Box<dyn Cell + '_>> {
