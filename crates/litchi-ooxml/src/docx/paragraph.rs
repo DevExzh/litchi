@@ -7,8 +7,8 @@ use crate::error::{OoxmlError, Result};
 use litchi_core::VerticalPosition;
 use litchi_core::XmlSlice;
 use litchi_opc::rel::Relationships;
-use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::{Reader, XmlVersion};
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::sync::Arc;
@@ -408,7 +408,10 @@ impl Paragraph {
                                     omml_content.push_str("=\"");
                                     omml_content.push_str(
                                         &attr
-                                            .decode_and_unescape_value(reader.decoder())
+                                            .decoded_and_normalized_value(
+                                                XmlVersion::Implicit1_0,
+                                                reader.decoder(),
+                                            )
                                             .unwrap_or(Cow::Borrowed("")),
                                     );
                                     omml_content.push('"');
@@ -456,7 +459,10 @@ impl Paragraph {
                                 omml_content.push_str("=\"");
                                 omml_content.push_str(
                                     &attr
-                                        .decode_and_unescape_value(reader.decoder())
+                                        .decoded_and_normalized_value(
+                                            XmlVersion::Implicit1_0,
+                                            reader.decoder(),
+                                        )
                                         .unwrap_or(Cow::Borrowed("")),
                                 );
                                 omml_content.push('"');
@@ -1028,7 +1034,10 @@ impl Run {
                         for attr in e.attributes().flatten() {
                             if attr.key.as_ref() == b"ascii" {
                                 let value = attr
-                                    .decode_and_unescape_value(reader.decoder())
+                                    .decoded_and_normalized_value(
+                                        XmlVersion::Implicit1_0,
+                                        reader.decoder(),
+                                    )
                                     .unwrap_or(Cow::Borrowed(""));
                                 return Ok(Some(value.to_string()));
                             }
@@ -1124,7 +1133,10 @@ impl Run {
                                 omml_content.push_str("=\"");
                                 omml_content.push_str(
                                     &attr
-                                        .decode_and_unescape_value(reader.decoder())
+                                        .decoded_and_normalized_value(
+                                            XmlVersion::Implicit1_0,
+                                            reader.decoder(),
+                                        )
                                         .unwrap_or(Cow::Borrowed("")),
                                 );
                                 omml_content.push('"');
@@ -1182,7 +1194,10 @@ impl Run {
                                     // Use Cow to avoid allocation when possible
                                     omml_content.push_str(
                                         &attr
-                                            .decode_and_unescape_value(reader.decoder())
+                                            .decoded_and_normalized_value(
+                                                XmlVersion::Implicit1_0,
+                                                reader.decoder(),
+                                            )
                                             .unwrap_or(Cow::Borrowed("")),
                                     );
                                     omml_content.push('"');
@@ -1242,7 +1257,10 @@ impl Run {
                                     omml_content.push_str("=\"");
                                     omml_content.push_str(
                                         &attr
-                                            .decode_and_unescape_value(reader.decoder())
+                                            .decoded_and_normalized_value(
+                                                XmlVersion::Implicit1_0,
+                                                reader.decoder(),
+                                            )
                                             .unwrap_or(Cow::Borrowed("")),
                                     );
                                     omml_content.push('"');

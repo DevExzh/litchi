@@ -108,7 +108,9 @@ fn encrypt_verifier(key: &[u8], verifier: &[u8; 16]) -> ([u8; 16], [u8; 32]) {
     let cipher = Aes128::new_from_slice(key).expect("AES-128 key must be 16 bytes");
 
     let mut encrypted_verifier = *verifier;
-    let block = aes::cipher::Block::<Aes128>::from_mut_slice(&mut encrypted_verifier);
+    let block: &mut aes::cipher::Block<Aes128> = (&mut encrypted_verifier)
+        .try_into()
+        .expect("AES block must be 16 bytes");
     cipher.encrypt_block(block);
 
     let mut sha = Sha1::new();
@@ -120,7 +122,8 @@ fn encrypt_verifier(key: &[u8], verifier: &[u8; 16]) -> ([u8; 16], [u8; 32]) {
 
     let mut encrypted_hash = padded;
     for chunk in encrypted_hash.chunks_mut(16) {
-        let block = aes::cipher::Block::<Aes128>::from_mut_slice(chunk);
+        let block: &mut aes::cipher::Block<Aes128> =
+            chunk.try_into().expect("AES block must be 16 bytes");
         cipher.encrypt_block(block);
     }
 
@@ -188,7 +191,8 @@ fn encrypt_package_stream(key: &[u8], data: &[u8]) -> Result<Vec<u8>> {
     padded.resize(data.len() + pad_len, pad_len as u8);
 
     for chunk in padded.chunks_mut(block_size) {
-        let block = aes::cipher::Block::<Aes128>::from_mut_slice(chunk);
+        let block: &mut aes::cipher::Block<Aes128> =
+            chunk.try_into().expect("AES block must be 16 bytes");
         cipher.encrypt_block(block);
     }
 
@@ -307,7 +311,9 @@ fn verify_standard2007_password(key: &[u8], verifier: &Standard2007Verifier) -> 
     })?;
 
     let mut decrypted_verifier = verifier.encrypted_verifier;
-    let block = aes::cipher::Block::<Aes128>::from_mut_slice(&mut decrypted_verifier);
+    let block: &mut aes::cipher::Block<Aes128> = (&mut decrypted_verifier)
+        .try_into()
+        .expect("AES block must be 16 bytes");
     cipher.decrypt_block(block);
 
     let mut sha = Sha1::new();
@@ -316,7 +322,8 @@ fn verify_standard2007_password(key: &[u8], verifier: &Standard2007Verifier) -> 
 
     let mut decrypted_hash = verifier.encrypted_verifier_hash;
     for chunk in decrypted_hash.chunks_mut(16) {
-        let block = aes::cipher::Block::<Aes128>::from_mut_slice(chunk);
+        let block: &mut aes::cipher::Block<Aes128> =
+            chunk.try_into().expect("AES block must be 16 bytes");
         cipher.decrypt_block(block);
     }
 
@@ -351,7 +358,8 @@ fn decrypt_package_stream(key: &[u8], encrypted: &[u8]) -> Result<Vec<u8>> {
     }
 
     for chunk in data.chunks_mut(16) {
-        let block = aes::cipher::Block::<Aes128>::from_mut_slice(chunk);
+        let block: &mut aes::cipher::Block<Aes128> =
+            chunk.try_into().expect("AES block must be 16 bytes");
         cipher.decrypt_block(block);
     }
 

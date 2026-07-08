@@ -8,8 +8,8 @@ use crate::constants::target_mode;
 use crate::error::{OpcError, Result};
 use crate::packuri::{PACKAGE_URI, PackURI};
 use crate::phys_pkg::PhysPkgReader;
-use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::{Reader, XmlVersion};
 use smallvec::SmallVec;
 use std::collections::HashMap;
 
@@ -122,14 +122,20 @@ impl ContentTypeMap {
                                 match attr.key.as_ref() {
                                     b"Extension" => {
                                         extension = Some(
-                                            attr.decode_and_unescape_value(reader.decoder())?
-                                                .to_string(),
+                                            attr.decoded_and_normalized_value(
+                                                XmlVersion::Implicit1_0,
+                                                reader.decoder(),
+                                            )?
+                                            .to_string(),
                                         );
                                     },
                                     b"ContentType" => {
                                         content_type = Some(
-                                            attr.decode_and_unescape_value(reader.decoder())?
-                                                .to_string(),
+                                            attr.decoded_and_normalized_value(
+                                                XmlVersion::Implicit1_0,
+                                                reader.decoder(),
+                                            )?
+                                            .to_string(),
                                         );
                                     },
                                     _ => {},
@@ -150,14 +156,20 @@ impl ContentTypeMap {
                                 match attr.key.as_ref() {
                                     b"PartName" => {
                                         partname = Some(
-                                            attr.decode_and_unescape_value(reader.decoder())?
-                                                .to_string(),
+                                            attr.decoded_and_normalized_value(
+                                                XmlVersion::Implicit1_0,
+                                                reader.decoder(),
+                                            )?
+                                            .to_string(),
                                         );
                                     },
                                     b"ContentType" => {
                                         content_type = Some(
-                                            attr.decode_and_unescape_value(reader.decoder())?
-                                                .to_string(),
+                                            attr.decoded_and_normalized_value(
+                                                XmlVersion::Implicit1_0,
+                                                reader.decoder(),
+                                            )?
+                                            .to_string(),
                                         );
                                     },
                                     _ => {},
@@ -291,25 +303,37 @@ impl PackageReader {
                         match attr.key.as_ref() {
                             b"Id" => {
                                 r_id = Some(
-                                    attr.decode_and_unescape_value(reader.decoder())?
-                                        .to_string(),
+                                    attr.decoded_and_normalized_value(
+                                        XmlVersion::Implicit1_0,
+                                        reader.decoder(),
+                                    )?
+                                    .to_string(),
                                 )
                             },
                             b"Type" => {
                                 reltype = Some(
-                                    attr.decode_and_unescape_value(reader.decoder())?
-                                        .to_string(),
+                                    attr.decoded_and_normalized_value(
+                                        XmlVersion::Implicit1_0,
+                                        reader.decoder(),
+                                    )?
+                                    .to_string(),
                                 )
                             },
                             b"Target" => {
                                 target_ref = Some(
-                                    attr.decode_and_unescape_value(reader.decoder())?
-                                        .to_string(),
+                                    attr.decoded_and_normalized_value(
+                                        XmlVersion::Implicit1_0,
+                                        reader.decoder(),
+                                    )?
+                                    .to_string(),
                                 )
                             },
                             b"TargetMode" => {
                                 target_mode = attr
-                                    .decode_and_unescape_value(reader.decoder())?
+                                    .decoded_and_normalized_value(
+                                        XmlVersion::Implicit1_0,
+                                        reader.decoder(),
+                                    )?
                                     .to_string()
                             },
                             _ => {},

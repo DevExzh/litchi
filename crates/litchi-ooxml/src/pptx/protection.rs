@@ -236,6 +236,7 @@ impl PresentationProtection {
         self.open_password = None;
     }
 
+    #[cfg(feature = "encryption")]
     pub(crate) fn open_password(&self) -> Option<&str> {
         self.open_password.as_deref()
     }

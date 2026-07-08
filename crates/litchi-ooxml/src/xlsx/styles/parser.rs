@@ -5,8 +5,8 @@
 
 use std::collections::HashMap;
 
-use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::{Reader, XmlVersion};
 
 use super::{Alignment, Border, BorderStyle, CellStyle, Fill, Font, NumberFormat, Styles};
 use crate::error::{OoxmlError, Result};
@@ -69,12 +69,18 @@ fn parse_number_formats(
                 for attr in e.attributes().flatten() {
                     match attr.key.local_name().as_ref() {
                         b"numFmtId" => {
-                            if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                            if let Ok(value) = attr.decoded_and_normalized_value(
+                                XmlVersion::Implicit1_0,
+                                reader.decoder(),
+                            ) {
                                 id = value.parse::<u32>().ok();
                             }
                         },
                         b"formatCode" => {
-                            if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                            if let Ok(value) = attr.decoded_and_normalized_value(
+                                XmlVersion::Implicit1_0,
+                                reader.decoder(),
+                            ) {
                                 code = Some(value.to_string());
                             }
                         },
@@ -125,7 +131,10 @@ fn parse_font(reader: &mut Reader<&[u8]>) -> Result<Font> {
                     b"name" => {
                         for attr in e.attributes().flatten() {
                             if attr.key.local_name().as_ref() == b"val"
-                                && let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                                && let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                )
                             {
                                 font.name = Some(value.to_string());
                             }
@@ -134,7 +143,10 @@ fn parse_font(reader: &mut Reader<&[u8]>) -> Result<Font> {
                     b"sz" => {
                         for attr in e.attributes().flatten() {
                             if attr.key.local_name().as_ref() == b"val"
-                                && let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                                && let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                )
                             {
                                 font.size = value.parse::<f64>().ok();
                             }
@@ -148,7 +160,10 @@ fn parse_font(reader: &mut Reader<&[u8]>) -> Result<Font> {
                         let mut underline_type = "single".to_string();
                         for attr in e.attributes().flatten() {
                             if attr.key.local_name().as_ref() == b"val"
-                                && let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                                && let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                )
                             {
                                 underline_type = value.to_string();
                             }
@@ -161,7 +176,10 @@ fn parse_font(reader: &mut Reader<&[u8]>) -> Result<Font> {
                     b"charset" => {
                         for attr in e.attributes().flatten() {
                             if attr.key.local_name().as_ref() == b"val"
-                                && let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                                && let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                )
                             {
                                 font.charset = value.parse::<u32>().ok();
                             }
@@ -170,7 +188,10 @@ fn parse_font(reader: &mut Reader<&[u8]>) -> Result<Font> {
                     b"family" => {
                         for attr in e.attributes().flatten() {
                             if attr.key.local_name().as_ref() == b"val"
-                                && let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                                && let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                )
                             {
                                 font.family = value.parse::<u32>().ok();
                             }
@@ -179,7 +200,10 @@ fn parse_font(reader: &mut Reader<&[u8]>) -> Result<Font> {
                     b"scheme" => {
                         for attr in e.attributes().flatten() {
                             if attr.key.local_name().as_ref() == b"val"
-                                && let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                                && let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                )
                             {
                                 font.scheme = Some(value.to_string());
                             }
@@ -250,7 +274,8 @@ fn parse_pattern_fill(
     // Get pattern type from attributes
     for attr in start.attributes().flatten() {
         if attr.key.local_name().as_ref() == b"patternType"
-            && let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+            && let Ok(value) =
+                attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
         {
             pattern_type = value.to_string();
         }
@@ -296,7 +321,8 @@ fn parse_gradient_fill(
     // Get gradient type from attributes
     for attr in start.attributes().flatten() {
         if attr.key.local_name().as_ref() == b"type"
-            && let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+            && let Ok(value) =
+                attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
         {
             gradient_type = Some(value.to_string());
         }
@@ -354,14 +380,16 @@ fn parse_border(
     for attr in start.attributes().flatten() {
         match attr.key.local_name().as_ref() {
             b"diagonalUp" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                     && (value == "1" || value == "true")
                 {
                     border.diagonal_direction = Some(border.diagonal_direction.unwrap_or(0) | 1);
                 }
             },
             b"diagonalDown" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                     && (value == "1" || value == "true")
                 {
                     border.diagonal_direction = Some(border.diagonal_direction.unwrap_or(0) | 2);
@@ -409,7 +437,8 @@ fn parse_border_side(
     // Get style from attributes
     for attr in start.attributes().flatten() {
         if attr.key.local_name().as_ref() == b"style"
-            && let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+            && let Ok(value) =
+                attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
         {
             style = value.to_string();
         }
@@ -470,57 +499,79 @@ fn parse_xf(
     for attr in start.attributes().flatten() {
         match attr.key.local_name().as_ref() {
             b"numFmtId" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     style.num_fmt_id = value.parse::<u32>().ok();
                 }
             },
             b"fontId" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     style.font_id = value.parse::<u32>().ok();
                 }
             },
             b"fillId" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     style.fill_id = value.parse::<u32>().ok();
                 }
             },
             b"borderId" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     style.border_id = value.parse::<u32>().ok();
                 }
             },
             b"xfId" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     style.xf_id = value.parse::<u32>().ok();
                 }
             },
             b"applyNumberFormat" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     style.apply_number_format = value == "1" || value == "true";
                 }
             },
             b"applyFont" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     style.apply_font = value == "1" || value == "true";
                 }
             },
             b"applyFill" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     style.apply_fill = value == "1" || value == "true";
                 }
             },
             b"applyBorder" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     style.apply_border = value == "1" || value == "true";
                 }
             },
             b"applyAlignment" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     style.apply_alignment = value == "1" || value == "true";
                 }
             },
             b"quotePrefix" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     style.quote_prefix = value == "1" || value == "true";
                 }
             },
@@ -556,37 +607,51 @@ fn parse_alignment(
     for attr in start.attributes().flatten() {
         match attr.key.local_name().as_ref() {
             b"horizontal" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     alignment.horizontal = Some(value.to_string());
                 }
             },
             b"vertical" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     alignment.vertical = Some(value.to_string());
                 }
             },
             b"textRotation" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     alignment.text_rotation = value.parse::<u32>().ok();
                 }
             },
             b"wrapText" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     alignment.wrap_text = value == "1" || value == "true";
                 }
             },
             b"indent" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     alignment.indent = value.parse::<u32>().ok();
                 }
             },
             b"shrinkToFit" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     alignment.shrink_to_fit = value == "1" || value == "true";
                 }
             },
             b"readingOrder" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     alignment.reading_order = value.parse::<u32>().ok();
                 }
             },
@@ -611,19 +676,25 @@ fn parse_color(
     for attr in start.attributes().flatten() {
         match attr.key.local_name().as_ref() {
             b"rgb" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     return Ok(Some(format!("#{}", value)));
                 }
             },
             b"theme" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     // For now, just store theme reference as-is
                     // A full implementation would resolve theme colors
                     return Ok(Some(format!("theme:{}", value)));
                 }
             },
             b"indexed" => {
-                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder()) {
+                if let Ok(value) =
+                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                {
                     return Ok(Some(format!("indexed:{}", value)));
                 }
             },

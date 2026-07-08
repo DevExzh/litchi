@@ -2,8 +2,8 @@ use crate::error::{OpcError, Result};
 use crate::packuri::PackURI;
 use crate::rel::Relationships;
 use memchr::memmem;
-use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::{Reader, XmlVersion};
 /// Open Packaging Convention (OPC) objects related to package parts.
 ///
 /// This module provides the Part trait and XmlPart implementation for representing
@@ -287,7 +287,10 @@ impl XmlPart {
                     for attr in e.attributes() {
                         let attr = attr?;
                         let key = std::str::from_utf8(attr.key.as_ref())?;
-                        let value = attr.decode_and_unescape_value(reader.decoder())?;
+                        let value = attr.decoded_and_normalized_value(
+                            XmlVersion::Implicit1_0,
+                            reader.decoder(),
+                        )?;
                         attrs.insert(key.to_string(), value.to_string());
                     }
                     results.push(attrs);

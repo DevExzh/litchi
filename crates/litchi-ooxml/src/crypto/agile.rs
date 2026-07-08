@@ -8,8 +8,8 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use cbc::{Decryptor, Encryptor};
 use hmac::{Hmac, Mac, digest::KeyInit};
-use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::{Reader, XmlVersion};
 use rand::TryRng;
 use rand::rngs::SysRng;
 use sha1::{Digest, Sha1};
@@ -410,14 +410,18 @@ fn parse_agile_encryption_info(xml_bytes: &[u8]) -> Result<AgileEncryptionInfo> 
                     for attr in e.attributes().flatten() {
                         match attr.key.local_name().as_ref() {
                             b"saltValue" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
                                     salt = Some(decode_b64_attr(&value, "keyData saltValue")?);
                                 }
                             },
                             b"blockSize" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
                                     let v = parse_usize_attr(&value, "keyData blockSize")?;
                                     block_size = Some(v);
                                 }
@@ -449,8 +453,10 @@ fn parse_agile_encryption_info(xml_bytes: &[u8]) -> Result<AgileEncryptionInfo> 
                     for attr in e.attributes().flatten() {
                         match attr.key.local_name().as_ref() {
                             b"encryptedHmacKey" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
                                     enc_key = Some(decode_b64_attr(
                                         &value,
                                         "dataIntegrity encryptedHmacKey",
@@ -458,8 +464,10 @@ fn parse_agile_encryption_info(xml_bytes: &[u8]) -> Result<AgileEncryptionInfo> 
                                 }
                             },
                             b"encryptedHmacValue" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
                                     enc_val = Some(decode_b64_attr(
                                         &value,
                                         "dataIntegrity encryptedHmacValue",
@@ -482,27 +490,35 @@ fn parse_agile_encryption_info(xml_bytes: &[u8]) -> Result<AgileEncryptionInfo> 
                     for attr in e.attributes().flatten() {
                         match attr.key.local_name().as_ref() {
                             b"saltValue" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
                                     salt = Some(decode_b64_attr(&value, "encryptedKey saltValue")?);
                                 }
                             },
                             b"spinCount" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
                                     spin = Some(parse_u32_attr(&value, "encryptedKey spinCount")?);
                                 }
                             },
                             b"blockSize" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
                                     let v = parse_usize_attr(&value, "encryptedKey blockSize")?;
                                     block_size = Some(v);
                                 }
                             },
                             b"encryptedVerifierHashInput" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
                                     enc_ver = Some(decode_b64_attr(
                                         &value,
                                         "encryptedVerifierHashInput",
@@ -510,8 +526,10 @@ fn parse_agile_encryption_info(xml_bytes: &[u8]) -> Result<AgileEncryptionInfo> 
                                 }
                             },
                             b"encryptedVerifierHashValue" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
                                     enc_ver_hash = Some(decode_b64_attr(
                                         &value,
                                         "encryptedVerifierHashValue",
@@ -519,8 +537,10 @@ fn parse_agile_encryption_info(xml_bytes: &[u8]) -> Result<AgileEncryptionInfo> 
                                 }
                             },
                             b"encryptedKeyValue" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
                                     enc_key_val =
                                         Some(decode_b64_attr(&value, "encryptedKeyValue")?);
                                 }

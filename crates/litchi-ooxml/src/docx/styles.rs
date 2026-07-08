@@ -2,8 +2,8 @@
 use crate::docx::enums::WdStyleType;
 use crate::error::{OoxmlError, Result};
 use litchi_opc::part::Part;
-use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::{Reader, XmlVersion};
 use smallvec::SmallVec;
 
 /// A collection of styles defined in a Word document.
@@ -132,27 +132,35 @@ impl<'a> Styles<'a> {
                     for attr in e.attributes().flatten() {
                         match attr.key.local_name().as_ref() {
                             b"type" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
                                     builder.style_type =
                                         WdStyleType::from_xml(&value).unwrap_or_default();
                                 }
                             },
                             b"styleId" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
                                     builder.style_id = Some(value.to_string());
                                 }
                             },
                             b"default" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
                                     builder.is_default = value == "1" || value == "true";
                                 }
                             },
                             b"customStyle" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
                                     builder.is_custom = value == "1" || value == "true";
                                 }
                             },
@@ -169,8 +177,10 @@ impl<'a> Styles<'a> {
                             // Parse name attribute
                             for attr in e.attributes().flatten() {
                                 if attr.key.local_name().as_ref() == b"val"
-                                    && let Ok(value) =
-                                        attr.decode_and_unescape_value(reader.decoder())
+                                    && let Ok(value) = attr.decoded_and_normalized_value(
+                                        XmlVersion::Implicit1_0,
+                                        reader.decoder(),
+                                    )
                                 {
                                     builder.name = Some(value.to_string());
                                 }
@@ -180,8 +190,10 @@ impl<'a> Styles<'a> {
                             // Parse basedOn attribute
                             for attr in e.attributes().flatten() {
                                 if attr.key.local_name().as_ref() == b"val"
-                                    && let Ok(value) =
-                                        attr.decode_and_unescape_value(reader.decoder())
+                                    && let Ok(value) = attr.decoded_and_normalized_value(
+                                        XmlVersion::Implicit1_0,
+                                        reader.decoder(),
+                                    )
                                 {
                                     builder.based_on = Some(value.to_string());
                                 }
@@ -191,8 +203,10 @@ impl<'a> Styles<'a> {
                             // Parse UI priority
                             for attr in e.attributes().flatten() {
                                 if attr.key.local_name().as_ref() == b"val"
-                                    && let Ok(value) =
-                                        attr.decode_and_unescape_value(reader.decoder())
+                                    && let Ok(value) = attr.decoded_and_normalized_value(
+                                        XmlVersion::Implicit1_0,
+                                        reader.decoder(),
+                                    )
                                     && let Ok(priority) = value.parse::<i32>()
                                 {
                                     builder.priority = Some(priority);

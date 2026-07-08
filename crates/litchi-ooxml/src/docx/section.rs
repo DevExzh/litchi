@@ -2,8 +2,8 @@
 use crate::docx::enums::{WdOrientation, WdSectionStart};
 use crate::error::Result;
 use litchi_core::unit::{EMUS_PER_CM, EMUS_PER_INCH, EMUS_PER_PT, EMUS_PER_TWIP, emu_to_twip_i64};
-use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::{Reader, XmlVersion};
 
 /// Length in English Metric Units (EMUs).
 ///
@@ -257,22 +257,28 @@ impl Section {
                     for attr in e.attributes().flatten() {
                         match attr.key.local_name().as_ref() {
                             b"w" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                    && let Ok(twips) = value.parse::<i64>()
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) && let Ok(twips) = value.parse::<i64>()
                                 {
                                     page_size.width = Some(Emu::from_twips(twips));
                                 }
                             },
                             b"h" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                    && let Ok(twips) = value.parse::<i64>()
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) && let Ok(twips) = value.parse::<i64>()
                                 {
                                     page_size.height = Some(Emu::from_twips(twips));
                                 }
                             },
                             b"orient" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
                                     page_size.orientation = WdOrientation::from_xml(&value)
                                         .unwrap_or(WdOrientation::Portrait);
                                 }
@@ -307,50 +313,64 @@ impl Section {
                     for attr in e.attributes().flatten() {
                         match attr.key.local_name().as_ref() {
                             b"top" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                    && let Ok(twips) = value.parse::<i64>()
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) && let Ok(twips) = value.parse::<i64>()
                                 {
                                     margins.top = Some(Emu::from_twips(twips));
                                 }
                             },
                             b"right" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                    && let Ok(twips) = value.parse::<i64>()
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) && let Ok(twips) = value.parse::<i64>()
                                 {
                                     margins.right = Some(Emu::from_twips(twips));
                                 }
                             },
                             b"bottom" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                    && let Ok(twips) = value.parse::<i64>()
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) && let Ok(twips) = value.parse::<i64>()
                                 {
                                     margins.bottom = Some(Emu::from_twips(twips));
                                 }
                             },
                             b"left" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                    && let Ok(twips) = value.parse::<i64>()
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) && let Ok(twips) = value.parse::<i64>()
                                 {
                                     margins.left = Some(Emu::from_twips(twips));
                                 }
                             },
                             b"header" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                    && let Ok(twips) = value.parse::<i64>()
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) && let Ok(twips) = value.parse::<i64>()
                                 {
                                     margins.header = Some(Emu::from_twips(twips));
                                 }
                             },
                             b"footer" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                    && let Ok(twips) = value.parse::<i64>()
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) && let Ok(twips) = value.parse::<i64>()
                                 {
                                     margins.footer = Some(Emu::from_twips(twips));
                                 }
                             },
                             b"gutter" => {
-                                if let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
-                                    && let Ok(twips) = value.parse::<i64>()
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) && let Ok(twips) = value.parse::<i64>()
                                 {
                                     margins.gutter = Some(Emu::from_twips(twips));
                                 }
@@ -384,7 +404,10 @@ impl Section {
                     // Parse type attribute
                     for attr in e.attributes().flatten() {
                         if attr.key.local_name().as_ref() == b"val"
-                            && let Ok(value) = attr.decode_and_unescape_value(reader.decoder())
+                            && let Ok(value) = attr.decoded_and_normalized_value(
+                                XmlVersion::Implicit1_0,
+                                reader.decoder(),
+                            )
                         {
                             start_type =
                                 WdSectionStart::from_xml(&value).unwrap_or(WdSectionStart::NewPage);
