@@ -1,7 +1,7 @@
 use crate::error::{OoxmlError, Result};
 use aes::Aes128;
 use aes::cipher::{
-    BlockDecryptMut, BlockEncryptMut, KeyIvInit,
+    BlockModeDecrypt, BlockModeEncrypt, KeyIvInit,
     block_padding::{NoPadding, Pkcs7},
 };
 use base64::Engine as _;
@@ -112,7 +112,7 @@ pub fn encrypt_ooxml_package_agile(package_bytes: &[u8], password: &str) -> Resu
     let iv_hmac_key = generate_iv_agile(&key_salt, Some(&K_INTEGRITY_KEY_BLOCK), AGILE_BLOCK_SIZE);
     let cipher = Aes128CbcEnc::new_from_slices(&content_key, &iv_hmac_key)
         .map_err(|_| OoxmlError::InvalidFormat("invalid AES key/iv for integrity key".into()))?;
-    let encrypted_hmac_key = cipher.encrypt_padded_vec_mut::<NoPadding>(&integrity_salt_padded);
+    let encrypted_hmac_key = cipher.encrypt_padded_vec::<NoPadding>(&integrity_salt_padded);
 
     let mut mac = HmacSha1::new_from_slice(&integrity_salt)
         .map_err(|e| OoxmlError::Other(format!("failed to init HMAC-SHA1: {e}")))?;
@@ -124,7 +124,7 @@ pub fn encrypt_ooxml_package_agile(package_bytes: &[u8], password: &str) -> Resu
         generate_iv_agile(&key_salt, Some(&K_INTEGRITY_VALUE_BLOCK), AGILE_BLOCK_SIZE);
     let cipher = Aes128CbcEnc::new_from_slices(&content_key, &iv_hmac_value)
         .map_err(|_| OoxmlError::InvalidFormat("invalid AES key/iv for integrity value".into()))?;
-    let encrypted_hmac_value = cipher.encrypt_padded_vec_mut::<NoPadding>(&hmac_value_padded);
+    let encrypted_hmac_value = cipher.encrypt_padded_vec::<NoPadding>(&hmac_value_padded);
 
     // 7) Build EncryptionInfo XML + binary prefix
     let xml = build_agile_encryption_info_xml(
@@ -241,7 +241,7 @@ fn hash_input_agile(
 
     let padded = pad_zero_to_block_multiple(input, block_size);
     // NoPadding because we padded manually
-    let ciphertext = cipher.encrypt_padded_vec_mut::<NoPadding>(&padded);
+    let ciphertext = cipher.encrypt_padded_vec::<NoPadding>(&padded);
 
     Ok(ciphertext)
 }
@@ -272,13 +272,13 @@ fn encrypt_agile_package_stream(
         if is_last {
             let cipher = Aes128CbcEnc::new_from_slices(content_key, &iv)
                 .map_err(|_| OoxmlError::InvalidFormat("invalid AES key/iv".into()))?;
-            let ct = cipher.encrypt_padded_vec_mut::<Pkcs7>(segment);
+            let ct = cipher.encrypt_padded_vec::<Pkcs7>(segment);
             out.extend_from_slice(&ct);
         } else {
             // 4096 is multiple of 16 => can use NoPadding
             let cipher = Aes128CbcEnc::new_from_slices(content_key, &iv)
                 .map_err(|_| OoxmlError::InvalidFormat("invalid AES key/iv".into()))?;
-            let ct = cipher.encrypt_padded_vec_mut::<NoPadding>(segment);
+            let ct = cipher.encrypt_padded_vec::<NoPadding>(segment);
             out.extend_from_slice(&ct);
         }
 
@@ -702,7 +702,7 @@ fn derive_agile_integrity_salt(
         OoxmlError::InvalidFormat("invalid AES key/iv for Agile integrity key".into())
     })?;
     let decrypted = cipher
-        .decrypt_padded_vec_mut::<NoPadding>(encrypted_hmac_key)
+        .decrypt_padded_vec::<NoPadding>(encrypted_hmac_key)
         .map_err(|_| {
             OoxmlError::InvalidFormat(
                 "failed to decrypt Agile integrity salt from encryptedHmacKey".to_string(),
@@ -739,7 +739,7 @@ fn verify_agile_integrity(
     let cipher = Aes128CbcEnc::new_from_slices(content_key, &iv).map_err(|_| {
         OoxmlError::InvalidFormat("invalid AES key/iv for Agile integrity value".into())
     })?;
-    let encrypted = cipher.encrypt_padded_vec_mut::<NoPadding>(&hmac_padded);
+    let encrypted = cipher.encrypt_padded_vec::<NoPadding>(&hmac_padded);
 
     if encrypted != encrypted_hmac_value {
         return Err(OoxmlError::InvalidFormat(
@@ -768,7 +768,7 @@ fn decrypt_hash_input_agile(
     let cipher = Aes128CbcDec::new_from_slices(&inter_key, &iv)
         .map_err(|_| OoxmlError::InvalidFormat("invalid AES-128 key/iv".into()))?;
     let decrypted = cipher
-        .decrypt_padded_vec_mut::<NoPadding>(encrypted)
+        .decrypt_padded_vec::<NoPadding>(encrypted)
         .map_err(|_| {
             OoxmlError::InvalidFormat("failed to decrypt Agile hashInput structure".to_string())
         })?;
@@ -851,7 +851,7 @@ fn decrypt_agile_package_stream(
 
         if is_last {
             let mut pt = cipher
-                .decrypt_padded_vec_mut::<Pkcs7>(segment_ct)
+                .decrypt_padded_vec::<Pkcs7>(segment_ct)
                 .map_err(|_| {
                     OoxmlError::InvalidFormat(
                         "invalid PKCS7 padding in Agile EncryptedPackage".to_string(),
@@ -860,7 +860,7 @@ fn decrypt_agile_package_stream(
             plain.append(&mut pt);
         } else {
             let mut pt = cipher
-                .decrypt_padded_vec_mut::<NoPadding>(segment_ct)
+                .decrypt_padded_vec::<NoPadding>(segment_ct)
                 .map_err(|_| {
                     OoxmlError::InvalidFormat("failed to decrypt Agile package segment".to_string())
                 })?;

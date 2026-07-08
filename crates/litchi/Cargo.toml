@@ -72,7 +72,7 @@ eval_engine_web_functions = ["eval_engine", "litchi-eval/web_functions"]
 
 [dependencies]
 aho-corasick = "1.1" # Fast string searching for fast byte pattern matching
-allsorts = { version = "0.16", optional = true } # Font subsetting and layout
+allsorts = { version = "0.17", optional = true } # Font subsetting and layout
 atoi_simd = "0.18" # SIMD-optimized conversion of byte slices to integers
 base64 = "0.22" # Base64 encoding/decoding for embedded binary data in XML
 bitflags = { version = "2.10", features = ["std", "serde"] } # Bit flags for efficient flag combinations
@@ -96,7 +96,7 @@ litchi-rtf = { workspace = true, optional = true } # RTF parser and writer (carv
 memchr = "2.7" # SIMD-accelerated string searching for fast byte pattern matching
 once_cell = "1" # Lazy statics and one-time initialization for global state
 parking_lot = { version = "0.12", features = ["hardware-lock-elision"] } # Lock-free synchronization primitives for concurrent programming
-phf = { version = "0.13", features = ["macros"] } # Perfect hash functions for compile-time static maps
+phf = { version = "0.14", features = ["macros"] } # Perfect hash functions for compile-time static maps
 rand = "0.10" # Cryptographically secure random numbers for salts in protection hashes
 rayon = "1.11" # Data parallelism library for parallel iterators and work-stealing
 roaring = "0" # Compressed bitmap data structure for efficient set operations
