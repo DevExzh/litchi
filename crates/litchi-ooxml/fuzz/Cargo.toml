@@ -1,0 +1,28 @@
+[package]
+name = "litchi-ooxml-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+authors = ["Ryker Zhu <ryker.zhu@outlook.com>"]
+license = "Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+litchi-ooxml = { path = ".." }
+
+[[bin]]
+name = "parse_docx"
+path = "fuzz_targets/parse_docx.rs"
+test = false
+doc = false
+bench = false
+
+[profile.release]
+debug = 1
+codegen-units = 1
+lto = "thin"
+
+[workspace]

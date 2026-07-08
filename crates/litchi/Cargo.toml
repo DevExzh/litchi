@@ -1,0 +1,122 @@
+[package]
+name = "litchi"
+version = "0.0.1"
+edition = "2024"
+description = "High-performance parser for Microsoft Office, OpenDocument, and Apple iWork file formats with unified API"
+authors = ["Ryker Zhu <ryker.zhu@outlook.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/DevExzh/litchi"
+documentation = "https://docs.rs/litchi"
+readme = "../../README.md"
+keywords = ["office", "docx", "xlsx", "pptx", "parser"]
+categories = ["parser-implementations", "encoding", "text-processing"]
+exclude = [
+    # Reference materials and third-party projects
+    "3rdparty/*",
+    # Examples
+    "examples/*",
+    # Test files
+    "test.*",
+    "*.doc",
+    "*.docx",
+    "*.xls",
+    "*.xlsx",
+    "*.xlsb",
+    "*.ppt",
+    "*.pptx",
+    "*.odt",
+    "*.ods",
+    "*.odp",
+    "*.pages",
+    "*.numbers",
+    "*.key",
+    "*.csv",
+    "*.txt",
+    # Build artifacts
+    "target/*",
+    # Media files (logo kept for crates.io display)
+    # "media/*",  # Uncomment if logo shouldn't be in package
+    # CI/CD and development files
+    ".github/*",
+    ".git/*",
+    ".gitignore",
+]
+
+[features]
+default = ["ole", "ooxml", "ooxml_encryption", "eval_engine"]
+full = [
+    "iwa",
+    "odf",
+    "ole",
+    "ooxml",
+    "ooxml_encryption",
+    "rtf",
+    "formula",
+    "imgconv",
+    "eval_engine",
+    "fonts",
+]
+# Format support features
+iwa = ["dep:litchi-iwa", "dep:soapberry-zip"]
+odf = ["dep:litchi-odf", "litchi-core/odf", "dep:soapberry-zip"]
+ole = ["dep:litchi-ole", "litchi-core/ole"]
+ooxml = ["dep:litchi-ooxml", "dep:soapberry-zip"]
+ooxml_encryption = ["ooxml", "ole", "litchi-ooxml/encryption"]
+rtf = ["dep:litchi-rtf", "litchi-core/rtf"]
+# Additional functionality features
+formula = ["dep:litchi-formula", "litchi-ole?/formula"]
+imgconv = ["dep:litchi-imgconv", "litchi-ole?/imgconv"]
+fonts = ["dep:allsorts", "dep:litchi-fonts"]
+eval_engine = ["dep:litchi-eval"]
+eval_engine_web_functions = ["eval_engine", "litchi-eval/web_functions"]
+
+[dependencies]
+aho-corasick = "1.1" # Fast string searching for fast byte pattern matching
+allsorts = { version = "0.17", optional = true } # Font subsetting and layout
+atoi_simd = "0.18" # SIMD-optimized conversion of byte slices to integers
+base64 = "0.22" # Base64 encoding/decoding for embedded binary data in XML
+bitflags = { version = "2.10", features = ["std", "serde"] } # Bit flags for efficient flag combinations
+bytes = { version = "1", features = ["serde"] } # Efficient byte buffer operations with zero-copy slicing
+chrono = { version = "0", features = ["serde"] } # Date and time types for Office timestamps
+fast-float2 = "0.2" # Fast string-to-float conversion with correct rounding
+fixedbitset = "0.5" # Fixed-size bitset for efficient visited tracking with better cache locality
+flate2 = { version = "1", features = ["zlib-rs"], default-features = false } # Compression/decompression for Office file formats
+itoa = "1.0" # Fast integer-to-string conversion
+litchi-core = { workspace = true } # Common types, traits, and utilities (carved out in workspace split)
+litchi-eval = { workspace = true, optional = true } # Formula evaluator engine (carved out in workspace split, gated by `eval_engine` feature)
+litchi-fonts = { workspace = true, optional = true } # Font discovery, loading, and subsetting (carved out in workspace split, gated by `fonts` feature)
+litchi-formula = { workspace = true, optional = true } # Formula parser/converter (carved out in workspace split, gated by `formula` feature)
+litchi-imgconv = { workspace = true, optional = true } # EMF/WMF/PICT image conversion (carved out in workspace split, gated by `imgconv` feature)
+litchi-iwa = { workspace = true, optional = true } # Apple iWork (.pages, .numbers, .key) parser (carved out in workspace split, gated by `iwa` feature)
+litchi-markdown = { workspace = true } # Format-agnostic Markdown emission helpers (carved out in workspace split)
+litchi-odf = { workspace = true, optional = true } # OpenDocument Format (.odt, .ods, .odp) parser (carved out in workspace split, gated by odf feature)
+litchi-ole = { workspace = true, optional = true } # Legacy OLE2 binary office formats (.doc, .xls, .ppt) parser/writer (carved out in workspace split, gated by `ole` feature)
+litchi-ooxml = { workspace = true, optional = true } # Modern Office Open XML formats (.docx, .xlsx, .xlsb, .pptx) parser/writer (carved out in workspace split, gated by `ooxml` feature)
+litchi-rtf = { workspace = true, optional = true } # RTF parser and writer (carved out in workspace split, gated by `rtf` feature)
+memchr = "2.7" # SIMD-accelerated string searching for fast byte pattern matching
+once_cell = "1" # Lazy statics and one-time initialization for global state
+parking_lot = { version = "0.12", features = ["hardware-lock-elision"] } # Lock-free synchronization primitives for concurrent programming
+phf = { version = "0.14", features = ["macros"] } # Perfect hash functions for compile-time static maps
+rand = "0.10" # Cryptographically secure random numbers for salts in protection hashes
+rayon = "1.11" # Data parallelism library for parallel iterators and work-stealing
+roaring = "0" # Compressed bitmap data structure for efficient set operations
+ryu = "1.0" # Fast float-to-string conversion with minimal allocations
+serde = { version = "1", features = ["derive"] } # Serialization/deserialization framework
+serde-saphyr = "0" # YAML serialization support
+sha2 = "0.11" # SHA-512 hashing for OOXML password protection
+smallvec = "1.15" # Stack-allocated vectors for small collections to avoid heap allocations
+soapberry-zip = { workspace = true, optional = true } # High-performance ZIP archive handling for modern Office formats (gated by ooxml/iwa/odf features)
+thiserror = "2.0" # Convenient derive macros for error types
+tokio = { version = "1", features = ["full"] }
+xml-minifier = { workspace = true }
+zerocopy = { version = "0.8", features = ["std"] } # Safe zero-cost type conversions between bytes and structured data
+zerocopy-derive = "0.8" # Derive macros for zerocopy traits
+
+[build-dependencies]
+# (none) — iwa proto compilation lives in `crates/litchi-iwa/build.rs`.
+
+[dev-dependencies]
+clap = { version = "4", features = ["derive"] }
+proptest = "1.5"
+tempfile = "3"
+zip = { version = "8", default-features = false, features = ["deflate"] }

@@ -1,0 +1,26 @@
+[package]
+name = "soapberry-zip"
+version = "0.0.1"
+authors = ["Ryker Zhu <ryker.zhu@outlook.com>"]
+edition = "2021"
+description = "High-performance ZIP reader for Office document formats (OOXML, ODF, iWork)"
+license = "MIT"
+keywords = ["zip", "archive", "office"]
+categories = ["filesystem", "compression", "parser-implementations"]
+rust-version = "1.70"
+
+[dependencies]
+# Hardware-accelerated CRC32 (uses SIMD/PCLMULQDQ when available)
+crc32fast = "1"
+# Deflate compression - used by all Office formats
+flate2 = { version = "1", features = ["zlib-rs"], default-features = false }
+# Parallel processing for multi-threaded decompression
+rayon = "1"
+
+[dev-dependencies]
+jiff = "0.2"
+paste = "1.0"
+quickcheck = "1.0.3"
+quickcheck_macros = "1.1.0"
+rstest = "0.26"
+tempfile = "3"

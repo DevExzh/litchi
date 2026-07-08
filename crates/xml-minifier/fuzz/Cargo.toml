@@ -1,0 +1,28 @@
+[package]
+name = "xml-minifier-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+authors = ["Ryker Zhu <ryker.zhu@outlook.com>"]
+license = "Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+xml-minifier = { path = ".." }
+
+[[bin]]
+name = "minify_xml"
+path = "fuzz_targets/minify_xml.rs"
+test = false
+doc = false
+bench = false
+
+[profile.release]
+debug = 1
+codegen-units = 1
+lto = "thin"
+
+[workspace]

@@ -1,0 +1,53 @@
+[package]
+name        = "litchi-ooxml"
+description = "Modern Office Open XML formats (.docx, .xlsx, .xlsb, .pptx) parser/writer for the Litchi office-formats library."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+default = []
+encryption = [
+    "dep:aes",
+    "dep:cbc",
+    "dep:hmac",
+    "dep:sha1",
+    "dep:litchi-cfb",
+    "dep:litchi-ole",
+]
+fonts = ["dep:litchi-fonts", "dep:allsorts"]
+
+[dependencies]
+aes             = { workspace = true, optional = true }
+allsorts        = { workspace = true, optional = true }
+atoi_simd       = { workspace = true }
+base64          = { workspace = true }
+bytes           = { workspace = true }
+cbc             = { workspace = true, optional = true }
+chrono          = { workspace = true }
+encoding_rs     = { workspace = true }
+fast-float2     = { workspace = true }
+hmac            = { workspace = true, optional = true }
+litchi-cfb      = { workspace = true, optional = true }
+litchi-core     = { workspace = true }
+litchi-fonts    = { workspace = true, optional = true }
+litchi-ole      = { workspace = true, optional = true }
+litchi-opc      = { workspace = true }
+memchr          = { workspace = true }
+quick-xml       = { workspace = true }
+rand            = { workspace = true }
+roaring         = { workspace = true }
+ryu             = { workspace = true }
+sha1            = { workspace = true, optional = true }
+sha2            = { workspace = true }
+smallvec        = { workspace = true }
+soapberry-zip   = { workspace = true }
+thiserror       = { workspace = true }
+xml-minifier    = { workspace = true }
+
+[dev-dependencies]
+proptest = "1.5"
+tempfile = { workspace = true }

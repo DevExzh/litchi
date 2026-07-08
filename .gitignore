@@ -85,3 +85,6 @@ Backup of *.doc*
 *.lock
 
 test*
+!tests/
+!tests/**
+!crates/soapberry-zip/assets/test.zip

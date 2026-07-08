@@ -1,0 +1,64 @@
+//! Unified spreadsheet API for Excel and Numbers files.
+//!
+//! This module provides a unified interface for working with spreadsheets,
+//! supporting multiple formats with automatic detection.
+//!
+//! # Supported Formats
+//!
+//! - `.xls` - Microsoft Excel 97-2003 (OLE2)
+//! - `.xlsx` - Microsoft Excel 2007+ (Office Open XML)
+//! - `.xlsb` - Microsoft Excel Binary Workbook
+//! - `.ods` - OpenDocument Spreadsheet
+//! - `.numbers` - Apple Numbers (iWork Archive)
+//!
+//! # Quick Start
+//!
+//! ```rust,no_run
+//! use litchi::sheet::Workbook;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+//! // Open any spreadsheet format - auto-detected
+//! let workbook = Workbook::open("data.numbers")?;
+//!
+//! // Get worksheet names
+//! let names = workbook.worksheet_names()?;
+//! println!("Worksheets: {:?}", names);
+//!
+//! // Extract all text
+//! let text = workbook.text()?;
+//! println!("{}", text);
+//!
+//! // Get metadata
+//! let metadata = workbook.metadata()?;
+//! if let Some(title) = metadata.title {
+//!     println!("Title: {}", title);
+//! }
+//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+//! # }
+//! ```
+//!
+//! # Architecture
+//!
+//! The module provides both:
+//! - **Unified API**: `Workbook` struct for high-level operations
+//! - **Trait-based API**: `Workbook`, `Worksheet`, `Cell` traits for advanced use
+
+// Submodule declarations
+#[cfg(feature = "eval_engine")]
+pub mod eval {
+    pub use litchi_eval::*;
+}
+pub mod functions;
+pub mod text;
+pub use litchi_core::sheet::traits;
+pub use litchi_core::sheet::types;
+mod workbook;
+mod workbook_types;
+
+// Re-exports
+#[cfg(feature = "eval_engine")]
+pub use eval::FormulaEvaluator;
+pub use functions::*;
+pub use traits::{Cell, CellIterator, RowIterator, WorkbookTrait, Worksheet, WorksheetIterator};
+pub use types::{CellValue, Result};
+pub use workbook::Workbook;

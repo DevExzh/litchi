@@ -1,154 +1,95 @@
-[package]
-name = "litchi"
-version = "0.0.1"
-edition = "2024"
-description = "High-performance parser for Microsoft Office, OpenDocument, and Apple iWork file formats with unified API"
-authors = ["Ryker Zhu <ryker.zhu@outlook.com>"]
-license = "Apache-2.0"
-repository = "https://github.com/DevExzh/litchi"
-documentation = "https://docs.rs/litchi"
-readme = "README.md"
-keywords = ["office", "docx", "xlsx", "pptx", "parser"]
-categories = ["parser-implementations", "encoding", "text-processing"]
-exclude = [
-    # Reference materials and third-party projects
-    "3rdparty/*",
-    # Examples
-    "examples/*",
-    # Test files
-    "test.*",
-    "*.doc",
-    "*.docx",
-    "*.xls",
-    "*.xlsx",
-    "*.xlsb",
-    "*.ppt",
-    "*.pptx",
-    "*.odt",
-    "*.ods",
-    "*.odp",
-    "*.pages",
-    "*.numbers",
-    "*.key",
-    "*.csv",
-    "*.txt",
-    # Build artifacts
-    "target/*",
-    # Media files (logo kept for crates.io display)
-    # "media/*",  # Uncomment if logo shouldn't be in package
-    # CI/CD and development files
-    ".github/*",
-    ".git/*",
-    ".gitignore",
-]
+[workspace]
+resolver = "3"
+members = ["crates/*"]
 
-[features]
-default = ["ole", "ooxml", "ooxml_encryption", "eval_engine"]
-full = [
-    "iwa",
-    "odf",
-    "ole",
-    "ooxml",
-    "ooxml_encryption",
-    "rtf",
-    "formula",
-    "imgconv",
-    "eval_engine",
-    "fonts",
-]
-# Format support features
-iwa = [
-    "dep:snap",
-    "dep:plist",
-    "dep:prost",
-    "dep:prost-types",
-    "dep:soapberry-zip",
-    "dep:prost-build",
-]
-odf = ["dep:soapberry-zip", "dep:quick-xml"]
-ole = ["dep:encoding_rs", "dep:bumpalo"]
-ooxml = ["dep:soapberry-zip", "dep:quick-xml", "dep:encoding_rs"]
-ooxml_encryption = ["ooxml", "ole", "dep:aes", "dep:cbc", "dep:hmac", "dep:sha1"]
-rtf = ["dep:bumpalo", "dep:crc-fast", "dep:encoding_rs"]
-# Additional functionality features
-formula = ["dep:rowan", "dep:bumpalo", "dep:quick-xml"]
-imgconv = ["dep:image"]
-fonts = ["dep:allsorts", "dep:font-kit"]
-eval_engine = ["dep:statrs", "dep:num-complex"]
-eval_engine_web_functions = [
-    "eval_engine",
-    "dep:urlencoding",
-    "dep:reqwest",
-    "dep:sxd-document",
-    "dep:sxd-xpath",
-]
+[workspace.package]
+version      = "0.0.1"
+edition      = "2024"
+authors      = ["Ryker Zhu <ryker.zhu@outlook.com>"]
+license      = "Apache-2.0"
+repository   = "https://github.com/DevExzh/litchi"
+rust-version = "1.85"
 
-[dependencies]
-aes = { version = "0.8", optional = true } # AES block cipher for OOXML file encryption
-aho-corasick = "1.1" # Fast string searching for fast byte pattern matching
-allsorts = { version = "0.16", optional = true } # Font subsetting and layout
-atoi_simd = "0.18" # SIMD-optimized conversion of byte slices to integers
-base64 = "0.22" # Base64 encoding/decoding for embedded binary data in XML
-bitflags = { version = "2.10", features = ["std", "serde"] } # Bit flags for efficient flag combinations
-bumpalo = { version = "3", features = ["collections"], optional = true } # Fast bump allocator for temporary formula parsing data
-bytes = { version = "1", features = ["serde"] } # Efficient byte buffer operations with zero-copy slicing
-cbc = { version = "0.1", features = ["alloc"], optional = true } # CBC mode for AES-based OOXML encryption
-chrono = { version = "0", features = ["serde"] } # Date and time types for Office timestamps
-crc-fast = { version = "1.8", features = ["optimize_crc32_auto"], optional = true } # Fast CRC32 implementation for verifying file integrity
-encoding_rs = { version = "0.8", optional = true } # Used by both OLE (.doc, .xls, .ppt) and OOXML (.xlsb) formats for UTF-16LE decoding
-fast-float2 = "0.2" # Fast string-to-float conversion with correct rounding
-fixedbitset = "0.5" # Fixed-size bitset for efficient visited tracking with better cache locality
-flate2 = { version = "1", features = ["zlib-rs"], default-features = false } # Compression/decompression for Office file formats
-font-kit = { version = "0.14", optional = true } # Font discovery and loading
-hmac = { version = "0.13", optional = true } # HMAC for Agile OOXML encryption integrity
-image = { version = "0.25", features = ["default-formats", "rayon"], optional = true } # Image format decoding/encoding for embedded media
-itoa = "1.0" # Fast integer-to-string conversion
-memchr = "2.7" # SIMD-accelerated string searching for fast byte pattern matching
-num-complex = { version = "0.4", optional = true } # Complex number arithmetic for engineering functions
-once_cell = "1" # Lazy statics and one-time initialization for global state
-parking_lot = { version = "0.12", features = ["hardware-lock-elision"] } # Lock-free synchronization primitives for concurrent programming
-phf = { version = "0.13", features = ["macros"] } # Perfect hash functions for compile-time static maps
-plist = { version = "1", optional = true } # Property list parser for iWork metadata and indexes
-prost = { version = "0.14", features = ["derive"], optional = true } # Protocol Buffers implementation for iWork archive structures
-prost-types = { version = "0.14", optional = true } # Well-known Protocol Buffer types used by iWork
-quick-xml = { version = "0.39", optional = true } # High-performance XML parser for .docx, .xlsx, .pptx files
-rand = "0.10" # Cryptographically secure random numbers for salts in protection hashes
-rayon = "1.11" # Data parallelism library for parallel iterators and work-stealing
-reqwest = { version = "0.13", features = ["json"], optional = true }
-roaring = "0" # Compressed bitmap data structure for efficient set operations
-rowan = { version = "0.16", optional = true } # Lossless syntax tree library for formula parsing (AST)
-ryu = "1.0" # Fast float-to-string conversion with minimal allocations
-serde = { version = "1", features = ["derive"] } # Serialization/deserialization framework
-serde-saphyr = "0" # YAML serialization support
-sha1 = { version = "0.11", optional = true } # SHA-1 hashing for Standard 2007 and Agile OOXML encryption
-sha2 = "0.11" # SHA-512 hashing for OOXML password protection
-smallvec = "1.15" # Stack-allocated vectors for small collections to avoid heap allocations
-snap = { version = "1", optional = true } # Snappy compression used in iWork file formats (.pages, .numbers, .key)
-soapberry-zip = { path = "soapberry-zip", optional = true } # High-performance ZIP archive handling for modern Office formats
-statrs = { version = "0.18", optional = true } # Statistics library for statistical functions
-sxd-document = { version = "0.3", optional = true }
-sxd-xpath = { version = "0.4", optional = true }
-thiserror = "2.0" # Convenient derive macros for error types
-tokio = { version = "1", features = ["full"] }
-urlencoding = { version = "2.1", optional = true }
-xml-minifier = { path = "xml-minifier" }
-zerocopy = { version = "0.8", features = ["std"] } # Safe zero-cost type conversions between bytes and structured data
-zerocopy-derive = "0.8" # Derive macros for zerocopy traits
+[workspace.dependencies]
+aes           = "0.9"
+aho-corasick  = "1.1"
+allsorts      = "0.17"
+atoi_simd     = "0.18"
+base64        = "0.22"
+bitflags      = { version = "2.10", features = ["std", "serde"] }
+bumpalo       = { version = "3", features = ["collections"] }
+bytes         = { version = "1", features = ["serde"] }
+cbc           = { version = "0.2", features = ["alloc"] }
+chrono        = { version = "0", features = ["serde"] }
+crc-fast      = { version = "1.8", features = ["optimize_crc32_auto"] }
+encoding_rs   = "0.8"
+fast-float2   = "0.2"
+fixedbitset   = "0.5"
+flate2        = { version = "1", features = ["zlib-rs"], default-features = false }
+font-kit      = "0.14"
+hmac          = "0.13"
+image         = { version = "0.25", features = ["default-formats", "rayon"] }
+itoa          = "1.0"
+litchi           = { version = "0.0.1", path = "crates/litchi" }
+litchi-cfb       = { version = "0.0.1", path = "crates/litchi-cfb" }
+# Path deps to internal crates.
+litchi-core      = { version = "0.0.1", path = "crates/litchi-core" }
+litchi-eval      = { version = "0.0.1", path = "crates/litchi-eval" }
+litchi-fonts     = { version = "0.0.1", path = "crates/litchi-fonts" }
+litchi-formula   = { version = "0.0.1", path = "crates/litchi-formula" }
+litchi-imgconv   = { version = "0.0.1", path = "crates/litchi-imgconv" }
+litchi-iwa       = { version = "0.0.1", path = "crates/litchi-iwa" }
+litchi-markdown  = { version = "0.0.1", path = "crates/litchi-markdown" }
+litchi-odf       = { version = "0.0.1", path = "crates/litchi-odf" }
+litchi-ole       = { version = "0.0.1", path = "crates/litchi-ole" }
+litchi-ooxml     = { version = "0.0.1", path = "crates/litchi-ooxml" }
+litchi-opc       = { version = "0.0.1", path = "crates/litchi-opc" }
+litchi-rtf       = { version = "0.0.1", path = "crates/litchi-rtf" }
+memchr        = "2.7"
+num-complex   = "0.4"
+once_cell     = "1"
+parking_lot   = { version = "0.12", features = ["hardware-lock-elision"] }
+phf           = { version = "0.14", features = ["macros"] }
+plist         = "1"
+prost         = { version = "0.14", features = ["derive"] }
+prost-build   = "0.14"
+prost-types   = "0.14"
+quick-xml     = "0.41"
+rand          = "0.10"
+rayon         = "1.11"
+reqwest       = { version = "0.13", features = ["json"] }
+roaring       = "0"
+rowan         = "0.16"
+ryu           = "1.0"
+serde         = { version = "1", features = ["derive"] }
+serde-saphyr  = "0"
+sha1          = "0.11"
+sha2          = "0.11"
+smallvec      = "1.15"
+snap          = "1"
+soapberry-zip    = { path = "crates/soapberry-zip" }
+statrs        = "0.18"
+sxd-document  = "0.3"
+sxd-xpath     = "0.4"
 
-[build-dependencies]
-# Build-time Protocol Buffer compiler for generating iWork message types
-# Only needed when iwa feature is enabled
-prost-build = { version = "0.14", optional = true }
-
-[dev-dependencies]
-clap = { version = "4", features = ["derive"] }
-proptest = "1.5"
-tempfile = "3"
-zip = { version = "8", default-features = false, features = ["deflate"] }
+# External deps used by ≥2 crates — declared once, inherited by members.
+# VERSIONS PRESERVED VERBATIM FROM CURRENT root Cargo.toml.
+tempfile      = "3"
+thiserror     = "2.0"
+tokio         = { version = "1", features = ["full"] }
+urlencoding   = "2.1"
+xml-minifier     = { path = "crates/xml-minifier" }
+zerocopy      = { version = "0.8", features = ["std"] }
+zerocopy-derive = "0.8"
 
 [profile.release]
 lto = true
 panic = "abort"
+
+[profile.release.package.litchi-py]
+opt-level = 3
+strip = true
+codegen-units = 1
 
 [profile.profiling]
 inherits = "release"
