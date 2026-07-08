@@ -33,20 +33,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Configure protection flags. We allow selecting locked and unlocked cells
     // but disallow most structural changes (formatting, inserting/deleting
     // rows/columns, sorting, etc.).
-    let mut protection = SheetProtection::default();
-    protection.select_locked_cells = Some(true);
-    protection.select_unlocked_cells = Some(true);
-    protection.format_cells = Some(false);
-    protection.format_columns = Some(false);
-    protection.format_rows = Some(false);
-    protection.insert_columns = Some(false);
-    protection.insert_rows = Some(false);
-    protection.insert_hyperlinks = Some(false);
-    protection.delete_columns = Some(false);
-    protection.delete_rows = Some(false);
-    protection.sort = Some(false);
-    protection.auto_filter = Some(false);
-    protection.pivot_tables = Some(false);
+    let protection = SheetProtection {
+        select_locked_cells: Some(true),
+        select_unlocked_cells: Some(true),
+        format_cells: Some(false),
+        format_columns: Some(false),
+        format_rows: Some(false),
+        insert_columns: Some(false),
+        insert_rows: Some(false),
+        insert_hyperlinks: Some(false),
+        delete_columns: Some(false),
+        delete_rows: Some(false),
+        sort: Some(false),
+        auto_filter: Some(false),
+        pivot_tables: Some(false),
+        ..Default::default()
+    };
 
     sheet.set_sheet_protection(Some(protection));
 

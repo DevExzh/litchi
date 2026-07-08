@@ -470,7 +470,7 @@ mod tests {
     #[test]
     fn test_formatted_data_variants() {
         let int_data = FormattedData::Int(42);
-        let float_data = FormattedData::Float(3.14);
+        let float_data = FormattedData::Float(std::f64::consts::PI);
         let datetime_data = FormattedData::DateTime(ExcelDateTime::new(
             44561.0,
             ExcelDateTimeType::DateTime,
@@ -483,7 +483,7 @@ mod tests {
         }
 
         match float_data {
-            FormattedData::Float(v) => assert_eq!(v, 3.14),
+            FormattedData::Float(v) => assert_eq!(v, std::f64::consts::PI),
             _ => panic!("Expected Float"),
         }
 

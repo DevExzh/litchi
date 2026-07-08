@@ -10,14 +10,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     pkg.opc_package_mut().with_font_embedding(true, true);
 
     // Add simple paragraph with Liberation Sans
-    let doc = pkg.document_mut()?;
-    let p = doc.add_paragraph();
-    let run = p.add_run();
-    run.set_text("Test with Liberation Sans font - ABCDEFGHIJKLMNOPQRSTUVWXYZ");
-    run.font_name("Liberation Sans");
-    run.font_size(24);
-
-    drop(doc);
+    {
+        let doc = pkg.document_mut()?;
+        let p = doc.add_paragraph();
+        let run = p.add_run();
+        run.set_text("Test with Liberation Sans font - ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        run.font_name("Liberation Sans");
+        run.font_size(24);
+    }
 
     // Save
     pkg.save("minimal_font_test.docx")?;

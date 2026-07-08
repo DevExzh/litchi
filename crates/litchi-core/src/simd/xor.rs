@@ -154,6 +154,7 @@ unsafe fn xor_32_bytes_inplace_neon(data: &mut [u8], key: &[u8; 16]) {
 
 // === Scalar fallback implementations ===
 
+#[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
 #[inline]
 fn xor_16_bytes_scalar(dst: &mut [u8], src: &[u8], key: &[u8; 16]) {
     for i in 0..16 {
@@ -161,6 +162,7 @@ fn xor_16_bytes_scalar(dst: &mut [u8], src: &[u8], key: &[u8; 16]) {
     }
 }
 
+#[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
 #[inline]
 fn xor_32_bytes_inplace_scalar(data: &mut [u8], key: &[u8; 16]) {
     for i in 0..16 {

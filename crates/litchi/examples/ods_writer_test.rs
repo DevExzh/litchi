@@ -27,14 +27,16 @@ fn main() -> Result<()> {
 
     // Set document metadata
     println!("✅ Setting metadata...");
-    let mut metadata = Metadata::default();
-    metadata.title = Some("Comprehensive ODS Writer Test Spreadsheet".to_string());
-    metadata.author = Some("Litchi Library Test Suite".to_string());
-    metadata.description = Some(
-        "This spreadsheet demonstrates all writing capabilities of the litchi ODS writer module."
-            .to_string(),
-    );
-    metadata.subject = Some("ODS Writer Test".to_string());
+    let metadata = Metadata {
+        title: Some("Comprehensive ODS Writer Test Spreadsheet".to_string()),
+        author: Some("Litchi Library Test Suite".to_string()),
+        description: Some(
+            "This spreadsheet demonstrates all writing capabilities of the litchi ODS writer module."
+                .to_string(),
+        ),
+        subject: Some("ODS Writer Test".to_string()),
+        ..Default::default()
+    };
     builder.set_metadata(metadata);
 
     // Sheet 1: Data Types Demo
@@ -60,7 +62,7 @@ fn main() -> Result<()> {
 
     builder.add_row_with_cell_values(&[
         CellValue::Text("Float".to_string()),
-        CellValue::Number(3.14159),
+        CellValue::Number(std::f64::consts::PI),
         CellValue::Text("Decimal number".to_string()),
     ])?;
 
@@ -189,8 +191,8 @@ fn main() -> Result<()> {
         ("Fiona Green", vec![85.0, 88.0, 86.0, 87.0]),
     ];
 
-    let mut row_idx = 1; // Start after header
-    for (name, scores) in students {
+    for (offset, (name, scores)) in students.into_iter().enumerate() {
+        let row_idx = offset + 1; // Start at row 1 after header row
         let mut row_values = vec![CellValue::Text(name.to_string())];
         for score in scores {
             row_values.push(CellValue::Number(score));
@@ -204,7 +206,6 @@ fn main() -> Result<()> {
             5,
             &format!("of:=AVERAGE(B{}:E{})", row_idx + 1, row_idx + 1),
         )?;
-        row_idx += 1;
     }
 
     // Sheet 4: Unicode and Special Characters

@@ -679,7 +679,7 @@ mod tests {
     fn test_ptg_enum_variants() {
         // Test that all Ptg variants can be created
         let _ = Ptg::PtgInt(42);
-        let _ = Ptg::PtgNum(3.14);
+        let _ = Ptg::PtgNum(std::f64::consts::PI);
         let _ = Ptg::PtgStr("test".to_string());
         let _ = Ptg::PtgRef(0, 0, true, true);
         let _ = Ptg::PtgArea(0, 0, 1, 1);
@@ -731,7 +731,11 @@ mod tests {
 
     #[test]
     fn test_encode_ptg_tokens() {
-        let tokens = vec![Ptg::PtgInt(42), Ptg::PtgAdd, Ptg::PtgNum(3.14)];
+        let tokens = vec![
+            Ptg::PtgInt(42),
+            Ptg::PtgAdd,
+            Ptg::PtgNum(std::f64::consts::PI),
+        ];
         let bytes = encode_ptg_tokens(&tokens);
         assert!(!bytes.is_empty());
         assert_eq!(bytes[0], 0x1E); // PtgInt opcode
@@ -797,7 +801,7 @@ mod tests {
         ];
 
         for (ptg, expected_opcode) in operators {
-            let bytes = encode_ptg_tokens(&[ptg.clone()]);
+            let bytes = encode_ptg_tokens(std::slice::from_ref(&ptg));
             assert_eq!(bytes[0], expected_opcode, "Opcode mismatch for {:?}", ptg);
         }
     }

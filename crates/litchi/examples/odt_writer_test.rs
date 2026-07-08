@@ -27,14 +27,16 @@ fn main() -> Result<()> {
 
     // Set document metadata
     println!("✅ Setting metadata...");
-    let mut metadata = Metadata::default();
-    metadata.title = Some("Comprehensive ODT Writer Test Document".to_string());
-    metadata.author = Some("Litchi Library Test Suite".to_string());
-    metadata.description = Some(
-        "This document demonstrates all writing capabilities of the litchi ODT writer module."
-            .to_string(),
-    );
-    metadata.subject = Some("ODT Writer Test".to_string());
+    let metadata = Metadata {
+        title: Some("Comprehensive ODT Writer Test Document".to_string()),
+        author: Some("Litchi Library Test Suite".to_string()),
+        description: Some(
+            "This document demonstrates all writing capabilities of the litchi ODT writer module."
+                .to_string(),
+        ),
+        subject: Some("ODT Writer Test".to_string()),
+        ..Metadata::default()
+    };
     builder.set_metadata(metadata);
 
     // Add main title heading

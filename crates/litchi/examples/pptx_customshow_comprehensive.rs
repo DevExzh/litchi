@@ -142,7 +142,7 @@ fn test_training_presentation() -> Result<(), Box<dyn std::error::Error>> {
             "Feedback & Next Steps",
         ];
 
-        for (_i, title) in training_topics.iter().enumerate() {
+        for title in training_topics.iter() {
             let slide = pres.add_slide()?;
             slide.set_title(title);
             slide.add_text_box(
@@ -210,7 +210,7 @@ fn test_product_demo() -> Result<(), Box<dyn std::error::Error>> {
             "Next Steps",
         ];
 
-        for (_i, title) in demo_slides.iter().enumerate() {
+        for title in demo_slides.iter() {
             let slide = pres.add_slide()?;
             slide.set_title(title);
             slide.add_text_box(
@@ -287,7 +287,7 @@ fn test_conference_presentation() -> Result<(), Box<dyn std::error::Error>> {
             "Thank You & Contact Info",
         ];
 
-        for (_i, title) in conference_content.iter().enumerate() {
+        for title in conference_content.iter() {
             let slide = pres.add_slide()?;
             slide.set_title(title);
             slide.add_text_box(

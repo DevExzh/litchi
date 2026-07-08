@@ -495,30 +495,30 @@ impl BoundsCalculator {
                 // Pack into SIMD vectors
                 let x_vals = vcombine_s16(
                     vcreate_s16(
-                        (x0 as u64)
-                            | ((x1 as u64) << 16)
-                            | ((x2 as u64) << 32)
-                            | ((x3 as u64) << 48),
+                        (x0 as u16 as u64)
+                            | ((x1 as u16 as u64) << 16)
+                            | ((x2 as u16 as u64) << 32)
+                            | ((x3 as u16 as u64) << 48),
                     ),
                     vcreate_s16(
-                        (x4 as u64)
-                            | ((x5 as u64) << 16)
-                            | ((x6 as u64) << 32)
-                            | ((x7 as u64) << 48),
+                        (x4 as u16 as u64)
+                            | ((x5 as u16 as u64) << 16)
+                            | ((x6 as u16 as u64) << 32)
+                            | ((x7 as u16 as u64) << 48),
                     ),
                 );
                 let y_vals = vcombine_s16(
                     vcreate_s16(
-                        (y0 as u64)
-                            | ((y1 as u64) << 16)
-                            | ((y2 as u64) << 32)
-                            | ((y3 as u64) << 48),
+                        (y0 as u16 as u64)
+                            | ((y1 as u16 as u64) << 16)
+                            | ((y2 as u16 as u64) << 32)
+                            | ((y3 as u16 as u64) << 48),
                     ),
                     vcreate_s16(
-                        (y4 as u64)
-                            | ((y5 as u64) << 16)
-                            | ((y6 as u64) << 32)
-                            | ((y7 as u64) << 48),
+                        (y4 as u16 as u64)
+                            | ((y5 as u16 as u64) << 16)
+                            | ((y6 as u16 as u64) << 32)
+                            | ((y7 as u16 as u64) << 48),
                     ),
                 );
 

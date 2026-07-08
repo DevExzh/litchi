@@ -567,7 +567,8 @@ mod tests {
 
     #[test]
     fn test_parse_float() {
-        assert!((parse_float(b"3.14").unwrap() - 3.14).abs() < 0.0001);
+        let expected = (std::f64::consts::PI * 100.0).trunc() / 100.0;
+        assert!((parse_float(b"3.14").unwrap() - expected).abs() < 0.0001);
         assert!((parse_float(b"-2.5").unwrap() + 2.5).abs() < 0.0001);
         assert!((parse_float(b"1e10").unwrap() - 1e10).abs() < 1.0);
     }
@@ -699,7 +700,8 @@ mod tests {
         );
         assert_eq!(ParsedValue::Boolean(true), ParsedValue::Boolean(true));
         assert_eq!(ParsedValue::Integer(42), ParsedValue::Integer(42));
-        assert_eq!(ParsedValue::Float(3.14), ParsedValue::Float(3.14));
+        let pi = std::f64::consts::PI;
+        assert_eq!(ParsedValue::Float(pi), ParsedValue::Float(pi));
         assert_eq!(
             ParsedValue::Length(10.0, "pt".to_string()),
             ParsedValue::Length(10.0, "pt".to_string())

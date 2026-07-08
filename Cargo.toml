@@ -86,6 +86,11 @@ zerocopy-derive = "0.8"
 lto = true
 panic = "abort"
 
+[profile.release.package.litchi-py]
+opt-level = 3
+strip = true
+codegen-units = 1
+
 [profile.profiling]
 inherits = "release"
 debug = true

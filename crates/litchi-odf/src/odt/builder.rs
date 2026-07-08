@@ -620,12 +620,14 @@ mod tests {
     #[test]
     fn test_set_metadata() {
         let mut builder = DocumentBuilder::new();
-        let mut metadata = Metadata::default();
-        metadata.title = Some("Test Title".to_string());
-        metadata.author = Some("Test Author".to_string());
-        metadata.subject = Some("Test Subject".to_string());
-        metadata.description = Some("Test Description".to_string());
-        metadata.keywords = Some("test, keywords".to_string());
+        let metadata = Metadata {
+            title: Some("Test Title".to_string()),
+            author: Some("Test Author".to_string()),
+            subject: Some("Test Subject".to_string()),
+            description: Some("Test Description".to_string()),
+            keywords: Some("test, keywords".to_string()),
+            ..Metadata::default()
+        };
         builder.set_metadata(metadata);
 
         assert_eq!(builder.metadata.title, Some("Test Title".to_string()));
@@ -754,9 +756,11 @@ mod tests {
         let mut builder = DocumentBuilder::new();
 
         // Set metadata
-        let mut metadata = Metadata::default();
-        metadata.title = Some("Complete Document".to_string());
-        metadata.author = Some("Test Author".to_string());
+        let metadata = Metadata {
+            title: Some("Complete Document".to_string()),
+            author: Some("Test Author".to_string()),
+            ..Metadata::default()
+        };
         builder.set_metadata(metadata);
 
         // Add various elements

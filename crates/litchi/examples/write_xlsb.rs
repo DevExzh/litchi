@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // B6: "Formula" => row=5, col=1
     sheet1.set_cell(5, 1, "Formula");
     // B7: SQRT(B5*2) -> write cached numeric result as constant for now
-    sheet1.set_cell(6, 1, 1.4142135623730951_f64);
+    sheet1.set_cell(6, 1, std::f64::consts::SQRT_2);
     wb.add_worksheet(sheet1);
 
     // Sheet2 and Sheet3 empty

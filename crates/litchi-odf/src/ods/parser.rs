@@ -497,7 +497,10 @@ mod tests {
 
         // Float/Number cell
         match &row.cells[1].value {
-            CellValue::Number(n) => assert!((n - 3.14).abs() < f64::EPSILON),
+            CellValue::Number(n) => {
+                let expected = (std::f64::consts::PI * 100.0).trunc() / 100.0;
+                assert!((n - expected).abs() < f64::EPSILON);
+            },
             _ => panic!("Expected Number"),
         }
 

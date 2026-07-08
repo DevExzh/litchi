@@ -51,9 +51,11 @@ pub(crate) mod test_helpers {
     use std::collections::HashMap;
     use std::sync::{Arc, RwLock};
 
+    type TestCellMap = HashMap<(String, u32, u32), CellValue>;
+
     /// A simple test engine for creating EvalCtx in tests.
     pub(crate) struct TestEngine {
-        cells: Arc<RwLock<HashMap<(String, u32, u32), CellValue>>>,
+        cells: Arc<RwLock<TestCellMap>>,
         current_pos: Arc<RwLock<Option<(String, u32, u32)>>>,
         sheet_count: usize,
     }

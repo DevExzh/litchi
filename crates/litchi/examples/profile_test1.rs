@@ -21,9 +21,11 @@ fn main() -> Result<(), litchi::Error> {
     println!("Document loaded. Starting formula conversion...");
 
     // Configure Markdown options with formula conversion
-    let mut options = MarkdownOptions::default();
-    options.formula_style = litchi::markdown::FormulaStyle::Dollar;
-    options.include_styles = true;
+    let options = MarkdownOptions {
+        formula_style: litchi::markdown::FormulaStyle::Dollar,
+        include_styles: true,
+        ..MarkdownOptions::default()
+    };
 
     // This is the hot path we want to profile
     let _markdown = doc.to_markdown_with_options(&options)?;

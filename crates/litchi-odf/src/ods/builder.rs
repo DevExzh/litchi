@@ -805,7 +805,9 @@ mod tests {
     fn test_add_row_with_numbers() {
         let mut builder = SpreadsheetBuilder::new();
         builder.add_sheet("Sheet1").unwrap();
-        builder.add_row_with_numbers(&[1.0, 2.5, 3.14]).unwrap();
+        builder
+            .add_row_with_numbers(&[1.0, 2.5, std::f64::consts::PI])
+            .unwrap();
 
         assert_eq!(builder.sheets[0].rows[0].cells.len(), 3);
         match &builder.sheets[0].rows[0].cells[0].value {

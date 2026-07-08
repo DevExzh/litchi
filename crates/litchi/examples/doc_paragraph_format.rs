@@ -16,10 +16,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut doc = DocWriter::new();
 
     // Left aligned with indents
-    let mut p1 = ParagraphFormatting::default();
-    p1.alignment = Some(0); // left
-    p1.left_indent = Some(720); // 0.5 inch
-    p1.first_line_indent = Some(360); // 0.25 inch
+    let p1 = ParagraphFormatting {
+        alignment: Some(0),           // left
+        left_indent: Some(720),       // 0.5 inch
+        first_line_indent: Some(360), // 0.25 inch
+        ..Default::default()
+    };
     doc.add_paragraph_with_format(
         "Left aligned with indents",
         CharacterFormatting::default(),
@@ -27,16 +29,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // Centered with spacing before/after
-    let mut p2 = ParagraphFormatting::default();
-    p2.alignment = Some(1); // center
-    p2.space_before = Some(240); // 12pt
-    p2.space_after = Some(240); // 12pt
+    let p2 = ParagraphFormatting {
+        alignment: Some(1),      // center
+        space_before: Some(240), // 12pt
+        space_after: Some(240),  // 12pt
+        ..Default::default()
+    };
     doc.add_paragraph_with_format("Centered with spacing", CharacterFormatting::default(), p2)?;
 
     // Justified with right indent
-    let mut p3 = ParagraphFormatting::default();
-    p3.alignment = Some(3); // justify
-    p3.right_indent = Some(720); // 0.5 inch
+    let p3 = ParagraphFormatting {
+        alignment: Some(3),      // justify
+        right_indent: Some(720), // 0.5 inch
+        ..Default::default()
+    };
     doc.add_paragraph_with_format(
         "Justified with right indent",
         CharacterFormatting::default(),

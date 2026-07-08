@@ -16,4 +16,4 @@ image        = { workspace = true }
 litchi-core  = { workspace = true }
 ryu          = { workspace = true }
 xml-minifier = { workspace = true }
-zerocopy     = { workspace = true }
+zerocopy     = { workspace = true, features = ["derive"] }

@@ -332,13 +332,13 @@ mod tests {
             row: 0,
             col: 0,
             xf_index: 0,
-            value: FormulaValue::Number(3.14),
+            value: FormulaValue::Number(std::f64::consts::PI),
             formula: vec![0x01, 0x02, 0x03],
         };
         let cell = XlsCell::from_record(&record, None).unwrap();
         assert!(cell.is_formula());
         if let CellValue::Float(v) = cell.value() {
-            assert!((v - 3.14).abs() < 0.001);
+            assert!((v - std::f64::consts::PI).abs() < 0.001);
         } else {
             panic!("Expected Float value");
         }

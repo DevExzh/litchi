@@ -691,10 +691,11 @@ mod tests {
     async fn test_eval_round_positive() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
-        let args = vec![num_expr(3.14159), num_expr(2.0)];
+        let args = vec![num_expr(std::f64::consts::PI), num_expr(2.0)];
         let result = eval_round(ctx, "Sheet1", &args).await.unwrap();
+        let expected = (std::f64::consts::PI * 100.0).round() / 100.0;
         match result {
-            CellValue::Float(v) => assert!((v - 3.14).abs() < 1e-9),
+            CellValue::Float(v) => assert!((v - expected).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
@@ -715,7 +716,7 @@ mod tests {
     async fn test_eval_round_wrong_args() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
-        let args = vec![num_expr(3.14)];
+        let args = vec![num_expr(std::f64::consts::PI)];
         let result = eval_round(ctx, "Sheet1", &args).await.unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 2 arguments")),
@@ -1036,10 +1037,11 @@ mod tests {
     async fn test_eval_trunc_with_digits() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
-        let args = vec![num_expr(3.14159), num_expr(2.0)];
+        let args = vec![num_expr(std::f64::consts::PI), num_expr(2.0)];
         let result = eval_trunc(ctx, "Sheet1", &args).await.unwrap();
+        let expected = (std::f64::consts::PI * 100.0).trunc() / 100.0;
         match result {
-            CellValue::Float(v) => assert!((v - 3.14).abs() < 1e-9),
+            CellValue::Float(v) => assert!((v - expected).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }

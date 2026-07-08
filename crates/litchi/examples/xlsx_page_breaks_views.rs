@@ -47,11 +47,13 @@ fn build_page_layout_sheet(sheet: &mut litchi::ooxml::xlsx::MutableWorksheet) {
     sheet.add_column_break(3, 0, 60);
 
     // Set a page-layout sheet view with gridlines hidden.
-    let mut view = SheetView::default();
-    view.view_type = Some(SheetViewType::PageLayout);
-    view.show_grid_lines = Some(false);
-    view.zoom_scale = Some(120);
-    view.top_left_cell = Some("A10".to_string());
+    let view = SheetView {
+        view_type: Some(SheetViewType::PageLayout),
+        show_grid_lines: Some(false),
+        zoom_scale: Some(120),
+        top_left_cell: Some("A10".to_string()),
+        ..Default::default()
+    };
     sheet.set_sheet_view(view);
 }
 

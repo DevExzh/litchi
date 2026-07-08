@@ -198,11 +198,4 @@ impl<'a> ShapeTextExtractor<'a> {
 }
 
 #[cfg(test)]
-mod tests {
-    #[test]
-    fn test_shape_text_extractor_creation() {
-        // Test requires actual bundle and index
-        // Placeholder test for ensuring module compiles
-        assert!(true);
-    }
-}
+mod tests {}

@@ -32,11 +32,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     writer.set_even_footer("Demo Document - Page [#]");
 
     // ===== TITLE PAGE =====
-    let mut title_char = CharacterFormatting::default();
-    title_char.bold = Some(true);
-    title_char.font_size = Some(28);
-    let mut title_para = ParagraphFormatting::default();
-    title_para.alignment = Some(1);
+    let title_char = CharacterFormatting {
+        bold: Some(true),
+        font_size: Some(28),
+        ..Default::default()
+    };
+    let title_para = ParagraphFormatting {
+        alignment: Some(1),
+        ..Default::default()
+    };
     writer.add_paragraph_with_format(
         "Comprehensive DOC Features Demonstration",
         title_char,
@@ -134,10 +138,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     // ===== SECTION 5: RICH TEXT =====
     writer.add_paragraph("Section 5: Rich Text Formatting")?;
     writer.add_paragraph("")?;
-    let mut bold_fmt = CharacterFormatting::default();
-    bold_fmt.bold = Some(true);
-    let mut italic_fmt = CharacterFormatting::default();
-    italic_fmt.italic = Some(true);
+    let bold_fmt = CharacterFormatting {
+        bold: Some(true),
+        ..Default::default()
+    };
+    let italic_fmt = CharacterFormatting {
+        italic: Some(true),
+        ..Default::default()
+    };
     writer.add_paragraph_runs(
         vec![
             (

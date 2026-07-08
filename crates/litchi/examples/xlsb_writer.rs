@@ -72,7 +72,7 @@ fn create_basic_sheet(workbook: &mut XlsbWorkbookWriter) -> Result<(), Box<dyn s
     sheet.set_cell(1, 1, CellValue::Int(42));
 
     sheet.set_cell(2, 0, CellValue::String("Float".to_string()));
-    sheet.set_cell(2, 1, CellValue::Float(3.14159));
+    sheet.set_cell(2, 1, CellValue::Float(std::f64::consts::PI));
 
     sheet.set_cell(3, 0, CellValue::String("String".to_string()));
     sheet.set_cell(3, 1, CellValue::String("Hello, World!".to_string()));

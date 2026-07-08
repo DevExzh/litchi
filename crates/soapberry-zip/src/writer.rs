@@ -94,8 +94,8 @@ impl ZipArchiveWriterBuilder {
     ///     .build(&mut output);
     ///
     /// // Add files normally
-    /// let mut file = archive.new_file("data.txt").create().unwrap();
-    /// let mut writer = soapberry_zip::ZipDataWriter::new(&mut file);
+    /// let (mut file, config) = archive.new_file("data.txt").start().unwrap();
+    /// let mut writer = config.wrap(&mut file);
     /// writer.write_all(b"File content").unwrap();
     /// let (_, desc) = writer.finish().unwrap();
     /// file.finish(desc).unwrap();
@@ -188,13 +188,13 @@ impl<W> ZipArchiveWriter<W> {
     ///
     /// // 1. Get local header offset
     /// let local_header_offset = archive.stream_offset();
-    /// let mut file = archive.new_file("test.txt").create().unwrap();
+    /// let (mut file, config) = archive.new_file("test.txt").start().unwrap();
     ///
     /// // 2. Get start of data offset
     /// let data_start_offset = file.stream_offset();
     ///
     /// // Write some data
-    /// let mut writer = soapberry_zip::ZipDataWriter::new(&mut file);
+    /// let mut writer = config.wrap(&mut file);
     /// writer.write_all(b"Hello World").unwrap();
     /// let (_, desc) = writer.finish().unwrap();
     ///
@@ -325,29 +325,32 @@ where
     /// let my_custom_field = ExtraFieldId::new(0x6666);
     ///
     /// // File with extra fields only in the local file header
-    /// let mut local_file = archive.new_file("video.mp4")
+    /// let (mut local_file, local_config) = archive
+    ///     .new_file("video.mp4")
     ///     .extra_field(my_custom_field, b"field1", Header::LOCAL)?
-    ///     .create()?;
-    /// let mut writer = ZipDataWriter::new(&mut local_file);
+    ///     .start()?;
+    /// let mut writer = local_config.wrap(&mut local_file);
     /// writer.write_all(b"video data")?;
     /// let (_, desc) = writer.finish()?;
     /// local_file.finish(desc)?;
     ///
     /// // File with extra fields only in the central directory
-    /// let mut central_file = archive.new_file("document.pdf")
+    /// let (mut central_file, central_config) = archive
+    ///     .new_file("document.pdf")
     ///     .extra_field(my_custom_field, b"field2", Header::CENTRAL)?
-    ///     .create()?;
-    /// let mut writer = ZipDataWriter::new(&mut central_file);
+    ///     .start()?;
+    /// let mut writer = central_config.wrap(&mut central_file);
     /// writer.write_all(b"PDF content")?;
     /// let (_, desc) = writer.finish()?;
     /// central_file.finish(desc)?;
     ///
     /// // File with extra fields in both headers for maximum compatibility
     /// assert_eq!(Header::default(), Header::LOCAL | Header::CENTRAL);
-    /// let mut both_file = archive.new_file("important.dat")
+    /// let (mut both_file, both_config) = archive
+    ///     .new_file("important.dat")
     ///     .extra_field(my_custom_field, b"field3", Header::default())?
-    ///     .create()?;
-    /// let mut writer = ZipDataWriter::new(&mut both_file);
+    ///     .start()?;
+    /// let mut writer = both_config.wrap(&mut both_file);
     /// writer.write_all(b"important data")?;
     /// let (_, desc) = writer.finish()?;
     /// both_file.finish(desc)?;

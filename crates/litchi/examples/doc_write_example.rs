@@ -1,10 +1,10 @@
-///! Example demonstrating DOC file writing with the Litchi library
-///!
-///! NOTE: This example demonstrates the API but will not work until
-///! the DOC writer implementation is complete. See OLE_WRITE_SUPPORT_STATUS.md
-///! for implementation status.
-///!
-///! Run with: cargo run --example doc_write_example
+//! Example demonstrating DOC file writing with the Litchi library
+//!
+//! NOTE: This example demonstrates the API but will not work until
+//! the DOC writer implementation is complete. See OLE_WRITE_SUPPORT_STATUS.md
+//! for implementation status.
+//!
+//! Run with: cargo run --example doc_write_example
 use litchi::ole::doc::{CharacterFormatting, DocWriter, ParagraphFormatting};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,12 +19,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     writer.set_property("Subject", "Demonstrating DOC writing");
 
     // Add a title paragraph with formatting
-    let mut title_char = CharacterFormatting::default();
-    title_char.bold = Some(true);
-    title_char.font_size = Some(28); // 14pt (font size in half-points)
-
-    let mut title_para = ParagraphFormatting::default();
-    title_para.alignment = Some(1); // Center
+    let title_char = CharacterFormatting {
+        bold: Some(true),
+        font_size: Some(28), // 14pt (font size in half-points)
+        ..Default::default()
+    };
+    let title_para = ParagraphFormatting {
+        alignment: Some(1), // Center
+        ..Default::default()
+    };
 
     writer.add_paragraph_with_format("Project Report", title_char, title_para)?;
 
@@ -34,9 +37,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // Add a section header
-    let mut header_char = CharacterFormatting::default();
-    header_char.bold = Some(true);
-    header_char.font_size = Some(24); // 12pt
+    let header_char = CharacterFormatting {
+        bold: Some(true),
+        font_size: Some(24), // 12pt
+        ..Default::default()
+    };
 
     writer.add_paragraph_with_format(
         "Introduction",
@@ -70,8 +75,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     writer.set_table_cell_text(table_idx, 2, 1, "In Progress")?;
 
     // Add conclusion
-    let mut conclusion_char = CharacterFormatting::default();
-    conclusion_char.italic = Some(true);
+    let conclusion_char = CharacterFormatting {
+        italic: Some(true),
+        ..Default::default()
+    };
 
     writer.add_paragraph_with_format(
         "For more information, visit the project documentation.",

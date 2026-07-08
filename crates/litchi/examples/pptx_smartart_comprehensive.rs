@@ -58,7 +58,7 @@ fn test_list_diagrams(
     pres: &mut litchi::ooxml::pptx::writer::pres::MutablePresentation,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let slide = pres.add_slide()?;
-    slide.set_title(&"SmartArt Diagram Types".to_string());
+    slide.set_title("SmartArt Diagram Types");
     println!("Test 1: List Diagrams");
     println!("---------------------");
 
@@ -127,7 +127,7 @@ fn test_process_diagrams(
     pres: &mut litchi::ooxml::pptx::writer::pres::MutablePresentation,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let slide = pres.add_slide()?;
-    slide.set_title(&"SmartArt Diagram Types".to_string());
+    slide.set_title("SmartArt Diagram Types");
     println!("Test 2: Process Diagrams");
     println!("------------------------");
 
@@ -196,7 +196,7 @@ fn test_cycle_diagrams(
     pres: &mut litchi::ooxml::pptx::writer::pres::MutablePresentation,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let slide = pres.add_slide()?;
-    slide.set_title(&"SmartArt Diagram Types".to_string());
+    slide.set_title("SmartArt Diagram Types");
     println!("Test 3: Cycle Diagrams");
     println!("----------------------");
 
@@ -265,7 +265,7 @@ fn test_hierarchy_diagrams(
     pres: &mut litchi::ooxml::pptx::writer::pres::MutablePresentation,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let slide = pres.add_slide()?;
-    slide.set_title(&"SmartArt Diagram Types".to_string());
+    slide.set_title("SmartArt Diagram Types");
     println!("Test 4: Hierarchy Diagrams");
     println!("--------------------------");
 
@@ -345,7 +345,7 @@ fn test_relationship_diagrams(
     pres: &mut litchi::ooxml::pptx::writer::pres::MutablePresentation,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let slide = pres.add_slide()?;
-    slide.set_title(&"SmartArt Diagram Types".to_string());
+    slide.set_title("SmartArt Diagram Types");
     println!("Test 5: Relationship Diagrams");
     println!("-----------------------------");
 
@@ -403,7 +403,7 @@ fn test_matrix_diagrams(
     pres: &mut litchi::ooxml::pptx::writer::pres::MutablePresentation,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let slide = pres.add_slide()?;
-    slide.set_title(&"SmartArt Diagram Types".to_string());
+    slide.set_title("SmartArt Diagram Types");
     println!("Test 6: Matrix Diagrams");
     println!("-----------------------");
 
@@ -452,7 +452,7 @@ fn test_pyramid_diagrams(
     pres: &mut litchi::ooxml::pptx::writer::pres::MutablePresentation,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let slide = pres.add_slide()?;
-    slide.set_title(&"SmartArt Diagram Types".to_string());
+    slide.set_title("SmartArt Diagram Types");
     println!("Test 7: Pyramid Diagrams");
     println!("------------------------");
 
@@ -515,7 +515,7 @@ fn test_complex_hierarchies(
     pres: &mut litchi::ooxml::pptx::writer::pres::MutablePresentation,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let slide = pres.add_slide()?;
-    slide.set_title(&"SmartArt Diagram Types".to_string());
+    slide.set_title("SmartArt Diagram Types");
     println!("Test 8: Complex Hierarchies");
     println!("---------------------------");
 

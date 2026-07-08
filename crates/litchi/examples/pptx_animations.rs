@@ -64,9 +64,13 @@ fn main() {
     ];
 
     for effect in effects {
-        let preset = effect.to_preset();
-        let parsed = AnimationEffect::from_preset(preset);
-        println!("  {:?} -> '{}' -> {:?}", effect, preset, parsed);
+        let preset_class = effect.preset_class();
+        let preset_id = effect.preset_id();
+        let parsed = AnimationEffect::from_preset_id(preset_id);
+        println!(
+            "  {:?} -> {} + {} -> {:?}",
+            effect, preset_class, preset_id, parsed
+        );
     }
 
     // Test triggers

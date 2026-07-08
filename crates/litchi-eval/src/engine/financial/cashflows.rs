@@ -1614,13 +1614,6 @@ mod tests {
         }
     }
 
-    // IRR test using range helper
-    fn make_range_expr(values: Vec<f64>) -> Expr {
-        // Create a range reference - for testing we'll use a literal array-like approach
-        // IRR flattens the first arg, so we can use a single Literal for simple cases
-        Expr::Literal(CellValue::Float(values[0]))
-    }
-
     #[tokio::test]
     async fn test_eval_irr_wrong_args() {
         let engine = crate::engine::test_helpers::TestEngine::new();

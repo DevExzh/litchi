@@ -11,10 +11,11 @@ fn main() -> Result<()> {
     let mut builder = SpreadsheetBuilder::new();
 
     // Set metadata
-    let mut metadata = Metadata::default();
-    metadata.title = Some("ODS Features Demo".to_string());
-    metadata.author = Some("Litchi Library".to_string());
-    builder.set_metadata(metadata);
+    builder.set_metadata(Metadata {
+        title: Some("ODS Features Demo".to_string()),
+        author: Some("Litchi Library".to_string()),
+        ..Default::default()
+    });
 
     // ===== Sheet 1: Overview =====
     builder.add_sheet("Overview")?;

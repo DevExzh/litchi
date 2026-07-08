@@ -18,11 +18,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut writer = DocWriter::new();
 
     // Add document title
-    let mut title_char = CharacterFormatting::default();
-    title_char.bold = Some(true);
-    title_char.font_size = Some(28);
-    let mut title_para = ParagraphFormatting::default();
-    title_para.alignment = Some(1);
+    let title_char = CharacterFormatting {
+        bold: Some(true),
+        font_size: Some(28),
+        ..Default::default()
+    };
+    let title_para = ParagraphFormatting {
+        alignment: Some(1),
+        ..Default::default()
+    };
     writer.add_paragraph_with_format("Image Examples", title_char, title_para)?;
     writer.add_paragraph("")?;
 

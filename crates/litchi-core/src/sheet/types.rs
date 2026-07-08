@@ -160,8 +160,8 @@ mod tests {
         let int = CellValue::Int(42);
         assert!(matches!(int, CellValue::Int(42)));
 
-        let float = CellValue::Float(3.14);
-        assert!(matches!(float, CellValue::Float(3.14)));
+        let float = CellValue::Float(std::f64::consts::PI);
+        assert!(matches!(float, CellValue::Float(_)));
 
         let string = CellValue::String("test".to_string());
         assert!(matches!(string, CellValue::String(_)));
@@ -198,8 +198,8 @@ mod tests {
 
     #[test]
     fn test_as_float() {
-        let float_val = CellValue::Float(3.14);
-        assert!((float_val.as_float().unwrap() - 3.14).abs() < 0.001);
+        let float_val = CellValue::Float(std::f64::consts::PI);
+        assert!((float_val.as_float().unwrap() - std::f64::consts::PI).abs() < 0.001);
 
         let int_val = CellValue::Int(42);
         assert_eq!(int_val.as_float(), None);
@@ -231,7 +231,8 @@ mod tests {
         let float_val = CellValue::infer_from_str("3.14");
         assert!(matches!(float_val, CellValue::Float(_)));
         if let CellValue::Float(f) = float_val {
-            assert!((f - 3.14).abs() < 0.001);
+            let expected = "3.14".parse::<f64>().unwrap();
+            assert!((f - expected).abs() < 0.001);
         }
 
         let float_val = CellValue::infer_from_str("-0.5");
@@ -301,10 +302,10 @@ mod tests {
         assert!(matches!(CellValue::from(42i64), CellValue::Int(42)));
         assert!(matches!(CellValue::from(42u32), CellValue::Int(42)));
 
-        let float_val: CellValue = 3.14f32.into();
+        let float_val: CellValue = std::f32::consts::PI.into();
         assert!(matches!(float_val, CellValue::Float(_)));
 
-        let float_val: CellValue = 3.14f64.into();
+        let float_val: CellValue = std::f64::consts::PI.into();
         assert!(matches!(float_val, CellValue::Float(_)));
 
         assert!(matches!(

@@ -125,7 +125,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
         ws.set_cell_value(1, 3, "Score");
         for i in 2..=11 {
-            ws.set_cell_value(i, 3, ((i as i64 - 2) * 5));
+            ws.set_cell_value(i, 3, (i as i64 - 2) * 5);
         }
 
         // Add conditional formatting - CellIs
@@ -235,13 +235,14 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         ws.set_page_setup_with_options("landscape", 9, Some(100), None, None);
 
         // Set headers and footers
-        let mut hf = HeaderFooter::default();
-        hf.header_left = Some("Company Name".to_string());
-        hf.header_center = Some("Confidential Document".to_string());
-        hf.header_right = Some("&D".to_string()); // Current date
-        hf.footer_left = Some("Department".to_string());
-        hf.footer_center = Some("Page &P of &N".to_string()); // Page numbers
-        hf.footer_right = Some("&T".to_string()); // Current time
+        let hf = HeaderFooter {
+            header_left: Some("Company Name".to_string()),
+            header_center: Some("Confidential Document".to_string()),
+            header_right: Some("&D".to_string()), // Current date
+            footer_left: Some("Department".to_string()),
+            footer_center: Some("Page &P of &N".to_string()), // Page numbers
+            footer_right: Some("&T".to_string()),             // Current time
+        };
 
         ws.set_header_footer(hf);
 

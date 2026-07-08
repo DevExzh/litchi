@@ -2828,7 +2828,7 @@ mod tests {
         let args = vec![num_expr(0.5), num_expr(1.0), num_expr(0.5)];
         let result = eval_lognorm_inv(ctx, "Sheet1", &args).await.unwrap();
         match result {
-            CellValue::Float(v) => assert!((v - 2.7183).abs() < 0.01),
+            CellValue::Float(v) => assert!((v - std::f64::consts::E).abs() < 0.01),
             _ => panic!("Expected Float"),
         }
     }

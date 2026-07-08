@@ -30,14 +30,16 @@ fn main() -> Result<()> {
 
     // Set document metadata
     println!("✅ Setting metadata...");
-    let mut metadata = Metadata::default();
-    metadata.title = Some("Comprehensive ODP Writer Test Presentation".to_string());
-    metadata.author = Some("Litchi Library Test Suite".to_string());
-    metadata.subject = Some("ODP Writer Test".to_string());
-    metadata.description = Some(
-        "This presentation demonstrates all writing capabilities of the litchi ODP writer module."
-            .to_string(),
-    );
+    let metadata = Metadata {
+        title: Some("Comprehensive ODP Writer Test Presentation".to_string()),
+        author: Some("Litchi Library Test Suite".to_string()),
+        subject: Some("ODP Writer Test".to_string()),
+        description: Some(
+            "This presentation demonstrates all writing capabilities of the litchi ODP writer module."
+                .to_string(),
+        ),
+        ..Default::default()
+    };
     builder.set_metadata(metadata);
 
     // Slide 1: Title Slide

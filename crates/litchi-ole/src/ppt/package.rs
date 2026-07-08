@@ -184,6 +184,21 @@ impl<R: Read + Seek> Package<R> {
     }
 }
 
+// `From<PptError> for litchi_core::Error` lives here (not in the umbrella) so
+// the orphan rule is satisfied — both source and target crates are external
+// to the umbrella.
+impl From<PptError> for litchi_core::Error {
+    fn from(err: PptError) -> Self {
+        match err {
+            PptError::Io(e) => litchi_core::Error::Io(e),
+            PptError::Ole(ole_err) => litchi_core::Error::from(ole_err),
+            PptError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
+            PptError::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),
+            PptError::Corrupted(s) => litchi_core::Error::CorruptedFile(s),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -213,20 +228,5 @@ mod tests {
         let result = Package::open("test_invalid.tmp");
         assert!(result.is_err());
         std::fs::remove_file("test_invalid.tmp").ok();
-    }
-}
-
-// `From<PptError> for litchi_core::Error` lives here (not in the umbrella) so
-// the orphan rule is satisfied — both source and target crates are external
-// to the umbrella.
-impl From<PptError> for litchi_core::Error {
-    fn from(err: PptError) -> Self {
-        match err {
-            PptError::Io(e) => litchi_core::Error::Io(e),
-            PptError::Ole(ole_err) => litchi_core::Error::from(ole_err),
-            PptError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
-            PptError::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),
-            PptError::Corrupted(s) => litchi_core::Error::CorruptedFile(s),
-        }
     }
 }

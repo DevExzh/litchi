@@ -644,40 +644,50 @@ mod tests {
 
     #[test]
     fn test_run_bold() {
-        let mut fmt = Formatting::default();
-        fmt.bold = true;
+        let fmt = Formatting {
+            bold: true,
+            ..Formatting::default()
+        };
         let run = Run::new(Cow::Borrowed("Bold"), fmt);
         assert!(run.bold().unwrap());
     }
 
     #[test]
     fn test_run_italic() {
-        let mut fmt = Formatting::default();
-        fmt.italic = true;
+        let fmt = Formatting {
+            italic: true,
+            ..Formatting::default()
+        };
         let run = Run::new(Cow::Borrowed("Italic"), fmt);
         assert!(run.italic().unwrap());
     }
 
     #[test]
     fn test_run_strikethrough() {
-        let mut fmt = Formatting::default();
-        fmt.strike = true;
+        let fmt = Formatting {
+            strike: true,
+            ..Formatting::default()
+        };
         let run = Run::new(Cow::Borrowed("Strike"), fmt);
         assert!(run.strikethrough().unwrap());
     }
 
     #[test]
     fn test_run_double_strikethrough() {
-        let mut fmt = Formatting::default();
-        fmt.double_strike = true;
+        let fmt = Formatting {
+            double_strike: true,
+            ..Formatting::default()
+        };
         let run = Run::new(Cow::Borrowed("DStrike"), fmt);
         assert!(run.strikethrough().unwrap());
     }
 
     #[test]
     fn test_run_underline() {
-        let mut fmt = Formatting::default();
-        fmt.underline = UnderlineStyle::Single;
+        let fmt = Formatting {
+            underline: UnderlineStyle::Single,
+            ..Formatting::default()
+        };
         let run = Run::new(Cow::Borrowed("Underline"), fmt);
         assert!(run.underline());
     }
@@ -691,8 +701,10 @@ mod tests {
 
     #[test]
     fn test_run_vertical_position_superscript() {
-        let mut fmt = Formatting::default();
-        fmt.superscript = true;
+        let fmt = Formatting {
+            superscript: true,
+            ..Formatting::default()
+        };
         let run = Run::new(Cow::Borrowed("Super"), fmt);
         assert!(matches!(
             run.vertical_position(),
@@ -702,8 +714,10 @@ mod tests {
 
     #[test]
     fn test_run_vertical_position_subscript() {
-        let mut fmt = Formatting::default();
-        fmt.subscript = true;
+        let fmt = Formatting {
+            subscript: true,
+            ..Formatting::default()
+        };
         let run = Run::new(Cow::Borrowed("Sub"), fmt);
         assert!(matches!(
             run.vertical_position(),

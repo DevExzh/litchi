@@ -38,7 +38,7 @@ fn create_test_data() -> Vec<Vec<CellValue>> {
         vec![
             CellValue::Empty,
             CellValue::Int(42),
-            CellValue::Float(3.14159),
+            CellValue::Float(std::f64::consts::PI),
         ],
         vec![
             CellValue::Bool(true),

@@ -26,13 +26,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 2. TITLE WITH FORMATTING
     // ============================================================
     println!("2. Adding title with formatting...");
-    let mut title_char = CharacterFormatting::default();
-    title_char.bold = Some(true);
-    title_char.font_size = Some(32); // 16pt (size in half-points)
-    title_char.font_name = Some("Arial".to_string());
+    let title_char = CharacterFormatting {
+        bold: Some(true),
+        font_size: Some(32), // 16pt (size in half-points)
+        font_name: Some("Arial".to_string()),
+        ..Default::default()
+    };
 
-    let mut title_para = ParagraphFormatting::default();
-    title_para.alignment = Some(1); // Center alignment
+    let title_para = ParagraphFormatting {
+        alignment: Some(1), // Center alignment
+        ..Default::default()
+    };
 
     writer.add_paragraph_with_format("DOC Format Feature Test Document", title_char, title_para)?;
 
@@ -40,13 +44,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 3. SUBTITLE WITH DIFFERENT FORMATTING
     // ============================================================
     println!("3. Adding subtitle...");
-    let mut subtitle_char = CharacterFormatting::default();
-    subtitle_char.italic = Some(true);
-    subtitle_char.font_size = Some(22); // 11pt
+    let subtitle_char = CharacterFormatting {
+        italic: Some(true),
+        font_size: Some(22), // 11pt
+        ..Default::default()
+    };
 
-    let mut subtitle_para = ParagraphFormatting::default();
-    subtitle_para.alignment = Some(1); // Center
-    subtitle_para.space_after = Some(240); // 240 twips spacing after
+    let subtitle_para = ParagraphFormatting {
+        alignment: Some(1),     // Center
+        space_after: Some(240), // 240 twips spacing after
+        ..Default::default()
+    };
 
     writer.add_paragraph_with_format(
         "Testing All Available Features",
@@ -58,14 +66,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 4. INTRODUCTION SECTION
     // ============================================================
     println!("4. Adding introduction section...");
-    let mut section_header = CharacterFormatting::default();
-    section_header.bold = Some(true);
-    section_header.font_size = Some(26); // 13pt
+    let section_header = CharacterFormatting {
+        bold: Some(true),
+        font_size: Some(26), // 13pt
+        ..Default::default()
+    };
 
-    let mut section_para = ParagraphFormatting::default();
-    section_para.alignment = Some(0); // Left alignment
-    section_para.space_before = Some(240);
-    section_para.space_after = Some(120);
+    let section_para = ParagraphFormatting {
+        alignment: Some(0), // Left alignment
+        space_before: Some(240),
+        space_after: Some(120),
+        ..Default::default()
+    };
 
     writer.add_paragraph_with_format(
         "1. Introduction",
@@ -95,8 +107,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // Left-aligned paragraph
-    let mut left_para = ParagraphFormatting::default();
-    left_para.alignment = Some(0); // Left
+    let left_para = ParagraphFormatting {
+        alignment: Some(0), // Left
+        ..Default::default()
+    };
     writer.add_paragraph_with_format(
         "This paragraph is left-aligned (default). It demonstrates the standard text alignment.",
         CharacterFormatting::default(),
@@ -104,8 +118,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // Center-aligned paragraph
-    let mut center_para = ParagraphFormatting::default();
-    center_para.alignment = Some(1); // Center
+    let center_para = ParagraphFormatting {
+        alignment: Some(1), // Center
+        ..Default::default()
+    };
     writer.add_paragraph_with_format(
         "This paragraph is center-aligned. Perfect for titles and headings.",
         CharacterFormatting::default(),
@@ -113,8 +129,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // Right-aligned paragraph
-    let mut right_para = ParagraphFormatting::default();
-    right_para.alignment = Some(2); // Right
+    let right_para = ParagraphFormatting {
+        alignment: Some(2), // Right
+        ..Default::default()
+    };
     writer.add_paragraph_with_format(
         "This paragraph is right-aligned. Often used for dates or signatures.",
         CharacterFormatting::default(),
@@ -122,8 +140,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // Justified paragraph
-    let mut justified_para = ParagraphFormatting::default();
-    justified_para.alignment = Some(3); // Justify
+    let justified_para = ParagraphFormatting {
+        alignment: Some(3), // Justify
+        ..Default::default()
+    };
     writer.add_paragraph_with_format(
         "This paragraph is justified. The text is aligned to both left and right margins, \
          creating a clean, professional look. This is commonly used in formal documents and books.",
@@ -142,8 +162,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // Left indent
-    let mut left_indent_para = ParagraphFormatting::default();
-    left_indent_para.left_indent = Some(720); // 0.5 inch (1440 twips = 1 inch)
+    let left_indent_para = ParagraphFormatting {
+        left_indent: Some(720), // 0.5 inch (1440 twips = 1 inch)
+        ..Default::default()
+    };
     writer.add_paragraph_with_format(
         "This paragraph has a left indent of 0.5 inches.",
         CharacterFormatting::default(),
@@ -151,8 +173,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // First line indent
-    let mut first_line_para = ParagraphFormatting::default();
-    first_line_para.first_line_indent = Some(720); // 0.5 inch
+    let first_line_para = ParagraphFormatting {
+        first_line_indent: Some(720), // 0.5 inch
+        ..Default::default()
+    };
     writer.add_paragraph_with_format(
         "This paragraph has a first-line indent of 0.5 inches. This is commonly used \
          in traditional book formatting where each paragraph starts with an indentation.",
@@ -161,9 +185,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // Hanging indent (negative first line)
-    let mut hanging_para = ParagraphFormatting::default();
-    hanging_para.left_indent = Some(720);
-    hanging_para.first_line_indent = Some(-720); // Negative = hanging indent
+    let hanging_para = ParagraphFormatting {
+        left_indent: Some(720),
+        first_line_indent: Some(-720), // Negative = hanging indent
+        ..Default::default()
+    };
     writer.add_paragraph_with_format(
         "This paragraph has a hanging indent, where the first line extends to the left \
          of subsequent lines. Often used for bibliographies and lists.",
@@ -182,8 +208,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // Bold text
-    let mut bold_char = CharacterFormatting::default();
-    bold_char.bold = Some(true);
+    let bold_char = CharacterFormatting {
+        bold: Some(true),
+        ..Default::default()
+    };
     writer.add_paragraph_with_format(
         "This text is bold.",
         bold_char,
@@ -191,8 +219,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // Italic text
-    let mut italic_char = CharacterFormatting::default();
-    italic_char.italic = Some(true);
+    let italic_char = CharacterFormatting {
+        italic: Some(true),
+        ..Default::default()
+    };
     writer.add_paragraph_with_format(
         "This text is italic.",
         italic_char,
@@ -200,8 +230,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // Underline text
-    let mut underline_char = CharacterFormatting::default();
-    underline_char.underline = Some(true);
+    let underline_char = CharacterFormatting {
+        underline: Some(true),
+        ..Default::default()
+    };
     writer.add_paragraph_with_format(
         "This text is underlined.",
         underline_char,
@@ -209,9 +241,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // Bold + Italic
-    let mut bold_italic_char = CharacterFormatting::default();
-    bold_italic_char.bold = Some(true);
-    bold_italic_char.italic = Some(true);
+    let bold_italic_char = CharacterFormatting {
+        bold: Some(true),
+        italic: Some(true),
+        ..Default::default()
+    };
     writer.add_paragraph_with_format(
         "This text is both bold and italic.",
         bold_italic_char,
@@ -219,10 +253,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // All formatting combined
-    let mut all_format_char = CharacterFormatting::default();
-    all_format_char.bold = Some(true);
-    all_format_char.italic = Some(true);
-    all_format_char.underline = Some(true);
+    let all_format_char = CharacterFormatting {
+        bold: Some(true),
+        italic: Some(true),
+        underline: Some(true),
+        ..Default::default()
+    };
     writer.add_paragraph_with_format(
         "This text combines bold, italic, and underline.",
         all_format_char,
@@ -240,8 +276,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     for size in [16, 20, 24, 28, 32, 36] {
-        let mut size_char = CharacterFormatting::default();
-        size_char.font_size = Some(size);
+        let size_char = CharacterFormatting {
+            font_size: Some(size),
+            ..Default::default()
+        };
         writer.add_paragraph_with_format(
             &format!("This text is {}pt (font_size = {})", size / 2, size),
             size_char,
@@ -259,16 +297,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         section_para.clone(),
     )?;
 
-    let mut space_before_para = ParagraphFormatting::default();
-    space_before_para.space_before = Some(360); // 0.25 inch
+    let space_before_para = ParagraphFormatting {
+        space_before: Some(360), // 0.25 inch
+        ..Default::default()
+    };
     writer.add_paragraph_with_format(
         "This paragraph has 0.25 inches of space before it.",
         CharacterFormatting::default(),
         space_before_para,
     )?;
 
-    let mut space_after_para = ParagraphFormatting::default();
-    space_after_para.space_after = Some(360); // 0.25 inch
+    let space_after_para = ParagraphFormatting {
+        space_after: Some(360), // 0.25 inch
+        ..Default::default()
+    };
     writer.add_paragraph_with_format(
         "This paragraph has 0.25 inches of space after it.",
         CharacterFormatting::default(),
@@ -334,8 +376,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     writer.add_paragraph_with_format("8. Conclusion", section_header, section_para)?;
 
-    let mut conclusion_char = CharacterFormatting::default();
-    conclusion_char.italic = Some(true);
+    let conclusion_char = CharacterFormatting {
+        italic: Some(true),
+        ..Default::default()
+    };
 
     writer.add_paragraph_with_format(
         "This document demonstrates the comprehensive DOC writing capabilities of the Litchi library. \
@@ -344,12 +388,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ParagraphFormatting::default(),
     )?;
 
-    let mut footer_para = ParagraphFormatting::default();
-    footer_para.alignment = Some(1); // Center
-    footer_para.space_before = Some(480);
+    let footer_para = ParagraphFormatting {
+        alignment: Some(1), // Center
+        space_before: Some(480),
+        ..Default::default()
+    };
 
-    let mut footer_char = CharacterFormatting::default();
-    footer_char.font_size = Some(18); // 9pt
+    let footer_char = CharacterFormatting {
+        font_size: Some(18), // 9pt
+        ..Default::default()
+    };
 
     writer.add_paragraph_with_format(
         "Generated by Litchi - High-Performance Office File Library",

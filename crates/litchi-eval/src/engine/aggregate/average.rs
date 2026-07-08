@@ -135,14 +135,6 @@ mod tests {
     use crate::engine::test_helpers::TestEngine;
     use crate::parser::Expr;
 
-    fn num_expr(n: f64) -> Expr {
-        if n == n.floor() {
-            Expr::Literal(CellValue::Int(n as i64))
-        } else {
-            Expr::Literal(CellValue::Float(n))
-        }
-    }
-
     #[tokio::test]
     async fn test_eval_average_basic() {
         let engine = TestEngine::new();
