@@ -33,7 +33,7 @@ pub fn boxed_err_to_py_err(err: Box<dyn std::error::Error + Send + Sync>) -> PyE
 /// File format enumeration
 ///
 /// Represents the different Office file formats supported by Litchi.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Copy, Debug)]
 pub enum FileFormat {
     /// Microsoft Word 97-2003 (.doc)
@@ -123,7 +123,7 @@ impl FileFormat {
 /// RGB color representation
 ///
 /// Represents a color in RGB format with values from 0-255.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 pub struct RGBColor {
     inner: litchi::RGBColor,
@@ -174,7 +174,7 @@ impl RGBColor {
 /// Length with units
 ///
 /// Represents a measurement with associated units (EMUs, points, inches, etc.).
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 pub struct Length {
     inner: litchi::Length,
