@@ -108,9 +108,7 @@ fn encrypt_verifier(key: &[u8], verifier: &[u8; 16]) -> ([u8; 16], [u8; 32]) {
     let cipher = Aes128::new_from_slice(key).expect("AES-128 key must be 16 bytes");
 
     let mut encrypted_verifier = *verifier;
-    let block: &mut aes::cipher::Block<Aes128> = (&mut encrypted_verifier)
-        .try_into()
-        .expect("AES block must be 16 bytes");
+    let block: &mut aes::cipher::Block<Aes128> = (&mut encrypted_verifier).into();
     cipher.encrypt_block(block);
 
     let mut sha = Sha1::new();
@@ -311,9 +309,7 @@ fn verify_standard2007_password(key: &[u8], verifier: &Standard2007Verifier) -> 
     })?;
 
     let mut decrypted_verifier = verifier.encrypted_verifier;
-    let block: &mut aes::cipher::Block<Aes128> = (&mut decrypted_verifier)
-        .try_into()
-        .expect("AES block must be 16 bytes");
+    let block: &mut aes::cipher::Block<Aes128> = (&mut decrypted_verifier).into();
     cipher.decrypt_block(block);
 
     let mut sha = Sha1::new();
