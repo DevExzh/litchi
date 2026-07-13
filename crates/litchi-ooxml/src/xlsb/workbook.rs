@@ -1,5 +1,6 @@
 //! Workbook implementation for XLSB files
 
+use crate::xlsb::XlsbCell;
 use crate::xlsb::error::XlsbResult;
 use crate::xlsb::formula::{
     FormulaExternalBook, FormulaExternalSheet, FormulaResolutionContext, FormulaSupportingLink,
@@ -7,6 +8,7 @@ use crate::xlsb::formula::{
 };
 use crate::xlsb::named_ranges::{NamedRange, validate_defined_name};
 use crate::xlsb::records::{XlsbRecordIter, record_types};
+use crate::xlsb::styles_table::{CellFormat, StylesTable};
 use crate::xlsb::worksheet::XlsbWorksheet;
 use litchi_core::binary;
 use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
@@ -20,6 +22,7 @@ pub struct XlsbWorkbook {
     worksheets: Vec<XlsbWorksheet>,
     formula_context: FormulaResolutionContext,
     shared_strings: Vec<String>,
+    styles: StylesTable,
     is_1904: bool,
 }
 
@@ -28,6 +31,7 @@ impl std::fmt::Debug for XlsbWorkbook {
         f.debug_struct("XlsbWorkbook")
             .field("worksheet_names", &self.formula_context.worksheet_names)
             .field("shared_strings_count", &self.shared_strings.len())
+            .field("cell_xfs_count", &self.styles.cell_xfs.len())
             .field("is_1904", &self.is_1904)
             .finish()
     }
@@ -39,6 +43,16 @@ impl XlsbWorkbook {
         &self.formula_context.defined_names
     }
 
+    /// Workbook style table loaded from `xl/styles.bin`.
+    pub fn styles(&self) -> &StylesTable {
+        &self.styles
+    }
+
+    /// Resolve a parsed cell's style reference to its cell XF.
+    pub fn style_for_cell(&self, cell: &XlsbCell) -> Option<&CellFormat> {
+        self.styles.get_cell_format(cell.style_id() as usize)
+    }
+
     /// Open an XLSB workbook from a reader
     pub fn new<R: Read + Seek>(reader: R) -> XlsbResult<Self> {
         let package = OpcPackage::from_reader(reader)?;
@@ -47,10 +61,12 @@ impl XlsbWorkbook {
             worksheets: Vec::new(),
             formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
+            styles: StylesTable::default(),
             is_1904: false,
         };
 
         workbook.load_workbook_info()?;
+        workbook.load_styles()?;
         workbook.load_shared_strings()?;
 
         Ok(workbook)
@@ -70,10 +86,12 @@ impl XlsbWorkbook {
             worksheets: Vec::new(),
             formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
+            styles: StylesTable::default(),
             is_1904: false,
         };
 
         workbook.load_workbook_info()?;
+        workbook.load_styles()?;
         workbook.load_shared_strings()?;
 
         Ok(workbook)
@@ -144,6 +162,16 @@ impl XlsbWorkbook {
         Ok(())
     }
 
+    /// Load workbook styles. The default table keeps style index zero usable
+    /// for minimal producer files that omit the optional styles part.
+    fn load_styles(&mut self) -> XlsbResult<()> {
+        let styles_uri = litchi_opc::PackURI::new("/xl/styles.bin")?;
+        if let Ok(styles_part) = self.package.get_part(&styles_uri) {
+            self.styles = StylesTable::from_reader(styles_part.blob())?;
+        }
+        Ok(())
+    }
+
     /// Get a worksheet by index (lazy loading)
     fn get_worksheet(&self, index: usize) -> XlsbResult<XlsbWorksheet> {
         if index >= self.formula_context.worksheet_names.len() {
@@ -168,6 +196,7 @@ impl XlsbWorkbook {
             &self.shared_strings,
             &self.formula_context,
             index,
+            self.styles.cell_xfs.len(),
         )
     }
 
@@ -276,6 +305,7 @@ impl XlsbWorkbook {
         shared_strings: &[String],
         formula_context: &FormulaResolutionContext,
         sheet_index: usize,
+        cell_xf_count: usize,
     ) -> XlsbResult<XlsbWorksheet> {
         let mut worksheet = XlsbWorksheet::new(name);
         let iter = crate::xlsb::records::RecordIter::<std::io::Cursor<&[u8]>>::from_cursor(cursor);
@@ -284,6 +314,7 @@ impl XlsbWorkbook {
             iter,
             shared_strings,
             &formula_context,
+            cell_xf_count,
         )?;
 
         // Read all cells
@@ -736,6 +767,7 @@ mod tests {
             worksheets: Vec::new(),
             formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
+            styles: StylesTable::default(),
             is_1904: false,
         };
         workbook.load_external_book(&uri)
@@ -811,6 +843,35 @@ mod tests {
     }
 
     #[test]
+    fn resolves_cell_style_references_from_real_fixtures() {
+        let mut saw_nondefault_style = false;
+        for fixture in ["universal-content.xlsb", "cond_format.xlsb"] {
+            let path = format!(
+                "{}/../../test-data/ooxml/xlsb/{fixture}",
+                env!("CARGO_MANIFEST_DIR")
+            );
+            let workbook = XlsbWorkbook::new(File::open(path).unwrap())
+                .unwrap_or_else(|error| panic!("{fixture}: {error}"));
+            assert!(!workbook.styles().cell_xfs.is_empty(), "{fixture}");
+            for index in 0..workbook.formula_context.worksheet_names.len() {
+                let worksheet = workbook.get_worksheet(index).unwrap();
+                if let Some((min_row, min_col, max_row, max_col)) = worksheet.dimensions() {
+                    for row in min_row..=max_row {
+                        for col in min_col..=max_col {
+                            let Some(cell) = worksheet.get_cell(row, col) else {
+                                continue;
+                            };
+                            saw_nondefault_style |= cell.style_id() != 0;
+                            assert!(workbook.style_for_cell(cell).is_some(), "{fixture}");
+                        }
+                    }
+                }
+            }
+        }
+        assert!(saw_nondefault_style);
+    }
+
+    #[test]
     fn reads_external_book_metadata_from_poi_corpus_when_available() {
         let path = std::path::Path::new(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -826,6 +887,7 @@ mod tests {
             worksheets: Vec::new(),
             formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
+            styles: StylesTable::default(),
             is_1904: false,
         };
         let uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();

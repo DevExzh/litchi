@@ -59,7 +59,7 @@ pub struct NumberFormat {
 }
 
 /// Cell format (XF record)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CellFormat {
     pub font_id: u32,
     pub fill_id: u32,
@@ -88,8 +88,8 @@ impl Default for StylesTable {
             fills: vec![Fill::default()],
             borders: vec![Border::default()],
             num_fmts: Self::builtin_formats(),
-            cell_xfs: Vec::new(),
-            cell_style_xfs: Vec::new(),
+            cell_xfs: vec![CellFormat::default()],
+            cell_style_xfs: vec![CellFormat::default()],
         }
     }
 }
@@ -143,12 +143,18 @@ impl StylesTable {
                     let (id, format_code) = Self::parse_num_fmt(data)?;
                     styles.num_fmts.insert(id, format_code);
                 },
-                record_types::BEGIN_CELL_XFS => in_cell_xfs = true,
+                record_types::BEGIN_CELL_XFS => {
+                    in_cell_xfs = true;
+                    styles.cell_xfs.clear();
+                },
                 record_types::END_CELL_XFS => in_cell_xfs = false,
                 record_types::XF if in_cell_xfs => {
                     styles.cell_xfs.push(Self::parse_xf(data)?);
                 },
-                record_types::BEGIN_CELL_STYLE_XFS => in_cell_style_xfs = true,
+                record_types::BEGIN_CELL_STYLE_XFS => {
+                    in_cell_style_xfs = true;
+                    styles.cell_style_xfs.clear();
+                },
                 record_types::END_CELL_STYLE_XFS => in_cell_style_xfs = false,
                 record_types::XF if in_cell_style_xfs => {
                     styles.cell_style_xfs.push(Self::parse_xf(data)?);

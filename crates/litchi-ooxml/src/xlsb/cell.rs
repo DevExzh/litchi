@@ -8,6 +8,13 @@ use crate::xlsb::records::CellRecord;
 use litchi_core::sheet::{Cell, CellValue};
 use std::sync::Arc;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct CellHeader {
+    pub col: u32,
+    pub style_id: u32,
+    pub show_phonetic: bool,
+}
+
 /// XLSB cell implementation
 ///
 /// Fields are ordered to minimize padding and optimize cache utilization.
@@ -20,6 +27,10 @@ pub struct XlsbCell {
     row: u32,
     /// Column index (0-based)
     col: u32,
+    /// Zero-based index into the workbook's cell XF table.
+    style_id: u32,
+    /// Whether phonetic information should be shown for this cell.
+    show_phonetic: bool,
     /// Track whether this cell came from a formula record
     is_formula: bool,
     /// Original binary formula, retained even if a token is not understood.
@@ -36,6 +47,8 @@ impl XlsbCell {
         XlsbCell {
             row,
             col,
+            style_id: 0,
+            show_phonetic: false,
             value,
             is_formula: false,
             formula: None,
@@ -49,6 +62,8 @@ impl XlsbCell {
         XlsbCell {
             row,
             col,
+            style_id: 0,
+            show_phonetic: false,
             value,
             is_formula: true,
             formula: None,
@@ -61,7 +76,7 @@ impl XlsbCell {
     /// ancillary streams.
     pub(crate) fn new_formula_binary(
         row: u32,
-        col: u32,
+        header: CellHeader,
         cached_value: CellValue,
         formula: CellParsedFormula,
         formula_flags: u16,
@@ -83,7 +98,9 @@ impl XlsbCell {
         Self {
             value,
             row,
-            col,
+            col: header.col,
+            style_id: header.style_id,
+            show_phonetic: header.show_phonetic,
             is_formula: true,
             formula: Some(formula),
             formula_group: None,
@@ -93,7 +110,7 @@ impl XlsbCell {
 
     pub(crate) fn new_grouped_formula(
         row: u32,
-        col: u32,
+        header: CellHeader,
         cached_value: CellValue,
         placeholder: CellParsedFormula,
         formula_flags: u16,
@@ -108,7 +125,7 @@ impl XlsbCell {
                 &group.formula.rgce,
                 &group.formula.rgcb,
                 row,
-                col,
+                header.col,
             )
             .parse(),
         };
@@ -127,7 +144,9 @@ impl XlsbCell {
         Self {
             value,
             row,
-            col,
+            col: header.col,
+            style_id: header.style_id,
+            show_phonetic: header.show_phonetic,
             is_formula: true,
             formula: Some(placeholder),
             formula_group: Some(group),
@@ -183,6 +202,30 @@ impl XlsbCell {
         self.is_formula.then_some(self.formula_flags)
     }
 
+    /// Zero-based index into [`StylesTable::cell_xfs`](crate::xlsb::StylesTable::cell_xfs).
+    pub fn style_id(&self) -> u32 {
+        self.style_id
+    }
+
+    /// Whether the XLSB cell header requests display of phonetic information.
+    pub fn show_phonetic(&self) -> bool {
+        self.show_phonetic
+    }
+
+    pub(crate) fn new_styled(row: u32, header: CellHeader, value: CellValue) -> Self {
+        Self {
+            row,
+            col: header.col,
+            style_id: header.style_id,
+            show_phonetic: header.show_phonetic,
+            value,
+            is_formula: false,
+            formula: None,
+            formula_group: None,
+            formula_flags: 0,
+        }
+    }
+
     /// Create cell from XLSB record
     pub fn from_record(record: &CellRecord, shared_strings: Option<&Vec<String>>) -> Option<Self> {
         let (value, is_formula) = match &record.value {
@@ -228,6 +271,8 @@ impl XlsbCell {
         Some(XlsbCell {
             row: record.row,
             col: record.col as u32,
+            style_id: 0,
+            show_phonetic: false,
             value,
             is_formula,
             formula: None,

@@ -1,6 +1,6 @@
 //! XLSB cells reader implementation
 
-use crate::xlsb::cell::XlsbCell;
+use crate::xlsb::cell::{CellHeader, XlsbCell};
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{
     CellParsedFormula, FormulaGroup, FormulaGroupKind, FormulaResolutionContext,
@@ -14,7 +14,7 @@ use std::io::{Read, Seek};
 use std::sync::Arc;
 
 struct ParsedFormulaCell {
-    col: u32,
+    header: CellHeader,
     cached_value: CellValue,
     formula: CellParsedFormula,
     flags: u16,
@@ -44,6 +44,7 @@ where
     iter: RecordIter<RS>,
     shared_strings: &'a [String],
     formula_context: &'a FormulaResolutionContext,
+    cell_xf_count: usize,
     dimensions: Dimensions,
     current_row: u32,
     buf: Vec<u8>,
@@ -63,6 +64,7 @@ where
         mut iter: RecordIter<RS>,
         shared_strings: &'a [String],
         formula_context: &'a FormulaResolutionContext,
+        cell_xf_count: usize,
     ) -> XlsbResult<Self> {
         let mut buf = Vec::with_capacity(1024);
 
@@ -93,6 +95,7 @@ where
             iter,
             shared_strings,
             formula_context,
+            cell_xf_count,
             dimensions,
             current_row: 0,
             buf,
@@ -126,6 +129,12 @@ where
                 return Ok(None);
             }
 
+            let cell_header = if matches!(typ, 0x0001..=0x000B) {
+                Some(self.parse_cell_header()?)
+            } else {
+                None
+            };
+
             match typ {
                 0x0000 => {
                     // BrtRowHdr
@@ -133,22 +142,30 @@ where
                 },
                 0x0001
                     // BrtCellBlank
-                    if self.buf.len() >= 4 => {
-                        let col = binary::read_u32_le_at(&self.buf, 0)?;
-                        return Ok(Some(XlsbCell::new(self.current_row, col, CellValue::Empty)));
+                    if self.buf.len() >= 8 => {
+                        let header = cell_header.unwrap();
+                        return Ok(Some(XlsbCell::new_styled(
+                            self.current_row,
+                            header,
+                            CellValue::Empty,
+                        )));
                     },
                 0x0002
                     // BrtCellRk
                     if self.buf.len() >= 12 => {
-                        let col = binary::read_u32_le_at(&self.buf, 0)?;
+                        let header = cell_header.unwrap();
                         let rk_val = binary::read_u32_le_at(&self.buf, 8)?;
                         let value = Self::parse_rk_value(rk_val);
-                        return Ok(Some(XlsbCell::new(self.current_row, col, value)));
+                        return Ok(Some(XlsbCell::new_styled(
+                            self.current_row,
+                            header,
+                            value,
+                        )));
                     },
                 0x0003
                     // BrtCellError
                     if self.buf.len() >= 9 => {
-                        let col = binary::read_u32_le_at(&self.buf, 0)?;
+                        let header = cell_header.unwrap();
                         let error_code = self.buf[8];
                         let error_msg = match error_code {
                             0x00 => "#NULL!",
@@ -161,56 +178,60 @@ where
                             0x2B => "#GETTING_DATA",
                             _ => "#ERR!",
                         };
-                        return Ok(Some(XlsbCell::new(
+                        return Ok(Some(XlsbCell::new_styled(
                             self.current_row,
-                            col,
+                            header,
                             CellValue::Error(error_msg.to_string()),
                         )));
                     },
                 0x0004
                     // BrtCellBool
                     if self.buf.len() >= 9 => {
-                        let col = binary::read_u32_le_at(&self.buf, 0)?;
+                        let header = cell_header.unwrap();
                         let value = self.buf[8] != 0;
-                        return Ok(Some(XlsbCell::new(
+                        return Ok(Some(XlsbCell::new_styled(
                             self.current_row,
-                            col,
+                            header,
                             CellValue::Bool(value),
                         )));
                     },
                 0x0005
                     // BrtCellReal
                     if self.buf.len() >= 16 => {
-                        let col = binary::read_u32_le_at(&self.buf, 0)?;
+                        let header = cell_header.unwrap();
                         let value = binary::read_f64_le_at(&self.buf, 8)?;
-                        return Ok(Some(XlsbCell::new(
+                        return Ok(Some(XlsbCell::new_styled(
                             self.current_row,
-                            col,
+                            header,
                             CellValue::Float(value),
                         )));
                     },
                 0x0006
                     // BrtCellSt
                     if self.buf.len() >= 8 => {
-                        let col = binary::read_u32_le_at(&self.buf, 0)?;
+                        let header = cell_header.unwrap();
                         let (string, _) = super::records::wide_str_with_len(&self.buf[8..])?;
-                        return Ok(Some(XlsbCell::new(
+                        return Ok(Some(XlsbCell::new_styled(
                             self.current_row,
-                            col,
+                            header,
                             CellValue::String(string),
                         )));
                     },
                 0x0007
                     // BrtCellIsst
                     if self.buf.len() >= 12 => {
-                        let col = binary::read_u32_le_at(&self.buf, 0)?;
+                        let header = cell_header.unwrap();
                         let idx = binary::read_u32_le_at(&self.buf, 8)? as usize;
                         let value = if idx < self.shared_strings.len() {
                             CellValue::String(self.shared_strings[idx].clone())
                         } else {
                             CellValue::Error("Invalid SST index".to_string())
                         };
-                        return Ok(Some(XlsbCell::new(self.current_row, col, value)));
+                        return Ok(Some(XlsbCell::new_styled(
+                            self.current_row,
+                            header,
+                            value,
+                        )));
                     },
                 0x0008 => {
                     // BrtFmlaString - formula with string result
@@ -220,11 +241,11 @@ where
                             found: self.buf.len(),
                         });
                     }
-                    let col = binary::read_u32_le_at(&self.buf, 0)?;
+                    let header = cell_header.unwrap();
                     let (string, consumed) =
                         super::records::wide_str_with_len(&self.buf[8..])?;
                     let parsed =
-                        self.parse_formula_cell(col, CellValue::String(string), 8 + consumed)?;
+                        self.parse_formula_cell(header, CellValue::String(string), 8 + consumed)?;
                     return self.resolve_formula_record(parsed).map(Some);
                 },
                 0x0009 => {
@@ -235,10 +256,10 @@ where
                             found: self.buf.len(),
                         });
                     }
-                    let col = binary::read_u32_le_at(&self.buf, 0)?;
+                    let header = cell_header.unwrap();
                     let num_value = binary::read_f64_le_at(&self.buf, 8)?;
                     let parsed =
-                        self.parse_formula_cell(col, CellValue::Float(num_value), 16)?;
+                        self.parse_formula_cell(header, CellValue::Float(num_value), 16)?;
                     return self.resolve_formula_record(parsed).map(Some);
                 },
                 0x000A => {
@@ -249,9 +270,13 @@ where
                             found: self.buf.len(),
                         });
                     }
-                    let col = binary::read_u32_le_at(&self.buf, 0)?;
+                    let header = cell_header.unwrap();
                     let bool_value = self.buf[8] != 0;
-                    let parsed = self.parse_formula_cell(col, CellValue::Bool(bool_value), 9)?;
+                    let parsed = self.parse_formula_cell(
+                        header,
+                        CellValue::Bool(bool_value),
+                        9,
+                    )?;
                     return self.resolve_formula_record(parsed).map(Some);
                 },
                 0x000B => {
@@ -262,10 +287,10 @@ where
                             found: self.buf.len(),
                         });
                     }
-                    let col = binary::read_u32_le_at(&self.buf, 0)?;
+                    let header = cell_header.unwrap();
                     let error_msg = Self::error_text(self.buf[8]);
                     let parsed = self.parse_formula_cell(
-                        col,
+                        header,
                         CellValue::Error(error_msg.to_string()),
                         9,
                     )?;
@@ -297,9 +322,42 @@ where
         }
     }
 
+    fn parse_cell_header(&self) -> XlsbResult<CellHeader> {
+        Self::decode_cell_header(&self.buf, self.cell_xf_count)
+    }
+
+    fn decode_cell_header(data: &[u8], cell_xf_count: usize) -> XlsbResult<CellHeader> {
+        if data.len() < 8 {
+            return Err(XlsbError::InvalidLength {
+                expected: 8,
+                found: data.len(),
+            });
+        }
+        let flags = data[7];
+        if flags & 0xFE != 0 {
+            return Err(XlsbError::Unrecognized {
+                typ: "Cell flags".to_string(),
+                val: format!("0x{flags:02X}"),
+            });
+        }
+        let col = binary::read_u32_le_at(data, 0)?;
+        let style_id = u32::from(data[4]) | (u32::from(data[5]) << 8) | (u32::from(data[6]) << 16);
+        if style_id as usize >= cell_xf_count {
+            return Err(XlsbError::Unrecognized {
+                typ: "Cell iStyleRef".to_string(),
+                val: format!("{style_id} (cell XF count {cell_xf_count})"),
+            });
+        }
+        Ok(CellHeader {
+            col,
+            style_id,
+            show_phonetic: flags & 1 != 0,
+        })
+    }
+
     fn parse_formula_cell(
         &self,
-        col: u32,
+        header: CellHeader,
         cached_value: CellValue,
         flags_offset: usize,
     ) -> XlsbResult<ParsedFormulaCell> {
@@ -326,7 +384,7 @@ where
             )));
         }
         Ok(ParsedFormulaCell {
-            col,
+            header,
             cached_value,
             formula,
             flags,
@@ -334,7 +392,7 @@ where
     }
 
     fn resolve_formula_record(&mut self, parsed: ParsedFormulaCell) -> XlsbResult<XlsbCell> {
-        let position = (self.current_row, parsed.col);
+        let position = (self.current_row, parsed.header.col);
         let exp_cell = parsed.formula.exp_cell()?;
 
         let next_type = self.iter.read_type()?;
@@ -405,7 +463,7 @@ where
         if let Some(group) = group {
             Ok(XlsbCell::new_grouped_formula(
                 position.0,
-                position.1,
+                parsed.header,
                 parsed.cached_value,
                 parsed.formula,
                 parsed.flags,
@@ -420,7 +478,7 @@ where
         } else {
             Ok(XlsbCell::new_formula_binary(
                 position.0,
-                position.1,
+                parsed.header,
                 parsed.cached_value,
                 parsed.formula,
                 parsed.flags,
@@ -544,5 +602,35 @@ where
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decodes_and_validates_cell_style_header() {
+        type Reader<'a> = XlsbCellsReader<'a, std::io::Cursor<&'a [u8]>>;
+
+        let header = [7, 0, 0, 0, 0x34, 0x12, 0, 1];
+        assert_eq!(
+            Reader::decode_cell_header(&header, 0x1235).unwrap(),
+            CellHeader {
+                col: 7,
+                style_id: 0x1234,
+                show_phonetic: true,
+            }
+        );
+        assert!(matches!(
+            Reader::decode_cell_header(&header, 0x1234),
+            Err(XlsbError::Unrecognized { .. })
+        ));
+
+        let reserved = [0, 0, 0, 0, 0, 0, 0, 2];
+        assert!(matches!(
+            Reader::decode_cell_header(&reserved, 1),
+            Err(XlsbError::Unrecognized { .. })
+        ));
     }
 }
