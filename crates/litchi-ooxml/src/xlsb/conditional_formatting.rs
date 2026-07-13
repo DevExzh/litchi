@@ -27,6 +27,31 @@ pub enum CfRuleType {
     IconSet = 6,
 }
 
+/// Binary record family used by a conditional-formatting collection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ConditionalFormattingRecordKind {
+    /// Original XLSB conditional-formatting records.
+    #[default]
+    Classic,
+    /// Office 2013 future-record conditional-formatting records.
+    Extension14,
+}
+
+/// Fields unique to an Office 2013 `BrtBeginCFRule14` record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConditionalFormattingRule14Metadata {
+    /// Signed priority. `-1` denotes an extension of a classic data-bar rule.
+    pub priority: i32,
+    /// Undefined field preserved for lossless roundtrips.
+    pub unused: u32,
+    /// Raw GUID bytes in MS-DTYP wire order.
+    pub guid: [u8; 16],
+    /// Whether `guid` is semantically present.
+    pub guid_present: bool,
+    /// Priority of the classic rule resolved through `BrtCFRuleExt`, if any.
+    pub linked_classic_priority: Option<u32>,
+}
+
 impl CfRuleType {
     pub fn from_u32(value: u32) -> Option<Self> {
         match value {
@@ -232,6 +257,18 @@ impl Cfvo {
         if !self.numeric_value.is_finite() {
             return Err(invalid("BrtCFVO14", "non-finite numeric parameter"));
         }
+        if self.formula_binary.is_none()
+            && matches!(self.cfvo_type, 4 | 5)
+            && !(0.0..=100.0).contains(&self.numeric_value)
+        {
+            return Err(invalid(
+                "BrtCFVO14",
+                format!(
+                    "percentage parameter {} outside 0..=100",
+                    self.numeric_value
+                ),
+            ));
+        }
         if matches!(self.cfvo_type, 2 | 3 | 8 | 9) && self.formula_binary.is_some() {
             return Err(invalid(
                 "BrtCFVO14",
@@ -405,6 +442,27 @@ impl ConditionalFormatColor {
         }
         Ok(raw)
     }
+
+    /// Parse an Office 2013 `BrtColor14` payload.
+    pub fn parse_extension14(data: &[u8]) -> XlsbResult<Self> {
+        if data.len() != 12 {
+            return Err(XlsbError::InvalidLength {
+                expected: 12,
+                found: data.len(),
+            });
+        }
+        if data[..4] != [0; 4] {
+            return Err(invalid("BrtColor14", "nonzero FRTBlank"));
+        }
+        Self::parse(&data[4..])
+    }
+
+    /// Serialize an Office 2013 `BrtColor14` payload.
+    pub fn serialize_extension14(self) -> XlsbResult<[u8; 12]> {
+        let mut data = [0; 12];
+        data[4..].copy_from_slice(&self.to_bytes()?);
+        Ok(data)
+    }
 }
 
 /// Color scale conditional formatting
@@ -504,6 +562,318 @@ impl IconSet {
     }
 }
 
+/// Direction of an Office 2013 data bar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(u8)]
+pub enum DataBarDirection14 {
+    /// Resolve direction from worksheet context.
+    #[default]
+    Context = 0,
+    LeftToRight = 1,
+    RightToLeft = 2,
+}
+
+impl DataBarDirection14 {
+    fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(Self::Context),
+            1 => Some(Self::LeftToRight),
+            2 => Some(Self::RightToLeft),
+            _ => None,
+        }
+    }
+}
+
+/// Axis placement of an Office 2013 data bar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(u8)]
+pub enum DataBarAxisPosition14 {
+    #[default]
+    Automatic = 0,
+    Midpoint = 1,
+    None = 2,
+}
+
+impl DataBarAxisPosition14 {
+    fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(Self::Automatic),
+            1 => Some(Self::Midpoint),
+            2 => Some(Self::None),
+            _ => None,
+        }
+    }
+}
+
+/// Office 2013 extended data-bar visualization.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DataBar14 {
+    pub min_cfvo: Cfvo,
+    pub max_cfvo: Cfvo,
+    /// Absent only when this augments a classic data-bar rule (`iPri = -1`).
+    pub positive_color: Option<ConditionalFormatColor>,
+    pub border_color: Option<ConditionalFormatColor>,
+    pub negative_color: Option<ConditionalFormatColor>,
+    pub negative_border_color: Option<ConditionalFormatColor>,
+    pub axis_color: Option<ConditionalFormatColor>,
+    pub min_length: u8,
+    pub max_length: u8,
+    pub show_value: bool,
+    pub direction: DataBarDirection14,
+    pub axis_position: DataBarAxisPosition14,
+    pub border: bool,
+    pub gradient: bool,
+    pub custom_negative_fill: bool,
+    pub custom_negative_border: bool,
+    /// Undefined upper flag bits preserved for lossless roundtrips.
+    pub unused_flags: u16,
+}
+
+impl DataBar14 {
+    pub fn new(min_cfvo: Cfvo, max_cfvo: Cfvo, positive_color: ConditionalFormatColor) -> Self {
+        Self {
+            min_cfvo,
+            max_cfvo,
+            positive_color: Some(positive_color),
+            border_color: None,
+            negative_color: None,
+            negative_border_color: None,
+            axis_color: Some(ConditionalFormatColor::automatic()),
+            min_length: 10,
+            max_length: 90,
+            show_value: true,
+            direction: DataBarDirection14::Context,
+            axis_position: DataBarAxisPosition14::Automatic,
+            border: false,
+            gradient: true,
+            custom_negative_fill: false,
+            custom_negative_border: false,
+            unused_flags: 0,
+        }
+    }
+
+    pub fn parse_header(data: &[u8]) -> XlsbResult<DataBar14Header> {
+        let mut cursor = CfCursor::new(data, "BrtBeginDatabar14");
+        if cursor.read_u32()? != 0 {
+            return Err(invalid("BrtBeginDatabar14", "nonzero FRTBlank"));
+        }
+        let min_length = cursor.read_u8()?;
+        let max_length = cursor.read_u8()?;
+        let show_value = cursor.read_bool8()?;
+        let direction = DataBarDirection14::from_u8(cursor.read_u8()?)
+            .ok_or_else(|| invalid("BrtBeginDatabar14", "invalid direction"))?;
+        let axis_position = DataBarAxisPosition14::from_u8(cursor.read_u8()?)
+            .ok_or_else(|| invalid("BrtBeginDatabar14", "invalid axis position"))?;
+        let flags = cursor.read_u16()?;
+        cursor.finish()?;
+        if min_length > max_length || max_length > 100 {
+            return Err(invalid(
+                "BrtBeginDatabar14",
+                "invalid minimum/maximum length",
+            ));
+        }
+        Ok(DataBar14Header {
+            min_length,
+            max_length,
+            show_value,
+            direction,
+            axis_position,
+            border: flags & 0x01 != 0,
+            gradient: flags & 0x02 != 0,
+            custom_negative_fill: flags & 0x04 != 0,
+            custom_negative_border: flags & 0x08 != 0,
+            unused_flags: flags & 0xfff0,
+        })
+    }
+
+    pub fn serialize_header(&self) -> XlsbResult<Vec<u8>> {
+        if self.min_length > self.max_length
+            || self.max_length > 100
+            || self.unused_flags & 0x0f != 0
+        {
+            return Err(invalid("BrtBeginDatabar14", "invalid data-bar header"));
+        }
+        let mut flags = self.unused_flags;
+        flags |= u16::from(self.border);
+        flags |= u16::from(self.gradient) << 1;
+        flags |= u16::from(self.custom_negative_fill) << 2;
+        flags |= u16::from(self.custom_negative_border) << 3;
+        let mut data = Vec::with_capacity(11);
+        data.extend_from_slice(&0u32.to_le_bytes());
+        data.extend_from_slice(&[
+            self.min_length,
+            self.max_length,
+            u8::from(self.show_value),
+            self.direction as u8,
+            self.axis_position as u8,
+        ]);
+        data.extend_from_slice(&flags.to_le_bytes());
+        Ok(data)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DataBar14Header {
+    pub min_length: u8,
+    pub max_length: u8,
+    pub show_value: bool,
+    pub direction: DataBarDirection14,
+    pub axis_position: DataBarAxisPosition14,
+    pub border: bool,
+    pub gradient: bool,
+    pub custom_negative_fill: bool,
+    pub custom_negative_border: bool,
+    pub unused_flags: u16,
+}
+
+/// One custom icon in an Office 2013 icon-set rule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConditionalFormatIcon {
+    /// Icon-set identifier, or `-1` for no icon.
+    pub icon_set: i32,
+    /// Zero-based icon index, or `-1` when `icon_set` is `-1`.
+    pub index: i32,
+}
+
+impl ConditionalFormatIcon {
+    pub fn parse(data: &[u8]) -> XlsbResult<Self> {
+        let mut cursor = CfCursor::new(data, "BrtCFIcon");
+        if cursor.read_u32()? != 0 {
+            return Err(invalid("BrtCFIcon", "nonzero FRTBlank"));
+        }
+        let value = Self {
+            icon_set: cursor.read_i32()?,
+            index: cursor.read_i32()?,
+        };
+        cursor.finish()?;
+        value.validate()?;
+        Ok(value)
+    }
+
+    pub fn serialize(self) -> XlsbResult<[u8; 12]> {
+        self.validate()?;
+        let mut data = [0; 12];
+        data[4..8].copy_from_slice(&self.icon_set.to_le_bytes());
+        data[8..].copy_from_slice(&self.index.to_le_bytes());
+        Ok(data)
+    }
+
+    fn validate(self) -> XlsbResult<()> {
+        if self.icon_set == -1 {
+            if self.index == -1 {
+                return Ok(());
+            }
+        } else if let Ok(icon_set) = u8::try_from(self.icon_set) {
+            if icon_set <= 19 && (0..icon_count14(icon_set) as i32).contains(&self.index) {
+                return Ok(());
+            }
+        }
+        Err(invalid("BrtCFIcon", "invalid icon set or index"))
+    }
+}
+
+/// Office 2013 extended icon-set visualization.
+#[derive(Debug, Clone, PartialEq)]
+pub struct IconSet14 {
+    pub icon_set_type: u8,
+    pub cfvos: Vec<Cfvo>,
+    /// Present only for a custom icon set and one-for-one with `cfvos`.
+    pub custom_icons: Option<Vec<ConditionalFormatIcon>>,
+    pub show_value: bool,
+    pub reverse: bool,
+    /// Undefined flag bits 3 through 6 preserved for lossless roundtrips.
+    pub unused_flags: u16,
+}
+
+impl IconSet14 {
+    pub fn new(icon_set_type: u8, cfvos: Vec<Cfvo>) -> Self {
+        Self {
+            icon_set_type,
+            cfvos,
+            custom_icons: None,
+            show_value: true,
+            reverse: false,
+            unused_flags: 0,
+        }
+    }
+
+    pub fn parse_header(data: &[u8]) -> XlsbResult<IconSet14Header> {
+        let mut cursor = CfCursor::new(data, "BrtBeginIconSet14");
+        if cursor.read_u32()? != 0 {
+            return Err(invalid("BrtBeginIconSet14", "nonzero FRTBlank"));
+        }
+        let icon_set_type = u8::try_from(cursor.read_u32()?)
+            .map_err(|_| invalid("BrtBeginIconSet14", "icon-set type overflow"))?;
+        if icon_set_type > 19 {
+            return Err(invalid("BrtBeginIconSet14", "invalid icon-set type"));
+        }
+        let flags = cursor.read_u16()?;
+        cursor.finish()?;
+        if flags & 0xff80 != 0 {
+            return Err(invalid("BrtBeginIconSet14", "reserved flags are nonzero"));
+        }
+        Ok(IconSet14Header {
+            icon_set_type,
+            custom: flags & 0x01 != 0,
+            show_value: flags & 0x02 == 0,
+            reverse: flags & 0x04 == 0,
+            unused_flags: flags & 0x78,
+        })
+    }
+
+    pub fn serialize_header(&self) -> XlsbResult<Vec<u8>> {
+        if self.icon_set_type > 19 || self.unused_flags & !0x78 != 0 {
+            return Err(invalid("BrtBeginIconSet14", "invalid icon-set header"));
+        }
+        let mut flags = self.unused_flags;
+        flags |= u16::from(self.custom_icons.is_some());
+        flags |= u16::from(!self.show_value) << 1;
+        flags |= u16::from(!self.reverse) << 2;
+        let mut data = Vec::with_capacity(10);
+        data.extend_from_slice(&0u32.to_le_bytes());
+        data.extend_from_slice(&u32::from(self.icon_set_type).to_le_bytes());
+        data.extend_from_slice(&flags.to_le_bytes());
+        Ok(data)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct IconSet14Header {
+    pub icon_set_type: u8,
+    pub custom: bool,
+    pub show_value: bool,
+    pub reverse: bool,
+    pub unused_flags: u16,
+}
+
+pub(crate) fn icon_count14(icon_set_type: u8) -> usize {
+    match icon_set_type {
+        0..=7 | 17 | 18 => 3,
+        8..=12 => 4,
+        13..=16 | 19 => 5,
+        _ => 0,
+    }
+}
+
+pub fn parse_rule_extension_guid(data: &[u8]) -> XlsbResult<[u8; 16]> {
+    if data.len() != 20 {
+        return Err(XlsbError::InvalidLength {
+            expected: 20,
+            found: data.len(),
+        });
+    }
+    if data[..4] != [0; 4] {
+        return Err(invalid("BrtCFRuleExt", "nonzero FRTBlank"));
+    }
+    Ok(data[4..].try_into().expect("sixteen-byte GUID"))
+}
+
+pub fn serialize_rule_extension_guid(guid: [u8; 16]) -> [u8; 20] {
+    let mut data = [0; 20];
+    data[4..].copy_from_slice(&guid);
+    data
+}
+
 /// Conditional formatting rule
 #[derive(Debug, Clone)]
 pub struct ConditionalFormattingRule {
@@ -527,6 +897,12 @@ pub struct ConditionalFormattingRule {
     pub data_bar: Option<DataBar>,
     /// Icon set (for IconSet type)
     pub icon_set: Option<IconSet>,
+    /// Office 2013 color scale.
+    pub color_scale14: Option<ColorScale>,
+    /// Office 2013 data bar.
+    pub data_bar14: Option<DataBar14>,
+    /// Office 2013 icon set.
+    pub icon_set14: Option<IconSet14>,
     /// Operator (for CellIs type): 1=between, 2=not between, 3=equal, etc.
     pub operator: Option<u8>,
     /// Exact 32-bit rule parameter (operator, rank, date operation, or standard deviation).
@@ -538,6 +914,10 @@ pub struct ConditionalFormattingRule {
     pub above_average: bool,
     pub bottom: bool,
     pub percent: bool,
+    /// Office 2013 record metadata when this rule came from `BrtBeginCFRule14`.
+    pub extension14: Option<ConditionalFormattingRule14Metadata>,
+    /// GUID linking a classic rule to an Office 2013 data-bar augmentation.
+    pub classic_extension_guid: Option<[u8; 16]>,
 }
 
 impl ConditionalFormattingRule {
@@ -553,6 +933,9 @@ impl ConditionalFormattingRule {
             color_scale: None,
             data_bar: None,
             icon_set: None,
+            color_scale14: None,
+            data_bar14: None,
+            icon_set14: None,
             operator: None,
             parameter: 0,
             template: default_template(rule_type),
@@ -560,6 +943,8 @@ impl ConditionalFormattingRule {
             above_average: false,
             bottom: false,
             percent: false,
+            extension14: None,
+            classic_extension_guid: None,
         }
     }
 
@@ -702,6 +1087,9 @@ impl ConditionalFormattingRule {
             color_scale: None,
             data_bar: None,
             icon_set: None,
+            color_scale14: None,
+            data_bar14: None,
+            icon_set14: None,
             operator,
             parameter,
             template,
@@ -709,7 +1097,279 @@ impl ConditionalFormattingRule {
             above_average,
             bottom,
             percent,
+            extension14: None,
+            classic_extension_guid: None,
         })
+    }
+
+    /// Parse an Office 2013 `BrtBeginCFRule14` payload.
+    pub fn parse_extension14(data: &[u8]) -> XlsbResult<Self> {
+        let context = FormulaResolutionContext::default();
+        Self::parse_extension14_with_context(data, (0, 0), &context)
+    }
+
+    pub(crate) fn parse_extension14_with_context(
+        data: &[u8],
+        base: (u32, u32),
+        context: &FormulaResolutionContext,
+    ) -> XlsbResult<Self> {
+        let (formulas, header_size) = parse_formula_header(data, "BrtBeginCFRule14", 2)?;
+        let mut cursor = CfCursor::new(&data[header_size..], "BrtBeginCFRule14");
+        let rule_type_raw = cursor.read_u32()?;
+        let rule_type = CfRuleType::from_u32(rule_type_raw).ok_or_else(|| {
+            invalid(
+                "BrtBeginCFRule14",
+                format!("invalid rule type {rule_type_raw}"),
+            )
+        })?;
+        let template = cursor.read_u32()?;
+        validate_extension14_template(rule_type, template)?;
+        let raw_dxf = cursor.read_u32()?;
+        let signed_priority = cursor.read_i32()?;
+        if signed_priority != -1 && signed_priority <= 0 {
+            return Err(invalid(
+                "BrtBeginCFRule14",
+                format!("invalid priority {signed_priority}"),
+            ));
+        }
+        if signed_priority == -1 && (rule_type != CfRuleType::DataBar || raw_dxf != 0) {
+            return Err(invalid(
+                "BrtBeginCFRule14",
+                "priority -1 requires a data-bar rule and zero DXF index",
+            ));
+        }
+        let visual = matches!(
+            rule_type,
+            CfRuleType::ColorScale | CfRuleType::DataBar | CfRuleType::IconSet
+        );
+        if signed_priority > 0 && visual && raw_dxf != u32::MAX {
+            return Err(invalid(
+                "BrtBeginCFRule14",
+                "visual rule has a differential-format index",
+            ));
+        }
+        let dxf_id = if signed_priority == -1 || raw_dxf == u32::MAX {
+            None
+        } else {
+            Some(raw_dxf)
+        };
+        let parameter = cursor.read_u32()?;
+        let reserved1 = cursor.read_u32()?;
+        let reserved2 = cursor.read_u32()?;
+        let flags = cursor.read_u16()?;
+        if reserved1 != 0 || reserved2 != 0 || flags & !0x1e != 0 {
+            return Err(invalid("BrtBeginCFRule14", "reserved fields are nonzero"));
+        }
+        let stop_if_true = flags & 0x02 != 0;
+        let above_average = flags & 0x04 != 0;
+        let bottom = flags & 0x08 != 0;
+        let percent = flags & 0x10 != 0;
+        if visual && stop_if_true {
+            return Err(invalid("BrtBeginCFRule14", "visual rule sets stop-if-true"));
+        }
+        validate_parameter_and_flags(
+            rule_type,
+            template,
+            parameter,
+            above_average,
+            bottom,
+            percent,
+        )?;
+        let declared = [cursor.read_u32()?, cursor.read_u32()?, cursor.read_u32()?];
+        let unused = cursor.read_u32()?;
+        let guid = cursor.read_array::<16>()?;
+        let guid_present = cursor.read_bool32()?;
+        let text = cursor.read_nullable_string()?;
+        cursor.finish()?;
+
+        if template == 8 {
+            if text
+                .as_ref()
+                .is_none_or(|text| text.is_empty() || text.encode_utf16().count() > 255)
+            {
+                return Err(invalid(
+                    "BrtBeginCFRule14",
+                    "contains-text template has an invalid text parameter",
+                ));
+            }
+        } else if text.is_some() {
+            return Err(invalid(
+                "BrtBeginCFRule14",
+                "non-text template has a string parameter",
+            ));
+        }
+
+        let mut formula_slots: [Option<CellParsedFormula>; 3] = [None, None, None];
+        let mut formula_iter = formulas.into_iter();
+        for (index, declared_size) in declared.into_iter().enumerate() {
+            if declared_size == 0 {
+                continue;
+            }
+            let formula = formula_iter.next().ok_or_else(|| {
+                invalid(
+                    "BrtBeginCFRule14",
+                    "declared formula is absent from FRTHeader",
+                )
+            })?;
+            if formula.rgce.len() != declared_size as usize {
+                return Err(invalid(
+                    "BrtBeginCFRule14",
+                    format!(
+                        "formula {} declared {declared_size} token bytes, found {}",
+                        index + 1,
+                        formula.rgce.len()
+                    ),
+                ));
+            }
+            formula_slots[index] = Some(formula);
+        }
+        if formula_iter.next().is_some() {
+            return Err(invalid(
+                "BrtBeginCFRule14",
+                "FRTHeader contains an undeclared formula",
+            ));
+        }
+        validate_formula_slots(rule_type, template, parameter, &formula_slots)?;
+
+        let mut binary_formulas = Vec::new();
+        let mut formula_extras = Vec::new();
+        let mut formula_texts = Vec::new();
+        for formula in formula_slots.into_iter().flatten() {
+            binary_formulas.push(formula.rgce.clone());
+            formula_extras.push(formula.rgcb.clone());
+            formula_texts.push(render_formula(&formula, base, context)?);
+        }
+        let operator = (rule_type == CfRuleType::CellIs)
+            .then(|| u8::try_from(parameter).ok())
+            .flatten();
+
+        Ok(Self {
+            rule_type,
+            dxf_id,
+            priority: u32::try_from(signed_priority).unwrap_or(0),
+            stop_if_true,
+            formulas: binary_formulas,
+            formula_extras,
+            formula_texts,
+            color_scale: None,
+            data_bar: None,
+            icon_set: None,
+            color_scale14: None,
+            data_bar14: None,
+            icon_set14: None,
+            operator,
+            parameter,
+            template,
+            text,
+            above_average,
+            bottom,
+            percent,
+            extension14: Some(ConditionalFormattingRule14Metadata {
+                priority: signed_priority,
+                unused,
+                guid,
+                guid_present,
+                linked_classic_priority: None,
+            }),
+            classic_extension_guid: None,
+        })
+    }
+
+    /// Serialize an Office 2013 `BrtBeginCFRule14` payload.
+    pub fn serialize_extension14(&self) -> XlsbResult<Vec<u8>> {
+        let metadata = self.extension14.ok_or_else(|| {
+            invalid(
+                "BrtBeginCFRule14",
+                "rule does not contain Office 2013 metadata",
+            )
+        })?;
+        validate_extension14_template(self.rule_type, self.template)?;
+        if metadata.priority != -1 && metadata.priority <= 0 {
+            return Err(invalid(
+                "BrtBeginCFRule14",
+                format!("invalid priority {}", metadata.priority),
+            ));
+        }
+        if metadata.priority > 0 && self.priority != metadata.priority as u32 {
+            return Err(invalid(
+                "BrtBeginCFRule14",
+                "classic and extension priorities disagree",
+            ));
+        }
+        if metadata.priority == -1 && self.rule_type != CfRuleType::DataBar {
+            return Err(invalid(
+                "BrtBeginCFRule14",
+                "priority -1 is only valid for a data-bar extension",
+            ));
+        }
+        let parameter = effective_rule_parameter(self)?;
+        validate_parameter_and_flags(
+            self.rule_type,
+            self.template,
+            parameter,
+            self.above_average,
+            self.bottom,
+            self.percent,
+        )?;
+        let visual = matches!(
+            self.rule_type,
+            CfRuleType::ColorScale | CfRuleType::DataBar | CfRuleType::IconSet
+        );
+        if visual && (self.stop_if_true || (metadata.priority > 0 && self.dxf_id.is_some())) {
+            return Err(invalid(
+                "BrtBeginCFRule14",
+                "visual rule has a DXF or stop-if-true flag",
+            ));
+        }
+        if metadata.priority == -1 && self.dxf_id.is_some() {
+            return Err(invalid(
+                "BrtBeginCFRule14",
+                "data-bar extension has a DXF index",
+            ));
+        }
+        validate_rule_text(self.template, self.text.as_deref(), "BrtBeginCFRule14")?;
+
+        let formulas = effective_rule_formulas(self)?;
+        validate_formula_count(self.rule_type, self.template, parameter, formulas.len())?;
+        let mut slots: [Option<&CellParsedFormula>; 3] = [None, None, None];
+        let start = if visual { 2 } else { 0 };
+        for (index, formula) in formulas.iter().enumerate() {
+            slots[start + index] = Some(formula);
+        }
+        let owned_slots = slots.each_ref().map(|formula| formula.cloned());
+        validate_formula_slots(self.rule_type, self.template, parameter, &owned_slots)?;
+
+        let mut payload = serialize_formula_header(&formulas, 2)?;
+        payload.extend_from_slice(&(self.rule_type as u32).to_le_bytes());
+        payload.extend_from_slice(&self.template.to_le_bytes());
+        let raw_dxf = if metadata.priority == -1 {
+            0
+        } else {
+            self.dxf_id.unwrap_or(u32::MAX)
+        };
+        payload.extend_from_slice(&raw_dxf.to_le_bytes());
+        payload.extend_from_slice(&metadata.priority.to_le_bytes());
+        payload.extend_from_slice(&parameter.to_le_bytes());
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        let mut flags = 0u16;
+        flags |= u16::from(self.stop_if_true) << 1;
+        flags |= u16::from(self.above_average) << 2;
+        flags |= u16::from(self.bottom) << 3;
+        flags |= u16::from(self.percent) << 4;
+        payload.extend_from_slice(&flags.to_le_bytes());
+        for formula in &slots {
+            payload.extend_from_slice(
+                &u32::try_from(formula.map_or(0, |formula| formula.rgce.len()))
+                    .map_err(|_| XlsbError::InvalidFormula("formula is too large".to_string()))?
+                    .to_le_bytes(),
+            );
+        }
+        payload.extend_from_slice(&metadata.unused.to_le_bytes());
+        payload.extend_from_slice(&metadata.guid);
+        payload.extend_from_slice(&u32::from(metadata.guid_present).to_le_bytes());
+        write_nullable_string(&mut payload, self.text.as_deref())?;
+        Ok(payload)
     }
 }
 
@@ -722,6 +1382,8 @@ pub struct ConditionalFormatting {
     pub rules: Vec<ConditionalFormattingRule>,
     /// Whether the ranges are confined to a PivotTable data area.
     pub pivot_only: bool,
+    /// Binary record family used to encode this collection.
+    pub record_kind: ConditionalFormattingRecordKind,
 }
 
 impl ConditionalFormatting {
@@ -730,6 +1392,17 @@ impl ConditionalFormatting {
             ranges,
             rules: Vec::new(),
             pivot_only: false,
+            record_kind: ConditionalFormattingRecordKind::Classic,
+        }
+    }
+
+    /// Create an Office 2013 conditional-formatting collection.
+    pub fn new_extension14(ranges: Vec<String>) -> Self {
+        Self {
+            ranges,
+            rules: Vec::new(),
+            pivot_only: false,
+            record_kind: ConditionalFormattingRecordKind::Extension14,
         }
     }
 
@@ -739,12 +1412,20 @@ impl ConditionalFormatting {
 
     /// Parse an Office 2013 `BrtBeginConditionalFormatting14` payload.
     pub fn parse_extension14_header(data: &[u8]) -> XlsbResult<(Self, u32)> {
+        let (formatting, count, _) = Self::parse_extension14_header_with_base(data)?;
+        Ok((formatting, count))
+    }
+
+    pub(crate) fn parse_extension14_header_with_base(
+        data: &[u8],
+    ) -> XlsbResult<(Self, u32, (u32, u32))> {
         let (ranges, header_size) =
             parse_sqref_header(data, "BrtBeginConditionalFormatting14", i32::MAX as usize)?;
         let mut cursor = CfCursor::new(&data[header_size..], "BrtBeginConditionalFormatting14");
         let count = cursor.read_u32()?;
         let pivot_only = cursor.read_bool32()?;
         cursor.finish()?;
+        let base = (ranges[0].0, ranges[0].2);
         let ranges = ranges
             .into_iter()
             .map(|(first_row, last_row, first_col, last_col)| {
@@ -762,8 +1443,10 @@ impl ConditionalFormatting {
                 ranges,
                 rules: Vec::new(),
                 pivot_only,
+                record_kind: ConditionalFormattingRecordKind::Extension14,
             },
             count,
+            base,
         ))
     }
 
@@ -818,6 +1501,7 @@ pub(crate) fn parse_classic_header(
             ranges,
             rules: Vec::new(),
             pivot_only,
+            record_kind: ConditionalFormattingRecordKind::Classic,
         },
         count,
         base,
@@ -851,6 +1535,19 @@ pub(crate) fn validate_template(rule_type: CfRuleType, template: u32) -> XlsbRes
             "BrtBeginCFRule",
             format!("template {template} is invalid for {rule_type:?}"),
         ))
+    }
+}
+
+fn validate_extension14_template(rule_type: CfRuleType, template: u32) -> XlsbResult<()> {
+    if rule_type == CfRuleType::DataBar && template == 0 {
+        Ok(())
+    } else {
+        validate_template(rule_type, template).map_err(|_| {
+            invalid(
+                "BrtBeginCFRule14",
+                format!("template {template} is invalid for {rule_type:?}"),
+            )
+        })
     }
 }
 
@@ -980,6 +1677,85 @@ fn format_number(value: f64) -> String {
     }
 }
 
+fn effective_rule_parameter(rule: &ConditionalFormattingRule) -> XlsbResult<u32> {
+    if rule.rule_type != CfRuleType::CellIs {
+        if rule.operator.is_some() {
+            return Err(invalid(
+                "BrtBeginCFRule14",
+                "operator is set on a non-cell-comparison rule",
+            ));
+        }
+        return Ok(rule.parameter);
+    }
+    let parameter = rule.operator.map_or(rule.parameter, u32::from);
+    if rule.parameter != 0 && rule.parameter != parameter {
+        return Err(invalid(
+            "BrtBeginCFRule14",
+            "operator and exact parameter disagree",
+        ));
+    }
+    Ok(parameter)
+}
+
+fn effective_rule_formulas(rule: &ConditionalFormattingRule) -> XlsbResult<Vec<CellParsedFormula>> {
+    if !rule.formulas.is_empty() {
+        if !rule.formula_extras.is_empty() && rule.formula_extras.len() != rule.formulas.len() {
+            return Err(XlsbError::InvalidFormula(
+                "conditional-format ancillary stream count does not match formulas".to_string(),
+            ));
+        }
+        return rule
+            .formulas
+            .iter()
+            .enumerate()
+            .map(|(index, rgce)| {
+                if rgce.is_empty() || rgce.len() > MAX_CELL_FORMULA_BYTES {
+                    return Err(XlsbError::InvalidFormula(format!(
+                        "conditional-format formula length {} is outside 1..={MAX_CELL_FORMULA_BYTES}",
+                        rgce.len()
+                    )));
+                }
+                Ok(CellParsedFormula {
+                    rgce: rgce.clone(),
+                    rgcb: rule.formula_extras.get(index).cloned().unwrap_or_default(),
+                })
+            })
+            .collect();
+    }
+    rule.formula_texts
+        .iter()
+        .map(|formula| crate::xlsb::formula::FormulaCompiler::compile(formula))
+        .collect()
+}
+
+fn validate_rule_text(template: u32, text: Option<&str>, record: &'static str) -> XlsbResult<()> {
+    if template == 8 {
+        if text.is_none_or(|text| text.is_empty() || text.encode_utf16().count() > 255) {
+            return Err(invalid(record, "invalid text parameter"));
+        }
+    } else if text.is_some() {
+        return Err(invalid(record, "non-text template has a text parameter"));
+    }
+    Ok(())
+}
+
+fn write_nullable_string(data: &mut Vec<u8>, value: Option<&str>) -> XlsbResult<()> {
+    let Some(value) = value else {
+        data.extend_from_slice(&u32::MAX.to_le_bytes());
+        return Ok(());
+    };
+    let units = value.encode_utf16().collect::<Vec<_>>();
+    data.extend_from_slice(
+        &u32::try_from(units.len())
+            .map_err(|_| invalid("XLNullableWideString", "string length overflow"))?
+            .to_le_bytes(),
+    );
+    for unit in units {
+        data.extend_from_slice(&unit.to_le_bytes());
+    }
+    Ok(())
+}
+
 fn invalid(typ: &'static str, val: impl Into<String>) -> XlsbError {
     XlsbError::Unrecognized {
         typ: typ.to_string(),
@@ -1023,11 +1799,39 @@ impl<'a> CfCursor<'a> {
         Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
     }
 
+    fn read_u8(&mut self) -> XlsbResult<u8> {
+        Ok(self.take(1)?[0])
+    }
+
+    fn read_bool8(&mut self) -> XlsbResult<bool> {
+        match self.read_u8()? {
+            0 => Ok(false),
+            1 => Ok(true),
+            value => Err(invalid(self.record, format!("invalid Boolean {value}"))),
+        }
+    }
+
     fn read_u32(&mut self) -> XlsbResult<u32> {
         let bytes = self.take(4)?;
         Ok(u32::from_le_bytes(
             bytes.try_into().expect("four-byte field"),
         ))
+    }
+
+    fn read_i32(&mut self) -> XlsbResult<i32> {
+        let bytes = self.take(4)?;
+        Ok(i32::from_le_bytes(
+            bytes.try_into().expect("four-byte field"),
+        ))
+    }
+
+    fn read_array<const N: usize>(&mut self) -> XlsbResult<[u8; N]> {
+        self.take(N)?
+            .try_into()
+            .map_err(|_| XlsbError::InvalidLength {
+                expected: N,
+                found: self.data.len().saturating_sub(self.offset),
+            })
     }
 
     fn read_f64(&mut self) -> XlsbResult<f64> {
@@ -1536,6 +2340,93 @@ mod tests {
     }
 
     #[test]
+    fn extension_color_and_rule_guid_roundtrip_exactly() {
+        let color = ConditionalFormatColor::theme(4, -2_500).unwrap();
+        let encoded = color.serialize_extension14().unwrap();
+        assert_eq!(
+            ConditionalFormatColor::parse_extension14(&encoded).unwrap(),
+            color
+        );
+        let mut malformed = encoded;
+        malformed[0] = 1;
+        assert!(ConditionalFormatColor::parse_extension14(&malformed).is_err());
+
+        let guid = [0x42; 16];
+        let encoded = serialize_rule_extension_guid(guid);
+        assert_eq!(parse_rule_extension_guid(&encoded).unwrap(), guid);
+        let mut malformed = encoded;
+        malformed[3] = 1;
+        assert!(parse_rule_extension_guid(&malformed).is_err());
+    }
+
+    #[test]
+    fn extension_data_bar_header_preserves_flags() {
+        let mut bar = DataBar14::new(
+            Cfvo::new(8, None),
+            Cfvo::new(9, None),
+            ConditionalFormatColor::from_argb(0xff44_72c4),
+        );
+        bar.min_length = 3;
+        bar.max_length = 97;
+        bar.show_value = false;
+        bar.direction = DataBarDirection14::RightToLeft;
+        bar.axis_position = DataBarAxisPosition14::Midpoint;
+        bar.border = true;
+        bar.custom_negative_fill = true;
+        bar.unused_flags = 0xA5F0;
+        let encoded = bar.serialize_header().unwrap();
+        let parsed = DataBar14::parse_header(&encoded).unwrap();
+        assert_eq!(parsed.min_length, 3);
+        assert_eq!(parsed.max_length, 97);
+        assert!(!parsed.show_value);
+        assert_eq!(parsed.direction, DataBarDirection14::RightToLeft);
+        assert_eq!(parsed.axis_position, DataBarAxisPosition14::Midpoint);
+        assert!(parsed.border);
+        assert!(parsed.gradient);
+        assert!(parsed.custom_negative_fill);
+        assert_eq!(parsed.unused_flags, 0xA5F0);
+
+        let mut malformed = encoded;
+        malformed[6] = 2;
+        assert!(DataBar14::parse_header(&malformed).is_err());
+    }
+
+    #[test]
+    fn extension_icon_set_and_custom_icons_roundtrip() {
+        let mut set = IconSet14::new(19, vec![Cfvo::new(1, Some("0".to_string())); 5]);
+        set.show_value = false;
+        set.reverse = true;
+        set.unused_flags = 0x38;
+        set.custom_icons = Some(vec![
+            ConditionalFormatIcon {
+                icon_set: -1,
+                index: -1,
+            };
+            5
+        ]);
+        let encoded = set.serialize_header().unwrap();
+        let parsed = IconSet14::parse_header(&encoded).unwrap();
+        assert_eq!(parsed.icon_set_type, 19);
+        assert!(parsed.custom);
+        assert!(!parsed.show_value);
+        assert!(parsed.reverse);
+        assert_eq!(parsed.unused_flags, 0x38);
+
+        for icon in set.custom_icons.unwrap() {
+            let encoded = icon.serialize().unwrap();
+            assert_eq!(ConditionalFormatIcon::parse(&encoded).unwrap(), icon);
+        }
+        assert!(
+            ConditionalFormatIcon {
+                icon_set: 0,
+                index: 3,
+            }
+            .serialize()
+            .is_err()
+        );
+    }
+
+    #[test]
     fn parses_classic_header_with_pivot_and_range() {
         let mut data = Vec::new();
         data.extend_from_slice(&1u32.to_le_bytes());
@@ -1564,5 +2455,85 @@ mod tests {
         assert_eq!(count, 1);
         assert_eq!(parsed.ranges, ["A1:B2", "C3"]);
         assert!(parsed.pivot_only);
+        assert_eq!(
+            parsed.record_kind,
+            ConditionalFormattingRecordKind::Extension14
+        );
+    }
+
+    #[test]
+    fn extension_rule_roundtrips_two_formulas_and_ancillary_data() {
+        let first = FormulaCompiler::compile("{1,2}").unwrap();
+        let second = FormulaCompiler::compile("10").unwrap();
+        assert!(!first.rgcb.is_empty());
+        let mut rule = ConditionalFormattingRule::new(CfRuleType::CellIs, 7);
+        rule.operator = Some(1);
+        rule.parameter = 1;
+        rule.formulas = vec![first.rgce.clone(), second.rgce.clone()];
+        rule.formula_extras = vec![first.rgcb.clone(), second.rgcb.clone()];
+        rule.dxf_id = Some(4);
+        rule.extension14 = Some(ConditionalFormattingRule14Metadata {
+            priority: 7,
+            unused: 0xA5A5_5A5A,
+            guid: [0x3c; 16],
+            guid_present: true,
+            linked_classic_priority: None,
+        });
+
+        let encoded = rule.serialize_extension14().unwrap();
+        let parsed = ConditionalFormattingRule::parse_extension14(&encoded).unwrap();
+        assert_eq!(parsed.priority, 7);
+        assert_eq!(parsed.operator, Some(1));
+        assert_eq!(parsed.formulas, [first.rgce, second.rgce]);
+        assert_eq!(parsed.formula_extras, [first.rgcb, second.rgcb]);
+        assert_eq!(parsed.extension14, rule.extension14);
+        assert_eq!(parsed.serialize_extension14().unwrap(), encoded);
+    }
+
+    #[test]
+    fn extension_rule_preserves_signed_data_bar_linkage() {
+        let mut rule = ConditionalFormattingRule::new(CfRuleType::DataBar, 0);
+        rule.template = 0;
+        rule.extension14 = Some(ConditionalFormattingRule14Metadata {
+            priority: -1,
+            unused: 0xDEAD_BEEF,
+            guid: [0x96; 16],
+            guid_present: true,
+            linked_classic_priority: None,
+        });
+
+        let encoded = rule.serialize_extension14().unwrap();
+        let parsed = ConditionalFormattingRule::parse_extension14(&encoded).unwrap();
+        assert_eq!(parsed.priority, 0);
+        assert_eq!(parsed.template, 0);
+        assert_eq!(parsed.extension14, rule.extension14);
+        assert_eq!(parsed.serialize_extension14().unwrap(), encoded);
+    }
+
+    #[test]
+    fn extension_rule_rejects_malformed_fixed_and_formula_fields() {
+        let mut rule = ConditionalFormattingRule::new(CfRuleType::Expression, 2);
+        rule.formula_texts.push("1".to_string());
+        rule.extension14 = Some(ConditionalFormattingRule14Metadata {
+            priority: 2,
+            unused: 0,
+            guid: [0; 16],
+            guid_present: false,
+            linked_classic_priority: None,
+        });
+        let encoded = rule.serialize_extension14().unwrap();
+        let (_, fixed_offset) = parse_formula_header(&encoded, "test", 2).unwrap();
+
+        let mut reserved = encoded.clone();
+        reserved[fixed_offset + 20..fixed_offset + 24].copy_from_slice(&1u32.to_le_bytes());
+        assert!(ConditionalFormattingRule::parse_extension14(&reserved).is_err());
+
+        let mut priority = encoded.clone();
+        priority[fixed_offset + 12..fixed_offset + 16].copy_from_slice(&0i32.to_le_bytes());
+        assert!(ConditionalFormattingRule::parse_extension14(&priority).is_err());
+
+        let mut declared = encoded;
+        declared[fixed_offset + 30..fixed_offset + 34].copy_from_slice(&999u32.to_le_bytes());
+        assert!(ConditionalFormattingRule::parse_extension14(&declared).is_err());
     }
 }

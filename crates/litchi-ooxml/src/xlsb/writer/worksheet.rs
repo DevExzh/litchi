@@ -139,6 +139,12 @@ enum ConditionalValueLocation {
     DataBarMin,
     DataBarMax,
     IconSet(usize),
+    ColorScale14Min,
+    ColorScale14Mid,
+    ColorScale14Max,
+    DataBar14Min,
+    DataBar14Max,
+    IconSet14(usize),
 }
 
 fn conditional_value_mut(
@@ -160,6 +166,26 @@ fn conditional_value_mut(
         ConditionalValueLocation::DataBarMax => rule.data_bar.as_mut().map(|bar| &mut bar.max_cfvo),
         ConditionalValueLocation::IconSet(index) => rule
             .icon_set
+            .as_mut()
+            .and_then(|set| set.cfvos.get_mut(index)),
+        ConditionalValueLocation::ColorScale14Min => {
+            rule.color_scale14.as_mut().map(|scale| &mut scale.min_cfvo)
+        },
+        ConditionalValueLocation::ColorScale14Mid => rule
+            .color_scale14
+            .as_mut()
+            .and_then(|scale| scale.mid_cfvo.as_mut()),
+        ConditionalValueLocation::ColorScale14Max => {
+            rule.color_scale14.as_mut().map(|scale| &mut scale.max_cfvo)
+        },
+        ConditionalValueLocation::DataBar14Min => {
+            rule.data_bar14.as_mut().map(|bar| &mut bar.min_cfvo)
+        },
+        ConditionalValueLocation::DataBar14Max => {
+            rule.data_bar14.as_mut().map(|bar| &mut bar.max_cfvo)
+        },
+        ConditionalValueLocation::IconSet14(index) => rule
+            .icon_set14
             .as_mut()
             .and_then(|set| set.cfvos.get_mut(index)),
     }
@@ -307,6 +333,24 @@ impl MutableXlsbWorksheet {
                     values.extend(
                         set.cfvos.iter().enumerate().map(|(index, value)| {
                             (ConditionalValueLocation::IconSet(index), value)
+                        }),
+                    );
+                }
+                if let Some(scale) = &rule.color_scale14 {
+                    values.push((ConditionalValueLocation::ColorScale14Min, &scale.min_cfvo));
+                    if let Some(midpoint) = &scale.mid_cfvo {
+                        values.push((ConditionalValueLocation::ColorScale14Mid, midpoint));
+                    }
+                    values.push((ConditionalValueLocation::ColorScale14Max, &scale.max_cfvo));
+                }
+                if let Some(bar) = &rule.data_bar14 {
+                    values.push((ConditionalValueLocation::DataBar14Min, &bar.min_cfvo));
+                    values.push((ConditionalValueLocation::DataBar14Max, &bar.max_cfvo));
+                }
+                if let Some(set) = &rule.icon_set14 {
+                    values.extend(
+                        set.cfvos.iter().enumerate().map(|(index, value)| {
+                            (ConditionalValueLocation::IconSet14(index), value)
                         }),
                     );
                 }

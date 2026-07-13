@@ -2,8 +2,9 @@
 
 use crate::xlsb::cell::{CellHeader, XlsbCell};
 use crate::xlsb::conditional_formatting::{
-    Cfvo, ColorScale, ConditionalFormatColor, ConditionalFormatting, ConditionalFormattingRule,
-    DataBar, IconSet, parse_classic_header,
+    CfRuleType, Cfvo, ColorScale, ConditionalFormatColor, ConditionalFormatIcon,
+    ConditionalFormatting, ConditionalFormattingRecordKind, ConditionalFormattingRule, DataBar,
+    DataBar14, IconSet, IconSet14, icon_count14, parse_classic_header, parse_rule_extension_guid,
 };
 use crate::xlsb::data_validation::{
     DataValidation, DataValidationSettings, parse_collection_settings, parse_dval_list,
@@ -21,6 +22,7 @@ use crate::xlsb::worksheet::{
 };
 use litchi_core::binary;
 use litchi_core::sheet::CellValue;
+use std::collections::{HashMap, HashSet};
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
@@ -29,6 +31,50 @@ struct ParsedFormulaCell {
     cached_value: CellValue,
     formula: CellParsedFormula,
     flags: u16,
+}
+
+fn build_color_scale(
+    cfvos: Vec<Cfvo>,
+    colors: Vec<ConditionalFormatColor>,
+    record: &'static str,
+    extension14: bool,
+) -> XlsbResult<ColorScale> {
+    if !(cfvos.len() == 2 || cfvos.len() == 3) || colors.len() != cfvos.len() {
+        return Err(XlsbError::Unrecognized {
+            typ: record.to_string(),
+            val: format!("{} thresholds and {} colors", cfvos.len(), colors.len()),
+        });
+    }
+    if (extension14 && cfvos.iter().any(|cfvo| matches!(cfvo.cfvo_type, 8 | 9)))
+        || cfvos[0].cfvo_type == 3
+        || cfvos[cfvos.len() - 1].cfvo_type == 2
+        || (cfvos.len() == 3 && matches!(cfvos[1].cfvo_type, 2 | 3))
+    {
+        return Err(XlsbError::Unrecognized {
+            typ: record.to_string(),
+            val: "invalid min/mid/max threshold type".to_string(),
+        });
+    }
+    let has_middle = colors.len() == 3;
+    let mut cfvos = cfvos.into_iter();
+    let min_cfvo = cfvos.next().expect("validated threshold count");
+    let middle_cfvo = if has_middle { cfvos.next() } else { None };
+    let max_cfvo = cfvos.next().expect("validated threshold count");
+    let mut colors = colors.into_iter();
+    let min_color_record = colors.next().expect("validated color count");
+    let mid_color_record = if has_middle { colors.next() } else { None };
+    let max_color_record = colors.next().expect("validated color count");
+    Ok(ColorScale {
+        min_cfvo,
+        mid_cfvo: middle_cfvo,
+        max_cfvo,
+        min_color: min_color_record.argb.unwrap_or(0),
+        mid_color: mid_color_record.and_then(|color| color.argb),
+        max_color: max_color_record.argb.unwrap_or(0),
+        min_color_record,
+        mid_color_record,
+        max_color_record,
+    })
 }
 
 /// Dimensions of a worksheet
@@ -82,7 +128,7 @@ where
     pub data_validation_settings: Option<DataValidationSettings>,
     /// UI settings from the Office 2013 validation collection.
     pub data_validation14_settings: Option<DataValidationSettings>,
-    /// Classic conditional-formatting blocks in stream order.
+    /// Classic and Office 2013 conditional-formatting blocks in stream order.
     pub conditional_formattings: Vec<ConditionalFormatting>,
 }
 
@@ -857,8 +903,15 @@ where
                     self.consume_conditional_formatting(&mut formatting, count, base)?;
                     self.conditional_formattings.push(formatting);
                 },
+                record_types::BEGIN_COND_FORMATTING14 => {
+                    let (mut formatting, count, base) =
+                        ConditionalFormatting::parse_extension14_header_with_base(&self.buf)?;
+                    self.consume_extension_conditional_formatting(&mut formatting, count, base)?;
+                    self.conditional_formattings.push(formatting);
+                },
                 0x0082 => {
                     // BrtEndSheet - end of worksheet
+                    self.resolve_conditional_formatting_links()?;
                     break;
                 },
                 _ => {
@@ -867,6 +920,88 @@ where
             }
         }
 
+        Ok(())
+    }
+
+    fn resolve_conditional_formatting_links(&mut self) -> XlsbResult<()> {
+        let mut classic = HashMap::new();
+        for formatting in &self.conditional_formattings {
+            if formatting.record_kind != ConditionalFormattingRecordKind::Classic {
+                continue;
+            }
+            for rule in &formatting.rules {
+                let Some(guid) = rule.classic_extension_guid else {
+                    continue;
+                };
+                let bar = rule
+                    .data_bar
+                    .as_ref()
+                    .ok_or_else(|| XlsbError::Unrecognized {
+                        typ: "BrtCFRuleExt".to_string(),
+                        val: "is attached to a non-data-bar rule".to_string(),
+                    })?;
+                if classic
+                    .insert(guid, (rule.priority, bar.min_length, bar.max_length))
+                    .is_some()
+                {
+                    return Err(XlsbError::Unrecognized {
+                        typ: "BrtCFRuleExt".to_string(),
+                        val: "duplicate GUID".to_string(),
+                    });
+                }
+            }
+        }
+
+        let mut matched = HashSet::new();
+        for formatting in &mut self.conditional_formattings {
+            if formatting.record_kind != ConditionalFormattingRecordKind::Extension14 {
+                continue;
+            }
+            for rule in &mut formatting.rules {
+                let Some(metadata) = rule.extension14.as_mut() else {
+                    continue;
+                };
+                if metadata.priority != -1 {
+                    continue;
+                }
+                metadata.linked_classic_priority = None;
+                if !metadata.guid_present {
+                    continue;
+                }
+                let Some(&(priority, classic_min, classic_max)) = classic.get(&metadata.guid)
+                else {
+                    continue;
+                };
+                if !matched.insert(metadata.guid) {
+                    return Err(XlsbError::Unrecognized {
+                        typ: "BrtBeginCFRule14".to_string(),
+                        val: "multiple data-bar extensions use the same GUID".to_string(),
+                    });
+                }
+                let bar = rule
+                    .data_bar14
+                    .as_ref()
+                    .expect("validated CFRule14 visualization");
+                let expected_lengths = if bar.min_length == 0 && bar.max_length == 100 {
+                    (10, 90)
+                } else {
+                    (bar.min_length, bar.max_length)
+                };
+                if (classic_min, classic_max) != expected_lengths {
+                    return Err(XlsbError::Unrecognized {
+                        typ: "BrtBeginDatabar14".to_string(),
+                        val: "widths do not agree with the linked classic data bar".to_string(),
+                    });
+                }
+                metadata.linked_classic_priority = Some(priority);
+            }
+        }
+        if let Some(orphan) = classic.keys().find(|guid| !matched.contains(*guid)) {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtCFRuleExt".to_string(),
+                val: format!("GUID {orphan:02X?} has no matching data-bar extension"),
+            });
+        }
         Ok(())
     }
 
@@ -1029,6 +1164,164 @@ where
         Ok(())
     }
 
+    fn consume_extension_conditional_formatting(
+        &mut self,
+        formatting: &mut ConditionalFormatting,
+        expected_count: u32,
+        base: (u32, u32),
+    ) -> XlsbResult<()> {
+        loop {
+            self.buf.clear();
+            let typ = self.iter.read_type()?;
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
+            match typ {
+                record_types::BEGIN_CF_RULE14 => {
+                    let mut rule = ConditionalFormattingRule::parse_extension14_with_context(
+                        &self.buf,
+                        base,
+                        self.formula_context,
+                    )?;
+                    let signed_priority = rule
+                        .extension14
+                        .as_ref()
+                        .expect("extension parser supplies metadata")
+                        .priority;
+                    if signed_priority > 0
+                        && formatting
+                            .rules
+                            .iter()
+                            .chain(self.conditional_formattings.iter().flat_map(|cf| &cf.rules))
+                            .any(|existing| existing.priority == rule.priority)
+                    {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtBeginCFRule14 priority".to_string(),
+                            val: format!("duplicate {}", rule.priority),
+                        });
+                    }
+                    self.consume_extension_conditional_rule(&mut rule, base)?;
+                    formatting.rules.push(rule);
+                },
+                record_types::END_COND_FORMATTING14 => {
+                    if !self.buf.is_empty() {
+                        return Err(XlsbError::InvalidLength {
+                            expected: 0,
+                            found: self.buf.len(),
+                        });
+                    }
+                    break;
+                },
+                _ => {
+                    return Err(XlsbError::Unrecognized {
+                        typ: "BrtBeginConditionalFormatting14 collection".to_string(),
+                        val: format!("unexpected record 0x{typ:04X}"),
+                    });
+                },
+            }
+        }
+        if formatting.rules.len() != expected_count as usize {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginConditionalFormatting14 count".to_string(),
+                val: format!(
+                    "declared {expected_count}, found {}",
+                    formatting.rules.len()
+                ),
+            });
+        }
+        Ok(())
+    }
+
+    fn consume_extension_conditional_rule(
+        &mut self,
+        rule: &mut ConditionalFormattingRule,
+        base: (u32, u32),
+    ) -> XlsbResult<()> {
+        loop {
+            self.buf.clear();
+            let typ = self.iter.read_type()?;
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
+            match typ {
+                record_types::BEGIN_COLOR_SCALE14 => {
+                    if rule.color_scale14.is_some() || !self.buf.is_empty() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtBeginColorScale14".to_string(),
+                            val: "duplicate record or nonempty payload".to_string(),
+                        });
+                    }
+                    rule.color_scale14 = Some(self.consume_color_scale14(base)?);
+                },
+                record_types::BEGIN_DATABAR14 => {
+                    if rule.data_bar14.is_some() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtBeginDatabar14".to_string(),
+                            val: "duplicate record".to_string(),
+                        });
+                    }
+                    let begin = self.buf.clone();
+                    let priority = rule
+                        .extension14
+                        .as_ref()
+                        .expect("extension parser supplies metadata")
+                        .priority;
+                    rule.data_bar14 = Some(self.consume_data_bar14(&begin, base, priority)?);
+                },
+                record_types::BEGIN_ICON_SET14 => {
+                    if rule.icon_set14.is_some() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtBeginIconSet14".to_string(),
+                            val: "duplicate record".to_string(),
+                        });
+                    }
+                    let begin = self.buf.clone();
+                    rule.icon_set14 = Some(self.consume_icon_set14(&begin, base)?);
+                },
+                record_types::END_CF_RULE14 => {
+                    if !self.buf.is_empty() {
+                        return Err(XlsbError::InvalidLength {
+                            expected: 0,
+                            found: self.buf.len(),
+                        });
+                    }
+                    break;
+                },
+                _ => {
+                    return Err(XlsbError::Unrecognized {
+                        typ: "BrtBeginCFRule14 collection".to_string(),
+                        val: format!("unexpected record 0x{typ:04X}"),
+                    });
+                },
+            }
+        }
+        let valid_visual = match rule.rule_type {
+            CfRuleType::ColorScale => {
+                rule.color_scale14.is_some()
+                    && rule.data_bar14.is_none()
+                    && rule.icon_set14.is_none()
+            },
+            CfRuleType::DataBar => {
+                rule.color_scale14.is_none()
+                    && rule.data_bar14.is_some()
+                    && rule.icon_set14.is_none()
+            },
+            CfRuleType::IconSet => {
+                rule.color_scale14.is_none()
+                    && rule.data_bar14.is_none()
+                    && rule.icon_set14.is_some()
+            },
+            _ => {
+                rule.color_scale14.is_none()
+                    && rule.data_bar14.is_none()
+                    && rule.icon_set14.is_none()
+            },
+        };
+        if !valid_visual {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginCFRule14 collection".to_string(),
+                val: "visualization records do not match rule type".to_string(),
+            });
+        }
+        Ok(())
+    }
+
     fn consume_conditional_rule(
         &mut self,
         rule: &mut ConditionalFormattingRule,
@@ -1067,6 +1360,15 @@ where
                     }
                     let begin = self.buf.clone();
                     rule.icon_set = Some(self.consume_icon_set(&begin, base)?);
+                },
+                record_types::CF_RULE_EXT => {
+                    if rule.classic_extension_guid.is_some() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtCFRuleExt".to_string(),
+                            val: "duplicate record".to_string(),
+                        });
+                    }
+                    rule.classic_extension_guid = Some(parse_rule_extension_guid(&self.buf)?);
                 },
                 record_types::END_CF_RULE => {
                     if !self.buf.is_empty() {
@@ -1178,6 +1480,32 @@ where
         })
     }
 
+    fn consume_color_scale14(&mut self, base: (u32, u32)) -> XlsbResult<ColorScale> {
+        let mut cfvos = Vec::new();
+        let mut colors = Vec::new();
+        loop {
+            self.buf.clear();
+            let typ = self.iter.read_type()?;
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
+            match typ {
+                record_types::CFVO14 if colors.is_empty() => cfvos.push(
+                    Cfvo::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
+                ),
+                record_types::COLOR14 => {
+                    colors.push(ConditionalFormatColor::parse_extension14(&self.buf)?)
+                },
+                record_types::END_COLOR_SCALE14 if self.buf.is_empty() => break,
+                _ => {
+                    return Err(XlsbError::Unrecognized {
+                        typ: "BrtBeginColorScale14 collection".to_string(),
+                        val: format!("unexpected record 0x{typ:04X}"),
+                    });
+                },
+            }
+        }
+        build_color_scale(cfvos, colors, "BrtBeginColorScale14 collection", true)
+    }
+
     fn consume_data_bar(&mut self, begin: &[u8], base: (u32, u32)) -> XlsbResult<DataBar> {
         if begin.len() != 3 || begin[0] > begin[1] || begin[1] > 100 || begin[2] > 1 {
             return Err(XlsbError::Unrecognized {
@@ -1241,6 +1569,91 @@ where
         })
     }
 
+    fn consume_data_bar14(
+        &mut self,
+        begin: &[u8],
+        base: (u32, u32),
+        priority: i32,
+    ) -> XlsbResult<DataBar14> {
+        let header = DataBar14::parse_header(begin)?;
+        let mut cfvos = Vec::new();
+        let mut colors = Vec::new();
+        loop {
+            self.buf.clear();
+            let typ = self.iter.read_type()?;
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
+            match typ {
+                record_types::CFVO14 if colors.is_empty() => cfvos.push(
+                    Cfvo::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
+                ),
+                record_types::COLOR14 => {
+                    colors.push(ConditionalFormatColor::parse_extension14(&self.buf)?)
+                },
+                record_types::END_DATABAR14 if self.buf.is_empty() => break,
+                _ => {
+                    return Err(XlsbError::Unrecognized {
+                        typ: "BrtBeginDatabar14 collection".to_string(),
+                        val: format!("unexpected record 0x{typ:04X}"),
+                    });
+                },
+            }
+        }
+        if cfvos.len() != 2
+            || matches!(cfvos[0].cfvo_type, 3 | 9)
+            || matches!(cfvos[1].cfvo_type, 2 | 8)
+        {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginDatabar14 collection".to_string(),
+                val: "invalid minimum/maximum thresholds".to_string(),
+            });
+        }
+        let expected_colors = usize::from(priority != -1)
+            + usize::from(header.border)
+            + usize::from(header.custom_negative_fill)
+            + usize::from(header.custom_negative_border && header.border)
+            + usize::from(
+                header.axis_position
+                    != crate::xlsb::conditional_formatting::DataBarAxisPosition14::None,
+            );
+        if colors.len() != expected_colors {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginDatabar14 collection".to_string(),
+                val: format!("expected {expected_colors} colors, found {}", colors.len()),
+            });
+        }
+        let [min_cfvo, max_cfvo]: [Cfvo; 2] = cfvos.try_into().expect("validated two thresholds");
+        let mut colors = colors.into_iter();
+        let positive_color = (priority != -1).then(|| colors.next()).flatten();
+        let border_color = header.border.then(|| colors.next()).flatten();
+        let negative_color = header.custom_negative_fill.then(|| colors.next()).flatten();
+        let negative_border_color = (header.custom_negative_border && header.border)
+            .then(|| colors.next())
+            .flatten();
+        let axis_color = (header.axis_position
+            != crate::xlsb::conditional_formatting::DataBarAxisPosition14::None)
+            .then(|| colors.next())
+            .flatten();
+        Ok(DataBar14 {
+            min_cfvo,
+            max_cfvo,
+            positive_color,
+            border_color,
+            negative_color,
+            negative_border_color,
+            axis_color,
+            min_length: header.min_length,
+            max_length: header.max_length,
+            show_value: header.show_value,
+            direction: header.direction,
+            axis_position: header.axis_position,
+            border: header.border,
+            gradient: header.gradient,
+            custom_negative_fill: header.custom_negative_fill,
+            custom_negative_border: header.custom_negative_border,
+            unused_flags: header.unused_flags,
+        })
+    }
+
     fn consume_icon_set(&mut self, begin: &[u8], base: (u32, u32)) -> XlsbResult<IconSet> {
         if begin.len() != 6 {
             return Err(XlsbError::InvalidLength {
@@ -1291,7 +1704,7 @@ where
         }
         if cfvos
             .iter()
-            .any(|cfvo| matches!(cfvo.cfvo_type, 2 | 3) || !cfvo.save_greater_than_or_equal)
+            .any(|cfvo| matches!(cfvo.cfvo_type, 2 | 3 | 8 | 9) || !cfvo.save_greater_than_or_equal)
         {
             return Err(XlsbError::Unrecognized {
                 typ: "BrtBeginIconSet collection".to_string(),
@@ -1303,6 +1716,55 @@ where
             cfvos,
             show_value: flags & 0x02 == 0,
             reverse: flags & 0x04 == 0,
+        })
+    }
+
+    fn consume_icon_set14(&mut self, begin: &[u8], base: (u32, u32)) -> XlsbResult<IconSet14> {
+        let header = IconSet14::parse_header(begin)?;
+        let expected = icon_count14(header.icon_set_type);
+        let mut cfvos = Vec::new();
+        let mut icons = Vec::new();
+        loop {
+            self.buf.clear();
+            let typ = self.iter.read_type()?;
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
+            match typ {
+                record_types::CFVO14 if icons.is_empty() => cfvos.push(
+                    Cfvo::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
+                ),
+                record_types::CF_ICON => icons.push(ConditionalFormatIcon::parse(&self.buf)?),
+                record_types::END_ICON_SET14 if self.buf.is_empty() => break,
+                _ => {
+                    return Err(XlsbError::Unrecognized {
+                        typ: "BrtBeginIconSet14 collection".to_string(),
+                        val: format!("unexpected record 0x{typ:04X}"),
+                    });
+                },
+            }
+        }
+        if cfvos.len() != expected
+            || cfvos.iter().any(|cfvo| {
+                matches!(cfvo.cfvo_type, 2 | 3 | 8 | 9) || !cfvo.save_greater_than_or_equal
+            })
+        {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginIconSet14 collection".to_string(),
+                val: format!("invalid set of {} thresholds", cfvos.len()),
+            });
+        }
+        if (header.custom && icons.len() != expected) || (!header.custom && !icons.is_empty()) {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginIconSet14 collection".to_string(),
+                val: format!("invalid set of {} custom icons", icons.len()),
+            });
+        }
+        Ok(IconSet14 {
+            icon_set_type: header.icon_set_type,
+            cfvos,
+            custom_icons: header.custom.then_some(icons),
+            show_value: header.show_value,
+            reverse: header.reverse,
+            unused_flags: header.unused_flags,
         })
     }
 
@@ -1572,6 +2034,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::xlsb::conditional_formatting::{
+        ConditionalFormattingRecordKind, ConditionalFormattingRule14Metadata, DataBarAxisPosition14,
+    };
     use crate::xlsb::writer::RecordWriter;
     use litchi_core::sheet::Cell;
 
@@ -1792,6 +2257,187 @@ mod tests {
             reader.next_cell(),
             Err(XlsbError::Unrecognized { .. })
         ));
+    }
+
+    #[test]
+    fn reads_office_2013_conditional_formatting_visualizations() {
+        fn metadata(priority: i32) -> ConditionalFormattingRule14Metadata {
+            ConditionalFormattingRule14Metadata {
+                priority,
+                unused: priority as u32,
+                guid: [priority as u8; 16],
+                guid_present: true,
+                linked_classic_priority: None,
+            }
+        }
+
+        let mut color_rule = ConditionalFormattingRule::new(CfRuleType::ColorScale, 1);
+        color_rule.extension14 = Some(metadata(1));
+        let color_thresholds = [Cfvo::new(2, None), Cfvo::new(3, None)];
+        let color_records = [
+            ConditionalFormatColor::from_argb(0xffff_0000),
+            ConditionalFormatColor::from_argb(0xff00_ff00),
+        ];
+
+        let mut bar_rule = ConditionalFormattingRule::new(CfRuleType::DataBar, 2);
+        bar_rule.extension14 = Some(metadata(2));
+        let bar = DataBar14::new(
+            Cfvo::new(8, None),
+            Cfvo::new(9, None),
+            ConditionalFormatColor::from_argb(0xff44_72c4),
+        );
+
+        let mut icon_rule = ConditionalFormattingRule::new(CfRuleType::IconSet, 3);
+        icon_rule.extension14 = Some(metadata(3));
+        let mut icon_thresholds = vec![
+            Cfvo::new(1, Some("0".to_string())),
+            Cfvo::new(1, Some("33".to_string())),
+            Cfvo::new(1, Some("67".to_string())),
+        ];
+        for threshold in &mut icon_thresholds {
+            threshold.save_greater_than_or_equal = true;
+        }
+        let icon_set = IconSet14::new(18, icon_thresholds.clone());
+
+        let mut formatting = ConditionalFormatting::new(vec!["A1:A10".to_string()]);
+        formatting.record_kind = ConditionalFormattingRecordKind::Extension14;
+        formatting.rules = vec![color_rule.clone(), bar_rule.clone(), icon_rule.clone()];
+
+        let mut worksheet = Vec::new();
+        let mut writer = RecordWriter::new(&mut worksheet);
+        writer.write_record(0x0094, &[0; 16]).unwrap();
+        writer.write_record(0x0091, &[]).unwrap();
+        writer.write_record(0x0092, &[]).unwrap();
+        writer
+            .write_record(
+                record_types::BEGIN_COND_FORMATTING14,
+                &formatting.serialize_extension14_header().unwrap(),
+            )
+            .unwrap();
+
+        writer
+            .write_record(
+                record_types::BEGIN_CF_RULE14,
+                &color_rule.serialize_extension14().unwrap(),
+            )
+            .unwrap();
+        writer
+            .write_record(record_types::BEGIN_COLOR_SCALE14, &[])
+            .unwrap();
+        for threshold in &color_thresholds {
+            writer
+                .write_record(
+                    record_types::CFVO14,
+                    &threshold.serialize_extension14().unwrap(),
+                )
+                .unwrap();
+        }
+        for color in color_records {
+            writer
+                .write_record(
+                    record_types::COLOR14,
+                    &color.serialize_extension14().unwrap(),
+                )
+                .unwrap();
+        }
+        writer
+            .write_record(record_types::END_COLOR_SCALE14, &[])
+            .unwrap();
+        writer
+            .write_record(record_types::END_CF_RULE14, &[])
+            .unwrap();
+
+        writer
+            .write_record(
+                record_types::BEGIN_CF_RULE14,
+                &bar_rule.serialize_extension14().unwrap(),
+            )
+            .unwrap();
+        writer
+            .write_record(
+                record_types::BEGIN_DATABAR14,
+                &bar.serialize_header().unwrap(),
+            )
+            .unwrap();
+        for threshold in [&bar.min_cfvo, &bar.max_cfvo] {
+            writer
+                .write_record(
+                    record_types::CFVO14,
+                    &threshold.serialize_extension14().unwrap(),
+                )
+                .unwrap();
+        }
+        for color in [bar.positive_color, bar.axis_color].into_iter().flatten() {
+            writer
+                .write_record(
+                    record_types::COLOR14,
+                    &color.serialize_extension14().unwrap(),
+                )
+                .unwrap();
+        }
+        writer
+            .write_record(record_types::END_DATABAR14, &[])
+            .unwrap();
+        writer
+            .write_record(record_types::END_CF_RULE14, &[])
+            .unwrap();
+
+        writer
+            .write_record(
+                record_types::BEGIN_CF_RULE14,
+                &icon_rule.serialize_extension14().unwrap(),
+            )
+            .unwrap();
+        writer
+            .write_record(
+                record_types::BEGIN_ICON_SET14,
+                &icon_set.serialize_header().unwrap(),
+            )
+            .unwrap();
+        for threshold in &icon_thresholds {
+            writer
+                .write_record(
+                    record_types::CFVO14,
+                    &threshold.serialize_extension14().unwrap(),
+                )
+                .unwrap();
+        }
+        writer
+            .write_record(record_types::END_ICON_SET14, &[])
+            .unwrap();
+        writer
+            .write_record(record_types::END_CF_RULE14, &[])
+            .unwrap();
+        writer
+            .write_record(record_types::END_COND_FORMATTING14, &[])
+            .unwrap();
+        writer.write_record(0x0082, &[]).unwrap();
+
+        let formula_context = FormulaResolutionContext::default();
+        let iter = RecordIter::new(std::io::Cursor::new(worksheet));
+        let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
+        assert!(reader.next_cell().unwrap().is_none());
+        let parsed = &reader.conditional_formattings[0];
+        assert_eq!(
+            parsed.record_kind,
+            ConditionalFormattingRecordKind::Extension14
+        );
+        assert_eq!(parsed.rules.len(), 3);
+        assert_eq!(
+            parsed.rules[0]
+                .color_scale14
+                .as_ref()
+                .unwrap()
+                .min_cfvo
+                .cfvo_type,
+            2
+        );
+        let parsed_bar = parsed.rules[1].data_bar14.as_ref().unwrap();
+        assert_eq!(parsed_bar.axis_position, DataBarAxisPosition14::Automatic);
+        assert_eq!(parsed_bar.positive_color.unwrap().argb, Some(0xff44_72c4));
+        let parsed_icons = parsed.rules[2].icon_set14.as_ref().unwrap();
+        assert_eq!(parsed_icons.icon_set_type, 18);
+        assert_eq!(parsed_icons.cfvos.len(), 3);
     }
 
     #[test]
