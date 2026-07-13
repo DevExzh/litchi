@@ -975,9 +975,7 @@ impl<R: Read> RecordIter<R> {
             b = self.read_u8()?;
             len += ((b & 0x7F) as usize) << (7 * i);
         }
-        if buf.len() < len {
-            *buf = vec![0; len];
-        }
+        buf.resize(len, 0);
 
         self.reader.read_exact(&mut buf[..len])?;
         Ok(len)

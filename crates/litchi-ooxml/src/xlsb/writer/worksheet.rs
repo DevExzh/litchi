@@ -4,6 +4,7 @@ use crate::xlsb::comments::Comment;
 use crate::xlsb::conditional_formatting::ConditionalFormatting;
 use crate::xlsb::data_validation::DataValidation;
 use crate::xlsb::error::XlsbResult;
+use crate::xlsb::formula::{CellParsedFormula, FormulaCompiler};
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
 use crate::xlsb::records::record_types;
@@ -17,6 +18,10 @@ use std::io::Write;
 pub struct CellData {
     pub value: CellValue,
     pub style: u32, // Style XF index
+    /// Optional pre-encoded cell formula for lossless XLSB workflows.
+    pub formula_binary: Option<CellParsedFormula>,
+    /// `GrbitFmla` flags; only bit 1 (`fAlwaysCalc`) is defined.
+    pub formula_flags: u16,
 }
 
 /// Column information for a single 0-based column.
@@ -172,8 +177,40 @@ impl MutableXlsbWorksheet {
         let cell_data = CellData {
             value: value.into(),
             style,
+            formula_binary: None,
+            formula_flags: 0,
         };
 
+        self.cells.insert((row, col), cell_data);
+        self.max_row = self.max_row.max(row);
+        self.max_col = self.max_col.max(col);
+    }
+
+    /// Set a formula using an already encoded `CellParsedFormula`.
+    ///
+    /// This is the lossless path for formulas containing tokens that the text
+    /// compiler does not yet understand. `cached_value` determines which
+    /// `BrtFmla*` record is emitted.
+    pub fn set_cell_formula_binary(
+        &mut self,
+        row: u32,
+        col: u32,
+        cached_value: CellValue,
+        formula: CellParsedFormula,
+        always_calculate: bool,
+        style: u32,
+    ) {
+        let cell_data = CellData {
+            value: CellValue::Formula {
+                formula: String::new(),
+                cached_value: Some(Box::new(cached_value)),
+                is_array: false,
+                array_range: None,
+            },
+            style,
+            formula_binary: Some(formula),
+            formula_flags: if always_calculate { 0x0002 } else { 0 },
+        };
         self.cells.insert((row, col), cell_data);
         self.max_row = self.max_row.max(row);
         self.max_col = self.max_col.max(col);
@@ -860,46 +897,101 @@ impl MutableXlsbWorksheet {
                 // CellValue::DateTime stores the Excel serial number directly
                 self.write_number_cell(writer, col, *dt, cell_data.style)?;
             },
-            CellValue::Formula { cached_value, .. } => {
-                // For formulas, write the cached value
-                // TODO: Support writing formula bytes
-                if let Some(cached) = cached_value {
-                    match cached.as_ref() {
-                        CellValue::Empty => self.write_blank_cell(writer, col, cell_data.style)?,
-                        CellValue::String(s) => self.write_shared_string_cell(
-                            writer,
-                            col,
-                            s,
-                            cell_data.style,
-                            shared_strings,
-                        )?,
-                        CellValue::Int(i) => {
-                            self.write_number_cell(writer, col, *i as f64, cell_data.style)?
-                        },
-                        CellValue::Float(f) => {
-                            self.write_number_cell(writer, col, *f, cell_data.style)?
-                        },
-                        CellValue::Bool(b) => {
-                            self.write_bool_cell(writer, col, *b, cell_data.style)?
-                        },
-                        CellValue::Error(e) => {
-                            self.write_error_cell(writer, col, e, cell_data.style)?
-                        },
-                        CellValue::DateTime(dt) => {
-                            self.write_number_cell(writer, col, *dt, cell_data.style)?
-                        },
-                        CellValue::Formula { .. } => {
-                            // Nested formula - shouldn't happen, but write as blank
-                            self.write_blank_cell(writer, col, cell_data.style)?;
-                        },
-                    }
-                } else {
-                    // No cached value, write as blank
-                    self.write_blank_cell(writer, col, cell_data.style)?;
-                }
-            },
+            CellValue::Formula {
+                formula,
+                cached_value,
+                is_array,
+                ..
+            } => self.write_formula_cell(
+                writer,
+                col,
+                cell_data.style,
+                formula,
+                cached_value.as_deref(),
+                *is_array,
+                cell_data.formula_binary.as_ref(),
+                cell_data.formula_flags,
+            )?,
         }
         Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn write_formula_cell<W: Write>(
+        &self,
+        writer: &mut RecordWriter<W>,
+        col: u32,
+        style: u32,
+        formula_text: &str,
+        cached_value: Option<&CellValue>,
+        is_array: bool,
+        encoded: Option<&CellParsedFormula>,
+        flags: u16,
+    ) -> XlsbResult<()> {
+        if is_array {
+            return Err(crate::xlsb::error::XlsbError::UnsupportedFeature(
+                "XLSB array formula writing requires BrtArrFmla".to_string(),
+            ));
+        }
+        if flags & !0x0002 != 0 {
+            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                "invalid GrbitFmla flags 0x{flags:04X}"
+            )));
+        }
+        let effective_flags = if cached_value.is_none() {
+            flags | 0x0002
+        } else {
+            flags
+        };
+
+        let compiled;
+        let parsed = if let Some(encoded) = encoded {
+            encoded
+        } else {
+            compiled = FormulaCompiler::compile(formula_text)?;
+            &compiled
+        };
+        let formula_bytes = parsed.to_bytes()?;
+        let cached = cached_value.unwrap_or(&CellValue::Float(0.0));
+
+        let mut data = Vec::new();
+        let mut temp_writer = RecordWriter::new(&mut data);
+        Self::write_cell_structure(&mut temp_writer, col, style)?;
+
+        let record_type = match cached {
+            CellValue::String(value) => {
+                temp_writer.write_wide_string(value)?;
+                record_types::FMLA_STRING
+            },
+            CellValue::Bool(value) => {
+                temp_writer.write_u8(u8::from(*value))?;
+                record_types::FMLA_BOOL
+            },
+            CellValue::Error(error) => {
+                temp_writer.write_u8(Self::error_code(error))?;
+                record_types::FMLA_ERROR
+            },
+            CellValue::Int(value) => {
+                temp_writer.write_f64(*value as f64)?;
+                record_types::FMLA_NUM
+            },
+            CellValue::Float(value) | CellValue::DateTime(value) => {
+                temp_writer.write_f64(*value)?;
+                record_types::FMLA_NUM
+            },
+            CellValue::Empty => {
+                temp_writer.write_f64(0.0)?;
+                record_types::FMLA_NUM
+            },
+            CellValue::Formula { .. } => {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                    "formula cached value cannot itself be a formula".to_string(),
+                ));
+            },
+        };
+        temp_writer.write_u16(effective_flags)?;
+        data.extend_from_slice(&formula_bytes);
+        writer.write_record(record_type, &data)
     }
 
     /// Write the Cell structure (2.5.10) - 8 bytes
@@ -1011,17 +1103,7 @@ impl MutableXlsbWorksheet {
         error: &str,
         style: u32,
     ) -> XlsbResult<()> {
-        let error_code = match error {
-            "#NULL!" => 0x00,
-            "#DIV/0!" => 0x07,
-            "#VALUE!" => 0x0F,
-            "#REF!" => 0x17,
-            "#NAME?" => 0x1D,
-            "#NUM!" => 0x24,
-            "#N/A" => 0x2A,
-            "#GETTING_DATA" => 0x2B,
-            _ => 0x2A, // Default to #N/A
-        };
+        let error_code = Self::error_code(error);
 
         let mut data = Vec::new();
         let mut temp_writer = RecordWriter::new(&mut data);
@@ -1032,6 +1114,20 @@ impl MutableXlsbWorksheet {
 
         writer.write_record(record_types::CELL_ERROR, &data)?;
         Ok(())
+    }
+
+    fn error_code(error: &str) -> u8 {
+        match error {
+            "#NULL!" => 0x00,
+            "#DIV/0!" => 0x07,
+            "#VALUE!" => 0x0F,
+            "#REF!" => 0x17,
+            "#NAME?" => 0x1D,
+            "#NUM!" => 0x24,
+            "#N/A" => 0x2A,
+            "#GETTING_DATA" => 0x2B,
+            _ => 0x2A, // Default to #N/A
+        }
     }
 
     /// Write merged cells
@@ -1512,8 +1608,92 @@ mod tests {
         let cell = CellData {
             value: CellValue::String("Test".to_string()),
             style: 5,
+            formula_binary: None,
+            formula_flags: 0,
         };
         assert_eq!(cell.style, 5);
         assert_eq!(cell.value.as_str(), Some("Test"));
+    }
+
+    #[test]
+    fn writes_ms_xlsb_brt_fmla_num_layout_without_downgrading_formula() {
+        let sheet = MutableXlsbWorksheet::new("Sheet1");
+        let cell = CellData {
+            value: CellValue::Formula {
+                formula: "C13*2".to_string(),
+                cached_value: Some(Box::new(CellValue::Float(4.0))),
+                is_array: false,
+                array_range: None,
+            },
+            style: 0,
+            formula_binary: None,
+            formula_flags: 0,
+        };
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+        let mut shared_strings = crate::xlsb::writer::MutableSharedStringsWriter::new();
+        sheet
+            .write_cell(&mut writer, 12, 1, &cell, &mut shared_strings)
+            .unwrap();
+
+        let mut expected = vec![0x09, 0x25]; // BrtFmlaNum, 37-byte payload
+        expected.extend_from_slice(&1_u32.to_le_bytes()); // Cell.column
+        expected.extend_from_slice(&[0; 4]); // style and phonetic flags
+        expected.extend_from_slice(&4_f64.to_le_bytes()); // cached xnum
+        expected.extend_from_slice(&0_u16.to_le_bytes()); // GrbitFmla
+        expected.extend_from_slice(&11_u32.to_le_bytes()); // cce
+        expected.extend_from_slice(&[
+            0x44, 0x0C, 0x00, 0x00, 0x00, 0x02, 0xC0, 0x1E, 0x02, 0x00, 0x05,
+        ]);
+        expected.extend_from_slice(&0_u32.to_le_bytes()); // cb
+        assert_eq!(buffer, expected);
+    }
+
+    #[test]
+    fn unsupported_formula_is_an_error_instead_of_a_cached_constant() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        sheet.set_cell(
+            0,
+            0,
+            CellValue::Formula {
+                formula: "UNSUPPORTED(A1)".to_string(),
+                cached_value: Some(Box::new(CellValue::Float(42.0))),
+                is_array: false,
+                array_range: None,
+            },
+        );
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+        let mut shared_strings = crate::xlsb::writer::MutableSharedStringsWriter::new();
+        let error = sheet.write(&mut writer, &mut shared_strings).unwrap_err();
+        assert!(matches!(
+            error,
+            crate::xlsb::error::XlsbError::UnsupportedFeature(_)
+        ));
+    }
+
+    #[test]
+    fn formula_without_cached_result_is_marked_for_recalculation() {
+        let sheet = MutableXlsbWorksheet::new("Sheet1");
+        let cell = CellData {
+            value: CellValue::Formula {
+                formula: "1+1".to_string(),
+                cached_value: None,
+                is_array: false,
+                array_range: None,
+            },
+            style: 0,
+            formula_binary: None,
+            formula_flags: 0,
+        };
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+        let mut shared_strings = crate::xlsb::writer::MutableSharedStringsWriter::new();
+        sheet
+            .write_cell(&mut writer, 0, 0, &cell, &mut shared_strings)
+            .unwrap();
+
+        // Two-byte record header, then Cell (8) + cached xnum (8).
+        assert_eq!(u16::from_le_bytes([buffer[18], buffer[19]]), 0x0002);
     }
 }

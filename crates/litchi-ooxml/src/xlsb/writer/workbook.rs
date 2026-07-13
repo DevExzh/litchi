@@ -746,6 +746,8 @@ impl Default for XlsbWorkbookWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_core::sheet::{CellValue, WorkbookTrait};
+    use std::io::Cursor;
 
     #[test]
     fn test_create_empty_workbook() {
@@ -872,5 +874,89 @@ mod tests {
         };
         workbook.add_named_range(named_range);
         // Verify it was added (indirectly via the test not failing)
+    }
+
+    #[test]
+    fn formula_survives_workbook_package_roundtrip() {
+        let mut workbook = XlsbWorkbookWriter::new();
+        let mut sheet = MutableXlsbWorksheet::new("Calculations");
+        sheet.set_cell(0, 0, 2.0);
+        sheet.set_cell(0, 1, 3.0);
+        sheet.set_cell(
+            0,
+            2,
+            CellValue::Formula {
+                formula: "A1+B1".to_string(),
+                cached_value: Some(Box::new(CellValue::Float(5.0))),
+                is_array: false,
+                array_range: None,
+            },
+        );
+        sheet.set_cell(
+            1,
+            0,
+            CellValue::Formula {
+                formula: "\"result\"".to_string(),
+                cached_value: Some(Box::new(CellValue::String("result".to_string()))),
+                is_array: false,
+                array_range: None,
+            },
+        );
+        sheet.set_cell(
+            1,
+            1,
+            CellValue::Formula {
+                formula: "1=1".to_string(),
+                cached_value: Some(Box::new(CellValue::Bool(true))),
+                is_array: false,
+                array_range: None,
+            },
+        );
+        sheet.set_cell(
+            1,
+            2,
+            CellValue::Formula {
+                formula: "1/0".to_string(),
+                cached_value: Some(Box::new(CellValue::Error("#DIV/0!".to_string()))),
+                is_array: false,
+                array_range: None,
+            },
+        );
+        workbook.add_worksheet(sheet);
+
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let worksheet = reader.worksheet_by_index(0).unwrap();
+        let value = worksheet.cell_value(0, 2).unwrap();
+        assert!(matches!(
+            value.as_ref(),
+            CellValue::Formula {
+                formula,
+                cached_value: Some(cached),
+                ..
+            } if formula == "(A1+B1)" && matches!(cached.as_ref(), CellValue::Float(5.0))
+        ));
+        assert!(matches!(
+            worksheet.cell_value(1, 0).unwrap().as_ref(),
+            CellValue::Formula {
+                cached_value: Some(cached),
+                ..
+            } if matches!(cached.as_ref(), CellValue::String(value) if value == "result")
+        ));
+        assert!(matches!(
+            worksheet.cell_value(1, 1).unwrap().as_ref(),
+            CellValue::Formula {
+                cached_value: Some(cached),
+                ..
+            } if matches!(cached.as_ref(), CellValue::Bool(true))
+        ));
+        assert!(matches!(
+            worksheet.cell_value(1, 2).unwrap().as_ref(),
+            CellValue::Formula {
+                cached_value: Some(cached),
+                ..
+            } if matches!(cached.as_ref(), CellValue::Error(error) if error == "#DIV/0!")
+        ));
     }
 }

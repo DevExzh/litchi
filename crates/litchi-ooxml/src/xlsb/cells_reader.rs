@@ -1,7 +1,8 @@
 //! XLSB cells reader implementation
 
 use crate::xlsb::cell::XlsbCell;
-use crate::xlsb::error::XlsbResult;
+use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::formula::CellParsedFormula;
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
 use crate::xlsb::records::RecordIter;
@@ -91,14 +92,13 @@ where
         loop {
             self.buf.clear();
             let typ = self.iter.read_type()?;
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
 
             if typ == 0x0092 {
                 // BrtEndSheetData - continue to read advanced features
                 self.read_advanced_features()?;
                 return Ok(None);
             }
-
-            let _ = self.iter.fill_buffer(&mut self.buf)?;
 
             match typ {
                 0x0000 => {
@@ -186,76 +186,67 @@ where
                         };
                         return Ok(Some(XlsbCell::new(self.current_row, col, value)));
                     },
-                0x0008
+                0x0008 => {
                     // BrtFmlaString - formula with string result
-                    if self.buf.len() >= 10 => {
-                        let col = binary::read_u32_le_at(&self.buf, 0)?;
-                        // Skip style (4 bytes) + flags (1 byte) + formula length (4 bytes)
-                        let formula_len = binary::read_u32_le_at(&self.buf, 6)? as usize;
-                        if self.buf.len() >= 10 + formula_len {
-                            // Read cached string value after formula
-                            let (string, _) =
-                                super::records::wide_str_with_len(&self.buf[10 + formula_len..])?;
-                            return Ok(Some(XlsbCell::new(
-                                self.current_row,
-                                col,
-                                CellValue::String(string),
-                            )));
-                        }
-                    },
-                0x0009
+                    if self.buf.len() < 12 {
+                        return Err(XlsbError::InvalidLength {
+                            expected: 12,
+                            found: self.buf.len(),
+                        });
+                    }
+                    let col = binary::read_u32_le_at(&self.buf, 0)?;
+                    let (string, consumed) =
+                        super::records::wide_str_with_len(&self.buf[8..])?;
+                    return self
+                        .finish_formula_cell(col, CellValue::String(string), 8 + consumed)
+                        .map(Some);
+                },
+                0x0009 => {
                     // BrtFmlaNum - formula with numeric result
-                    if self.buf.len() >= 18 => {
-                        let col = binary::read_u32_le_at(&self.buf, 0)?;
-                        let formula_len = binary::read_u32_le_at(&self.buf, 6)? as usize;
-                        if self.buf.len() >= 10 + formula_len + 8 {
-                            let num_value = binary::read_f64_le_at(&self.buf, 10 + formula_len)?;
-                            return Ok(Some(XlsbCell::new(
-                                self.current_row,
-                                col,
-                                CellValue::Float(num_value),
-                            )));
-                        }
-                    },
-                0x000A
+                    if self.buf.len() < 18 {
+                        return Err(XlsbError::InvalidLength {
+                            expected: 18,
+                            found: self.buf.len(),
+                        });
+                    }
+                    let col = binary::read_u32_le_at(&self.buf, 0)?;
+                    let num_value = binary::read_f64_le_at(&self.buf, 8)?;
+                    return self
+                        .finish_formula_cell(col, CellValue::Float(num_value), 16)
+                        .map(Some);
+                },
+                0x000A => {
                     // BrtFmlaBool - formula with boolean result
-                    if self.buf.len() >= 11 => {
-                        let col = binary::read_u32_le_at(&self.buf, 0)?;
-                        let formula_len = binary::read_u32_le_at(&self.buf, 6)? as usize;
-                        if self.buf.len() > 10 + formula_len {
-                            let bool_value = self.buf[10 + formula_len] != 0;
-                            return Ok(Some(XlsbCell::new(
-                                self.current_row,
-                                col,
-                                CellValue::Bool(bool_value),
-                            )));
-                        }
-                    },
-                0x000B
+                    if self.buf.len() < 11 {
+                        return Err(XlsbError::InvalidLength {
+                            expected: 11,
+                            found: self.buf.len(),
+                        });
+                    }
+                    let col = binary::read_u32_le_at(&self.buf, 0)?;
+                    let bool_value = self.buf[8] != 0;
+                    return self
+                        .finish_formula_cell(col, CellValue::Bool(bool_value), 9)
+                        .map(Some);
+                },
+                0x000B => {
                     // BrtFmlaError - formula with error result
-                    if self.buf.len() >= 11 => {
-                        let col = binary::read_u32_le_at(&self.buf, 0)?;
-                        let formula_len = binary::read_u32_le_at(&self.buf, 6)? as usize;
-                        if self.buf.len() > 10 + formula_len {
-                            let error_code = self.buf[10 + formula_len];
-                            let error_msg = match error_code {
-                                0x00 => "#NULL!",
-                                0x07 => "#DIV/0!",
-                                0x0F => "#VALUE!",
-                                0x17 => "#REF!",
-                                0x1D => "#NAME?",
-                                0x24 => "#NUM!",
-                                0x2A => "#N/A",
-                                0x2B => "#GETTING_DATA",
-                                _ => "#ERR!",
-                            };
-                            return Ok(Some(XlsbCell::new(
-                                self.current_row,
-                                col,
-                                CellValue::Error(error_msg.to_string()),
-                            )));
-                        }
-                    },
+                    if self.buf.len() < 11 {
+                        return Err(XlsbError::InvalidLength {
+                            expected: 11,
+                            found: self.buf.len(),
+                        });
+                    }
+                    let col = binary::read_u32_le_at(&self.buf, 0)?;
+                    let error_msg = Self::error_text(self.buf[8]);
+                    return self
+                        .finish_formula_cell(
+                            col,
+                            CellValue::Error(error_msg.to_string()),
+                            9,
+                        )
+                        .map(Some);
+                },
                 _ => {
                     // Skip unknown records
                 },
@@ -273,6 +264,52 @@ where
                 binary::read_u32_le_at(buf, 4).unwrap_or(0),
                 binary::read_u32_le_at(buf, 12).unwrap_or(0),
             ),
+        }
+    }
+
+    fn finish_formula_cell(
+        &self,
+        col: u32,
+        cached_value: CellValue,
+        flags_offset: usize,
+    ) -> XlsbResult<XlsbCell> {
+        let formula_offset = flags_offset.checked_add(2).ok_or_else(|| {
+            XlsbError::InvalidFormula("formula record offset overflow".to_string())
+        })?;
+        if self.buf.len() < formula_offset {
+            return Err(XlsbError::InvalidLength {
+                expected: formula_offset,
+                found: self.buf.len(),
+            });
+        }
+        let flags = binary::read_u16_le_at(&self.buf, flags_offset)?;
+        let (formula, consumed) = CellParsedFormula::parse(&self.buf[formula_offset..])?;
+        if formula_offset + consumed != self.buf.len() {
+            return Err(XlsbError::InvalidFormula(format!(
+                "formula record has {} trailing bytes",
+                self.buf.len() - formula_offset - consumed
+            )));
+        }
+        Ok(XlsbCell::new_formula_binary(
+            self.current_row,
+            col,
+            cached_value,
+            formula,
+            flags,
+        ))
+    }
+
+    fn error_text(error_code: u8) -> &'static str {
+        match error_code {
+            0x00 => "#NULL!",
+            0x07 => "#DIV/0!",
+            0x0F => "#VALUE!",
+            0x17 => "#REF!",
+            0x1D => "#NAME?",
+            0x24 => "#NUM!",
+            0x2A => "#N/A",
+            0x2B => "#GETTING_DATA",
+            _ => "#ERR!",
         }
     }
 
@@ -361,13 +398,12 @@ where
         loop {
             self.buf.clear();
             let typ = self.iter.read_type()?;
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
 
             if typ == 0x00B2 {
                 // BrtEndMergeCells
                 break;
             }
-
-            let _ = self.iter.fill_buffer(&mut self.buf)?;
 
             if typ == 0x00B0 {
                 // BrtMergeCell

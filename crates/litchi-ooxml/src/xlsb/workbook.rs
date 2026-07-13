@@ -274,3 +274,62 @@ impl<'a> WorksheetIterator<'a> for XlsbWorksheetIterator<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_core::sheet::{Cell, Worksheet};
+    use std::fs::File;
+
+    #[test]
+    fn reads_formula_records_from_real_workbook_fixture() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/ooxml/xlsb/universal-content.xlsb"
+        );
+        let workbook = XlsbWorkbook::new(File::open(path).unwrap()).unwrap();
+        let mut formula_cells = Vec::new();
+        for index in 0..workbook.worksheet_names.len() {
+            let worksheet = workbook.get_worksheet(index).unwrap();
+            if let Some((min_row, min_col, max_row, max_col)) = worksheet.dimensions() {
+                for row in min_row..=max_row {
+                    for col in min_col..=max_col {
+                        let Some(cell) = worksheet.get_cell(row, col) else {
+                            continue;
+                        };
+                        if cell.is_formula() {
+                            formula_cells.push((
+                                worksheet.name().to_string(),
+                                cell.coordinate(),
+                                cell.value().clone(),
+                                cell.formula_bytes().unwrap().to_vec(),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        assert_eq!(formula_cells.len(), 4);
+        let formulas: Vec<_> = formula_cells
+            .iter()
+            .map(|cell| match &cell.2 {
+                litchi_core::sheet::CellValue::Formula {
+                    formula,
+                    cached_value,
+                    ..
+                } => (cell.1.as_str(), formula.as_str(), cached_value.as_deref()),
+                value => panic!("expected decoded formula, found {value:?}"),
+            })
+            .collect();
+        assert_eq!(formulas[0].0, "C1");
+        assert_eq!(formulas[0].1, "(2*3)");
+        assert_eq!(formulas[1].1, "(2+3)");
+        assert_eq!(formulas[2].1, "(2-3)");
+        assert_eq!(formulas[3].1, "(C1+C2)");
+        assert!(matches!(
+            formulas[3].2,
+            Some(litchi_core::sheet::CellValue::Float(11.0))
+        ));
+        assert!(formula_cells.iter().all(|cell| !cell.3.is_empty()));
+    }
+}

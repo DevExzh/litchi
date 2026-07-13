@@ -19,16 +19,105 @@
 //!
 //! # Reference
 //!
-//! - [MS-XLSB] Section 2.5.97 - Formulas
+//! - [MS-XLSB] Section 2.5.98 - Formulas
 //! - [MS-XLS] Section 2.5.198 - Ptg (for token details, largely compatible)
 
-use crate::xlsb::error::XlsbResult;
+use crate::xlsb::error::{XlsbError, XlsbResult};
 use litchi_core::binary;
+
+/// Maximum size of an XLSB cell formula token stream.
+///
+/// [MS-XLSB] 2.5.98.4 requires `cce` to be greater than zero and less than
+/// 16,385 bytes.
+pub const MAX_CELL_FORMULA_BYTES: usize = 16_384;
+
+/// The binary representation of a cell formula (`CellParsedFormula`).
+///
+/// `rgce` contains the RPN token stream and `rgcb` contains ancillary data for
+/// tokens such as arrays. Keeping both buffers allows callers to preserve
+/// formulas even when a newer Excel token is not understood by the text
+/// converter.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CellParsedFormula {
+    pub rgce: Vec<u8>,
+    pub rgcb: Vec<u8>,
+}
+
+impl CellParsedFormula {
+    /// Parse a `CellParsedFormula`, returning the structure and bytes consumed.
+    pub fn parse(data: &[u8]) -> XlsbResult<(Self, usize)> {
+        if data.len() < 4 {
+            return Err(XlsbError::InvalidLength {
+                expected: 4,
+                found: data.len(),
+            });
+        }
+
+        let cce = binary::read_u32_le_at(data, 0)? as usize;
+        if cce == 0 || cce > MAX_CELL_FORMULA_BYTES {
+            return Err(XlsbError::InvalidFormula(format!(
+                "cell formula token length {cce} is outside 1..={MAX_CELL_FORMULA_BYTES}"
+            )));
+        }
+        let cb_offset = 4usize.checked_add(cce).ok_or_else(|| {
+            XlsbError::InvalidFormula("cell formula token length overflow".to_string())
+        })?;
+        if data.len() < cb_offset + 4 {
+            return Err(XlsbError::InvalidLength {
+                expected: cb_offset + 4,
+                found: data.len(),
+            });
+        }
+
+        let cb = binary::read_u32_le_at(data, cb_offset)? as usize;
+        let end = cb_offset
+            .checked_add(4)
+            .and_then(|offset| offset.checked_add(cb))
+            .ok_or_else(|| {
+                XlsbError::InvalidFormula("cell formula ancillary length overflow".to_string())
+            })?;
+        if data.len() < end {
+            return Err(XlsbError::InvalidLength {
+                expected: end,
+                found: data.len(),
+            });
+        }
+
+        Ok((
+            Self {
+                rgce: data[4..cb_offset].to_vec(),
+                rgcb: data[cb_offset + 4..end].to_vec(),
+            },
+            end,
+        ))
+    }
+
+    /// Serialize this formula with its two length prefixes.
+    pub fn to_bytes(&self) -> XlsbResult<Vec<u8>> {
+        if self.rgce.is_empty() || self.rgce.len() > MAX_CELL_FORMULA_BYTES {
+            return Err(XlsbError::InvalidFormula(format!(
+                "cell formula token length {} is outside 1..={MAX_CELL_FORMULA_BYTES}",
+                self.rgce.len()
+            )));
+        }
+        let cce = u32::try_from(self.rgce.len())
+            .map_err(|_| XlsbError::InvalidFormula("formula is too large".to_string()))?;
+        let cb = u32::try_from(self.rgcb.len()).map_err(|_| {
+            XlsbError::InvalidFormula("formula ancillary data is too large".to_string())
+        })?;
+        let mut bytes = Vec::with_capacity(8 + self.rgce.len() + self.rgcb.len());
+        bytes.extend_from_slice(&cce.to_le_bytes());
+        bytes.extend_from_slice(&self.rgce);
+        bytes.extend_from_slice(&cb.to_le_bytes());
+        bytes.extend_from_slice(&self.rgcb);
+        Ok(bytes)
+    }
+}
 
 /// Parse Tree Generator (Ptg) token types
 ///
 /// These constants define the various formula token types used in XLSB.
-/// Reference: [MS-XLSB] Section 2.5.97.23
+/// Reference: [MS-XLSB] Section 2.5.98.16
 #[allow(dead_code)]
 pub mod ptg_types {
     // Operands
@@ -94,7 +183,7 @@ pub mod ptg_types {
 /// Formula token representation
 ///
 /// Represents a single token in a formula's RPN sequence.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FormulaToken {
     /// Number constant
     Number(f64),
@@ -128,8 +217,12 @@ pub enum FormulaToken {
     BinaryOp(BinaryOperator),
     /// Unary operator
     UnaryOp(UnaryOperator),
-    /// Function call (function index, arg count)
-    Function { index: u16, arg_count: u8 },
+    /// Function call (function index, argument count, command-table flag).
+    Function {
+        index: u16,
+        arg_count: u8,
+        is_command: bool,
+    },
     /// Defined name reference
     Name(u32),
     /// Unknown/unsupported token
@@ -182,21 +275,18 @@ impl<'a> FormulaParser<'a> {
         let mut tokens = Vec::new();
 
         while self.offset < self.data.len() {
-            if let Some(token) = self.parse_token()? {
-                tokens.push(token);
-            } else {
-                // Skip unknown tokens
-                self.offset += 1;
-            }
+            tokens.push(self.parse_token()?);
         }
 
         Ok(tokens)
     }
 
     /// Parse a single token
-    fn parse_token(&mut self) -> XlsbResult<Option<FormulaToken>> {
+    fn parse_token(&mut self) -> XlsbResult<FormulaToken> {
         if self.offset >= self.data.len() {
-            return Ok(None);
+            return Err(XlsbError::InvalidFormula(
+                "unexpected end of formula token stream".to_string(),
+            ));
         }
 
         let ptg_type = self.data[self.offset];
@@ -205,22 +295,22 @@ impl<'a> FormulaParser<'a> {
         use ptg_types::*;
 
         match ptg_type {
-            PTG_ADD => Ok(Some(FormulaToken::BinaryOp(BinaryOperator::Add))),
-            PTG_SUB => Ok(Some(FormulaToken::BinaryOp(BinaryOperator::Subtract))),
-            PTG_MUL => Ok(Some(FormulaToken::BinaryOp(BinaryOperator::Multiply))),
-            PTG_DIV => Ok(Some(FormulaToken::BinaryOp(BinaryOperator::Divide))),
-            PTG_POWER => Ok(Some(FormulaToken::BinaryOp(BinaryOperator::Power))),
-            PTG_CONCAT => Ok(Some(FormulaToken::BinaryOp(BinaryOperator::Concat))),
-            PTG_LT => Ok(Some(FormulaToken::BinaryOp(BinaryOperator::LessThan))),
-            PTG_LE => Ok(Some(FormulaToken::BinaryOp(BinaryOperator::LessEqual))),
-            PTG_EQ => Ok(Some(FormulaToken::BinaryOp(BinaryOperator::Equal))),
-            PTG_GE => Ok(Some(FormulaToken::BinaryOp(BinaryOperator::GreaterEqual))),
-            PTG_GT => Ok(Some(FormulaToken::BinaryOp(BinaryOperator::GreaterThan))),
-            PTG_NE => Ok(Some(FormulaToken::BinaryOp(BinaryOperator::NotEqual))),
+            PTG_ADD => Ok(FormulaToken::BinaryOp(BinaryOperator::Add)),
+            PTG_SUB => Ok(FormulaToken::BinaryOp(BinaryOperator::Subtract)),
+            PTG_MUL => Ok(FormulaToken::BinaryOp(BinaryOperator::Multiply)),
+            PTG_DIV => Ok(FormulaToken::BinaryOp(BinaryOperator::Divide)),
+            PTG_POWER => Ok(FormulaToken::BinaryOp(BinaryOperator::Power)),
+            PTG_CONCAT => Ok(FormulaToken::BinaryOp(BinaryOperator::Concat)),
+            PTG_LT => Ok(FormulaToken::BinaryOp(BinaryOperator::LessThan)),
+            PTG_LE => Ok(FormulaToken::BinaryOp(BinaryOperator::LessEqual)),
+            PTG_EQ => Ok(FormulaToken::BinaryOp(BinaryOperator::Equal)),
+            PTG_GE => Ok(FormulaToken::BinaryOp(BinaryOperator::GreaterEqual)),
+            PTG_GT => Ok(FormulaToken::BinaryOp(BinaryOperator::GreaterThan)),
+            PTG_NE => Ok(FormulaToken::BinaryOp(BinaryOperator::NotEqual)),
 
-            PTG_UPLUS => Ok(Some(FormulaToken::UnaryOp(UnaryOperator::Plus))),
-            PTG_UMINUS => Ok(Some(FormulaToken::UnaryOp(UnaryOperator::Minus))),
-            PTG_PERCENT => Ok(Some(FormulaToken::UnaryOp(UnaryOperator::Percent))),
+            PTG_UPLUS => Ok(FormulaToken::UnaryOp(UnaryOperator::Plus)),
+            PTG_UMINUS => Ok(FormulaToken::UnaryOp(UnaryOperator::Minus)),
+            PTG_PERCENT => Ok(FormulaToken::UnaryOp(UnaryOperator::Percent)),
 
             PTG_INT => self.parse_int(),
             PTG_NUM => self.parse_num(),
@@ -228,136 +318,133 @@ impl<'a> FormulaParser<'a> {
             PTG_BOOL => self.parse_bool(),
             PTG_ERR => self.parse_err(),
 
-            PTG_REF | PTG_REF_N => self.parse_ref(),
-            PTG_AREA | PTG_AREA_N => self.parse_area(),
-
-            PTG_FUNC => self.parse_func(),
-            PTG_FUNC_VAR => self.parse_func_var(),
-
-            PTG_NAME => self.parse_name(),
+            _ if ptg_type >= 0x20 => match ptg_type & 0x1F {
+                0x04 | 0x0C => self.parse_ref(),
+                0x05 | 0x0D => self.parse_area(),
+                0x01 => self.parse_func(),
+                0x02 => self.parse_func_var(),
+                0x03 => self.parse_name(),
+                _ => Ok(FormulaToken::Unknown(ptg_type)),
+            },
 
             _ => {
                 // Unknown token type
-                Ok(Some(FormulaToken::Unknown(ptg_type)))
+                Ok(FormulaToken::Unknown(ptg_type))
             },
         }
     }
 
-    /// Parse integer constant
-    fn parse_int(&mut self) -> XlsbResult<Option<FormulaToken>> {
-        if self.offset + 2 > self.data.len() {
-            return Ok(None);
+    fn require(&self, len: usize, context: &str) -> XlsbResult<()> {
+        if self.offset + len <= self.data.len() {
+            Ok(())
+        } else {
+            Err(XlsbError::InvalidFormula(format!(
+                "truncated {context} token at byte {}: need {len} bytes, have {}",
+                self.offset.saturating_sub(1),
+                self.data.len().saturating_sub(self.offset)
+            )))
         }
+    }
+
+    /// Parse integer constant
+    fn parse_int(&mut self) -> XlsbResult<FormulaToken> {
+        self.require(2, "PtgInt")?;
 
         let value = binary::read_u16_le_at(self.data, self.offset)?;
         self.offset += 2;
 
-        Ok(Some(FormulaToken::Int(value)))
+        Ok(FormulaToken::Int(value))
     }
 
     /// Parse floating point constant
-    fn parse_num(&mut self) -> XlsbResult<Option<FormulaToken>> {
-        if self.offset + 8 > self.data.len() {
-            return Ok(None);
-        }
+    fn parse_num(&mut self) -> XlsbResult<FormulaToken> {
+        self.require(8, "PtgNum")?;
 
         let value = binary::read_f64_le_at(self.data, self.offset)?;
         self.offset += 8;
 
-        Ok(Some(FormulaToken::Number(value)))
+        Ok(FormulaToken::Number(value))
     }
 
     /// Parse string constant
-    fn parse_str(&mut self) -> XlsbResult<Option<FormulaToken>> {
-        if self.offset + 1 > self.data.len() {
-            return Ok(None);
-        }
+    fn parse_str(&mut self) -> XlsbResult<FormulaToken> {
+        self.require(2, "PtgStr length")?;
+        let len = binary::read_u16_le_at(self.data, self.offset)? as usize;
+        self.offset += 2;
+        let byte_len = len.checked_mul(2).ok_or_else(|| {
+            XlsbError::InvalidFormula("PtgStr UTF-16 length overflow".to_string())
+        })?;
+        self.require(byte_len, "PtgStr text")?;
+        let units = self.data[self.offset..self.offset + byte_len]
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
+        let string = char::decode_utf16(units)
+            .collect::<Result<String, _>>()
+            .map_err(|_| XlsbError::Encoding("invalid UTF-16 in PtgStr".to_string()))?;
+        self.offset += byte_len;
 
-        let len = self.data[self.offset] as usize;
-        self.offset += 1;
-
-        if self.offset + len > self.data.len() {
-            return Ok(None);
-        }
-
-        // String is stored as UTF-8 (not UTF-16LE like in records)
-        let string =
-            String::from_utf8_lossy(&self.data[self.offset..self.offset + len]).into_owned();
-        self.offset += len;
-
-        Ok(Some(FormulaToken::String(string)))
+        Ok(FormulaToken::String(string))
     }
 
     /// Parse boolean constant
-    fn parse_bool(&mut self) -> XlsbResult<Option<FormulaToken>> {
-        if self.offset + 1 > self.data.len() {
-            return Ok(None);
-        }
+    fn parse_bool(&mut self) -> XlsbResult<FormulaToken> {
+        self.require(1, "PtgBool")?;
 
         let value = self.data[self.offset] != 0;
         self.offset += 1;
 
-        Ok(Some(FormulaToken::Bool(value)))
+        Ok(FormulaToken::Bool(value))
     }
 
     /// Parse error constant
-    fn parse_err(&mut self) -> XlsbResult<Option<FormulaToken>> {
-        if self.offset + 1 > self.data.len() {
-            return Ok(None);
-        }
+    fn parse_err(&mut self) -> XlsbResult<FormulaToken> {
+        self.require(1, "PtgErr")?;
 
         let error_code = self.data[self.offset];
         self.offset += 1;
 
-        Ok(Some(FormulaToken::Error(error_code)))
+        Ok(FormulaToken::Error(error_code))
     }
 
     /// Parse cell reference
-    fn parse_ref(&mut self) -> XlsbResult<Option<FormulaToken>> {
-        if self.offset + 4 > self.data.len() {
-            return Ok(None);
-        }
+    fn parse_ref(&mut self) -> XlsbResult<FormulaToken> {
+        self.require(6, "PtgRef")?;
 
-        let row_data = binary::read_u16_le_at(self.data, self.offset)?;
-        let col_data = binary::read_u16_le_at(self.data, self.offset + 2)?;
-        self.offset += 4;
+        let row = binary::read_u32_le_at(self.data, self.offset)?;
+        let col_data = binary::read_u16_le_at(self.data, self.offset + 4)?;
+        self.offset += 6;
 
         // Extract row and column (with relative flags)
-        let row = (row_data & 0x3FFF) as u32;
-        let row_relative = (row_data & 0x8000) != 0;
         let col = (col_data & 0x3FFF) as u32;
-        let col_relative = (col_data & 0x8000) != 0;
+        let col_relative = (col_data & 0x4000) != 0;
+        let row_relative = (col_data & 0x8000) != 0;
 
-        Ok(Some(FormulaToken::CellRef {
+        Ok(FormulaToken::CellRef {
             row,
             col,
             row_relative,
             col_relative,
-        }))
+        })
     }
 
     /// Parse area reference
-    fn parse_area(&mut self) -> XlsbResult<Option<FormulaToken>> {
-        if self.offset + 8 > self.data.len() {
-            return Ok(None);
-        }
+    fn parse_area(&mut self) -> XlsbResult<FormulaToken> {
+        self.require(12, "PtgArea")?;
 
-        let row_first_data = binary::read_u16_le_at(self.data, self.offset)?;
-        let row_last_data = binary::read_u16_le_at(self.data, self.offset + 2)?;
-        let col_first_data = binary::read_u16_le_at(self.data, self.offset + 4)?;
-        let col_last_data = binary::read_u16_le_at(self.data, self.offset + 6)?;
-        self.offset += 8;
+        let row_first = binary::read_u32_le_at(self.data, self.offset)?;
+        let row_last = binary::read_u32_le_at(self.data, self.offset + 4)?;
+        let col_first_data = binary::read_u16_le_at(self.data, self.offset + 8)?;
+        let col_last_data = binary::read_u16_le_at(self.data, self.offset + 10)?;
+        self.offset += 12;
 
-        let row_first = (row_first_data & 0x3FFF) as u32;
-        let row_first_relative = (row_first_data & 0x8000) != 0;
-        let row_last = (row_last_data & 0x3FFF) as u32;
-        let row_last_relative = (row_last_data & 0x8000) != 0;
         let col_first = (col_first_data & 0x3FFF) as u32;
-        let col_first_relative = (col_first_data & 0x8000) != 0;
+        let col_first_relative = (col_first_data & 0x4000) != 0;
+        let row_first_relative = (col_first_data & 0x8000) != 0;
         let col_last = (col_last_data & 0x3FFF) as u32;
-        let col_last_relative = (col_last_data & 0x8000) != 0;
+        let col_last_relative = (col_last_data & 0x4000) != 0;
+        let row_last_relative = (col_last_data & 0x8000) != 0;
 
-        Ok(Some(FormulaToken::AreaRef {
+        Ok(FormulaToken::AreaRef {
             row_first,
             row_last,
             col_first,
@@ -366,14 +453,12 @@ impl<'a> FormulaParser<'a> {
             row_last_relative,
             col_first_relative,
             col_last_relative,
-        }))
+        })
     }
 
     /// Parse function with fixed arguments
-    fn parse_func(&mut self) -> XlsbResult<Option<FormulaToken>> {
-        if self.offset + 2 > self.data.len() {
-            return Ok(None);
-        }
+    fn parse_func(&mut self) -> XlsbResult<FormulaToken> {
+        self.require(2, "PtgFunc")?;
 
         let index = binary::read_u16_le_at(self.data, self.offset)?;
         self.offset += 2;
@@ -381,32 +466,38 @@ impl<'a> FormulaParser<'a> {
         // Look up argument count from function table (simplified)
         let arg_count = Self::get_function_arg_count(index);
 
-        Ok(Some(FormulaToken::Function { index, arg_count }))
+        Ok(FormulaToken::Function {
+            index,
+            arg_count,
+            is_command: false,
+        })
     }
 
     /// Parse function with variable arguments
-    fn parse_func_var(&mut self) -> XlsbResult<Option<FormulaToken>> {
-        if self.offset + 3 > self.data.len() {
-            return Ok(None);
-        }
+    fn parse_func_var(&mut self) -> XlsbResult<FormulaToken> {
+        self.require(3, "PtgFuncVar")?;
 
         let arg_count = self.data[self.offset];
-        let index = binary::read_u16_le_at(self.data, self.offset + 1)?;
+        let tab = binary::read_u16_le_at(self.data, self.offset + 1)?;
+        let index = tab & 0x7FFF;
+        let is_command = tab & 0x8000 != 0;
         self.offset += 3;
 
-        Ok(Some(FormulaToken::Function { index, arg_count }))
+        Ok(FormulaToken::Function {
+            index,
+            arg_count,
+            is_command,
+        })
     }
 
     /// Parse defined name reference
-    fn parse_name(&mut self) -> XlsbResult<Option<FormulaToken>> {
-        if self.offset + 4 > self.data.len() {
-            return Ok(None);
-        }
+    fn parse_name(&mut self) -> XlsbResult<FormulaToken> {
+        self.require(4, "PtgName")?;
 
         let name_index = binary::read_u32_le_at(self.data, self.offset)?;
         self.offset += 4;
 
-        Ok(Some(FormulaToken::Name(name_index)))
+        Ok(FormulaToken::Name(name_index))
     }
 
     /// Get function argument count by function index
@@ -414,12 +505,7 @@ impl<'a> FormulaParser<'a> {
     /// This is a simplified lookup. In a complete implementation, this would
     /// use a comprehensive table of all Excel functions.
     fn get_function_arg_count(index: u16) -> u8 {
-        match index {
-            0 => 1, // COUNT
-            4 => 2, // SUM (variable, but typically 1+)
-            1 => 2, // IF (typically 3, but can be 2)
-            _ => 1, // Default to 1 for unknown
-        }
+        builtin_function_by_index(index).map_or(0, |function| function.min_args)
     }
 }
 
@@ -436,13 +522,19 @@ impl FormulaConverter {
     ///
     /// Uses RPN to infix conversion with proper operator precedence.
     pub fn tokens_to_string(tokens: &[FormulaToken]) -> String {
+        Self::try_tokens_to_string(tokens).unwrap_or_default()
+    }
+
+    /// Convert tokens to text, rejecting token streams that cannot be
+    /// represented faithfully by this converter.
+    pub fn try_tokens_to_string(tokens: &[FormulaToken]) -> XlsbResult<String> {
         let mut stack: Vec<String> = Vec::new();
 
         for token in tokens {
             match token {
                 FormulaToken::Number(n) => stack.push(format!("{}", n)),
                 FormulaToken::Int(i) => stack.push(format!("{}", i)),
-                FormulaToken::String(s) => stack.push(format!("\"{}\"", s)),
+                FormulaToken::String(s) => stack.push(format!("\"{}\"", s.replace('"', "\"\""))),
                 FormulaToken::Bool(b) => stack.push(if *b {
                     "TRUE".to_string()
                 } else {
@@ -469,32 +561,69 @@ impl FormulaConverter {
                     col_first,
                     row_last,
                     col_last,
-                    ..
+                    row_first_relative,
+                    row_last_relative,
+                    col_first_relative,
+                    col_last_relative,
                 } => {
-                    let first = crate::xlsb::utils::cell_reference(*row_first, *col_first);
-                    let last = crate::xlsb::utils::cell_reference(*row_last, *col_last);
+                    let first = Self::format_reference(
+                        *row_first,
+                        *col_first,
+                        *row_first_relative,
+                        *col_first_relative,
+                    );
+                    let last = Self::format_reference(
+                        *row_last,
+                        *col_last,
+                        *row_last_relative,
+                        *col_last_relative,
+                    );
                     stack.push(format!("{}:{}", first, last));
                 },
                 FormulaToken::BinaryOp(op) => {
-                    if stack.len() >= 2 {
-                        let right = stack.pop().unwrap();
-                        let left = stack.pop().unwrap();
-                        let op_str = Self::binary_op_to_string(*op);
-                        stack.push(format!("({}{}{})", left, op_str, right));
+                    if stack.len() < 2 {
+                        return Err(XlsbError::InvalidFormula(
+                            "binary operator has fewer than two operands".to_string(),
+                        ));
                     }
+                    let right = stack.pop().expect("length checked");
+                    let left = stack.pop().expect("length checked");
+                    let op_str = Self::binary_op_to_string(*op);
+                    stack.push(format!("({}{}{})", left, op_str, right));
                 },
                 FormulaToken::UnaryOp(op) => {
-                    if !stack.is_empty() {
-                        let operand = stack.pop().unwrap();
-                        match op {
-                            UnaryOperator::Plus => stack.push(format!("+({})", operand)),
-                            UnaryOperator::Minus => stack.push(format!("-({})", operand)),
-                            UnaryOperator::Percent => stack.push(format!("({}%)", operand)),
-                        }
+                    let Some(operand) = stack.pop() else {
+                        return Err(XlsbError::InvalidFormula(
+                            "unary operator has no operand".to_string(),
+                        ));
+                    };
+                    match op {
+                        UnaryOperator::Plus => stack.push(format!("+({})", operand)),
+                        UnaryOperator::Minus => stack.push(format!("-({})", operand)),
+                        UnaryOperator::Percent => stack.push(format!("({}%)", operand)),
                     }
                 },
-                FormulaToken::Function { index, arg_count } => {
-                    let func_name = Self::function_name(*index);
+                FormulaToken::Function {
+                    index,
+                    arg_count,
+                    is_command,
+                } => {
+                    if *is_command {
+                        return Err(XlsbError::UnsupportedFeature(format!(
+                            "XLSB command function index {index}"
+                        )));
+                    }
+                    let Some(function) = builtin_function_by_index(*index) else {
+                        return Err(XlsbError::UnsupportedFeature(format!(
+                            "XLSB built-in function index {index}"
+                        )));
+                    };
+                    let func_name = function.name;
+                    if stack.len() < usize::from(*arg_count) {
+                        return Err(XlsbError::InvalidFormula(format!(
+                            "function {func_name} requires {arg_count} stack operands"
+                        )));
+                    }
                     let mut args = Vec::new();
                     for _ in 0..*arg_count {
                         if let Some(arg) = stack.pop() {
@@ -503,12 +632,37 @@ impl FormulaConverter {
                     }
                     stack.push(format!("{}({})", func_name, args.join(",")));
                 },
-                FormulaToken::Name(idx) => stack.push(format!("Name{}", idx)),
-                FormulaToken::Unknown(t) => stack.push(format!("?Ptg{:02X}?", t)),
+                FormulaToken::Name(idx) => {
+                    return Err(XlsbError::UnsupportedFeature(format!(
+                        "XLSB defined name index {idx} requires workbook name resolution"
+                    )));
+                },
+                FormulaToken::Unknown(t) => {
+                    return Err(XlsbError::UnsupportedFeature(format!(
+                        "XLSB formula token 0x{t:02X}"
+                    )));
+                },
             }
         }
 
-        stack.pop().unwrap_or_default()
+        if stack.len() != 1 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "formula leaves {} values on the evaluation stack",
+                stack.len()
+            )));
+        }
+        Ok(stack.pop().expect("length checked"))
+    }
+
+    fn format_reference(row: u32, col: u32, row_relative: bool, col_relative: bool) -> String {
+        let col_str = crate::xlsb::utils::column_index_to_name(col + 1);
+        format!(
+            "{}{}{}{}",
+            if col_relative { "" } else { "$" },
+            col_str,
+            if row_relative { "" } else { "$" },
+            row + 1
+        )
     }
 
     /// Convert binary operator to string
@@ -543,19 +697,560 @@ impl FormulaConverter {
             _ => format!("#ERR{:02X}!", code),
         }
     }
+}
 
-    /// Get function name by index (simplified)
-    fn function_name(index: u16) -> String {
-        match index {
-            0 => "COUNT".to_string(),
-            1 => "IF".to_string(),
-            4 => "SUM".to_string(),
-            5 => "AVERAGE".to_string(),
-            6 => "MIN".to_string(),
-            7 => "MAX".to_string(),
-            _ => format!("FUNC{}", index),
+#[derive(Debug, Clone, Copy)]
+struct BuiltinFunction {
+    index: u16,
+    name: &'static str,
+    min_args: u8,
+    max_args: u8,
+}
+
+fn builtin_function_by_index(index: u16) -> Option<BuiltinFunction> {
+    let (name, min_args, max_args) = match index {
+        0 => ("COUNT", 0, 30),
+        1 => ("IF", 2, 3),
+        2 => ("ISNA", 1, 1),
+        3 => ("ISERROR", 1, 1),
+        4 => ("SUM", 0, 30),
+        5 => ("AVERAGE", 1, 30),
+        6 => ("MIN", 1, 30),
+        7 => ("MAX", 1, 30),
+        8 => ("ROW", 0, 1),
+        9 => ("COLUMN", 0, 1),
+        10 => ("NA", 0, 0),
+        11 => ("NPV", 2, 30),
+        12 => ("STDEV", 1, 30),
+        13 => ("DOLLAR", 1, 2),
+        14 => ("FIXED", 2, 3),
+        15 => ("SIN", 1, 1),
+        16 => ("COS", 1, 1),
+        17 => ("TAN", 1, 1),
+        18 => ("ATAN", 1, 1),
+        19 => ("PI", 0, 0),
+        20 => ("SQRT", 1, 1),
+        21 => ("EXP", 1, 1),
+        22 => ("LN", 1, 1),
+        23 => ("LOG10", 1, 1),
+        24 => ("ABS", 1, 1),
+        25 => ("INT", 1, 1),
+        26 => ("SIGN", 1, 1),
+        27 => ("ROUND", 2, 2),
+        28 => ("LOOKUP", 2, 3),
+        29 => ("INDEX", 2, 4),
+        30 => ("REPT", 2, 2),
+        31 => ("MID", 3, 3),
+        32 => ("LEN", 1, 1),
+        33 => ("VALUE", 1, 1),
+        34 => ("TRUE", 0, 0),
+        35 => ("FALSE", 0, 0),
+        36 => ("AND", 1, 30),
+        37 => ("OR", 1, 30),
+        38 => ("NOT", 1, 1),
+        39 => ("MOD", 2, 2),
+        64 => ("MATCH", 2, 3),
+        65 => ("DATE", 3, 3),
+        74 => ("NOW", 0, 0),
+        82 => ("SEARCH", 2, 3),
+        100 => ("CHOOSE", 2, 30),
+        101 => ("HLOOKUP", 3, 4),
+        102 => ("VLOOKUP", 3, 4),
+        115 => ("LEFT", 1, 2),
+        116 => ("RIGHT", 1, 2),
+        124 => ("FIND", 2, 3),
+        221 => ("TODAY", 0, 0),
+        336 => ("CONCATENATE", 0, 30),
+        345 => ("SUMIF", 2, 3),
+        346 => ("COUNTIF", 2, 2),
+        _ => return None,
+    };
+    Some(BuiltinFunction {
+        index,
+        name,
+        min_args,
+        max_args,
+    })
+}
+
+fn builtin_function_by_name(name: &str) -> Option<BuiltinFunction> {
+    const INDICES: &[u16] = &[
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 64, 65, 74, 82, 100, 101, 102,
+        115, 116, 124, 221, 336, 345, 346,
+    ];
+    INDICES.iter().find_map(|index| {
+        let function = builtin_function_by_index(*index)?;
+        function.name.eq_ignore_ascii_case(name).then_some(function)
+    })
+}
+
+/// Compiles a practical, standards-defined subset of Excel formula text to
+/// XLSB RPN tokens.
+///
+/// The compiler supports literals, A1 references and ranges, parentheses,
+/// arithmetic/comparison/concatenation operators, percent, and the built-in
+/// functions in this module's supported `Ftab` table. Unsupported constructs
+/// return an error; they are never replaced by a cached value.
+pub struct FormulaCompiler<'a> {
+    input: &'a str,
+    offset: usize,
+}
+
+#[derive(Debug)]
+enum CompileExpr {
+    Number(f64),
+    String(String),
+    Bool(bool),
+    Ref(A1Reference),
+    Area(A1Reference, A1Reference),
+    Unary(UnaryOperator, Box<CompileExpr>),
+    Binary(BinaryOperator, Box<CompileExpr>, Box<CompileExpr>),
+    Function(BuiltinFunction, Vec<CompileExpr>),
+}
+
+#[derive(Debug, Clone, Copy)]
+struct A1Reference {
+    row: u32,
+    col: u32,
+    row_relative: bool,
+    col_relative: bool,
+}
+
+impl<'a> FormulaCompiler<'a> {
+    pub fn compile(formula: &'a str) -> XlsbResult<CellParsedFormula> {
+        let input = formula.strip_prefix('=').unwrap_or(formula).trim();
+        if input.is_empty() {
+            return Err(XlsbError::InvalidFormula(
+                "formula expression is empty".to_string(),
+            ));
+        }
+        let mut compiler = Self { input, offset: 0 };
+        let expression = compiler.parse_comparison()?;
+        compiler.skip_spaces();
+        if compiler.offset != compiler.input.len() {
+            return Err(compiler.error("unexpected trailing input"));
+        }
+
+        let mut rgce = Vec::new();
+        Self::emit(&expression, &mut rgce)?;
+        if rgce.len() > MAX_CELL_FORMULA_BYTES {
+            return Err(XlsbError::InvalidFormula(format!(
+                "compiled formula is {} bytes; maximum is {MAX_CELL_FORMULA_BYTES}",
+                rgce.len()
+            )));
+        }
+        Ok(CellParsedFormula {
+            rgce,
+            rgcb: Vec::new(),
+        })
+    }
+
+    fn parse_comparison(&mut self) -> XlsbResult<CompileExpr> {
+        let mut expression = self.parse_concat()?;
+        loop {
+            let operator = if self.consume("<>") {
+                Some(BinaryOperator::NotEqual)
+            } else if self.consume("<=") {
+                Some(BinaryOperator::LessEqual)
+            } else if self.consume(">=") {
+                Some(BinaryOperator::GreaterEqual)
+            } else if self.consume("=") {
+                Some(BinaryOperator::Equal)
+            } else if self.consume("<") {
+                Some(BinaryOperator::LessThan)
+            } else if self.consume(">") {
+                Some(BinaryOperator::GreaterThan)
+            } else {
+                None
+            };
+            let Some(operator) = operator else { break };
+            let right = self.parse_concat()?;
+            expression = CompileExpr::Binary(operator, Box::new(expression), Box::new(right));
+        }
+        Ok(expression)
+    }
+
+    fn parse_concat(&mut self) -> XlsbResult<CompileExpr> {
+        let mut expression = self.parse_additive()?;
+        while self.consume("&") {
+            let right = self.parse_additive()?;
+            expression = CompileExpr::Binary(
+                BinaryOperator::Concat,
+                Box::new(expression),
+                Box::new(right),
+            );
+        }
+        Ok(expression)
+    }
+
+    fn parse_additive(&mut self) -> XlsbResult<CompileExpr> {
+        let mut expression = self.parse_multiplicative()?;
+        loop {
+            let operator = if self.consume("+") {
+                Some(BinaryOperator::Add)
+            } else if self.consume("-") {
+                Some(BinaryOperator::Subtract)
+            } else {
+                None
+            };
+            let Some(operator) = operator else { break };
+            let right = self.parse_multiplicative()?;
+            expression = CompileExpr::Binary(operator, Box::new(expression), Box::new(right));
+        }
+        Ok(expression)
+    }
+
+    fn parse_multiplicative(&mut self) -> XlsbResult<CompileExpr> {
+        let mut expression = self.parse_power()?;
+        loop {
+            let operator = if self.consume("*") {
+                Some(BinaryOperator::Multiply)
+            } else if self.consume("/") {
+                Some(BinaryOperator::Divide)
+            } else {
+                None
+            };
+            let Some(operator) = operator else { break };
+            let right = self.parse_power()?;
+            expression = CompileExpr::Binary(operator, Box::new(expression), Box::new(right));
+        }
+        Ok(expression)
+    }
+
+    fn parse_power(&mut self) -> XlsbResult<CompileExpr> {
+        let left = self.parse_unary()?;
+        if self.consume("^") {
+            let right = self.parse_power()?;
+            Ok(CompileExpr::Binary(
+                BinaryOperator::Power,
+                Box::new(left),
+                Box::new(right),
+            ))
+        } else {
+            Ok(left)
         }
     }
+
+    fn parse_unary(&mut self) -> XlsbResult<CompileExpr> {
+        if self.consume("+") {
+            return Ok(CompileExpr::Unary(
+                UnaryOperator::Plus,
+                Box::new(self.parse_unary()?),
+            ));
+        }
+        if self.consume("-") {
+            return Ok(CompileExpr::Unary(
+                UnaryOperator::Minus,
+                Box::new(self.parse_unary()?),
+            ));
+        }
+        let mut expression = self.parse_primary()?;
+        while self.consume("%") {
+            expression = CompileExpr::Unary(UnaryOperator::Percent, Box::new(expression));
+        }
+        Ok(expression)
+    }
+
+    fn parse_primary(&mut self) -> XlsbResult<CompileExpr> {
+        self.skip_spaces();
+        if self.consume("(") {
+            let expression = self.parse_comparison()?;
+            if !self.consume(")") {
+                return Err(self.error("expected ')'"));
+            }
+            return Ok(expression);
+        }
+        if self.peek_char() == Some('"') {
+            return self.parse_string().map(CompileExpr::String);
+        }
+        if self
+            .peek_char()
+            .is_some_and(|ch| ch.is_ascii_digit() || ch == '.')
+        {
+            return self.parse_number().map(CompileExpr::Number);
+        }
+
+        let identifier = self.parse_identifier()?;
+        if self.consume("(") {
+            let function = builtin_function_by_name(&identifier).ok_or_else(|| {
+                XlsbError::UnsupportedFeature(format!(
+                    "XLSB formula function {identifier} is not in the supported Ftab set"
+                ))
+            })?;
+            let mut arguments = Vec::new();
+            if !self.consume(")") {
+                loop {
+                    arguments.push(self.parse_comparison()?);
+                    if self.consume(")") {
+                        break;
+                    }
+                    if !self.consume(",") {
+                        return Err(self.error("expected ',' or ')' in function call"));
+                    }
+                }
+            }
+            if arguments.len() < usize::from(function.min_args)
+                || arguments.len() > usize::from(function.max_args)
+            {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "{} expects {}..={} arguments, found {}",
+                    function.name,
+                    function.min_args,
+                    function.max_args,
+                    arguments.len()
+                )));
+            }
+            return Ok(CompileExpr::Function(function, arguments));
+        }
+        if identifier.eq_ignore_ascii_case("TRUE") {
+            return Ok(CompileExpr::Bool(true));
+        }
+        if identifier.eq_ignore_ascii_case("FALSE") {
+            return Ok(CompileExpr::Bool(false));
+        }
+
+        let first = parse_a1_reference(&identifier).ok_or_else(|| {
+            self.error("defined names and sheet-qualified references are not yet supported")
+        })?;
+        if self.consume(":") {
+            let second_text = self.parse_identifier()?;
+            let second = parse_a1_reference(&second_text)
+                .ok_or_else(|| self.error("invalid range end reference"))?;
+            Ok(CompileExpr::Area(first, second))
+        } else {
+            Ok(CompileExpr::Ref(first))
+        }
+    }
+
+    fn parse_string(&mut self) -> XlsbResult<String> {
+        debug_assert_eq!(self.peek_char(), Some('"'));
+        self.offset += 1;
+        let mut value = String::new();
+        loop {
+            let Some(ch) = self.peek_char() else {
+                return Err(self.error("unterminated string literal"));
+            };
+            self.offset += ch.len_utf8();
+            if ch == '"' {
+                if self.peek_char() == Some('"') {
+                    self.offset += 1;
+                    value.push('"');
+                } else {
+                    break;
+                }
+            } else {
+                value.push(ch);
+            }
+        }
+        if value.encode_utf16().count() > 255 {
+            return Err(XlsbError::InvalidFormula(
+                "formula string literal exceeds 255 UTF-16 code units".to_string(),
+            ));
+        }
+        Ok(value)
+    }
+
+    fn parse_number(&mut self) -> XlsbResult<f64> {
+        self.skip_spaces();
+        let start = self.offset;
+        let mut seen_exponent = false;
+        while let Some(ch) = self.peek_char() {
+            if ch.is_ascii_digit() || ch == '.' {
+                self.offset += 1;
+            } else if matches!(ch, 'e' | 'E') && !seen_exponent {
+                seen_exponent = true;
+                self.offset += 1;
+                if matches!(self.peek_char(), Some('+' | '-')) {
+                    self.offset += 1;
+                }
+            } else {
+                break;
+            }
+        }
+        self.input[start..self.offset]
+            .parse::<f64>()
+            .map_err(|_| self.error("invalid numeric literal"))
+    }
+
+    fn parse_identifier(&mut self) -> XlsbResult<String> {
+        self.skip_spaces();
+        let start = self.offset;
+        while let Some(ch) = self.peek_char() {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '$') {
+                self.offset += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        if self.offset == start {
+            Err(self.error("expected literal, reference, or function"))
+        } else {
+            Ok(self.input[start..self.offset].to_string())
+        }
+    }
+
+    fn consume(&mut self, text: &str) -> bool {
+        self.skip_spaces();
+        if self.input[self.offset..].starts_with(text) {
+            self.offset += text.len();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn skip_spaces(&mut self) {
+        while self.peek_char().is_some_and(char::is_whitespace) {
+            self.offset += self.peek_char().expect("checked").len_utf8();
+        }
+    }
+
+    fn peek_char(&self) -> Option<char> {
+        self.input[self.offset..].chars().next()
+    }
+
+    fn error(&self, message: &str) -> XlsbError {
+        XlsbError::InvalidFormula(format!("{message} at byte {}", self.offset))
+    }
+
+    fn emit(expression: &CompileExpr, output: &mut Vec<u8>) -> XlsbResult<()> {
+        match expression {
+            CompileExpr::Number(value) => {
+                if value.fract() == 0.0 && *value >= 0.0 && *value <= f64::from(u16::MAX) {
+                    output.push(ptg_types::PTG_INT);
+                    output.extend_from_slice(&(*value as u16).to_le_bytes());
+                } else {
+                    output.push(ptg_types::PTG_NUM);
+                    output.extend_from_slice(&value.to_le_bytes());
+                }
+            },
+            CompileExpr::String(value) => {
+                let utf16: Vec<u16> = value.encode_utf16().collect();
+                output.push(ptg_types::PTG_STR);
+                output.extend_from_slice(&(utf16.len() as u16).to_le_bytes());
+                for unit in utf16 {
+                    output.extend_from_slice(&unit.to_le_bytes());
+                }
+            },
+            CompileExpr::Bool(value) => {
+                output.push(ptg_types::PTG_BOOL);
+                output.push(u8::from(*value));
+            },
+            CompileExpr::Ref(reference) => emit_reference(output, 0x44, *reference),
+            CompileExpr::Area(first, last) => {
+                output.push(0x25); // PtgArea, REFERENCE class
+                output.extend_from_slice(&first.row.to_le_bytes());
+                output.extend_from_slice(&last.row.to_le_bytes());
+                output.extend_from_slice(&reference_column_bits(*first).to_le_bytes());
+                output.extend_from_slice(&reference_column_bits(*last).to_le_bytes());
+            },
+            CompileExpr::Unary(operator, operand) => {
+                Self::emit(operand, output)?;
+                output.push(match operator {
+                    UnaryOperator::Plus => ptg_types::PTG_UPLUS,
+                    UnaryOperator::Minus => ptg_types::PTG_UMINUS,
+                    UnaryOperator::Percent => ptg_types::PTG_PERCENT,
+                });
+            },
+            CompileExpr::Binary(operator, left, right) => {
+                Self::emit(left, output)?;
+                Self::emit(right, output)?;
+                output.push(match operator {
+                    BinaryOperator::Add => ptg_types::PTG_ADD,
+                    BinaryOperator::Subtract => ptg_types::PTG_SUB,
+                    BinaryOperator::Multiply => ptg_types::PTG_MUL,
+                    BinaryOperator::Divide => ptg_types::PTG_DIV,
+                    BinaryOperator::Power => ptg_types::PTG_POWER,
+                    BinaryOperator::Concat => ptg_types::PTG_CONCAT,
+                    BinaryOperator::LessThan => ptg_types::PTG_LT,
+                    BinaryOperator::LessEqual => ptg_types::PTG_LE,
+                    BinaryOperator::Equal => ptg_types::PTG_EQ,
+                    BinaryOperator::GreaterEqual => ptg_types::PTG_GE,
+                    BinaryOperator::GreaterThan => ptg_types::PTG_GT,
+                    BinaryOperator::NotEqual => ptg_types::PTG_NE,
+                });
+            },
+            CompileExpr::Function(function, arguments) => {
+                for argument in arguments {
+                    Self::emit(argument, output)?;
+                }
+                if function.min_args == function.max_args {
+                    output.push(0x41); // PtgFunc, VALUE class
+                    output.extend_from_slice(&function.index.to_le_bytes());
+                } else {
+                    output.push(0x42); // PtgFuncVar, VALUE class
+                    output.push(arguments.len() as u8);
+                    output.extend_from_slice(&function.index.to_le_bytes());
+                }
+            },
+        }
+        Ok(())
+    }
+}
+
+fn parse_a1_reference(value: &str) -> Option<A1Reference> {
+    let bytes = value.as_bytes();
+    let mut offset = 0;
+    let col_relative = bytes.get(offset) != Some(&b'$');
+    if !col_relative {
+        offset += 1;
+    }
+    let col_start = offset;
+    while bytes.get(offset).is_some_and(u8::is_ascii_alphabetic) {
+        offset += 1;
+    }
+    if offset == col_start {
+        return None;
+    }
+    let mut col = 0u32;
+    for byte in bytes[col_start..offset].iter().map(u8::to_ascii_uppercase) {
+        col = col
+            .checked_mul(26)?
+            .checked_add(u32::from(byte - b'A' + 1))?;
+    }
+    if col == 0 || col > 16_384 {
+        return None;
+    }
+
+    let row_relative = bytes.get(offset) != Some(&b'$');
+    if !row_relative {
+        offset += 1;
+    }
+    let row_start = offset;
+    while bytes.get(offset).is_some_and(u8::is_ascii_digit) {
+        offset += 1;
+    }
+    if offset == row_start || offset != bytes.len() {
+        return None;
+    }
+    let row = value[row_start..offset].parse::<u32>().ok()?;
+    if row == 0 || row > 1_048_576 {
+        return None;
+    }
+    Some(A1Reference {
+        row: row - 1,
+        col: col - 1,
+        row_relative,
+        col_relative,
+    })
+}
+
+fn reference_column_bits(reference: A1Reference) -> u16 {
+    let mut bits = reference.col as u16;
+    if reference.col_relative {
+        bits |= 0x4000;
+    }
+    if reference.row_relative {
+        bits |= 0x8000;
+    }
+    bits
+}
+
+fn emit_reference(output: &mut Vec<u8>, token: u8, reference: A1Reference) {
+    output.push(token);
+    output.extend_from_slice(&reference.row.to_le_bytes());
+    output.extend_from_slice(&reference_column_bits(reference).to_le_bytes());
 }
 
 #[cfg(test)]
@@ -596,5 +1291,69 @@ mod tests {
         ];
         let formula = FormulaConverter::tokens_to_string(&tokens);
         assert_eq!(formula, "(1+2)");
+    }
+
+    #[test]
+    fn parses_ms_xlsb_brt_fmla_num_example_formula() {
+        // [MS-XLSB] 3.7.37: PtgRef(C13), PtgInt(2), PtgMul.
+        let rgce = vec![
+            0x44, 0x0C, 0x00, 0x00, 0x00, 0x02, 0xC0, 0x1E, 0x02, 0x00, 0x05,
+        ];
+        let parsed = CellParsedFormula {
+            rgce: rgce.clone(),
+            rgcb: Vec::new(),
+        };
+        let bytes = parsed.to_bytes().unwrap();
+        let (roundtrip, consumed) = CellParsedFormula::parse(&bytes).unwrap();
+        assert_eq!(consumed, bytes.len());
+        assert_eq!(roundtrip, parsed);
+
+        let tokens = FormulaParser::new(&rgce).parse().unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
+            "(C13*2)"
+        );
+    }
+
+    #[test]
+    fn compiler_matches_ms_xlsb_reference_and_multiply_tokens() {
+        let formula = FormulaCompiler::compile("=C13*2").unwrap();
+        assert_eq!(
+            formula.rgce,
+            vec![
+                0x44, 0x0C, 0x00, 0x00, 0x00, 0x02, 0xC0, 0x1E, 0x02, 0x00, 0x05,
+            ]
+        );
+    }
+
+    #[test]
+    fn compiler_supports_ranges_functions_unicode_and_absolute_refs() {
+        let formula = FormulaCompiler::compile("SUM($A$1:B3)+\"荔枝\"").unwrap();
+        let tokens = FormulaParser::new(&formula.rgce).parse().unwrap();
+        let text = FormulaConverter::try_tokens_to_string(&tokens).unwrap();
+        assert_eq!(text, "(SUM($A$1:B3)+\"荔枝\")");
+    }
+
+    #[test]
+    fn cell_parsed_formula_rejects_zero_and_oversized_token_streams() {
+        let zero = [0_u8; 8];
+        assert!(matches!(
+            CellParsedFormula::parse(&zero),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+
+        let mut oversized = Vec::new();
+        oversized.extend_from_slice(&((MAX_CELL_FORMULA_BYTES as u32) + 1).to_le_bytes());
+        oversized.extend_from_slice(&[0; 4]);
+        assert!(matches!(
+            CellParsedFormula::parse(&oversized),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+    }
+
+    #[test]
+    fn truncated_token_is_an_error_instead_of_becoming_unknown_bytes() {
+        let error = FormulaParser::new(&[0x44, 0x01]).parse().unwrap_err();
+        assert!(matches!(error, XlsbError::InvalidFormula(_)));
     }
 }

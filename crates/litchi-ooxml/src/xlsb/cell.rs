@@ -1,5 +1,6 @@
 //! Cell representation for XLSB files
 
+use crate::xlsb::formula::{CellParsedFormula, FormulaConverter, FormulaParser};
 use crate::xlsb::records::CellRecord;
 use litchi_core::sheet::{Cell, CellValue};
 
@@ -17,6 +18,10 @@ pub struct XlsbCell {
     col: u32,
     /// Track whether this cell came from a formula record
     is_formula: bool,
+    /// Original binary formula, retained even if a token is not understood.
+    formula: Option<CellParsedFormula>,
+    /// Formula calculation flags from `GrbitFmla`.
+    formula_flags: u16,
 }
 
 impl XlsbCell {
@@ -27,6 +32,8 @@ impl XlsbCell {
             col,
             value,
             is_formula: false,
+            formula: None,
+            formula_flags: 0,
         }
     }
 
@@ -37,7 +44,54 @@ impl XlsbCell {
             col,
             value,
             is_formula: true,
+            formula: None,
+            formula_flags: 0,
         }
+    }
+
+    /// Create a formula cell while preserving the exact XLSB token and
+    /// ancillary streams.
+    pub(crate) fn new_formula_binary(
+        row: u32,
+        col: u32,
+        cached_value: CellValue,
+        formula: CellParsedFormula,
+        formula_flags: u16,
+    ) -> Self {
+        let value = FormulaParser::new(&formula.rgce)
+            .parse()
+            .and_then(|tokens| FormulaConverter::try_tokens_to_string(&tokens))
+            .map(|formula_text| CellValue::Formula {
+                formula: formula_text,
+                cached_value: Some(Box::new(cached_value.clone())),
+                is_array: false,
+                array_range: None,
+            })
+            .unwrap_or(cached_value);
+
+        Self {
+            value,
+            row,
+            col,
+            is_formula: true,
+            formula: Some(formula),
+            formula_flags,
+        }
+    }
+
+    /// Raw XLSB formula RPN token stream (`rgce`).
+    pub fn formula_bytes(&self) -> Option<&[u8]> {
+        self.formula.as_ref().map(|formula| formula.rgce.as_slice())
+    }
+
+    /// Raw XLSB ancillary formula stream (`rgcb`).
+    pub fn formula_extra_bytes(&self) -> Option<&[u8]> {
+        self.formula.as_ref().map(|formula| formula.rgcb.as_slice())
+    }
+
+    /// Formula recalculation flags from `GrbitFmla`.
+    pub fn formula_flags(&self) -> Option<u16> {
+        self.is_formula.then_some(self.formula_flags)
     }
 
     /// Create cell from XLSB record
@@ -87,6 +141,8 @@ impl XlsbCell {
             col: record.col as u32,
             value,
             is_formula,
+            formula: None,
+            formula_flags: 0,
         })
     }
 
