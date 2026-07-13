@@ -1,6 +1,9 @@
 //! XLSB cells reader implementation
 
 use crate::xlsb::cell::{CellHeader, XlsbCell};
+use crate::xlsb::data_validation::{
+    DataValidation, DataValidationSettings, parse_collection_settings, parse_dval_list,
+};
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{
     CellParsedFormula, FormulaGroup, FormulaGroupKind, FormulaResolutionContext,
@@ -69,6 +72,12 @@ where
     pub sheet_protection: Option<XlsbSheetProtection>,
     /// ISO strong password-verifier metadata.
     pub strong_sheet_protection: Option<XlsbStrongProtection>,
+    /// Classic worksheet data-validation rules.
+    pub data_validations: Vec<DataValidation>,
+    /// UI settings from the classic validation collection.
+    pub data_validation_settings: Option<DataValidationSettings>,
+    /// UI settings from the Office 2013 validation collection.
+    pub data_validation14_settings: Option<DataValidationSettings>,
 }
 
 impl<'a, RS> XlsbCellsReader<'a, RS>
@@ -132,6 +141,9 @@ where
             auto_filter: None,
             sheet_protection: None,
             strong_sheet_protection: None,
+            data_validations: Vec::new(),
+            data_validation_settings: None,
+            data_validation14_settings: None,
         })
     }
 
@@ -811,6 +823,28 @@ where
                     self.sheet_protection = Some(base);
                     self.strong_sheet_protection = Some(strong);
                 },
+                record_types::BEGIN_D_VALS => {
+                    if self.data_validation_settings.is_some() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtBeginDVals".to_string(),
+                            val: "duplicate collection".to_string(),
+                        });
+                    }
+                    let (settings, count) = parse_collection_settings(&self.buf, false)?;
+                    self.data_validation_settings = Some(settings);
+                    self.consume_classic_data_validations(count)?;
+                },
+                record_types::BEGIN_D_VALS14 => {
+                    if self.data_validation14_settings.is_some() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtBeginDVals14".to_string(),
+                            val: "duplicate collection".to_string(),
+                        });
+                    }
+                    let (settings, count) = parse_collection_settings(&self.buf, true)?;
+                    self.data_validation14_settings = Some(settings);
+                    self.consume_extension_data_validations(count)?;
+                },
                 0x0082 => {
                     // BrtEndSheet - end of worksheet
                     break;
@@ -821,6 +855,105 @@ where
             }
         }
 
+        Ok(())
+    }
+
+    fn consume_classic_data_validations(&mut self, expected_count: u32) -> XlsbResult<()> {
+        let start = self.data_validations.len();
+        let mut pending_list = None;
+        loop {
+            self.buf.clear();
+            let typ = self.iter.read_type()?;
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
+            match typ {
+                record_types::D_VAL_LIST => {
+                    if pending_list.is_some() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtDValList".to_string(),
+                            val: "consecutive list overrides".to_string(),
+                        });
+                    }
+                    pending_list = Some(parse_dval_list(&self.buf)?);
+                },
+                record_types::D_VAL => {
+                    let rule = DataValidation::parse_classic(
+                        &self.buf,
+                        pending_list.take(),
+                        self.formula_context,
+                    )?;
+                    self.data_validations.push(rule);
+                },
+                record_types::END_D_VALS => {
+                    if !self.buf.is_empty() {
+                        return Err(XlsbError::InvalidLength {
+                            expected: 0,
+                            found: self.buf.len(),
+                        });
+                    }
+                    if pending_list.is_some() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtDValList".to_string(),
+                            val: "not followed by BrtDVal".to_string(),
+                        });
+                    }
+                    break;
+                },
+                _ => {
+                    return Err(XlsbError::Unrecognized {
+                        typ: "BrtBeginDVals collection".to_string(),
+                        val: format!("unexpected record 0x{typ:04X}"),
+                    });
+                },
+            }
+        }
+        let found = self.data_validations.len() - start;
+        if found != expected_count as usize {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginDVals count".to_string(),
+                val: format!("declared {expected_count}, found {found}"),
+            });
+        }
+        Ok(())
+    }
+
+    fn consume_extension_data_validations(&mut self, expected_count: u32) -> XlsbResult<()> {
+        let start = self.data_validations.len();
+        loop {
+            self.buf.clear();
+            let typ = self.iter.read_type()?;
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
+            match typ {
+                record_types::D_VAL14 => {
+                    self.data_validations
+                        .push(DataValidation::parse_extension14(
+                            &self.buf,
+                            self.formula_context,
+                        )?)
+                },
+                record_types::END_D_VALS14 => {
+                    if !self.buf.is_empty() {
+                        return Err(XlsbError::InvalidLength {
+                            expected: 0,
+                            found: self.buf.len(),
+                        });
+                    }
+                    break;
+                },
+                _ => {
+                    return Err(XlsbError::Unrecognized {
+                        typ: "BrtBeginDVals14 collection".to_string(),
+                        val: format!("unexpected record 0x{typ:04X}"),
+                    });
+                },
+            }
+        }
+        let found = self.data_validations.len() - start;
+        if found != expected_count as usize {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginDVals14 count".to_string(),
+                val: format!("declared {expected_count}, found {found}"),
+            });
+        }
         Ok(())
     }
 
@@ -1258,5 +1391,29 @@ mod tests {
         assert!(row.hidden);
         assert!(row.show_phonetic);
         assert_eq!(row.column_spans, vec![(2, 2)]);
+    }
+
+    #[test]
+    fn rejects_a_validation_collection_with_a_mismatched_count() {
+        let mut worksheet = Vec::new();
+        let mut writer = RecordWriter::new(&mut worksheet);
+        writer.write_record(0x0094, &[0; 16]).unwrap();
+        writer.write_record(0x0091, &[]).unwrap();
+        writer.write_record(0x0092, &[]).unwrap();
+        let mut begin = vec![0; 14];
+        begin.extend_from_slice(&1u32.to_le_bytes());
+        writer
+            .write_record(record_types::BEGIN_D_VALS, &begin)
+            .unwrap();
+        writer.write_record(record_types::END_D_VALS, &[]).unwrap();
+        writer.write_record(0x0082, &[]).unwrap();
+
+        let formula_context = FormulaResolutionContext::default();
+        let iter = RecordIter::new(std::io::Cursor::new(worksheet));
+        let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
+        assert!(matches!(
+            reader.next_cell(),
+            Err(XlsbError::Unrecognized { .. })
+        ));
     }
 }

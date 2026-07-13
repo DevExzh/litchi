@@ -2,7 +2,7 @@
 
 use crate::xlsb::comments::Comment;
 use crate::xlsb::conditional_formatting::ConditionalFormatting;
-use crate::xlsb::data_validation::DataValidation;
+use crate::xlsb::data_validation::{DataValidation, DataValidationSettings};
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{
     CellParsedFormula, FormulaCompilationContext, FormulaCompiler, FormulaConverter, FormulaGroup,
@@ -111,6 +111,8 @@ pub struct MutableXlsbWorksheet {
     sheet_protection: Option<SheetProtection>,
     /// Data validation rules.
     data_validations: Vec<DataValidation>,
+    data_validation_settings: DataValidationSettings,
+    data_validation14_settings: DataValidationSettings,
     /// Conditional formatting rules.
     conditional_formattings: Vec<ConditionalFormatting>,
     /// Array and shared formula definitions. Cell records contain only a
@@ -124,6 +126,7 @@ pub struct MutableXlsbWorksheet {
 pub(crate) struct ContextualFormulaRestore {
     cell_positions: Vec<(u32, u32)>,
     group_formulas: Vec<(usize, CellParsedFormula)>,
+    validation_formulas: Vec<(usize, bool, bool)>,
 }
 
 fn formula_requires_workbook_context(error: &XlsbError) -> bool {
@@ -158,6 +161,8 @@ impl MutableXlsbWorksheet {
             auto_filter: None,
             sheet_protection: None,
             data_validations: Vec::new(),
+            data_validation_settings: DataValidationSettings::default(),
+            data_validation14_settings: DataValidationSettings::default(),
             conditional_formattings: Vec::new(),
             formula_groups: Vec::new(),
             formula_group_sources: BTreeMap::new(),
@@ -212,6 +217,32 @@ impl MutableXlsbWorksheet {
                 ));
             }
         }
+        let mut compiled_validations = Vec::new();
+        for (index, validation) in self.data_validations.iter().enumerate() {
+            let formula1 = if validation.formula1_binary.is_none() && !validation.string_list {
+                validation
+                    .formula1
+                    .as_deref()
+                    .filter(|formula| !formula.is_empty())
+                    .map(|formula| FormulaCompiler::compile_with_context(formula, context))
+                    .transpose()?
+            } else {
+                None
+            };
+            let formula2 = if validation.formula2_binary.is_none() {
+                validation
+                    .formula2
+                    .as_deref()
+                    .filter(|formula| !formula.is_empty())
+                    .map(|formula| FormulaCompiler::compile_with_context(formula, context))
+                    .transpose()?
+            } else {
+                None
+            };
+            if formula1.is_some() || formula2.is_some() {
+                compiled_validations.push((index, formula1, formula2));
+            }
+        }
         let positions = compiled
             .iter()
             .map(|(position, _)| *position)
@@ -229,9 +260,23 @@ impl MutableXlsbWorksheet {
                 (index, old)
             })
             .collect();
+        let validation_formulas = compiled_validations
+            .into_iter()
+            .map(|(index, formula1, formula2)| {
+                let restore = (index, formula1.is_some(), formula2.is_some());
+                if let Some(formula) = formula1 {
+                    self.data_validations[index].formula1_binary = Some(formula);
+                }
+                if let Some(formula) = formula2 {
+                    self.data_validations[index].formula2_binary = Some(formula);
+                }
+                restore
+            })
+            .collect();
         Ok(ContextualFormulaRestore {
             cell_positions: positions,
             group_formulas,
+            validation_formulas,
         })
     }
 
@@ -243,6 +288,14 @@ impl MutableXlsbWorksheet {
         }
         for (index, formula) in restore.group_formulas {
             self.formula_groups[index].formula = formula;
+        }
+        for (index, clear_first, clear_second) in restore.validation_formulas {
+            if clear_first {
+                self.data_validations[index].formula1_binary = None;
+            }
+            if clear_second {
+                self.data_validations[index].formula2_binary = None;
+            }
         }
     }
 
@@ -579,6 +632,8 @@ impl MutableXlsbWorksheet {
         self.auto_filter = None;
         self.sheet_protection = None;
         self.data_validations.clear();
+        self.data_validation_settings = DataValidationSettings::default();
+        self.data_validation14_settings = DataValidationSettings::default();
         self.conditional_formattings.clear();
         self.formula_groups.clear();
         self.formula_group_sources.clear();
@@ -755,6 +810,16 @@ impl MutableXlsbWorksheet {
     /// Get all data validations.
     pub fn data_validations(&self) -> &[DataValidation] {
         &self.data_validations
+    }
+
+    /// Set UI prompt settings for classic `BrtDVal` rules.
+    pub fn set_data_validation_settings(&mut self, settings: DataValidationSettings) {
+        self.data_validation_settings = settings;
+    }
+
+    /// Set UI prompt settings for Office 2013 `BrtDVal14` rules.
+    pub fn set_data_validation14_settings(&mut self, settings: DataValidationSettings) {
+        self.data_validation14_settings = settings;
     }
 
     /// Add a conditional formatting block.
@@ -951,6 +1016,8 @@ impl MutableXlsbWorksheet {
             crate::xlsb::writer::data_validation::write_data_validations(
                 writer,
                 &self.data_validations,
+                self.data_validation_settings,
+                self.data_validation14_settings,
             )?;
         }
 

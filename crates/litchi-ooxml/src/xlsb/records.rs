@@ -291,6 +291,10 @@ pub mod record_types {
     pub const BEGIN_D_VALS: u16 = 0x023D;
     pub const END_D_VALS: u16 = 0x023E;
     pub const D_VAL: u16 = 0x0040;
+    pub const D_VAL_LIST: u16 = 0x02A9;
+    pub const D_VAL14: u16 = 0x041D;
+    pub const BEGIN_D_VALS14: u16 = 0x041E;
+    pub const END_D_VALS14: u16 = 0x0482;
 
     // Conditional formatting
     pub const BEGIN_COND_FORMATTING: u16 = 0x01CD;

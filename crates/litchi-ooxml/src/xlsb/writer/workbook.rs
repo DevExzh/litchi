@@ -949,6 +949,9 @@ impl Default for XlsbWorkbookWriter {
 mod tests {
     use super::*;
     use crate::xlsb::comments::Comment;
+    use crate::xlsb::data_validation::{
+        DataValidation, DataValidationRecordKind, DataValidationSettings,
+    };
     use crate::xlsb::{CalculationMode, SharedStringRun, SheetProtection};
     use litchi_core::sheet::{CellValue, WorkbookTrait};
     use std::io::Cursor;
@@ -1078,6 +1081,86 @@ mod tests {
                 first_column: 0,
                 last_column: 4,
             }
+        );
+    }
+
+    #[test]
+    fn classic_and_extension_validations_survive_package_roundtrip() {
+        let mut workbook = XlsbWorkbookWriter::new();
+        let mut sheet = MutableXlsbWorksheet::new("Validated");
+        sheet.set_cell(0, 0, 5);
+
+        let mut classic = DataValidation::new(1, "A1:A10 C1:C10".to_string());
+        classic.operator = 0;
+        classic.formula1 = Some("1".to_string());
+        classic.formula2 = Some("10".to_string());
+        classic.ime_mode = 4;
+        classic.show_input_message = true;
+        classic.input_title = Some("Number".to_string());
+        classic.input_text = Some("Enter 1 through 10".to_string());
+        sheet.add_data_validation(classic);
+
+        let mut extension = DataValidation::new(7, "B1:B20".to_string());
+        extension.formula1 = Some("Source!A1>0".to_string());
+        extension.record_kind = DataValidationRecordKind::Extension14;
+        sheet.add_data_validation(extension);
+        sheet.set_data_validation_settings(DataValidationSettings {
+            input_prompts_disabled: true,
+            prompt_x: 120,
+            prompt_y: 240,
+        });
+        sheet.set_data_validation14_settings(DataValidationSettings {
+            input_prompts_disabled: false,
+            prompt_x: 12,
+            prompt_y: 24,
+        });
+        workbook.add_worksheet(sheet);
+        let mut source = MutableXlsbWorksheet::new("Source");
+        source.set_cell(0, 0, 1);
+        workbook.add_worksheet(source);
+
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let worksheet = reader.worksheet(0).unwrap();
+        assert_eq!(worksheet.data_validations().len(), 2);
+        assert_eq!(
+            worksheet.data_validations()[0].record_kind,
+            DataValidationRecordKind::Classic
+        );
+        assert_eq!(worksheet.data_validations()[0].cell_ranges, "A1:A10 C1:C10");
+        assert_eq!(
+            worksheet.data_validations()[0].formula1.as_deref(),
+            Some("1")
+        );
+        assert_eq!(
+            worksheet.data_validations()[0].formula2.as_deref(),
+            Some("10")
+        );
+        assert_eq!(worksheet.data_validations()[0].ime_mode, 4);
+        assert_eq!(
+            worksheet.data_validations()[1].record_kind,
+            DataValidationRecordKind::Extension14
+        );
+        assert_eq!(
+            worksheet.data_validations()[1].formula1.as_deref(),
+            Some("(Source!A1>0)")
+        );
+        assert_eq!(
+            worksheet.data_validation_settings(),
+            Some(DataValidationSettings {
+                input_prompts_disabled: true,
+                prompt_x: 120,
+                prompt_y: 240,
+            })
+        );
+        assert_eq!(
+            worksheet.data_validation14_settings(),
+            Some(DataValidationSettings {
+                input_prompts_disabled: false,
+                prompt_x: 12,
+                prompt_y: 24,
+            })
         );
     }
 

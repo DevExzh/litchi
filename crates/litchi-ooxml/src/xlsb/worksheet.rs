@@ -2,6 +2,7 @@
 
 use crate::xlsb::cell::XlsbCell;
 use crate::xlsb::comments::Comment;
+use crate::xlsb::data_validation::{DataValidation, DataValidationSettings};
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
 use litchi_core::sheet::{
@@ -125,6 +126,9 @@ pub struct XlsbWorksheet {
     auto_filter: Option<XlsbAutoFilter>,
     sheet_protection: Option<XlsbSheetProtection>,
     strong_sheet_protection: Option<XlsbStrongProtection>,
+    data_validations: Vec<DataValidation>,
+    data_validation_settings: Option<DataValidationSettings>,
+    data_validation14_settings: Option<DataValidationSettings>,
 }
 
 impl XlsbWorksheet {
@@ -143,6 +147,9 @@ impl XlsbWorksheet {
             auto_filter: None,
             sheet_protection: None,
             strong_sheet_protection: None,
+            data_validations: Vec::new(),
+            data_validation_settings: None,
+            data_validation14_settings: None,
         }
     }
 
@@ -194,6 +201,17 @@ impl XlsbWorksheet {
         self.strong_sheet_protection = protection;
     }
 
+    pub(crate) fn set_data_validations(
+        &mut self,
+        settings: Option<DataValidationSettings>,
+        extension14_settings: Option<DataValidationSettings>,
+        validations: Vec<DataValidation>,
+    ) {
+        self.data_validation_settings = settings;
+        self.data_validation14_settings = extension14_settings;
+        self.data_validations = validations;
+    }
+
     /// Get all merged cells
     pub fn merged_cells(&self) -> &[MergedCell] {
         &self.merged_cells
@@ -232,6 +250,21 @@ impl XlsbWorksheet {
     /// Strong password-verifier metadata, if the ISO protection record exists.
     pub fn strong_sheet_protection(&self) -> Option<&XlsbStrongProtection> {
         self.strong_sheet_protection.as_ref()
+    }
+
+    /// Worksheet data-validation rules in stream order.
+    pub fn data_validations(&self) -> &[DataValidation] {
+        &self.data_validations
+    }
+
+    /// Worksheet-level UI settings for classic data validation.
+    pub fn data_validation_settings(&self) -> Option<DataValidationSettings> {
+        self.data_validation_settings
+    }
+
+    /// Worksheet-level UI settings for Office 2013 data validation.
+    pub fn data_validation14_settings(&self) -> Option<DataValidationSettings> {
+        self.data_validation14_settings
     }
 }
 

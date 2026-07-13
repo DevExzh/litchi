@@ -498,6 +498,11 @@ impl XlsbWorkbook {
         worksheet.set_auto_filter(cells_reader.auto_filter);
         worksheet.set_sheet_protection(cells_reader.sheet_protection);
         worksheet.set_strong_sheet_protection(cells_reader.strong_sheet_protection);
+        worksheet.set_data_validations(
+            cells_reader.data_validation_settings,
+            cells_reader.data_validation14_settings,
+            cells_reader.data_validations,
+        );
 
         Ok(worksheet)
     }
