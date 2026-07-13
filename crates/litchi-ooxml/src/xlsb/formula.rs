@@ -133,6 +133,15 @@ pub enum FormulaArrayValue {
     Error(u8),
 }
 
+/// Kind of non-evaluating memory marker in an XLSB formula token stream.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FormulaMemoryKind {
+    Area,
+    Error(u8),
+    Function,
+    NoMemory,
+}
+
 impl CellParsedFormula {
     /// Parse a `CellParsedFormula`, returning the structure and bytes consumed.
     pub fn parse(data: &[u8]) -> XlsbResult<(Self, usize)> {
@@ -420,6 +429,13 @@ pub enum FormulaToken {
         cols: u32,
         values: Vec<FormulaArrayValue>,
     },
+    /// Prefix metadata for a following binary reference expression.
+    Memory {
+        kind: FormulaMemoryKind,
+        expression_bytes: u16,
+        /// Cached `UncheckedRfX` values in field order.
+        cached_ranges: Vec<[u32; 4]>,
+    },
     /// Cell reference (row, col, relative_row, relative_col)
     CellRef {
         row: u32,
@@ -491,6 +507,7 @@ pub struct FormulaParser<'a> {
     extra: &'a [u8],
     extra_offset: usize,
     validate_extra: bool,
+    memory_expression_ends: Vec<usize>,
     base_cell: Option<(u32, u32)>,
 }
 
@@ -503,6 +520,7 @@ impl<'a> FormulaParser<'a> {
             extra: &[],
             extra_offset: 0,
             validate_extra: false,
+            memory_expression_ends: Vec::new(),
             base_cell: None,
         }
     }
@@ -515,6 +533,7 @@ impl<'a> FormulaParser<'a> {
             extra,
             extra_offset: 0,
             validate_extra: true,
+            memory_expression_ends: Vec::new(),
             base_cell: None,
         }
     }
@@ -527,6 +546,7 @@ impl<'a> FormulaParser<'a> {
             extra: &[],
             extra_offset: 0,
             validate_extra: false,
+            memory_expression_ends: Vec::new(),
             base_cell: Some((row, col)),
         }
     }
@@ -539,6 +559,7 @@ impl<'a> FormulaParser<'a> {
             extra,
             extra_offset: 0,
             validate_extra: true,
+            memory_expression_ends: Vec::new(),
             base_cell: Some((row, col)),
         }
     }
@@ -548,9 +569,21 @@ impl<'a> FormulaParser<'a> {
     /// Returns a vector of formula tokens in RPN order.
     pub fn parse(&mut self) -> XlsbResult<Vec<FormulaToken>> {
         let mut tokens = Vec::new();
+        let mut boundaries = Vec::new();
 
         while self.offset < self.data.len() {
             tokens.push(self.parse_token()?);
+            boundaries.push(self.offset);
+        }
+
+        if let Some(end) = self
+            .memory_expression_ends
+            .iter()
+            .find(|end| boundaries.binary_search(end).is_err())
+        {
+            return Err(XlsbError::InvalidFormula(format!(
+                "memory expression ends at byte {end}, which is not a token boundary"
+            )));
         }
 
         if self.validate_extra && self.extra_offset != self.extra.len() {
@@ -612,6 +645,10 @@ impl<'a> FormulaParser<'a> {
                 0x05 => self.parse_area(false),
                 0x0D => self.parse_area(true),
                 0x00 => self.parse_array(),
+                0x06 => self.parse_memory(FormulaMemoryKind::Area),
+                0x07 => self.parse_memory(FormulaMemoryKind::Error(0)),
+                0x08 => self.parse_memory(FormulaMemoryKind::NoMemory),
+                0x09 => self.parse_memory(FormulaMemoryKind::Function),
                 0x01 => self.parse_func(),
                 0x02 => self.parse_func_var(),
                 0x03 => self.parse_name(),
@@ -859,6 +896,79 @@ impl<'a> FormulaParser<'a> {
         Ok(FormulaToken::Array { rows, cols, values })
     }
 
+    fn parse_memory(&mut self, mut kind: FormulaMemoryKind) -> XlsbResult<FormulaToken> {
+        let token = self.data[self.offset - 1];
+        if token & 0x80 != 0 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "memory token 0x{token:02X} has its reserved bit set"
+            )));
+        }
+        let (payload_len, cce_offset) = match kind {
+            FormulaMemoryKind::Function => (2, 0),
+            FormulaMemoryKind::Area | FormulaMemoryKind::NoMemory => (6, 4),
+            FormulaMemoryKind::Error(_) => (6, 4),
+        };
+        self.require(payload_len, "memory token")?;
+        if matches!(kind, FormulaMemoryKind::Error(_)) {
+            let error = self.data[self.offset];
+            if !matches!(error, 0x00 | 0x07 | 0x0F | 0x17 | 0x1D | 0x24 | 0x2A | 0x2B) {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "invalid PtgMemErr code 0x{error:02X}"
+                )));
+            }
+            kind = FormulaMemoryKind::Error(error);
+        }
+        let expression_bytes = binary::read_u16_le_at(self.data, self.offset + cce_offset)?;
+        self.offset += payload_len;
+        if expression_bytes == 0 {
+            return Err(XlsbError::InvalidFormula(
+                "memory token has an empty reference expression".to_string(),
+            ));
+        }
+        if usize::from(expression_bytes) > self.data.len().saturating_sub(self.offset) {
+            return Err(XlsbError::InvalidFormula(format!(
+                "memory token declares {expression_bytes} expression bytes, but only {} remain",
+                self.data.len().saturating_sub(self.offset)
+            )));
+        }
+        self.memory_expression_ends
+            .push(self.offset + usize::from(expression_bytes));
+
+        let mut cached_ranges = Vec::new();
+        if kind == FormulaMemoryKind::Area {
+            self.require_extra(4, "PtgExtraMem count")?;
+            let count = usize::try_from(binary::read_u32_le_at(self.extra, self.extra_offset)?)
+                .map_err(|_| XlsbError::InvalidFormula("PtgExtraMem is too large".to_string()))?;
+            self.extra_offset += 4;
+            if count > self.extra.len().saturating_sub(self.extra_offset) / 16 {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "PtgExtraMem declares {count} ranges beyond its ancillary payload"
+                )));
+            }
+            cached_ranges.reserve(count);
+            for _ in 0..count {
+                self.require_extra(16, "PtgExtraMem range")?;
+                let range = [
+                    binary::read_u32_le_at(self.extra, self.extra_offset)?,
+                    binary::read_u32_le_at(self.extra, self.extra_offset + 4)?,
+                    binary::read_u32_le_at(self.extra, self.extra_offset + 8)?,
+                    binary::read_u32_le_at(self.extra, self.extra_offset + 12)?,
+                ];
+                self.extra_offset += 16;
+                let invalid = range == [1_048_575, 1_048_575, 16_383, 16_383];
+                if !invalid {
+                    FormulaRange::new(range[0], range[1], range[2], range[3])?;
+                }
+                cached_ranges.push(range);
+            }
+        }
+        Ok(FormulaToken::Memory {
+            kind,
+            expression_bytes,
+            cached_ranges,
+        })
+    }
+
     /// Parse cell reference
     fn parse_ref(&mut self, offset_reference: bool) -> XlsbResult<FormulaToken> {
         self.require(6, "PtgRef")?;
@@ -1101,6 +1211,7 @@ impl FormulaConverter {
                     text.push('}');
                     stack.push(text);
                 },
+                FormulaToken::Memory { .. } => {},
                 FormulaToken::String(s) => stack.push(format!("\"{}\"", s.replace('"', "\"\""))),
                 FormulaToken::Bool(b) => stack.push(if *b {
                     "TRUE".to_string()
@@ -2315,6 +2426,55 @@ mod tests {
 
         assert!(matches!(
             FormulaCompiler::compile_shared("SUM({1,2})", 0, 0),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+    }
+
+    #[test]
+    fn parser_consumes_memory_area_and_cached_ranges() {
+        let left = FormulaCompiler::compile("A1").unwrap().rgce;
+        let right = FormulaCompiler::compile("B2").unwrap().rgce;
+        let expression_len = left.len() + right.len() + 1;
+        let mut rgce = vec![0x46, 0, 0, 0, 0];
+        rgce.extend_from_slice(&(expression_len as u16).to_le_bytes());
+        rgce.extend_from_slice(&left);
+        rgce.extend_from_slice(&right);
+        rgce.push(ptg_types::PTG_UNION);
+
+        let mut rgcb = Vec::new();
+        rgcb.extend_from_slice(&1_u32.to_le_bytes());
+        rgcb.extend_from_slice(&0_u32.to_le_bytes());
+        rgcb.extend_from_slice(&1_u32.to_le_bytes());
+        rgcb.extend_from_slice(&0_u32.to_le_bytes());
+        rgcb.extend_from_slice(&1_u32.to_le_bytes());
+        let tokens = FormulaParser::with_extra(&rgce, &rgcb).parse().unwrap();
+        assert!(matches!(
+            &tokens[0],
+            FormulaToken::Memory {
+                kind: FormulaMemoryKind::Area,
+                expression_bytes: 15,
+                cached_ranges,
+            } if cached_ranges == &vec![[0, 1, 0, 1]]
+        ));
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
+            "(A1,B2)"
+        );
+    }
+
+    #[test]
+    fn parser_rejects_truncated_memory_metadata() {
+        let rgce = [0x46, 0, 0, 0, 0, 0, 0];
+        let mut rgcb = Vec::new();
+        rgcb.extend_from_slice(&u32::MAX.to_le_bytes());
+        assert!(matches!(
+            FormulaParser::with_extra(&rgce, &rgcb).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+
+        let oversized_expression = [0x49, 0x01, 0x00];
+        assert!(matches!(
+            FormulaParser::new(&oversized_expression).parse(),
             Err(XlsbError::InvalidFormula(_))
         ));
     }
