@@ -3,6 +3,7 @@
 use super::{
     Cell, CellValue, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
     NamedRangeUsage, Row, Sheet,
+    annotation::{AnnotationBuilder, decode_reference},
 };
 use litchi_core::{Error, Result};
 use quick_xml::Reader;
@@ -12,8 +13,10 @@ use quick_xml::events::BytesStart;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, NamespaceResolver, PrefixDeclaration, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::collections::BTreeMap;
 
 const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 
 /// Parser for ODS-specific structures.
 ///
@@ -32,41 +35,148 @@ impl OdsParser {
         let mut current_sheet: Option<SheetBuilder> = None;
         let mut current_row: Option<RowBuilder> = None;
         let mut current_cell: Option<CellBuilder> = None;
-        let mut in_text_element = false;
+        let mut text_element_depth = 0usize;
         let mut text_content = String::new();
+        let mut annotation_builder: Option<AnnotationBuilder> = None;
+        let mut annotation_depth = 0usize;
+        let mut document_namespaces = BTreeMap::new();
+        let mut namespace_scopes = Vec::new();
 
         loop {
             match reader.read_event_into(&mut buf) {
-                Ok(Event::Start(ref e)) => match e.name().as_ref() {
-                    b"table:table" => {
-                        let name = Self::extract_table_name(e)?;
-                        current_sheet = Some(SheetBuilder::new(name));
-                    },
-                    b"table:table-row" if current_sheet.is_some() => {
-                        current_row = Some(RowBuilder::new());
-                    },
-                    b"table:table-cell" if current_row.is_some() => {
-                        let cell_builder = Self::parse_cell_attributes(e)?;
-                        current_cell = Some(cell_builder);
-                        text_content.clear();
-                    },
-                    b"text:p" | b"text:span" if current_cell.is_some() => {
-                        in_text_element = true;
-                        if e.name().as_ref() == b"text:p" {
-                            text_content.clear();
+                Ok(Event::Start(ref e)) => {
+                    let namespace_scope =
+                        Self::push_namespace_scope(e, reader.decoder(), &mut document_namespaces)?;
+                    namespace_scopes.push(namespace_scope);
+
+                    if let Some(builder) = annotation_builder.as_mut() {
+                        builder.start(e, reader.decoder())?;
+                        annotation_depth += 1;
+                    } else if current_cell.is_some()
+                        && Self::is_office_annotation(e, &document_namespaces)
+                    {
+                        annotation_builder = Some(AnnotationBuilder::new(
+                            e,
+                            reader.decoder(),
+                            document_namespaces.clone(),
+                        )?);
+                    } else if text_element_depth > 0 {
+                        text_element_depth += 1;
+                    } else {
+                        match e.name().as_ref() {
+                            b"table:table" => {
+                                let name = Self::extract_table_name(e)?;
+                                current_sheet = Some(SheetBuilder::new(name));
+                            },
+                            b"table:table-row" if current_sheet.is_some() => {
+                                current_row = Some(RowBuilder::new());
+                            },
+                            b"table:table-cell" if current_row.is_some() => {
+                                let cell_builder = Self::parse_cell_attributes(e)?;
+                                current_cell = Some(cell_builder);
+                                text_content.clear();
+                            },
+                            b"text:p" if current_cell.is_some() => {
+                                if !text_content.is_empty() {
+                                    text_content.push('\n');
+                                }
+                                text_element_depth = 1;
+                            },
+                            _ => {},
                         }
-                    },
-                    _ => {},
+                    }
                 },
-                Ok(Event::Text(ref t)) if in_text_element && current_cell.is_some() => {
-                    let text = String::from_utf8(t.to_vec()).unwrap_or_default();
-                    text_content.push_str(&text);
+                Ok(Event::Empty(ref e)) => {
+                    if let Some(builder) = annotation_builder.as_mut() {
+                        builder.empty(e, reader.decoder())?;
+                    } else if current_cell.is_some()
+                        && Self::is_office_annotation(e, &document_namespaces)
+                    {
+                        let annotation = AnnotationBuilder::new(
+                            e,
+                            reader.decoder(),
+                            document_namespaces.clone(),
+                        )?
+                        .finish()?;
+                        if let Some(cell) = current_cell.as_mut() {
+                            cell.annotation = Some(annotation);
+                        }
+                    } else if text_element_depth > 0 {
+                        Self::push_text_empty_element(e, reader.decoder(), &mut text_content)?;
+                    } else if e.name().as_ref() == b"table:table-cell" && current_row.is_some() {
+                        let cell_builder = Self::parse_cell_attributes(e)?;
+                        if let Some(row) = current_row.as_mut() {
+                            for _ in 0..cell_builder.repeated {
+                                row.add_cell(cell_builder.build(""));
+                            }
+                        }
+                    }
+                },
+                Ok(Event::Text(ref t)) if annotation_builder.is_some() => {
+                    if let Some(builder) = annotation_builder.as_mut() {
+                        builder.text(t)?;
+                    }
+                },
+                Ok(Event::CData(ref t)) if annotation_builder.is_some() => {
+                    if let Some(builder) = annotation_builder.as_mut() {
+                        builder.cdata(t)?;
+                    }
+                },
+                Ok(Event::GeneralRef(ref reference)) if annotation_builder.is_some() => {
+                    if let Some(builder) = annotation_builder.as_mut() {
+                        builder.reference(reference)?;
+                    }
+                },
+                Ok(Event::Text(ref t)) if text_element_depth > 0 && current_cell.is_some() => {
+                    let decoded = t.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid cell text: {error}"))
+                    })?;
+                    let decoded = quick_xml::escape::unescape(&decoded).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid cell character reference: {error}"))
+                    })?;
+                    text_content.push_str(&decoded);
+                },
+                Ok(Event::CData(ref t)) if text_element_depth > 0 && current_cell.is_some() => {
+                    let decoded = t.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid cell CDATA: {error}"))
+                    })?;
+                    text_content.push_str(&decoded);
+                },
+                Ok(Event::GeneralRef(ref reference))
+                    if text_element_depth > 0 && current_cell.is_some() =>
+                {
+                    text_content.push_str(&decode_reference(reference)?);
                 },
                 Ok(Event::End(ref e)) => {
+                    if annotation_builder.is_some() {
+                        if annotation_depth == 0 {
+                            let annotation = annotation_builder
+                                .take()
+                                .expect("annotation builder was checked")
+                                .finish()?;
+                            if let Some(cell) = current_cell.as_mut() {
+                                cell.annotation = Some(annotation);
+                            }
+                        } else {
+                            annotation_builder
+                                .as_mut()
+                                .expect("annotation builder was checked")
+                                .end_element()?;
+                            annotation_depth -= 1;
+                        }
+                        Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
+                        buf.clear();
+                        continue;
+                    }
+
+                    if text_element_depth > 0 {
+                        text_element_depth -= 1;
+                        Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
+                        buf.clear();
+                        continue;
+                    }
+
                     match e.name().as_ref() {
-                        b"text:p" | b"text:span" if in_text_element => {
-                            in_text_element = false;
-                        },
                         b"table:table-cell" => {
                             if let Some(cell_builder) = current_cell.take() {
                                 let repeated = cell_builder.repeated;
@@ -99,6 +209,7 @@ impl OdsParser {
                         },
                         _ => {},
                     }
+                    Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => {
@@ -110,6 +221,103 @@ impl OdsParser {
         }
 
         Ok(sheets)
+    }
+
+    fn is_office_annotation(
+        element: &BytesStart<'_>,
+        namespaces: &BTreeMap<String, String>,
+    ) -> bool {
+        let qualified_name = element.name();
+        let Ok(name) = std::str::from_utf8(qualified_name.as_ref()) else {
+            return false;
+        };
+        let Some((prefix, local)) = name.split_once(':') else {
+            return false;
+        };
+        local == "annotation"
+            && namespaces
+                .get(prefix)
+                .is_some_and(|namespace| namespace == OFFICE_NAMESPACE)
+    }
+
+    fn push_namespace_scope(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &mut BTreeMap<String, String>,
+    ) -> Result<Vec<(String, Option<String>)>> {
+        let mut previous_bindings = Vec::new();
+        for attribute in element.attributes() {
+            let attribute = attribute.map_err(|error| {
+                Error::InvalidFormat(format!("invalid XML namespace declaration: {error}"))
+            })?;
+            let name = std::str::from_utf8(attribute.key.as_ref()).map_err(|_| {
+                Error::InvalidFormat("invalid UTF-8 in XML namespace declaration".to_string())
+            })?;
+            let Some(prefix) = name.strip_prefix("xmlns:") else {
+                continue;
+            };
+            let value = attribute
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                .map_err(|error| {
+                    Error::InvalidFormat(format!("invalid XML namespace URI: {error}"))
+                })?
+                .into_owned();
+            let prefix = prefix.to_string();
+            let previous = namespaces.insert(prefix.clone(), value);
+            previous_bindings.push((prefix, previous));
+        }
+        Ok(previous_bindings)
+    }
+
+    fn pop_namespace_scope(
+        namespaces: &mut BTreeMap<String, String>,
+        scope: Option<Vec<(String, Option<String>)>>,
+    ) {
+        let Some(scope) = scope else { return };
+        for (prefix, previous) in scope.into_iter().rev() {
+            if let Some(previous) = previous {
+                namespaces.insert(prefix, previous);
+            } else {
+                namespaces.remove(&prefix);
+            }
+        }
+    }
+
+    fn push_text_empty_element(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        text: &mut String,
+    ) -> Result<()> {
+        match element.name().as_ref() {
+            b"text:line-break" => text.push('\n'),
+            b"text:tab" => text.push('\t'),
+            b"text:s" => {
+                let mut count = 1usize;
+                for attribute in element.attributes() {
+                    let attribute = attribute.map_err(|error| {
+                        Error::InvalidFormat(format!("invalid text:s attribute: {error}"))
+                    })?;
+                    if attribute.key.as_ref() == b"text:c" {
+                        let value = attribute
+                            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                            .map_err(|error| {
+                                Error::InvalidFormat(format!("invalid text:s count: {error}"))
+                            })?;
+                        count = value.parse::<usize>().map_err(|_| {
+                            Error::InvalidFormat(format!("invalid text:s count '{value}'"))
+                        })?;
+                    }
+                }
+                if count > 1_000_000 {
+                    return Err(Error::InvalidFormat(
+                        "text:s count exceeds the supported safety limit".to_string(),
+                    ));
+                }
+                text.extend(std::iter::repeat_n(' ', count));
+            },
+            _ => {},
+        }
+        Ok(())
     }
 
     /// Parse document-global and sheet-local named ranges and expressions.
@@ -400,6 +608,7 @@ impl OdsParser {
             currency,
             formula,
             repeated,
+            annotation: None,
         })
     }
 }
@@ -472,6 +681,7 @@ pub(crate) struct CellBuilder {
     currency: Option<String>,
     formula: Option<String>,
     repeated: usize,
+    annotation: Option<super::CellAnnotation>,
 }
 
 impl CellBuilder {
@@ -483,6 +693,7 @@ impl CellBuilder {
             text: text_content.to_string(),
             // Clone necessary: formula may be reused for repeated cells
             formula: self.formula.clone(),
+            annotation: self.annotation.clone(),
             row: 0, // Will be set by parent
             col: 0, // Will be set by parent
         }
@@ -829,6 +1040,46 @@ mod tests {
     }
 
     #[test]
+    fn parses_rich_annotations_without_mixing_them_into_cell_text() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+    xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0">
+  <o:body><o:spreadsheet><table:table table:name="Notes"><table:table-row>
+    <table:table-cell table:number-columns-repeated="2" o:value-type="string">
+      <o:annotation o:display="true" draw:style-name="gr1" svg:width="3.2cm">
+        <dc:creator>A &amp; B</dc:creator><dc:date>2026-07-13T12:34:56Z</dc:date>
+        <text:p text:style-name="P1"><text:span text:style-name="T1">first</text:span><text:line-break/>second</text:p>
+        <text:list><text:list-item><text:p>item</text:p></text:list-item></text:list>
+      </o:annotation>
+      <text:p>cell <text:span>value</text:span></text:p><text:p>line two</text:p>
+    </table:table-cell>
+  </table:table-row></table:table></o:spreadsheet></o:body>
+</o:document-content>"#;
+
+        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let cells = &sheets[0].rows[0].cells;
+        assert_eq!(cells.len(), 2);
+        assert_eq!(cells[0].text, "cell value\nline two");
+        assert_eq!(cells[1].text, "cell value\nline two");
+
+        for cell in cells {
+            let annotation = cell.annotation().unwrap();
+            assert_eq!(annotation.creator().as_deref(), Some("A & B"));
+            assert_eq!(annotation.date().as_deref(), Some("2026-07-13T12:34:56Z"));
+            assert_eq!(annotation.display(), Some(true));
+            assert_eq!(annotation.attribute("draw:style-name"), Some("gr1"));
+            assert_eq!(annotation.attribute("svg:width"), Some("3.2cm"));
+            assert_eq!(annotation.text(), "first\nsecond\nitem");
+            assert_eq!(annotation.children()[2].name(), "text:p");
+            assert_eq!(annotation.children()[3].name(), "text:list");
+        }
+    }
+
+    #[test]
     fn test_extract_table_name_default() {
         // XML without table:name attribute
         let xml = r#"<?xml version="1.0"?>
@@ -857,6 +1108,7 @@ mod tests {
                 value: CellValue::Text("A1".to_string()),
                 text: "A1".to_string(),
                 formula: None,
+                annotation: None,
                 row: 0,
                 col: 0,
             }],
@@ -879,6 +1131,7 @@ mod tests {
             value: CellValue::Text("A".to_string()),
             text: "A".to_string(),
             formula: None,
+            annotation: None,
             row: 0,
             col: 0,
         };
@@ -888,6 +1141,7 @@ mod tests {
             value: CellValue::Number(42.0),
             text: "42".to_string(),
             formula: None,
+            annotation: None,
             row: 0,
             col: 0,
         };
@@ -907,6 +1161,7 @@ mod tests {
             value_str: Some("123.45".to_string()),
             currency: None,
             formula: None,
+            annotation: None,
             repeated: 1,
         };
         let cell = builder.build("123.45");
@@ -921,6 +1176,7 @@ mod tests {
             value_str: Some("99.99".to_string()),
             currency: None,
             formula: None,
+            annotation: None,
             repeated: 1,
         };
         let cell = builder.build("99.99");
@@ -935,6 +1191,7 @@ mod tests {
             value_str: Some("0.001".to_string()),
             currency: None,
             formula: None,
+            annotation: None,
             repeated: 1,
         };
         let cell = builder.build("0.001");
@@ -951,6 +1208,7 @@ mod tests {
             value_str: Some("not-a-number".to_string()),
             currency: None,
             formula: None,
+            annotation: None,
             repeated: 1,
         };
         let cell = builder.build("some text");
@@ -968,6 +1226,7 @@ mod tests {
             value_str: Some("false".to_string()),
             currency: None,
             formula: None,
+            annotation: None,
             repeated: 1,
         };
         let cell = builder.build("FALSE");
@@ -982,6 +1241,7 @@ mod tests {
             value_str: Some("maybe".to_string()),
             currency: None,
             formula: None,
+            annotation: None,
             repeated: 1,
         };
         let cell = builder.build("maybe");
@@ -998,6 +1258,7 @@ mod tests {
             value_str: None,
             currency: None,
             formula: None,
+            annotation: None,
             repeated: 1,
         };
         let cell = builder.build("   ");
@@ -1014,6 +1275,7 @@ mod tests {
             value_str: Some("50".to_string()),
             currency: None, // No currency specified
             formula: None,
+            annotation: None,
             repeated: 1,
         };
         let cell = builder.build("$50");

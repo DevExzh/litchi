@@ -4,8 +4,8 @@
 
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
-    Cell, CellValue, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row,
-    Sheet,
+    Cell, CellAnnotation, CellValue, NamedDefinition, NamedDefinitionScope, NamedExpression,
+    NamedRange, Row, Sheet,
     named_expression::{ensure_unique, write_named_definitions},
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
@@ -121,6 +121,19 @@ impl SpreadsheetBuilder {
         Ok(())
     }
 
+    fn validate_annotations(&self) -> Result<()> {
+        for annotation in self
+            .sheets
+            .iter()
+            .flat_map(|sheet| sheet.rows.iter())
+            .flat_map(|row| row.cells.iter())
+            .filter_map(Cell::annotation)
+        {
+            annotation.validate()?;
+        }
+        Ok(())
+    }
+
     /// Add a new sheet to the spreadsheet
     ///
     /// # Arguments
@@ -183,6 +196,7 @@ impl SpreadsheetBuilder {
                 text: value.to_string(),
                 value: CellValue::Text(value.to_string()),
                 formula: None,
+                annotation: None,
                 row: row_index,
                 col,
             })
@@ -236,6 +250,7 @@ impl SpreadsheetBuilder {
                 text: value.to_string(),
                 value: CellValue::Number(value),
                 formula: None,
+                annotation: None,
                 row: row_index,
                 col,
             })
@@ -304,6 +319,7 @@ impl SpreadsheetBuilder {
                     text,
                     value: value.clone(),
                     formula: None,
+                    annotation: None,
                     row: row_index,
                     col,
                 }
@@ -365,6 +381,7 @@ impl SpreadsheetBuilder {
                     text: String::new(),
                     value: CellValue::Empty,
                     formula: None,
+                    annotation: None,
                     row,
                     col: row_data.cells.len(),
                 });
@@ -382,10 +399,12 @@ impl SpreadsheetBuilder {
                 CellValue::Empty => String::new(),
             };
 
+            let annotation = row_data.cells[col].annotation.take();
             row_data.cells[col] = Cell {
                 text,
                 value,
                 formula: None,
+                annotation,
                 row,
                 col,
             };
@@ -436,6 +455,7 @@ impl SpreadsheetBuilder {
                     text: String::new(),
                     value: CellValue::Empty,
                     formula: None,
+                    annotation: None,
                     row,
                     col: row_data.cells.len(),
                 });
@@ -446,6 +466,55 @@ impl SpreadsheetBuilder {
         }
 
         Ok(self)
+    }
+
+    /// Attach or replace an annotation on a cell in the current sheet.
+    pub fn set_cell_annotation(
+        &mut self,
+        row: usize,
+        col: usize,
+        annotation: CellAnnotation,
+    ) -> Result<&mut Self> {
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        let sheet = self
+            .sheets
+            .last_mut()
+            .expect("a default sheet was added when the builder was empty");
+        while sheet.rows.len() <= row {
+            sheet.rows.push(Row {
+                cells: Vec::new(),
+                index: sheet.rows.len(),
+            });
+        }
+        let row_data = &mut sheet.rows[row];
+        while row_data.cells.len() <= col {
+            row_data.cells.push(Cell {
+                text: String::new(),
+                value: CellValue::Empty,
+                formula: None,
+                annotation: None,
+                row,
+                col: row_data.cells.len(),
+            });
+        }
+        row_data.cells[col].annotation = Some(annotation);
+        Ok(self)
+    }
+
+    /// Remove and return an annotation from a cell in the current sheet.
+    pub fn remove_cell_annotation(
+        &mut self,
+        row: usize,
+        col: usize,
+    ) -> Result<Option<CellAnnotation>> {
+        Ok(self
+            .sheets
+            .last_mut()
+            .and_then(|sheet| sheet.rows.get_mut(row))
+            .and_then(|row| row.cells.get_mut(col))
+            .and_then(Cell::take_annotation))
     }
 
     /// Select a specific sheet by index for subsequent operations
@@ -504,6 +573,7 @@ impl SpreadsheetBuilder {
     ///         value: CellValue::Number(100.0),
     ///         text: "100".to_string(),
     ///         formula: None,
+    ///         annotation: None,
     ///         row: 0,
     ///         col: 0,
     ///     },
@@ -561,6 +631,14 @@ impl SpreadsheetBuilder {
                 .any(|definition| matches!(definition, NamedDefinition::Expression(_)))
     }
 
+    fn has_annotations(&self) -> bool {
+        self.sheets
+            .iter()
+            .flat_map(|sheet| sheet.rows.iter())
+            .flat_map(|row| row.cells.iter())
+            .any(Cell::has_annotation)
+    }
+
     fn push_table_start(out: &mut String, name: &str) {
         out.push_str(&format!(
             r#"<table:table table:name="{}">"#,
@@ -580,80 +658,7 @@ impl SpreadsheetBuilder {
     }
 
     fn push_cell(out: &mut String, cell: &Cell) {
-        let formula_attr = cell
-            .formula
-            .as_deref()
-            .map(|f| format!(" table:formula=\"{}\"", escape_xml(f)))
-            .unwrap_or_default();
-
-        match &cell.value {
-            CellValue::Text(_) => {
-                out.push_str(&format!(
-                    r#"<table:table-cell{} office:value-type="string"><text:p>{}</text:p></table:table-cell>"#,
-                    formula_attr,
-                    escape_xml(&cell.text)
-                ));
-            },
-            CellValue::Number(f) => {
-                out.push_str(&format!(
-                    r#"<table:table-cell{} office:value-type="float" office:value="{}"><text:p>{}</text:p></table:table-cell>"#,
-                    formula_attr,
-                    f,
-                    escape_xml(&cell.text)
-                ));
-            },
-            CellValue::Currency(f, currency) => {
-                out.push_str(&format!(
-                    r#"<table:table-cell{} office:value-type="currency" office:value="{}" office:currency="{}"><text:p>{}</text:p></table:table-cell>"#,
-                    formula_attr,
-                    f,
-                    escape_xml(currency),
-                    escape_xml(&cell.text)
-                ));
-            },
-            CellValue::Percentage(f) => {
-                out.push_str(&format!(
-                    r#"<table:table-cell{} office:value-type="percentage" office:value="{}"><text:p>{}</text:p></table:table-cell>"#,
-                    formula_attr,
-                    f,
-                    escape_xml(&cell.text)
-                ));
-            },
-            CellValue::Date(d) => {
-                out.push_str(&format!(
-                    r#"<table:table-cell{} office:value-type="date" office:date-value="{}"><text:p>{}</text:p></table:table-cell>"#,
-                    formula_attr,
-                    escape_xml(d),
-                    escape_xml(&cell.text)
-                ));
-            },
-            CellValue::Time(t) => {
-                out.push_str(&format!(
-                    r#"<table:table-cell{} office:value-type="time" office:time-value="{}"><text:p>{}</text:p></table:table-cell>"#,
-                    formula_attr,
-                    escape_xml(t),
-                    escape_xml(&cell.text)
-                ));
-            },
-            CellValue::Boolean(b) => {
-                out.push_str(&format!(
-                    r#"<table:table-cell{} office:value-type="boolean" office:boolean-value="{}"><text:p>{}</text:p></table:table-cell>"#,
-                    formula_attr,
-                    b,
-                    escape_xml(&cell.text)
-                ));
-            },
-            CellValue::Empty => {
-                if cell.formula.is_some() {
-                    out.push_str(&format!(
-                        r#"<table:table-cell{} office:value-type="float" office:value="0"><text:p>0</text:p></table:table-cell>"#,
-                        formula_attr
-                    ));
-                } else {
-                    out.push_str("<table:table-cell/>");
-                }
-            },
-        }
+        super::cell::write_cell_xml(out, cell);
     }
 
     /// Generate the content.xml body for spreadsheet
@@ -727,6 +732,9 @@ impl SpreadsheetBuilder {
             r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0""#,
         );
         out.push_str(of_ns);
+        if self.has_annotations() {
+            out.push_str(r#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0""#);
+        }
         out.push_str(
             r#" office:version="1.3"><office:font-face-decls/><office:automatic-styles/><office:body><office:spreadsheet>"#,
         );
@@ -774,6 +782,7 @@ impl SpreadsheetBuilder {
     /// ```
     pub fn build(self) -> Result<Vec<u8>> {
         self.validate_named_definitions()?;
+        self.validate_annotations()?;
         let mut writer = PackageWriter::new();
 
         // Set MIME type
@@ -1071,6 +1080,7 @@ mod tests {
                 value: CellValue::Number(100.0),
                 text: "100".to_string(),
                 formula: None,
+                annotation: None,
                 row: 0,
                 col: 0,
             },
@@ -1078,6 +1088,7 @@ mod tests {
                 value: CellValue::Text("Test".to_string()),
                 text: "Test".to_string(),
                 formula: None,
+                annotation: None,
                 row: 0,
                 col: 1,
             },
@@ -1199,6 +1210,51 @@ mod tests {
         assert!(!bytes.is_empty());
         // Check it's a valid ZIP (starts with PK)
         assert_eq!(&bytes[0..2], b"PK");
+    }
+
+    #[test]
+    fn cell_annotations_round_trip_through_ods_package() {
+        let mut annotation = CellAnnotation::new("plain & safe");
+        annotation.set_creator(Some("Ada"));
+        annotation.set_date(Some("2026-07-13T12:34:56Z"));
+        annotation.set_display(Some(true));
+        annotation
+            .set_attribute("draw:style-name", "comment-style")
+            .unwrap();
+        annotation.set_attribute("svg:width", "4.5cm").unwrap();
+
+        let mut span = crate::ods::AnnotationElement::new("text:span").unwrap();
+        span.set_attribute("text:style-name", "Emphasis").unwrap();
+        span.push_text("rich");
+        let mut paragraph = crate::ods::AnnotationElement::new("text:p").unwrap();
+        paragraph.push_element(span);
+        annotation.push_element(paragraph);
+
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Notes").unwrap();
+        builder
+            .set_cell(0, 0, CellValue::Text("value".to_string()))
+            .unwrap()
+            .set_cell_annotation(0, 0, annotation)
+            .unwrap();
+        builder
+            .set_cell_annotation(1, 2, CellAnnotation::new("empty-cell note"))
+            .unwrap();
+
+        let mut spreadsheet =
+            crate::ods::Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+        let sheets = spreadsheet.sheets().unwrap();
+        let first = sheets[0].rows[0].cells[0].annotation().unwrap();
+        assert_eq!(first.creator().as_deref(), Some("Ada"));
+        assert_eq!(first.date().as_deref(), Some("2026-07-13T12:34:56Z"));
+        assert_eq!(first.display(), Some(true));
+        assert_eq!(first.attribute("draw:style-name"), Some("comment-style"));
+        assert_eq!(first.attribute("svg:width"), Some("4.5cm"));
+        assert_eq!(first.text(), "plain & safe\nrich");
+        assert_eq!(
+            sheets[0].rows[1].cells[2].annotation().unwrap().text(),
+            "empty-cell note"
+        );
     }
 
     #[test]

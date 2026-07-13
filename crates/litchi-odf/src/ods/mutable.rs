@@ -5,8 +5,8 @@
 
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
-    Cell, CellValue, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row,
-    Sheet, Spreadsheet,
+    Cell, CellAnnotation, CellValue, NamedDefinition, NamedDefinitionScope, NamedExpression,
+    NamedRange, Row, Sheet, Spreadsheet,
     named_expression::{ensure_unique, write_named_definitions},
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
@@ -59,6 +59,14 @@ impl MutableSpreadsheet {
                 .any(|definition| matches!(definition, NamedDefinition::Expression(_)))
     }
 
+    fn has_annotations(&self) -> bool {
+        self.sheets
+            .iter()
+            .flat_map(|sheet| sheet.rows.iter())
+            .flat_map(|row| row.cells.iter())
+            .any(Cell::has_annotation)
+    }
+
     fn push_table_columns(out: &mut String, max_cols: usize) {
         if max_cols <= 1 {
             out.push_str("<table:table-column/>");
@@ -71,80 +79,7 @@ impl MutableSpreadsheet {
     }
 
     fn push_cell(out: &mut String, cell: &Cell) {
-        let formula_attr = cell
-            .formula
-            .as_deref()
-            .map(|f| format!(" table:formula=\"{}\"", escape_xml(f)))
-            .unwrap_or_default();
-
-        match &cell.value {
-            CellValue::Text(_) => {
-                out.push_str(&format!(
-                    r#"<table:table-cell{} office:value-type="string"><text:p>{}</text:p></table:table-cell>"#,
-                    formula_attr,
-                    escape_xml(&cell.text)
-                ));
-            },
-            CellValue::Number(f) => {
-                out.push_str(&format!(
-                    r#"<table:table-cell{} office:value-type="float" office:value="{}"><text:p>{}</text:p></table:table-cell>"#,
-                    formula_attr,
-                    f,
-                    escape_xml(&cell.text)
-                ));
-            },
-            CellValue::Currency(f, currency) => {
-                out.push_str(&format!(
-                    r#"<table:table-cell{} office:value-type="currency" office:value="{}" office:currency="{}"><text:p>{}</text:p></table:table-cell>"#,
-                    formula_attr,
-                    f,
-                    escape_xml(currency),
-                    escape_xml(&cell.text)
-                ));
-            },
-            CellValue::Percentage(f) => {
-                out.push_str(&format!(
-                    r#"<table:table-cell{} office:value-type="percentage" office:value="{}"><text:p>{}</text:p></table:table-cell>"#,
-                    formula_attr,
-                    f,
-                    escape_xml(&cell.text)
-                ));
-            },
-            CellValue::Date(d) => {
-                out.push_str(&format!(
-                    r#"<table:table-cell{} office:value-type="date" office:date-value="{}"><text:p>{}</text:p></table:table-cell>"#,
-                    formula_attr,
-                    escape_xml(d),
-                    escape_xml(&cell.text)
-                ));
-            },
-            CellValue::Time(t) => {
-                out.push_str(&format!(
-                    r#"<table:table-cell{} office:value-type="time" office:time-value="{}"><text:p>{}</text:p></table:table-cell>"#,
-                    formula_attr,
-                    escape_xml(t),
-                    escape_xml(&cell.text)
-                ));
-            },
-            CellValue::Boolean(b) => {
-                out.push_str(&format!(
-                    r#"<table:table-cell{} office:value-type="boolean" office:boolean-value="{}"><text:p>{}</text:p></table:table-cell>"#,
-                    formula_attr,
-                    b,
-                    escape_xml(&cell.text)
-                ));
-            },
-            CellValue::Empty => {
-                if cell.formula.is_some() {
-                    out.push_str(&format!(
-                        r#"<table:table-cell{} office:value-type="float" office:value="0"><text:p>0</text:p></table:table-cell>"#,
-                        formula_attr
-                    ));
-                } else {
-                    out.push_str("<table:table-cell/>");
-                }
-            },
-        }
+        super::cell::write_cell_xml(out, cell);
     }
 
     /// Create a mutable spreadsheet from an existing Spreadsheet.
@@ -276,6 +211,19 @@ impl MutableSpreadsheet {
         Ok(())
     }
 
+    fn validate_annotations(&self) -> Result<()> {
+        for annotation in self
+            .sheets
+            .iter()
+            .flat_map(|sheet| sheet.rows.iter())
+            .flat_map(|row| row.cells.iter())
+            .filter_map(Cell::annotation)
+        {
+            annotation.validate()?;
+        }
+        Ok(())
+    }
+
     /// Add a new sheet.
     pub fn add_sheet(&mut self, name: &str) -> Result<()> {
         let sheet = Sheet {
@@ -388,6 +336,7 @@ impl MutableSpreadsheet {
                     value: CellValue::Empty,
                     text: String::new(),
                     formula: None,
+                    annotation: None,
                     row,
                     col: col_index,
                 });
@@ -413,6 +362,55 @@ impl MutableSpreadsheet {
                 sheet_index
             )))
         }
+    }
+
+    /// Attach or replace an annotation on a cell.
+    pub fn set_cell_annotation(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+        annotation: CellAnnotation,
+    ) -> Result<()> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        while sheet.rows.len() <= row {
+            sheet.rows.push(Row {
+                cells: Vec::new(),
+                index: sheet.rows.len(),
+            });
+        }
+        let row_data = &mut sheet.rows[row];
+        while row_data.cells.len() <= col {
+            row_data.cells.push(Cell {
+                value: CellValue::Empty,
+                text: String::new(),
+                formula: None,
+                annotation: None,
+                row,
+                col: row_data.cells.len(),
+            });
+        }
+        row_data.cells[col].annotation = Some(annotation);
+        Ok(())
+    }
+
+    /// Remove and return an annotation from a cell.
+    pub fn remove_cell_annotation(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+    ) -> Result<Option<CellAnnotation>> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        Ok(sheet
+            .rows
+            .get_mut(row)
+            .and_then(|row| row.cells.get_mut(col))
+            .and_then(Cell::take_annotation))
     }
 
     /// Clear a cell value.
@@ -530,6 +528,9 @@ impl MutableSpreadsheet {
             r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0""#,
         );
         out.push_str(of_ns);
+        if self.has_annotations() {
+            out.push_str(r#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0""#);
+        }
         out.push_str(
             r#" office:version="1.3"><office:font-face-decls/><office:automatic-styles/><office:body><office:spreadsheet>"#,
         );
@@ -556,6 +557,7 @@ impl MutableSpreadsheet {
     /// Convert to bytes.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         self.validate_named_definitions()?;
+        self.validate_annotations()?;
         let mut writer = PackageWriter::new();
 
         writer.set_mimetype(&self.mimetype)?;
@@ -647,5 +649,27 @@ mod tests {
         mutable.remove_sheet(0).unwrap();
         assert_eq!(mutable.named_definitions().len(), 1);
         assert_eq!(mutable.named_definitions()[0].name(), "Global");
+    }
+
+    #[test]
+    fn mutable_spreadsheet_adds_edits_and_removes_annotations() {
+        let mut mutable = MutableSpreadsheet::new();
+        mutable.add_sheet("Sheet1").unwrap();
+        let mut annotation = CellAnnotation::new("review this");
+        annotation.set_creator(Some("Reviewer"));
+        mutable.set_cell_annotation(0, 3, 4, annotation).unwrap();
+
+        mutable.sheets_mut()[0].rows[3].cells[4]
+            .annotation_mut()
+            .unwrap()
+            .push_paragraph("follow-up");
+        let mut round_trip = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let sheets = round_trip.sheets().unwrap();
+        let annotation = sheets[0].rows[3].cells[4].annotation().unwrap();
+        assert_eq!(annotation.creator().as_deref(), Some("Reviewer"));
+        assert_eq!(annotation.text(), "review this\nfollow-up");
+
+        assert!(mutable.remove_cell_annotation(0, 3, 4).unwrap().is_some());
+        assert!(mutable.remove_cell_annotation(0, 3, 4).unwrap().is_none());
     }
 }

@@ -1,6 +1,7 @@
 //! Cell data structures for ODS spreadsheets.
 
-use litchi_core::Result;
+use super::CellAnnotation;
+use litchi_core::{Result, xml::escape_xml};
 
 /// Cell data types supported by ODF spreadsheets.
 ///
@@ -37,6 +38,8 @@ pub struct Cell {
     pub text: String,
     /// The formula in the cell (if any), in ODF format
     pub formula: Option<String>,
+    /// The optional ODF annotation (comment/note) attached to the cell.
+    pub annotation: Option<CellAnnotation>,
     /// The row index (0-based)
     pub row: usize,
     /// The column index (0-based)
@@ -78,6 +81,31 @@ impl Cell {
     /// None otherwise.
     pub fn formula(&self) -> Result<Option<&str>> {
         Ok(self.formula.as_deref())
+    }
+
+    /// Return the cell annotation, if present.
+    pub fn annotation(&self) -> Option<&CellAnnotation> {
+        self.annotation.as_ref()
+    }
+
+    /// Return a mutable cell annotation, if present.
+    pub fn annotation_mut(&mut self) -> Option<&mut CellAnnotation> {
+        self.annotation.as_mut()
+    }
+
+    /// Attach or replace the cell annotation.
+    pub fn set_annotation(&mut self, annotation: CellAnnotation) {
+        self.annotation = Some(annotation);
+    }
+
+    /// Remove and return the cell annotation.
+    pub fn take_annotation(&mut self) -> Option<CellAnnotation> {
+        self.annotation.take()
+    }
+
+    /// Check whether this cell has an annotation.
+    pub fn has_annotation(&self) -> bool {
+        self.annotation.is_some()
     }
 
     /// Parse and get the formula structure.
@@ -221,6 +249,74 @@ impl Cell {
     }
 }
 
+pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
+    output.push_str("<table:table-cell");
+    if let Some(formula) = &cell.formula {
+        output.push_str(" table:formula=\"");
+        output.push_str(&escape_xml(formula));
+        output.push('"');
+    }
+
+    match &cell.value {
+        CellValue::Text(_) => output.push_str(" office:value-type=\"string\""),
+        CellValue::Number(value) => {
+            output.push_str(" office:value-type=\"float\" office:value=\"");
+            output.push_str(&value.to_string());
+            output.push('"');
+        },
+        CellValue::Currency(value, currency) => {
+            output.push_str(" office:value-type=\"currency\" office:value=\"");
+            output.push_str(&value.to_string());
+            output.push_str("\" office:currency=\"");
+            output.push_str(&escape_xml(currency));
+            output.push('"');
+        },
+        CellValue::Percentage(value) => {
+            output.push_str(" office:value-type=\"percentage\" office:value=\"");
+            output.push_str(&value.to_string());
+            output.push('"');
+        },
+        CellValue::Date(value) => {
+            output.push_str(" office:value-type=\"date\" office:date-value=\"");
+            output.push_str(&escape_xml(value));
+            output.push('"');
+        },
+        CellValue::Time(value) => {
+            output.push_str(" office:value-type=\"time\" office:time-value=\"");
+            output.push_str(&escape_xml(value));
+            output.push('"');
+        },
+        CellValue::Boolean(value) => {
+            output.push_str(" office:value-type=\"boolean\" office:boolean-value=\"");
+            output.push_str(if *value { "true" } else { "false" });
+            output.push('"');
+        },
+        CellValue::Empty if cell.formula.is_some() => {
+            output.push_str(" office:value-type=\"float\" office:value=\"0\"");
+        },
+        CellValue::Empty if cell.annotation.is_none() => {
+            output.push_str("/>");
+            return;
+        },
+        CellValue::Empty => {},
+    }
+
+    output.push('>');
+    if let Some(annotation) = &cell.annotation {
+        annotation.write_xml(output);
+    }
+    if matches!(cell.value, CellValue::Empty) {
+        if cell.formula.is_some() {
+            output.push_str("<text:p>0</text:p>");
+        }
+    } else {
+        output.push_str("<text:p>");
+        output.push_str(&escape_xml(&cell.text));
+        output.push_str("</text:p>");
+    }
+    output.push_str("</table:table-cell>");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -285,6 +381,7 @@ mod tests {
             value: CellValue::Empty,
             text: String::new(),
             formula: None,
+            annotation: None,
             row: 0,
             col: 0,
         };
@@ -299,6 +396,7 @@ mod tests {
             value: CellValue::Text("Hello".to_string()),
             text: "Hello".to_string(),
             formula: None,
+            annotation: None,
             row: 0,
             col: 0,
         };
@@ -311,6 +409,7 @@ mod tests {
             value: CellValue::Number(42.0),
             text: "42".to_string(),
             formula: None,
+            annotation: None,
             row: 0,
             col: 0,
         };
@@ -326,6 +425,7 @@ mod tests {
             value: CellValue::Number(42.0),
             text: "42".to_string(),
             formula: None,
+            annotation: None,
             row: 0,
             col: 0,
         };
@@ -335,6 +435,7 @@ mod tests {
             value: CellValue::Currency(100.0, "USD".to_string()),
             text: "$100".to_string(),
             formula: None,
+            annotation: None,
             row: 0,
             col: 0,
         };
@@ -344,6 +445,7 @@ mod tests {
             value: CellValue::Percentage(0.5),
             text: "50%".to_string(),
             formula: None,
+            annotation: None,
             row: 0,
             col: 0,
         };
@@ -353,6 +455,7 @@ mod tests {
             value: CellValue::Text("Hello".to_string()),
             text: "Hello".to_string(),
             formula: None,
+            annotation: None,
             row: 0,
             col: 0,
         };
@@ -365,6 +468,7 @@ mod tests {
             value: CellValue::Number(42.0),
             text: "42".to_string(),
             formula: Some("=A1+B1".to_string()),
+            annotation: None,
             row: 0,
             col: 0,
         };
@@ -377,6 +481,7 @@ mod tests {
             value: CellValue::Text("Hello".to_string()),
             text: "Hello".to_string(),
             formula: None,
+            annotation: None,
             row: 0,
             col: 0,
         };
@@ -389,6 +494,7 @@ mod tests {
             value: CellValue::Number(42.0),
             text: "42".to_string(),
             formula: Some("=A1".to_string()),
+            annotation: None,
             row: 0,
             col: 0,
         };
@@ -398,6 +504,7 @@ mod tests {
             value: CellValue::Text("Hello".to_string()),
             text: "Hello".to_string(),
             formula: None,
+            annotation: None,
             row: 0,
             col: 0,
         };
@@ -410,6 +517,7 @@ mod tests {
             value: CellValue::Empty,
             text: String::new(),
             formula: None,
+            annotation: None,
             row: 5,
             col: 10,
         };
@@ -422,6 +530,7 @@ mod tests {
             value: CellValue::Empty,
             text: String::new(),
             formula: None,
+            annotation: None,
             row: 0,
             col: 0,
         };
@@ -431,6 +540,7 @@ mod tests {
             value: CellValue::Text("Hello".to_string()),
             text: "Hello".to_string(),
             formula: None,
+            annotation: None,
             row: 0,
             col: 0,
         };

@@ -91,6 +91,7 @@
 //! - ✅ Repeated cells/rows expansion
 //! - ✅ Merged cell handling
 //! - ✅ Global and sheet-local named ranges and expressions
+//! - ✅ Cell annotations with metadata, rich text/lists, extensions, and drawing geometry
 //!
 //! ### Writing (`ods/builder.rs`, `ods/mutable.rs`)
 //! - ✅ SpreadsheetBuilder for creating new ODS files
@@ -101,6 +102,7 @@
 //! - ✅ MutableSpreadsheet for modifying existing spreadsheets
 //! - ✅ Insert/delete rows and columns
 //! - ✅ Set metadata
+//! - ✅ Create, replace, edit, remove, and round-trip cell annotations
 //! - ✅ Save to file or bytes
 //!
 //! ### TODO - Advanced Features
@@ -108,7 +110,6 @@
 //! - ⚠️ Data validation rules
 //! - ⚠️ Conditional formatting
 //! - ⚠️ Pivot tables
-//! - ⚠️ Cell comments (notes)
 //! - ⚠️ Sheet protection
 //! - ⚠️ Filter and sort criteria
 //!
@@ -232,9 +233,9 @@ pub use litchi_core::unit::{Length, LengthUnit};
 // Re-export main types for convenience
 pub use odp::{MutablePresentation, Presentation, PresentationBuilder};
 pub use ods::{
-    Cell as SCell, CellValue, FormulaNamespace, MutableSpreadsheet, NamedDefinition,
-    NamedDefinitionScope, NamedExpression, NamedRange, NamedRangeUsage, Row as SRow, Sheet,
-    Spreadsheet, SpreadsheetBuilder,
+    AnnotationElement, AnnotationNode, Cell as SCell, CellAnnotation, CellValue, FormulaNamespace,
+    MutableSpreadsheet, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
+    NamedRangeUsage, Row as SRow, Sheet, Spreadsheet, SpreadsheetBuilder,
 };
 pub use odt::{Document, DocumentBuilder, MutableDocument};
 

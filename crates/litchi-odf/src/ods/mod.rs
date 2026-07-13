@@ -20,6 +20,7 @@
 //! - ✅ Merged cell handling
 //! - ✅ Metadata extraction
 //! - ✅ Global and sheet-local named ranges and named expressions
+//! - ✅ Cell annotations with metadata, rich text/lists, extensions, and drawing geometry
 //!
 //! ## ✅ Formula Support (`formula.rs`) - PARTIAL
 //! - ✅ Formula string representation
@@ -37,13 +38,13 @@
 //! - ✅ `insert_column()` / `delete_column()` - Column operations
 //! - ✅ `save()` / `to_bytes()` - Write to file or bytes
 //! - ✅ `MutableSpreadsheet` - Modify existing spreadsheets
+//! - ✅ Create, replace, edit, remove, and round-trip cell annotations
 //!
 //! ## 🚧 TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing (embedded charts)
 //! - ⚠️ Data validation rules
 //! - ⚠️ Conditional formatting
 //! - ⚠️ Pivot tables
-//! - ⚠️ Cell comments/notes
 //! - ⚠️ Sheet protection and locking
 //! - ⚠️ Filter and sort criteria
 //! - ⚠️ Sparklines
@@ -56,6 +57,7 @@
 //! - calamine: Spreadsheet parsing patterns
 //! - ODF Toolkit: Simple API - Spreadsheet class
 
+mod annotation;
 mod builder;
 mod cell;
 /// OpenFormula parsing and support
@@ -67,6 +69,7 @@ mod row;
 mod sheet;
 mod spreadsheet;
 
+pub use annotation::{AnnotationElement, AnnotationNode, CellAnnotation};
 pub use builder::SpreadsheetBuilder;
 pub use cell::{Cell, CellValue};
 pub use mutable::MutableSpreadsheet;
