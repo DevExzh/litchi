@@ -402,6 +402,9 @@ pub enum FormulaToken {
     MissingArg,
     /// Display parenthesis around the preceding expression (`PtgParen`).
     Parenthesis,
+    /// Non-evaluating control/display attribute. The selector is retained for
+    /// diagnostics while its payload is consumed by the parser.
+    Attribute(u8),
     /// Cell reference (row, col, relative_row, relative_col)
     CellRef {
         row: u32,
@@ -540,6 +543,7 @@ impl<'a> FormulaParser<'a> {
             PTG_PERCENT => Ok(FormulaToken::UnaryOp(UnaryOperator::Percent)),
             PTG_PAREN => Ok(FormulaToken::Parenthesis),
             PTG_MISSING_ARG => Ok(FormulaToken::MissingArg),
+            PTG_ATTR => self.parse_attr(),
 
             PTG_INT => self.parse_int(),
             PTG_NUM => self.parse_num(),
@@ -635,6 +639,49 @@ impl<'a> FormulaParser<'a> {
         self.offset += 1;
 
         Ok(FormulaToken::Error(error_code))
+    }
+
+    /// Parse the selector-specific payload of the `PtgAttr` token family.
+    fn parse_attr(&mut self) -> XlsbResult<FormulaToken> {
+        self.require(1, "PtgAttr selector")?;
+        let selector = self.data[self.offset];
+        self.offset += 1;
+
+        if selector == 0x04 {
+            // PtgAttrChoose: cOffset is one less than the number of u16
+            // offsets that follow it.
+            self.require(2, "PtgAttrChoose count")?;
+            let count = usize::from(binary::read_u16_le_at(self.data, self.offset)?) + 1;
+            self.offset += 2;
+            let byte_len = count.checked_mul(2).ok_or_else(|| {
+                XlsbError::InvalidFormula("PtgAttrChoose offset count overflow".to_string())
+            })?;
+            self.require(byte_len, "PtgAttrChoose offsets")?;
+            self.offset += byte_len;
+            return Ok(FormulaToken::Attribute(selector));
+        }
+
+        match selector {
+            // Semi, If, GoTo, Sum, Baxcel, Space, SpaceSemi, IfError all have
+            // a two-byte selector-specific payload after the selector byte.
+            0x01 | 0x02 | 0x08 | 0x10 | 0x20 | 0x21 | 0x40 | 0x41 | 0x80 => {
+                self.require(2, "PtgAttr payload")?;
+                self.offset += 2;
+                if selector == 0x10 {
+                    // PtgAttrSum is semantically SUM(expression).
+                    Ok(FormulaToken::Function {
+                        index: 4,
+                        arg_count: 1,
+                        is_command: false,
+                    })
+                } else {
+                    Ok(FormulaToken::Attribute(selector))
+                }
+            },
+            _ => Err(XlsbError::InvalidFormula(format!(
+                "unknown PtgAttr selector 0x{selector:02X}"
+            ))),
+        }
     }
 
     /// Parse cell reference
@@ -832,6 +879,7 @@ impl FormulaConverter {
                     };
                     stack.push(format!("({expression})"));
                 },
+                FormulaToken::Attribute(_) => {},
                 FormulaToken::String(s) => stack.push(format!("\"{}\"", s.replace('"', "\"\""))),
                 FormulaToken::Bool(b) => stack.push(if *b {
                     "TRUE".to_string()
@@ -1786,6 +1834,36 @@ mod tests {
             FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
             "(A1,B2)"
         );
+    }
+
+    #[test]
+    fn parser_consumes_attribute_payloads_and_converts_attr_sum() {
+        let attr_sum = [ptg_types::PTG_INT, 1, 0, ptg_types::PTG_ATTR, 0x10, 0, 0];
+        let tokens = FormulaParser::new(&attr_sum).parse().unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
+            "SUM(1)"
+        );
+
+        let attr_choose = [
+            ptg_types::PTG_ATTR,
+            0x04,
+            0x01,
+            0x00, // two offsets
+            0x02,
+            0x00,
+            0x04,
+            0x00,
+        ];
+        assert_eq!(
+            FormulaParser::new(&attr_choose).parse().unwrap(),
+            vec![FormulaToken::Attribute(0x04)]
+        );
+
+        assert!(matches!(
+            FormulaParser::new(&attr_choose[..7]).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
     }
 
     #[test]
