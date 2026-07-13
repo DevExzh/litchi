@@ -164,7 +164,7 @@ pub use styles::{
 };
 pub use styles_table::{CellFormat, Fill, Font, StylesTable};
 pub use workbook::XlsbWorkbook;
-pub use worksheet::{XlsbColumnInfo, XlsbRowInfo, XlsbWorksheet};
+pub use worksheet::{XlsbAutoFilter, XlsbColumnInfo, XlsbRowInfo, XlsbWorksheet};
 // Re-export low-level record iterator types for diagnostics and advanced users.
 // The actual implementations live in records.rs; this keeps the module private
 // while still allowing external tooling (like examples) to traverse raw records.

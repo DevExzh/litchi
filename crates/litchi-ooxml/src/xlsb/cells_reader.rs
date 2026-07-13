@@ -9,7 +9,7 @@ use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
 use crate::xlsb::records::{RecordIter, record_types};
 use crate::xlsb::shared_strings::SharedString;
-use crate::xlsb::worksheet::{XlsbColumnInfo, XlsbRowInfo};
+use crate::xlsb::worksheet::{XlsbAutoFilter, XlsbColumnInfo, XlsbRowInfo};
 use litchi_core::binary;
 use litchi_core::sheet::CellValue;
 use std::io::{Read, Seek};
@@ -61,6 +61,8 @@ where
     pub column_infos: Vec<XlsbColumnInfo>,
     /// Row header metadata found within sheet data.
     pub row_infos: Vec<XlsbRowInfo>,
+    /// Worksheet AutoFilter range.
+    pub auto_filter: Option<XlsbAutoFilter>,
 }
 
 impl<'a, RS> XlsbCellsReader<'a, RS>
@@ -121,6 +123,7 @@ where
             hyperlinks: Vec::new(),
             column_infos,
             row_infos: Vec::new(),
+            auto_filter: None,
         })
     }
 
@@ -752,6 +755,16 @@ where
                         self.hyperlinks.push(hyperlink);
                     }
                 },
+                record_types::BEGIN_A_FILTER => {
+                    if self.auto_filter.is_some() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtBeginAFilter".to_string(),
+                            val: "duplicate worksheet AutoFilter".to_string(),
+                        });
+                    }
+                    self.auto_filter = Some(Self::parse_auto_filter(&self.buf)?);
+                    self.consume_auto_filter_records()?;
+                },
                 0x0082 => {
                     // BrtEndSheet - end of worksheet
                     break;
@@ -763,6 +776,60 @@ where
         }
 
         Ok(())
+    }
+
+    fn parse_auto_filter(data: &[u8]) -> XlsbResult<XlsbAutoFilter> {
+        if data.len() != 16 {
+            return Err(XlsbError::InvalidLength {
+                expected: 16,
+                found: data.len(),
+            });
+        }
+        let first_row = binary::read_u32_le_at(data, 0)?;
+        let last_row = binary::read_u32_le_at(data, 4)?;
+        let first_column = binary::read_u32_le_at(data, 8)?;
+        let last_column = binary::read_u32_le_at(data, 12)?;
+        if first_row > last_row
+            || last_row >= 0x10_0000
+            || first_column > last_column
+            || last_column >= 0x4000
+        {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginAFilter rfx".to_string(),
+                val: format!(
+                    "rows {first_row}..={last_row}, columns {first_column}..={last_column}"
+                ),
+            });
+        }
+        Ok(XlsbAutoFilter {
+            first_row,
+            last_row,
+            first_column,
+            last_column,
+        })
+    }
+
+    fn consume_auto_filter_records(&mut self) -> XlsbResult<()> {
+        loop {
+            self.buf.clear();
+            let typ = self.iter.read_type()?;
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
+            if typ == record_types::END_A_FILTER {
+                if !self.buf.is_empty() {
+                    return Err(XlsbError::InvalidLength {
+                        expected: 0,
+                        found: self.buf.len(),
+                    });
+                }
+                return Ok(());
+            }
+            if typ == record_types::BEGIN_A_FILTER {
+                return Err(XlsbError::Unrecognized {
+                    typ: "BrtBeginAFilter".to_string(),
+                    val: "nested AutoFilter".to_string(),
+                });
+            }
+        }
     }
 
     /// Read merged cells section

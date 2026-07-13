@@ -495,6 +495,7 @@ impl XlsbWorkbook {
         }
         worksheet.set_column_infos(cells_reader.column_infos);
         worksheet.set_row_infos(cells_reader.row_infos);
+        worksheet.set_auto_filter(cells_reader.auto_filter);
 
         Ok(worksheet)
     }

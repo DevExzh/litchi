@@ -1782,6 +1782,16 @@ impl MutableXlsbWorksheet {
         let Some(ref af) = self.auto_filter else {
             return Ok(());
         };
+        if af.row_first > af.row_last
+            || af.row_last >= 0x10_0000
+            || af.col_first > af.col_last
+            || af.col_last >= 0x4000
+        {
+            return Err(XlsbError::Encoding(format!(
+                "invalid AutoFilter range: rows {}..={}, columns {}..={}",
+                af.row_first, af.row_last, af.col_first, af.col_last
+            )));
+        }
 
         let mut data = Vec::new();
         let mut temp_writer = RecordWriter::new(&mut data);

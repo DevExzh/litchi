@@ -60,6 +60,19 @@ pub struct XlsbRowInfo {
     pub column_spans: Vec<(u32, u32)>,
 }
 
+/// Cell range governed by a worksheet AutoFilter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XlsbAutoFilter {
+    /// First zero-based row, inclusive.
+    pub first_row: u32,
+    /// Last zero-based row, inclusive.
+    pub last_row: u32,
+    /// First zero-based column, inclusive.
+    pub first_column: u32,
+    /// Last zero-based column, inclusive.
+    pub last_column: u32,
+}
+
 /// XLSB worksheet implementation
 #[derive(Debug, Clone)]
 pub struct XlsbWorksheet {
@@ -72,6 +85,7 @@ pub struct XlsbWorksheet {
     comments: Vec<Comment>,
     column_infos: Vec<XlsbColumnInfo>,
     row_infos: Vec<XlsbRowInfo>,
+    auto_filter: Option<XlsbAutoFilter>,
 }
 
 impl XlsbWorksheet {
@@ -87,6 +101,7 @@ impl XlsbWorksheet {
             comments: Vec::new(),
             column_infos: Vec::new(),
             row_infos: Vec::new(),
+            auto_filter: None,
         }
     }
 
@@ -126,6 +141,10 @@ impl XlsbWorksheet {
         self.row_infos = infos;
     }
 
+    pub(crate) fn set_auto_filter(&mut self, auto_filter: Option<XlsbAutoFilter>) {
+        self.auto_filter = auto_filter;
+    }
+
     /// Get all merged cells
     pub fn merged_cells(&self) -> &[MergedCell] {
         &self.merged_cells
@@ -149,6 +168,11 @@ impl XlsbWorksheet {
     /// Row formatting, visibility, and occupied-column records in row order.
     pub fn row_infos(&self) -> &[XlsbRowInfo] {
         &self.row_infos
+    }
+
+    /// Worksheet AutoFilter range, if present.
+    pub fn auto_filter(&self) -> Option<XlsbAutoFilter> {
+        self.auto_filter
     }
 }
 

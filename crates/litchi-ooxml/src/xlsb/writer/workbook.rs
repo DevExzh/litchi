@@ -1059,6 +1059,29 @@ mod tests {
     }
 
     #[test]
+    fn auto_filter_range_survives_package_roundtrip() {
+        let mut workbook = XlsbWorkbookWriter::new();
+        let mut sheet = MutableXlsbWorksheet::new("Filtered");
+        sheet.set_cell(0, 0, "Header");
+        sheet.set_auto_filter(0, 20, 0, 4);
+        workbook.add_worksheet(sheet);
+
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let auto_filter = reader.worksheet(0).unwrap().auto_filter().unwrap();
+        assert_eq!(
+            auto_filter,
+            crate::xlsb::XlsbAutoFilter {
+                first_row: 0,
+                last_row: 20,
+                first_column: 0,
+                last_column: 4,
+            }
+        );
+    }
+
+    #[test]
     fn test_workbook_writer_default() {
         let workbook: XlsbWorkbookWriter = Default::default();
         assert_eq!(workbook.worksheet_count(), 0);
