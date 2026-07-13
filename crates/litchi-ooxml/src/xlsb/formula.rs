@@ -1873,6 +1873,22 @@ fn builtin_function_by_name(name: &str) -> Option<BuiltinFunction> {
 pub struct FormulaCompiler<'a> {
     input: &'a str,
     offset: usize,
+    context: Option<&'a FormulaCompilationContext<'a>>,
+}
+
+/// A defined name visible to the XLSB formula text compiler.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FormulaDefinedName {
+    pub(crate) name: String,
+    pub(crate) sheet_id: Option<u32>,
+}
+
+/// Workbook metadata used to compile context-dependent formula operands.
+#[derive(Debug)]
+pub(crate) struct FormulaCompilationContext<'a> {
+    pub(crate) worksheet_names: &'a [String],
+    pub(crate) defined_names: &'a [FormulaDefinedName],
+    pub(crate) current_sheet: u32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1896,6 +1912,9 @@ enum CompileExpr {
     },
     Ref(A1Reference),
     Area(A1Reference, A1Reference),
+    Ref3d(u16, A1Reference),
+    Area3d(u16, A1Reference, A1Reference),
+    Name(u32),
     Unary(UnaryOperator, Box<CompileExpr>),
     Binary(BinaryOperator, Box<CompileExpr>, Box<CompileExpr>),
     Function(BuiltinFunction, Vec<CompileExpr>),
@@ -1911,7 +1930,14 @@ struct A1Reference {
 
 impl<'a> FormulaCompiler<'a> {
     pub fn compile(formula: &'a str) -> XlsbResult<CellParsedFormula> {
-        Self::compile_with_encoding(formula, FormulaEncoding::Cell)
+        Self::compile_with_encoding(formula, FormulaEncoding::Cell, None)
+    }
+
+    pub(crate) fn compile_with_context(
+        formula: &'a str,
+        context: &'a FormulaCompilationContext<'a>,
+    ) -> XlsbResult<CellParsedFormula> {
+        Self::compile_with_encoding(formula, FormulaEncoding::Cell, Some(context))
     }
 
     /// Compile a shared formula, encoding relative A1 references as
@@ -1926,12 +1952,17 @@ impl<'a> FormulaCompiler<'a> {
                 "shared formula base ({base_row}, {base_col})"
             )));
         }
-        Self::compile_with_encoding(formula, FormulaEncoding::Shared { base_row, base_col })
+        Self::compile_with_encoding(
+            formula,
+            FormulaEncoding::Shared { base_row, base_col },
+            None,
+        )
     }
 
     fn compile_with_encoding(
         formula: &'a str,
         encoding: FormulaEncoding,
+        context: Option<&'a FormulaCompilationContext<'a>>,
     ) -> XlsbResult<CellParsedFormula> {
         let input = formula.strip_prefix('=').unwrap_or(formula).trim();
         if input.is_empty() {
@@ -1939,7 +1970,11 @@ impl<'a> FormulaCompiler<'a> {
                 "formula expression is empty".to_string(),
             ));
         }
-        let mut compiler = Self { input, offset: 0 };
+        let mut compiler = Self {
+            input,
+            offset: 0,
+            context,
+        };
         let expression = compiler.parse_comparison()?;
         compiler.skip_spaces();
         if compiler.offset != compiler.input.len() {
@@ -2089,7 +2124,18 @@ impl<'a> FormulaCompiler<'a> {
             return self.parse_number().map(CompileExpr::Number);
         }
 
+        if self.peek_char() == Some('\'') {
+            let sheet_name = self.parse_quoted_sheet_name()?;
+            if !self.consume("!") {
+                return Err(self.error("expected '!' after quoted worksheet name"));
+            }
+            return self.parse_qualified_reference(&sheet_name);
+        }
+
         let identifier = self.parse_identifier()?;
+        if self.consume("!") {
+            return self.parse_qualified_reference(&identifier);
+        }
         if self.consume("(") {
             let function = builtin_function_by_name(&identifier).ok_or_else(|| {
                 XlsbError::UnsupportedFeature(format!(
@@ -2137,9 +2183,11 @@ impl<'a> FormulaCompiler<'a> {
             return Ok(CompileExpr::Bool(false));
         }
 
-        let first = parse_a1_reference(&identifier).ok_or_else(|| {
-            self.error("defined names and sheet-qualified references are not yet supported")
-        })?;
+        let Some(first) = parse_a1_reference(&identifier) else {
+            return self
+                .resolve_defined_name(&identifier)
+                .map(CompileExpr::Name);
+        };
         if self.consume(":") {
             let second_text = self.parse_identifier()?;
             let second = parse_a1_reference(&second_text)
@@ -2299,7 +2347,7 @@ impl<'a> FormulaCompiler<'a> {
         self.skip_spaces();
         let start = self.offset;
         while let Some(ch) = self.peek_char() {
-            if ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '$') {
+            if ch.is_alphanumeric() || matches!(ch, '_' | '.' | '$' | '?' | '\\' | '\u{061F}') {
                 self.offset += ch.len_utf8();
             } else {
                 break;
@@ -2310,6 +2358,96 @@ impl<'a> FormulaCompiler<'a> {
         } else {
             Ok(self.input[start..self.offset].to_string())
         }
+    }
+
+    fn parse_quoted_sheet_name(&mut self) -> XlsbResult<String> {
+        self.skip_spaces();
+        debug_assert_eq!(self.peek_char(), Some('\''));
+        self.offset += 1;
+        let mut name = String::new();
+        loop {
+            let Some(ch) = self.peek_char() else {
+                return Err(self.error("unterminated quoted worksheet name"));
+            };
+            self.offset += ch.len_utf8();
+            if ch == '\'' {
+                if self.peek_char() == Some('\'') {
+                    self.offset += 1;
+                    name.push('\'');
+                } else {
+                    break;
+                }
+            } else {
+                name.push(ch);
+            }
+        }
+        if name.is_empty() {
+            return Err(self.error("worksheet name is empty"));
+        }
+        Ok(name)
+    }
+
+    fn parse_qualified_reference(&mut self, sheet_name: &str) -> XlsbResult<CompileExpr> {
+        let sheet_index = self.resolve_sheet(sheet_name)?;
+        let first_text = self.parse_identifier()?;
+        let first = parse_a1_reference(&first_text)
+            .ok_or_else(|| self.error("invalid sheet-qualified cell reference"))?;
+        if self.consume(":") {
+            let second_text = self.parse_identifier()?;
+            let second = parse_a1_reference(&second_text)
+                .ok_or_else(|| self.error("invalid sheet-qualified range end"))?;
+            Ok(CompileExpr::Area3d(sheet_index, first, second))
+        } else {
+            Ok(CompileExpr::Ref3d(sheet_index, first))
+        }
+    }
+
+    fn resolve_sheet(&self, sheet_name: &str) -> XlsbResult<u16> {
+        let context = self.context.ok_or_else(|| {
+            XlsbError::UnsupportedFeature(
+                "sheet-qualified reference requires workbook compilation context".to_string(),
+            )
+        })?;
+        let index = context
+            .worksheet_names
+            .iter()
+            .position(|candidate| excel_name_eq(candidate, sheet_name))
+            .ok_or_else(|| XlsbError::WorksheetNotFound(sheet_name.to_string()))?;
+        u16::try_from(index)
+            .ok()
+            .and_then(|index| index.checked_add(2))
+            .ok_or_else(|| {
+                XlsbError::InvalidFormula(format!(
+                    "worksheet {sheet_name:?} cannot be represented in the extern-sheet table"
+                ))
+            })
+    }
+
+    fn resolve_defined_name(&self, name: &str) -> XlsbResult<u32> {
+        let context = self.context.ok_or_else(|| {
+            XlsbError::UnsupportedFeature(format!(
+                "defined name {name:?} requires workbook compilation context"
+            ))
+        })?;
+        let local = context.defined_names.iter().position(|candidate| {
+            candidate.sheet_id == Some(context.current_sheet)
+                && excel_name_eq(&candidate.name, name)
+        });
+        let index = local.or_else(|| {
+            context.defined_names.iter().position(|candidate| {
+                candidate.sheet_id.is_none() && excel_name_eq(&candidate.name, name)
+            })
+        });
+        let index = index.ok_or_else(|| {
+            XlsbError::InvalidFormula(format!(
+                "defined name {name:?} is not visible from worksheet {}",
+                context.current_sheet
+            ))
+        })?;
+        u32::try_from(index)
+            .ok()
+            .and_then(|index| index.checked_add(1))
+            .ok_or_else(|| XlsbError::InvalidFormula("defined-name index overflow".to_string()))
     }
 
     fn consume(&mut self, text: &str) -> bool {
@@ -2434,6 +2572,24 @@ impl<'a> FormulaCompiler<'a> {
                         output.extend_from_slice(&last_col.to_le_bytes());
                     },
                 }
+            },
+            CompileExpr::Ref3d(sheet_index, reference) => {
+                output.push(0x5A); // PtgRef3d, VALUE class
+                output.extend_from_slice(&sheet_index.to_le_bytes());
+                output.extend_from_slice(&reference.row.to_le_bytes());
+                output.extend_from_slice(&reference_column_bits(*reference).to_le_bytes());
+            },
+            CompileExpr::Area3d(sheet_index, first, last) => {
+                output.push(0x5B); // PtgArea3d, VALUE class
+                output.extend_from_slice(&sheet_index.to_le_bytes());
+                output.extend_from_slice(&first.row.to_le_bytes());
+                output.extend_from_slice(&last.row.to_le_bytes());
+                output.extend_from_slice(&reference_column_bits(*first).to_le_bytes());
+                output.extend_from_slice(&reference_column_bits(*last).to_le_bytes());
+            },
+            CompileExpr::Name(index) => {
+                output.push(0x43); // PtgName, VALUE class
+                output.extend_from_slice(&index.to_le_bytes());
             },
             CompileExpr::Unary(operator, operand) => {
                 Self::emit(operand, output, extra, encoding)?;
@@ -2634,6 +2790,12 @@ fn formula_error_code(value: &str) -> Option<u8> {
     FORMULA_ERRORS
         .iter()
         .find_map(|(literal, code)| literal.eq_ignore_ascii_case(value).then_some(*code))
+}
+
+pub(crate) fn excel_name_eq(left: &str, right: &str) -> bool {
+    left.chars()
+        .flat_map(char::to_lowercase)
+        .eq(right.chars().flat_map(char::to_lowercase))
 }
 
 fn is_formula_error_code(value: u8) -> bool {
@@ -2883,6 +3045,45 @@ mod tests {
         let tokens = FormulaParser::new(&formula.rgce).parse().unwrap();
         let text = FormulaConverter::try_tokens_to_string(&tokens).unwrap();
         assert_eq!(text, "(SUM($A$1:B3)+\"荔枝\")");
+    }
+
+    #[test]
+    fn compiler_emits_contextual_names_and_sheet_references() {
+        let worksheet_names = vec!["Data".to_string(), "O'Brien Data".to_string()];
+        let defined_names = vec![
+            FormulaDefinedName {
+                name: "Rate".to_string(),
+                sheet_id: None,
+            },
+            FormulaDefinedName {
+                name: "Rate".to_string(),
+                sheet_id: Some(1),
+            },
+        ];
+        let context = FormulaCompilationContext {
+            worksheet_names: &worksheet_names,
+            defined_names: &defined_names,
+            current_sheet: 1,
+        };
+        let compiled =
+            FormulaCompiler::compile_with_context("Rate+Data!A1:B2+'O''Brien Data'!$C$3", &context)
+                .unwrap();
+
+        assert!(compiled.rgce.starts_with(&[0x43, 2, 0, 0, 0]));
+        assert!(
+            compiled
+                .rgce
+                .windows(3)
+                .any(|window| window == [0x5B, 2, 0])
+        );
+        assert!(
+            compiled
+                .rgce
+                .windows(3)
+                .any(|window| window == [0x5A, 3, 0])
+        );
+        assert!(FormulaCompiler::compile("Rate").is_err());
+        assert!(FormulaCompiler::compile("Data!A1").is_err());
     }
 
     #[test]

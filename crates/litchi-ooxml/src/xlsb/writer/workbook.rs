@@ -3,7 +3,9 @@
 //! This module provides functionality to create complete XLSB files with multiple worksheets,
 //! shared strings, styles, and advanced features.
 use crate::xlsb::error::XlsbResult;
-use crate::xlsb::formula::CellParsedFormula;
+use crate::xlsb::formula::{
+    CellParsedFormula, FormulaCompilationContext, FormulaDefinedName, excel_name_eq,
+};
 use crate::xlsb::named_ranges::{NamedRange, validate_defined_name};
 use crate::xlsb::records::record_types;
 use crate::xlsb::writer::{
@@ -133,6 +135,7 @@ impl XlsbWorkbookWriter {
     ///
     /// * `writer` - A writer that implements `Write` and `Seek`
     pub fn save<W: Write + Seek>(&mut self, writer: W) -> XlsbResult<()> {
+        self.validate_formula_metadata()?;
         let mut package = OpcPackage::new();
 
         // Add document properties (required by Excel)
@@ -163,6 +166,72 @@ impl XlsbWorkbookWriter {
         // Save package to output
         package.to_stream(writer)?;
 
+        Ok(())
+    }
+
+    fn validate_formula_metadata(&self) -> XlsbResult<()> {
+        if self.worksheets.len() > usize::from(u16::MAX) - 2 {
+            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                "{} worksheets exceed the XLSB extern-sheet index limit",
+                self.worksheets.len()
+            )));
+        }
+        for (index, worksheet) in self.worksheets.iter().enumerate() {
+            let name = worksheet.name();
+            let name_len = name.encode_utf16().count();
+            if name_len == 0
+                || name_len > 31
+                || name.contains(['\0', '\u{0003}', ':', '\\', '*', '?', '/', '[', ']'])
+                || name.starts_with('\'')
+                || name.ends_with('\'')
+            {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    "worksheet name {name:?} does not follow BrtBundleSh grammar"
+                )));
+            }
+            if self.worksheets[..index]
+                .iter()
+                .any(|existing| excel_name_eq(existing.name(), name))
+            {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    "duplicate worksheet name {name:?}"
+                )));
+            }
+        }
+        for (index, named_range) in self.named_ranges.iter().enumerate() {
+            if named_range.function {
+                return Err(crate::xlsb::error::XlsbError::UnsupportedFeature(format!(
+                    "macro defined name {} cannot be emitted",
+                    named_range.name
+                )));
+            }
+            validate_defined_name(&named_range.name)?;
+            if named_range.formula.is_none() {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    "defined name {} has no formula",
+                    named_range.name
+                )));
+            }
+            if named_range.sheet_id.is_some_and(|sheet_id| {
+                usize::try_from(sheet_id)
+                    .ok()
+                    .is_none_or(|sheet_id| sheet_id >= self.worksheets.len())
+            }) {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    "defined name {} has invalid sheet scope {:?}",
+                    named_range.name, named_range.sheet_id
+                )));
+            }
+            if self.named_ranges[..index].iter().any(|existing| {
+                existing.sheet_id == named_range.sheet_id
+                    && excel_name_eq(&existing.name, &named_range.name)
+            }) {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    "duplicate defined name {:?} in scope {:?}",
+                    named_range.name, named_range.sheet_id
+                )));
+            }
+        }
         Ok(())
     }
 
@@ -639,6 +708,19 @@ impl XlsbWorkbookWriter {
 
     /// Add worksheet parts to the package
     fn add_worksheet_parts(&mut self, package: &mut OpcPackage) -> XlsbResult<()> {
+        let worksheet_names = self
+            .worksheets
+            .iter()
+            .map(|worksheet| worksheet.name().to_string())
+            .collect::<Vec<_>>();
+        let defined_names = self
+            .named_ranges
+            .iter()
+            .map(|named_range| FormulaDefinedName {
+                name: named_range.name.clone(),
+                sheet_id: named_range.sheet_id,
+            })
+            .collect::<Vec<_>>();
         for (i, worksheet) in self.worksheets.iter_mut().enumerate() {
             // Create the worksheet part with an empty blob first so we can attach
             // relationships (binary index + external hyperlinks) and obtain
@@ -688,10 +770,23 @@ impl XlsbWorkbookWriter {
             // Now serialize the worksheet with fully-populated relationship IDs
             // in the hyperlink records.
             let mut sheet_data = Vec::new();
-            {
+            let current_sheet = u32::try_from(i).map_err(|_| {
+                crate::xlsb::error::XlsbError::InvalidFormula(
+                    "worksheet index overflow".to_string(),
+                )
+            })?;
+            let formula_context = FormulaCompilationContext {
+                worksheet_names: &worksheet_names,
+                defined_names: &defined_names,
+                current_sheet,
+            };
+            let compiled_positions = worksheet.compile_contextual_formulas(&formula_context)?;
+            let write_result = {
                 let mut writer = RecordWriter::new(&mut sheet_data);
-                worksheet.write(&mut writer, &mut self.shared_strings)?;
-            }
+                worksheet.write(&mut writer, &mut self.shared_strings)
+            };
+            worksheet.clear_compiled_formulas(&compiled_positions);
+            write_result?;
             sheet_part.set_blob(sheet_data);
 
             package.add_part(Box::new(sheet_part));
@@ -904,39 +999,31 @@ mod tests {
         use crate::xlsb::named_ranges::{NamedRange, create_area3d_formula};
 
         let mut workbook = XlsbWorkbookWriter::new();
-        workbook.add_worksheet(MutableXlsbWorksheet::new("Data"));
+        workbook.add_worksheet(MutableXlsbWorksheet::new("Data Sheet"));
         workbook.add_named_range(
             NamedRange::new("SalesData".to_string(), None)
                 .with_formula(create_area3d_formula(0, 1, 3, 1, 1).unwrap()),
         );
         let mut summary = MutableXlsbWorksheet::new("Summary");
-        let mut name_token = vec![crate::xlsb::formula::ptg_types::PTG_NAME];
-        name_token.extend_from_slice(&1_u32.to_le_bytes());
-        summary.set_cell_formula_binary(
+        summary.set_cell(
             0,
             0,
-            CellValue::Float(0.0),
-            CellParsedFormula {
-                rgce: name_token,
-                rgcb: Vec::new(),
+            CellValue::Formula {
+                formula: "SalesData".to_string(),
+                cached_value: Some(Box::new(CellValue::Float(0.0))),
+                is_array: false,
+                array_range: None,
             },
-            false,
-            0,
         );
-        let mut reference_token = vec![crate::xlsb::formula::ptg_types::PTG_REF_3D];
-        reference_token.extend_from_slice(&2_u16.to_le_bytes());
-        reference_token.extend_from_slice(&1_u32.to_le_bytes());
-        reference_token.extend_from_slice(&1_u16.to_le_bytes());
-        summary.set_cell_formula_binary(
+        summary.set_cell(
             0,
             1,
-            CellValue::Float(0.0),
-            CellParsedFormula {
-                rgce: reference_token,
-                rgcb: Vec::new(),
+            CellValue::Formula {
+                formula: "'Data Sheet'!$B$2".to_string(),
+                cached_value: Some(Box::new(CellValue::Float(0.0))),
+                is_array: false,
+                array_range: None,
             },
-            false,
-            0,
         );
         workbook.add_worksheet(summary);
 
@@ -951,8 +1038,56 @@ mod tests {
         ));
         assert!(matches!(
             summary.cell_value(0, 1).unwrap().as_ref(),
-            CellValue::Formula { formula, .. } if formula == "Data!$B$2"
+            CellValue::Formula { formula, .. } if formula == "'Data Sheet'!$B$2"
         ));
+    }
+
+    #[test]
+    fn rejects_ambiguous_formula_metadata_before_writing() {
+        use crate::xlsb::named_ranges::{NamedRange, create_area3d_formula};
+
+        let mut duplicate_sheets = XlsbWorkbookWriter::new();
+        duplicate_sheets.add_worksheet(MutableXlsbWorksheet::new("Data"));
+        duplicate_sheets.add_worksheet(MutableXlsbWorksheet::new("data"));
+        assert!(duplicate_sheets.save(Cursor::new(Vec::new())).is_err());
+
+        let mut invalid_sheet = XlsbWorkbookWriter::new();
+        invalid_sheet.add_worksheet(MutableXlsbWorksheet::new("Data/2026"));
+        assert!(invalid_sheet.save(Cursor::new(Vec::new())).is_err());
+
+        let mut duplicate_names = XlsbWorkbookWriter::new();
+        duplicate_names.add_worksheet(MutableXlsbWorksheet::new("Data"));
+        duplicate_names.add_named_range(
+            NamedRange::new("Rate".to_string(), None)
+                .with_formula(create_area3d_formula(0, 0, 0, 0, 0).unwrap()),
+        );
+        duplicate_names.add_named_range(
+            NamedRange::new("rate".to_string(), None)
+                .with_formula(create_area3d_formula(0, 1, 1, 0, 0).unwrap()),
+        );
+        assert!(duplicate_names.save(Cursor::new(Vec::new())).is_err());
+    }
+
+    #[test]
+    fn contextual_formula_tokens_are_not_cached_across_saves() {
+        let mut workbook = XlsbWorkbookWriter::new();
+        workbook.add_worksheet(MutableXlsbWorksheet::new("Data"));
+        let mut summary = MutableXlsbWorksheet::new("Summary");
+        summary.set_cell(
+            0,
+            0,
+            CellValue::Formula {
+                formula: "Data!A1".to_string(),
+                cached_value: None,
+                is_array: false,
+                array_range: None,
+            },
+        );
+        workbook.add_worksheet(summary);
+        workbook.save(Cursor::new(Vec::new())).unwrap();
+
+        workbook.get_worksheet_mut(0).unwrap().set_name("Renamed");
+        assert!(workbook.save(Cursor::new(Vec::new())).is_err());
     }
 
     #[test]

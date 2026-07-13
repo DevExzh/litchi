@@ -5,8 +5,8 @@ use crate::xlsb::conditional_formatting::ConditionalFormatting;
 use crate::xlsb::data_validation::DataValidation;
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{
-    CellParsedFormula, FormulaCompiler, FormulaConverter, FormulaGroup, FormulaGroupKind,
-    FormulaParser, FormulaRange,
+    CellParsedFormula, FormulaCompilationContext, FormulaCompiler, FormulaConverter, FormulaGroup,
+    FormulaGroupKind, FormulaParser, FormulaRange,
 };
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
@@ -144,6 +144,46 @@ impl MutableXlsbWorksheet {
             data_validations: Vec::new(),
             conditional_formattings: Vec::new(),
             formula_groups: Vec::new(),
+        }
+    }
+
+    pub(crate) fn compile_contextual_formulas(
+        &mut self,
+        context: &FormulaCompilationContext<'_>,
+    ) -> XlsbResult<Vec<(u32, u32)>> {
+        let mut compiled = Vec::new();
+        for (&position, cell) in &self.cells {
+            let CellValue::Formula {
+                formula, is_array, ..
+            } = &cell.value
+            else {
+                continue;
+            };
+            if cell.formula_binary.is_none() && !is_array {
+                compiled.push((
+                    position,
+                    FormulaCompiler::compile_with_context(formula, context)?,
+                ));
+            }
+        }
+        let positions = compiled
+            .iter()
+            .map(|(position, _)| *position)
+            .collect::<Vec<_>>();
+        for (position, formula) in compiled {
+            self.cells
+                .get_mut(&position)
+                .expect("formula cell collected from worksheet")
+                .formula_binary = Some(formula);
+        }
+        Ok(positions)
+    }
+
+    pub(crate) fn clear_compiled_formulas(&mut self, positions: &[(u32, u32)]) {
+        for position in positions {
+            if let Some(cell) = self.cells.get_mut(position) {
+                cell.formula_binary = None;
+            }
         }
     }
 
