@@ -2093,6 +2093,24 @@ impl<'a> FormulaCompiler<'a> {
         base_row: u32,
         base_col: u32,
     ) -> XlsbResult<CellParsedFormula> {
+        Self::compile_shared_with_optional_context(formula, base_row, base_col, None)
+    }
+
+    pub(crate) fn compile_shared_with_context(
+        formula: &'a str,
+        base_row: u32,
+        base_col: u32,
+        context: &'a FormulaCompilationContext<'a>,
+    ) -> XlsbResult<CellParsedFormula> {
+        Self::compile_shared_with_optional_context(formula, base_row, base_col, Some(context))
+    }
+
+    fn compile_shared_with_optional_context(
+        formula: &'a str,
+        base_row: u32,
+        base_col: u32,
+        context: Option<&'a FormulaCompilationContext<'a>>,
+    ) -> XlsbResult<CellParsedFormula> {
         if base_row >= 1_048_576 || base_col >= 16_384 {
             return Err(XlsbError::InvalidCellReference(format!(
                 "shared formula base ({base_row}, {base_col})"
@@ -2101,7 +2119,7 @@ impl<'a> FormulaCompiler<'a> {
         Self::compile_with_encoding(
             formula,
             FormulaEncoding::Shared { base_row, base_col },
-            None,
+            context,
         )
     }
 

@@ -835,12 +835,12 @@ impl XlsbWorkbookWriter {
                 sheet_ranges: &formula_sheet_ranges,
                 current_sheet,
             };
-            let compiled_positions = worksheet.compile_contextual_formulas(&formula_context)?;
+            let compiled_formulas = worksheet.compile_contextual_formulas(&formula_context)?;
             let write_result = {
                 let mut writer = RecordWriter::new(&mut sheet_data);
                 worksheet.write(&mut writer, &mut self.shared_strings)
             };
-            worksheet.clear_compiled_formulas(&compiled_positions);
+            worksheet.clear_compiled_formulas(compiled_formulas);
             write_result?;
             sheet_part.set_blob(sheet_data);
 
@@ -1128,6 +1128,84 @@ mod tests {
                     if formula == "SUM('Data Sheet:Summary'!A1)"
             ));
         }
+    }
+
+    #[test]
+    fn contextual_grouped_formulas_survive_package_roundtrip() {
+        use crate::xlsb::named_ranges::{NamedRange, create_area3d_formula};
+
+        let mut workbook = XlsbWorkbookWriter::new();
+        workbook.add_worksheet(MutableXlsbWorksheet::new("Data"));
+        workbook.add_worksheet(MutableXlsbWorksheet::new("Middle"));
+        workbook.add_named_range(
+            NamedRange::new("Rate".to_string(), None)
+                .with_formula(create_area3d_formula(0, 0, 0, 0, 0).unwrap()),
+        );
+        let mut summary = MutableXlsbWorksheet::new("Summary");
+        summary
+            .set_array_formula(0, 0, 0, 1, "SUM('Data:Middle'!A1)+Rate")
+            .unwrap();
+        summary
+            .set_shared_formula(0, 2, 1, 2, "Data!A1+$A1")
+            .unwrap();
+        summary.set_cell(
+            0,
+            3,
+            CellValue::Formula {
+                formula: "Middle!A1".to_string(),
+                cached_value: None,
+                is_array: true,
+                array_range: Some("D1:E1".to_string()),
+            },
+        );
+        workbook.add_worksheet(summary);
+
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let summary = reader.worksheet_by_index(2).unwrap();
+        for col in 0..=1 {
+            assert!(matches!(
+                summary.cell_value(0, col).unwrap().as_ref(),
+                CellValue::Formula {
+                    formula,
+                    is_array: true,
+                    array_range: Some(range),
+                    ..
+                } if formula == "(SUM('Data:Middle'!A1)+Rate)" && range == "A1:B1"
+            ));
+        }
+        assert!(matches!(
+            summary.cell_value(0, 2).unwrap().as_ref(),
+            CellValue::Formula { formula, is_array: false, .. }
+                if formula == "(Data!A1+$A1)"
+        ));
+        assert!(matches!(
+            summary.cell_value(1, 2).unwrap().as_ref(),
+            CellValue::Formula { formula, is_array: false, .. }
+                if formula == "(Data!A1+$A2)"
+        ));
+        for col in 3..=4 {
+            assert!(matches!(
+                summary.cell_value(0, col).unwrap().as_ref(),
+                CellValue::Formula {
+                    formula,
+                    is_array: true,
+                    array_range: Some(range),
+                    ..
+                } if formula == "Middle!A1" && range == "D1:E1"
+            ));
+        }
+
+        workbook.get_worksheet_mut(0).unwrap().set_name("Renamed");
+        assert!(workbook.save(Cursor::new(Vec::new())).is_err());
+
+        let mut invalid = MutableXlsbWorksheet::new("Invalid");
+        assert!(
+            invalid
+                .set_array_formula(0, 0, 0, 0, "NOT_A_REAL_FUNCTION(1)")
+                .is_err()
+        );
     }
 
     #[test]

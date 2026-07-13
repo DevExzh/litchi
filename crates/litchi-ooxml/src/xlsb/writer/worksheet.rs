@@ -116,6 +116,22 @@ pub struct MutableXlsbWorksheet {
     /// Array and shared formula definitions. Cell records contain only a
     /// `PtgExp` reference to one of these definitions.
     formula_groups: Vec<FormulaGroup>,
+    /// Original text for formula groups created through the text API. Binary
+    /// groups intentionally have no entry and are never recompiled.
+    formula_group_sources: BTreeMap<(u32, u32), String>,
+}
+
+pub(crate) struct ContextualFormulaRestore {
+    cell_positions: Vec<(u32, u32)>,
+    group_formulas: Vec<(usize, CellParsedFormula)>,
+}
+
+fn formula_requires_workbook_context(error: &XlsbError) -> bool {
+    matches!(
+        error,
+        XlsbError::UnsupportedFeature(message)
+            if message.ends_with("requires workbook compilation context")
+    )
 }
 
 impl MutableXlsbWorksheet {
@@ -144,22 +160,52 @@ impl MutableXlsbWorksheet {
             data_validations: Vec::new(),
             conditional_formattings: Vec::new(),
             formula_groups: Vec::new(),
+            formula_group_sources: BTreeMap::new(),
         }
     }
 
     pub(crate) fn compile_contextual_formulas(
         &mut self,
         context: &FormulaCompilationContext<'_>,
-    ) -> XlsbResult<Vec<(u32, u32)>> {
+    ) -> XlsbResult<ContextualFormulaRestore> {
+        let mut compiled_groups = Vec::new();
+        for (index, group) in self.formula_groups.iter().enumerate() {
+            let Some(source) = self.formula_group_sources.get(&group.range.top_left()) else {
+                continue;
+            };
+            let formula = match group.kind {
+                FormulaGroupKind::Array => FormulaCompiler::compile_with_context(source, context)?,
+                FormulaGroupKind::Shared => FormulaCompiler::compile_shared_with_context(
+                    source,
+                    group.range.row_first,
+                    group.range.col_first,
+                    context,
+                )?,
+            };
+            compiled_groups.push((index, formula));
+        }
+
         let mut compiled = Vec::new();
         for (&position, cell) in &self.cells {
             let CellValue::Formula {
-                formula, is_array, ..
+                formula,
+                is_array,
+                array_range,
+                ..
             } = &cell.value
             else {
                 continue;
             };
-            if cell.formula_binary.is_none() && !is_array {
+            let is_grouped = self
+                .formula_groups
+                .iter()
+                .any(|group| group.range.contains(position.0, position.1));
+            let is_array_anchor = *is_array
+                && array_range
+                    .as_deref()
+                    .and_then(|range| FormulaRange::parse_a1(range).ok())
+                    .is_some_and(|range| range.top_left() == position);
+            if cell.formula_binary.is_none() && (!is_array || is_array_anchor) && !is_grouped {
                 compiled.push((
                     position,
                     FormulaCompiler::compile_with_context(formula, context)?,
@@ -176,14 +222,27 @@ impl MutableXlsbWorksheet {
                 .expect("formula cell collected from worksheet")
                 .formula_binary = Some(formula);
         }
-        Ok(positions)
+        let group_formulas = compiled_groups
+            .into_iter()
+            .map(|(index, formula)| {
+                let old = std::mem::replace(&mut self.formula_groups[index].formula, formula);
+                (index, old)
+            })
+            .collect();
+        Ok(ContextualFormulaRestore {
+            cell_positions: positions,
+            group_formulas,
+        })
     }
 
-    pub(crate) fn clear_compiled_formulas(&mut self, positions: &[(u32, u32)]) {
-        for position in positions {
-            if let Some(cell) = self.cells.get_mut(position) {
+    pub(crate) fn clear_compiled_formulas(&mut self, restore: ContextualFormulaRestore) {
+        for position in restore.cell_positions {
+            if let Some(cell) = self.cells.get_mut(&position) {
                 cell.formula_binary = None;
             }
+        }
+        for (index, formula) in restore.group_formulas {
+            self.formula_groups[index].formula = formula;
         }
     }
 
@@ -278,14 +337,23 @@ impl MutableXlsbWorksheet {
         formula: &str,
     ) -> XlsbResult<()> {
         let range = FormulaRange::new(row_first, row_last, col_first, col_last)?;
-        let definition = FormulaCompiler::compile(formula)?;
+        let definition = match FormulaCompiler::compile(formula) {
+            Ok(definition) => definition,
+            Err(error) if formula_requires_workbook_context(&error) => {
+                FormulaCompiler::compile("0")?
+            },
+            Err(error) => return Err(error),
+        };
         let group = FormulaGroup {
             kind: FormulaGroupKind::Array,
             range,
             formula: definition,
             always_calculate: true,
         };
-        self.install_formula_group(group, Some(formula))
+        self.install_formula_group(group, Some(formula))?;
+        self.formula_group_sources
+            .insert(range.top_left(), formula.to_string());
+        Ok(())
     }
 
     /// Set an XLSB shared formula over an inclusive, 0-based cell range.
@@ -301,14 +369,23 @@ impl MutableXlsbWorksheet {
         formula: &str,
     ) -> XlsbResult<()> {
         let range = FormulaRange::new(row_first, row_last, col_first, col_last)?;
-        let definition = FormulaCompiler::compile_shared(formula, row_first, col_first)?;
+        let definition = match FormulaCompiler::compile_shared(formula, row_first, col_first) {
+            Ok(definition) => definition,
+            Err(error) if formula_requires_workbook_context(&error) => {
+                FormulaCompiler::compile_shared("0", row_first, col_first)?
+            },
+            Err(error) => return Err(error),
+        };
         let group = FormulaGroup {
             kind: FormulaGroupKind::Shared,
             range,
             formula: definition,
             always_calculate: false,
         };
-        self.install_formula_group(group, Some(formula))
+        self.install_formula_group(group, Some(formula))?;
+        self.formula_group_sources
+            .insert(range.top_left(), formula.to_string());
+        Ok(())
     }
 
     /// Set an array or shared formula from an already encoded definition.
@@ -339,6 +416,8 @@ impl MutableXlsbWorksheet {
             .position(|existing| existing.range.top_left() == group.range.top_left())
         {
             let replaced = self.formula_groups.remove(index);
+            self.formula_group_sources
+                .remove(&replaced.range.top_left());
             if replaced.kind == FormulaGroupKind::Array {
                 self.normalize_array_formula_ranges(&[replaced.range.to_a1()]);
             }
@@ -407,6 +486,12 @@ impl MutableXlsbWorksheet {
     }
 
     fn remove_formula_groups_containing(&mut self, row: u32, col: u32) {
+        let removed_anchors = self
+            .formula_groups
+            .iter()
+            .filter(|group| group.range.contains(row, col))
+            .map(|group| group.range.top_left())
+            .collect::<Vec<_>>();
         let removed_array_ranges: Vec<String> = self
             .formula_groups
             .iter()
@@ -415,6 +500,9 @@ impl MutableXlsbWorksheet {
             .collect();
         self.formula_groups
             .retain(|group| !group.range.contains(row, col));
+        for anchor in removed_anchors {
+            self.formula_group_sources.remove(&anchor);
+        }
         if removed_array_ranges.is_empty() {
             return;
         }
@@ -442,6 +530,7 @@ impl MutableXlsbWorksheet {
 
     fn dissolve_formula_groups_for_structure_change(&mut self) {
         self.formula_groups.clear();
+        self.formula_group_sources.clear();
         for cell in self.cells.values_mut() {
             if let CellValue::Formula {
                 is_array,
@@ -492,6 +581,7 @@ impl MutableXlsbWorksheet {
         self.data_validations.clear();
         self.conditional_formattings.clear();
         self.formula_groups.clear();
+        self.formula_group_sources.clear();
     }
 
     /// Set a custom column width (in character units) for a 0-based column.
@@ -1093,7 +1183,11 @@ impl MutableXlsbWorksheet {
             groups.push(FormulaGroup {
                 kind: FormulaGroupKind::Array,
                 range,
-                formula: FormulaCompiler::compile(formula)?,
+                formula: if let Some(formula) = &cell.formula_binary {
+                    formula.clone()
+                } else {
+                    FormulaCompiler::compile(formula)?
+                },
                 always_calculate: cached_value.is_none(),
             });
         }
