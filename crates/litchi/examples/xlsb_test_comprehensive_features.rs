@@ -125,7 +125,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cf_sales = ConditionalFormatting::new(vec!["B4:B8".to_string()]);
     let mut rule_sales = ConditionalFormattingRule::new(CfRuleType::CellIs, 2);
     rule_sales.operator = Some(5); // Greater than
-    rule_sales.formulas = vec![b"C4".to_vec()]; // Compare with target
+    rule_sales.formula_texts = vec!["C4".to_string()]; // Compare with target
     rule_sales.dxf_id = Some(0);
     cf_sales.rules.push(rule_sales);
     sheet.add_conditional_formatting(cf_sales);

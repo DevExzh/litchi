@@ -2,6 +2,7 @@
 
 use crate::xlsb::cell::XlsbCell;
 use crate::xlsb::comments::Comment;
+use crate::xlsb::conditional_formatting::ConditionalFormatting;
 use crate::xlsb::data_validation::{DataValidation, DataValidationSettings};
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
@@ -129,6 +130,7 @@ pub struct XlsbWorksheet {
     data_validations: Vec<DataValidation>,
     data_validation_settings: Option<DataValidationSettings>,
     data_validation14_settings: Option<DataValidationSettings>,
+    conditional_formattings: Vec<ConditionalFormatting>,
 }
 
 impl XlsbWorksheet {
@@ -150,6 +152,7 @@ impl XlsbWorksheet {
             data_validations: Vec::new(),
             data_validation_settings: None,
             data_validation14_settings: None,
+            conditional_formattings: Vec::new(),
         }
     }
 
@@ -212,6 +215,13 @@ impl XlsbWorksheet {
         self.data_validations = validations;
     }
 
+    pub(crate) fn set_conditional_formattings(
+        &mut self,
+        conditional_formattings: Vec<ConditionalFormatting>,
+    ) {
+        self.conditional_formattings = conditional_formattings;
+    }
+
     /// Get all merged cells
     pub fn merged_cells(&self) -> &[MergedCell] {
         &self.merged_cells
@@ -265,6 +275,11 @@ impl XlsbWorksheet {
     /// Worksheet-level UI settings for Office 2013 data validation.
     pub fn data_validation14_settings(&self) -> Option<DataValidationSettings> {
         self.data_validation14_settings
+    }
+
+    /// Conditional-formatting blocks in worksheet stream order.
+    pub fn conditional_formattings(&self) -> &[ConditionalFormatting] {
+        &self.conditional_formattings
     }
 }
 

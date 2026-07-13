@@ -308,6 +308,7 @@ pub mod record_types {
     pub const BEGIN_COLOR_SCALE: u16 = 0x01D5;
     pub const END_COLOR_SCALE: u16 = 0x01D6;
     pub const CFVO: u16 = 0x01D7;
+    pub const COLOR: u16 = 0x0234;
 
     // Protection
     pub const BOOK_PROTECTION: u16 = 0x0216;

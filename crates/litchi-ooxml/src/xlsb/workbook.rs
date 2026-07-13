@@ -503,6 +503,7 @@ impl XlsbWorkbook {
             cells_reader.data_validation14_settings,
             cells_reader.data_validations,
         );
+        worksheet.set_conditional_formattings(cells_reader.conditional_formattings);
 
         Ok(worksheet)
     }
@@ -1024,6 +1025,31 @@ mod tests {
             Some(litchi_core::sheet::CellValue::Float(11.0))
         ));
         assert!(formula_cells.iter().all(|cell| !cell.3.is_empty()));
+    }
+
+    #[test]
+    fn reads_conditional_formatting_from_real_workbook_fixture() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/ooxml/xlsb/cond_format.xlsb"
+        );
+        let workbook = XlsbWorkbook::new(File::open(path).unwrap()).unwrap();
+        let worksheet = workbook.worksheet(0).unwrap();
+        let formatting = worksheet.conditional_formattings();
+        assert_eq!(formatting.len(), 1);
+        assert_eq!(formatting[0].ranges, ["E3:E18"]);
+        assert!(!formatting[0].pivot_only);
+        assert_eq!(formatting[0].rules.len(), 1);
+        let rule = &formatting[0].rules[0];
+        assert_eq!(
+            rule.rule_type,
+            crate::xlsb::conditional_formatting::CfRuleType::CellIs
+        );
+        assert_eq!(rule.template, 0);
+        assert_eq!(rule.dxf_id, Some(0));
+        assert_eq!(rule.priority, 1);
+        assert_eq!(rule.parameter, 5);
+        assert_eq!(rule.formula_texts, ["5"]);
     }
 
     #[test]

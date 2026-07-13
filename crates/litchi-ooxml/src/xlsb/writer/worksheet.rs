@@ -1,7 +1,7 @@
 //! Mutable XLSB worksheet for CRUD operations
 
 use crate::xlsb::comments::Comment;
-use crate::xlsb::conditional_formatting::ConditionalFormatting;
+use crate::xlsb::conditional_formatting::{Cfvo, ConditionalFormatting, ConditionalFormattingRule};
 use crate::xlsb::data_validation::{DataValidation, DataValidationSettings};
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{
@@ -127,6 +127,42 @@ pub(crate) struct ContextualFormulaRestore {
     cell_positions: Vec<(u32, u32)>,
     group_formulas: Vec<(usize, CellParsedFormula)>,
     validation_formulas: Vec<(usize, bool, bool)>,
+    conditional_rule_formulas: Vec<(usize, usize)>,
+    conditional_value_formulas: Vec<(usize, usize, ConditionalValueLocation)>,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ConditionalValueLocation {
+    ColorScaleMin,
+    ColorScaleMid,
+    ColorScaleMax,
+    DataBarMin,
+    DataBarMax,
+    IconSet(usize),
+}
+
+fn conditional_value_mut(
+    rule: &mut ConditionalFormattingRule,
+    location: ConditionalValueLocation,
+) -> Option<&mut Cfvo> {
+    match location {
+        ConditionalValueLocation::ColorScaleMin => {
+            rule.color_scale.as_mut().map(|scale| &mut scale.min_cfvo)
+        },
+        ConditionalValueLocation::ColorScaleMid => rule
+            .color_scale
+            .as_mut()
+            .and_then(|scale| scale.mid_cfvo.as_mut()),
+        ConditionalValueLocation::ColorScaleMax => {
+            rule.color_scale.as_mut().map(|scale| &mut scale.max_cfvo)
+        },
+        ConditionalValueLocation::DataBarMin => rule.data_bar.as_mut().map(|bar| &mut bar.min_cfvo),
+        ConditionalValueLocation::DataBarMax => rule.data_bar.as_mut().map(|bar| &mut bar.max_cfvo),
+        ConditionalValueLocation::IconSet(index) => rule
+            .icon_set
+            .as_mut()
+            .and_then(|set| set.cfvos.get_mut(index)),
+    }
 }
 
 fn formula_requires_workbook_context(error: &XlsbError) -> bool {
@@ -243,6 +279,55 @@ impl MutableXlsbWorksheet {
                 compiled_validations.push((index, formula1, formula2));
             }
         }
+        let mut compiled_conditional_rules = Vec::new();
+        let mut compiled_conditional_values = Vec::new();
+        for (formatting_index, formatting) in self.conditional_formattings.iter().enumerate() {
+            for (rule_index, rule) in formatting.rules.iter().enumerate() {
+                if rule.formulas.is_empty() && !rule.formula_texts.is_empty() {
+                    let formulas = rule
+                        .formula_texts
+                        .iter()
+                        .map(|formula| FormulaCompiler::compile_with_context(formula, context))
+                        .collect::<XlsbResult<Vec<_>>>()?;
+                    compiled_conditional_rules.push((formatting_index, rule_index, formulas));
+                }
+                let mut values = Vec::new();
+                if let Some(scale) = &rule.color_scale {
+                    values.push((ConditionalValueLocation::ColorScaleMin, &scale.min_cfvo));
+                    if let Some(midpoint) = &scale.mid_cfvo {
+                        values.push((ConditionalValueLocation::ColorScaleMid, midpoint));
+                    }
+                    values.push((ConditionalValueLocation::ColorScaleMax, &scale.max_cfvo));
+                }
+                if let Some(bar) = &rule.data_bar {
+                    values.push((ConditionalValueLocation::DataBarMin, &bar.min_cfvo));
+                    values.push((ConditionalValueLocation::DataBarMax, &bar.max_cfvo));
+                }
+                if let Some(set) = &rule.icon_set {
+                    values.extend(
+                        set.cfvos.iter().enumerate().map(|(index, value)| {
+                            (ConditionalValueLocation::IconSet(index), value)
+                        }),
+                    );
+                }
+                for (location, value) in values {
+                    let source = value.value.as_deref().filter(|source| {
+                        value.formula_binary.is_none()
+                            && (value.cfvo_type == 7
+                                || (matches!(value.cfvo_type, 1 | 4 | 5)
+                                    && source.parse::<f64>().is_err()))
+                    });
+                    if let Some(source) = source {
+                        compiled_conditional_values.push((
+                            formatting_index,
+                            rule_index,
+                            location,
+                            FormulaCompiler::compile_with_context(source, context)?,
+                        ));
+                    }
+                }
+            }
+        }
         let positions = compiled
             .iter()
             .map(|(position, _)| *position)
@@ -273,10 +358,36 @@ impl MutableXlsbWorksheet {
                 restore
             })
             .collect();
+        let conditional_rule_formulas = compiled_conditional_rules
+            .into_iter()
+            .map(|(formatting_index, rule_index, formulas)| {
+                let rule = &mut self.conditional_formattings[formatting_index].rules[rule_index];
+                rule.formulas = formulas
+                    .iter()
+                    .map(|formula| formula.rgce.clone())
+                    .collect();
+                rule.formula_extras = formulas.into_iter().map(|formula| formula.rgcb).collect();
+                (formatting_index, rule_index)
+            })
+            .collect();
+        let conditional_value_formulas = compiled_conditional_values
+            .into_iter()
+            .map(|(formatting_index, rule_index, location, formula)| {
+                conditional_value_mut(
+                    &mut self.conditional_formattings[formatting_index].rules[rule_index],
+                    location,
+                )
+                .expect("conditional value collected from worksheet")
+                .formula_binary = Some(formula);
+                (formatting_index, rule_index, location)
+            })
+            .collect();
         Ok(ContextualFormulaRestore {
             cell_positions: positions,
             group_formulas,
             validation_formulas,
+            conditional_rule_formulas,
+            conditional_value_formulas,
         })
     }
 
@@ -295,6 +406,19 @@ impl MutableXlsbWorksheet {
             }
             if clear_second {
                 self.data_validations[index].formula2_binary = None;
+            }
+        }
+        for (formatting_index, rule_index) in restore.conditional_rule_formulas {
+            let rule = &mut self.conditional_formattings[formatting_index].rules[rule_index];
+            rule.formulas.clear();
+            rule.formula_extras.clear();
+        }
+        for (formatting_index, rule_index, location) in restore.conditional_value_formulas {
+            if let Some(value) = conditional_value_mut(
+                &mut self.conditional_formattings[formatting_index].rules[rule_index],
+                location,
+            ) {
+                value.formula_binary = None;
             }
         }
     }

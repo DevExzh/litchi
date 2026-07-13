@@ -1,6 +1,10 @@
 //! XLSB cells reader implementation
 
 use crate::xlsb::cell::{CellHeader, XlsbCell};
+use crate::xlsb::conditional_formatting::{
+    Cfvo, ColorScale, ConditionalFormatColor, ConditionalFormatting, ConditionalFormattingRule,
+    DataBar, IconSet, parse_classic_header,
+};
 use crate::xlsb::data_validation::{
     DataValidation, DataValidationSettings, parse_collection_settings, parse_dval_list,
 };
@@ -78,6 +82,8 @@ where
     pub data_validation_settings: Option<DataValidationSettings>,
     /// UI settings from the Office 2013 validation collection.
     pub data_validation14_settings: Option<DataValidationSettings>,
+    /// Classic conditional-formatting blocks in stream order.
+    pub conditional_formattings: Vec<ConditionalFormatting>,
 }
 
 impl<'a, RS> XlsbCellsReader<'a, RS>
@@ -144,6 +150,7 @@ where
             data_validations: Vec::new(),
             data_validation_settings: None,
             data_validation14_settings: None,
+            conditional_formattings: Vec::new(),
         })
     }
 
@@ -845,6 +852,11 @@ where
                     self.data_validation14_settings = Some(settings);
                     self.consume_extension_data_validations(count)?;
                 },
+                record_types::BEGIN_COND_FORMATTING => {
+                    let (mut formatting, count, base) = parse_classic_header(&self.buf)?;
+                    self.consume_conditional_formatting(&mut formatting, count, base)?;
+                    self.conditional_formattings.push(formatting);
+                },
                 0x0082 => {
                     // BrtEndSheet - end of worksheet
                     break;
@@ -955,6 +967,343 @@ where
             });
         }
         Ok(())
+    }
+
+    fn consume_conditional_formatting(
+        &mut self,
+        formatting: &mut ConditionalFormatting,
+        expected_count: u32,
+        base: (u32, u32),
+    ) -> XlsbResult<()> {
+        loop {
+            self.buf.clear();
+            let typ = self.iter.read_type()?;
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
+            match typ {
+                record_types::BEGIN_CF_RULE => {
+                    let mut rule = ConditionalFormattingRule::parse_with_context(
+                        &self.buf,
+                        base,
+                        self.formula_context,
+                    )?;
+                    if formatting
+                        .rules
+                        .iter()
+                        .chain(self.conditional_formattings.iter().flat_map(|cf| &cf.rules))
+                        .any(|existing| existing.priority == rule.priority)
+                    {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtBeginCFRule priority".to_string(),
+                            val: format!("duplicate {}", rule.priority),
+                        });
+                    }
+                    self.consume_conditional_rule(&mut rule, base)?;
+                    formatting.rules.push(rule);
+                },
+                record_types::END_COND_FORMATTING => {
+                    if !self.buf.is_empty() {
+                        return Err(XlsbError::InvalidLength {
+                            expected: 0,
+                            found: self.buf.len(),
+                        });
+                    }
+                    break;
+                },
+                _ => {
+                    return Err(XlsbError::Unrecognized {
+                        typ: "BrtBeginConditionalFormatting collection".to_string(),
+                        val: format!("unexpected record 0x{typ:04X}"),
+                    });
+                },
+            }
+        }
+        if formatting.rules.len() != expected_count as usize {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginConditionalFormatting count".to_string(),
+                val: format!(
+                    "declared {expected_count}, found {}",
+                    formatting.rules.len()
+                ),
+            });
+        }
+        Ok(())
+    }
+
+    fn consume_conditional_rule(
+        &mut self,
+        rule: &mut ConditionalFormattingRule,
+        base: (u32, u32),
+    ) -> XlsbResult<()> {
+        loop {
+            self.buf.clear();
+            let typ = self.iter.read_type()?;
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
+            match typ {
+                record_types::BEGIN_COLOR_SCALE => {
+                    if rule.color_scale.is_some() || !self.buf.is_empty() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtBeginColorScale".to_string(),
+                            val: "duplicate record or nonempty payload".to_string(),
+                        });
+                    }
+                    rule.color_scale = Some(self.consume_color_scale(base)?);
+                },
+                record_types::BEGIN_DATABAR => {
+                    if rule.data_bar.is_some() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtBeginDatabar".to_string(),
+                            val: "duplicate record".to_string(),
+                        });
+                    }
+                    let begin = self.buf.clone();
+                    rule.data_bar = Some(self.consume_data_bar(&begin, base)?);
+                },
+                record_types::BEGIN_ICON_SET => {
+                    if rule.icon_set.is_some() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtBeginIconSet".to_string(),
+                            val: "duplicate record".to_string(),
+                        });
+                    }
+                    let begin = self.buf.clone();
+                    rule.icon_set = Some(self.consume_icon_set(&begin, base)?);
+                },
+                record_types::END_CF_RULE => {
+                    if !self.buf.is_empty() {
+                        return Err(XlsbError::InvalidLength {
+                            expected: 0,
+                            found: self.buf.len(),
+                        });
+                    }
+                    break;
+                },
+                _ => {
+                    return Err(XlsbError::Unrecognized {
+                        typ: "BrtBeginCFRule collection".to_string(),
+                        val: format!("unexpected record 0x{typ:04X}"),
+                    });
+                },
+            }
+        }
+        let valid_visual = match rule.rule_type {
+            crate::xlsb::conditional_formatting::CfRuleType::ColorScale => {
+                rule.color_scale.is_some() && rule.data_bar.is_none() && rule.icon_set.is_none()
+            },
+            crate::xlsb::conditional_formatting::CfRuleType::DataBar => {
+                rule.color_scale.is_none() && rule.data_bar.is_some() && rule.icon_set.is_none()
+            },
+            crate::xlsb::conditional_formatting::CfRuleType::IconSet => {
+                rule.color_scale.is_none() && rule.data_bar.is_none() && rule.icon_set.is_some()
+            },
+            _ => rule.color_scale.is_none() && rule.data_bar.is_none() && rule.icon_set.is_none(),
+        };
+        if !valid_visual {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginCFRule collection".to_string(),
+                val: "visualization records do not match rule type".to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    fn consume_color_scale(&mut self, base: (u32, u32)) -> XlsbResult<ColorScale> {
+        let mut cfvos = Vec::new();
+        let mut colors = Vec::new();
+        loop {
+            self.buf.clear();
+            let typ = self.iter.read_type()?;
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
+            match typ {
+                record_types::CFVO if colors.is_empty() => cfvos.push(Cfvo::parse_with_context(
+                    &self.buf,
+                    base,
+                    self.formula_context,
+                )?),
+                record_types::COLOR => colors.push(ConditionalFormatColor::parse(&self.buf)?),
+                record_types::END_COLOR_SCALE if self.buf.is_empty() => break,
+                _ => {
+                    return Err(XlsbError::Unrecognized {
+                        typ: "BrtBeginColorScale collection".to_string(),
+                        val: format!("unexpected record 0x{typ:04X}"),
+                    });
+                },
+            }
+        }
+        if !(cfvos.len() == 2 || cfvos.len() == 3) || colors.len() != cfvos.len() {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginColorScale collection".to_string(),
+                val: format!("{} thresholds and {} colors", cfvos.len(), colors.len()),
+            });
+        }
+        if cfvos.first().is_some_and(|cfvo| cfvo.cfvo_type == 3)
+            || cfvos.last().is_some_and(|cfvo| cfvo.cfvo_type == 2)
+            || (cfvos.len() == 3 && matches!(cfvos[1].cfvo_type, 2 | 3))
+        {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginColorScale collection".to_string(),
+                val: "invalid min/mid/max threshold type".to_string(),
+            });
+        }
+        let has_middle = colors.len() == 3;
+        let mut cfvos = cfvos.into_iter();
+        let min_cfvo = cfvos.next().ok_or_else(|| XlsbError::Unrecognized {
+            typ: "BrtBeginColorScale collection".to_string(),
+            val: "missing minimum threshold".to_string(),
+        })?;
+        let middle_cfvo = if has_middle { cfvos.next() } else { None };
+        let max_cfvo = cfvos.next().ok_or_else(|| XlsbError::Unrecognized {
+            typ: "BrtBeginColorScale collection".to_string(),
+            val: "missing maximum threshold".to_string(),
+        })?;
+        let mut colors = colors.into_iter();
+        let min_color_record = colors.next().ok_or_else(|| XlsbError::Unrecognized {
+            typ: "BrtBeginColorScale collection".to_string(),
+            val: "missing minimum color".to_string(),
+        })?;
+        let mid_color_record = if has_middle { colors.next() } else { None };
+        let max_color_record = colors.next().ok_or_else(|| XlsbError::Unrecognized {
+            typ: "BrtBeginColorScale collection".to_string(),
+            val: "missing maximum color".to_string(),
+        })?;
+        Ok(ColorScale {
+            min_cfvo,
+            mid_cfvo: middle_cfvo,
+            max_cfvo,
+            min_color: min_color_record.argb.unwrap_or(0),
+            mid_color: mid_color_record.and_then(|color| color.argb),
+            max_color: max_color_record.argb.unwrap_or(0),
+            min_color_record,
+            mid_color_record,
+            max_color_record,
+        })
+    }
+
+    fn consume_data_bar(&mut self, begin: &[u8], base: (u32, u32)) -> XlsbResult<DataBar> {
+        if begin.len() != 3 || begin[0] > begin[1] || begin[1] > 100 || begin[2] > 1 {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginDatabar".to_string(),
+                val: "invalid width or show-value field".to_string(),
+            });
+        }
+        let mut cfvos = Vec::new();
+        let mut color = None;
+        loop {
+            self.buf.clear();
+            let typ = self.iter.read_type()?;
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
+            match typ {
+                record_types::CFVO if color.is_none() => cfvos.push(Cfvo::parse_with_context(
+                    &self.buf,
+                    base,
+                    self.formula_context,
+                )?),
+                record_types::COLOR if color.is_none() => {
+                    color = Some(ConditionalFormatColor::parse(&self.buf)?)
+                },
+                record_types::END_DATABAR if self.buf.is_empty() => break,
+                _ => {
+                    return Err(XlsbError::Unrecognized {
+                        typ: "BrtBeginDatabar collection".to_string(),
+                        val: format!("unexpected record 0x{typ:04X}"),
+                    });
+                },
+            }
+        }
+        if cfvos.len() != 2 || color.is_none() {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginDatabar collection".to_string(),
+                val: format!("{} thresholds, color={}", cfvos.len(), color.is_some()),
+            });
+        }
+        if cfvos[0].cfvo_type == 3 || cfvos[1].cfvo_type == 2 {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginDatabar collection".to_string(),
+                val: "invalid minimum/maximum threshold type".to_string(),
+            });
+        }
+        let [min_cfvo, max_cfvo]: [Cfvo; 2] =
+            cfvos.try_into().map_err(|_| XlsbError::Unrecognized {
+                typ: "BrtBeginDatabar collection".to_string(),
+                val: "invalid threshold count".to_string(),
+            })?;
+        let color_record = color.ok_or_else(|| XlsbError::Unrecognized {
+            typ: "BrtBeginDatabar collection".to_string(),
+            val: "missing color".to_string(),
+        })?;
+        Ok(DataBar {
+            min_cfvo,
+            max_cfvo,
+            color: color_record.argb.unwrap_or(0),
+            show_value: begin[2] != 0,
+            min_length: begin[0],
+            max_length: begin[1],
+            color_record,
+        })
+    }
+
+    fn consume_icon_set(&mut self, begin: &[u8], base: (u32, u32)) -> XlsbResult<IconSet> {
+        if begin.len() != 6 {
+            return Err(XlsbError::InvalidLength {
+                expected: 6,
+                found: begin.len(),
+            });
+        }
+        let icon_set = binary::read_u32_le_at(begin, 0)?;
+        let flags = binary::read_u16_le_at(begin, 4)?;
+        if icon_set > 16 || flags & !0x7e != 0 {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginIconSet".to_string(),
+                val: format!("set {icon_set}, flags 0x{flags:04X}"),
+            });
+        }
+        let expected = if icon_set <= 7 {
+            3
+        } else if icon_set <= 12 {
+            4
+        } else {
+            5
+        };
+        let mut cfvos = Vec::new();
+        loop {
+            self.buf.clear();
+            let typ = self.iter.read_type()?;
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
+            match typ {
+                record_types::CFVO => cfvos.push(Cfvo::parse_with_context(
+                    &self.buf,
+                    base,
+                    self.formula_context,
+                )?),
+                record_types::END_ICON_SET if self.buf.is_empty() => break,
+                _ => {
+                    return Err(XlsbError::Unrecognized {
+                        typ: "BrtBeginIconSet collection".to_string(),
+                        val: format!("unexpected record 0x{typ:04X}"),
+                    });
+                },
+            }
+        }
+        if cfvos.len() != expected {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginIconSet collection".to_string(),
+                val: format!("expected {expected} thresholds, found {}", cfvos.len()),
+            });
+        }
+        if cfvos
+            .iter()
+            .any(|cfvo| matches!(cfvo.cfvo_type, 2 | 3) || !cfvo.save_greater_than_or_equal)
+        {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginIconSet collection".to_string(),
+                val: "invalid threshold type or fSaveGTE flag".to_string(),
+            });
+        }
+        Ok(IconSet {
+            icon_set_type: icon_set as u8,
+            cfvos,
+            show_value: flags & 0x02 == 0,
+            reverse: flags & 0x04 == 0,
+        })
     }
 
     fn parse_auto_filter(data: &[u8]) -> XlsbResult<XlsbAutoFilter> {
@@ -1415,5 +1764,76 @@ mod tests {
             reader.next_cell(),
             Err(XlsbError::Unrecognized { .. })
         ));
+    }
+
+    #[test]
+    fn rejects_conditional_formatting_with_a_mismatched_rule_count() {
+        let mut worksheet = Vec::new();
+        let mut writer = RecordWriter::new(&mut worksheet);
+        writer.write_record(0x0094, &[0; 16]).unwrap();
+        writer.write_record(0x0091, &[]).unwrap();
+        writer.write_record(0x0092, &[]).unwrap();
+        let mut begin = 1u32.to_le_bytes().to_vec();
+        begin.extend_from_slice(&0u32.to_le_bytes());
+        begin.extend_from_slice(&1u32.to_le_bytes());
+        begin.extend_from_slice(&[0; 16]);
+        writer
+            .write_record(record_types::BEGIN_COND_FORMATTING, &begin)
+            .unwrap();
+        writer
+            .write_record(record_types::END_COND_FORMATTING, &[])
+            .unwrap();
+        writer.write_record(0x0082, &[]).unwrap();
+
+        let formula_context = FormulaResolutionContext::default();
+        let iter = RecordIter::new(std::io::Cursor::new(worksheet));
+        let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
+        assert!(matches!(
+            reader.next_cell(),
+            Err(XlsbError::Unrecognized { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_incomplete_color_scale_collection() {
+        let mut worksheet = Vec::new();
+        let mut writer = RecordWriter::new(&mut worksheet);
+        writer.write_record(0x0094, &[0; 16]).unwrap();
+        writer.write_record(0x0091, &[]).unwrap();
+        writer.write_record(0x0092, &[]).unwrap();
+        let mut begin = 1u32.to_le_bytes().to_vec();
+        begin.extend_from_slice(&0u32.to_le_bytes());
+        begin.extend_from_slice(&1u32.to_le_bytes());
+        begin.extend_from_slice(&[0; 16]);
+        writer
+            .write_record(record_types::BEGIN_COND_FORMATTING, &begin)
+            .unwrap();
+
+        let mut rule = 3u32.to_le_bytes().to_vec();
+        rule.extend_from_slice(&2u32.to_le_bytes());
+        rule.extend_from_slice(&u32::MAX.to_le_bytes());
+        rule.extend_from_slice(&1u32.to_le_bytes());
+        rule.extend_from_slice(&[0; 10]);
+        rule.extend_from_slice(&[0; 12]);
+        rule.extend_from_slice(&u32::MAX.to_le_bytes());
+        writer
+            .write_record(record_types::BEGIN_CF_RULE, &rule)
+            .unwrap();
+        writer
+            .write_record(record_types::BEGIN_COLOR_SCALE, &[])
+            .unwrap();
+        writer
+            .write_record(record_types::END_COLOR_SCALE, &[])
+            .unwrap();
+        writer.write_record(record_types::END_CF_RULE, &[]).unwrap();
+        writer
+            .write_record(record_types::END_COND_FORMATTING, &[])
+            .unwrap();
+        writer.write_record(0x0082, &[]).unwrap();
+
+        let formula_context = FormulaResolutionContext::default();
+        let iter = RecordIter::new(std::io::Cursor::new(worksheet));
+        let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
+        assert!(reader.next_cell().is_err());
     }
 }

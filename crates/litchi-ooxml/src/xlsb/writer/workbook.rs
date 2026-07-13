@@ -949,6 +949,10 @@ impl Default for XlsbWorkbookWriter {
 mod tests {
     use super::*;
     use crate::xlsb::comments::Comment;
+    use crate::xlsb::conditional_formatting::{
+        CfRuleType, Cfvo, ColorScale, ConditionalFormatting, ConditionalFormattingRule, DataBar,
+        IconSet,
+    };
     use crate::xlsb::data_validation::{
         DataValidation, DataValidationRecordKind, DataValidationSettings,
     };
@@ -1162,6 +1166,73 @@ mod tests {
                 prompt_y: 24,
             })
         );
+    }
+
+    #[test]
+    fn classic_conditional_formatting_survives_package_roundtrip() {
+        let mut workbook = XlsbWorkbookWriter::new();
+        let mut sheet = MutableXlsbWorksheet::new("Formatted");
+        sheet.set_cell(0, 0, 5);
+        let mut formatting = ConditionalFormatting::new(vec!["A1:A10 C1:C10".to_string()]);
+        formatting.pivot_only = true;
+
+        let mut expression = ConditionalFormattingRule::new(CfRuleType::Expression, 1);
+        expression.formula_texts.push("Source!A1>0".to_string());
+        expression.stop_if_true = true;
+        formatting.add_rule(expression);
+
+        let mut scale = ConditionalFormattingRule::new(CfRuleType::ColorScale, 2);
+        scale.color_scale = Some(ColorScale::new(
+            Cfvo::new(2, None),
+            Cfvo::new(7, Some("Source!A1".to_string())),
+            0xffff_0000,
+            0xff00_ff00,
+        ));
+        formatting.add_rule(scale);
+
+        let mut bar = ConditionalFormattingRule::new(CfRuleType::DataBar, 3);
+        bar.data_bar = Some(DataBar::new(
+            Cfvo::new(2, None),
+            Cfvo::new(3, None),
+            0xff44_72c4,
+        ));
+        formatting.add_rule(bar);
+
+        let mut icons = ConditionalFormattingRule::new(CfRuleType::IconSet, 4);
+        icons.icon_set = Some(IconSet::new(
+            0,
+            vec![
+                Cfvo::new(1, Some("0".to_string())),
+                Cfvo::new(4, Some("33".to_string())),
+                Cfvo::new(4, Some("67".to_string())),
+            ],
+        ));
+        formatting.add_rule(icons);
+        sheet.add_conditional_formatting(formatting);
+        workbook.add_worksheet(sheet);
+
+        let mut source = MutableXlsbWorksheet::new("Source");
+        source.set_cell(0, 0, 10);
+        workbook.add_worksheet(source);
+
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let worksheet = reader.worksheet(0).unwrap();
+        let formatting = &worksheet.conditional_formattings()[0];
+        assert_eq!(formatting.ranges, ["A1:A10", "C1:C10"]);
+        assert!(formatting.pivot_only);
+        assert_eq!(formatting.rules.len(), 4);
+        assert_eq!(formatting.rules[0].formula_texts, ["(Source!A1>0)"]);
+        assert!(formatting.rules[0].stop_if_true);
+        let scale = formatting.rules[1].color_scale.as_ref().unwrap();
+        assert_eq!(scale.max_cfvo.value.as_deref(), Some("Source!A1"));
+        assert_eq!(scale.min_color, 0xffff_0000);
+        assert_eq!(scale.max_color, 0xff00_ff00);
+        assert!(formatting.rules[2].data_bar.is_some());
+        let icons = formatting.rules[3].icon_set.as_ref().unwrap();
+        assert_eq!(icons.icon_set_type, 0);
+        assert_eq!(icons.cfvos.len(), 3);
     }
 
     #[test]
