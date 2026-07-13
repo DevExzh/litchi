@@ -142,6 +142,13 @@ pub mod record_types {
     pub const COL_INFO: u16 = 0x003C;
     pub const CELL_R_STRING: u16 = 0x003E;
 
+    // Extension wrappers
+    pub const FRT_BEGIN: u16 = 0x0023;
+    pub const FRT_END: u16 = 0x0024;
+    pub const AC_BEGIN: u16 = 0x0025;
+    pub const AC_END: u16 = 0x0026;
+    pub const UID: u16 = 0x028B;
+
     // Workbook structure records
     pub const FILE_VERSION: u16 = 0x0080;
     pub const BEGIN_SHEET: u16 = 0x0081;

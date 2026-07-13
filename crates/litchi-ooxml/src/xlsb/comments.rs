@@ -25,6 +25,8 @@ pub struct Comment {
     pub runs: Vec<SharedStringRun>,
     /// Comment identifier used by shared-workbook metadata.
     pub guid: [u8; 16],
+    /// Optional identifier carried by an alternate-content `BrtUid` record.
+    pub alternate_guid: Option<[u8; 16]>,
     /// Whether comment is visible
     pub visible: bool,
 }
@@ -47,6 +49,7 @@ impl Comment {
             text,
             runs: Vec::new(),
             guid: [0; 16],
+            alternate_guid: None,
             visible: false,
         }
     }
@@ -83,10 +86,48 @@ pub(crate) fn read_comments(reader: impl Read) -> XlsbResult<Vec<Comment>> {
     expect(&records, &mut pos, record_types::BEGIN_COMMENT_LIST)?;
     let mut comments = Vec::new();
     let mut cells = HashSet::new();
-    while records
-        .get(pos)
-        .is_some_and(|r| r.header.record_type == record_types::BEGIN_COMMENT)
-    {
+    loop {
+        let alternate_guid = if records
+            .get(pos)
+            .is_some_and(|r| r.header.record_type == record_types::AC_BEGIN)
+        {
+            pos += 1;
+            let mut uid = None;
+            while records
+                .get(pos)
+                .is_some_and(|record| record.header.record_type != record_types::AC_END)
+            {
+                let record = &records[pos];
+                if record.header.record_type == record_types::UID {
+                    if record.data.len() != 16 || uid.is_some() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "ACUID BrtUid".to_string(),
+                            val: "invalid or duplicate UID".to_string(),
+                        });
+                    }
+                    let mut value = [0; 16];
+                    value.copy_from_slice(&record.data);
+                    uid = Some(value);
+                }
+                pos += 1;
+            }
+            expect(&records, &mut pos, record_types::AC_END)?;
+            uid
+        } else {
+            None
+        };
+        if records
+            .get(pos)
+            .is_none_or(|r| r.header.record_type != record_types::BEGIN_COMMENT)
+        {
+            if alternate_guid.is_some() {
+                return Err(XlsbError::Unrecognized {
+                    typ: "ACUID".to_string(),
+                    val: "not followed by BrtBeginComment".to_string(),
+                });
+            }
+            break;
+        }
         let begin = &records[pos];
         pos += 1;
         if begin.data.len() != 36 {
@@ -143,10 +184,30 @@ pub(crate) fn read_comments(reader: impl Read) -> XlsbResult<Vec<Comment>> {
             text: rich.text,
             runs: rich.runs,
             guid,
+            alternate_guid,
             visible: false,
         });
     }
     expect(&records, &mut pos, record_types::END_COMMENT_LIST)?;
+    while records
+        .get(pos)
+        .is_some_and(|record| record.header.record_type == record_types::FRT_BEGIN)
+    {
+        if records[pos].data.len() != 4 {
+            return Err(XlsbError::InvalidLength {
+                expected: 4,
+                found: records[pos].data.len(),
+            });
+        }
+        pos += 1;
+        while records
+            .get(pos)
+            .is_some_and(|record| record.header.record_type != record_types::FRT_END)
+        {
+            pos += 1;
+        }
+        expect(&records, &mut pos, record_types::FRT_END)?;
+    }
     expect(&records, &mut pos, record_types::END_COMMENTS)?;
     if pos != records.len() {
         return Err(XlsbError::Unrecognized {
@@ -247,5 +308,58 @@ mod tests {
         assert_eq!(comment.col, 0);
         assert_eq!(comment.author, "John");
         assert!(!comment.visible);
+    }
+
+    #[test]
+    fn reads_alternate_uid_and_future_record_wrappers() {
+        let mut bytes = Vec::new();
+        let mut writer = RecordWriter::new(&mut bytes);
+        writer
+            .write_record(record_types::BEGIN_COMMENTS, &[])
+            .unwrap();
+        writer
+            .write_record(record_types::BEGIN_COMMENT_AUTHORS, &[])
+            .unwrap();
+        writer
+            .write_record(record_types::COMMENT_AUTHOR, &0u32.to_le_bytes())
+            .unwrap();
+        writer
+            .write_record(record_types::END_COMMENT_AUTHORS, &[])
+            .unwrap();
+        writer
+            .write_record(record_types::BEGIN_COMMENT_LIST, &[])
+            .unwrap();
+        writer
+            .write_record(record_types::AC_BEGIN, &[0; 4])
+            .unwrap();
+        writer.write_record(record_types::UID, &[9; 16]).unwrap();
+        writer.write_record(record_types::AC_END, &[]).unwrap();
+        let mut begin = Vec::new();
+        begin.extend_from_slice(&0u32.to_le_bytes());
+        begin.extend_from_slice(&2u32.to_le_bytes());
+        begin.extend_from_slice(&2u32.to_le_bytes());
+        begin.extend_from_slice(&3u32.to_le_bytes());
+        begin.extend_from_slice(&3u32.to_le_bytes());
+        begin.extend_from_slice(&[7; 16]);
+        writer
+            .write_record(record_types::BEGIN_COMMENT, &begin)
+            .unwrap();
+        writer.write_record(record_types::END_COMMENT, &[]).unwrap();
+        writer
+            .write_record(record_types::END_COMMENT_LIST, &[])
+            .unwrap();
+        writer
+            .write_record(record_types::FRT_BEGIN, &[0; 4])
+            .unwrap();
+        writer.write_record(record_types::UID, &[1; 16]).unwrap();
+        writer.write_record(record_types::FRT_END, &[]).unwrap();
+        writer
+            .write_record(record_types::END_COMMENTS, &[])
+            .unwrap();
+
+        let comments = read_comments(bytes.as_slice()).unwrap();
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].alternate_guid, Some([9; 16]));
+        assert_eq!(comments[0].guid, [7; 16]);
     }
 }
