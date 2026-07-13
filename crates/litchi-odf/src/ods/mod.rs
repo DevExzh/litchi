@@ -60,6 +60,7 @@
 mod annotation;
 mod builder;
 mod cell;
+mod data_validation;
 /// OpenFormula parsing and support
 pub mod formula;
 mod mutable;
@@ -72,6 +73,12 @@ mod spreadsheet;
 pub use annotation::{AnnotationElement, AnnotationNode, CellAnnotation};
 pub use builder::SpreadsheetBuilder;
 pub use cell::{Cell, CellValue};
+pub use data_validation::{
+    ContentValidation, ValidationDisplayList, ValidationErrorMacro, ValidationErrorMessage,
+    ValidationEventListener, ValidationMessage, ValidationMessageType,
+    ValidationPresentationEventListener, ValidationPresentationSound,
+    ValidationScriptEventListener,
+};
 pub use mutable::MutableSpreadsheet;
 pub use named_expression::{
     FormulaNamespace, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,

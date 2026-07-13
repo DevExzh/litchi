@@ -72,7 +72,8 @@ impl OdsParser {
                                 current_row = Some(RowBuilder::new());
                             },
                             b"table:table-cell" if current_row.is_some() => {
-                                let cell_builder = Self::parse_cell_attributes(e)?;
+                                let cell_builder =
+                                    Self::parse_cell_attributes(e, reader.decoder())?;
                                 current_cell = Some(cell_builder);
                                 text_content.clear();
                             },
@@ -104,7 +105,7 @@ impl OdsParser {
                     } else if text_element_depth > 0 {
                         Self::push_text_empty_element(e, reader.decoder(), &mut text_content)?;
                     } else if e.name().as_ref() == b"table:table-cell" && current_row.is_some() {
-                        let cell_builder = Self::parse_cell_attributes(e)?;
+                        let cell_builder = Self::parse_cell_attributes(e, reader.decoder())?;
                         if let Some(row) = current_row.as_mut() {
                             for _ in 0..cell_builder.repeated {
                                 row.add_cell(cell_builder.build(""));
@@ -555,11 +556,15 @@ impl OdsParser {
     }
 
     /// Parse cell attributes and create a CellBuilder
-    fn parse_cell_attributes(e: &quick_xml::events::BytesStart) -> Result<CellBuilder> {
+    fn parse_cell_attributes(
+        e: &quick_xml::events::BytesStart,
+        decoder: Decoder,
+    ) -> Result<CellBuilder> {
         let mut value_type = None;
         let mut value_str = None;
         let mut currency = None;
         let mut formula = None;
+        let mut validation_name = None;
         let mut repeated = 1;
 
         for attr_result in e.attributes() {
@@ -590,6 +595,17 @@ impl OdsParser {
                             .map_err(|_| Error::InvalidFormat("Invalid UTF-8".to_string()))?,
                     );
                 },
+                b"table:content-validation-name" => {
+                    validation_name = Some(
+                        attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+                            .map_err(|error| {
+                                Error::InvalidFormat(format!(
+                                    "invalid content-validation name: {error}"
+                                ))
+                            })?
+                            .into_owned(),
+                    );
+                },
                 b"table:number-columns-repeated" => {
                     if let Ok(rep) = String::from_utf8(attr.value.to_vec())
                         .map_err(|_| Error::InvalidFormat("Invalid UTF-8".to_string()))?
@@ -607,6 +623,7 @@ impl OdsParser {
             value_str,
             currency,
             formula,
+            validation_name,
             repeated,
             annotation: None,
         })
@@ -680,6 +697,7 @@ pub(crate) struct CellBuilder {
     value_str: Option<String>,
     currency: Option<String>,
     formula: Option<String>,
+    validation_name: Option<String>,
     repeated: usize,
     annotation: Option<super::CellAnnotation>,
 }
@@ -694,6 +712,7 @@ impl CellBuilder {
             // Clone necessary: formula may be reused for repeated cells
             formula: self.formula.clone(),
             annotation: self.annotation.clone(),
+            validation_name: self.validation_name.clone(),
             row: 0, // Will be set by parent
             col: 0, // Will be set by parent
         }
@@ -1109,6 +1128,7 @@ mod tests {
                 text: "A1".to_string(),
                 formula: None,
                 annotation: None,
+                validation_name: None,
                 row: 0,
                 col: 0,
             }],
@@ -1132,6 +1152,7 @@ mod tests {
             text: "A".to_string(),
             formula: None,
             annotation: None,
+            validation_name: None,
             row: 0,
             col: 0,
         };
@@ -1142,6 +1163,7 @@ mod tests {
             text: "42".to_string(),
             formula: None,
             annotation: None,
+            validation_name: None,
             row: 0,
             col: 0,
         };
@@ -1162,6 +1184,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            validation_name: None,
             repeated: 1,
         };
         let cell = builder.build("123.45");
@@ -1177,6 +1200,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            validation_name: None,
             repeated: 1,
         };
         let cell = builder.build("99.99");
@@ -1192,6 +1216,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            validation_name: None,
             repeated: 1,
         };
         let cell = builder.build("0.001");
@@ -1209,6 +1234,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            validation_name: None,
             repeated: 1,
         };
         let cell = builder.build("some text");
@@ -1227,6 +1253,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            validation_name: None,
             repeated: 1,
         };
         let cell = builder.build("FALSE");
@@ -1242,6 +1269,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            validation_name: None,
             repeated: 1,
         };
         let cell = builder.build("maybe");
@@ -1259,6 +1287,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            validation_name: None,
             repeated: 1,
         };
         let cell = builder.build("   ");
@@ -1276,6 +1305,7 @@ mod tests {
             currency: None, // No currency specified
             formula: None,
             annotation: None,
+            validation_name: None,
             repeated: 1,
         };
         let cell = builder.build("$50");

@@ -1,7 +1,8 @@
 //! Main Spreadsheet structure and implementation.
 
 use super::{
-    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Sheet, parser::OdsParser,
+    ContentValidation, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Sheet,
+    data_validation::parse_content_validations, parser::OdsParser,
 };
 use crate::core::{Content, Meta, OwnedPackage, Styles};
 use litchi_core::{Error, Metadata, Result};
@@ -42,6 +43,7 @@ pub struct Spreadsheet {
     styles: Option<Styles>,
     meta: Option<Meta>,
     named_definitions: Vec<NamedDefinition>,
+    content_validations: Vec<ContentValidation>,
 }
 
 impl Spreadsheet {
@@ -108,6 +110,7 @@ impl Spreadsheet {
         let content_bytes = package.get_file("content.xml")?;
         let content = Content::from_bytes(&content_bytes)?;
         let named_definitions = OdsParser::parse_named_definitions(content.xml_content())?;
+        let content_validations = parse_content_validations(content.xml_content())?;
 
         let styles = if package.has_file("styles.xml") {
             let styles_bytes = package.get_file("styles.xml")?;
@@ -129,6 +132,7 @@ impl Spreadsheet {
             styles,
             meta,
             named_definitions,
+            content_validations,
         })
     }
 
@@ -154,12 +158,38 @@ impl Spreadsheet {
         let content_bytes = package.get_file("content.xml")?;
         let content = Content::from_bytes(&content_bytes)?;
 
-        OdsParser::parse_sheets(content.xml_content())
+        let sheets = OdsParser::parse_sheets(content.xml_content())?;
+        for cell in sheets
+            .iter()
+            .flat_map(|sheet| sheet.rows.iter())
+            .flat_map(|row| row.cells.iter())
+        {
+            if let Some(name) = cell.validation_name.as_deref()
+                && self.content_validation(name).is_none()
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "cell references missing content validation '{name}'"
+                )));
+            }
+        }
+        Ok(sheets)
     }
 
     /// Return all named ranges and expressions in document order.
     pub fn named_definitions(&self) -> &[NamedDefinition] {
         &self.named_definitions
+    }
+
+    /// Return document-level spreadsheet content validations in document order.
+    pub fn content_validations(&self) -> &[ContentValidation] {
+        &self.content_validations
+    }
+
+    /// Find a content-validation definition by name.
+    pub fn content_validation(&self, name: &str) -> Option<&ContentValidation> {
+        self.content_validations
+            .iter()
+            .find(|validation| validation.name == name)
     }
 
     /// Return all named ranges, including global and sheet-local ranges.

@@ -4,8 +4,9 @@
 
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
-    Cell, CellAnnotation, CellValue, NamedDefinition, NamedDefinitionScope, NamedExpression,
-    NamedRange, Row, Sheet,
+    Cell, CellAnnotation, CellValue, ContentValidation, NamedDefinition, NamedDefinitionScope,
+    NamedExpression, NamedRange, Row, Sheet,
+    data_validation::{validate_collection, write_content_validations},
     named_expression::{ensure_unique, write_named_definitions},
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
@@ -34,6 +35,7 @@ pub struct SpreadsheetBuilder {
     sheets: Vec<Sheet>,
     metadata: Metadata,
     named_definitions: Vec<NamedDefinition>,
+    content_validations: Vec<ContentValidation>,
 }
 
 impl Default for SpreadsheetBuilder {
@@ -57,6 +59,7 @@ impl SpreadsheetBuilder {
             sheets: Vec::new(),
             metadata: Metadata::default(),
             named_definitions: Vec::new(),
+            content_validations: Vec::new(),
         }
     }
 
@@ -72,6 +75,28 @@ impl SpreadsheetBuilder {
     /// Return the named ranges and expressions added to this spreadsheet.
     pub fn named_definitions(&self) -> &[NamedDefinition] {
         &self.named_definitions
+    }
+
+    /// Return document-level cell validation definitions.
+    pub fn content_validations(&self) -> &[ContentValidation] {
+        &self.content_validations
+    }
+
+    /// Add a uniquely named content-validation definition.
+    pub fn add_content_validation(&mut self, validation: ContentValidation) -> Result<&mut Self> {
+        validation.validate()?;
+        if self
+            .content_validations
+            .iter()
+            .any(|existing| existing.name == validation.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate content validation '{}'",
+                validation.name
+            )));
+        }
+        self.content_validations.push(validation);
+        Ok(self)
     }
 
     /// Add a named range.
@@ -132,6 +157,39 @@ impl SpreadsheetBuilder {
             annotation.validate()?;
         }
         Ok(())
+    }
+
+    fn validate_content_validations(&self) -> Result<()> {
+        validate_collection(&self.content_validations)?;
+        let names = self
+            .content_validations
+            .iter()
+            .map(|validation| validation.name.as_str())
+            .collect::<std::collections::HashSet<_>>();
+        for cell in self
+            .sheets
+            .iter()
+            .flat_map(|sheet| sheet.rows.iter())
+            .flat_map(|row| row.cells.iter())
+        {
+            if let Some(name) = cell.validation_name.as_deref()
+                && !names.contains(name)
+            {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "cell references missing content validation '{name}'"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    fn has_validation_event_listeners(&self) -> bool {
+        self.content_validations.iter().any(|validation| {
+            validation
+                .error_macro
+                .as_ref()
+                .is_some_and(|error_macro| !error_macro.event_listeners.is_empty())
+        })
     }
 
     /// Add a new sheet to the spreadsheet
@@ -197,6 +255,7 @@ impl SpreadsheetBuilder {
                 value: CellValue::Text(value.to_string()),
                 formula: None,
                 annotation: None,
+                validation_name: None,
                 row: row_index,
                 col,
             })
@@ -251,6 +310,7 @@ impl SpreadsheetBuilder {
                 value: CellValue::Number(value),
                 formula: None,
                 annotation: None,
+                validation_name: None,
                 row: row_index,
                 col,
             })
@@ -320,6 +380,7 @@ impl SpreadsheetBuilder {
                     value: value.clone(),
                     formula: None,
                     annotation: None,
+                    validation_name: None,
                     row: row_index,
                     col,
                 }
@@ -382,6 +443,7 @@ impl SpreadsheetBuilder {
                     value: CellValue::Empty,
                     formula: None,
                     annotation: None,
+                    validation_name: None,
                     row,
                     col: row_data.cells.len(),
                 });
@@ -400,11 +462,13 @@ impl SpreadsheetBuilder {
             };
 
             let annotation = row_data.cells[col].annotation.take();
+            let validation_name = row_data.cells[col].validation_name.take();
             row_data.cells[col] = Cell {
                 text,
                 value,
                 formula: None,
                 annotation,
+                validation_name,
                 row,
                 col,
             };
@@ -456,6 +520,7 @@ impl SpreadsheetBuilder {
                     value: CellValue::Empty,
                     formula: None,
                     annotation: None,
+                    validation_name: None,
                     row,
                     col: row_data.cells.len(),
                 });
@@ -495,6 +560,7 @@ impl SpreadsheetBuilder {
                 value: CellValue::Empty,
                 formula: None,
                 annotation: None,
+                validation_name: None,
                 row,
                 col: row_data.cells.len(),
             });
@@ -515,6 +581,58 @@ impl SpreadsheetBuilder {
             .and_then(|sheet| sheet.rows.get_mut(row))
             .and_then(|row| row.cells.get_mut(col))
             .and_then(Cell::take_annotation))
+    }
+
+    /// Apply a named content validation to a cell in the current sheet.
+    pub fn set_cell_validation(
+        &mut self,
+        row: usize,
+        col: usize,
+        validation_name: &str,
+    ) -> Result<&mut Self> {
+        if !self
+            .content_validations
+            .iter()
+            .any(|validation| validation.name == validation_name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "missing content validation '{validation_name}'"
+            )));
+        }
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        let sheet = self.sheets.last_mut().expect("default sheet was added");
+        while sheet.rows.len() <= row {
+            sheet.rows.push(Row {
+                cells: Vec::new(),
+                index: sheet.rows.len(),
+            });
+        }
+        let row_data = &mut sheet.rows[row];
+        while row_data.cells.len() <= col {
+            row_data.cells.push(Cell {
+                text: String::new(),
+                value: CellValue::Empty,
+                formula: None,
+                annotation: None,
+                validation_name: None,
+                row,
+                col: row_data.cells.len(),
+            });
+        }
+        row_data.cells[col].set_validation_name(validation_name);
+        Ok(self)
+    }
+
+    /// Remove and return the content-validation name applied to a cell.
+    pub fn clear_cell_validation(&mut self, row: usize, col: usize) -> Result<Option<String>> {
+        Ok(self
+            .sheets
+            .last_mut()
+            .and_then(|sheet| sheet.rows.get_mut(row))
+            .and_then(|row| row.cells.get_mut(col))
+            .and_then(|cell| cell.validation_name.take()))
     }
 
     /// Select a specific sheet by index for subsequent operations
@@ -574,6 +692,7 @@ impl SpreadsheetBuilder {
     ///         text: "100".to_string(),
     ///         formula: None,
     ///         annotation: None,
+    ///         validation_name: None,
     ///         row: 0,
     ///         col: 0,
     ///     },
@@ -685,6 +804,8 @@ impl SpreadsheetBuilder {
 
         let mut body = String::with_capacity(estimated);
 
+        write_content_validations(&mut body, &self.content_validations);
+
         for sheet in &self.sheets {
             Self::push_table_start(&mut body, &sheet.name);
             Self::push_table_columns(&mut body, Self::sheet_max_cols(sheet));
@@ -732,8 +853,16 @@ impl SpreadsheetBuilder {
             r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0""#,
         );
         out.push_str(of_ns);
-        if self.has_annotations() {
+        let has_annotations = self.has_annotations();
+        let has_validation_event_listeners = self.has_validation_event_listeners();
+        if has_annotations {
             out.push_str(r#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0""#);
+        }
+        if has_validation_event_listeners {
+            out.push_str(r#" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0""#);
+            if !has_annotations {
+                out.push_str(r#" xmlns:xlink="http://www.w3.org/1999/xlink""#);
+            }
         }
         out.push_str(
             r#" office:version="1.3"><office:font-face-decls/><office:automatic-styles/><office:body><office:spreadsheet>"#,
@@ -783,6 +912,7 @@ impl SpreadsheetBuilder {
     pub fn build(self) -> Result<Vec<u8>> {
         self.validate_named_definitions()?;
         self.validate_annotations()?;
+        self.validate_content_validations()?;
         let mut writer = PackageWriter::new();
 
         // Set MIME type
@@ -910,6 +1040,60 @@ mod tests {
             NamedExpression::new("Duplicate", "of:=1", NamedDefinitionScope::Global).unwrap();
         builder.add_named_range(first).unwrap();
         assert!(builder.add_named_expression(second).is_err());
+    }
+
+    #[test]
+    fn content_validations_round_trip_through_ods_package() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Input").unwrap();
+        builder.set_cell(1, 2, CellValue::Number(7.0)).unwrap();
+
+        let mut validation = ContentValidation::new("whole&number").unwrap();
+        validation
+            .set_condition("of:cell-content-is-whole-number()")
+            .unwrap();
+        validation.base_cell_address = Some("$Input.$C$2".to_string());
+        validation.allow_empty_cell = Some(false);
+        validation.display_list = Some(crate::ods::ValidationDisplayList::Unsorted);
+        validation.help_message = Some(crate::ods::ValidationMessage {
+            title: Some("Required input".to_string()),
+            display: Some(true),
+            paragraphs: vec!["Enter  a\twhole\nnumber".to_string()],
+        });
+        validation.error_message = Some(crate::ods::ValidationErrorMessage {
+            title: Some("Invalid value".to_string()),
+            display: Some(true),
+            message_type: Some(crate::ods::ValidationMessageType::Stop),
+            paragraphs: vec!["Try again".to_string()],
+        });
+        builder.add_content_validation(validation.clone()).unwrap();
+        builder.set_cell_validation(1, 2, "whole&number").unwrap();
+
+        let mut spreadsheet =
+            crate::ods::Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+        assert_eq!(
+            spreadsheet.content_validation("whole&number"),
+            Some(&validation)
+        );
+        let sheets = spreadsheet.sheets().unwrap();
+        assert_eq!(
+            sheets[0].rows[1].cells[2].validation_name(),
+            Some("whole&number")
+        );
+    }
+
+    #[test]
+    fn content_validations_reject_duplicates_and_missing_references() {
+        let validation = ContentValidation::new("known").unwrap();
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_content_validation(validation.clone()).unwrap();
+        assert!(builder.add_content_validation(validation).is_err());
+        assert!(builder.set_cell_validation(0, 0, "missing").is_err());
+
+        builder.add_sheet("Sheet1").unwrap();
+        builder.set_cell(0, 0, CellValue::Empty).unwrap();
+        builder.sheets[0].rows[0].cells[0].set_validation_name("missing");
+        assert!(builder.build().is_err());
     }
 
     #[test]
@@ -1081,6 +1265,7 @@ mod tests {
                 text: "100".to_string(),
                 formula: None,
                 annotation: None,
+                validation_name: None,
                 row: 0,
                 col: 0,
             },
@@ -1089,6 +1274,7 @@ mod tests {
                 text: "Test".to_string(),
                 formula: None,
                 annotation: None,
+                validation_name: None,
                 row: 0,
                 col: 1,
             },

@@ -5,8 +5,9 @@
 
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
-    Cell, CellAnnotation, CellValue, NamedDefinition, NamedDefinitionScope, NamedExpression,
-    NamedRange, Row, Sheet, Spreadsheet,
+    Cell, CellAnnotation, CellValue, ContentValidation, NamedDefinition, NamedDefinitionScope,
+    NamedExpression, NamedRange, Row, Sheet, Spreadsheet,
+    data_validation::{validate_collection, write_content_validations},
     named_expression::{ensure_unique, write_named_definitions},
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
@@ -40,6 +41,7 @@ pub struct MutableSpreadsheet {
     styles_xml: Option<String>,
     /// Global and sheet-local named ranges and expressions.
     named_definitions: Vec<NamedDefinition>,
+    content_validations: Vec<ContentValidation>,
 }
 
 impl MutableSpreadsheet {
@@ -100,6 +102,7 @@ impl MutableSpreadsheet {
         let sheets = spreadsheet.sheets()?;
         let metadata = spreadsheet.metadata()?;
         let named_definitions = spreadsheet.named_definitions().to_vec();
+        let content_validations = spreadsheet.content_validations().to_vec();
         let mimetype = "application/vnd.oasis.opendocument.spreadsheet".to_string();
 
         // Extract styles XML from the spreadsheet's package (requires accessing internal package)
@@ -112,6 +115,7 @@ impl MutableSpreadsheet {
             mimetype,
             styles_xml: None,
             named_definitions,
+            content_validations,
         })
     }
 
@@ -123,6 +127,7 @@ impl MutableSpreadsheet {
             mimetype: "application/vnd.oasis.opendocument.spreadsheet".to_string(),
             styles_xml: None,
             named_definitions: Vec::new(),
+            content_validations: Vec::new(),
         }
     }
 
@@ -149,6 +154,37 @@ impl MutableSpreadsheet {
     /// Return all global and sheet-local named definitions.
     pub fn named_definitions(&self) -> &[NamedDefinition] {
         &self.named_definitions
+    }
+
+    /// Return document-level content validation definitions.
+    pub fn content_validations(&self) -> &[ContentValidation] {
+        &self.content_validations
+    }
+
+    /// Add a uniquely named content-validation definition.
+    pub fn add_content_validation(&mut self, validation: ContentValidation) -> Result<()> {
+        validation.validate()?;
+        if self
+            .content_validations
+            .iter()
+            .any(|existing| existing.name == validation.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate content validation '{}'",
+                validation.name
+            )));
+        }
+        self.content_validations.push(validation);
+        Ok(())
+    }
+
+    /// Remove and return a content-validation definition.
+    pub fn remove_content_validation(&mut self, name: &str) -> Option<ContentValidation> {
+        let index = self
+            .content_validations
+            .iter()
+            .position(|validation| validation.name == name)?;
+        Some(self.content_validations.remove(index))
     }
 
     /// Add a named range.
@@ -222,6 +258,39 @@ impl MutableSpreadsheet {
             annotation.validate()?;
         }
         Ok(())
+    }
+
+    fn validate_content_validations(&self) -> Result<()> {
+        validate_collection(&self.content_validations)?;
+        let names = self
+            .content_validations
+            .iter()
+            .map(|validation| validation.name.as_str())
+            .collect::<std::collections::HashSet<_>>();
+        for cell in self
+            .sheets
+            .iter()
+            .flat_map(|sheet| sheet.rows.iter())
+            .flat_map(|row| row.cells.iter())
+        {
+            if let Some(name) = cell.validation_name.as_deref()
+                && !names.contains(name)
+            {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "cell references missing content validation '{name}'"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    fn has_validation_event_listeners(&self) -> bool {
+        self.content_validations.iter().any(|validation| {
+            validation
+                .error_macro
+                .as_ref()
+                .is_some_and(|error_macro| !error_macro.event_listeners.is_empty())
+        })
     }
 
     /// Add a new sheet.
@@ -337,6 +406,7 @@ impl MutableSpreadsheet {
                     text: String::new(),
                     formula: None,
                     annotation: None,
+                    validation_name: None,
                     row,
                     col: col_index,
                 });
@@ -388,6 +458,7 @@ impl MutableSpreadsheet {
                 text: String::new(),
                 formula: None,
                 annotation: None,
+                validation_name: None,
                 row,
                 col: row_data.cells.len(),
             });
@@ -411,6 +482,65 @@ impl MutableSpreadsheet {
             .get_mut(row)
             .and_then(|row| row.cells.get_mut(col))
             .and_then(Cell::take_annotation))
+    }
+
+    /// Apply a named content validation to a cell.
+    pub fn set_cell_validation(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+        validation_name: &str,
+    ) -> Result<()> {
+        if !self
+            .content_validations
+            .iter()
+            .any(|validation| validation.name == validation_name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "missing content validation '{validation_name}'"
+            )));
+        }
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        while sheet.rows.len() <= row {
+            sheet.rows.push(Row {
+                cells: Vec::new(),
+                index: sheet.rows.len(),
+            });
+        }
+        let row_data = &mut sheet.rows[row];
+        while row_data.cells.len() <= col {
+            row_data.cells.push(Cell {
+                value: CellValue::Empty,
+                text: String::new(),
+                formula: None,
+                annotation: None,
+                validation_name: None,
+                row,
+                col: row_data.cells.len(),
+            });
+        }
+        row_data.cells[col].set_validation_name(validation_name);
+        Ok(())
+    }
+
+    /// Remove and return the content-validation name applied to a cell.
+    pub fn clear_cell_validation(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+    ) -> Result<Option<String>> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        Ok(sheet
+            .rows
+            .get_mut(row)
+            .and_then(|row| row.cells.get_mut(col))
+            .and_then(|cell| cell.validation_name.take()))
     }
 
     /// Clear a cell value.
@@ -485,6 +615,7 @@ impl MutableSpreadsheet {
     /// Generate content.xml from current state.
     fn generate_content_xml(&self) -> String {
         let mut body = String::new();
+        write_content_validations(&mut body, &self.content_validations);
 
         for sheet in &self.sheets {
             let escaped_name = escape_xml(&sheet.name);
@@ -528,8 +659,16 @@ impl MutableSpreadsheet {
             r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0""#,
         );
         out.push_str(of_ns);
-        if self.has_annotations() {
+        let has_annotations = self.has_annotations();
+        let has_validation_event_listeners = self.has_validation_event_listeners();
+        if has_annotations {
             out.push_str(r#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0""#);
+        }
+        if has_validation_event_listeners {
+            out.push_str(r#" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0""#);
+            if !has_annotations {
+                out.push_str(r#" xmlns:xlink="http://www.w3.org/1999/xlink""#);
+            }
         }
         out.push_str(
             r#" office:version="1.3"><office:font-face-decls/><office:automatic-styles/><office:body><office:spreadsheet>"#,
@@ -558,6 +697,7 @@ impl MutableSpreadsheet {
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         self.validate_named_definitions()?;
         self.validate_annotations()?;
+        self.validate_content_validations()?;
         let mut writer = PackageWriter::new();
 
         writer.set_mimetype(&self.mimetype)?;
@@ -585,7 +725,10 @@ impl Default for MutableSpreadsheet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ods::{NamedRangeUsage, SpreadsheetBuilder};
+    use crate::ods::{
+        NamedRangeUsage, SpreadsheetBuilder, ValidationDisplayList, ValidationErrorMacro,
+        ValidationEventListener, ValidationScriptEventListener,
+    };
 
     #[test]
     fn mutable_spreadsheet_preserves_and_edits_named_definitions() {
@@ -671,5 +814,45 @@ mod tests {
 
         assert!(mutable.remove_cell_annotation(0, 3, 4).unwrap().is_some());
         assert!(mutable.remove_cell_annotation(0, 3, 4).unwrap().is_none());
+    }
+
+    #[test]
+    fn mutable_spreadsheet_round_trips_content_validations() {
+        let mut mutable = MutableSpreadsheet::new();
+        mutable.add_sheet("Sheet1").unwrap();
+        let mut validation = ContentValidation::new("list").unwrap();
+        validation
+            .set_condition("of:cell-content-is-in-list(\"red\";\"green\")")
+            .unwrap();
+        validation.display_list = Some(ValidationDisplayList::SortAscending);
+        validation.error_macro = Some(ValidationErrorMacro {
+            execute: Some(false),
+            event_listeners: vec![ValidationEventListener::Script(
+                ValidationScriptEventListener {
+                    event_name: "dom:change".to_string(),
+                    language: "ooo:script".to_string(),
+                    macro_name: Some("Standard.Module1.Invalid".to_string()),
+                    href: None,
+                    actuate: None,
+                },
+            )],
+        });
+        mutable.add_content_validation(validation.clone()).unwrap();
+        mutable.set_cell_validation(0, 4, 5, "list").unwrap();
+
+        let mut output = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        assert_eq!(output.content_validation("list"), Some(&validation));
+        assert_eq!(
+            output.sheets().unwrap()[0].rows[4].cells[5].validation_name(),
+            Some("list")
+        );
+
+        assert!(mutable.remove_content_validation("list").is_some());
+        assert!(mutable.to_bytes().is_err());
+        assert_eq!(
+            mutable.clear_cell_validation(0, 4, 5).unwrap().as_deref(),
+            Some("list")
+        );
+        assert!(mutable.to_bytes().is_ok());
     }
 }

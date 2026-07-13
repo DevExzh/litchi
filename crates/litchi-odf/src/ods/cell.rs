@@ -40,6 +40,8 @@ pub struct Cell {
     pub formula: Option<String>,
     /// The optional ODF annotation (comment/note) attached to the cell.
     pub annotation: Option<CellAnnotation>,
+    /// Name of the document-level content validation applied to this cell.
+    pub validation_name: Option<String>,
     /// The row index (0-based)
     pub row: usize,
     /// The column index (0-based)
@@ -106,6 +108,21 @@ impl Cell {
     /// Check whether this cell has an annotation.
     pub fn has_annotation(&self) -> bool {
         self.annotation.is_some()
+    }
+
+    /// Return the document-level content-validation name applied to this cell.
+    pub fn validation_name(&self) -> Option<&str> {
+        self.validation_name.as_deref()
+    }
+
+    /// Apply a named document-level content validation to this cell.
+    pub fn set_validation_name(&mut self, name: impl Into<String>) {
+        self.validation_name = Some(name.into());
+    }
+
+    /// Remove the content-validation reference from this cell.
+    pub fn clear_validation(&mut self) {
+        self.validation_name = None;
     }
 
     /// Parse and get the formula structure.
@@ -256,6 +273,11 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
         output.push_str(&escape_xml(formula));
         output.push('"');
     }
+    if let Some(validation_name) = &cell.validation_name {
+        output.push_str(" table:content-validation-name=\"");
+        output.push_str(&escape_xml(validation_name));
+        output.push('"');
+    }
 
     match &cell.value {
         CellValue::Text(_) => output.push_str(" office:value-type=\"string\""),
@@ -382,6 +404,7 @@ mod tests {
             text: String::new(),
             formula: None,
             annotation: None,
+            validation_name: None,
             row: 0,
             col: 0,
         };
@@ -397,6 +420,7 @@ mod tests {
             text: "Hello".to_string(),
             formula: None,
             annotation: None,
+            validation_name: None,
             row: 0,
             col: 0,
         };
@@ -410,6 +434,7 @@ mod tests {
             text: "42".to_string(),
             formula: None,
             annotation: None,
+            validation_name: None,
             row: 0,
             col: 0,
         };
@@ -426,6 +451,7 @@ mod tests {
             text: "42".to_string(),
             formula: None,
             annotation: None,
+            validation_name: None,
             row: 0,
             col: 0,
         };
@@ -436,6 +462,7 @@ mod tests {
             text: "$100".to_string(),
             formula: None,
             annotation: None,
+            validation_name: None,
             row: 0,
             col: 0,
         };
@@ -446,6 +473,7 @@ mod tests {
             text: "50%".to_string(),
             formula: None,
             annotation: None,
+            validation_name: None,
             row: 0,
             col: 0,
         };
@@ -456,6 +484,7 @@ mod tests {
             text: "Hello".to_string(),
             formula: None,
             annotation: None,
+            validation_name: None,
             row: 0,
             col: 0,
         };
@@ -469,6 +498,7 @@ mod tests {
             text: "42".to_string(),
             formula: Some("=A1+B1".to_string()),
             annotation: None,
+            validation_name: None,
             row: 0,
             col: 0,
         };
@@ -482,6 +512,7 @@ mod tests {
             text: "Hello".to_string(),
             formula: None,
             annotation: None,
+            validation_name: None,
             row: 0,
             col: 0,
         };
@@ -495,6 +526,7 @@ mod tests {
             text: "42".to_string(),
             formula: Some("=A1".to_string()),
             annotation: None,
+            validation_name: None,
             row: 0,
             col: 0,
         };
@@ -505,6 +537,7 @@ mod tests {
             text: "Hello".to_string(),
             formula: None,
             annotation: None,
+            validation_name: None,
             row: 0,
             col: 0,
         };
@@ -518,6 +551,7 @@ mod tests {
             text: String::new(),
             formula: None,
             annotation: None,
+            validation_name: None,
             row: 5,
             col: 10,
         };
@@ -531,6 +565,7 @@ mod tests {
             text: String::new(),
             formula: None,
             annotation: None,
+            validation_name: None,
             row: 0,
             col: 0,
         };
@@ -541,6 +576,7 @@ mod tests {
             text: "Hello".to_string(),
             formula: None,
             annotation: None,
+            validation_name: None,
             row: 0,
             col: 0,
         };

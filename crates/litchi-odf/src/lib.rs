@@ -233,9 +233,12 @@ pub use litchi_core::unit::{Length, LengthUnit};
 // Re-export main types for convenience
 pub use odp::{MutablePresentation, Presentation, PresentationBuilder};
 pub use ods::{
-    AnnotationElement, AnnotationNode, Cell as SCell, CellAnnotation, CellValue, FormulaNamespace,
-    MutableSpreadsheet, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
-    NamedRangeUsage, Row as SRow, Sheet, Spreadsheet, SpreadsheetBuilder,
+    AnnotationElement, AnnotationNode, Cell as SCell, CellAnnotation, CellValue, ContentValidation,
+    FormulaNamespace, MutableSpreadsheet, NamedDefinition, NamedDefinitionScope, NamedExpression,
+    NamedRange, NamedRangeUsage, Row as SRow, Sheet, Spreadsheet, SpreadsheetBuilder,
+    ValidationDisplayList, ValidationErrorMacro, ValidationErrorMessage, ValidationEventListener,
+    ValidationMessage, ValidationMessageType, ValidationPresentationEventListener,
+    ValidationPresentationSound, ValidationScriptEventListener,
 };
 pub use odt::{Document, DocumentBuilder, MutableDocument};
 
