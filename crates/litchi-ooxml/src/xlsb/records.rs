@@ -309,6 +309,20 @@ pub mod record_types {
     pub const END_COLOR_SCALE: u16 = 0x01D6;
     pub const CFVO: u16 = 0x01D7;
     pub const COLOR: u16 = 0x0234;
+    pub const BEGIN_COND_FORMATTING14: u16 = 0x0416;
+    pub const END_COND_FORMATTING14: u16 = 0x0417;
+    pub const BEGIN_CF_RULE14: u16 = 0x0418;
+    pub const END_CF_RULE14: u16 = 0x0419;
+    pub const CFVO14: u16 = 0x041A;
+    pub const BEGIN_DATABAR14: u16 = 0x041B;
+    pub const BEGIN_ICON_SET14: u16 = 0x041C;
+    pub const COLOR14: u16 = 0x041F;
+    pub const CF_ICON: u16 = 0x0458;
+    pub const CF_RULE_EXT: u16 = 0x047A;
+    pub const END_ICON_SET14: u16 = 0x0483;
+    pub const END_DATABAR14: u16 = 0x0484;
+    pub const BEGIN_COLOR_SCALE14: u16 = 0x0485;
+    pub const END_COLOR_SCALE14: u16 = 0x0486;
 
     // Protection
     pub const BOOK_PROTECTION: u16 = 0x0216;

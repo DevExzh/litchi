@@ -101,6 +101,7 @@
 
 /// Error types for XLSB parsing
 mod error;
+mod frt;
 
 /// XLSB record parsing utilities
 mod records;

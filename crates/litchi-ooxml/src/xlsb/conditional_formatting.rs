@@ -5,7 +5,10 @@ use crate::xlsb::formula::{
     CellParsedFormula, FormulaConverter, FormulaParser, FormulaResolutionContext,
     MAX_CELL_FORMULA_BYTES,
 };
-use crate::xlsb::utils::cell_reference;
+use crate::xlsb::frt::{
+    parse_formula_header, parse_sqref_header, serialize_formula_header, serialize_sqref_header,
+};
+use crate::xlsb::utils::{cell_reference, parse_cell_reference};
 
 /// Conditional formatting rule type (CFType per MS-XLSB 2.5.18)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -144,6 +147,116 @@ impl Cfvo {
             greater_than_or_equal,
             formula_binary,
         })
+    }
+
+    /// Parse an Office 2013 `BrtCFVO14` record.
+    pub fn parse_extension14(data: &[u8]) -> XlsbResult<Self> {
+        let context = FormulaResolutionContext::default();
+        Self::parse_extension14_with_context(data, (0, 0), &context)
+    }
+
+    pub(crate) fn parse_extension14_with_context(
+        data: &[u8],
+        base: (u32, u32),
+        context: &FormulaResolutionContext,
+    ) -> XlsbResult<Self> {
+        let (formulas, header_size) = parse_formula_header(data, "BrtCFVO14", 1)?;
+        let mut cursor = CfCursor::new(&data[header_size..], "BrtCFVO14");
+        let cfvo_type = u8::try_from(cursor.read_u32()?)
+            .map_err(|_| invalid("BrtCFVO14", "CFVO type overflow"))?;
+        if !matches!(cfvo_type, 1 | 2 | 3 | 4 | 5 | 7 | 8 | 9) {
+            return Err(invalid("BrtCFVO14", format!("invalid type {cfvo_type}")));
+        }
+        let numeric_value = cursor.read_f64()?;
+        if !numeric_value.is_finite() {
+            return Err(invalid("BrtCFVO14", "non-finite numeric parameter"));
+        }
+        let save_greater_than_or_equal = cursor.read_bool32()?;
+        let greater_than_or_equal = cursor.read_bool32()?;
+        let declared_formula_size = cursor.read_u32()? as usize;
+        cursor.finish()?;
+        let formula_binary = formulas.into_iter().next();
+        if formula_binary
+            .as_ref()
+            .map_or(0, |formula| formula.rgce.len())
+            != declared_formula_size
+        {
+            return Err(invalid(
+                "BrtCFVO14",
+                "FRT formula and declared token size disagree",
+            ));
+        }
+        if matches!(cfvo_type, 2 | 3 | 8 | 9) && formula_binary.is_some() {
+            return Err(invalid(
+                "BrtCFVO14",
+                "automatic/min/max threshold contains a formula",
+            ));
+        }
+        if cfvo_type == 7 && formula_binary.is_none() {
+            return Err(invalid("BrtCFVO14", "formula threshold omits its formula"));
+        }
+        if formula_binary.is_none()
+            && matches!(cfvo_type, 4 | 5)
+            && !(0.0..=100.0).contains(&numeric_value)
+        {
+            return Err(invalid(
+                "BrtCFVO14",
+                format!("percentage parameter {numeric_value} outside 0..=100"),
+            ));
+        }
+        let value = if let Some(formula) = &formula_binary {
+            Some(render_formula(formula, base, context)?)
+        } else if matches!(cfvo_type, 1 | 4 | 5) {
+            Some(format_number(numeric_value))
+        } else {
+            None
+        };
+        Ok(Self {
+            cfvo_type,
+            value,
+            numeric_value,
+            save_greater_than_or_equal,
+            greater_than_or_equal,
+            formula_binary,
+        })
+    }
+
+    /// Serialize an Office 2013 `BrtCFVO14` payload using its binary formula.
+    pub fn serialize_extension14(&self) -> XlsbResult<Vec<u8>> {
+        if !matches!(self.cfvo_type, 1 | 2 | 3 | 4 | 5 | 7 | 8 | 9) {
+            return Err(invalid(
+                "BrtCFVO14",
+                format!("invalid type {}", self.cfvo_type),
+            ));
+        }
+        if !self.numeric_value.is_finite() {
+            return Err(invalid("BrtCFVO14", "non-finite numeric parameter"));
+        }
+        if matches!(self.cfvo_type, 2 | 3 | 8 | 9) && self.formula_binary.is_some() {
+            return Err(invalid(
+                "BrtCFVO14",
+                "automatic/min/max threshold contains a formula",
+            ));
+        }
+        if self.cfvo_type == 7 && self.formula_binary.is_none() {
+            return Err(invalid("BrtCFVO14", "formula threshold omits its formula"));
+        }
+        let formulas = self.formula_binary.as_slice();
+        let mut data = serialize_formula_header(formulas, 1)?;
+        data.extend_from_slice(&u32::from(self.cfvo_type).to_le_bytes());
+        data.extend_from_slice(&self.numeric_value.to_le_bytes());
+        data.extend_from_slice(&u32::from(self.save_greater_than_or_equal).to_le_bytes());
+        data.extend_from_slice(&u32::from(self.greater_than_or_equal).to_le_bytes());
+        data.extend_from_slice(
+            &u32::try_from(
+                self.formula_binary
+                    .as_ref()
+                    .map_or(0, |formula| formula.rgce.len()),
+            )
+            .map_err(|_| XlsbError::InvalidFormula("formula is too large".to_string()))?
+            .to_le_bytes(),
+        );
+        Ok(data)
     }
 }
 
@@ -622,6 +735,60 @@ impl ConditionalFormatting {
 
     pub fn add_rule(&mut self, rule: ConditionalFormattingRule) {
         self.rules.push(rule);
+    }
+
+    /// Parse an Office 2013 `BrtBeginConditionalFormatting14` payload.
+    pub fn parse_extension14_header(data: &[u8]) -> XlsbResult<(Self, u32)> {
+        let (ranges, header_size) =
+            parse_sqref_header(data, "BrtBeginConditionalFormatting14", i32::MAX as usize)?;
+        let mut cursor = CfCursor::new(&data[header_size..], "BrtBeginConditionalFormatting14");
+        let count = cursor.read_u32()?;
+        let pivot_only = cursor.read_bool32()?;
+        cursor.finish()?;
+        let ranges = ranges
+            .into_iter()
+            .map(|(first_row, last_row, first_col, last_col)| {
+                let first = cell_reference(first_row, first_col);
+                let last = cell_reference(last_row, last_col);
+                if first == last {
+                    first
+                } else {
+                    format!("{first}:{last}")
+                }
+            })
+            .collect();
+        Ok((
+            Self {
+                ranges,
+                rules: Vec::new(),
+                pivot_only,
+            },
+            count,
+        ))
+    }
+
+    /// Serialize an Office 2013 `BrtBeginConditionalFormatting14` payload.
+    pub fn serialize_extension14_header(&self) -> XlsbResult<Vec<u8>> {
+        let mut ranges = Vec::new();
+        for range_list in &self.ranges {
+            for range in range_list
+                .split([',', ' '])
+                .filter(|range| !range.is_empty())
+            {
+                let (first, last) = range.split_once(':').unwrap_or((range, range));
+                let (first_row, first_col) = parse_cell_reference(first)?;
+                let (last_row, last_col) = parse_cell_reference(last)?;
+                ranges.push((first_row, last_row, first_col, last_col));
+            }
+        }
+        let mut data = serialize_sqref_header(&ranges)?;
+        data.extend_from_slice(
+            &u32::try_from(self.rules.len())
+                .map_err(|_| invalid("BrtBeginConditionalFormatting14", "rule count overflow"))?
+                .to_le_bytes(),
+        );
+        data.extend_from_slice(&u32::from(self.pivot_only).to_le_bytes());
+        Ok(data)
     }
 }
 
@@ -1300,6 +1467,54 @@ mod tests {
     }
 
     #[test]
+    fn extension_cfvo_roundtrips_formula_and_automatic_bounds() {
+        let formula = FormulaCompiler::compile("$A$1").unwrap();
+        let formula_value = Cfvo {
+            cfvo_type: 7,
+            value: Some("$A$1".to_string()),
+            numeric_value: 0.0,
+            save_greater_than_or_equal: true,
+            greater_than_or_equal: false,
+            formula_binary: Some(formula.clone()),
+        };
+        let encoded = formula_value.serialize_extension14().unwrap();
+        let parsed = Cfvo::parse_extension14(&encoded).unwrap();
+        assert_eq!(parsed.cfvo_type, 7);
+        assert_eq!(parsed.formula_binary, Some(formula));
+        assert!(!parsed.greater_than_or_equal);
+
+        for cfvo_type in [8, 9] {
+            let automatic = Cfvo {
+                cfvo_type,
+                value: None,
+                numeric_value: 0.0,
+                save_greater_than_or_equal: false,
+                greater_than_or_equal: true,
+                formula_binary: None,
+            };
+            let encoded = automatic.serialize_extension14().unwrap();
+            assert_eq!(Cfvo::parse_extension14(&encoded).unwrap(), automatic);
+        }
+    }
+
+    #[test]
+    fn extension_cfvo_rejects_inconsistent_formula_metadata() {
+        let formula = FormulaCompiler::compile("1").unwrap();
+        let value = Cfvo {
+            cfvo_type: 7,
+            value: Some("1".to_string()),
+            numeric_value: 0.0,
+            save_greater_than_or_equal: false,
+            greater_than_or_equal: true,
+            formula_binary: Some(formula),
+        };
+        let mut encoded = value.serialize_extension14().unwrap();
+        let declared_offset = encoded.len() - 4;
+        encoded[declared_offset..].copy_from_slice(&999u32.to_le_bytes());
+        assert!(Cfvo::parse_extension14(&encoded).is_err());
+    }
+
+    #[test]
     fn parses_direct_and_theme_colors() {
         let direct = ConditionalFormatColor::parse(&[5, 0, 0, 0, 0x11, 0x22, 0x33, 0xff]).unwrap();
         assert_eq!(direct.argb, Some(0xff11_2233));
@@ -1335,5 +1550,19 @@ mod tests {
         assert!(formatting.pivot_only);
         assert_eq!(formatting.ranges, ["A1:B2"]);
         assert_eq!(base, (0, 0));
+    }
+
+    #[test]
+    fn extension_header_roundtrips_ranges_and_pivot_flag() {
+        let mut formatting = ConditionalFormatting::new(vec!["A1:B2 C3".to_string()]);
+        formatting.pivot_only = true;
+        formatting
+            .rules
+            .push(ConditionalFormattingRule::new(CfRuleType::Expression, 1));
+        let encoded = formatting.serialize_extension14_header().unwrap();
+        let (parsed, count) = ConditionalFormatting::parse_extension14_header(&encoded).unwrap();
+        assert_eq!(count, 1);
+        assert_eq!(parsed.ranges, ["A1:B2", "C3"]);
+        assert!(parsed.pivot_only);
     }
 }
