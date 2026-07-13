@@ -402,8 +402,8 @@ impl WorkbookPropRecord {
 pub struct BundleSheetRecord {
     pub id: u32,
     pub name: String,
-    pub visible: u8,
-    pub sheet_type: u8,
+    pub state: u32,
+    pub rel_id: Option<String>,
 }
 
 impl BundleSheetRecord {
@@ -415,48 +415,85 @@ impl BundleSheetRecord {
             });
         }
 
-        let id = binary::read_u32_le_at(data, 0)?;
-        let visible = data[4];
-        let sheet_type = data[5];
-        let rel_len = binary::read_u32_le_at(data, 8)? as usize;
-
-        if rel_len != 0xFFFF_FFFF {
-            let rel_len = rel_len * 2; // UTF-16 bytes
-            if data.len() < 12 + rel_len {
-                return Err(XlsbError::InvalidLength {
-                    expected: 12 + rel_len,
-                    found: data.len(),
-                });
-            }
-
-            // Skip the relationship ID (rel_len bytes of UTF-16)
-            let name_start = 12 + rel_len;
-            if data.len() < name_start + 4 {
-                return Err(XlsbError::InvalidLength {
-                    expected: name_start + 4,
-                    found: data.len(),
-                });
-            }
-
-            // Read sheet name as wide string
-            let (name, _) = wide_str_with_len(&data[name_start..])?;
-
-            Ok(BundleSheetRecord {
-                id,
-                name: name.to_string(),
-                visible,
-                sheet_type,
-            })
-        } else {
-            // Handle the case where rel_len is 0xFFFFFFFF
-            // This might indicate a different format or no relationship
-            Ok(BundleSheetRecord {
-                id,
-                name: format!("Sheet{}", id),
-                visible,
-                sheet_type,
-            })
+        let state = binary::read_u32_le_at(data, 0)?;
+        if state > 2 {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBundleSh hsState".to_string(),
+                val: state.to_string(),
+            });
         }
+        let current_id = binary::read_u32_le_at(data, 4)?;
+        let (id, strings_offset) = if (1..=0xFFFF).contains(&current_id) {
+            (current_id, 8)
+        } else {
+            // Excel beta XLSB files have an undocumented extra four bytes
+            // before iTabID. This layout is also recognized by Apache POI.
+            if data.len() < 16 {
+                return Err(XlsbError::Unrecognized {
+                    typ: "BrtBundleSh iTabID".to_string(),
+                    val: current_id.to_string(),
+                });
+            }
+            let beta_id = binary::read_u32_le_at(data, 8)?;
+            if !(1..=0xFFFF).contains(&beta_id) {
+                return Err(XlsbError::Unrecognized {
+                    typ: "BrtBundleSh iTabID".to_string(),
+                    val: format!("current {current_id}, beta {beta_id}"),
+                });
+            }
+            (beta_id, 12)
+        };
+
+        let (rel_id, rel_consumed) = if binary::read_u32_le_at(data, strings_offset)? == u32::MAX {
+            (None, 4)
+        } else {
+            let (value, consumed) = wide_str_with_len(&data[strings_offset..])?;
+            if value.is_empty() {
+                return Err(XlsbError::Unrecognized {
+                    typ: "BrtBundleSh strRelID".to_string(),
+                    val: "empty relationship ID".to_string(),
+                });
+            }
+            (Some(value), consumed)
+        };
+        if rel_id.is_none() && state != 2 {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBundleSh strRelID".to_string(),
+                val: "NULL relationship on a sheet that is not very hidden".to_string(),
+            });
+        }
+        let name_offset = strings_offset.checked_add(rel_consumed).ok_or_else(|| {
+            XlsbError::Encoding("BrtBundleSh relationship size overflow".to_string())
+        })?;
+        let (name, name_consumed) = wide_str_with_len(&data[name_offset..])?;
+        if name_offset + name_consumed != data.len() {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBundleSh".to_string(),
+                val: format!(
+                    "{} trailing bytes",
+                    data.len() - name_offset - name_consumed
+                ),
+            });
+        }
+        let name_len = name.encode_utf16().count();
+        if name_len == 0
+            || name_len > 31
+            || name.contains(['\0', '\u{0003}', ':', '\\', '*', '?', '/', '[', ']'])
+            || name.starts_with('\'')
+            || name.ends_with('\'')
+        {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBundleSh strName".to_string(),
+                val: name,
+            });
+        }
+
+        Ok(BundleSheetRecord {
+            id,
+            name,
+            state,
+            rel_id,
+        })
     }
 }
 
@@ -977,5 +1014,60 @@ impl<R: Read> RecordIter<R> {
                 let _ = self.fill_buffer(buf).map_err(XlsbError::Io)?;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn wide_string(value: &str) -> Vec<u8> {
+        let mut data = (value.encode_utf16().count() as u32).to_le_bytes().to_vec();
+        for unit in value.encode_utf16() {
+            data.extend_from_slice(&unit.to_le_bytes());
+        }
+        data
+    }
+
+    #[test]
+    fn parses_current_and_excel_beta_bundle_sheets() {
+        let mut current = 0u32.to_le_bytes().to_vec();
+        current.extend_from_slice(&7u32.to_le_bytes());
+        current.extend_from_slice(&wide_string("rId7"));
+        current.extend_from_slice(&wide_string("Data"));
+        let sheet = BundleSheetRecord::parse(&current).unwrap();
+        assert_eq!(sheet.id, 7);
+        assert_eq!(sheet.state, 0);
+        assert_eq!(sheet.rel_id.as_deref(), Some("rId7"));
+        assert_eq!(sheet.name, "Data");
+
+        let mut beta = 0u64.to_le_bytes().to_vec();
+        beta.extend_from_slice(&8u32.to_le_bytes());
+        beta.extend_from_slice(&wide_string("rId8"));
+        beta.extend_from_slice(&wide_string("Legacy"));
+        let sheet = BundleSheetRecord::parse(&beta).unwrap();
+        assert_eq!(sheet.id, 8);
+        assert_eq!(sheet.rel_id.as_deref(), Some("rId8"));
+        assert_eq!(sheet.name, "Legacy");
+    }
+
+    #[test]
+    fn rejects_malformed_bundle_sheet_metadata() {
+        let mut invalid = 0u32.to_le_bytes().to_vec();
+        invalid.extend_from_slice(&0u32.to_le_bytes());
+        invalid.extend_from_slice(&0u32.to_le_bytes());
+        assert!(matches!(
+            BundleSheetRecord::parse(&invalid),
+            Err(XlsbError::Unrecognized { .. })
+        ));
+
+        let mut null_visible = 0u32.to_le_bytes().to_vec();
+        null_visible.extend_from_slice(&1u32.to_le_bytes());
+        null_visible.extend_from_slice(&u32::MAX.to_le_bytes());
+        null_visible.extend_from_slice(&wide_string("Module"));
+        assert!(matches!(
+            BundleSheetRecord::parse(&null_visible),
+            Err(XlsbError::Unrecognized { .. })
+        ));
     }
 }

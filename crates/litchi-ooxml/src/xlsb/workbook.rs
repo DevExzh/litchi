@@ -20,9 +20,21 @@ use std::io::{BufReader, Cursor, Read, Seek};
 pub struct XlsbWorkbook {
     package: OpcPackage,
     worksheets: Vec<XlsbWorksheet>,
+    worksheet_rel_ids: Vec<Option<String>>,
     formula_context: FormulaResolutionContext,
     shared_strings: Vec<String>,
     styles: StylesTable,
+    is_1904: bool,
+}
+
+#[derive(Default)]
+struct ParsedWorkbookInfo {
+    worksheet_names: Vec<String>,
+    worksheet_rel_ids: Vec<Option<String>>,
+    supporting_links: Vec<FormulaSupportingLink>,
+    external_sheets: Vec<FormulaExternalSheet>,
+    external_link_rel_ids: Vec<String>,
+    defined_names: Vec<String>,
     is_1904: bool,
 }
 
@@ -30,6 +42,7 @@ impl std::fmt::Debug for XlsbWorkbook {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("XlsbWorkbook")
             .field("worksheet_names", &self.formula_context.worksheet_names)
+            .field("worksheet_rel_ids", &self.worksheet_rel_ids)
             .field("shared_strings_count", &self.shared_strings.len())
             .field("cell_xfs_count", &self.styles.cell_xfs.len())
             .field("is_1904", &self.is_1904)
@@ -59,6 +72,7 @@ impl XlsbWorkbook {
         let mut workbook = XlsbWorkbook {
             package,
             worksheets: Vec::new(),
+            worksheet_rel_ids: Vec::new(),
             formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
@@ -84,6 +98,7 @@ impl XlsbWorkbook {
         let mut workbook = XlsbWorkbook {
             package,
             worksheets: Vec::new(),
+            worksheet_rel_ids: Vec::new(),
             formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
@@ -104,21 +119,9 @@ impl XlsbWorkbook {
 
         let blob = workbook_part.blob();
         let mut iter = XlsbRecordIter::new(BufReader::new(blob));
-        let mut worksheet_names = Vec::new();
-        let mut supporting_links = Vec::new();
-        let mut external_sheets = Vec::new();
-        let mut external_link_rel_ids = Vec::new();
-        let mut defined_names = Vec::new();
-        Self::read_workbook(
-            &mut iter,
-            &mut worksheet_names,
-            &mut supporting_links,
-            &mut external_sheets,
-            &mut external_link_rel_ids,
-            &mut defined_names,
-            &mut self.is_1904,
-        )?;
-        let external_link_uris = external_link_rel_ids
+        let info = Self::read_workbook(&mut iter)?;
+        let external_link_uris = info
+            .external_link_rel_ids
             .iter()
             .map(|rel_id| {
                 let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
@@ -139,13 +142,15 @@ impl XlsbWorkbook {
             .map(|uri| self.load_external_book(uri))
             .collect::<XlsbResult<Vec<_>>>()?;
         self.formula_context = FormulaResolutionContext {
-            worksheet_names: worksheet_names.into(),
-            supporting_links: supporting_links.into(),
-            external_sheets: external_sheets.into(),
+            worksheet_names: info.worksheet_names.into(),
+            supporting_links: info.supporting_links.into(),
+            external_sheets: info.external_sheets.into(),
             external_books: external_books.into(),
-            defined_names: defined_names.into(),
+            defined_names: info.defined_names.into(),
             current_sheet: None,
         };
+        self.worksheet_rel_ids = info.worksheet_rel_ids;
+        self.is_1904 = info.is_1904;
 
         Ok(())
     }
@@ -183,9 +188,28 @@ impl XlsbWorkbook {
         }
 
         let name = &self.formula_context.worksheet_names[index];
-        // For now, assume worksheets are at xl/worksheets/sheet1.bin, sheet2.bin, etc.
-        let sheet_path = format!("/xl/worksheets/sheet{}.bin", index + 1);
-        let sheet_uri = litchi_opc::PackURI::new(&sheet_path)?;
+        let rel_id = self
+            .worksheet_rel_ids
+            .get(index)
+            .and_then(Option::as_deref)
+            .ok_or_else(|| {
+                crate::xlsb::error::XlsbError::UnsupportedFeature(format!(
+                    "sheet {name:?} has no worksheet relationship"
+                ))
+            })?;
+        let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
+        let workbook_part = self.package.get_part(&workbook_uri)?;
+        let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
+            crate::xlsb::error::XlsbError::FileNotFound(format!(
+                "relationship {rel_id:?} for sheet {name:?}"
+            ))
+        })?;
+        if relationship.is_external() {
+            return Err(crate::xlsb::error::XlsbError::UnsupportedFeature(format!(
+                "sheet {name:?} has an external worksheet relationship"
+            )));
+        }
+        let sheet_uri = relationship.target_partname()?;
 
         let sheet_part = self.package.get_part(&sheet_uri)?;
         let blob = sheet_part.blob();
@@ -228,15 +252,15 @@ impl XlsbWorkbook {
     }
 
     /// Read workbook structure
-    fn read_workbook(
-        iter: &mut XlsbRecordIter<impl Read>,
-        worksheet_names: &mut Vec<String>,
-        supporting_links: &mut Vec<FormulaSupportingLink>,
-        external_sheets: &mut Vec<FormulaExternalSheet>,
-        external_link_rel_ids: &mut Vec<String>,
-        defined_names: &mut Vec<String>,
-        is_1904: &mut bool,
-    ) -> XlsbResult<()> {
+    fn read_workbook(iter: &mut XlsbRecordIter<impl Read>) -> XlsbResult<ParsedWorkbookInfo> {
+        let mut info = ParsedWorkbookInfo::default();
+        let worksheet_names = &mut info.worksheet_names;
+        let worksheet_rel_ids = &mut info.worksheet_rel_ids;
+        let supporting_links = &mut info.supporting_links;
+        let external_sheets = &mut info.external_sheets;
+        let external_link_rel_ids = &mut info.external_link_rel_ids;
+        let defined_names = &mut info.defined_names;
+        let is_1904 = &mut info.is_1904;
         for record in iter.by_ref() {
             let record = record?;
             match record.header.record_type {
@@ -248,7 +272,17 @@ impl XlsbWorkbook {
                 },
                 record_types::BUNDLE_SH => {
                     let bundle_sh = crate::xlsb::records::BundleSheetRecord::parse(&record.data)?;
+                    if worksheet_names
+                        .iter()
+                        .any(|name| excel_name_eq(name, &bundle_sh.name))
+                    {
+                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtBundleSh strName".to_string(),
+                            val: format!("duplicate sheet name {:?}", bundle_sh.name),
+                        });
+                    }
                     worksheet_names.push(bundle_sh.name);
+                    worksheet_rel_ids.push(bundle_sh.rel_id);
                 },
                 record_types::SUP_SELF => {
                     supporting_links.push(FormulaSupportingLink::SelfWorkbook);
@@ -295,7 +329,7 @@ impl XlsbWorkbook {
                 },
             }
         }
-        Ok(())
+        Ok(info)
     }
 
     /// Read a worksheet
@@ -765,6 +799,7 @@ mod tests {
         let workbook = XlsbWorkbook {
             package,
             worksheets: Vec::new(),
+            worksheet_rel_ids: Vec::new(),
             formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
@@ -845,7 +880,12 @@ mod tests {
     #[test]
     fn resolves_cell_style_references_from_real_fixtures() {
         let mut saw_nondefault_style = false;
-        for fixture in ["universal-content.xlsb", "cond_format.xlsb"] {
+        for fixture in [
+            "Simple.xlsb",
+            "date.xlsb",
+            "universal-content.xlsb",
+            "cond_format.xlsb",
+        ] {
             let path = format!(
                 "{}/../../test-data/ooxml/xlsb/{fixture}",
                 env!("CARGO_MANIFEST_DIR")
@@ -885,6 +925,7 @@ mod tests {
         let workbook = XlsbWorkbook {
             package,
             worksheets: Vec::new(),
+            worksheet_rel_ids: Vec::new(),
             formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
