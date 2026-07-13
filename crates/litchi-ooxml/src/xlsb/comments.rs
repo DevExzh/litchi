@@ -1,5 +1,13 @@
 //! Comment support for XLSB
 
+use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::records::{XlsbRecord, XlsbRecordIter, record_types, wide_str_with_len};
+use crate::xlsb::shared_strings::{SharedString, SharedStringRun};
+use crate::xlsb::writer::RecordWriter;
+use litchi_core::binary;
+use std::collections::{HashMap, HashSet};
+use std::io::{Read, Write};
+
 /// Comment information
 ///
 /// Represents a cell comment with author and text.
@@ -13,6 +21,10 @@ pub struct Comment {
     pub author: String,
     /// Comment text
     pub text: String,
+    /// Font runs within the comment text.
+    pub runs: Vec<SharedStringRun>,
+    /// Comment identifier used by shared-workbook metadata.
+    pub guid: [u8; 16],
     /// Whether comment is visible
     pub visible: bool,
 }
@@ -33,6 +45,8 @@ impl Comment {
             col,
             author,
             text,
+            runs: Vec::new(),
+            guid: [0; 16],
             visible: false,
         }
     }
@@ -41,6 +55,185 @@ impl Comment {
     pub fn set_visible(&mut self, visible: bool) {
         self.visible = visible;
     }
+}
+
+pub(crate) fn read_comments(reader: impl Read) -> XlsbResult<Vec<Comment>> {
+    let records = XlsbRecordIter::new(reader).collect::<XlsbResult<Vec<_>>>()?;
+    let mut pos = 0;
+    expect(&records, &mut pos, record_types::BEGIN_COMMENTS)?;
+    expect(&records, &mut pos, record_types::BEGIN_COMMENT_AUTHORS)?;
+    let mut authors = Vec::new();
+    while records
+        .get(pos)
+        .is_some_and(|r| r.header.record_type == record_types::COMMENT_AUTHOR)
+    {
+        let record = &records[pos];
+        pos += 1;
+        let (author, consumed) = wide_str_with_len(&record.data)?;
+        let len = author.encode_utf16().count();
+        if consumed != record.data.len() || len > 54 {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtCommentAuthor".to_string(),
+                val: author,
+            });
+        }
+        authors.push(author);
+    }
+    expect(&records, &mut pos, record_types::END_COMMENT_AUTHORS)?;
+    expect(&records, &mut pos, record_types::BEGIN_COMMENT_LIST)?;
+    let mut comments = Vec::new();
+    let mut cells = HashSet::new();
+    while records
+        .get(pos)
+        .is_some_and(|r| r.header.record_type == record_types::BEGIN_COMMENT)
+    {
+        let begin = &records[pos];
+        pos += 1;
+        if begin.data.len() != 36 {
+            return Err(XlsbError::InvalidLength {
+                expected: 36,
+                found: begin.data.len(),
+            });
+        }
+        let author_raw = binary::read_u32_le_at(&begin.data, 0)?;
+        let row = binary::read_u32_le_at(&begin.data, 4)?;
+        let last_row = binary::read_u32_le_at(&begin.data, 8)?;
+        let col = binary::read_u32_le_at(&begin.data, 12)?;
+        let last_col = binary::read_u32_le_at(&begin.data, 16)?;
+        if author_raw > i32::MAX as u32
+            || author_raw as usize >= authors.len()
+            || row != last_row
+            || col != last_col
+            || row >= 1_048_576
+            || col >= 16_384
+            || !cells.insert((row, col))
+        {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginComment".to_string(),
+                val: format!("author={author_raw}, range={row}:{col}-{last_row}:{last_col}"),
+            });
+        }
+        let rich = if records
+            .get(pos)
+            .is_some_and(|r| r.header.record_type == record_types::COMMENT_TEXT)
+        {
+            let value = SharedString::parse(&records[pos].data)?;
+            pos += 1;
+            if records[pos - 1].data[0] & 1 == 0 || value.phonetic.is_some() {
+                return Err(XlsbError::Unrecognized {
+                    typ: "BrtCommentText".to_string(),
+                    val: "invalid RichStr flags".to_string(),
+                });
+            }
+            value
+        } else {
+            SharedString {
+                text: String::new(),
+                runs: Vec::new(),
+                phonetic: None,
+            }
+        };
+        expect(&records, &mut pos, record_types::END_COMMENT)?;
+        let mut guid = [0; 16];
+        guid.copy_from_slice(&begin.data[20..36]);
+        comments.push(Comment {
+            row,
+            col,
+            author: authors[author_raw as usize].clone(),
+            text: rich.text,
+            runs: rich.runs,
+            guid,
+            visible: false,
+        });
+    }
+    expect(&records, &mut pos, record_types::END_COMMENT_LIST)?;
+    expect(&records, &mut pos, record_types::END_COMMENTS)?;
+    if pos != records.len() {
+        return Err(XlsbError::Unrecognized {
+            typ: "Comments stream".to_string(),
+            val: "trailing records".to_string(),
+        });
+    }
+    Ok(comments)
+}
+
+fn expect(records: &[XlsbRecord], pos: &mut usize, typ: u16) -> XlsbResult<()> {
+    let record = records.get(*pos).ok_or(XlsbError::InvalidRecordType(typ))?;
+    if record.header.record_type != typ {
+        return Err(XlsbError::InvalidRecordType(record.header.record_type));
+    }
+    if !record.data.is_empty() {
+        return Err(XlsbError::InvalidLength {
+            expected: 0,
+            found: record.data.len(),
+        });
+    }
+    *pos += 1;
+    Ok(())
+}
+
+pub(crate) fn write_comments<W: Write>(
+    writer: &mut RecordWriter<W>,
+    comments: &[Comment],
+) -> XlsbResult<()> {
+    writer.write_record(record_types::BEGIN_COMMENTS, &[])?;
+    writer.write_record(record_types::BEGIN_COMMENT_AUTHORS, &[])?;
+    let mut authors = Vec::<&str>::new();
+    let mut author_ids = HashMap::<&str, u32>::new();
+    for comment in comments {
+        if !author_ids.contains_key(comment.author.as_str()) {
+            author_ids.insert(comment.author.as_str(), authors.len() as u32);
+            authors.push(&comment.author);
+        }
+    }
+    for author in &authors {
+        let len = author.encode_utf16().count();
+        if len > 54 {
+            return Err(XlsbError::Encoding(
+                "comment author length must not exceed 54 characters".to_string(),
+            ));
+        }
+        let mut data = Vec::new();
+        data.extend_from_slice(&(len as u32).to_le_bytes());
+        for unit in author.encode_utf16() {
+            data.extend_from_slice(&unit.to_le_bytes());
+        }
+        writer.write_record(record_types::COMMENT_AUTHOR, &data)?;
+    }
+    writer.write_record(record_types::END_COMMENT_AUTHORS, &[])?;
+    writer.write_record(record_types::BEGIN_COMMENT_LIST, &[])?;
+    let mut cells = HashSet::new();
+    for comment in comments {
+        if comment.row >= 1_048_576
+            || comment.col >= 16_384
+            || !cells.insert((comment.row, comment.col))
+        {
+            return Err(XlsbError::Encoding(
+                "invalid or duplicate comment cell".to_string(),
+            ));
+        }
+        let author = author_ids[comment.author.as_str()];
+        let mut begin = Vec::with_capacity(36);
+        begin.extend_from_slice(&author.to_le_bytes());
+        begin.extend_from_slice(&comment.row.to_le_bytes());
+        begin.extend_from_slice(&comment.row.to_le_bytes());
+        begin.extend_from_slice(&comment.col.to_le_bytes());
+        begin.extend_from_slice(&comment.col.to_le_bytes());
+        begin.extend_from_slice(&comment.guid);
+        writer.write_record(record_types::BEGIN_COMMENT, &begin)?;
+        if !comment.text.is_empty() {
+            let rich = SharedString {
+                text: comment.text.clone(),
+                runs: comment.runs.clone(),
+                phonetic: None,
+            };
+            writer.write_record(record_types::COMMENT_TEXT, &rich.to_comment_bytes()?)?;
+        }
+        writer.write_record(record_types::END_COMMENT, &[])?;
+    }
+    writer.write_record(record_types::END_COMMENT_LIST, &[])?;
+    writer.write_record(record_types::END_COMMENTS, &[])?;
+    Ok(())
 }
 
 #[cfg(test)]

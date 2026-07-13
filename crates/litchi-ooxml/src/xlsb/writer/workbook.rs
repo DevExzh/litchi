@@ -829,6 +829,23 @@ impl XlsbWorkbookWriter {
                 }
             }
 
+            let comments_part = if worksheet.comments().is_empty() {
+                None
+            } else {
+                let comments_name = format!("comments{}.bin", i + 1);
+                sheet_part.relate_to(&format!("../{comments_name}"), rel::COMMENTS);
+                let mut comments_data = Vec::new();
+                crate::xlsb::comments::write_comments(
+                    &mut RecordWriter::new(&mut comments_data),
+                    worksheet.comments(),
+                )?;
+                Some(BlobPart::new(
+                    PackURI::new(format!("/xl/{comments_name}"))?,
+                    "application/vnd.ms-excel.comments".to_string(),
+                    comments_data,
+                ))
+            };
+
             // Now serialize the worksheet with fully-populated relationship IDs
             // in the hyperlink records.
             let mut sheet_data = Vec::new();
@@ -854,6 +871,9 @@ impl XlsbWorkbookWriter {
 
             package.add_part(Box::new(sheet_part));
             package.add_part(Box::new(binary_index_part));
+            if let Some(part) = comments_part {
+                package.add_part(Box::new(part));
+            }
         }
 
         Ok(formula_sheet_ranges.into_inner())
@@ -928,7 +948,8 @@ impl Default for XlsbWorkbookWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::xlsb::CalculationMode;
+    use crate::xlsb::comments::Comment;
+    use crate::xlsb::{CalculationMode, SharedStringRun};
     use litchi_core::sheet::{CellValue, WorkbookTrait};
     use std::io::Cursor;
 
@@ -972,6 +993,36 @@ mod tests {
         workbook.save(&mut output).unwrap();
         let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
         assert_eq!(reader.calculation_properties(), &expected);
+    }
+
+    #[test]
+    fn comments_survive_package_roundtrip() {
+        let mut workbook = XlsbWorkbookWriter::new();
+        let mut sheet = MutableXlsbWorksheet::new("Notes");
+        let mut first = Comment::new(2, 3, "Author".to_string(), "formatted note".to_string());
+        first.runs = vec![SharedStringRun {
+            character_index: 0,
+            font_id: 0,
+        }];
+        first.guid = [7; 16];
+        sheet.add_comment(first);
+        sheet.add_comment(Comment::new(
+            4,
+            1,
+            "Author".to_string(),
+            "second note".to_string(),
+        ));
+        workbook.add_worksheet(sheet);
+
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let worksheet = reader.worksheet(0).unwrap();
+        assert_eq!(worksheet.comments().len(), 2);
+        assert_eq!(worksheet.comments()[0].text, "formatted note");
+        assert_eq!(worksheet.comments()[0].runs.len(), 1);
+        assert_eq!(worksheet.comments()[0].guid, [7; 16]);
+        assert_eq!(worksheet.comments()[1].author, "Author");
     }
 
     #[test]

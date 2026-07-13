@@ -15,6 +15,7 @@ use crate::xlsb::worksheet::XlsbWorksheet;
 use litchi_core::binary;
 use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
 use litchi_opc::OpcPackage;
+use litchi_opc::constants::relationship_type;
 use std::io::{BufReader, Cursor, Read, Seek};
 
 /// XLSB workbook implementation
@@ -196,8 +197,8 @@ impl XlsbWorkbook {
         Ok(())
     }
 
-    /// Get a worksheet by index (lazy loading)
-    fn get_worksheet(&self, index: usize) -> XlsbResult<XlsbWorksheet> {
+    /// Load a concrete XLSB worksheet by index, including related comments.
+    pub fn worksheet(&self, index: usize) -> XlsbResult<XlsbWorksheet> {
         if index >= self.formula_context.worksheet_names.len() {
             return Err(crate::error::OoxmlError::InvalidFormat(format!(
                 "Worksheet index {} out of bounds",
@@ -231,16 +232,51 @@ impl XlsbWorkbook {
         let sheet_uri = relationship.target_partname()?;
 
         let sheet_part = self.package.get_part(&sheet_uri)?;
+        let comments_uri = {
+            let mut relationships = sheet_part
+                .rels()
+                .iter()
+                .filter(|rel| rel.reltype() == relationship_type::COMMENTS);
+            let first = relationships.next();
+            if relationships.next().is_some() {
+                return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                    typ: "worksheet comments relationship".to_string(),
+                    val: "multiple relationships".to_string(),
+                });
+            }
+            match first {
+                Some(rel) if rel.is_external() => {
+                    return Err(crate::xlsb::error::XlsbError::UnsupportedFeature(
+                        "external XLSB comments part".to_string(),
+                    ));
+                },
+                Some(rel) => Some(rel.target_partname()?),
+                None => None,
+            }
+        };
         let blob = sheet_part.blob();
         let cursor = Cursor::new(blob);
-        Self::read_worksheet(
+        let mut worksheet = Self::read_worksheet(
             cursor,
             name.clone(),
             &self.shared_strings,
             &self.formula_context,
             index,
             self.styles.cell_xfs.len(),
-        )
+        )?;
+        if let Some(uri) = comments_uri {
+            let part = self.package.get_part(&uri)?;
+            if !part.rels().is_empty() {
+                return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                    typ: "Comments part".to_string(),
+                    val: "relationships are not permitted".to_string(),
+                });
+            }
+            for comment in crate::xlsb::comments::read_comments(part.blob())? {
+                worksheet.add_comment(comment);
+            }
+        }
+        Ok(worksheet)
     }
 
     /// Read shared strings from SST
@@ -795,7 +831,7 @@ impl litchi_core::sheet::WorkbookTrait for XlsbWorkbook {
     }
 
     fn worksheet_by_index(&self, index: usize) -> Result<Box<dyn SheetTrait + '_>> {
-        let worksheet = self.get_worksheet(index)?;
+        let worksheet = self.worksheet(index)?;
         Ok(Box::new(worksheet))
     }
 
@@ -831,7 +867,7 @@ pub struct XlsbWorksheetIterator<'a> {
 impl<'a> WorksheetIterator<'a> for XlsbWorksheetIterator<'a> {
     fn next(&mut self) -> Option<Result<Box<dyn SheetTrait + 'a>>> {
         if self.index < self.workbook.formula_context.worksheet_names.len() {
-            match self.workbook.get_worksheet(self.index) {
+            match self.workbook.worksheet(self.index) {
                 Ok(worksheet) => {
                     self.index += 1;
                     Some(Ok(Box::new(worksheet)))
@@ -937,7 +973,7 @@ mod tests {
         let workbook = XlsbWorkbook::new(File::open(path).unwrap()).unwrap();
         let mut formula_cells = Vec::new();
         for index in 0..workbook.formula_context.worksheet_names.len() {
-            let worksheet = workbook.get_worksheet(index).unwrap();
+            let worksheet = workbook.worksheet(index).unwrap();
             if let Some((min_row, min_col, max_row, max_col)) = worksheet.dimensions() {
                 for row in min_row..=max_row {
                     for col in min_col..=max_col {
@@ -997,7 +1033,7 @@ mod tests {
             assert_eq!(rich.runs[0].character_index, 0);
             let mut found_cell_text = false;
             for index in 0..workbook.formula_context.worksheet_names.len() {
-                let worksheet = workbook.get_worksheet(index).unwrap();
+                let worksheet = workbook.worksheet(index).unwrap();
                 let Some((min_row, min_col, max_row, max_col)) = worksheet.dimensions() else {
                     continue;
                 };
@@ -1038,6 +1074,22 @@ mod tests {
             );
             assert_eq!(phonetic.alignment, crate::xlsb::PhoneticAlignment::Left);
         }
+    }
+
+    #[test]
+    fn reads_binary_comments_from_real_fixture() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/ooxml/xlsb/comments.xlsb"
+        );
+        let workbook = XlsbWorkbook::new(File::open(path).unwrap()).unwrap();
+        let worksheet = workbook.worksheet(0).unwrap();
+        assert_eq!(worksheet.comments().len(), 4);
+        let first = &worksheet.comments()[0];
+        assert_eq!((first.row, first.col), (0, 0));
+        assert_eq!(first.author, "Sven Nissel");
+        assert!(first.text.contains("comment top row1"));
+        assert_eq!(first.runs.len(), 2);
     }
 
     #[test]
@@ -1105,7 +1157,7 @@ mod tests {
                 .unwrap_or_else(|error| panic!("{fixture}: {error}"));
             assert!(!workbook.styles().cell_xfs.is_empty(), "{fixture}");
             for index in 0..workbook.formula_context.worksheet_names.len() {
-                let worksheet = workbook.get_worksheet(index).unwrap();
+                let worksheet = workbook.worksheet(index).unwrap();
                 if let Some((min_row, min_col, max_row, max_col)) = worksheet.dimensions() {
                     for row in min_row..=max_row {
                         for col in min_col..=max_col {
@@ -1133,7 +1185,7 @@ mod tests {
         }
         let workbook = XlsbWorkbook::new(File::open(path).unwrap()).unwrap();
         assert!(workbook.styles().num_fmts.keys().any(|id| *id >= 164));
-        let worksheet = workbook.get_worksheet(0).unwrap();
+        let worksheet = workbook.worksheet(0).unwrap();
         assert!(worksheet.dimensions().is_some());
     }
 

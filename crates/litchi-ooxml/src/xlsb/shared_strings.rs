@@ -229,6 +229,57 @@ impl SharedString {
         })
     }
 
+    pub(crate) fn to_comment_bytes(&self) -> XlsbResult<Vec<u8>> {
+        let text_len = self.text.encode_utf16().count();
+        if text_len > 0x7FFF {
+            return Err(XlsbError::Encoding(
+                "RichStr text exceeds 32,767 characters".to_string(),
+            ));
+        }
+        if self.phonetic.is_some() {
+            return Err(XlsbError::UnsupportedFeature(
+                "phonetic metadata is not permitted in BrtCommentText".to_string(),
+            ));
+        }
+        let mut runs = self.runs.clone();
+        if runs.is_empty() && text_len != 0 {
+            runs.push(SharedStringRun {
+                character_index: 0,
+                font_id: 0,
+            });
+        }
+        Self::validate_runs(&runs, text_len)?;
+        let mut data = vec![1];
+        data.extend_from_slice(&(text_len as u32).to_le_bytes());
+        for unit in self.text.encode_utf16() {
+            data.extend_from_slice(&unit.to_le_bytes());
+        }
+        data.extend_from_slice(&(runs.len() as u32).to_le_bytes());
+        for run in runs {
+            data.extend_from_slice(&run.character_index.to_le_bytes());
+            data.extend_from_slice(&run.font_id.to_le_bytes());
+        }
+        Ok(data)
+    }
+
+    fn validate_runs(runs: &[SharedStringRun], text_len: usize) -> XlsbResult<()> {
+        if runs.len() > 0x7FFF {
+            return Err(XlsbError::Encoding("too many RichStr runs".to_string()));
+        }
+        let mut previous = None;
+        for run in runs {
+            if usize::from(run.character_index) >= text_len
+                || previous.is_some_and(|v| run.character_index <= v)
+            {
+                return Err(XlsbError::Encoding(
+                    "invalid RichStr run ordering or index".to_string(),
+                ));
+            }
+            previous = Some(run.character_index);
+        }
+        Ok(())
+    }
+
     fn read_count(data: &[u8], offset: &mut usize, context: &str) -> XlsbResult<usize> {
         let end = offset
             .checked_add(4)
