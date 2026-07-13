@@ -2,10 +2,9 @@
 //!
 //! This module implements parsing for cell alignment within BrtXF records
 //! according to the MS-XLSB specification.
-//! Reference: [MS-XLSB] Section 2.5.148 - XFProps
+//! Reference: [MS-XLSB] Section 2.4.865 - BrtXF
 
 use crate::xlsb::error::XlsbResult;
-use litchi_core::binary;
 
 /// Horizontal alignment values
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,58 +90,33 @@ impl Default for Alignment {
 impl Alignment {
     /// Parse alignment from XF record data
     ///
-    /// # XFProps Structure (MS-XLSB Section 2.5.148)
+    /// # BrtXF Structure (MS-XLSB Section 2.4.865)
     ///
-    /// The alignment is encoded in a bitfield structure:
-    /// - Bits 0-2: horizontal alignment (3 bits)
-    /// - Bits 3-4: vertical alignment (2 bits)
-    /// - Bit 5: wrap text (1 bit)
-    /// - Bits 6-9: rotation (4 bits for angle/90)
-    /// - Bit 10: shrink to fit (1 bit)
-    /// - Bits 11-14: indent level (4 bits)
-    /// - Bits 15-16: text direction (2 bits)
+    /// Rotation and indentation are stored as bytes 10 and 11. Alignment and
+    /// protection flags occupy bytes 12 and 13.
     pub fn parse(data: &[u8], offset: usize) -> XlsbResult<Option<Self>> {
-        // XF record layout (simplified):
-        // Offset 0-1: font ID (u16)
-        // Offset 2-3: num fmt ID (u16)
-        // Offset 4-5: fill ID (u16)
-        // Offset 6-7: border ID (u16)
-        // Offset 8-9: XF flags (u16) - indicates what follows
-        // Offset 10+: alignment data (if present)
-
-        if offset + 10 > data.len() {
+        if offset + 16 > data.len() {
             return Ok(None);
         }
 
-        // Read XF flags to determine if alignment is present
-        let xf_flags = binary::read_u16_le_at(data, offset + 8)?;
-
-        // Bit 4 of xf_flags indicates if alignment is present
-        let has_alignment = (xf_flags & 0x0010) != 0;
-
-        if !has_alignment || offset + 12 > data.len() {
+        let rotation = data[offset + 10];
+        let indent = data[offset + 11];
+        let alignment_flags = data[offset + 12];
+        let property_flags = data[offset + 13];
+        if rotation == 0 && indent == 0 && alignment_flags == 0 && property_flags & 0x0F == 0 {
             return Ok(None);
         }
 
-        // Read alignment flags (2 bytes starting at offset+10)
-        let align_flags = binary::read_u16_le_at(data, offset + 10)?;
-
-        // Extract alignment properties from bitfield
-        let horizontal = HorizontalAlignment::from_u8((align_flags & 0x07) as u8);
-        let vertical = VerticalAlignment::from_u8(((align_flags >> 3) & 0x03) as u8);
-        let wrap_text = (align_flags & 0x0020) != 0;
-        let rotation = ((align_flags >> 6) & 0x000F) as u8;
-        let shrink_to_fit = (align_flags & 0x0400) != 0;
-        let indent = ((align_flags >> 11) & 0x000F) as u8;
-        let text_direction = ((align_flags >> 15) & 0x0003) as u8;
-
-        // Convert rotation from 90-degree units to degrees
-        let rotation_degrees = rotation.saturating_mul(15); // Excel uses 15-degree increments
+        let horizontal = HorizontalAlignment::from_u8(alignment_flags & 0x07);
+        let vertical = VerticalAlignment::from_u8((alignment_flags >> 3) & 0x07);
+        let wrap_text = alignment_flags & 0x40 != 0;
+        let shrink_to_fit = property_flags & 0x01 != 0;
+        let text_direction = (property_flags >> 2) & 0x03;
 
         Ok(Some(Alignment {
             horizontal,
             vertical,
-            rotation: rotation_degrees,
+            rotation,
             indent,
             text_direction,
             wrap_text,
@@ -180,5 +154,29 @@ mod tests {
         assert_eq!(align.vertical, VerticalAlignment::Bottom);
         assert!(!align.wrap_text);
         assert!(!align.shrink_to_fit);
+    }
+
+    #[test]
+    fn parses_brt_xf_alignment_at_spec_offsets() {
+        let mut data = [0u8; 16];
+        data[10] = 45;
+        data[11] = 7;
+        data[12] = 3 | (2 << 3) | 0x40;
+        data[13] = 1 | (2 << 2);
+
+        let alignment = Alignment::parse(&data, 0).unwrap().unwrap();
+        assert_eq!(alignment.horizontal, HorizontalAlignment::Right);
+        assert_eq!(alignment.vertical, VerticalAlignment::Bottom);
+        assert_eq!(alignment.rotation, 45);
+        assert_eq!(alignment.indent, 7);
+        assert_eq!(alignment.text_direction, 2);
+        assert!(alignment.wrap_text);
+        assert!(alignment.shrink_to_fit);
+    }
+
+    #[test]
+    fn omits_default_and_truncated_alignment() {
+        assert!(Alignment::parse(&[0; 16], 0).unwrap().is_none());
+        assert!(Alignment::parse(&[0; 15], 0).unwrap().is_none());
     }
 }

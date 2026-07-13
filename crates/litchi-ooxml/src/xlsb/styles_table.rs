@@ -119,9 +119,7 @@ impl StylesTable {
                 },
                 record_types::END_FONTS => in_fonts = false,
                 record_types::FONT if in_fonts => {
-                    if let Ok(font) = Self::parse_font(data) {
-                        styles.fonts.push(font);
-                    }
+                    styles.fonts.push(Self::parse_font(data)?);
                 },
                 record_types::BEGIN_FILLS => {
                     in_fills = true;
@@ -129,9 +127,7 @@ impl StylesTable {
                 },
                 record_types::END_FILLS => in_fills = false,
                 record_types::FILL if in_fills => {
-                    if let Ok(fill) = Self::parse_fill(data) {
-                        styles.fills.push(fill);
-                    }
+                    styles.fills.push(Self::parse_fill(data)?);
                 },
                 record_types::BEGIN_BORDERS => {
                     in_borders = true;
@@ -139,30 +135,23 @@ impl StylesTable {
                 },
                 record_types::END_BORDERS => in_borders = false,
                 record_types::BORDER if in_borders => {
-                    if let Ok(border) = Self::parse_border(data) {
-                        styles.borders.push(border);
-                    }
+                    styles.borders.push(Self::parse_border(data)?);
                 },
                 record_types::BEGIN_FMTS => in_fmts = true,
                 record_types::END_FMTS => in_fmts = false,
                 record_types::FMT if in_fmts => {
-                    if let Ok((id, format_code)) = Self::parse_num_fmt(data) {
-                        styles.num_fmts.insert(id, format_code);
-                    }
+                    let (id, format_code) = Self::parse_num_fmt(data)?;
+                    styles.num_fmts.insert(id, format_code);
                 },
                 record_types::BEGIN_CELL_XFS => in_cell_xfs = true,
                 record_types::END_CELL_XFS => in_cell_xfs = false,
                 record_types::XF if in_cell_xfs => {
-                    if let Ok(xf) = Self::parse_xf(data) {
-                        styles.cell_xfs.push(xf);
-                    }
+                    styles.cell_xfs.push(Self::parse_xf(data)?);
                 },
                 record_types::BEGIN_CELL_STYLE_XFS => in_cell_style_xfs = true,
                 record_types::END_CELL_STYLE_XFS => in_cell_style_xfs = false,
                 record_types::XF if in_cell_style_xfs => {
-                    if let Ok(xf) = Self::parse_xf(data) {
-                        styles.cell_style_xfs.push(xf);
-                    }
+                    styles.cell_style_xfs.push(Self::parse_xf(data)?);
                 },
                 _ => {
                     // Skip other records
@@ -175,9 +164,10 @@ impl StylesTable {
 
     /// Parse font record
     fn parse_font(data: &[u8]) -> XlsbResult<Font> {
-        if data.len() < 8 {
+        const FONT_NAME_OFFSET: usize = 21;
+        if data.len() < FONT_NAME_OFFSET {
             return Err(XlsbError::InvalidLength {
-                expected: 8,
+                expected: FONT_NAME_OFFSET,
                 found: data.len(),
             });
         }
@@ -187,25 +177,16 @@ impl StylesTable {
         let size = height as f64 / 20.0;
 
         let flags = binary::read_u16_le_at(data, 2)?;
-        let bold = (flags & 0x0001) != 0;
         let italic = (flags & 0x0002) != 0;
-        let underline = (flags & 0x0004) != 0;
         let strike = (flags & 0x0008) != 0;
+        let bold = binary::read_u16_le_at(data, 4)? >= 0x02BC;
+        let underline = data[8] != 0;
 
-        // Color (optional, 4 bytes ARGB)
-        let color = if data.len() >= 12 {
-            Some(binary::read_u32_le_at(data, 8)?)
-        } else {
-            None
-        };
+        let color = Self::parse_direct_color(data, 12)?;
 
-        // Font name
-        let name_offset = if data.len() >= 12 { 12 } else { 8 };
-        let (name, _) = if data.len() > name_offset {
-            wide_str_with_len(&data[name_offset..])?
-        } else {
-            ("Calibri".to_string(), 0)
-        };
+        // bFontScheme is at byte 20; this compact public model does not
+        // currently expose theme font schemes.
+        let (name, _) = wide_str_with_len(&data[FONT_NAME_OFFSET..])?;
 
         Ok(Font {
             size,
@@ -220,22 +201,24 @@ impl StylesTable {
 
     /// Parse fill record
     fn parse_fill(data: &[u8]) -> XlsbResult<Fill> {
-        if data.is_empty() {
-            return Ok(Fill::default());
+        const FIXED_FILL_SIZE: usize = 68;
+        if data.len() < FIXED_FILL_SIZE {
+            return Err(XlsbError::InvalidLength {
+                expected: FIXED_FILL_SIZE,
+                found: data.len(),
+            });
         }
 
-        let pattern_type = if !data.is_empty() { data[0] as u32 } else { 0 };
-
-        let fg_color = if data.len() >= 5 {
-            Some(binary::read_u32_le_at(data, 1)?)
+        let pattern_type = binary::read_u32_le_at(data, 0)?;
+        let (fg_color, bg_color) = if pattern_type == 0x28 {
+            // Gradient fills use the trailing GradientStop array rather than
+            // the two pattern colors.
+            (None, None)
         } else {
-            None
-        };
-
-        let bg_color = if data.len() >= 9 {
-            Some(binary::read_u32_le_at(data, 5)?)
-        } else {
-            None
+            (
+                Self::parse_direct_color(data, 4)?,
+                Self::parse_direct_color(data, 12)?,
+            )
         };
 
         Ok(Fill {
@@ -243,6 +226,37 @@ impl StylesTable {
             fg_color,
             bg_color,
         })
+    }
+
+    /// Decode a direct `BrtColor` into the compact ARGB representation used
+    /// by the public style model. Automatic, indexed, and theme colors cannot
+    /// be resolved without their palette/theme context and are left as None.
+    fn parse_direct_color(data: &[u8], offset: usize) -> XlsbResult<Option<u32>> {
+        if offset + 8 > data.len() {
+            return Err(XlsbError::InvalidLength {
+                expected: offset + 8,
+                found: data.len(),
+            });
+        }
+
+        let flags = data[offset];
+        let valid_rgb = flags & 1 != 0;
+        let color_type = flags >> 1;
+        if color_type != 2 {
+            return Ok(None);
+        }
+        if !valid_rgb {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtColor".to_string(),
+                val: "direct RGB color is not marked valid".to_string(),
+            });
+        }
+
+        let red = u32::from(data[offset + 4]);
+        let green = u32::from(data[offset + 5]);
+        let blue = u32::from(data[offset + 6]);
+        let alpha = u32::from(data[offset + 7]);
+        Ok(Some((alpha << 24) | (red << 16) | (green << 8) | blue))
     }
 
     /// Parse border record using the dedicated border parser
@@ -267,21 +281,20 @@ impl StylesTable {
 
     /// Parse XF (cell format) record
     fn parse_xf(data: &[u8]) -> XlsbResult<CellFormat> {
-        if data.len() < 8 {
+        if data.len() < 16 {
             return Err(XlsbError::InvalidLength {
-                expected: 8,
+                expected: 16,
                 found: data.len(),
             });
         }
 
-        // XF record structure (simplified)
-        let font_id = binary::read_u16_le_at(data, 0)? as u32;
+        let font_id = binary::read_u16_le_at(data, 4)? as u32;
         let num_fmt_id = binary::read_u16_le_at(data, 2)? as u32;
-        let fill_id = binary::read_u16_le_at(data, 4)? as u32;
-        let border_id = binary::read_u16_le_at(data, 6)? as u32;
+        let fill_id = binary::read_u16_le_at(data, 6)? as u32;
+        let border_id = binary::read_u16_le_at(data, 8)? as u32;
 
         // Parse alignment if present using the dedicated alignment parser
-        let alignment = Alignment::parse(data, 0).ok().flatten();
+        let alignment = Alignment::parse(data, 0)?;
 
         Ok(CellFormat {
             font_id,
@@ -369,6 +382,151 @@ impl StylesTable {
                 || format_lower.contains('s')
         } else {
             false
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::xlsb::styles::{HorizontalAlignment, VerticalAlignment};
+    use litchi_opc::{OpcPackage, PackURI};
+    use std::fs::File;
+
+    fn direct_color(argb: u32) -> [u8; 8] {
+        [
+            5,
+            0,
+            0,
+            0,
+            ((argb >> 16) & 0xFF) as u8,
+            ((argb >> 8) & 0xFF) as u8,
+            (argb & 0xFF) as u8,
+            ((argb >> 24) & 0xFF) as u8,
+        ]
+    }
+
+    #[test]
+    fn parses_spec_layout_font_and_direct_color() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&240u16.to_le_bytes());
+        data.extend_from_slice(&0x000Au16.to_le_bytes());
+        data.extend_from_slice(&700u16.to_le_bytes());
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&[1, 2, 0, 0]);
+        data.extend_from_slice(&direct_color(0x80402010));
+        data.push(0);
+        data.extend_from_slice(&5u32.to_le_bytes());
+        for unit in "Arial".encode_utf16() {
+            data.extend_from_slice(&unit.to_le_bytes());
+        }
+
+        let font = StylesTable::parse_font(&data).unwrap();
+        assert_eq!(font.name, "Arial");
+        assert_eq!(font.size, 12.0);
+        assert_eq!(font.color, Some(0x80402010));
+        assert!(font.bold);
+        assert!(font.italic);
+        assert!(font.underline);
+        assert!(font.strike);
+    }
+
+    #[test]
+    fn parses_pattern_fill_colors_at_spec_offsets() {
+        let mut data = vec![0u8; 68];
+        data[0..4].copy_from_slice(&1u32.to_le_bytes());
+        data[4..12].copy_from_slice(&direct_color(0xFFFF0000));
+        data[12..20].copy_from_slice(&direct_color(0x4000FF00));
+
+        let fill = StylesTable::parse_fill(&data).unwrap();
+        assert_eq!(fill.pattern_type, 1);
+        assert_eq!(fill.fg_color, Some(0xFFFF0000));
+        assert_eq!(fill.bg_color, Some(0x4000FF00));
+    }
+
+    #[test]
+    fn parses_xf_indices_and_alignment_at_spec_offsets() {
+        let mut data = [0u8; 16];
+        data[0..2].copy_from_slice(&0x1234u16.to_le_bytes());
+        data[2..4].copy_from_slice(&165u16.to_le_bytes());
+        data[4..6].copy_from_slice(&2u16.to_le_bytes());
+        data[6..8].copy_from_slice(&3u16.to_le_bytes());
+        data[8..10].copy_from_slice(&4u16.to_le_bytes());
+        data[10] = 90;
+        data[11] = 6;
+        data[12] = 2 | (1 << 3) | 0x40;
+        data[13] = 1 | (2 << 2);
+
+        let format = StylesTable::parse_xf(&data).unwrap();
+        assert_eq!(format.num_fmt_id, 165);
+        assert_eq!(format.font_id, 2);
+        assert_eq!(format.fill_id, 3);
+        assert_eq!(format.border_id, 4);
+        let alignment = format.alignment.unwrap();
+        assert_eq!(alignment.horizontal, HorizontalAlignment::Center);
+        assert_eq!(alignment.vertical, VerticalAlignment::Center);
+        assert_eq!(alignment.rotation, 90);
+        assert_eq!(alignment.indent, 6);
+        assert_eq!(alignment.text_direction, 2);
+        assert!(alignment.wrap_text);
+        assert!(alignment.shrink_to_fit);
+    }
+
+    #[test]
+    fn rejects_truncated_style_records_and_invalid_direct_color() {
+        assert!(matches!(
+            StylesTable::parse_font(&[0; 20]),
+            Err(XlsbError::InvalidLength { .. })
+        ));
+        assert!(matches!(
+            StylesTable::parse_fill(&[0; 67]),
+            Err(XlsbError::InvalidLength { .. })
+        ));
+        let invalid = [4, 0, 0, 0, 1, 2, 3, 4];
+        assert!(matches!(
+            StylesTable::parse_direct_color(&invalid, 0),
+            Err(XlsbError::Unrecognized { .. })
+        ));
+    }
+
+    #[test]
+    fn reads_styles_from_real_xlsb_fixtures() {
+        for fixture in [
+            "Simple.xlsb",
+            "hyperlink.xlsb",
+            "date.xlsb",
+            "universal-content.xlsb",
+            "comments.xlsb",
+            "cond_format.xlsb",
+        ] {
+            let path = format!(
+                "{}/../../test-data/ooxml/xlsb/{fixture}",
+                env!("CARGO_MANIFEST_DIR")
+            );
+            let package = OpcPackage::from_reader(File::open(path).unwrap()).unwrap();
+            let part = package
+                .get_part(&PackURI::new("/xl/styles.bin").unwrap())
+                .unwrap();
+            let styles = StylesTable::from_reader(part.blob()).unwrap();
+
+            assert!(!styles.fonts.is_empty(), "{fixture}");
+            assert!(styles.fills.len() >= 2, "{fixture}");
+            assert!(!styles.cell_xfs.is_empty(), "{fixture}");
+            for format in &styles.cell_xfs {
+                assert!((format.font_id as usize) < styles.fonts.len(), "{fixture}");
+                assert!((format.fill_id as usize) < styles.fills.len(), "{fixture}");
+                assert!(
+                    (format.border_id as usize) < styles.borders.len(),
+                    "{fixture}"
+                );
+            }
+
+            if fixture == "universal-content.xlsb" {
+                let default_font = styles.get_font(0).unwrap();
+                assert_eq!(default_font.name, "Arial");
+                assert_eq!(default_font.size, 10.0);
+                assert!(default_font.color.is_none());
+            }
         }
     }
 }

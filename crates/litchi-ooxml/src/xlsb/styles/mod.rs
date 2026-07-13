@@ -9,8 +9,5 @@ pub mod border_parser;
 pub use alignment_parser::Alignment;
 pub use border_parser::Border;
 
-// Re-export detailed types for internal use
-#[allow(unused_imports)]
-pub(crate) use alignment_parser::{HorizontalAlignment, VerticalAlignment};
-#[allow(unused_imports)]
-pub(crate) use border_parser::{BorderSide, BorderStyle};
+pub use alignment_parser::{HorizontalAlignment, VerticalAlignment};
+pub use border_parser::{BorderSide, BorderStyle};

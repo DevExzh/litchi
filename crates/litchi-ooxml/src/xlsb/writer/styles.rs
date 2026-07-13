@@ -3,9 +3,9 @@
 //! This module provides functionality to write style information (fonts, fills, borders, etc.)
 //! to XLSB binary format files.
 
-use crate::xlsb::error::XlsbResult;
+use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::records::record_types;
-use crate::xlsb::styles::Border;
+use crate::xlsb::styles::{Border, BorderSide};
 use crate::xlsb::styles_table::{Fill, Font};
 use crate::xlsb::writer::RecordWriter;
 use std::io::Write;
@@ -38,7 +38,13 @@ impl StylesWriter {
     pub fn new() -> Self {
         StylesWriter {
             fonts: vec![Font::default()],
-            fills: vec![Fill::default(), Fill::default()],
+            fills: vec![
+                Fill::default(),
+                Fill {
+                    pattern_type: 17,
+                    ..Fill::default()
+                },
+            ],
             borders: vec![Border::default()],
             dxfs: Vec::new(),
         }
@@ -131,8 +137,8 @@ impl StylesWriter {
 
         // Fonts, fills, borders
         self.write_default_fonts(writer)?;
-        self.write_default_fills(writer)?;
-        self.write_default_borders(writer)?;
+        self.write_fills(writer)?;
+        self.write_borders(writer)?;
 
         // Cell style XFs and cell XFs
         self.write_default_cell_style_xfs(writer)?;
@@ -187,32 +193,26 @@ impl StylesWriter {
         Ok(())
     }
 
-    /// Write fills. To keep the writer simple and fully spec-compliant we
-    /// currently emit the two standard fills used by Excel and SheetJS:
-    /// `none` (pattern 0) and `gray125` (pattern 17). Custom fills tracked in
-    /// the `fills` vector are not yet serialized.
-    fn write_default_fills<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    /// Write the standard and user-added pattern fills.
+    fn write_fills<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
         let mut count_data = Vec::new();
         let mut temp_writer = RecordWriter::new(&mut count_data);
-        temp_writer.write_u32(2)?; // exactly two fills: none and gray125
+        temp_writer.write_u32(self.fills.len() as u32)?;
         writer.write_record(record_types::BEGIN_FILLS, &count_data)?;
 
-        // Pattern codes follow the XLSB Fls enumeration as used by SheetJS:
-        // 0 = none, 17 = gray125.
-        for pattern in [0u32, 17u32] {
+        for fill in &self.fills {
+            if !matches!(fill.pattern_type, 0..=18) {
+                return Err(XlsbError::UnsupportedFeature(format!(
+                    "XLSB fill pattern {} is not a supported pattern fill",
+                    fill.pattern_type
+                )));
+            }
             let mut fill_data = Vec::new();
             let mut temp = RecordWriter::new(&mut fill_data);
 
-            // Fls (4 bytes)
-            temp.write_u32(pattern)?;
-
-            // BrtColor (FG) - automatic
-            temp.write_u32(0)?;
-            temp.write_u32(0)?;
-
-            // BrtColor (BG) - automatic
-            temp.write_u32(0)?;
-            temp.write_u32(0)?;
+            temp.write_u32(fill.pattern_type)?;
+            Self::write_brt_color(&mut temp, fill.fg_color)?;
+            Self::write_brt_color(&mut temp, fill.bg_color)?;
 
             // 12 reserved u32 values (gradient / extra fields)
             for _ in 0..12 {
@@ -226,32 +226,53 @@ impl StylesWriter {
         Ok(())
     }
 
-    /// Write borders. For now we emit a single default border using the same
-    /// payload shape as SheetJS' `write_BrtBorder`, which is sufficient for
-    /// default workbooks.
-    fn write_default_borders<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    /// Write cell borders as `BrtBorder` records.
+    fn write_borders<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
         let mut count_data = Vec::new();
         let mut temp_writer = RecordWriter::new(&mut count_data);
-        temp_writer.write_u32(1)?; // one default border
+        temp_writer.write_u32(self.borders.len() as u32)?;
         writer.write_record(record_types::BEGIN_BORDERS, &count_data)?;
 
-        let mut border_data = Vec::new();
-        let mut temp = RecordWriter::new(&mut border_data);
+        for border in &self.borders {
+            if border.vertical.is_some() || border.horizontal.is_some() {
+                return Err(XlsbError::UnsupportedFeature(
+                    "vertical and horizontal table borders are not BrtBorder fields".to_string(),
+                ));
+            }
+            if (border.diagonal_down || border.diagonal_up) && border.diagonal.is_none() {
+                return Err(XlsbError::Unrecognized {
+                    typ: "BrtBorder diagonal".to_string(),
+                    val: "direction is set without a diagonal border".to_string(),
+                });
+            }
 
-        // Diagonal flags (1 byte)
-        temp.write_u8(0)?;
-
-        // Five Blxf structures (top, bottom, left, right, diagonal), each:
-        // 1 byte dg, 1 byte reserved, 4 bytes color, 4 bytes color.
-        for _ in 0..5 {
-            temp.write_u8(0)?; // dg
-            temp.write_u8(0)?; // reserved
-            temp.write_u32(0)?; // color 1
-            temp.write_u32(0)?; // color 2
+            let mut border_data = Vec::new();
+            let mut temp = RecordWriter::new(&mut border_data);
+            temp.write_u8(u8::from(border.diagonal_down) | (u8::from(border.diagonal_up) << 1))?;
+            Self::write_blxf(&mut temp, border.top.as_ref())?;
+            Self::write_blxf(&mut temp, border.bottom.as_ref())?;
+            Self::write_blxf(&mut temp, border.left.as_ref())?;
+            Self::write_blxf(&mut temp, border.right.as_ref())?;
+            Self::write_blxf(&mut temp, border.diagonal.as_ref())?;
+            writer.write_record(record_types::BORDER, &border_data)?;
         }
 
-        writer.write_record(record_types::BORDER, &border_data)?;
         writer.write_record(record_types::END_BORDERS, &[])?;
+        Ok(())
+    }
+
+    fn write_blxf<W: Write>(
+        writer: &mut RecordWriter<W>,
+        side: Option<&BorderSide>,
+    ) -> XlsbResult<()> {
+        if let Some(side) = side {
+            writer.write_u8(side.style as u8)?;
+            writer.write_u8(0)?;
+            Self::write_brt_color(writer, side.color)?;
+        } else {
+            writer.write_u16(0)?;
+            Self::write_brt_color(writer, None)?;
+        }
         Ok(())
     }
 
@@ -458,12 +479,26 @@ impl StylesWriter {
     /// structure used by this crate. This closely follows SheetJS'
     /// `write_BrtFont` implementation.
     fn write_font_record<W: Write>(writer: &mut RecordWriter<W>, font: &Font) -> XlsbResult<()> {
+        let height = (font.size * 20.0).round();
+        if !font.size.is_finite() || !(20.0..=8191.0).contains(&height) {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtFont height".to_string(),
+                val: font.size.to_string(),
+            });
+        }
+        let name_len = font.name.encode_utf16().count();
+        if !(1..=31).contains(&name_len) {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtFont name length".to_string(),
+                val: name_len.to_string(),
+            });
+        }
+
         let mut font_data = Vec::new();
         let mut temp_writer = RecordWriter::new(&mut font_data);
 
         // Height in twips (size * 20)
-        let height = (font.size * 20.0).round() as u16;
-        temp_writer.write_u16(height)?;
+        temp_writer.write_u16(height as u16)?;
 
         // FontFlags (2 bytes) – we currently map italic and strikeout only.
         let mut grbit: u8 = 0;
@@ -493,10 +528,7 @@ impl StylesWriter {
         temp_writer.write_u8(0)?; // charset
         temp_writer.write_u8(0)?; // reserved
 
-        // BrtColor: we currently always emit automatic color (8 zero bytes).
-        // TODO: honor `font.color` by mapping ARGB to BrtColor when needed.
-        temp_writer.write_u32(0)?;
-        temp_writer.write_u32(0)?;
+        Self::write_brt_color(&mut temp_writer, font.color)?;
 
         // Scheme: 2 = minor (Calibri in the default theme).
         temp_writer.write_u8(2)?;
@@ -505,6 +537,27 @@ impl StylesWriter {
         temp_writer.write_wide_string(&font.name)?;
 
         writer.write_record(record_types::FONT, &font_data)?;
+        Ok(())
+    }
+
+    /// Write an automatic or direct ARGB `BrtColor`.
+    fn write_brt_color<W: Write>(
+        writer: &mut RecordWriter<W>,
+        color: Option<u32>,
+    ) -> XlsbResult<()> {
+        if let Some(argb) = color {
+            // fValidRGB=1, xColorType=2 (direct ARGB).
+            writer.write_u8((2 << 1) | 1)?;
+            writer.write_u8(0)?; // index is ignored for direct colors
+            writer.write_u16(0)?; // no tint or shade
+            writer.write_u8(((argb >> 16) & 0xFF) as u8)?;
+            writer.write_u8(((argb >> 8) & 0xFF) as u8)?;
+            writer.write_u8((argb & 0xFF) as u8)?;
+            writer.write_u8(((argb >> 24) & 0xFF) as u8)?;
+        } else {
+            writer.write_u32(0)?;
+            writer.write_u32(0)?;
+        }
         Ok(())
     }
 }
@@ -518,6 +571,8 @@ impl Default for StylesWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::xlsb::{BorderStyle, StylesTable};
+    use std::io::Cursor;
 
     #[test]
     fn test_styles_writer_new() {
@@ -559,6 +614,72 @@ mod tests {
         let idx = writer.add_fill(fill);
         assert_eq!(idx, 2); // Index after default fills
         assert_eq!(writer.fills.len(), 3);
+    }
+
+    #[test]
+    fn writes_and_reads_direct_font_and_pattern_fill_colors() {
+        let mut styles = StylesWriter::new();
+        styles.add_font(Font {
+            name: "Arial".to_string(),
+            size: 12.0,
+            color: Some(0x80402010),
+            bold: true,
+            italic: true,
+            underline: true,
+            strike: true,
+        });
+        styles.add_fill(Fill {
+            pattern_type: 1,
+            fg_color: Some(0xFFFF0000),
+            bg_color: Some(0x4000FF00),
+        });
+        styles.add_border(Border {
+            top: Some(BorderSide {
+                style: BorderStyle::Thin,
+                color: Some(0xFF112233),
+            }),
+            diagonal: Some(BorderSide {
+                style: BorderStyle::Double,
+                color: Some(0x80402010),
+            }),
+            diagonal_down: true,
+            ..Border::default()
+        });
+
+        let mut bytes = Vec::new();
+        styles.write(&mut RecordWriter::new(&mut bytes)).unwrap();
+        let parsed = StylesTable::from_reader(Cursor::new(bytes)).unwrap();
+
+        let font = parsed.get_font(1).unwrap();
+        assert_eq!(font.name, "Arial");
+        assert_eq!(font.size, 12.0);
+        assert_eq!(font.color, Some(0x80402010));
+        assert!(font.bold);
+        assert!(font.italic);
+        assert!(font.underline);
+        assert!(font.strike);
+
+        assert_eq!(parsed.get_fill(1).unwrap().pattern_type, 17);
+        let fill = parsed.get_fill(2).unwrap();
+        assert_eq!(fill.pattern_type, 1);
+        assert_eq!(fill.fg_color, Some(0xFFFF0000));
+        assert_eq!(fill.bg_color, Some(0x4000FF00));
+
+        let border = parsed.get_border(1).unwrap();
+        assert_eq!(border.top.as_ref().unwrap().style, BorderStyle::Thin);
+        assert_eq!(border.top.as_ref().unwrap().color, Some(0xFF112233));
+        assert_eq!(border.diagonal.as_ref().unwrap().style, BorderStyle::Double);
+        assert_eq!(border.diagonal.as_ref().unwrap().color, Some(0x80402010));
+        assert!(border.diagonal_down);
+        assert!(!border.diagonal_up);
+    }
+
+    #[test]
+    fn direct_brt_color_uses_rgba_byte_order() {
+        let mut bytes = Vec::new();
+        StylesWriter::write_brt_color(&mut RecordWriter::new(&mut bytes), Some(0x80402010))
+            .unwrap();
+        assert_eq!(bytes, [5, 0, 0, 0, 0x40, 0x20, 0x10, 0x80]);
     }
 
     #[test]

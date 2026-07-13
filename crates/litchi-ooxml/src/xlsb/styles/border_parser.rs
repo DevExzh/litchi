@@ -3,8 +3,7 @@
 //! This module implements parsing for BrtBorder records according to the MS-XLSB specification.
 //! Reference: [MS-XLSB] Section 2.4.55 - BrtBorder
 
-use crate::xlsb::error::XlsbResult;
-use litchi_core::binary;
+use crate::xlsb::error::{XlsbError, XlsbResult};
 
 /// Border side information
 #[derive(Debug, Clone)]
@@ -66,6 +65,8 @@ pub struct Border {
     pub diagonal: Option<BorderSide>,
     pub vertical: Option<BorderSide>,
     pub horizontal: Option<BorderSide>,
+    pub diagonal_down: bool,
+    pub diagonal_up: bool,
 }
 
 impl Border {
@@ -74,117 +75,72 @@ impl Border {
     /// # BrtBorder Structure (MS-XLSB Section 2.4.55)
     ///
     /// The BrtBorder record specifies border formatting properties.
-    /// Each border side is encoded with:
-    /// - 1 byte: border style
-    /// - 4 bytes: ARGB color (optional)
+    /// Each border side is a 10-byte `Blxf`: style, reserved byte, and an
+    /// 8-byte `BrtColor`.
     pub fn parse(data: &[u8]) -> XlsbResult<Self> {
-        if data.is_empty() {
-            return Ok(Border::default());
+        const BORDER_SIZE: usize = 51;
+        if data.len() < BORDER_SIZE {
+            return Err(XlsbError::InvalidLength {
+                expected: BORDER_SIZE,
+                found: data.len(),
+            });
+        }
+        let flags = data[0];
+        if flags & !0x03 != 0 {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBorder flags".to_string(),
+                val: format!("0x{flags:02X}"),
+            });
         }
 
-        let mut offset = 0;
-        let mut border = Border::default();
-
-        // Read flags to determine which borders are present
-        if data.len() < 2 {
-            return Ok(border);
-        }
-
-        let flags = binary::read_u16_le_at(data, offset)?;
-        offset += 2;
-
-        // Bit flags indicate which borders are defined
-        // Bit 0: top
-        // Bit 1: bottom
-        // Bit 2: left
-        // Bit 3: right
-        // Bit 4: diagonal
-        // Bit 5: vertical (for table borders)
-        // Bit 6: horizontal (for table borders)
-
-        // Parse top border
-        if (flags & 0x01) != 0
-            && let Some(side) = Self::parse_border_side(data, &mut offset)?
-        {
-            border.top = Some(side);
-        }
-
-        // Parse bottom border
-        if (flags & 0x02) != 0
-            && let Some(side) = Self::parse_border_side(data, &mut offset)?
-        {
-            border.bottom = Some(side);
-        }
-
-        // Parse left border
-        if (flags & 0x04) != 0
-            && let Some(side) = Self::parse_border_side(data, &mut offset)?
-        {
-            border.left = Some(side);
-        }
-
-        // Parse right border
-        if (flags & 0x08) != 0
-            && let Some(side) = Self::parse_border_side(data, &mut offset)?
-        {
-            border.right = Some(side);
-        }
-
-        // Parse diagonal border
-        if (flags & 0x10) != 0
-            && let Some(side) = Self::parse_border_side(data, &mut offset)?
-        {
-            border.diagonal = Some(side);
-        }
-
-        // Parse vertical border (for table borders)
-        if (flags & 0x20) != 0
-            && let Some(side) = Self::parse_border_side(data, &mut offset)?
-        {
-            border.vertical = Some(side);
-        }
-
-        // Parse horizontal border (for table borders)
-        if (flags & 0x40) != 0
-            && let Some(side) = Self::parse_border_side(data, &mut offset)?
-        {
-            border.horizontal = Some(side);
-        }
-
-        Ok(border)
+        Ok(Border {
+            top: Self::parse_blxf(&data[1..11])?,
+            bottom: Self::parse_blxf(&data[11..21])?,
+            left: Self::parse_blxf(&data[21..31])?,
+            right: Self::parse_blxf(&data[31..41])?,
+            diagonal: Self::parse_blxf(&data[41..51])?,
+            vertical: None,
+            horizontal: None,
+            diagonal_down: flags & 1 != 0,
+            diagonal_up: flags & 2 != 0,
+        })
     }
 
-    /// Parse a single border side
-    ///
-    /// Format:
-    /// - 1 byte: border style
-    /// - 4 bytes: color (ARGB) - optional based on style
-    fn parse_border_side(data: &[u8], offset: &mut usize) -> XlsbResult<Option<BorderSide>> {
-        if *offset >= data.len() {
-            return Ok(None);
+    fn parse_blxf(data: &[u8]) -> XlsbResult<Option<BorderSide>> {
+        let style_byte = data[0];
+        if style_byte > 13 || data[1] != 0 {
+            return Err(XlsbError::Unrecognized {
+                typ: "Blxf".to_string(),
+                val: format!("style 0x{style_byte:02X}, reserved 0x{:02X}", data[1]),
+            });
         }
-
-        // Read border style
-        let style_byte = data[*offset];
-        *offset += 1;
-
         let style = BorderStyle::from_u8(style_byte);
-
-        // If style is None, no color follows
         if style == BorderStyle::None {
             return Ok(None);
         }
 
-        // Read color (4 bytes ARGB)
-        let color = if *offset + 4 <= data.len() {
-            let c = binary::read_u32_le_at(data, *offset)?;
-            *offset += 4;
-            Some(c)
-        } else {
-            None
-        };
-
+        let color = Self::parse_direct_color(&data[2..10])?;
         Ok(Some(BorderSide { style, color }))
+    }
+
+    fn parse_direct_color(data: &[u8]) -> XlsbResult<Option<u32>> {
+        let valid_rgb = data[0] & 1 != 0;
+        let color_type = data[0] >> 1;
+        if color_type != 2 {
+            return Ok(None);
+        }
+        if !valid_rgb {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtColor".to_string(),
+                val: "direct RGB color is not marked valid".to_string(),
+            });
+        }
+        Ok(Some(
+            (u32::from(data[7]) << 24)
+                | (u32::from(data[4]) << 16)
+                | (u32::from(data[5]) << 8)
+                | u32::from(data[6]),
+        ))
     }
 }
 
@@ -202,20 +158,33 @@ mod tests {
 
     #[test]
     fn test_empty_border() {
-        let border = Border::parse(&[]).unwrap();
-        assert!(border.top.is_none());
-        assert!(border.bottom.is_none());
+        assert!(matches!(
+            Border::parse(&[]),
+            Err(XlsbError::InvalidLength { .. })
+        ));
     }
 
     #[test]
     fn test_border_with_top() {
-        // Flags: 0x01 (top border present)
-        // Style: 0x01 (Thin)
-        // Color: 0x00000000 (black)
-        let data = vec![0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00];
+        let mut data = vec![0; 51];
+        data[1] = 1;
+        data[3..11].copy_from_slice(&[5, 0, 0, 0, 0x40, 0x20, 0x10, 0x80]);
         let border = Border::parse(&data).unwrap();
         assert!(border.top.is_some());
         let top = border.top.unwrap();
         assert_eq!(top.style, BorderStyle::Thin);
+        assert_eq!(top.color, Some(0x80402010));
+        assert!(border.bottom.is_none());
+    }
+
+    #[test]
+    fn parses_diagonal_flags_and_side() {
+        let mut data = vec![0; 51];
+        data[0] = 3;
+        data[41] = 6;
+        let border = Border::parse(&data).unwrap();
+        assert!(border.diagonal_down);
+        assert!(border.diagonal_up);
+        assert_eq!(border.diagonal.unwrap().style, BorderStyle::Double);
     }
 }

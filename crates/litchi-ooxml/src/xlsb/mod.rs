@@ -153,7 +153,10 @@ pub mod formula;
 
 pub use cell::XlsbCell;
 pub use error::{XlsbError, XlsbResult};
-pub use styles_table::StylesTable;
+pub use styles::{
+    Alignment, Border, BorderSide, BorderStyle, HorizontalAlignment, VerticalAlignment,
+};
+pub use styles_table::{CellFormat, Fill, Font, StylesTable};
 pub use workbook::XlsbWorkbook;
 pub use worksheet::XlsbWorksheet;
 // Re-export low-level record iterator types for diagnostics and advanced users.
