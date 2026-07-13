@@ -205,6 +205,7 @@ pub mod record_types {
     pub const BEGIN_EXTERNALS: u16 = 0x0161;
     pub const END_EXTERNALS: u16 = 0x0162;
     pub const SUP_BOOK_SRC: u16 = 0x0163;
+    pub const SUP_ADDIN: u16 = 0x0164;
     pub const SUP_SELF: u16 = 0x0165;
     pub const SUP_SAME: u16 = 0x0166;
     pub const SUP_TABS: u16 = 0x0167;
@@ -325,14 +326,18 @@ pub fn wide_str(buf: &[u8], str_len: &mut usize) -> XlsbResult<String> {
     }
 
     let len = binary::read_u32_le_at(buf, 0)? as usize;
-    if buf.len() < 4 + len * 2 {
+    let consumed = len
+        .checked_mul(2)
+        .and_then(|byte_len| byte_len.checked_add(4))
+        .ok_or_else(|| XlsbError::Encoding("wide string length overflow".to_string()))?;
+    if buf.len() < consumed {
         return Err(XlsbError::WideStringLength {
-            expected: 4 + len * 2,
+            expected: consumed,
             actual: buf.len(),
         });
     }
 
-    *str_len = 4 + len * 2;
+    *str_len = consumed;
     let utf16_data = &buf[4..*str_len];
 
     // Convert UTF-16LE to UTF-8 using encoding_rs
@@ -350,14 +355,17 @@ pub fn wide_str_with_len(buf: &[u8]) -> XlsbResult<(String, usize)> {
     }
 
     let len = binary::read_u32_le_at(buf, 0)? as usize;
-    if buf.len() < 4 + len * 2 {
+    let consumed = len
+        .checked_mul(2)
+        .and_then(|byte_len| byte_len.checked_add(4))
+        .ok_or_else(|| XlsbError::Encoding("wide string length overflow".to_string()))?;
+    if buf.len() < consumed {
         return Err(XlsbError::WideStringLength {
-            expected: 4 + len * 2,
+            expected: consumed,
             actual: buf.len(),
         });
     }
 
-    let consumed = 4 + len * 2;
     let utf16_data = &buf[4..consumed];
 
     // Convert UTF-16LE to UTF-8 using encoding_rs
@@ -883,50 +891,14 @@ pub struct NameRecord {
 impl NameRecord {
     #[allow(dead_code)]
     pub fn parse(data: &[u8]) -> XlsbResult<Self> {
-        if data.len() < 8 {
-            return Err(XlsbError::InvalidLength {
-                expected: 8,
-                found: data.len(),
-            });
-        }
-
-        let flags = binary::read_u32_le_at(data, 0)?;
-        let hidden = (flags & 0x0001) != 0;
-        let function = (flags & 0x0002) != 0;
-
-        // Sheet ID (-1 for global scope, otherwise sheet-specific)
-        let sheet_id_raw = binary::read_u32_le_at(data, 4)? as i32;
-        let sheet_id = if sheet_id_raw == -1 {
-            None
-        } else {
-            Some(sheet_id_raw as u32)
-        };
-
-        let mut offset = 8;
-
-        // Read name
-        let (name, consumed) = wide_str_with_len(&data[offset..])?;
-        offset += consumed;
-
-        // Read formula if present
-        let formula = if offset < data.len() {
-            let formula_len = binary::read_u32_le_at(data, offset)? as usize;
-            offset += 4;
-            if data.len() >= offset + formula_len {
-                Some(data[offset..offset + formula_len].to_vec())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        let named_range = crate::xlsb::named_ranges::NamedRange::parse(data)?;
 
         Ok(NameRecord {
-            name,
-            formula,
-            sheet_id,
-            hidden,
-            function,
+            name: named_range.name,
+            formula: named_range.formula,
+            sheet_id: named_range.sheet_id,
+            hidden: named_range.hidden,
+            function: named_range.function,
         })
     }
 }

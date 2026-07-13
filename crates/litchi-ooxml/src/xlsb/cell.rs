@@ -2,6 +2,7 @@
 
 use crate::xlsb::formula::{
     CellParsedFormula, FormulaConverter, FormulaGroup, FormulaGroupKind, FormulaParser,
+    FormulaResolutionContext,
 };
 use crate::xlsb::records::CellRecord;
 use litchi_core::sheet::{Cell, CellValue};
@@ -64,10 +65,13 @@ impl XlsbCell {
         cached_value: CellValue,
         formula: CellParsedFormula,
         formula_flags: u16,
+        formula_context: &FormulaResolutionContext,
     ) -> Self {
         let value = FormulaParser::with_extra(&formula.rgce, &formula.rgcb)
             .parse()
-            .and_then(|tokens| FormulaConverter::try_tokens_to_string(&tokens))
+            .and_then(|tokens| {
+                FormulaConverter::try_tokens_to_string_with_context(&tokens, formula_context)
+            })
             .map(|formula_text| CellValue::Formula {
                 formula: formula_text,
                 cached_value: Some(Box::new(cached_value.clone())),
@@ -94,6 +98,7 @@ impl XlsbCell {
         placeholder: CellParsedFormula,
         formula_flags: u16,
         group: Arc<FormulaGroup>,
+        formula_context: &FormulaResolutionContext,
     ) -> Self {
         let tokens = match group.kind {
             FormulaGroupKind::Array => {
@@ -109,7 +114,9 @@ impl XlsbCell {
         };
         let is_array = group.kind == FormulaGroupKind::Array;
         let value = tokens
-            .and_then(|tokens| FormulaConverter::try_tokens_to_string(&tokens))
+            .and_then(|tokens| {
+                FormulaConverter::try_tokens_to_string_with_context(&tokens, formula_context)
+            })
             .map(|formula_text| CellValue::Formula {
                 formula: formula_text,
                 cached_value: Some(Box::new(cached_value.clone())),

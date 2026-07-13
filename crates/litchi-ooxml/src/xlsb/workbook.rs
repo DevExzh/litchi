@@ -1,8 +1,11 @@
 //! Workbook implementation for XLSB files
 
 use crate::xlsb::error::XlsbResult;
+use crate::xlsb::formula::{FormulaExternalSheet, FormulaResolutionContext, FormulaSupportingLink};
+use crate::xlsb::named_ranges::NamedRange;
 use crate::xlsb::records::{XlsbRecordIter, record_types};
 use crate::xlsb::worksheet::XlsbWorksheet;
+use litchi_core::binary;
 use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
 use litchi_opc::OpcPackage;
 use std::io::{BufReader, Cursor, Read, Seek};
@@ -12,7 +15,7 @@ use std::io::{BufReader, Cursor, Read, Seek};
 pub struct XlsbWorkbook {
     package: OpcPackage,
     worksheets: Vec<XlsbWorksheet>,
-    worksheet_names: Vec<String>,
+    formula_context: FormulaResolutionContext,
     shared_strings: Vec<String>,
     is_1904: bool,
 }
@@ -20,7 +23,7 @@ pub struct XlsbWorkbook {
 impl std::fmt::Debug for XlsbWorkbook {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("XlsbWorkbook")
-            .field("worksheet_names", &self.worksheet_names)
+            .field("worksheet_names", &self.formula_context.worksheet_names)
             .field("shared_strings_count", &self.shared_strings.len())
             .field("is_1904", &self.is_1904)
             .finish()
@@ -28,13 +31,18 @@ impl std::fmt::Debug for XlsbWorkbook {
 }
 
 impl XlsbWorkbook {
+    /// Workbook and sheet-scoped defined names in `PtgName` index order.
+    pub fn defined_names(&self) -> &[String] {
+        &self.formula_context.defined_names
+    }
+
     /// Open an XLSB workbook from a reader
     pub fn new<R: Read + Seek>(reader: R) -> XlsbResult<Self> {
         let package = OpcPackage::from_reader(reader)?;
         let mut workbook = XlsbWorkbook {
             package,
             worksheets: Vec::new(),
-            worksheet_names: Vec::new(),
+            formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
             is_1904: false,
         };
@@ -57,7 +65,7 @@ impl XlsbWorkbook {
         let mut workbook = XlsbWorkbook {
             package,
             worksheets: Vec::new(),
-            worksheet_names: Vec::new(),
+            formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
             is_1904: false,
         };
@@ -75,7 +83,25 @@ impl XlsbWorkbook {
 
         let blob = workbook_part.blob();
         let mut iter = XlsbRecordIter::new(BufReader::new(blob));
-        Self::read_workbook(&mut iter, &mut self.worksheet_names, &mut self.is_1904)?;
+        let mut worksheet_names = Vec::new();
+        let mut supporting_links = Vec::new();
+        let mut external_sheets = Vec::new();
+        let mut defined_names = Vec::new();
+        Self::read_workbook(
+            &mut iter,
+            &mut worksheet_names,
+            &mut supporting_links,
+            &mut external_sheets,
+            &mut defined_names,
+            &mut self.is_1904,
+        )?;
+        self.formula_context = FormulaResolutionContext {
+            worksheet_names: worksheet_names.into(),
+            supporting_links: supporting_links.into(),
+            external_sheets: external_sheets.into(),
+            defined_names: defined_names.into(),
+            current_sheet: None,
+        };
 
         Ok(())
     }
@@ -94,7 +120,7 @@ impl XlsbWorkbook {
 
     /// Get a worksheet by index (lazy loading)
     fn get_worksheet(&self, index: usize) -> XlsbResult<XlsbWorksheet> {
-        if index >= self.worksheet_names.len() {
+        if index >= self.formula_context.worksheet_names.len() {
             return Err(crate::error::OoxmlError::InvalidFormat(format!(
                 "Worksheet index {} out of bounds",
                 index
@@ -102,7 +128,7 @@ impl XlsbWorkbook {
             .into());
         }
 
-        let name = &self.worksheet_names[index];
+        let name = &self.formula_context.worksheet_names[index];
         // For now, assume worksheets are at xl/worksheets/sheet1.bin, sheet2.bin, etc.
         let sheet_path = format!("/xl/worksheets/sheet{}.bin", index + 1);
         let sheet_uri = litchi_opc::PackURI::new(&sheet_path)?;
@@ -110,7 +136,13 @@ impl XlsbWorkbook {
         let sheet_part = self.package.get_part(&sheet_uri)?;
         let blob = sheet_part.blob();
         let cursor = Cursor::new(blob);
-        Self::read_worksheet(cursor, name.clone(), &self.shared_strings)
+        Self::read_worksheet(
+            cursor,
+            name.clone(),
+            &self.shared_strings,
+            &self.formula_context,
+            index,
+        )
     }
 
     /// Read shared strings from SST
@@ -144,6 +176,9 @@ impl XlsbWorkbook {
     fn read_workbook(
         iter: &mut XlsbRecordIter<impl Read>,
         worksheet_names: &mut Vec<String>,
+        supporting_links: &mut Vec<FormulaSupportingLink>,
+        external_sheets: &mut Vec<FormulaExternalSheet>,
+        defined_names: &mut Vec<String>,
         is_1904: &mut bool,
     ) -> XlsbResult<()> {
         for record in iter.by_ref() {
@@ -156,17 +191,36 @@ impl XlsbWorkbook {
                     }
                 },
                 record_types::BUNDLE_SH => {
-                    match crate::xlsb::records::BundleSheetRecord::parse(&record.data) {
-                        Ok(bundle_sh) => {
-                            worksheet_names.push(bundle_sh.name);
-                        },
-                        Err(_e) => {
-                            // Failed to parse BundleSheetRecord
-                        },
-                    }
+                    let bundle_sh = crate::xlsb::records::BundleSheetRecord::parse(&record.data)?;
+                    worksheet_names.push(bundle_sh.name);
                 },
-                record_types::END_BUNDLE_SHS => {
-                    break;
+                record_types::SUP_SELF => {
+                    supporting_links.push(FormulaSupportingLink::SelfWorkbook);
+                },
+                record_types::SUP_SAME => {
+                    supporting_links.push(FormulaSupportingLink::SameSheet);
+                },
+                record_types::SUP_BOOK_SRC => {
+                    supporting_links.push(FormulaSupportingLink::ExternalWorkbook);
+                },
+                record_types::SUP_ADDIN => {
+                    supporting_links.push(FormulaSupportingLink::AddIn);
+                },
+                record_types::EXTERN_SHEET => {
+                    Self::parse_extern_sheet(&record.data, external_sheets)?;
+                },
+                record_types::NAME => {
+                    let named_range = NamedRange::parse(&record.data)?;
+                    if named_range
+                        .sheet_id
+                        .is_some_and(|index| index as usize >= worksheet_names.len())
+                    {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                            "BrtName {} has invalid sheet scope {:?}",
+                            named_range.name, named_range.sheet_id
+                        )));
+                    }
+                    defined_names.push(named_range.name);
                 },
                 _ => {
                     // Skip other records
@@ -181,11 +235,17 @@ impl XlsbWorkbook {
         cursor: Cursor<&[u8]>,
         name: String,
         shared_strings: &[String],
+        formula_context: &FormulaResolutionContext,
+        sheet_index: usize,
     ) -> XlsbResult<XlsbWorksheet> {
         let mut worksheet = XlsbWorksheet::new(name);
         let iter = crate::xlsb::records::RecordIter::<std::io::Cursor<&[u8]>>::from_cursor(cursor);
-        let mut cells_reader =
-            crate::xlsb::cells_reader::XlsbCellsReader::new(iter, shared_strings.to_vec())?;
+        let formula_context = formula_context.for_sheet(sheet_index);
+        let mut cells_reader = crate::xlsb::cells_reader::XlsbCellsReader::new(
+            iter,
+            shared_strings,
+            &formula_context,
+        )?;
 
         // Read all cells
         while let Some(cell) = cells_reader.next_cell()? {
@@ -202,6 +262,54 @@ impl XlsbWorkbook {
 
         Ok(worksheet)
     }
+
+    fn parse_extern_sheet(
+        data: &[u8],
+        external_sheets: &mut Vec<FormulaExternalSheet>,
+    ) -> XlsbResult<()> {
+        if data.len() < 4 {
+            return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                expected: 4,
+                found: data.len(),
+            });
+        }
+        let count = usize::try_from(binary::read_u32_le_at(data, 0)?).map_err(|_| {
+            crate::xlsb::error::XlsbError::InvalidFormula(
+                "BrtExternSheet count overflow".to_string(),
+            )
+        })?;
+        if count >= 65_536 {
+            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                "BrtExternSheet count {count} exceeds 65,535"
+            )));
+        }
+        let expected = 4usize
+            .checked_add(count.checked_mul(12).ok_or_else(|| {
+                crate::xlsb::error::XlsbError::InvalidFormula(
+                    "BrtExternSheet size overflow".to_string(),
+                )
+            })?)
+            .ok_or_else(|| {
+                crate::xlsb::error::XlsbError::InvalidFormula(
+                    "BrtExternSheet size overflow".to_string(),
+                )
+            })?;
+        if data.len() != expected {
+            return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                expected,
+                found: data.len(),
+            });
+        }
+        external_sheets.reserve(count);
+        for chunk in data[4..].chunks_exact(12) {
+            external_sheets.push(FormulaExternalSheet {
+                external_link: binary::read_u32_le_at(chunk, 0)?,
+                first_sheet: binary::read_u32_le_at(chunk, 4)? as i32,
+                last_sheet: binary::read_u32_le_at(chunk, 8)? as i32,
+            });
+        }
+        Ok(())
+    }
 }
 
 impl litchi_core::sheet::WorkbookTrait for XlsbWorkbook {
@@ -214,12 +322,12 @@ impl litchi_core::sheet::WorkbookTrait for XlsbWorkbook {
     }
 
     fn worksheet_count(&self) -> usize {
-        self.worksheet_names.len()
+        self.formula_context.worksheet_names.len()
     }
 
     fn worksheet_names(&self) -> &[String] {
         // Return slice reference - zero-copy!
-        &self.worksheet_names
+        &self.formula_context.worksheet_names
     }
 
     fn worksheet_by_index(&self, index: usize) -> Result<Box<dyn SheetTrait + '_>> {
@@ -228,7 +336,7 @@ impl litchi_core::sheet::WorkbookTrait for XlsbWorkbook {
     }
 
     fn worksheet_by_name(&self, name: &str) -> Result<Box<dyn SheetTrait + '_>> {
-        for (i, ws_name) in self.worksheet_names.iter().enumerate() {
+        for (i, ws_name) in self.formula_context.worksheet_names.iter().enumerate() {
             if ws_name == name {
                 return self.worksheet_by_index(i);
             }
@@ -258,7 +366,7 @@ pub struct XlsbWorksheetIterator<'a> {
 
 impl<'a> WorksheetIterator<'a> for XlsbWorksheetIterator<'a> {
     fn next(&mut self) -> Option<Result<Box<dyn SheetTrait + 'a>>> {
-        if self.index < self.workbook.worksheet_names.len() {
+        if self.index < self.workbook.formula_context.worksheet_names.len() {
             match self.workbook.get_worksheet(self.index) {
                 Ok(worksheet) => {
                     self.index += 1;
@@ -289,7 +397,7 @@ mod tests {
         );
         let workbook = XlsbWorkbook::new(File::open(path).unwrap()).unwrap();
         let mut formula_cells = Vec::new();
-        for index in 0..workbook.worksheet_names.len() {
+        for index in 0..workbook.formula_context.worksheet_names.len() {
             let worksheet = workbook.get_worksheet(index).unwrap();
             if let Some((min_row, min_col, max_row, max_col)) = worksheet.dimensions() {
                 for row in min_row..=max_row {

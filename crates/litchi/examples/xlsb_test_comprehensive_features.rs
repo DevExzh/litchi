@@ -134,18 +134,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // === NAMED RANGES ===
     // Define named range for sales data B4:B8 (rows 3-7, col 1, 0-indexed)
-    let sales_formula = create_area3d_formula(0, 3, 7, 1, 1);
+    let sales_formula = create_area3d_formula(0, 3, 7, 1, 1)?;
     let sales_range = NamedRange::new("SalesData".to_string(), Some(0)).with_formula(sales_formula);
     workbook.add_named_range(sales_range);
 
     // Define named range for targets C4:C8 (rows 3-7, col 2, 0-indexed)
-    let targets_formula = create_area3d_formula(0, 3, 7, 2, 2);
+    let targets_formula = create_area3d_formula(0, 3, 7, 2, 2)?;
     let targets_range =
         NamedRange::new("Targets".to_string(), Some(0)).with_formula(targets_formula);
     workbook.add_named_range(targets_range);
 
     // Global named range for entire data area A3:F8 (rows 2-7, cols 0-5)
-    let total_formula = create_area3d_formula(0, 2, 7, 0, 5);
+    let total_formula = create_area3d_formula(0, 2, 7, 0, 5)?;
     let total_range = NamedRange::new("GrandTotal".to_string(), None).with_formula(total_formula);
     workbook.add_named_range(total_range);
 

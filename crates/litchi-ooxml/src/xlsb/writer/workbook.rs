@@ -3,7 +3,8 @@
 //! This module provides functionality to create complete XLSB files with multiple worksheets,
 //! shared strings, styles, and advanced features.
 use crate::xlsb::error::XlsbResult;
-use crate::xlsb::named_ranges::NamedRange;
+use crate::xlsb::formula::CellParsedFormula;
+use crate::xlsb::named_ranges::{NamedRange, validate_defined_name};
 use crate::xlsb::records::record_types;
 use crate::xlsb::writer::{
     MutableSharedStringsWriter, MutableXlsbWorksheet, RecordWriter, StylesWriter,
@@ -168,6 +169,34 @@ impl XlsbWorkbookWriter {
     /// Write workbook-level defined names (BrtName records).
     fn write_named_ranges<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
         for named_range in &self.named_ranges {
+            if named_range.function {
+                return Err(crate::xlsb::error::XlsbError::UnsupportedFeature(format!(
+                    "macro defined name {} cannot be emitted",
+                    named_range.name
+                )));
+            }
+            validate_defined_name(&named_range.name)?;
+            if let Some(sheet_id) = named_range.sheet_id {
+                if usize::try_from(sheet_id)
+                    .ok()
+                    .is_none_or(|index| index >= self.worksheets.len())
+                {
+                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                        "defined name {} has invalid sheet scope {sheet_id}",
+                        named_range.name
+                    )));
+                }
+            }
+            let formula = named_range.formula.as_ref().ok_or_else(|| {
+                crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    "defined name {} has no formula",
+                    named_range.name
+                ))
+            })?;
+            let parsed_formula = CellParsedFormula {
+                rgce: formula.clone(),
+                rgcb: Vec::new(),
+            };
             let mut data = Vec::new();
             let mut temp_writer = RecordWriter::new(&mut data);
 
@@ -175,20 +204,15 @@ impl XlsbWorkbookWriter {
             if named_range.hidden {
                 flags |= 0x0001;
             }
-            if named_range.function {
-                flags |= 0x0002;
-            }
             temp_writer.write_u32(flags)?;
+            temp_writer.write_u8(0)?; // chKey; zero for non-macro names
 
-            let sheet_id_raw = named_range.sheet_id.map(|id| id as i32).unwrap_or(-1);
-            temp_writer.write_i32(sheet_id_raw)?;
+            temp_writer.write_u32(named_range.sheet_id.unwrap_or(u32::MAX))?;
             temp_writer.write_wide_string(&named_range.name)?;
-
-            let formula = named_range.formula.as_deref().unwrap_or(&[]);
-            temp_writer.write_u32(formula.len() as u32)?;
-            for byte in formula {
-                temp_writer.write_u8(*byte)?;
+            for byte in parsed_formula.to_bytes()? {
+                temp_writer.write_u8(byte)?;
             }
+            temp_writer.write_u32(u32::MAX)?; // NULL comment
 
             writer.write_record(record_types::NAME, &data)?;
         }
@@ -861,19 +885,74 @@ mod tests {
     }
 
     #[test]
-    fn test_workbook_with_named_ranges() {
+    fn test_add_named_range() {
         use crate::xlsb::named_ranges::NamedRange;
 
         let mut workbook = XlsbWorkbookWriter::new();
-        let named_range = NamedRange {
-            name: "TestRange".to_string(),
-            sheet_id: Some(0),
-            formula: None,
-            hidden: false,
-            function: false,
-        };
+        let named_range = NamedRange::new("TestRange".to_string(), None).with_formula(vec![
+            crate::xlsb::formula::ptg_types::PTG_INT,
+            1,
+            0,
+        ]);
         workbook.add_named_range(named_range);
-        // Verify it was added (indirectly via the test not failing)
+        assert_eq!(workbook.named_ranges.len(), 1);
+        assert_eq!(workbook.named_ranges[0].name, "TestRange");
+    }
+
+    #[test]
+    fn defined_name_survives_package_roundtrip() {
+        use crate::xlsb::named_ranges::{NamedRange, create_area3d_formula};
+
+        let mut workbook = XlsbWorkbookWriter::new();
+        workbook.add_worksheet(MutableXlsbWorksheet::new("Data"));
+        workbook.add_named_range(
+            NamedRange::new("SalesData".to_string(), None)
+                .with_formula(create_area3d_formula(0, 1, 3, 1, 1).unwrap()),
+        );
+        let mut summary = MutableXlsbWorksheet::new("Summary");
+        let mut name_token = vec![crate::xlsb::formula::ptg_types::PTG_NAME];
+        name_token.extend_from_slice(&1_u32.to_le_bytes());
+        summary.set_cell_formula_binary(
+            0,
+            0,
+            CellValue::Float(0.0),
+            CellParsedFormula {
+                rgce: name_token,
+                rgcb: Vec::new(),
+            },
+            false,
+            0,
+        );
+        let mut reference_token = vec![crate::xlsb::formula::ptg_types::PTG_REF_3D];
+        reference_token.extend_from_slice(&2_u16.to_le_bytes());
+        reference_token.extend_from_slice(&1_u32.to_le_bytes());
+        reference_token.extend_from_slice(&1_u16.to_le_bytes());
+        summary.set_cell_formula_binary(
+            0,
+            1,
+            CellValue::Float(0.0),
+            CellParsedFormula {
+                rgce: reference_token,
+                rgcb: Vec::new(),
+            },
+            false,
+            0,
+        );
+        workbook.add_worksheet(summary);
+
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        assert_eq!(reader.defined_names(), &["SalesData"]);
+        let summary = reader.worksheet_by_index(1).unwrap();
+        assert!(matches!(
+            summary.cell_value(0, 0).unwrap().as_ref(),
+            CellValue::Formula { formula, .. } if formula == "SalesData"
+        ));
+        assert!(matches!(
+            summary.cell_value(0, 1).unwrap().as_ref(),
+            CellValue::Formula { formula, .. } if formula == "Data!$B$2"
+        ));
     }
 
     #[test]

@@ -2,7 +2,9 @@
 
 use crate::xlsb::cell::XlsbCell;
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::formula::{CellParsedFormula, FormulaGroup, FormulaGroupKind};
+use crate::xlsb::formula::{
+    CellParsedFormula, FormulaGroup, FormulaGroupKind, FormulaResolutionContext,
+};
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
 use crate::xlsb::records::{RecordIter, record_types};
@@ -35,12 +37,13 @@ impl Dimensions {
 
 /// XLSB cells reader
 #[allow(dead_code)]
-pub struct XlsbCellsReader<RS>
+pub struct XlsbCellsReader<'a, RS>
 where
     RS: Read + Seek,
 {
     iter: RecordIter<RS>,
-    shared_strings: Vec<String>,
+    shared_strings: &'a [String],
+    formula_context: &'a FormulaResolutionContext,
     dimensions: Dimensions,
     current_row: u32,
     buf: Vec<u8>,
@@ -52,11 +55,15 @@ where
     pub hyperlinks: Vec<Hyperlink>,
 }
 
-impl<RS> XlsbCellsReader<RS>
+impl<'a, RS> XlsbCellsReader<'a, RS>
 where
     RS: Read + Seek,
 {
-    pub fn new(mut iter: RecordIter<RS>, shared_strings: Vec<String>) -> XlsbResult<Self> {
+    pub fn new(
+        mut iter: RecordIter<RS>,
+        shared_strings: &'a [String],
+        formula_context: &'a FormulaResolutionContext,
+    ) -> XlsbResult<Self> {
         let mut buf = Vec::with_capacity(1024);
 
         // Skip to BrtWsDim (worksheet dimensions)
@@ -85,6 +92,7 @@ where
         Ok(XlsbCellsReader {
             iter,
             shared_strings,
+            formula_context,
             dimensions,
             current_row: 0,
             buf,
@@ -402,6 +410,7 @@ where
                 parsed.formula,
                 parsed.flags,
                 group,
+                self.formula_context,
             ))
         } else if exp_cell.is_some() {
             Err(XlsbError::InvalidFormula(format!(
@@ -415,6 +424,7 @@ where
                 parsed.cached_value,
                 parsed.formula,
                 parsed.flags,
+                self.formula_context,
             ))
         }
     }

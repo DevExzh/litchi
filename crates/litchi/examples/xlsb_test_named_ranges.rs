@@ -44,23 +44,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create named range for price column B2:B4 (rows 1-3, col 1, 0-indexed)
     // Formula bytes use Area3dPtg format: sheet_idx, row1, row2, col1, col2
-    let prices_formula = create_area3d_formula(0, 1, 3, 1, 1);
+    let prices_formula = create_area3d_formula(0, 1, 3, 1, 1)?;
     let prices_range = NamedRange::new("Prices".to_string(), Some(0)).with_formula(prices_formula);
     workbook.add_named_range(prices_range);
 
     // Create named range for quantity column C2:C4 (rows 1-3, col 2, 0-indexed)
-    let quantities_formula = create_area3d_formula(0, 1, 3, 2, 2);
+    let quantities_formula = create_area3d_formula(0, 1, 3, 2, 2)?;
     let quantities_range =
         NamedRange::new("Quantities".to_string(), Some(0)).with_formula(quantities_formula);
     workbook.add_named_range(quantities_range);
 
     // Create global named range for total cell C5 (row 4, col 2)
-    let total_formula = create_area3d_formula(0, 4, 4, 2, 2);
+    let total_formula = create_area3d_formula(0, 4, 4, 2, 2)?;
     let total_range = NamedRange::new("GrandTotal".to_string(), None).with_formula(total_formula);
     workbook.add_named_range(total_range);
 
     // Create a hidden named range for A1:C5 (entire data area)
-    let hidden_formula = create_area3d_formula(0, 0, 4, 0, 2);
+    let hidden_formula = create_area3d_formula(0, 0, 4, 0, 2)?;
     let hidden_range = NamedRange::new("_HiddenCalc".to_string(), None)
         .with_formula(hidden_formula)
         .with_hidden(true);

@@ -34,6 +34,147 @@ use litchi_core::binary;
 /// 16,385 bytes.
 pub const MAX_CELL_FORMULA_BYTES: usize = 16_384;
 
+/// One entry from the workbook's `BrtExternSheet.rgXti` array.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FormulaExternalSheet {
+    pub external_link: u32,
+    pub first_sheet: i32,
+    pub last_sheet: i32,
+}
+
+/// Kind of supporting link referenced by `BrtExternSheet` entries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FormulaSupportingLink {
+    SelfWorkbook,
+    SameSheet,
+    ExternalWorkbook,
+    AddIn,
+}
+
+/// Workbook data required to render context-dependent XLSB formula tokens.
+///
+/// This context is owned once by the workbook and borrowed while worksheets
+/// are decoded; it is never cloned per cell.
+#[derive(Debug, Clone, Default)]
+pub struct FormulaResolutionContext {
+    pub(crate) worksheet_names: std::sync::Arc<[String]>,
+    pub(crate) supporting_links: std::sync::Arc<[FormulaSupportingLink]>,
+    pub(crate) external_sheets: std::sync::Arc<[FormulaExternalSheet]>,
+    pub(crate) defined_names: std::sync::Arc<[String]>,
+    pub(crate) current_sheet: Option<usize>,
+}
+
+impl FormulaResolutionContext {
+    pub(crate) fn for_sheet(&self, sheet_index: usize) -> Self {
+        let mut context = self.clone();
+        context.current_sheet = Some(sheet_index);
+        context
+    }
+
+    fn resolve_sheet_prefix(&self, index: u16) -> XlsbResult<String> {
+        if index == u16::MAX {
+            return Err(XlsbError::InvalidFormula(
+                "3D reference uses invalid Xti index 0xFFFF".to_string(),
+            ));
+        }
+        let xti = self
+            .external_sheets
+            .get(usize::from(index))
+            .ok_or_else(|| {
+                XlsbError::InvalidFormula(format!(
+                    "Xti index {index} exceeds {} extern-sheet entries",
+                    self.external_sheets.len()
+                ))
+            })?;
+        let link_index = usize::try_from(xti.external_link)
+            .map_err(|_| XlsbError::InvalidFormula("external-link index overflow".to_string()))?;
+        let supporting_link = self.supporting_links.get(link_index).ok_or_else(|| {
+            XlsbError::InvalidFormula(format!(
+                "Xti index {index} refers to missing supporting link {}",
+                xti.external_link
+            ))
+        })?;
+        let (first_index, last_index) = match supporting_link {
+            FormulaSupportingLink::SelfWorkbook => {
+                if xti.first_sheet < 0 || xti.last_sheet < xti.first_sheet {
+                    return Err(XlsbError::InvalidFormula(format!(
+                        "Xti index {index} has invalid self-reference sheet range {}..={}",
+                        xti.first_sheet, xti.last_sheet
+                    )));
+                }
+                (
+                    usize::try_from(xti.first_sheet).map_err(|_| {
+                        XlsbError::InvalidFormula("first sheet index overflow".to_string())
+                    })?,
+                    usize::try_from(xti.last_sheet).map_err(|_| {
+                        XlsbError::InvalidFormula("last sheet index overflow".to_string())
+                    })?,
+                )
+            },
+            FormulaSupportingLink::SameSheet => {
+                if xti.first_sheet != -2 || xti.last_sheet != -2 {
+                    return Err(XlsbError::InvalidFormula(format!(
+                        "same-sheet Xti index {index} must use workbook scope -2/-2"
+                    )));
+                }
+                let sheet = self.current_sheet.ok_or_else(|| {
+                    XlsbError::UnsupportedFeature(
+                        "same-sheet reference requires a consuming worksheet".to_string(),
+                    )
+                })?;
+                (sheet, sheet)
+            },
+            FormulaSupportingLink::ExternalWorkbook => {
+                return Err(XlsbError::UnsupportedFeature(format!(
+                    "Xti index {index} refers to an external workbook"
+                )));
+            },
+            FormulaSupportingLink::AddIn => {
+                return Err(XlsbError::UnsupportedFeature(format!(
+                    "Xti index {index} refers to an add-in"
+                )));
+            },
+        };
+        if last_index < first_index {
+            return Err(XlsbError::InvalidFormula(format!(
+                "Xti index {index} has invalid sheet range {}..={}",
+                xti.first_sheet, xti.last_sheet
+            )));
+        }
+        let first = self.worksheet_names.get(first_index).ok_or_else(|| {
+            XlsbError::InvalidFormula(format!(
+                "Xti first sheet {} exceeds {} worksheets",
+                xti.first_sheet,
+                self.worksheet_names.len()
+            ))
+        })?;
+        let last = self.worksheet_names.get(last_index).ok_or_else(|| {
+            XlsbError::InvalidFormula(format!(
+                "Xti last sheet {} exceeds {} worksheets",
+                xti.last_sheet,
+                self.worksheet_names.len()
+            ))
+        })?;
+        let unquoted = if first_index == last_index {
+            first.clone()
+        } else {
+            format!("{first}:{last}")
+        };
+        if unquoted
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.'))
+            && !unquoted
+                .chars()
+                .next()
+                .is_some_and(|ch| ch.is_ascii_digit())
+        {
+            Ok(unquoted)
+        } else {
+            Ok(format!("'{}'", unquoted.replace('\'', "''")))
+        }
+    }
+}
+
 /// Inclusive worksheet range used by array and shared formulas.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FormulaRange {
@@ -457,6 +598,26 @@ pub enum FormulaToken {
         col_first_relative: bool,
         col_last_relative: bool,
     },
+    /// Cell reference qualified by an extern-sheet (`Xti`) index.
+    CellRef3d {
+        sheet_index: u16,
+        row: u32,
+        col: u32,
+        row_relative: bool,
+        col_relative: bool,
+    },
+    /// Area reference qualified by an extern-sheet (`Xti`) index.
+    AreaRef3d {
+        sheet_index: u16,
+        row_first: u32,
+        row_last: u32,
+        col_first: u32,
+        col_last: u32,
+        row_first_relative: bool,
+        row_last_relative: bool,
+        col_first_relative: bool,
+        col_last_relative: bool,
+    },
     /// Invalid single-cell or area reference. A sheet index is present for
     /// the 3D token forms and retained even though the text form is `#REF!`.
     ReferenceError {
@@ -672,6 +833,8 @@ impl<'a> FormulaParser<'a> {
                 0x0B => self.parse_reference_error(true, false),
                 0x1C => self.parse_reference_error(false, true),
                 0x1D => self.parse_reference_error(true, true),
+                0x1A => self.parse_ref_3d(),
+                0x1B => self.parse_area_3d(),
                 0x00 => self.parse_array(),
                 0x06 => self.parse_memory(FormulaMemoryKind::Area),
                 0x07 => self.parse_memory(FormulaMemoryKind::Error(0)),
@@ -1140,6 +1303,63 @@ impl<'a> FormulaParser<'a> {
         })
     }
 
+    fn parse_ref_3d(&mut self) -> XlsbResult<FormulaToken> {
+        let token = self.data[self.offset - 1];
+        if token & 0x80 != 0 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "PtgRef3d token 0x{token:02X} has its reserved bit set"
+            )));
+        }
+        self.require(8, "PtgRef3d")?;
+        let sheet_index = binary::read_u16_le_at(self.data, self.offset)?;
+        let row = binary::read_u32_le_at(self.data, self.offset + 2)?;
+        let col_data = binary::read_u16_le_at(self.data, self.offset + 6)?;
+        self.offset += 8;
+        let col = u32::from(col_data & 0x3FFF);
+        if row >= 1_048_576 || col >= 16_384 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "PtgRef3d coordinate ({row}, {col}) is outside the worksheet"
+            )));
+        }
+        Ok(FormulaToken::CellRef3d {
+            sheet_index,
+            row,
+            col,
+            row_relative: col_data & 0x8000 != 0,
+            col_relative: col_data & 0x4000 != 0,
+        })
+    }
+
+    fn parse_area_3d(&mut self) -> XlsbResult<FormulaToken> {
+        let token = self.data[self.offset - 1];
+        if token & 0x80 != 0 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "PtgArea3d token 0x{token:02X} has its reserved bit set"
+            )));
+        }
+        self.require(14, "PtgArea3d")?;
+        let sheet_index = binary::read_u16_le_at(self.data, self.offset)?;
+        let row_first = binary::read_u32_le_at(self.data, self.offset + 2)?;
+        let row_last = binary::read_u32_le_at(self.data, self.offset + 6)?;
+        let col_first_data = binary::read_u16_le_at(self.data, self.offset + 10)?;
+        let col_last_data = binary::read_u16_le_at(self.data, self.offset + 12)?;
+        self.offset += 14;
+        let col_first = u32::from(col_first_data & 0x3FFF);
+        let col_last = u32::from(col_last_data & 0x3FFF);
+        FormulaRange::new(row_first, row_last, col_first, col_last)?;
+        Ok(FormulaToken::AreaRef3d {
+            sheet_index,
+            row_first,
+            row_last,
+            col_first,
+            col_last,
+            row_first_relative: col_first_data & 0x8000 != 0,
+            row_last_relative: col_last_data & 0x8000 != 0,
+            col_first_relative: col_first_data & 0x4000 != 0,
+            col_last_relative: col_last_data & 0x4000 != 0,
+        })
+    }
+
     fn resolve_reference(
         &self,
         row_data: u32,
@@ -1236,6 +1456,11 @@ impl<'a> FormulaParser<'a> {
 
         let name_index = binary::read_u32_le_at(self.data, self.offset)?;
         self.offset += 4;
+        if name_index == 0 {
+            return Err(XlsbError::InvalidFormula(
+                "PtgName index is one-based and cannot be zero".to_string(),
+            ));
+        }
 
         Ok(FormulaToken::Name(name_index))
     }
@@ -1276,6 +1501,21 @@ impl FormulaConverter {
     /// Convert tokens to text, rejecting token streams that cannot be
     /// represented faithfully by this converter.
     pub fn try_tokens_to_string(tokens: &[FormulaToken]) -> XlsbResult<String> {
+        Self::try_tokens_to_string_with_optional_context(tokens, None)
+    }
+
+    /// Convert formula tokens using workbook extern-sheet and name metadata.
+    pub fn try_tokens_to_string_with_context(
+        tokens: &[FormulaToken],
+        context: &FormulaResolutionContext,
+    ) -> XlsbResult<String> {
+        Self::try_tokens_to_string_with_optional_context(tokens, Some(context))
+    }
+
+    fn try_tokens_to_string_with_optional_context(
+        tokens: &[FormulaToken],
+        context: Option<&FormulaResolutionContext>,
+    ) -> XlsbResult<String> {
         let mut stack: Vec<String> = Vec::new();
 
         for token in tokens {
@@ -1385,6 +1625,54 @@ impl FormulaConverter {
                     );
                     stack.push(format!("{}:{}", first, last));
                 },
+                FormulaToken::CellRef3d {
+                    sheet_index,
+                    row,
+                    col,
+                    row_relative,
+                    col_relative,
+                } => {
+                    let context = context.ok_or_else(|| {
+                        XlsbError::UnsupportedFeature(
+                            "PtgRef3d requires workbook extern-sheet resolution".to_string(),
+                        )
+                    })?;
+                    let prefix = context.resolve_sheet_prefix(*sheet_index)?;
+                    let reference =
+                        Self::format_reference(*row, *col, *row_relative, *col_relative);
+                    stack.push(format!("{prefix}!{reference}"));
+                },
+                FormulaToken::AreaRef3d {
+                    sheet_index,
+                    row_first,
+                    row_last,
+                    col_first,
+                    col_last,
+                    row_first_relative,
+                    row_last_relative,
+                    col_first_relative,
+                    col_last_relative,
+                } => {
+                    let context = context.ok_or_else(|| {
+                        XlsbError::UnsupportedFeature(
+                            "PtgArea3d requires workbook extern-sheet resolution".to_string(),
+                        )
+                    })?;
+                    let prefix = context.resolve_sheet_prefix(*sheet_index)?;
+                    let first = Self::format_reference(
+                        *row_first,
+                        *col_first,
+                        *row_first_relative,
+                        *col_first_relative,
+                    );
+                    let last = Self::format_reference(
+                        *row_last,
+                        *col_last,
+                        *row_last_relative,
+                        *col_last_relative,
+                    );
+                    stack.push(format!("{prefix}!{first}:{last}"));
+                },
                 FormulaToken::ReferenceError { .. } => stack.push("#REF!".to_string()),
                 FormulaToken::BinaryOp(op) => {
                     if stack.len() < 2 {
@@ -1439,9 +1727,21 @@ impl FormulaConverter {
                     stack.push(format!("{}({})", func_name, args.join(",")));
                 },
                 FormulaToken::Name(idx) => {
-                    return Err(XlsbError::UnsupportedFeature(format!(
-                        "XLSB defined name index {idx} requires workbook name resolution"
-                    )));
+                    let context = context.ok_or_else(|| {
+                        XlsbError::UnsupportedFeature(format!(
+                            "XLSB defined name index {idx} requires workbook name resolution"
+                        ))
+                    })?;
+                    let index = usize::try_from(*idx - 1).map_err(|_| {
+                        XlsbError::InvalidFormula("PtgName index overflow".to_string())
+                    })?;
+                    let name = context.defined_names.get(index).ok_or_else(|| {
+                        XlsbError::InvalidFormula(format!(
+                            "PtgName index {idx} exceeds {} workbook names",
+                            context.defined_names.len()
+                        ))
+                    })?;
+                    stack.push(name.clone());
                 },
                 FormulaToken::Unknown(t) => {
                     return Err(XlsbError::UnsupportedFeature(format!(
@@ -2763,6 +3063,104 @@ mod tests {
             FormulaParser::new(&[0xAA, 0, 0, 0, 0, 0, 0]).parse(),
             Err(XlsbError::InvalidFormula(_))
         ));
+    }
+
+    #[test]
+    fn parser_resolves_internal_3d_references_and_defined_names() {
+        let context = FormulaResolutionContext {
+            worksheet_names: vec!["Data 1".to_string(), "Last".to_string()].into(),
+            supporting_links: vec![FormulaSupportingLink::SelfWorkbook].into(),
+            external_sheets: vec![
+                FormulaExternalSheet {
+                    external_link: 0,
+                    first_sheet: 0,
+                    last_sheet: 0,
+                },
+                FormulaExternalSheet {
+                    external_link: 0,
+                    first_sheet: 0,
+                    last_sheet: 1,
+                },
+            ]
+            .into(),
+            defined_names: vec!["Rate".to_string()].into(),
+            current_sheet: None,
+        };
+
+        let ref_3d = [0x5A, 0, 0, 1, 0, 0, 0, 0, 0xC0];
+        let tokens = FormulaParser::new(&ref_3d).parse().unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string_with_context(&tokens, &context).unwrap(),
+            "'Data 1'!A2"
+        );
+        assert!(FormulaConverter::try_tokens_to_string(&tokens).is_err());
+
+        let area_3d = [0x7B, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0];
+        let tokens = FormulaParser::new(&area_3d).parse().unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string_with_context(&tokens, &context).unwrap(),
+            "'Data 1:Last'!$A$1:$B$2"
+        );
+
+        let name = [0x43, 1, 0, 0, 0];
+        let tokens = FormulaParser::new(&name).parse().unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string_with_context(&tokens, &context).unwrap(),
+            "Rate"
+        );
+    }
+
+    #[test]
+    fn contextual_reference_parser_rejects_invalid_indices_and_payloads() {
+        let context = FormulaResolutionContext {
+            worksheet_names: vec!["Sheet1".to_string()].into(),
+            supporting_links: vec![FormulaSupportingLink::SelfWorkbook].into(),
+            external_sheets: Vec::new().into(),
+            defined_names: Vec::new().into(),
+            current_sheet: None,
+        };
+        let invalid_xti = [0x5A, 0, 0, 0, 0, 0, 0, 0, 0];
+        let tokens = FormulaParser::new(&invalid_xti).parse().unwrap();
+        assert!(matches!(
+            FormulaConverter::try_tokens_to_string_with_context(&tokens, &context),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+        assert!(matches!(
+            FormulaParser::new(&[0x43, 0, 0, 0, 0]).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+        assert!(matches!(
+            FormulaParser::new(&[0xDA, 0, 0, 0, 0, 0, 0, 0, 0]).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+        assert!(matches!(
+            FormulaParser::new(&[0x5B; 14]).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+    }
+
+    #[test]
+    fn resolves_same_sheet_supporting_links_in_the_consuming_sheet() {
+        let context = FormulaResolutionContext {
+            worksheet_names: vec!["First".to_string(), "Current Sheet".to_string()].into(),
+            supporting_links: vec![FormulaSupportingLink::SameSheet].into(),
+            external_sheets: vec![FormulaExternalSheet {
+                external_link: 0,
+                first_sheet: -2,
+                last_sheet: -2,
+            }]
+            .into(),
+            defined_names: Vec::new().into(),
+            current_sheet: None,
+        }
+        .for_sheet(1);
+        let tokens = FormulaParser::new(&[0x5A, 0, 0, 0, 0, 0, 0, 0, 0])
+            .parse()
+            .unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string_with_context(&tokens, &context).unwrap(),
+            "'Current Sheet'!$A$1"
+        );
     }
 
     #[test]

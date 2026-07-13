@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     workbook.add_worksheet(sheet);
 
     // Named range for sales data B3:B4
-    let sales_formula = create_area3d_formula(0, 2, 3, 1, 1);
+    let sales_formula = create_area3d_formula(0, 2, 3, 1, 1)?;
     let sales_range = NamedRange::new("SalesData".to_string(), Some(0)).with_formula(sales_formula);
     workbook.add_named_range(sales_range);
 
