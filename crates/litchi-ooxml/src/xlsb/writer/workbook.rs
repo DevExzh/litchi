@@ -949,7 +949,7 @@ impl Default for XlsbWorkbookWriter {
 mod tests {
     use super::*;
     use crate::xlsb::comments::Comment;
-    use crate::xlsb::{CalculationMode, SharedStringRun};
+    use crate::xlsb::{CalculationMode, SharedStringRun, SheetProtection};
     use litchi_core::sheet::{CellValue, WorkbookTrait};
     use std::io::Cursor;
 
@@ -1079,6 +1079,34 @@ mod tests {
                 last_column: 4,
             }
         );
+    }
+
+    #[test]
+    fn sheet_protection_survives_package_roundtrip() {
+        let mut workbook = XlsbWorkbookWriter::new();
+        let mut sheet = MutableXlsbWorksheet::new("Protected");
+        sheet.set_cell(0, 0, "locked");
+        sheet.set_sheet_protection(Some(SheetProtection {
+            password_hash: Some(0x5A3C),
+            objects: Some(true),
+            format_cells: Some(false),
+            sort: Some(false),
+            ..SheetProtection::default()
+        }));
+        workbook.add_worksheet(sheet);
+
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let protection = reader.worksheet(0).unwrap().sheet_protection().unwrap();
+        assert_eq!(protection.password_hash, Some(0x5A3C));
+        assert!(protection.locked);
+        assert!(!protection.allow_edit_objects);
+        assert!(protection.allow_edit_scenarios);
+        assert!(protection.allow_format_cells);
+        assert!(!protection.allow_format_columns);
+        assert!(protection.allow_sort);
+        assert!(protection.allow_select_locked_cells);
     }
 
     #[test]

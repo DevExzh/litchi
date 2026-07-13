@@ -73,6 +73,30 @@ pub struct XlsbAutoFilter {
     pub last_column: u32,
 }
 
+/// Worksheet protection state and permissions from `BrtSheetProtection`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XlsbSheetProtection {
+    /// Legacy password verifier, absent when the stored value is zero.
+    pub password_hash: Option<u16>,
+    /// Whether the worksheet and locked-cell contents are protected.
+    pub locked: bool,
+    pub allow_edit_objects: bool,
+    pub allow_edit_scenarios: bool,
+    pub allow_format_cells: bool,
+    pub allow_format_columns: bool,
+    pub allow_format_rows: bool,
+    pub allow_insert_columns: bool,
+    pub allow_insert_rows: bool,
+    pub allow_insert_hyperlinks: bool,
+    pub allow_delete_columns: bool,
+    pub allow_delete_rows: bool,
+    pub allow_select_locked_cells: bool,
+    pub allow_sort: bool,
+    pub allow_auto_filter: bool,
+    pub allow_pivot_tables: bool,
+    pub allow_select_unlocked_cells: bool,
+}
+
 /// XLSB worksheet implementation
 #[derive(Debug, Clone)]
 pub struct XlsbWorksheet {
@@ -86,6 +110,7 @@ pub struct XlsbWorksheet {
     column_infos: Vec<XlsbColumnInfo>,
     row_infos: Vec<XlsbRowInfo>,
     auto_filter: Option<XlsbAutoFilter>,
+    sheet_protection: Option<XlsbSheetProtection>,
 }
 
 impl XlsbWorksheet {
@@ -102,6 +127,7 @@ impl XlsbWorksheet {
             column_infos: Vec::new(),
             row_infos: Vec::new(),
             auto_filter: None,
+            sheet_protection: None,
         }
     }
 
@@ -145,6 +171,10 @@ impl XlsbWorksheet {
         self.auto_filter = auto_filter;
     }
 
+    pub(crate) fn set_sheet_protection(&mut self, sheet_protection: Option<XlsbSheetProtection>) {
+        self.sheet_protection = sheet_protection;
+    }
+
     /// Get all merged cells
     pub fn merged_cells(&self) -> &[MergedCell] {
         &self.merged_cells
@@ -173,6 +203,11 @@ impl XlsbWorksheet {
     /// Worksheet AutoFilter range, if present.
     pub fn auto_filter(&self) -> Option<XlsbAutoFilter> {
         self.auto_filter
+    }
+
+    /// Worksheet protection state and allowed operations, if enabled.
+    pub fn sheet_protection(&self) -> Option<XlsbSheetProtection> {
+        self.sheet_protection
     }
 }
 

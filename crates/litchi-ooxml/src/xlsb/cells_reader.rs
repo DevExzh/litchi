@@ -9,7 +9,7 @@ use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
 use crate::xlsb::records::{RecordIter, record_types};
 use crate::xlsb::shared_strings::SharedString;
-use crate::xlsb::worksheet::{XlsbAutoFilter, XlsbColumnInfo, XlsbRowInfo};
+use crate::xlsb::worksheet::{XlsbAutoFilter, XlsbColumnInfo, XlsbRowInfo, XlsbSheetProtection};
 use litchi_core::binary;
 use litchi_core::sheet::CellValue;
 use std::io::{Read, Seek};
@@ -63,6 +63,8 @@ where
     pub row_infos: Vec<XlsbRowInfo>,
     /// Worksheet AutoFilter range.
     pub auto_filter: Option<XlsbAutoFilter>,
+    /// Worksheet protection settings.
+    pub sheet_protection: Option<XlsbSheetProtection>,
 }
 
 impl<'a, RS> XlsbCellsReader<'a, RS>
@@ -124,6 +126,7 @@ where
             column_infos,
             row_infos: Vec::new(),
             auto_filter: None,
+            sheet_protection: None,
         })
     }
 
@@ -765,6 +768,15 @@ where
                     self.auto_filter = Some(Self::parse_auto_filter(&self.buf)?);
                     self.consume_auto_filter_records()?;
                 },
+                record_types::SHEET_PROTECTION => {
+                    if self.sheet_protection.is_some() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtSheetProtection".to_string(),
+                            val: "duplicate record".to_string(),
+                        });
+                    }
+                    self.sheet_protection = Some(Self::parse_sheet_protection(&self.buf)?);
+                },
                 0x0082 => {
                     // BrtEndSheet - end of worksheet
                     break;
@@ -830,6 +842,46 @@ where
                 });
             }
         }
+    }
+
+    fn parse_sheet_protection(data: &[u8]) -> XlsbResult<XlsbSheetProtection> {
+        if data.len() != 66 {
+            return Err(XlsbError::InvalidLength {
+                expected: 66,
+                found: data.len(),
+            });
+        }
+        let password = binary::read_u16_le_at(data, 0)?;
+        let mut flags = [false; 16];
+        for (index, flag) in flags.iter_mut().enumerate() {
+            let value = binary::read_u32_le_at(data, 2 + index * 4)?;
+            if value > 1 {
+                return Err(XlsbError::Unrecognized {
+                    typ: "BrtSheetProtection Boolean".to_string(),
+                    val: format!("field {index}: {value}"),
+                });
+            }
+            *flag = value != 0;
+        }
+        Ok(XlsbSheetProtection {
+            password_hash: (password != 0).then_some(password),
+            locked: flags[0],
+            allow_edit_objects: flags[1],
+            allow_edit_scenarios: flags[2],
+            allow_format_cells: flags[3],
+            allow_format_columns: flags[4],
+            allow_format_rows: flags[5],
+            allow_insert_columns: flags[6],
+            allow_insert_rows: flags[7],
+            allow_insert_hyperlinks: flags[8],
+            allow_delete_columns: flags[9],
+            allow_delete_rows: flags[10],
+            allow_select_locked_cells: flags[11],
+            allow_sort: flags[12],
+            allow_auto_filter: flags[13],
+            allow_pivot_tables: flags[14],
+            allow_select_unlocked_cells: flags[15],
+        })
     }
 
     /// Read merged cells section
