@@ -1026,6 +1026,39 @@ mod tests {
     }
 
     #[test]
+    fn row_and_column_formatting_survive_package_roundtrip() {
+        let mut workbook = XlsbWorkbookWriter::new();
+        let mut sheet = MutableXlsbWorksheet::new("Layout");
+        sheet.set_cell(3, 2, "value");
+        sheet.set_column_width(2, 18.25);
+        sheet.set_column_hidden(2, true);
+        sheet.set_column_best_fit(2, true);
+        sheet.set_row_height(3, 24.5);
+        sheet.set_row_hidden(3, true);
+        workbook.add_worksheet(sheet);
+
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let worksheet = reader.worksheet(0).unwrap();
+
+        assert_eq!(worksheet.column_infos().len(), 1);
+        let column = &worksheet.column_infos()[0];
+        assert_eq!((column.first_column, column.last_column), (2, 2));
+        assert_eq!(column.width, 18.25);
+        assert!(column.user_set_width);
+        assert!(column.hidden);
+        assert!(column.best_fit);
+
+        assert_eq!(worksheet.row_infos().len(), 1);
+        let row = &worksheet.row_infos()[0];
+        assert_eq!(row.row, 3);
+        assert_eq!(row.height, Some(24.5));
+        assert!(row.hidden);
+        assert_eq!(row.column_spans, vec![(2, 2)]);
+    }
+
+    #[test]
     fn test_workbook_writer_default() {
         let workbook: XlsbWorkbookWriter = Default::default();
         assert_eq!(workbook.worksheet_count(), 0);

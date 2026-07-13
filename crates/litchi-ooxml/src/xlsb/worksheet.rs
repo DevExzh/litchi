@@ -10,6 +10,56 @@ use litchi_core::sheet::{
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
+/// Width, style, visibility, and outline metadata for an XLSB column range.
+#[derive(Debug, Clone, PartialEq)]
+pub struct XlsbColumnInfo {
+    /// First zero-based column covered by this record.
+    pub first_column: u32,
+    /// Last zero-based column covered by this record, inclusive.
+    pub last_column: u32,
+    /// Width in standard-digit character units.
+    pub width: f64,
+    /// Zero-based default cell-XF index for the covered columns.
+    pub style_id: u32,
+    /// Whether the columns are hidden.
+    pub hidden: bool,
+    /// Whether the width differs from the worksheet default.
+    pub user_set_width: bool,
+    /// Whether the width was adjusted to fit cell contents.
+    pub best_fit: bool,
+    /// Whether cells show phonetic information by default.
+    pub show_phonetic: bool,
+    /// Outline level from 0 through 7.
+    pub outline_level: u8,
+    /// Whether this outline group is collapsed.
+    pub collapsed: bool,
+}
+
+/// Formatting, visibility, and occupied-column metadata for an XLSB row.
+#[derive(Debug, Clone, PartialEq)]
+pub struct XlsbRowInfo {
+    /// Zero-based row index.
+    pub row: u32,
+    /// Applied row style, absent when `fGhostDirty` is clear.
+    pub style_id: Option<u32>,
+    /// Custom height in points, absent when `fUnsynced` is clear.
+    pub height: Option<f64>,
+    /// Whether extra top-border ascender padding is allocated.
+    pub extra_ascender: bool,
+    /// Whether extra bottom-border descender padding is allocated.
+    pub extra_descender: bool,
+    /// Outline level from 0 through 7.
+    pub outline_level: u8,
+    /// Whether preceding child rows are collapsed.
+    pub collapsed: bool,
+    /// Whether this row is hidden.
+    pub hidden: bool,
+    /// Whether cells show phonetic information by default.
+    pub show_phonetic: bool,
+    /// Inclusive occupied-column spans, one per 1,024-column segment.
+    pub column_spans: Vec<(u32, u32)>,
+}
+
 /// XLSB worksheet implementation
 #[derive(Debug, Clone)]
 pub struct XlsbWorksheet {
@@ -20,6 +70,8 @@ pub struct XlsbWorksheet {
     merged_cells: Vec<MergedCell>,
     hyperlinks: Vec<Hyperlink>,
     comments: Vec<Comment>,
+    column_infos: Vec<XlsbColumnInfo>,
+    row_infos: Vec<XlsbRowInfo>,
 }
 
 impl XlsbWorksheet {
@@ -33,6 +85,8 @@ impl XlsbWorksheet {
             merged_cells: Vec::new(),
             hyperlinks: Vec::new(),
             comments: Vec::new(),
+            column_infos: Vec::new(),
+            row_infos: Vec::new(),
         }
     }
 
@@ -64,6 +118,14 @@ impl XlsbWorksheet {
         self.comments.push(comment);
     }
 
+    pub(crate) fn set_column_infos(&mut self, infos: Vec<XlsbColumnInfo>) {
+        self.column_infos = infos;
+    }
+
+    pub(crate) fn set_row_infos(&mut self, infos: Vec<XlsbRowInfo>) {
+        self.row_infos = infos;
+    }
+
     /// Get all merged cells
     pub fn merged_cells(&self) -> &[MergedCell] {
         &self.merged_cells
@@ -77,6 +139,16 @@ impl XlsbWorksheet {
     /// Get all comments
     pub fn comments(&self) -> &[Comment] {
         &self.comments
+    }
+
+    /// Column-range formatting and visibility records in stream order.
+    pub fn column_infos(&self) -> &[XlsbColumnInfo] {
+        &self.column_infos
+    }
+
+    /// Row formatting, visibility, and occupied-column records in row order.
+    pub fn row_infos(&self) -> &[XlsbRowInfo] {
+        &self.row_infos
     }
 }
 

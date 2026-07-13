@@ -598,6 +598,26 @@ impl MutableXlsbWorksheet {
         entry.width = Some(width);
     }
 
+    /// Set whether a zero-based column is hidden.
+    pub fn set_column_hidden(&mut self, col: u32, hidden: bool) {
+        let entry = self.columns.entry(col).or_insert(ColumnInfo {
+            width: None,
+            hidden: false,
+            best_fit: false,
+        });
+        entry.hidden = hidden;
+    }
+
+    /// Set whether a zero-based column width was automatically best-fit.
+    pub fn set_column_best_fit(&mut self, col: u32, best_fit: bool) {
+        let entry = self.columns.entry(col).or_insert(ColumnInfo {
+            width: None,
+            hidden: false,
+            best_fit: false,
+        });
+        entry.best_fit = best_fit;
+    }
+
     /// Set a custom row height (in points) for a 0-based row.
     ///
     /// Heights are encoded in twips (1/20 of a point) in the `BrtRowHdr`
@@ -609,6 +629,15 @@ impl MutableXlsbWorksheet {
             hidden: false,
         });
         entry.height = Some(height);
+    }
+
+    /// Set whether a zero-based row is hidden.
+    pub fn set_row_hidden(&mut self, row: u32, hidden: bool) {
+        let entry = self.rows.entry(row).or_insert(RowInfo {
+            height: None,
+            hidden: false,
+        });
+        entry.hidden = hidden;
     }
 
     /// Configure a basic auto-filter range for the worksheet.
@@ -1670,7 +1699,7 @@ impl MutableXlsbWorksheet {
             temp_writer.write_u32(0)?;
 
             // Flags (2 bytes): 0x0001 = hidden, 0x0002 = custom width,
-            // 0x0008 = best fit.
+            // 0x0004 = best fit.
             let mut flags: u16 = 0;
             if info.hidden {
                 flags |= 0x0001;
@@ -1679,7 +1708,7 @@ impl MutableXlsbWorksheet {
                 flags |= 0x0002;
             }
             if info.best_fit {
-                flags |= 0x0008;
+                flags |= 0x0004;
             }
             temp_writer.write_u16(flags)?;
 
@@ -1777,6 +1806,7 @@ mod tests {
     use crate::xlsb::data_validation::DataValidation;
     use crate::xlsb::hyperlinks::Hyperlink;
     use crate::xlsb::merged_cells::MergedCell;
+    use litchi_core::binary;
 
     #[test]
     fn test_set_and_get_cell() {
@@ -2072,6 +2102,31 @@ mod tests {
         assert_eq!(info.width, Some(15.0));
         assert!(!info.hidden);
         assert!(info.best_fit);
+    }
+
+    #[test]
+    fn writes_best_fit_in_the_specified_column_flag() {
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        sheet.columns.insert(
+            2,
+            ColumnInfo {
+                width: Some(15.0),
+                hidden: false,
+                best_fit: true,
+            },
+        );
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+        let mut shared_strings = crate::xlsb::writer::MutableSharedStringsWriter::new();
+        sheet.write(&mut writer, &mut shared_strings).unwrap();
+
+        let record = crate::xlsb::records::XlsbRecordIter::new(buffer.as_slice())
+            .find_map(|record| {
+                let record = record.unwrap();
+                (record.header.record_type == record_types::COL_INFO).then_some(record)
+            })
+            .unwrap();
+        assert_eq!(binary::read_u16_le_at(&record.data, 16).unwrap(), 0x0006);
     }
 
     #[test]

@@ -493,6 +493,8 @@ impl XlsbWorkbook {
         for hyperlink in cells_reader.hyperlinks {
             worksheet.add_hyperlink(hyperlink);
         }
+        worksheet.set_column_infos(cells_reader.column_infos);
+        worksheet.set_row_infos(cells_reader.row_infos);
 
         Ok(worksheet)
     }

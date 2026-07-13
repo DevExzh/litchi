@@ -9,6 +9,7 @@ use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
 use crate::xlsb::records::{RecordIter, record_types};
 use crate::xlsb::shared_strings::SharedString;
+use crate::xlsb::worksheet::{XlsbColumnInfo, XlsbRowInfo};
 use litchi_core::binary;
 use litchi_core::sheet::CellValue;
 use std::io::{Read, Seek};
@@ -48,6 +49,7 @@ where
     cell_xf_count: usize,
     dimensions: Dimensions,
     current_row: u32,
+    last_row: Option<u32>,
     buf: Vec<u8>,
     pending_record: Option<(u16, Vec<u8>)>,
     formula_groups: Vec<Arc<FormulaGroup>>,
@@ -55,6 +57,10 @@ where
     pub merged_cells: Vec<MergedCell>,
     /// Hyperlinks found in the worksheet
     pub hyperlinks: Vec<Hyperlink>,
+    /// Column formatting records found before sheet data.
+    pub column_infos: Vec<XlsbColumnInfo>,
+    /// Row header metadata found within sheet data.
+    pub row_infos: Vec<XlsbRowInfo>,
 }
 
 impl<'a, RS> XlsbCellsReader<'a, RS>
@@ -78,19 +84,27 @@ where
             ],
             &mut buf,
         )?;
-        let dimensions = Self::parse_dimensions(&buf[..16]);
+        if buf.len() != 16 {
+            return Err(XlsbError::InvalidLength {
+                expected: 16,
+                found: buf.len(),
+            });
+        }
+        let dimensions = Self::parse_dimensions(&buf);
 
-        // Skip to BrtBeginSheetData
-        let _ = iter.next_skip_blocks(
-            0x0091, // BrtBeginSheetData
-            &[
-                (0x0085, Some(0x0086)), // Views
-                (0x0025, Some(0x0026)), // AC blocks
-                (0x01E5, None),         // BrtWsFmtInfo
-                (0x0186, Some(0x0187)), // Col Infos
-            ],
-            &mut buf,
-        )?;
+        // Read worksheet preamble through BrtBeginSheetData, retaining column
+        // formatting while safely ignoring unrelated and future records.
+        let mut column_infos = Vec::new();
+        loop {
+            let typ = iter.read_type()?;
+            let _ = iter.fill_buffer(&mut buf)?;
+            if typ == 0x0091 {
+                break;
+            }
+            if typ == record_types::COL_INFO {
+                column_infos.push(Self::parse_column_info(&buf, cell_xf_count)?);
+            }
+        }
 
         Ok(XlsbCellsReader {
             iter,
@@ -99,11 +113,14 @@ where
             cell_xf_count,
             dimensions,
             current_row: 0,
+            last_row: None,
             buf,
             pending_record: None,
             formula_groups: Vec::new(),
             merged_cells: Vec::new(),
             hyperlinks: Vec::new(),
+            column_infos,
+            row_infos: Vec::new(),
         })
     }
 
@@ -139,7 +156,14 @@ where
             match typ {
                 0x0000 => {
                     // BrtRowHdr
-                    self.current_row = binary::read_u32_le_at(&self.buf, 0)?;
+                    let info = Self::parse_row_info(
+                        &self.buf,
+                        self.cell_xf_count,
+                        self.last_row,
+                    )?;
+                    self.current_row = info.row;
+                    self.last_row = Some(info.row);
+                    self.row_infos.push(info);
                 },
                 0x0001
                     // BrtCellBlank
@@ -336,6 +360,150 @@ where
                 binary::read_u32_le_at(buf, 12).unwrap_or(0),
             ),
         }
+    }
+
+    fn parse_column_info(data: &[u8], cell_xf_count: usize) -> XlsbResult<XlsbColumnInfo> {
+        if data.len() != 18 {
+            return Err(XlsbError::InvalidLength {
+                expected: 18,
+                found: data.len(),
+            });
+        }
+        let first_column = binary::read_u32_le_at(data, 0)?;
+        let last_column = binary::read_u32_le_at(data, 4)?;
+        let width_raw = binary::read_u32_le_at(data, 8)?;
+        let style_id = binary::read_u32_le_at(data, 12)?;
+        let flags = binary::read_u16_le_at(data, 16)?;
+        if first_column > last_column || last_column >= 0x4000 {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtColInfo range".to_string(),
+                val: format!("{first_column}..={last_column}"),
+            });
+        }
+        if width_raw > 0xFFFF {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtColInfo coldx".to_string(),
+                val: width_raw.to_string(),
+            });
+        }
+        if style_id as usize >= cell_xf_count {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtColInfo ixfe".to_string(),
+                val: format!("{style_id} (cell XF count {cell_xf_count})"),
+            });
+        }
+        if flags & !0x170F != 0 {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtColInfo flags".to_string(),
+                val: format!("0x{flags:04X}"),
+            });
+        }
+        Ok(XlsbColumnInfo {
+            first_column,
+            last_column,
+            width: f64::from(width_raw) / 256.0,
+            style_id,
+            hidden: flags & 0x0001 != 0,
+            user_set_width: flags & 0x0002 != 0,
+            best_fit: flags & 0x0004 != 0,
+            show_phonetic: flags & 0x0008 != 0,
+            outline_level: ((flags >> 8) & 7) as u8,
+            collapsed: flags & 0x1000 != 0,
+        })
+    }
+
+    fn parse_row_info(
+        data: &[u8],
+        cell_xf_count: usize,
+        previous_row: Option<u32>,
+    ) -> XlsbResult<XlsbRowInfo> {
+        if data.len() < 17 {
+            return Err(XlsbError::InvalidLength {
+                expected: 17,
+                found: data.len(),
+            });
+        }
+        let row = binary::read_u32_le_at(data, 0)?;
+        let raw_style_id = binary::read_u32_le_at(data, 4)?;
+        let height_twips = binary::read_u16_le_at(data, 8)?;
+        let flags1 = data[10];
+        let flags2 = data[11];
+        let phonetic_flags = data[12];
+        let span_count = binary::read_u32_le_at(data, 13)? as usize;
+        if span_count > 16 {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtRowHdr ccolspan".to_string(),
+                val: span_count.to_string(),
+            });
+        }
+        let expected = span_count
+            .checked_mul(8)
+            .and_then(|size| size.checked_add(17))
+            .ok_or_else(|| XlsbError::Encoding("BrtRowHdr size overflow".to_string()))?;
+        if data.len() != expected {
+            return Err(XlsbError::InvalidLength {
+                expected,
+                found: data.len(),
+            });
+        }
+        if row >= 0x10_0000 || previous_row.is_some_and(|previous| row <= previous) {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtRowHdr rw".to_string(),
+                val: row.to_string(),
+            });
+        }
+        if height_twips > 0x2000 {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtRowHdr miyRw".to_string(),
+                val: height_twips.to_string(),
+            });
+        }
+        if flags1 & 0xFC != 0 || flags2 & 0x80 != 0 || phonetic_flags & 0xFE != 0 {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtRowHdr flags".to_string(),
+                val: format!("0x{flags1:02X}/0x{flags2:02X}/0x{phonetic_flags:02X}"),
+            });
+        }
+        let style_applied = flags2 & 0x40 != 0;
+        if style_applied && raw_style_id as usize >= cell_xf_count {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtRowHdr ixfe".to_string(),
+                val: format!("{raw_style_id} (cell XF count {cell_xf_count})"),
+            });
+        }
+
+        let mut column_spans = Vec::with_capacity(span_count);
+        let mut previous_segment = None;
+        for span in data[17..].chunks_exact(8) {
+            let first = binary::read_u32_le_at(span, 0)?;
+            let last = binary::read_u32_le_at(span, 4)?;
+            let segment = first / 1024;
+            if first > last
+                || last >= 0x4000
+                || last / 1024 != segment
+                || previous_segment.is_some_and(|previous| segment <= previous)
+            {
+                return Err(XlsbError::Unrecognized {
+                    typ: "BrtRowHdr BrtColSpan".to_string(),
+                    val: format!("{first}..={last}"),
+                });
+            }
+            previous_segment = Some(segment);
+            column_spans.push((first, last));
+        }
+
+        Ok(XlsbRowInfo {
+            row,
+            style_id: style_applied.then_some(raw_style_id),
+            height: (flags2 & 0x20 != 0).then_some(f64::from(height_twips) / 20.0),
+            extra_ascender: flags1 & 1 != 0,
+            extra_descender: flags1 & 2 != 0,
+            outline_level: flags2 & 7,
+            collapsed: flags2 & 0x08 != 0,
+            hidden: flags2 & 0x10 != 0,
+            show_phonetic: phonetic_flags & 1 != 0,
+            column_spans,
+        })
     }
 
     fn parse_cell_header(&self) -> XlsbResult<CellHeader> {
@@ -631,10 +799,30 @@ mod tests {
         let mut bytes = Vec::new();
         let mut writer = RecordWriter::new(&mut bytes);
         writer.write_record(0x0094, &[0; 16]).unwrap();
-        writer.write_record(0x0091, &[]).unwrap();
         writer
-            .write_record(record_types::ROW_HDR, &4u32.to_le_bytes())
+            .write_record(record_types::BEGIN_COL_INFOS, &[])
             .unwrap();
+        let mut column = 2u32.to_le_bytes().to_vec();
+        column.extend_from_slice(&4u32.to_le_bytes());
+        column.extend_from_slice(&4096u32.to_le_bytes());
+        column.extend_from_slice(&0u32.to_le_bytes());
+        column.extend_from_slice(&0x130Fu16.to_le_bytes());
+        writer
+            .write_record(record_types::COL_INFO, &column)
+            .unwrap();
+        writer
+            .write_record(record_types::END_COL_INFOS, &[])
+            .unwrap();
+        writer.write_record(0x0091, &[]).unwrap();
+
+        let mut row = 4u32.to_le_bytes().to_vec();
+        row.extend_from_slice(&0u32.to_le_bytes());
+        row.extend_from_slice(&500u16.to_le_bytes());
+        row.extend_from_slice(&[3, 0x7A, 1]);
+        row.extend_from_slice(&1u32.to_le_bytes());
+        row.extend_from_slice(&2u32.to_le_bytes());
+        row.extend_from_slice(&2u32.to_le_bytes());
+        writer.write_record(record_types::ROW_HDR, &row).unwrap();
 
         let mut cell = 2u32.to_le_bytes().to_vec();
         cell.extend_from_slice(&[0, 0, 0, 1]);
@@ -694,5 +882,29 @@ mod tests {
         assert_eq!(rich.runs[0].font_id, 3);
         assert_eq!(rich.runs[1].font_id, 5);
         assert!(reader.next_cell().unwrap().is_none());
+
+        assert_eq!(reader.column_infos.len(), 1);
+        let column = &reader.column_infos[0];
+        assert_eq!((column.first_column, column.last_column), (2, 4));
+        assert_eq!(column.width, 16.0);
+        assert!(column.hidden);
+        assert!(column.user_set_width);
+        assert!(column.best_fit);
+        assert!(column.show_phonetic);
+        assert_eq!(column.outline_level, 3);
+        assert!(column.collapsed);
+
+        assert_eq!(reader.row_infos.len(), 1);
+        let row = &reader.row_infos[0];
+        assert_eq!(row.row, 4);
+        assert_eq!(row.style_id, Some(0));
+        assert_eq!(row.height, Some(25.0));
+        assert!(row.extra_ascender);
+        assert!(row.extra_descender);
+        assert_eq!(row.outline_level, 2);
+        assert!(row.collapsed);
+        assert!(row.hidden);
+        assert!(row.show_phonetic);
+        assert_eq!(row.column_spans, vec![(2, 2)]);
     }
 }
