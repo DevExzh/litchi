@@ -22,7 +22,10 @@
 //! - [MS-XLSB] Section 2.5.98 - Formulas
 //! - [MS-XLS] Section 2.5.198 - Ptg (for token details, largely compatible)
 
+mod function_table;
+
 use crate::xlsb::error::{XlsbError, XlsbResult};
+use function_table::BUILTIN_FUNCTIONS;
 use litchi_core::binary;
 
 /// Maximum size of an XLSB cell formula token stream.
@@ -1084,8 +1087,7 @@ impl<'a> FormulaParser<'a> {
         let index = binary::read_u16_le_at(self.data, self.offset)?;
         self.offset += 2;
 
-        // Look up argument count from function table (simplified)
-        let arg_count = Self::get_function_arg_count(index);
+        let arg_count = Self::get_function_arg_count(index)?;
 
         Ok(FormulaToken::Function {
             index,
@@ -1104,6 +1106,23 @@ impl<'a> FormulaParser<'a> {
         let is_command = tab & 0x8000 != 0;
         self.offset += 3;
 
+        if !is_command {
+            if let Some(function) = builtin_function_by_index(index) {
+                if function.min_args == function.max_args {
+                    return Err(XlsbError::InvalidFormula(format!(
+                        "PtgFuncVar specifies fixed-arity function {}",
+                        function.name
+                    )));
+                }
+                if !function.accepts_arg_count(arg_count) {
+                    return Err(XlsbError::InvalidFormula(format!(
+                        "{} does not accept {arg_count} arguments",
+                        function.name
+                    )));
+                }
+            }
+        }
+
         Ok(FormulaToken::Function {
             index,
             arg_count,
@@ -1121,12 +1140,20 @@ impl<'a> FormulaParser<'a> {
         Ok(FormulaToken::Name(name_index))
     }
 
-    /// Get function argument count by function index
-    ///
-    /// This is a simplified lookup. In a complete implementation, this would
-    /// use a comprehensive table of all Excel functions.
-    fn get_function_arg_count(index: u16) -> u8 {
-        builtin_function_by_index(index).map_or(0, |function| function.min_args)
+    /// Resolve the parameter count of a fixed-arity `Ftab` function.
+    fn get_function_arg_count(index: u16) -> XlsbResult<u8> {
+        let function = builtin_function_by_index(index).ok_or_else(|| {
+            XlsbError::UnsupportedFeature(format!(
+                "fixed-arity XLSB function index {index} is not a non-macro Ftab entry"
+            ))
+        })?;
+        if function.min_args != function.max_args {
+            return Err(XlsbError::InvalidFormula(format!(
+                "PtgFunc specifies variable-arity function {}",
+                function.name
+            )));
+        }
+        Ok(function.min_args)
     }
 }
 
@@ -1388,64 +1415,30 @@ struct BuiltinFunction {
     max_args: u8,
 }
 
+impl BuiltinFunction {
+    fn accepts_arg_count(self, count: u8) -> bool {
+        if count < self.min_args || count > self.max_args {
+            return false;
+        }
+        match self.index {
+            // GETPIVOTDATA permits the two mandatory arguments, one optional
+            // field, or complete field/item pairs thereafter.
+            358 => count <= 3 || count % 2 == 0,
+            // COUNTIFS is made solely of range/criteria pairs.
+            481 => count % 2 == 0,
+            // SUMIFS and AVERAGEIFS have one leading aggregate range followed
+            // by range/criteria pairs.
+            482 | 484 => count % 2 == 1,
+            _ => true,
+        }
+    }
+}
+
 fn builtin_function_by_index(index: u16) -> Option<BuiltinFunction> {
-    let (name, min_args, max_args) = match index {
-        0 => ("COUNT", 0, 30),
-        1 => ("IF", 2, 3),
-        2 => ("ISNA", 1, 1),
-        3 => ("ISERROR", 1, 1),
-        4 => ("SUM", 0, 30),
-        5 => ("AVERAGE", 1, 30),
-        6 => ("MIN", 1, 30),
-        7 => ("MAX", 1, 30),
-        8 => ("ROW", 0, 1),
-        9 => ("COLUMN", 0, 1),
-        10 => ("NA", 0, 0),
-        11 => ("NPV", 2, 30),
-        12 => ("STDEV", 1, 30),
-        13 => ("DOLLAR", 1, 2),
-        14 => ("FIXED", 2, 3),
-        15 => ("SIN", 1, 1),
-        16 => ("COS", 1, 1),
-        17 => ("TAN", 1, 1),
-        18 => ("ATAN", 1, 1),
-        19 => ("PI", 0, 0),
-        20 => ("SQRT", 1, 1),
-        21 => ("EXP", 1, 1),
-        22 => ("LN", 1, 1),
-        23 => ("LOG10", 1, 1),
-        24 => ("ABS", 1, 1),
-        25 => ("INT", 1, 1),
-        26 => ("SIGN", 1, 1),
-        27 => ("ROUND", 2, 2),
-        28 => ("LOOKUP", 2, 3),
-        29 => ("INDEX", 2, 4),
-        30 => ("REPT", 2, 2),
-        31 => ("MID", 3, 3),
-        32 => ("LEN", 1, 1),
-        33 => ("VALUE", 1, 1),
-        34 => ("TRUE", 0, 0),
-        35 => ("FALSE", 0, 0),
-        36 => ("AND", 1, 30),
-        37 => ("OR", 1, 30),
-        38 => ("NOT", 1, 1),
-        39 => ("MOD", 2, 2),
-        64 => ("MATCH", 2, 3),
-        65 => ("DATE", 3, 3),
-        74 => ("NOW", 0, 0),
-        82 => ("SEARCH", 2, 3),
-        100 => ("CHOOSE", 2, 30),
-        101 => ("HLOOKUP", 3, 4),
-        102 => ("VLOOKUP", 3, 4),
-        115 => ("LEFT", 1, 2),
-        116 => ("RIGHT", 1, 2),
-        124 => ("FIND", 2, 3),
-        221 => ("TODAY", 0, 0),
-        336 => ("CONCATENATE", 0, 30),
-        345 => ("SUMIF", 2, 3),
-        346 => ("COUNTIF", 2, 2),
-        _ => return None,
-    };
+    let position = BUILTIN_FUNCTIONS
+        .binary_search_by_key(&index, |entry| entry.0)
+        .ok()?;
+    let (index, name, min_args, max_args) = BUILTIN_FUNCTIONS[position];
     Some(BuiltinFunction {
         index,
         name,
@@ -1455,23 +1448,25 @@ fn builtin_function_by_index(index: u16) -> Option<BuiltinFunction> {
 }
 
 fn builtin_function_by_name(name: &str) -> Option<BuiltinFunction> {
-    const INDICES: &[u16] = &[
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-        25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 64, 65, 74, 82, 100, 101, 102,
-        115, 116, 124, 221, 336, 345, 346,
-    ];
-    INDICES.iter().find_map(|index| {
-        let function = builtin_function_by_index(*index)?;
-        function.name.eq_ignore_ascii_case(name).then_some(function)
-    })
+    BUILTIN_FUNCTIONS
+        .iter()
+        .find_map(|&(index, function_name, min_args, max_args)| {
+            function_name
+                .eq_ignore_ascii_case(name)
+                .then_some(BuiltinFunction {
+                    index,
+                    name: function_name,
+                    min_args,
+                    max_args,
+                })
+        })
 }
 
-/// Compiles a practical, standards-defined subset of Excel formula text to
-/// XLSB RPN tokens.
+/// Compiles standards-defined Excel formula text to XLSB RPN tokens.
 ///
 /// The compiler supports literals, A1 references and ranges, parentheses,
 /// arithmetic/comparison/concatenation operators, percent, and the built-in
-/// functions in this module's supported `Ftab` table, and typed array
+/// non-macro built-in functions from [MS-XLSB]'s `Ftab` table, and typed array
 /// constants. Unsupported constructs return an error; they are never replaced
 /// by a cached value.
 pub struct FormulaCompiler<'a> {
@@ -1716,15 +1711,16 @@ impl<'a> FormulaCompiler<'a> {
                     }
                 }
             }
-            if arguments.len() < usize::from(function.min_args)
-                || arguments.len() > usize::from(function.max_args)
-            {
+            let argument_count = u8::try_from(arguments.len()).map_err(|_| {
+                XlsbError::InvalidFormula(format!("{} has more than 255 arguments", function.name))
+            })?;
+            if !function.accepts_arg_count(argument_count) {
                 return Err(XlsbError::InvalidFormula(format!(
-                    "{} expects {}..={} arguments, found {}",
+                    "{} does not accept {} arguments (range {}..={})",
                     function.name,
+                    arguments.len(),
                     function.min_args,
                     function.max_args,
-                    arguments.len()
                 )));
             }
             return Ok(CompileExpr::Function(function, arguments));
@@ -2280,6 +2276,103 @@ mod tests {
         let tokens = FormulaParser::new(&formula.rgce).parse().unwrap();
         let text = FormulaConverter::try_tokens_to_string(&tokens).unwrap();
         assert_eq!(text, "(SUM($A$1:B3)+\"荔枝\")");
+    }
+
+    #[test]
+    fn builtin_function_table_is_sorted_unique_and_non_macro() {
+        assert_eq!(BUILTIN_FUNCTIONS.len(), 363);
+        assert!(
+            BUILTIN_FUNCTIONS
+                .windows(2)
+                .all(|entries| entries[0].0 < entries[1].0)
+        );
+
+        let mut names = std::collections::HashSet::new();
+        for &(index, name, min_args, max_args) in BUILTIN_FUNCTIONS {
+            assert!(min_args <= max_args, "invalid arity for {name}");
+            assert!(
+                names.insert(name.to_ascii_uppercase()),
+                "duplicate function name {name} at index {index}"
+            );
+        }
+
+        assert!(builtin_function_by_index(53).is_none()); // GOTO macro function
+        assert!(builtin_function_by_index(110).is_none()); // EXEC macro function
+        assert!(builtin_function_by_index(255).is_none()); // context-dependent UDF
+        assert!(builtin_function_by_index(468).is_none()); // future-function CONVERT
+    }
+
+    #[test]
+    fn compiler_covers_legacy_analysis_and_ooxml_function_ranges() {
+        let cases: &[(&str, &str, &[u8])] = &[
+            ("ROUNDUP(1.2,0)", "ROUNDUP(1.2,0)", &[0x41, 0xD4, 0x00]),
+            ("MEDIAN(1,2,3)", "MEDIAN(1,2,3)", &[0x42, 0x03, 0xE3, 0x00]),
+            ("CUBESETCOUNT(1)", "CUBESETCOUNT(1)", &[0x41, 0xDF, 0x01]),
+        ];
+        for &(source, expected, token_suffix) in cases {
+            let formula = FormulaCompiler::compile(source).unwrap();
+            assert!(formula.rgce.ends_with(token_suffix));
+            let tokens = FormulaParser::new(&formula.rgce).parse().unwrap();
+            assert_eq!(
+                FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
+                expected
+            );
+        }
+
+        let accrint = FormulaCompiler::compile("ACCRINT(1,2,3,4,5,6,7,8)").unwrap();
+        assert!(accrint.rgce.ends_with(&[0x42, 0x08, 0xD5, 0x01]));
+        assert!(FormulaCompiler::compile("ACCRINT(1,2,3,4,5,6,7,8,9)").is_err());
+    }
+
+    #[test]
+    fn compiler_and_parser_enforce_function_argument_grammars() {
+        assert!(FormulaCompiler::compile("SUM()").is_err());
+        assert!(FormulaCompiler::compile("COUNTIFS(A1,1)").is_ok());
+        assert!(FormulaCompiler::compile("COUNTIFS(A1,1,B1)").is_err());
+        assert!(FormulaCompiler::compile("SUMIFS(A1,B1,1)").is_ok());
+        assert!(FormulaCompiler::compile("SUMIFS(A1,B1,1,C1)").is_err());
+        assert!(FormulaCompiler::compile("GETPIVOTDATA(1,2,3)").is_ok());
+        assert!(FormulaCompiler::compile("GETPIVOTDATA(1,2,3,4,5)").is_err());
+
+        assert!(matches!(
+            FormulaParser::new(&[0x41, 0xE3, 0x00]).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+        assert!(matches!(
+            FormulaParser::new(&[0x42, 0x02, 0xD4, 0x00]).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+        assert!(matches!(
+            FormulaParser::new(&[0x42, 0x03, 0xE1, 0x01]).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+
+        assert!(matches!(
+            FormulaCompiler::compile("EXEC(\"calc\")"),
+            Err(XlsbError::UnsupportedFeature(_))
+        ));
+        assert!(matches!(
+            FormulaCompiler::compile("CONVERT(1,\"m\",\"ft\")"),
+            Err(XlsbError::UnsupportedFeature(_))
+        ));
+    }
+
+    #[test]
+    fn variable_functions_support_the_full_u8_argument_count() {
+        let formula_255 = format!("SUM({})", vec!["1"; 255].join(","));
+        let compiled = FormulaCompiler::compile(&formula_255).unwrap();
+        assert!(compiled.rgce.ends_with(&[0x42, 0xFF, 0x04, 0x00]));
+        let tokens = FormulaParser::new(&compiled.rgce).parse().unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
+            formula_255
+        );
+
+        let formula_256 = format!("SUM({})", vec!["1"; 256].join(","));
+        assert!(matches!(
+            FormulaCompiler::compile(&formula_256),
+            Err(XlsbError::InvalidFormula(_))
+        ));
     }
 
     #[test]
