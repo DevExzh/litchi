@@ -398,6 +398,10 @@ pub enum FormulaToken {
     Error(u8),
     /// Integer constant
     Int(u16),
+    /// Omitted function argument (`PtgMissArg`).
+    MissingArg,
+    /// Display parenthesis around the preceding expression (`PtgParen`).
+    Parenthesis,
     /// Cell reference (row, col, relative_row, relative_col)
     CellRef {
         row: u32,
@@ -447,6 +451,9 @@ pub enum BinaryOperator {
     GreaterEqual,
     GreaterThan,
     NotEqual,
+    Intersection,
+    Union,
+    Range,
 }
 
 /// Unary operators
@@ -524,10 +531,15 @@ impl<'a> FormulaParser<'a> {
             PTG_GE => Ok(FormulaToken::BinaryOp(BinaryOperator::GreaterEqual)),
             PTG_GT => Ok(FormulaToken::BinaryOp(BinaryOperator::GreaterThan)),
             PTG_NE => Ok(FormulaToken::BinaryOp(BinaryOperator::NotEqual)),
+            PTG_ISECT => Ok(FormulaToken::BinaryOp(BinaryOperator::Intersection)),
+            PTG_UNION => Ok(FormulaToken::BinaryOp(BinaryOperator::Union)),
+            PTG_RANGE => Ok(FormulaToken::BinaryOp(BinaryOperator::Range)),
 
             PTG_UPLUS => Ok(FormulaToken::UnaryOp(UnaryOperator::Plus)),
             PTG_UMINUS => Ok(FormulaToken::UnaryOp(UnaryOperator::Minus)),
             PTG_PERCENT => Ok(FormulaToken::UnaryOp(UnaryOperator::Percent)),
+            PTG_PAREN => Ok(FormulaToken::Parenthesis),
+            PTG_MISSING_ARG => Ok(FormulaToken::MissingArg),
 
             PTG_INT => self.parse_int(),
             PTG_NUM => self.parse_num(),
@@ -811,6 +823,15 @@ impl FormulaConverter {
             match token {
                 FormulaToken::Number(n) => stack.push(format!("{}", n)),
                 FormulaToken::Int(i) => stack.push(format!("{}", i)),
+                FormulaToken::MissingArg => stack.push(String::new()),
+                FormulaToken::Parenthesis => {
+                    let Some(expression) = stack.pop() else {
+                        return Err(XlsbError::InvalidFormula(
+                            "PtgParen has no preceding expression".to_string(),
+                        ));
+                    };
+                    stack.push(format!("({expression})"));
+                },
                 FormulaToken::String(s) => stack.push(format!("\"{}\"", s.replace('"', "\"\""))),
                 FormulaToken::Bool(b) => stack.push(if *b {
                     "TRUE".to_string()
@@ -957,6 +978,9 @@ impl FormulaConverter {
             BinaryOperator::GreaterEqual => ">=",
             BinaryOperator::GreaterThan => ">",
             BinaryOperator::NotEqual => "<>",
+            BinaryOperator::Intersection => " ",
+            BinaryOperator::Union => ",",
+            BinaryOperator::Range => ":",
         }
     }
 
@@ -1085,6 +1109,8 @@ enum CompileExpr {
     Number(f64),
     String(String),
     Bool(bool),
+    MissingArg,
+    Parenthesized(Box<CompileExpr>),
     Ref(A1Reference),
     Area(A1Reference, A1Reference),
     Unary(UnaryOperator, Box<CompileExpr>),
@@ -1264,7 +1290,7 @@ impl<'a> FormulaCompiler<'a> {
             if !self.consume(")") {
                 return Err(self.error("expected ')'"));
             }
-            return Ok(expression);
+            return Ok(CompileExpr::Parenthesized(Box::new(expression)));
         }
         if self.peek_char() == Some('"') {
             return self.parse_string().map(CompileExpr::String);
@@ -1286,6 +1312,14 @@ impl<'a> FormulaCompiler<'a> {
             let mut arguments = Vec::new();
             if !self.consume(")") {
                 loop {
+                    if self.consume(")") {
+                        arguments.push(CompileExpr::MissingArg);
+                        break;
+                    }
+                    if self.consume(",") {
+                        arguments.push(CompileExpr::MissingArg);
+                        continue;
+                    }
                     arguments.push(self.parse_comparison()?);
                     if self.consume(")") {
                         break;
@@ -1446,6 +1480,11 @@ impl<'a> FormulaCompiler<'a> {
                 output.push(ptg_types::PTG_BOOL);
                 output.push(u8::from(*value));
             },
+            CompileExpr::MissingArg => output.push(ptg_types::PTG_MISSING_ARG),
+            CompileExpr::Parenthesized(expression) => {
+                Self::emit(expression, output, encoding)?;
+                output.push(ptg_types::PTG_PAREN);
+            },
             CompileExpr::Ref(reference) => match encoding {
                 FormulaEncoding::Cell => emit_reference(output, 0x44, *reference),
                 FormulaEncoding::Shared { base_row, base_col } => {
@@ -1498,6 +1537,9 @@ impl<'a> FormulaCompiler<'a> {
                     BinaryOperator::GreaterEqual => ptg_types::PTG_GE,
                     BinaryOperator::GreaterThan => ptg_types::PTG_GT,
                     BinaryOperator::NotEqual => ptg_types::PTG_NE,
+                    BinaryOperator::Intersection => ptg_types::PTG_ISECT,
+                    BinaryOperator::Union => ptg_types::PTG_UNION,
+                    BinaryOperator::Range => ptg_types::PTG_RANGE,
                 });
             },
             CompileExpr::Function(function, arguments) => {
@@ -1713,6 +1755,37 @@ mod tests {
         let tokens = FormulaParser::new(&formula.rgce).parse().unwrap();
         let text = FormulaConverter::try_tokens_to_string(&tokens).unwrap();
         assert_eq!(text, "(SUM($A$1:B3)+\"荔枝\")");
+    }
+
+    #[test]
+    fn compiler_and_converter_preserve_missing_arguments_and_parentheses() {
+        let missing = FormulaCompiler::compile("IF(TRUE,,0)").unwrap();
+        assert!(missing.rgce.contains(&ptg_types::PTG_MISSING_ARG));
+        let tokens = FormulaParser::new(&missing.rgce).parse().unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
+            "IF(TRUE,,0)"
+        );
+
+        let parenthesized = FormulaCompiler::compile("(1+2)*3").unwrap();
+        assert!(parenthesized.rgce.contains(&ptg_types::PTG_PAREN));
+        let tokens = FormulaParser::new(&parenthesized.rgce).parse().unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
+            "(((1+2))*3)"
+        );
+    }
+
+    #[test]
+    fn parser_converts_binary_reference_operators() {
+        let mut rgce = FormulaCompiler::compile("A1").unwrap().rgce;
+        rgce.extend_from_slice(&FormulaCompiler::compile("B2").unwrap().rgce);
+        rgce.push(ptg_types::PTG_UNION);
+        let tokens = FormulaParser::new(&rgce).parse().unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
+            "(A1,B2)"
+        );
     }
 
     #[test]
