@@ -1,6 +1,8 @@
 //! Main Spreadsheet structure and implementation.
 
-use super::Sheet;
+use super::{
+    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Sheet, parser::OdsParser,
+};
 use crate::core::{Content, Meta, OwnedPackage, Styles};
 use litchi_core::{Error, Metadata, Result};
 use std::path::Path;
@@ -39,6 +41,7 @@ pub struct Spreadsheet {
     #[allow(dead_code)]
     styles: Option<Styles>,
     meta: Option<Meta>,
+    named_definitions: Vec<NamedDefinition>,
 }
 
 impl Spreadsheet {
@@ -104,6 +107,7 @@ impl Spreadsheet {
         // Parse core components
         let content_bytes = package.get_file("content.xml")?;
         let content = Content::from_bytes(&content_bytes)?;
+        let named_definitions = OdsParser::parse_named_definitions(content.xml_content())?;
 
         let styles = if package.has_file("styles.xml") {
             let styles_bytes = package.get_file("styles.xml")?;
@@ -124,6 +128,7 @@ impl Spreadsheet {
             content,
             styles,
             meta,
+            named_definitions,
         })
     }
 
@@ -145,13 +150,66 @@ impl Spreadsheet {
     ///
     /// Returns a vector of `Sheet` objects representing all sheets in the document.
     pub fn sheets(&mut self) -> Result<Vec<Sheet>> {
-        use super::parser::OdsParser;
-
         let package = self.package.package()?;
         let content_bytes = package.get_file("content.xml")?;
         let content = Content::from_bytes(&content_bytes)?;
 
         OdsParser::parse_sheets(content.xml_content())
+    }
+
+    /// Return all named ranges and expressions in document order.
+    pub fn named_definitions(&self) -> &[NamedDefinition] {
+        &self.named_definitions
+    }
+
+    /// Return all named ranges, including global and sheet-local ranges.
+    pub fn named_ranges(&self) -> impl Iterator<Item = &NamedRange> {
+        self.named_definitions
+            .iter()
+            .filter_map(|definition| match definition {
+                NamedDefinition::Range(range) => Some(range),
+                NamedDefinition::Expression(_) => None,
+            })
+    }
+
+    /// Find a named range by name and scope.
+    pub fn named_range(&self, name: &str, scope: &NamedDefinitionScope) -> Option<&NamedRange> {
+        self.named_definitions
+            .iter()
+            .find_map(|definition| match definition {
+                NamedDefinition::Range(range) if range.name == name && &range.scope == scope => {
+                    Some(range)
+                },
+                _ => None,
+            })
+    }
+
+    /// Return all named expressions, including global and sheet-local expressions.
+    pub fn named_expressions(&self) -> impl Iterator<Item = &NamedExpression> {
+        self.named_definitions
+            .iter()
+            .filter_map(|definition| match definition {
+                NamedDefinition::Expression(expression) => Some(expression),
+                NamedDefinition::Range(_) => None,
+            })
+    }
+
+    /// Find a named expression by name and scope.
+    pub fn named_expression(
+        &self,
+        name: &str,
+        scope: &NamedDefinitionScope,
+    ) -> Option<&NamedExpression> {
+        self.named_definitions
+            .iter()
+            .find_map(|definition| match definition {
+                NamedDefinition::Expression(expression)
+                    if expression.name == name && &expression.scope == scope =>
+                {
+                    Some(expression)
+                },
+                _ => None,
+            })
     }
 
     /// Get a sheet by name.

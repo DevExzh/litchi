@@ -4,7 +4,11 @@
 //! for in-place modification of sheets, rows, and cells.
 
 use crate::core::{OdfStructure, PackageWriter};
-use crate::ods::{Cell, CellValue, Row, Sheet, Spreadsheet};
+use crate::ods::{
+    Cell, CellValue, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row,
+    Sheet, Spreadsheet,
+    named_expression::{ensure_unique, write_named_definitions},
+};
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
 
@@ -34,6 +38,8 @@ pub struct MutableSpreadsheet {
     mimetype: String,
     /// Original styles XML
     styles_xml: Option<String>,
+    /// Global and sheet-local named ranges and expressions.
+    named_definitions: Vec<NamedDefinition>,
 }
 
 impl MutableSpreadsheet {
@@ -47,6 +53,10 @@ impl MutableSpreadsheet {
             .flat_map(|s| s.rows.iter())
             .flat_map(|r| r.cells.iter())
             .any(|c| c.formula.is_some())
+            || self
+                .named_definitions
+                .iter()
+                .any(|definition| matches!(definition, NamedDefinition::Expression(_)))
     }
 
     fn push_table_columns(out: &mut String, max_cols: usize) {
@@ -154,6 +164,7 @@ impl MutableSpreadsheet {
     pub fn from_spreadsheet(mut spreadsheet: Spreadsheet) -> Result<Self> {
         let sheets = spreadsheet.sheets()?;
         let metadata = spreadsheet.metadata()?;
+        let named_definitions = spreadsheet.named_definitions().to_vec();
         let mimetype = "application/vnd.oasis.opendocument.spreadsheet".to_string();
 
         // Extract styles XML from the spreadsheet's package (requires accessing internal package)
@@ -165,6 +176,7 @@ impl MutableSpreadsheet {
             metadata,
             mimetype,
             styles_xml: None,
+            named_definitions,
         })
     }
 
@@ -175,6 +187,7 @@ impl MutableSpreadsheet {
             metadata: Metadata::default(),
             mimetype: "application/vnd.oasis.opendocument.spreadsheet".to_string(),
             styles_xml: None,
+            named_definitions: Vec::new(),
         }
     }
 
@@ -198,6 +211,71 @@ impl MutableSpreadsheet {
         &mut self.metadata
     }
 
+    /// Return all global and sheet-local named definitions.
+    pub fn named_definitions(&self) -> &[NamedDefinition] {
+        &self.named_definitions
+    }
+
+    /// Add a named range.
+    pub fn add_named_range(&mut self, range: NamedRange) -> Result<()> {
+        self.add_named_definition(range.into())
+    }
+
+    /// Add a named OpenFormula expression.
+    pub fn add_named_expression(&mut self, expression: NamedExpression) -> Result<()> {
+        self.add_named_definition(expression.into())
+    }
+
+    /// Add either kind of named definition.
+    pub fn add_named_definition(&mut self, definition: NamedDefinition) -> Result<()> {
+        definition.validate()?;
+        self.validate_scope(definition.scope())?;
+        ensure_unique(&self.named_definitions, &definition)?;
+        self.named_definitions.push(definition);
+        Ok(())
+    }
+
+    /// Remove a named definition and return it if it exists.
+    pub fn remove_named_definition(
+        &mut self,
+        name: &str,
+        scope: &NamedDefinitionScope,
+    ) -> Option<NamedDefinition> {
+        let index = self
+            .named_definitions
+            .iter()
+            .position(|definition| definition.name() == name && definition.scope() == scope)?;
+        Some(self.named_definitions.remove(index))
+    }
+
+    fn validate_scope(&self, scope: &NamedDefinitionScope) -> Result<()> {
+        if let NamedDefinitionScope::Sheet(sheet_name) = scope
+            && !self.sheets.iter().any(|sheet| sheet.name == *sheet_name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "named definition refers to missing sheet '{sheet_name}'"
+            )));
+        }
+        Ok(())
+    }
+
+    fn validate_named_definitions(&self) -> Result<()> {
+        for (index, definition) in self.named_definitions.iter().enumerate() {
+            definition.validate()?;
+            self.validate_scope(definition.scope())?;
+            if self.named_definitions[..index].iter().any(|existing| {
+                existing.name() == definition.name() && existing.scope() == definition.scope()
+            }) {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "duplicate named definition '{}' in {:?}",
+                    definition.name(),
+                    definition.scope()
+                )));
+            }
+        }
+        Ok(())
+    }
+
     /// Add a new sheet.
     pub fn add_sheet(&mut self, name: &str) -> Result<()> {
         let sheet = Sheet {
@@ -211,7 +289,10 @@ impl MutableSpreadsheet {
     /// Remove a sheet at index.
     pub fn remove_sheet(&mut self, index: usize) -> Result<Sheet> {
         if index < self.sheets.len() {
-            Ok(self.sheets.remove(index))
+            let sheet = self.sheets.remove(index);
+            self.named_definitions
+                .retain(|definition| definition.scope().sheet_name() != Some(sheet.name.as_str()));
+            Ok(sheet)
         } else {
             Err(litchi_core::Error::InvalidFormat(format!(
                 "Sheet index {} out of bounds",
@@ -421,8 +502,22 @@ impl MutableSpreadsheet {
                 body.push_str("</table:table-row>");
             }
 
+            write_named_definitions(
+                &mut body,
+                self.named_definitions.iter().filter(|definition| {
+                    definition.scope().sheet_name() == Some(sheet.name.as_str())
+                }),
+            );
+
             body.push_str("</table:table>");
         }
+
+        write_named_definitions(
+            &mut body,
+            self.named_definitions
+                .iter()
+                .filter(|definition| definition.scope() == &NamedDefinitionScope::Global),
+        );
 
         let of_ns = if self.has_formulas() {
             " xmlns:of=\"urn:oasis:names:tc:opendocument:xmlns:of:1.2\""
@@ -460,6 +555,7 @@ impl MutableSpreadsheet {
 
     /// Convert to bytes.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        self.validate_named_definitions()?;
         let mut writer = PackageWriter::new();
 
         writer.set_mimetype(&self.mimetype)?;
@@ -481,5 +577,75 @@ impl MutableSpreadsheet {
 impl Default for MutableSpreadsheet {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ods::{NamedRangeUsage, SpreadsheetBuilder};
+
+    #[test]
+    fn mutable_spreadsheet_preserves_and_edits_named_definitions() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sheet1").unwrap();
+        builder
+            .add_named_range(
+                NamedRange::new(
+                    "LocalPrintArea",
+                    "$Sheet1.$A$1:.$C$9",
+                    NamedDefinitionScope::sheet("Sheet1"),
+                )
+                .unwrap()
+                .with_usage(NamedRangeUsage::PrintRange),
+            )
+            .unwrap();
+        let spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+
+        let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
+        assert_eq!(mutable.named_definitions().len(), 1);
+        mutable
+            .add_named_expression(
+                NamedExpression::new("GlobalValue", "of:=42", NamedDefinitionScope::Global)
+                    .unwrap(),
+            )
+            .unwrap();
+
+        let output = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        assert!(
+            output
+                .named_range("LocalPrintArea", &NamedDefinitionScope::sheet("Sheet1"))
+                .is_some()
+        );
+        assert!(
+            output
+                .named_expression("GlobalValue", &NamedDefinitionScope::Global)
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn removing_sheet_removes_its_local_definitions_only() {
+        let mut mutable = MutableSpreadsheet::new();
+        mutable.add_sheet("Sheet1").unwrap();
+        mutable
+            .add_named_range(
+                NamedRange::new(
+                    "Local",
+                    "$Sheet1.$A$1",
+                    NamedDefinitionScope::sheet("Sheet1"),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        mutable
+            .add_named_expression(
+                NamedExpression::new("Global", "of:=1", NamedDefinitionScope::Global).unwrap(),
+            )
+            .unwrap();
+
+        mutable.remove_sheet(0).unwrap();
+        assert_eq!(mutable.named_definitions().len(), 1);
+        assert_eq!(mutable.named_definitions()[0].name(), "Global");
     }
 }

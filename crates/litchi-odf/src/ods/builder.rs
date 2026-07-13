@@ -3,7 +3,11 @@
 //! This module provides a builder pattern for creating new ODS spreadsheets from scratch.
 
 use crate::core::{OdfStructure, PackageWriter};
-use crate::ods::{Cell, CellValue, Row, Sheet};
+use crate::ods::{
+    Cell, CellValue, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row,
+    Sheet,
+    named_expression::{ensure_unique, write_named_definitions},
+};
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
 
@@ -29,6 +33,7 @@ use std::path::Path;
 pub struct SpreadsheetBuilder {
     sheets: Vec<Sheet>,
     metadata: Metadata,
+    named_definitions: Vec<NamedDefinition>,
 }
 
 impl Default for SpreadsheetBuilder {
@@ -51,6 +56,7 @@ impl SpreadsheetBuilder {
         Self {
             sheets: Vec::new(),
             metadata: Metadata::default(),
+            named_definitions: Vec::new(),
         }
     }
 
@@ -61,6 +67,58 @@ impl SpreadsheetBuilder {
     /// * `metadata` - Document metadata (title, author, etc.)
     pub fn set_metadata(&mut self, metadata: Metadata) {
         self.metadata = metadata;
+    }
+
+    /// Return the named ranges and expressions added to this spreadsheet.
+    pub fn named_definitions(&self) -> &[NamedDefinition] {
+        &self.named_definitions
+    }
+
+    /// Add a named range.
+    pub fn add_named_range(&mut self, range: NamedRange) -> Result<&mut Self> {
+        self.add_named_definition(range.into())
+    }
+
+    /// Add a named OpenFormula expression.
+    pub fn add_named_expression(&mut self, expression: NamedExpression) -> Result<&mut Self> {
+        self.add_named_definition(expression.into())
+    }
+
+    /// Add either kind of named definition.
+    pub fn add_named_definition(&mut self, definition: NamedDefinition) -> Result<&mut Self> {
+        definition.validate()?;
+        self.validate_scope(definition.scope())?;
+        ensure_unique(&self.named_definitions, &definition)?;
+        self.named_definitions.push(definition);
+        Ok(self)
+    }
+
+    fn validate_scope(&self, scope: &NamedDefinitionScope) -> Result<()> {
+        if let NamedDefinitionScope::Sheet(sheet_name) = scope
+            && !self.sheets.iter().any(|sheet| sheet.name == *sheet_name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "named definition refers to missing sheet '{sheet_name}'"
+            )));
+        }
+        Ok(())
+    }
+
+    fn validate_named_definitions(&self) -> Result<()> {
+        for (index, definition) in self.named_definitions.iter().enumerate() {
+            definition.validate()?;
+            self.validate_scope(definition.scope())?;
+            if self.named_definitions[..index].iter().any(|existing| {
+                existing.name() == definition.name() && existing.scope() == definition.scope()
+            }) {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "duplicate named definition '{}' in {:?}",
+                    definition.name(),
+                    definition.scope()
+                )));
+            }
+        }
+        Ok(())
     }
 
     /// Add a new sheet to the spreadsheet
@@ -497,6 +555,10 @@ impl SpreadsheetBuilder {
             .flat_map(|s| s.rows.iter())
             .flat_map(|r| r.cells.iter())
             .any(|c| c.formula.is_some())
+            || self
+                .named_definitions
+                .iter()
+                .any(|definition| matches!(definition, NamedDefinition::Expression(_)))
     }
 
     fn push_table_start(out: &mut String, name: &str) {
@@ -607,6 +669,7 @@ impl SpreadsheetBuilder {
         estimated += self.sheets.len() * 96;
         estimated += cell_count * 96;
         estimated += self.sheets.iter().map(|s| s.name.len()).sum::<usize>();
+        estimated += self.named_definitions.len() * 128;
         estimated += self
             .sheets
             .iter()
@@ -629,8 +692,22 @@ impl SpreadsheetBuilder {
                 body.push_str("</table:table-row>");
             }
 
+            write_named_definitions(
+                &mut body,
+                self.named_definitions.iter().filter(|definition| {
+                    definition.scope().sheet_name() == Some(sheet.name.as_str())
+                }),
+            );
+
             body.push_str("</table:table>");
         }
+
+        write_named_definitions(
+            &mut body,
+            self.named_definitions
+                .iter()
+                .filter(|definition| definition.scope() == &NamedDefinitionScope::Global),
+        );
 
         body
     }
@@ -696,6 +773,7 @@ impl SpreadsheetBuilder {
     /// # }
     /// ```
     pub fn build(self) -> Result<Vec<u8>> {
+        self.validate_named_definitions()?;
         let mut writer = PackageWriter::new();
 
         // Set MIME type
@@ -757,6 +835,72 @@ mod tests {
     fn test_spreadsheet_builder_default() {
         let builder: SpreadsheetBuilder = Default::default();
         assert_eq!(builder.sheets.len(), 0);
+    }
+
+    #[test]
+    fn named_definitions_round_trip_through_ods_package() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Sales & Tax").unwrap();
+        builder
+            .add_named_range(
+                NamedRange::new(
+                    "PrintableSales",
+                    "$'Sales & Tax'.$A$1:.$B$5",
+                    NamedDefinitionScope::sheet("Sales & Tax"),
+                )
+                .unwrap()
+                .with_base_cell("$'Sales & Tax'.$A$1")
+                .unwrap()
+                .with_usage(crate::ods::NamedRangeUsage::PrintRange)
+                .with_usage(crate::ods::NamedRangeUsage::Filter),
+            )
+            .unwrap();
+        builder
+            .add_named_expression(
+                NamedExpression::new("TaxRate", "of:=0.2", NamedDefinitionScope::Global).unwrap(),
+            )
+            .unwrap();
+
+        let bytes = builder.build().unwrap();
+        let spreadsheet = crate::ods::Spreadsheet::from_bytes(bytes).unwrap();
+        let range = spreadsheet
+            .named_range(
+                "PrintableSales",
+                &NamedDefinitionScope::sheet("Sales & Tax"),
+            )
+            .unwrap();
+        assert_eq!(range.usable_as.len(), 2);
+        assert_eq!(
+            range.base_cell_address.as_deref(),
+            Some("$'Sales & Tax'.$A$1")
+        );
+        assert_eq!(
+            spreadsheet
+                .named_expression("TaxRate", &NamedDefinitionScope::Global)
+                .unwrap()
+                .expression,
+            "of:=0.2"
+        );
+    }
+
+    #[test]
+    fn named_definitions_require_existing_scope_and_unique_name() {
+        let mut builder = SpreadsheetBuilder::new();
+        let local = NamedRange::new(
+            "LocalName",
+            "$Missing.$A$1",
+            NamedDefinitionScope::sheet("Missing"),
+        )
+        .unwrap();
+        assert!(builder.add_named_range(local).is_err());
+
+        builder.add_sheet("Sheet1").unwrap();
+        let first =
+            NamedRange::new("Duplicate", "$Sheet1.$A$1", NamedDefinitionScope::Global).unwrap();
+        let second =
+            NamedExpression::new("Duplicate", "of:=1", NamedDefinitionScope::Global).unwrap();
+        builder.add_named_range(first).unwrap();
+        assert!(builder.add_named_expression(second).is_err());
     }
 
     #[test]

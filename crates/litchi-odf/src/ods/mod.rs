@@ -19,6 +19,7 @@
 //! - ✅ Repeated cell/row expansion
 //! - ✅ Merged cell handling
 //! - ✅ Metadata extraction
+//! - ✅ Global and sheet-local named ranges and named expressions
 //!
 //! ## ✅ Formula Support (`formula.rs`) - PARTIAL
 //! - ✅ Formula string representation
@@ -42,7 +43,6 @@
 //! - ⚠️ Data validation rules
 //! - ⚠️ Conditional formatting
 //! - ⚠️ Pivot tables
-//! - ⚠️ Named ranges (cell range naming)
 //! - ⚠️ Cell comments/notes
 //! - ⚠️ Sheet protection and locking
 //! - ⚠️ Filter and sort criteria
@@ -61,6 +61,7 @@ mod cell;
 /// OpenFormula parsing and support
 pub mod formula;
 mod mutable;
+mod named_expression;
 mod parser;
 mod row;
 mod sheet;
@@ -69,6 +70,10 @@ mod spreadsheet;
 pub use builder::SpreadsheetBuilder;
 pub use cell::{Cell, CellValue};
 pub use mutable::MutableSpreadsheet;
+pub use named_expression::{
+    FormulaNamespace, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
+    NamedRangeUsage,
+};
 pub use row::Row;
 pub use sheet::Sheet;
 pub use spreadsheet::Spreadsheet;

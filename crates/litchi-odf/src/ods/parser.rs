@@ -1,9 +1,19 @@
 //! ODS-specific parsing utilities.
 
-use super::{Cell, CellValue, Row, Sheet};
+use super::{
+    Cell, CellValue, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
+    NamedRangeUsage, Row, Sheet,
+};
 use litchi_core::{Error, Result};
 use quick_xml::Reader;
+use quick_xml::XmlVersion;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::BytesStart;
 use quick_xml::events::Event;
+use quick_xml::name::{Namespace, NamespaceResolver, PrefixDeclaration, ResolveResult};
+use quick_xml::reader::NsReader;
+
+const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 
 /// Parser for ODS-specific structures.
 ///
@@ -100,6 +110,227 @@ impl OdsParser {
         }
 
         Ok(sheets)
+    }
+
+    /// Parse document-global and sheet-local named ranges and expressions.
+    ///
+    /// Namespace URIs are resolved rather than assuming the conventional
+    /// `table` prefix, because XML namespace prefixes are freely replaceable.
+    pub fn parse_named_definitions(xml_content: &str) -> Result<Vec<NamedDefinition>> {
+        let mut reader = NsReader::from_str(xml_content);
+        let mut buf = Vec::new();
+        let mut definitions = Vec::new();
+        let mut table_stack: Vec<Option<String>> = Vec::new();
+        let mut active_scope: Option<NamedDefinitionScope> = None;
+
+        loop {
+            let event = reader
+                .read_resolved_event_into(&mut buf)
+                .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+
+            match event {
+                (namespace, Event::Start(element)) if Self::is_table_namespace(&namespace) => {
+                    match element.local_name().as_ref() {
+                        b"table" => {
+                            let name = Self::table_attribute(
+                                reader.resolver(),
+                                reader.decoder(),
+                                &element,
+                                b"name",
+                            )?;
+                            table_stack.push(name);
+                        },
+                        b"named-expressions" => {
+                            if active_scope.is_some() {
+                                return Err(Error::InvalidFormat(
+                                    "nested table:named-expressions element".to_string(),
+                                ));
+                            }
+                            active_scope = Some(match table_stack.last() {
+                                Some(Some(sheet)) => NamedDefinitionScope::Sheet(sheet.clone()),
+                                Some(None) => {
+                                    return Err(Error::InvalidFormat(
+                                        "sheet-local named definitions require table:name"
+                                            .to_string(),
+                                    ));
+                                },
+                                None => NamedDefinitionScope::Global,
+                            });
+                        },
+                        b"named-range" | b"named-expression" => {
+                            if let Some(scope) = &active_scope {
+                                definitions.push(Self::parse_named_definition(
+                                    reader.resolver(),
+                                    reader.decoder(),
+                                    &element,
+                                    scope.clone(),
+                                )?);
+                            }
+                        },
+                        _ => {},
+                    }
+                },
+                (namespace, Event::Empty(element)) if Self::is_table_namespace(&namespace) => {
+                    match element.local_name().as_ref() {
+                        b"named-range" | b"named-expression" => {
+                            if let Some(scope) = &active_scope {
+                                definitions.push(Self::parse_named_definition(
+                                    reader.resolver(),
+                                    reader.decoder(),
+                                    &element,
+                                    scope.clone(),
+                                )?);
+                            }
+                        },
+                        _ => {},
+                    }
+                },
+                (namespace, Event::End(element)) if Self::is_table_namespace(&namespace) => {
+                    match element.local_name().as_ref() {
+                        b"named-expressions" => active_scope = None,
+                        b"table" => {
+                            table_stack.pop();
+                        },
+                        _ => {},
+                    }
+                },
+                (_, Event::Eof) => break,
+                _ => {},
+            }
+            buf.clear();
+        }
+
+        Ok(definitions)
+    }
+
+    fn is_table_namespace(namespace: &ResolveResult<'_>) -> bool {
+        matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == TABLE_NAMESPACE)
+    }
+
+    fn parse_named_definition(
+        resolver: &NamespaceResolver,
+        decoder: Decoder,
+        element: &BytesStart<'_>,
+        scope: NamedDefinitionScope,
+    ) -> Result<NamedDefinition> {
+        let name = Self::required_table_attribute(resolver, decoder, element, b"name")?;
+        let base_cell_address =
+            Self::table_attribute(resolver, decoder, element, b"base-cell-address")?;
+
+        match element.local_name().as_ref() {
+            b"named-range" => {
+                let cell_range_address = Self::required_table_attribute(
+                    resolver,
+                    decoder,
+                    element,
+                    b"cell-range-address",
+                )?;
+                let mut range = NamedRange::new(name, cell_range_address, scope)?;
+                range.base_cell_address = base_cell_address;
+                if let Some(usable_as) =
+                    Self::table_attribute(resolver, decoder, element, b"range-usable-as")?
+                {
+                    if usable_as.is_empty() {
+                        return Err(Error::InvalidFormat(
+                            "table:range-usable-as must not be empty".to_string(),
+                        ));
+                    }
+                    if usable_as != "none" {
+                        for token in usable_as.split_whitespace() {
+                            let usage = NamedRangeUsage::parse(token)?;
+                            if !range.usable_as.contains(&usage) {
+                                range.usable_as.push(usage);
+                            }
+                        }
+                    }
+                }
+                range.validate()?;
+                Ok(range.into())
+            },
+            b"named-expression" => {
+                let expression =
+                    Self::required_table_attribute(resolver, decoder, element, b"expression")?;
+                let formula_namespace_uri = Self::formula_namespace_uri(resolver, &expression)?;
+                let mut expression = if let Some(uri) = formula_namespace_uri {
+                    NamedExpression::new_with_namespace(name, expression, uri, scope)?
+                } else {
+                    NamedExpression::new(name, expression, scope)?
+                };
+                expression.base_cell_address = base_cell_address;
+                expression.validate()?;
+                Ok(expression.into())
+            },
+            _ => Err(Error::InvalidFormat(
+                "unexpected named definition element".to_string(),
+            )),
+        }
+    }
+
+    fn required_table_attribute(
+        resolver: &NamespaceResolver,
+        decoder: Decoder,
+        element: &BytesStart<'_>,
+        local_name: &[u8],
+    ) -> Result<String> {
+        Self::table_attribute(resolver, decoder, element, local_name)?.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "{} is missing required table:{} attribute",
+                String::from_utf8_lossy(element.local_name().as_ref()),
+                String::from_utf8_lossy(local_name)
+            ))
+        })
+    }
+
+    fn table_attribute(
+        resolver: &NamespaceResolver,
+        decoder: Decoder,
+        element: &BytesStart<'_>,
+        local_name: &[u8],
+    ) -> Result<Option<String>> {
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let (namespace, local) = resolver.resolve_attribute(attribute.key);
+            if Self::is_table_namespace(&namespace) && local.as_ref() == local_name {
+                let value = attribute
+                    .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid XML attribute value: {error}"))
+                    })?;
+                return Ok(Some(value.into_owned()));
+            }
+        }
+        Ok(None)
+    }
+
+    fn formula_namespace_uri(
+        resolver: &NamespaceResolver,
+        expression: &str,
+    ) -> Result<Option<String>> {
+        let Some((prefix, remainder)) = expression.split_once(':') else {
+            return Ok(None);
+        };
+        if prefix.is_empty() || !remainder.starts_with('=') {
+            return Ok(None);
+        }
+
+        for (declaration, namespace) in resolver.bindings() {
+            if let PrefixDeclaration::Named(candidate) = declaration
+                && candidate == prefix.as_bytes()
+            {
+                return String::from_utf8(namespace.as_ref().to_vec())
+                    .map(Some)
+                    .map_err(|_| {
+                        Error::InvalidFormat(format!(
+                            "formula namespace for prefix '{prefix}' is not UTF-8"
+                        ))
+                    });
+            }
+        }
+
+        Err(Error::InvalidFormat(format!(
+            "formula prefix '{prefix}' is not bound to a namespace"
+        )))
     }
 
     /// Extract table name from table:table element
@@ -810,5 +1041,75 @@ mod tests {
                 // Error is also acceptable
             },
         }
+    }
+
+    #[test]
+    fn parses_global_and_sheet_local_named_definitions_with_namespace_aliases() {
+        let xml = r#"<?xml version="1.0"?>
+            <o:document-content
+                xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+                xmlns:f="urn:example:formula">
+              <o:body><o:spreadsheet>
+                <t:table t:name="Sales &amp; Tax">
+                  <t:table-column/><t:table-row><t:table-cell/></t:table-row>
+                  <t:named-expressions>
+                    <t:named-range t:name="LocalRange"
+                      t:cell-range-address="$'Sales &amp; Tax'.$A$1:.$B$2"
+                      t:base-cell-address="$'Sales &amp; Tax'.$A$1"
+                      t:range-usable-as="print-range filter repeat-row repeat-column"/>
+                  </t:named-expressions>
+                </t:table>
+                <t:named-expressions>
+                  <t:named-expression t:name="TaxRate"
+                    t:expression="f:=0.2" t:base-cell-address="$'Sales &amp; Tax'.$A$1"/>
+                </t:named-expressions>
+              </o:spreadsheet></o:body>
+            </o:document-content>"#;
+
+        let definitions = OdsParser::parse_named_definitions(xml).unwrap();
+        assert_eq!(definitions.len(), 2);
+        let NamedDefinition::Range(range) = &definitions[0] else {
+            panic!("expected named range");
+        };
+        assert_eq!(range.name, "LocalRange");
+        assert_eq!(
+            range.scope,
+            NamedDefinitionScope::Sheet("Sales & Tax".to_string())
+        );
+        assert_eq!(range.usable_as.len(), 4);
+        assert_eq!(
+            range.base_cell_address.as_deref(),
+            Some("$'Sales & Tax'.$A$1")
+        );
+
+        let NamedDefinition::Expression(expression) = &definitions[1] else {
+            panic!("expected named expression");
+        };
+        assert_eq!(expression.name, "TaxRate");
+        assert_eq!(expression.expression, "f:=0.2");
+        assert_eq!(
+            expression.formula_namespace.as_ref().unwrap().uri,
+            "urn:example:formula"
+        );
+        assert_eq!(expression.scope, NamedDefinitionScope::Global);
+    }
+
+    #[test]
+    fn named_definition_parser_rejects_missing_attributes_and_invalid_usage() {
+        let missing_address = r#"<office:spreadsheet
+            xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
+            <table:named-expressions><table:named-range table:name="Broken"/>
+            </table:named-expressions></office:spreadsheet>"#;
+        assert!(OdsParser::parse_named_definitions(missing_address).is_err());
+
+        let invalid_usage = r#"<office:spreadsheet
+            xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
+            <table:named-expressions><table:named-range table:name="Broken"
+              table:cell-range-address="$Sheet1.$A$1" table:range-usable-as="chart"/>
+            </table:named-expressions></office:spreadsheet>"#;
+        assert!(OdsParser::parse_named_definitions(invalid_usage).is_err());
     }
 }
