@@ -319,11 +319,16 @@ impl MutableXlsbWorksheet {
                 let decoded = || -> XlsbResult<String> {
                     let tokens = match group.kind {
                         FormulaGroupKind::Array => {
-                            FormulaParser::new(&group.formula.rgce).parse()?
+                            FormulaParser::with_extra(&group.formula.rgce, &group.formula.rgcb)
+                                .parse()?
                         },
-                        FormulaGroupKind::Shared => {
-                            FormulaParser::with_base_cell(&group.formula.rgce, row, col).parse()?
-                        },
+                        FormulaGroupKind::Shared => FormulaParser::with_base_cell_and_extra(
+                            &group.formula.rgce,
+                            &group.formula.rgcb,
+                            row,
+                            col,
+                        )
+                        .parse()?,
                     };
                     FormulaConverter::try_tokens_to_string(&tokens)
                 };

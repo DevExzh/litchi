@@ -124,6 +124,15 @@ pub struct CellParsedFormula {
     pub rgcb: Vec<u8>,
 }
 
+/// Scalar value stored in an XLSB `PtgExtraArray`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum FormulaArrayValue {
+    Number(f64),
+    String(String),
+    Bool(bool),
+    Error(u8),
+}
+
 impl CellParsedFormula {
     /// Parse a `CellParsedFormula`, returning the structure and bytes consumed.
     pub fn parse(data: &[u8]) -> XlsbResult<(Self, usize)> {
@@ -405,6 +414,12 @@ pub enum FormulaToken {
     /// Non-evaluating control/display attribute. The selector is retained for
     /// diagnostics while its payload is consumed by the parser.
     Attribute(u8),
+    /// Rectangular constant array stored across `PtgArray` and `RgbExtra`.
+    Array {
+        rows: u32,
+        cols: u32,
+        values: Vec<FormulaArrayValue>,
+    },
     /// Cell reference (row, col, relative_row, relative_col)
     CellRef {
         row: u32,
@@ -473,6 +488,9 @@ pub enum UnaryOperator {
 pub struct FormulaParser<'a> {
     data: &'a [u8],
     offset: usize,
+    extra: &'a [u8],
+    extra_offset: usize,
+    validate_extra: bool,
     base_cell: Option<(u32, u32)>,
 }
 
@@ -482,6 +500,21 @@ impl<'a> FormulaParser<'a> {
         FormulaParser {
             data,
             offset: 0,
+            extra: &[],
+            extra_offset: 0,
+            validate_extra: false,
+            base_cell: None,
+        }
+    }
+
+    /// Parse a formula together with its corresponding `RgbExtra` stream.
+    pub fn with_extra(data: &'a [u8], extra: &'a [u8]) -> Self {
+        FormulaParser {
+            data,
+            offset: 0,
+            extra,
+            extra_offset: 0,
+            validate_extra: true,
             base_cell: None,
         }
     }
@@ -491,6 +524,21 @@ impl<'a> FormulaParser<'a> {
         FormulaParser {
             data,
             offset: 0,
+            extra: &[],
+            extra_offset: 0,
+            validate_extra: false,
+            base_cell: Some((row, col)),
+        }
+    }
+
+    /// Parse a shared formula and ancillary stream at a concrete target cell.
+    pub fn with_base_cell_and_extra(data: &'a [u8], extra: &'a [u8], row: u32, col: u32) -> Self {
+        FormulaParser {
+            data,
+            offset: 0,
+            extra,
+            extra_offset: 0,
+            validate_extra: true,
             base_cell: Some((row, col)),
         }
     }
@@ -503,6 +551,13 @@ impl<'a> FormulaParser<'a> {
 
         while self.offset < self.data.len() {
             tokens.push(self.parse_token()?);
+        }
+
+        if self.validate_extra && self.extra_offset != self.extra.len() {
+            return Err(XlsbError::InvalidFormula(format!(
+                "formula has {} unconsumed ancillary bytes",
+                self.extra.len() - self.extra_offset
+            )));
         }
 
         Ok(tokens)
@@ -556,6 +611,7 @@ impl<'a> FormulaParser<'a> {
                 0x0C => self.parse_ref(true),
                 0x05 => self.parse_area(false),
                 0x0D => self.parse_area(true),
+                0x00 => self.parse_array(),
                 0x01 => self.parse_func(),
                 0x02 => self.parse_func_var(),
                 0x03 => self.parse_name(),
@@ -597,6 +653,7 @@ impl<'a> FormulaParser<'a> {
 
         let value = binary::read_f64_le_at(self.data, self.offset)?;
         self.offset += 8;
+        validate_xnum(value, "PtgNum")?;
 
         Ok(FormulaToken::Number(value))
     }
@@ -682,6 +739,124 @@ impl<'a> FormulaParser<'a> {
                 "unknown PtgAttr selector 0x{selector:02X}"
             ))),
         }
+    }
+
+    fn require_extra(&self, len: usize, context: &str) -> XlsbResult<()> {
+        if self.extra_offset + len <= self.extra.len() {
+            Ok(())
+        } else {
+            Err(XlsbError::InvalidFormula(format!(
+                "truncated {context} at ancillary byte {}: need {len} bytes, have {}",
+                self.extra_offset,
+                self.extra.len().saturating_sub(self.extra_offset)
+            )))
+        }
+    }
+
+    fn parse_array(&mut self) -> XlsbResult<FormulaToken> {
+        let token = self.data[self.offset - 1];
+        if token & 0x80 != 0 || !matches!(token & 0x60, 0x40 | 0x60) {
+            return Err(XlsbError::InvalidFormula(format!(
+                "PtgArray has invalid data type in token 0x{token:02X}"
+            )));
+        }
+        self.require(14, "PtgArray")?;
+        self.offset += 14;
+        self.require_extra(8, "PtgExtraArray dimensions")?;
+        let rows = binary::read_u32_le_at(self.extra, self.extra_offset)?;
+        let cols = binary::read_u32_le_at(self.extra, self.extra_offset + 4)?;
+        self.extra_offset += 8;
+        if rows == 0 || cols == 0 || rows > 1_048_576 || cols > 16_384 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "PtgExtraArray dimensions {rows}x{cols} are invalid"
+            )));
+        }
+        let count_u64 = u64::from(rows)
+            .checked_mul(u64::from(cols))
+            .ok_or_else(|| XlsbError::InvalidFormula("array size overflow".to_string()))?;
+        let count = usize::try_from(count_u64)
+            .map_err(|_| XlsbError::InvalidFormula("array is too large".to_string()))?;
+        // Every SerAr uses at least two bytes. Reject impossible dimensions
+        // before allocating based on attacker-controlled counts.
+        if count > self.extra.len().saturating_sub(self.extra_offset) / 2 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "PtgExtraArray declares {count} values beyond its ancillary payload"
+            )));
+        }
+        let mut values = Vec::with_capacity(count);
+        for _ in 0..count {
+            self.require_extra(1, "SerAr tag")?;
+            let tag = self.extra[self.extra_offset];
+            self.extra_offset += 1;
+            let value = match tag {
+                0x00 => {
+                    self.require_extra(8, "SerNum")?;
+                    let value = binary::read_f64_le_at(self.extra, self.extra_offset)?;
+                    self.extra_offset += 8;
+                    validate_xnum(value, "SerNum")?;
+                    FormulaArrayValue::Number(value)
+                },
+                0x01 => {
+                    self.require_extra(2, "SerStr length")?;
+                    let len = usize::from(binary::read_u16_le_at(self.extra, self.extra_offset)?);
+                    self.extra_offset += 2;
+                    if len >= 256 {
+                        return Err(XlsbError::InvalidFormula(format!(
+                            "SerStr length {len} exceeds 255 UTF-16 code units"
+                        )));
+                    }
+                    let byte_len = len.checked_mul(2).ok_or_else(|| {
+                        XlsbError::InvalidFormula("SerStr length overflow".to_string())
+                    })?;
+                    self.require_extra(byte_len, "SerStr text")?;
+                    let units = self.extra[self.extra_offset..self.extra_offset + byte_len]
+                        .chunks_exact(2)
+                        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
+                    let value = char::decode_utf16(units)
+                        .collect::<Result<String, _>>()
+                        .map_err(|_| XlsbError::Encoding("invalid UTF-16 in SerStr".to_string()))?;
+                    self.extra_offset += byte_len;
+                    FormulaArrayValue::String(value)
+                },
+                0x02 => {
+                    self.require_extra(1, "SerBool")?;
+                    let value = self.extra[self.extra_offset];
+                    self.extra_offset += 1;
+                    if value > 1 {
+                        return Err(XlsbError::InvalidFormula(format!(
+                            "invalid SerBool value {value}"
+                        )));
+                    }
+                    FormulaArrayValue::Bool(value != 0)
+                },
+                0x04 => {
+                    self.require_extra(4, "SerErr")?;
+                    let error = self.extra[self.extra_offset];
+                    if !matches!(error, 0x00 | 0x07 | 0x0F | 0x17 | 0x1D | 0x24 | 0x2A | 0x2B) {
+                        return Err(XlsbError::InvalidFormula(format!(
+                            "invalid SerErr code 0x{error:02X}"
+                        )));
+                    }
+                    if self.extra[self.extra_offset + 1..self.extra_offset + 4]
+                        .iter()
+                        .any(|byte| *byte != 0)
+                    {
+                        return Err(XlsbError::InvalidFormula(
+                            "SerErr reserved bytes are nonzero".to_string(),
+                        ));
+                    }
+                    self.extra_offset += 4;
+                    FormulaArrayValue::Error(error)
+                },
+                _ => {
+                    return Err(XlsbError::InvalidFormula(format!(
+                        "unknown SerAr tag 0x{tag:02X}"
+                    )));
+                },
+            };
+            values.push(value);
+        }
+        Ok(FormulaToken::Array { rows, cols, values })
     }
 
     /// Parse cell reference
@@ -880,6 +1055,52 @@ impl FormulaConverter {
                     stack.push(format!("({expression})"));
                 },
                 FormulaToken::Attribute(_) => {},
+                FormulaToken::Array { rows, cols, values } => {
+                    let expected = usize::try_from(u64::from(*rows) * u64::from(*cols))
+                        .map_err(|_| XlsbError::InvalidFormula("array is too large".to_string()))?;
+                    if values.len() != expected {
+                        return Err(XlsbError::InvalidFormula(format!(
+                            "array dimensions require {expected} values, found {}",
+                            values.len()
+                        )));
+                    }
+                    let mut text = String::from("{");
+                    for row in 0..*rows {
+                        if row != 0 {
+                            text.push(';');
+                        }
+                        for col in 0..*cols {
+                            if col != 0 {
+                                text.push(',');
+                            }
+                            let index =
+                                usize::try_from(u64::from(row) * u64::from(*cols) + u64::from(col))
+                                    .map_err(|_| {
+                                        XlsbError::InvalidFormula(
+                                            "array index overflow".to_string(),
+                                        )
+                                    })?;
+                            match &values[index] {
+                                FormulaArrayValue::Number(value) => {
+                                    text.push_str(&value.to_string());
+                                },
+                                FormulaArrayValue::String(value) => {
+                                    text.push('"');
+                                    text.push_str(&value.replace('"', "\"\""));
+                                    text.push('"');
+                                },
+                                FormulaArrayValue::Bool(value) => {
+                                    text.push_str(if *value { "TRUE" } else { "FALSE" });
+                                },
+                                FormulaArrayValue::Error(error) => {
+                                    text.push_str(&Self::error_to_string(*error));
+                                },
+                            }
+                        }
+                    }
+                    text.push('}');
+                    stack.push(text);
+                },
                 FormulaToken::String(s) => stack.push(format!("\"{}\"", s.replace('"', "\"\""))),
                 FormulaToken::Bool(b) => stack.push(if *b {
                     "TRUE".to_string()
@@ -1139,8 +1360,9 @@ fn builtin_function_by_name(name: &str) -> Option<BuiltinFunction> {
 ///
 /// The compiler supports literals, A1 references and ranges, parentheses,
 /// arithmetic/comparison/concatenation operators, percent, and the built-in
-/// functions in this module's supported `Ftab` table. Unsupported constructs
-/// return an error; they are never replaced by a cached value.
+/// functions in this module's supported `Ftab` table, and typed array
+/// constants. Unsupported constructs return an error; they are never replaced
+/// by a cached value.
 pub struct FormulaCompiler<'a> {
     input: &'a str,
     offset: usize,
@@ -1159,6 +1381,11 @@ enum CompileExpr {
     Bool(bool),
     MissingArg,
     Parenthesized(Box<CompileExpr>),
+    Array {
+        rows: u32,
+        cols: u32,
+        values: Vec<FormulaArrayValue>,
+    },
     Ref(A1Reference),
     Area(A1Reference, A1Reference),
     Unary(UnaryOperator, Box<CompileExpr>),
@@ -1212,17 +1439,15 @@ impl<'a> FormulaCompiler<'a> {
         }
 
         let mut rgce = Vec::new();
-        Self::emit(&expression, &mut rgce, encoding)?;
+        let mut rgcb = Vec::new();
+        Self::emit(&expression, &mut rgce, &mut rgcb, encoding)?;
         if rgce.len() > MAX_CELL_FORMULA_BYTES {
             return Err(XlsbError::InvalidFormula(format!(
                 "compiled formula is {} bytes; maximum is {MAX_CELL_FORMULA_BYTES}",
                 rgce.len()
             )));
         }
-        Ok(CellParsedFormula {
-            rgce,
-            rgcb: Vec::new(),
-        })
+        Ok(CellParsedFormula { rgce, rgcb })
     }
 
     fn parse_comparison(&mut self) -> XlsbResult<CompileExpr> {
@@ -1340,6 +1565,9 @@ impl<'a> FormulaCompiler<'a> {
             }
             return Ok(CompileExpr::Parenthesized(Box::new(expression)));
         }
+        if self.consume("{") {
+            return self.parse_array_constant();
+        }
         if self.peek_char() == Some('"') {
             return self.parse_string().map(CompileExpr::String);
         }
@@ -1438,6 +1666,97 @@ impl<'a> FormulaCompiler<'a> {
         Ok(value)
     }
 
+    fn parse_array_constant(&mut self) -> XlsbResult<CompileExpr> {
+        let mut values = Vec::new();
+        let mut rows = 1_u32;
+        let mut cols = 0_u32;
+        let mut current_cols = 0_u32;
+        loop {
+            self.skip_spaces();
+            if self.peek_char() == Some('}') {
+                return Err(self.error("array rows cannot be empty"));
+            }
+            let value = if self.peek_char() == Some('"') {
+                FormulaArrayValue::String(self.parse_string()?)
+            } else if self.peek_char() == Some('#') {
+                let start = self.offset;
+                while self
+                    .peek_char()
+                    .is_some_and(|ch| !matches!(ch, ',' | ';' | '}') && !ch.is_whitespace())
+                {
+                    self.offset += self.peek_char().expect("checked").len_utf8();
+                }
+                let error = match self.input[start..self.offset].to_ascii_uppercase().as_str() {
+                    "#NULL!" => 0x00,
+                    "#DIV/0!" => 0x07,
+                    "#VALUE!" => 0x0F,
+                    "#REF!" => 0x17,
+                    "#NAME?" => 0x1D,
+                    "#NUM!" => 0x24,
+                    "#N/A" => 0x2A,
+                    "#GETTING_DATA" => 0x2B,
+                    _ => return Err(self.error("unknown array error literal")),
+                };
+                FormulaArrayValue::Error(error)
+            } else if self.input[self.offset..]
+                .get(..4)
+                .is_some_and(|value| value.eq_ignore_ascii_case("TRUE"))
+            {
+                self.offset += 4;
+                FormulaArrayValue::Bool(true)
+            } else if self.input[self.offset..]
+                .get(..5)
+                .is_some_and(|value| value.eq_ignore_ascii_case("FALSE"))
+            {
+                self.offset += 5;
+                FormulaArrayValue::Bool(false)
+            } else {
+                let negative = self.consume("-");
+                if !negative {
+                    self.consume("+");
+                }
+                let mut number = self.parse_number()?;
+                if negative {
+                    number = -number;
+                }
+                FormulaArrayValue::Number(number)
+            };
+            values.push(value);
+            current_cols = current_cols.checked_add(1).ok_or_else(|| {
+                XlsbError::InvalidFormula("array column count overflow".to_string())
+            })?;
+
+            if self.consume(",") {
+                continue;
+            }
+            if self.consume(";") {
+                if cols == 0 {
+                    cols = current_cols;
+                } else if cols != current_cols {
+                    return Err(self.error("array rows have different column counts"));
+                }
+                rows = rows.checked_add(1).ok_or_else(|| {
+                    XlsbError::InvalidFormula("array row count overflow".to_string())
+                })?;
+                current_cols = 0;
+                continue;
+            }
+            if self.consume("}") {
+                if cols == 0 {
+                    cols = current_cols;
+                } else if cols != current_cols {
+                    return Err(self.error("array rows have different column counts"));
+                }
+                break;
+            }
+            return Err(self.error("expected ',', ';', or '}' in array constant"));
+        }
+        if rows > 1_048_576 || cols == 0 || cols > 16_384 {
+            return Err(self.error("array dimensions exceed worksheet limits"));
+        }
+        Ok(CompileExpr::Array { rows, cols, values })
+    }
+
     fn parse_number(&mut self) -> XlsbResult<f64> {
         self.skip_spaces();
         let start = self.offset;
@@ -1504,10 +1823,12 @@ impl<'a> FormulaCompiler<'a> {
     fn emit(
         expression: &CompileExpr,
         output: &mut Vec<u8>,
+        extra: &mut Vec<u8>,
         encoding: FormulaEncoding,
     ) -> XlsbResult<()> {
         match expression {
             CompileExpr::Number(value) => {
+                validate_xnum(*value, "compiled number")?;
                 if value.fract() == 0.0 && *value >= 0.0 && *value <= f64::from(u16::MAX) {
                     output.push(ptg_types::PTG_INT);
                     output.extend_from_slice(&(*value as u16).to_le_bytes());
@@ -1530,8 +1851,41 @@ impl<'a> FormulaCompiler<'a> {
             },
             CompileExpr::MissingArg => output.push(ptg_types::PTG_MISSING_ARG),
             CompileExpr::Parenthesized(expression) => {
-                Self::emit(expression, output, encoding)?;
+                Self::emit(expression, output, extra, encoding)?;
                 output.push(ptg_types::PTG_PAREN);
+            },
+            CompileExpr::Array { rows, cols, values } => {
+                if matches!(encoding, FormulaEncoding::Shared { .. }) {
+                    return Err(XlsbError::InvalidFormula(
+                        "shared formulas cannot contain PtgArray".to_string(),
+                    ));
+                }
+                output.push(0x40); // PtgArray, VALUE class
+                output.extend_from_slice(&[0; 14]);
+                extra.extend_from_slice(&rows.to_le_bytes());
+                extra.extend_from_slice(&cols.to_le_bytes());
+                for value in values {
+                    match value {
+                        FormulaArrayValue::Number(value) => {
+                            extra.push(0x00);
+                            extra.extend_from_slice(&value.to_le_bytes());
+                        },
+                        FormulaArrayValue::String(value) => {
+                            let utf16: Vec<u16> = value.encode_utf16().collect();
+                            extra.push(0x01);
+                            extra.extend_from_slice(&(utf16.len() as u16).to_le_bytes());
+                            for unit in utf16 {
+                                extra.extend_from_slice(&unit.to_le_bytes());
+                            }
+                        },
+                        FormulaArrayValue::Bool(value) => {
+                            extra.extend_from_slice(&[0x02, u8::from(*value)]);
+                        },
+                        FormulaArrayValue::Error(error) => {
+                            extra.extend_from_slice(&[0x04, *error, 0, 0, 0]);
+                        },
+                    }
+                }
             },
             CompileExpr::Ref(reference) => match encoding {
                 FormulaEncoding::Cell => emit_reference(output, 0x44, *reference),
@@ -1562,7 +1916,7 @@ impl<'a> FormulaCompiler<'a> {
                 }
             },
             CompileExpr::Unary(operator, operand) => {
-                Self::emit(operand, output, encoding)?;
+                Self::emit(operand, output, extra, encoding)?;
                 output.push(match operator {
                     UnaryOperator::Plus => ptg_types::PTG_UPLUS,
                     UnaryOperator::Minus => ptg_types::PTG_UMINUS,
@@ -1570,8 +1924,8 @@ impl<'a> FormulaCompiler<'a> {
                 });
             },
             CompileExpr::Binary(operator, left, right) => {
-                Self::emit(left, output, encoding)?;
-                Self::emit(right, output, encoding)?;
+                Self::emit(left, output, extra, encoding)?;
+                Self::emit(right, output, extra, encoding)?;
                 output.push(match operator {
                     BinaryOperator::Add => ptg_types::PTG_ADD,
                     BinaryOperator::Subtract => ptg_types::PTG_SUB,
@@ -1592,7 +1946,7 @@ impl<'a> FormulaCompiler<'a> {
             },
             CompileExpr::Function(function, arguments) => {
                 for argument in arguments {
-                    Self::emit(argument, output, encoding)?;
+                    Self::emit(argument, output, extra, encoding)?;
                 }
                 if function.min_args == function.max_args {
                     output.push(0x41); // PtgFunc, VALUE class
@@ -1606,6 +1960,18 @@ impl<'a> FormulaCompiler<'a> {
         }
         Ok(())
     }
+}
+
+fn validate_xnum(value: f64, context: &str) -> XlsbResult<()> {
+    if !value.is_finite()
+        || (value == 0.0 && value.is_sign_negative())
+        || (value != 0.0 && !value.is_normal())
+    {
+        return Err(XlsbError::InvalidFormula(format!(
+            "{context} contains a non-finite, denormalized, or negative-zero Xnum"
+        )));
+    }
+    Ok(())
 }
 
 fn parse_a1_reference(value: &str) -> Option<A1Reference> {
@@ -1862,6 +2228,93 @@ mod tests {
 
         assert!(matches!(
             FormulaParser::new(&attr_choose[..7]).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+    }
+
+    #[test]
+    fn parser_decodes_typed_array_ancillary_values() {
+        let mut rgce = vec![0x40];
+        rgce.extend_from_slice(&[0; 14]);
+        let mut rgcb = Vec::new();
+        rgcb.extend_from_slice(&2_u32.to_le_bytes());
+        rgcb.extend_from_slice(&2_u32.to_le_bytes());
+        rgcb.push(0x00);
+        rgcb.extend_from_slice(&1_f64.to_le_bytes());
+        rgcb.extend_from_slice(&[0x01, 0x01, 0x00, b'x', 0x00]);
+        rgcb.extend_from_slice(&[0x02, 0x01]);
+        rgcb.extend_from_slice(&[0x04, 0x07, 0x00, 0x00, 0x00]);
+
+        let tokens = FormulaParser::with_extra(&rgce, &rgcb).parse().unwrap();
+        assert_eq!(
+            tokens,
+            vec![FormulaToken::Array {
+                rows: 2,
+                cols: 2,
+                values: vec![
+                    FormulaArrayValue::Number(1.0),
+                    FormulaArrayValue::String("x".to_string()),
+                    FormulaArrayValue::Bool(true),
+                    FormulaArrayValue::Error(0x07),
+                ],
+            }]
+        );
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
+            "{1,\"x\";TRUE,#DIV/0!}"
+        );
+    }
+
+    #[test]
+    fn parser_rejects_malformed_array_ancillary_data_without_large_allocation() {
+        let mut rgce = vec![0x40];
+        rgce.extend_from_slice(&[0; 14]);
+        let mut impossible = Vec::new();
+        impossible.extend_from_slice(&1_048_576_u32.to_le_bytes());
+        impossible.extend_from_slice(&16_384_u32.to_le_bytes());
+        assert!(matches!(
+            FormulaParser::with_extra(&rgce, &impossible).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+
+        let mut invalid_bool = Vec::new();
+        invalid_bool.extend_from_slice(&1_u32.to_le_bytes());
+        invalid_bool.extend_from_slice(&1_u32.to_le_bytes());
+        invalid_bool.extend_from_slice(&[0x02, 0x02]);
+        assert!(matches!(
+            FormulaParser::with_extra(&rgce, &invalid_bool).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+
+        let mut invalid_number = Vec::new();
+        invalid_number.extend_from_slice(&1_u32.to_le_bytes());
+        invalid_number.extend_from_slice(&1_u32.to_le_bytes());
+        invalid_number.push(0x00);
+        invalid_number.extend_from_slice(&f64::NEG_INFINITY.to_le_bytes());
+        assert!(matches!(
+            FormulaParser::with_extra(&rgce, &invalid_number).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+    }
+
+    #[test]
+    fn compiler_emits_and_roundtrips_array_constants() {
+        let formula = FormulaCompiler::compile("SUM({1,\"x\";TRUE,#N/A})").unwrap();
+        assert_eq!(
+            &formula.rgce[..15],
+            &[0x40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        );
+        assert_eq!(&formula.rgcb[..8], &[2, 0, 0, 0, 2, 0, 0, 0]);
+        let tokens = FormulaParser::with_extra(&formula.rgce, &formula.rgcb)
+            .parse()
+            .unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
+            "SUM({1,\"x\";TRUE,#N/A})"
+        );
+
+        assert!(matches!(
+            FormulaCompiler::compile_shared("SUM({1,2})", 0, 0),
             Err(XlsbError::InvalidFormula(_))
         ));
     }

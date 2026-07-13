@@ -1030,4 +1030,35 @@ mod tests {
             ));
         }
     }
+
+    #[test]
+    fn array_constant_survives_package_roundtrip() {
+        let mut workbook = XlsbWorkbookWriter::new();
+        let mut sheet = MutableXlsbWorksheet::new("Array constant");
+        sheet.set_cell(
+            0,
+            0,
+            CellValue::Formula {
+                formula: "SUM({1,2;3,4})".to_string(),
+                cached_value: Some(Box::new(CellValue::Float(10.0))),
+                is_array: false,
+                array_range: None,
+            },
+        );
+        workbook.add_worksheet(sheet);
+
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let worksheet = reader.worksheet_by_index(0).unwrap();
+        assert!(matches!(
+            worksheet.cell_value(0, 0).unwrap().as_ref(),
+            CellValue::Formula {
+                formula,
+                cached_value: Some(cached),
+                ..
+            } if formula == "SUM({1,2;3,4})"
+                && matches!(cached.as_ref(), CellValue::Float(10.0))
+        ));
+    }
 }

@@ -65,7 +65,7 @@ impl XlsbCell {
         formula: CellParsedFormula,
         formula_flags: u16,
     ) -> Self {
-        let value = FormulaParser::new(&formula.rgce)
+        let value = FormulaParser::with_extra(&formula.rgce, &formula.rgcb)
             .parse()
             .and_then(|tokens| FormulaConverter::try_tokens_to_string(&tokens))
             .map(|formula_text| CellValue::Formula {
@@ -96,10 +96,16 @@ impl XlsbCell {
         group: Arc<FormulaGroup>,
     ) -> Self {
         let tokens = match group.kind {
-            FormulaGroupKind::Array => FormulaParser::new(&group.formula.rgce).parse(),
-            FormulaGroupKind::Shared => {
-                FormulaParser::with_base_cell(&group.formula.rgce, row, col).parse()
+            FormulaGroupKind::Array => {
+                FormulaParser::with_extra(&group.formula.rgce, &group.formula.rgcb).parse()
             },
+            FormulaGroupKind::Shared => FormulaParser::with_base_cell_and_extra(
+                &group.formula.rgce,
+                &group.formula.rgcb,
+                row,
+                col,
+            )
+            .parse(),
         };
         let is_array = group.kind == FormulaGroupKind::Array;
         let value = tokens
