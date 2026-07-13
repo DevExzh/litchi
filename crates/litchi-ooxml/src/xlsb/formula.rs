@@ -2033,6 +2033,7 @@ pub(crate) struct FormulaDefinedName {
 pub(crate) struct FormulaCompilationContext<'a> {
     pub(crate) worksheet_names: &'a [String],
     pub(crate) defined_names: &'a [FormulaDefinedName],
+    pub(crate) sheet_ranges: &'a std::cell::RefCell<Vec<(u32, u32)>>,
     pub(crate) current_sheet: u32,
 }
 
@@ -2270,16 +2271,25 @@ impl<'a> FormulaCompiler<'a> {
         }
 
         if self.peek_char() == Some('\'') {
-            let sheet_name = self.parse_quoted_sheet_name()?;
+            let sheet_qualifier = self.parse_quoted_sheet_name()?;
             if !self.consume("!") {
                 return Err(self.error("expected '!' after quoted worksheet name"));
             }
-            return self.parse_qualified_reference(&sheet_name);
+            let (first_sheet, last_sheet) = Self::split_sheet_qualifier(&sheet_qualifier)?;
+            return self.parse_qualified_reference(first_sheet, last_sheet);
         }
 
         let identifier = self.parse_identifier()?;
+        let sheet_range_checkpoint = self.offset;
+        if self.consume(":") {
+            let last_sheet = self.parse_identifier()?;
+            if self.consume("!") {
+                return self.parse_qualified_reference(&identifier, Some(&last_sheet));
+            }
+            self.offset = sheet_range_checkpoint;
+        }
         if self.consume("!") {
-            return self.parse_qualified_reference(&identifier);
+            return self.parse_qualified_reference(&identifier, None);
         }
         if self.consume("(") {
             let function = builtin_function_by_name(&identifier).ok_or_else(|| {
@@ -2532,8 +2542,24 @@ impl<'a> FormulaCompiler<'a> {
         Ok(name)
     }
 
-    fn parse_qualified_reference(&mut self, sheet_name: &str) -> XlsbResult<CompileExpr> {
-        let sheet_index = self.resolve_sheet(sheet_name)?;
+    fn split_sheet_qualifier(value: &str) -> XlsbResult<(&str, Option<&str>)> {
+        let Some((first, last)) = value.split_once(':') else {
+            return Ok((value, None));
+        };
+        if first.is_empty() || last.is_empty() || last.contains(':') {
+            return Err(XlsbError::InvalidFormula(format!(
+                "invalid worksheet range {value:?}"
+            )));
+        }
+        Ok((first, Some(last)))
+    }
+
+    fn parse_qualified_reference(
+        &mut self,
+        first_sheet: &str,
+        last_sheet: Option<&str>,
+    ) -> XlsbResult<CompileExpr> {
+        let sheet_index = self.resolve_sheet_range(first_sheet, last_sheet)?;
         let first_text = self.parse_identifier()?;
         let first = parse_a1_reference(&first_text)
             .ok_or_else(|| self.error("invalid sheet-qualified cell reference"))?;
@@ -2547,25 +2573,77 @@ impl<'a> FormulaCompiler<'a> {
         }
     }
 
-    fn resolve_sheet(&self, sheet_name: &str) -> XlsbResult<u16> {
+    fn resolve_sheet_range(&self, first_sheet: &str, last_sheet: Option<&str>) -> XlsbResult<u16> {
         let context = self.context.ok_or_else(|| {
             XlsbError::UnsupportedFeature(
                 "sheet-qualified reference requires workbook compilation context".to_string(),
             )
         })?;
-        let index = context
+        let first_index = context
             .worksheet_names
             .iter()
-            .position(|candidate| excel_name_eq(candidate, sheet_name))
-            .ok_or_else(|| XlsbError::WorksheetNotFound(sheet_name.to_string()))?;
-        u16::try_from(index)
-            .ok()
-            .and_then(|index| index.checked_add(2))
-            .ok_or_else(|| {
-                XlsbError::InvalidFormula(format!(
-                    "worksheet {sheet_name:?} cannot be represented in the extern-sheet table"
-                ))
-            })
+            .position(|candidate| excel_name_eq(candidate, first_sheet))
+            .ok_or_else(|| XlsbError::WorksheetNotFound(first_sheet.to_string()))?;
+        let last_index = if let Some(last_sheet) = last_sheet {
+            context
+                .worksheet_names
+                .iter()
+                .position(|candidate| excel_name_eq(candidate, last_sheet))
+                .ok_or_else(|| XlsbError::WorksheetNotFound(last_sheet.to_string()))?
+        } else {
+            first_index
+        };
+        if last_index < first_index {
+            return Err(XlsbError::InvalidFormula(format!(
+                "worksheet range {first_sheet:?}:{last_sheet:?} is in reverse workbook order"
+            )));
+        }
+        if first_index == last_index {
+            return u16::try_from(first_index)
+                .ok()
+                .and_then(|index| index.checked_add(2))
+                .ok_or_else(|| {
+                    XlsbError::InvalidFormula(format!(
+                        "worksheet {first_sheet:?} cannot be represented in the extern-sheet table"
+                    ))
+                });
+        }
+
+        let first = u32::try_from(first_index)
+            .map_err(|_| XlsbError::InvalidFormula("first sheet index overflow".to_string()))?;
+        let last = u32::try_from(last_index)
+            .map_err(|_| XlsbError::InvalidFormula("last sheet index overflow".to_string()))?;
+        let mut ranges = context.sheet_ranges.borrow_mut();
+        let range_index = if let Some(index) = ranges
+            .iter()
+            .position(|candidate| *candidate == (first, last))
+        {
+            index
+        } else {
+            let base_count = context
+                .worksheet_names
+                .len()
+                .checked_add(2)
+                .ok_or_else(|| XlsbError::InvalidFormula("Xti count overflow".to_string()))?;
+            if base_count
+                .checked_add(ranges.len())
+                .is_none_or(|count| count >= usize::from(u16::MAX))
+            {
+                return Err(XlsbError::InvalidFormula(
+                    "formula sheet ranges exceed the XLSB extern-sheet limit".to_string(),
+                ));
+            }
+            ranges.push((first, last));
+            ranges.len() - 1
+        };
+        let xti_index = context
+            .worksheet_names
+            .len()
+            .checked_add(2)
+            .and_then(|base| base.checked_add(range_index))
+            .ok_or_else(|| XlsbError::InvalidFormula("Xti index overflow".to_string()))?;
+        u16::try_from(xti_index)
+            .map_err(|_| XlsbError::InvalidFormula("Xti index overflow".to_string()))
     }
 
     fn resolve_defined_name(&self, name: &str) -> XlsbResult<u32> {
@@ -3194,7 +3272,11 @@ mod tests {
 
     #[test]
     fn compiler_emits_contextual_names_and_sheet_references() {
-        let worksheet_names = vec!["Data".to_string(), "O'Brien Data".to_string()];
+        let worksheet_names = vec![
+            "Data".to_string(),
+            "O'Brien Data".to_string(),
+            "Summary".to_string(),
+        ];
         let defined_names = vec![
             FormulaDefinedName {
                 name: "Rate".to_string(),
@@ -3205,9 +3287,11 @@ mod tests {
                 sheet_id: Some(1),
             },
         ];
+        let sheet_ranges = std::cell::RefCell::new(Vec::new());
         let context = FormulaCompilationContext {
             worksheet_names: &worksheet_names,
             defined_names: &defined_names,
+            sheet_ranges: &sheet_ranges,
             current_sheet: 1,
         };
         let compiled =
@@ -3229,6 +3313,21 @@ mod tests {
         );
         assert!(FormulaCompiler::compile("Rate").is_err());
         assert!(FormulaCompiler::compile("Data!A1").is_err());
+
+        let span = FormulaCompiler::compile_with_context(
+            "SUM('Data:Summary'!A1)+Data:Summary!$B$2",
+            &context,
+        )
+        .unwrap();
+        assert_eq!(&*sheet_ranges.borrow(), &[(0, 2)]);
+        assert_eq!(
+            span.rgce
+                .windows(3)
+                .filter(|window| *window == [0x5A, 5, 0])
+                .count(),
+            2
+        );
+        assert!(FormulaCompiler::compile_with_context("Summary:Data!A1", &context).is_err());
     }
 
     #[test]

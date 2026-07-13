@@ -146,7 +146,7 @@ impl XlsbWorkbookWriter {
 
         // Add worksheets first so that shared_strings is fully populated before we
         // decide whether to create a sharedStrings part and relationship.
-        self.add_worksheet_parts(&mut package)?;
+        let formula_sheet_ranges = self.add_worksheet_parts(&mut package)?;
 
         // Add shared strings table only if non-empty. Excel-generated empty XLSB
         // workbooks omit sharedStrings.bin entirely, and the corresponding
@@ -161,7 +161,7 @@ impl XlsbWorkbookWriter {
         // Finally add the workbook part (after worksheets / shared strings / styles)
         // so that relationships are created with full knowledge of which parts
         // actually exist.
-        self.add_workbook_part(&mut package)?;
+        self.add_workbook_part(&mut package, &formula_sheet_ranges)?;
 
         // Save package to output
         package.to_stream(writer)?;
@@ -416,12 +416,16 @@ impl XlsbWorkbookWriter {
     }
 
     /// Add workbook part to the package
-    fn add_workbook_part(&self, package: &mut OpcPackage) -> XlsbResult<()> {
+    fn add_workbook_part(
+        &self,
+        package: &mut OpcPackage,
+        formula_sheet_ranges: &[(u32, u32)],
+    ) -> XlsbResult<()> {
         let mut workbook_data = Vec::new();
         let mut writer = RecordWriter::new(&mut workbook_data);
 
         // Write workbook structure
-        self.write_workbook(&mut writer)?;
+        self.write_workbook(&mut writer, formula_sheet_ranges)?;
 
         // Create workbook part
         let workbook_uri = PackURI::new("/xl/workbook.bin")?;
@@ -493,7 +497,11 @@ impl XlsbWorkbookWriter {
     ///
     /// The book views and calculation properties are currently written with a
     /// single default view and sensible defaults for calculation settings.
-    fn write_workbook<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    fn write_workbook<W: Write>(
+        &self,
+        writer: &mut RecordWriter<W>,
+        formula_sheet_ranges: &[(u32, u32)],
+    ) -> XlsbResult<()> {
         // BrtBeginBook
         writer.write_record(record_types::BEGIN_BOOK, &[])?;
 
@@ -514,7 +522,7 @@ impl XlsbWorkbookWriter {
         // EXTERNALS block with self-references, mirroring SheetJS and
         // [MS-XLSB] examples. This creates a minimal but fully valid
         // extern sheet table for the workbook.
-        self.write_externals(writer)?;
+        self.write_externals(writer, formula_sheet_ranges)?;
 
         // Defined names (named ranges), if any.
         self.write_named_ranges(writer)?;
@@ -665,7 +673,11 @@ impl XlsbWorkbookWriter {
     ///
     /// Based on SheetJS implementation: always writes BrtSupSelf with BrtExternSheet
     /// This creates self-references for the workbook and all sheets.
-    fn write_externals<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+    fn write_externals<W: Write>(
+        &self,
+        writer: &mut RecordWriter<W>,
+        formula_sheet_ranges: &[(u32, u32)],
+    ) -> XlsbResult<()> {
         // BrtBeginExternals - no data
         writer.write_record(record_types::BEGIN_EXTERNALS, &[])?;
 
@@ -678,8 +690,26 @@ impl XlsbWorkbookWriter {
 
         let sheet_count = self.worksheets.len();
 
-        // Total count: sheet_count + 2
-        temp_writer.write_u32((sheet_count + 2) as u32)?;
+        // Total count: workbook and #REF entries, single-sheet entries, then
+        // the distinct multi-sheet ranges referenced by formulas.
+        let entry_count = sheet_count
+            .checked_add(2)
+            .and_then(|count| count.checked_add(formula_sheet_ranges.len()))
+            .ok_or_else(|| {
+                crate::xlsb::error::XlsbError::InvalidFormula(
+                    "BrtExternSheet entry count overflow".to_string(),
+                )
+            })?;
+        if entry_count >= 65_536 {
+            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                "BrtExternSheet entry count {entry_count} exceeds 65,535"
+            )));
+        }
+        temp_writer.write_u32(u32::try_from(entry_count).map_err(|_| {
+            crate::xlsb::error::XlsbError::InvalidFormula(
+                "BrtExternSheet entry count overflow".to_string(),
+            )
+        })?)?;
 
         // First entry: workbook-level reference (0, -2, -2)
         temp_writer.write_u32(0)?;
@@ -698,6 +728,29 @@ impl XlsbWorkbookWriter {
             temp_writer.write_i32(i as i32)?;
         }
 
+        for &(first_sheet, last_sheet) in formula_sheet_ranges {
+            if last_sheet < first_sheet
+                || usize::try_from(last_sheet)
+                    .ok()
+                    .is_none_or(|last_sheet| last_sheet >= sheet_count)
+            {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    "invalid formula sheet range {first_sheet}..={last_sheet}"
+                )));
+            }
+            temp_writer.write_u32(0)?;
+            temp_writer.write_i32(i32::try_from(first_sheet).map_err(|_| {
+                crate::xlsb::error::XlsbError::InvalidFormula(
+                    "first formula sheet index overflow".to_string(),
+                )
+            })?)?;
+            temp_writer.write_i32(i32::try_from(last_sheet).map_err(|_| {
+                crate::xlsb::error::XlsbError::InvalidFormula(
+                    "last formula sheet index overflow".to_string(),
+                )
+            })?)?;
+        }
+
         writer.write_record(record_types::EXTERN_SHEET, &data)?;
 
         // BrtEndExternals - no data
@@ -707,7 +760,7 @@ impl XlsbWorkbookWriter {
     }
 
     /// Add worksheet parts to the package
-    fn add_worksheet_parts(&mut self, package: &mut OpcPackage) -> XlsbResult<()> {
+    fn add_worksheet_parts(&mut self, package: &mut OpcPackage) -> XlsbResult<Vec<(u32, u32)>> {
         let worksheet_names = self
             .worksheets
             .iter()
@@ -721,6 +774,7 @@ impl XlsbWorkbookWriter {
                 sheet_id: named_range.sheet_id,
             })
             .collect::<Vec<_>>();
+        let formula_sheet_ranges = std::cell::RefCell::new(Vec::new());
         for (i, worksheet) in self.worksheets.iter_mut().enumerate() {
             // Create the worksheet part with an empty blob first so we can attach
             // relationships (binary index + external hyperlinks) and obtain
@@ -778,6 +832,7 @@ impl XlsbWorkbookWriter {
             let formula_context = FormulaCompilationContext {
                 worksheet_names: &worksheet_names,
                 defined_names: &defined_names,
+                sheet_ranges: &formula_sheet_ranges,
                 current_sheet,
             };
             let compiled_positions = worksheet.compile_contextual_formulas(&formula_context)?;
@@ -793,7 +848,7 @@ impl XlsbWorkbookWriter {
             package.add_part(Box::new(binary_index_part));
         }
 
-        Ok(())
+        Ok(formula_sheet_ranges.into_inner())
     }
 
     /// Add shared strings part to the package
@@ -1040,6 +1095,39 @@ mod tests {
             summary.cell_value(0, 1).unwrap().as_ref(),
             CellValue::Formula { formula, .. } if formula == "'Data Sheet'!$B$2"
         ));
+    }
+
+    #[test]
+    fn sheet_range_formula_survives_package_roundtrip() {
+        let mut workbook = XlsbWorkbookWriter::new();
+        workbook.add_worksheet(MutableXlsbWorksheet::new("Data Sheet"));
+        workbook.add_worksheet(MutableXlsbWorksheet::new("Middle"));
+        let mut summary = MutableXlsbWorksheet::new("Summary");
+        for col in 0..2 {
+            summary.set_cell(
+                0,
+                col,
+                CellValue::Formula {
+                    formula: "SUM('Data Sheet:Summary'!A1)".to_string(),
+                    cached_value: Some(Box::new(CellValue::Float(0.0))),
+                    is_array: false,
+                    array_range: None,
+                },
+            );
+        }
+        workbook.add_worksheet(summary);
+
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let summary = reader.worksheet_by_index(2).unwrap();
+        for col in 0..2 {
+            assert!(matches!(
+                summary.cell_value(0, col).unwrap().as_ref(),
+                CellValue::Formula { formula, .. }
+                    if formula == "SUM('Data Sheet:Summary'!A1)"
+            ));
+        }
     }
 
     #[test]
