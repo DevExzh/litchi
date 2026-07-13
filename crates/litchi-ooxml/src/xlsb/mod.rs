@@ -111,6 +111,7 @@ mod workbook;
 /// Worksheet parsing implementation
 mod worksheet;
 
+mod calculation;
 /// Cell value parsing and representation
 mod cell;
 
@@ -151,6 +152,7 @@ pub mod conditional_formatting;
 /// Formula parsing and generation
 pub mod formula;
 
+pub use calculation::{CalculationMode, CalculationProperties};
 pub use cell::XlsbCell;
 pub use error::{XlsbError, XlsbResult};
 pub use styles::{

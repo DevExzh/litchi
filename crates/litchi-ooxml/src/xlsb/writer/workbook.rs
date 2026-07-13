@@ -2,6 +2,7 @@
 //!
 //! This module provides functionality to create complete XLSB files with multiple worksheets,
 //! shared strings, styles, and advanced features.
+use crate::xlsb::calculation::CalculationProperties;
 use crate::xlsb::error::XlsbResult;
 use crate::xlsb::formula::{
     CellParsedFormula, FormulaCompilationContext, FormulaDefinedName, excel_name_eq,
@@ -48,6 +49,7 @@ pub struct XlsbWorkbookWriter {
     named_ranges: Vec<NamedRange>,
     shared_strings: MutableSharedStringsWriter,
     styles: StylesWriter,
+    calculation_properties: CalculationProperties,
     is_1904: bool,
 }
 
@@ -76,6 +78,7 @@ impl XlsbWorkbookWriter {
             named_ranges: Vec::new(),
             shared_strings: MutableSharedStringsWriter::new(),
             styles: StylesWriter::new(),
+            calculation_properties: CalculationProperties::default(),
             is_1904: false,
         }
     }
@@ -87,6 +90,16 @@ impl XlsbWorkbookWriter {
     /// * `is_1904` - `true` for 1904 date system (Mac), `false` for 1900 (Windows, default)
     pub fn set_date_system(&mut self, is_1904: bool) {
         self.is_1904 = is_1904;
+    }
+
+    /// Workbook formula calculation policy written to `BrtCalcProp`.
+    pub fn calculation_properties(&self) -> &CalculationProperties {
+        &self.calculation_properties
+    }
+
+    /// Mutably configure workbook formula calculation policy.
+    pub fn calculation_properties_mut(&mut self) -> &mut CalculationProperties {
+        &mut self.calculation_properties
     }
 
     /// Add a worksheet to the workbook
@@ -649,21 +662,16 @@ impl XlsbWorkbookWriter {
     ///
     /// Spec example fields and order
     fn write_calc_properties<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+        self.calculation_properties.validate()?;
         let mut data = Vec::new();
         let mut temp_writer = RecordWriter::new(&mut data);
 
-        // recalcID (DWORD)
-        temp_writer.write_u32(0x0001_EB1D)?;
-        // fAutoRecalc (LONG)
-        temp_writer.write_u32(1)?;
-        // cCalcCount (DWORD)
-        temp_writer.write_u32(100)?;
-        // xnumDelta (Xnum/f64): 0.001
-        temp_writer.write_f64(0.001f64)?;
-        // cUserThreadCount (LONG)
-        temp_writer.write_u32(1)?;
-        // Flags (WORD) with bits per spec: 0b0110_1010 = 0x006A
-        temp_writer.write_u16(0x006A)?;
+        temp_writer.write_u32(self.calculation_properties.recalculation_id)?;
+        temp_writer.write_u32(self.calculation_properties.mode as u32)?;
+        temp_writer.write_u32(self.calculation_properties.iteration_count)?;
+        temp_writer.write_f64(self.calculation_properties.iteration_delta)?;
+        temp_writer.write_u32(self.calculation_properties.user_thread_count as u32)?;
+        temp_writer.write_u16(self.calculation_properties.flags())?;
 
         writer.write_record(record_types::CALC_PROP, &data)?;
         Ok(())
@@ -920,6 +928,7 @@ impl Default for XlsbWorkbookWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::xlsb::CalculationMode;
     use litchi_core::sheet::{CellValue, WorkbookTrait};
     use std::io::Cursor;
 
@@ -943,6 +952,26 @@ mod tests {
         let mut workbook = XlsbWorkbookWriter::new();
         workbook.set_date_system(true);
         assert!(workbook.is_1904);
+    }
+
+    #[test]
+    fn calculation_properties_survive_package_roundtrip() {
+        let mut workbook = XlsbWorkbookWriter::new();
+        let properties = workbook.calculation_properties_mut();
+        properties.mode = CalculationMode::Manual;
+        properties.iterative_calculation = true;
+        properties.iteration_count = 25;
+        properties.iteration_delta = 0.000_01;
+        properties.user_set_thread_count = true;
+        properties.user_thread_count = 4;
+        properties.full_calculation_on_load = true;
+        workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet1"));
+
+        let expected = workbook.calculation_properties().clone();
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        assert_eq!(reader.calculation_properties(), &expected);
     }
 
     #[test]

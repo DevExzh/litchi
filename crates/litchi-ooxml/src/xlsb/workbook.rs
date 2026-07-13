@@ -1,6 +1,7 @@
 //! Workbook implementation for XLSB files
 
 use crate::xlsb::XlsbCell;
+use crate::xlsb::calculation::CalculationProperties;
 use crate::xlsb::error::XlsbResult;
 use crate::xlsb::formula::{
     FormulaExternalBook, FormulaExternalSheet, FormulaResolutionContext, FormulaSupportingLink,
@@ -24,6 +25,7 @@ pub struct XlsbWorkbook {
     formula_context: FormulaResolutionContext,
     shared_strings: Vec<String>,
     styles: StylesTable,
+    calculation_properties: CalculationProperties,
     is_1904: bool,
 }
 
@@ -36,6 +38,7 @@ struct ParsedWorkbookInfo {
     external_link_rel_ids: Vec<String>,
     defined_names: Vec<String>,
     is_1904: bool,
+    calculation_properties: Option<CalculationProperties>,
 }
 
 impl std::fmt::Debug for XlsbWorkbook {
@@ -45,6 +48,7 @@ impl std::fmt::Debug for XlsbWorkbook {
             .field("worksheet_rel_ids", &self.worksheet_rel_ids)
             .field("shared_strings_count", &self.shared_strings.len())
             .field("cell_xfs_count", &self.styles.cell_xfs.len())
+            .field("calculation_properties", &self.calculation_properties)
             .field("is_1904", &self.is_1904)
             .finish()
     }
@@ -66,6 +70,11 @@ impl XlsbWorkbook {
         self.styles.get_cell_format(cell.style_id() as usize)
     }
 
+    /// Workbook formula calculation policy.
+    pub fn calculation_properties(&self) -> &CalculationProperties {
+        &self.calculation_properties
+    }
+
     /// Open an XLSB workbook from a reader
     pub fn new<R: Read + Seek>(reader: R) -> XlsbResult<Self> {
         let package = OpcPackage::from_reader(reader)?;
@@ -76,6 +85,7 @@ impl XlsbWorkbook {
             formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
+            calculation_properties: CalculationProperties::default(),
             is_1904: false,
         };
 
@@ -102,6 +112,7 @@ impl XlsbWorkbook {
             formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
+            calculation_properties: CalculationProperties::default(),
             is_1904: false,
         };
 
@@ -151,6 +162,7 @@ impl XlsbWorkbook {
         };
         self.worksheet_rel_ids = info.worksheet_rel_ids;
         self.is_1904 = info.is_1904;
+        self.calculation_properties = info.calculation_properties.unwrap_or_default();
 
         Ok(())
     }
@@ -269,6 +281,15 @@ impl XlsbWorkbook {
                     {
                         *is_1904 = prop.is_date1904;
                     }
+                },
+                record_types::CALC_PROP => {
+                    if info.calculation_properties.is_some() {
+                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtCalcProp".to_string(),
+                            val: "duplicate record".to_string(),
+                        });
+                    }
+                    info.calculation_properties = Some(CalculationProperties::parse(&record.data)?);
                 },
                 record_types::BUNDLE_SH => {
                     let bundle_sh = crate::xlsb::records::BundleSheetRecord::parse(&record.data)?;
@@ -803,6 +824,7 @@ mod tests {
             formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
+            calculation_properties: CalculationProperties::default(),
             is_1904: false,
         };
         workbook.load_external_book(&uri)
@@ -944,6 +966,7 @@ mod tests {
             formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
+            calculation_properties: CalculationProperties::default(),
             is_1904: false,
         };
         let uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
