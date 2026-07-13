@@ -272,15 +272,34 @@ impl StylesTable {
 
     /// Parse number format record
     fn parse_num_fmt(data: &[u8]) -> XlsbResult<(u32, String)> {
-        if data.len() < 4 {
+        if data.len() < 8 {
             return Err(XlsbError::InvalidLength {
-                expected: 4,
+                expected: 8,
                 found: data.len(),
             });
         }
 
-        let id = binary::read_u32_le_at(data, 0)?;
-        let (format_code, _) = wide_str_with_len(&data[4..])?;
+        let id = u32::from(binary::read_u16_le_at(data, 0)?);
+        if !matches!(id, 5..=8 | 23..=26 | 41..=44 | 63..=66 | 164..=382) {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtFmt ifmt".to_string(),
+                val: id.to_string(),
+            });
+        }
+        let (format_code, consumed) = wide_str_with_len(&data[2..])?;
+        let length = format_code.encode_utf16().count();
+        if !(1..=255).contains(&length) {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtFmt stFmtCode length".to_string(),
+                val: length.to_string(),
+            });
+        }
+        if consumed + 2 != data.len() {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtFmt".to_string(),
+                val: format!("{} trailing bytes", data.len() - consumed - 2),
+            });
+        }
 
         Ok((id, format_code))
     }
@@ -479,6 +498,19 @@ mod tests {
     }
 
     #[test]
+    fn parses_two_byte_number_format_identifier() {
+        let mut data = 166u16.to_le_bytes().to_vec();
+        data.extend_from_slice(&7u32.to_le_bytes());
+        for unit in "0.00000".encode_utf16() {
+            data.extend_from_slice(&unit.to_le_bytes());
+        }
+        assert_eq!(
+            StylesTable::parse_num_fmt(&data).unwrap(),
+            (166, "0.00000".to_string())
+        );
+    }
+
+    #[test]
     fn rejects_truncated_style_records_and_invalid_direct_color() {
         assert!(matches!(
             StylesTable::parse_font(&[0; 20]),
@@ -534,5 +566,22 @@ mod tests {
                 assert!(default_font.color.is_none());
             }
         }
+    }
+
+    #[test]
+    fn reads_custom_number_formats_from_poi_fixture_when_available() {
+        let path = std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/poi/test-data/spreadsheet/62815.xlsb"
+        ));
+        if !path.exists() {
+            return;
+        }
+        let package = OpcPackage::from_reader(File::open(path).unwrap()).unwrap();
+        let part = package
+            .get_part(&PackURI::new("/xl/styles.bin").unwrap())
+            .unwrap();
+        let styles = StylesTable::from_reader(part.blob()).unwrap();
+        assert!(styles.num_fmts.keys().any(|id| *id >= 164));
     }
 }

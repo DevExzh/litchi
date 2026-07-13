@@ -912,6 +912,21 @@ mod tests {
     }
 
     #[test]
+    fn opens_poi_custom_number_fixture_when_available() {
+        let path = std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/poi/test-data/spreadsheet/62815.xlsb"
+        ));
+        if !path.exists() {
+            return;
+        }
+        let workbook = XlsbWorkbook::new(File::open(path).unwrap()).unwrap();
+        assert!(workbook.styles().num_fmts.keys().any(|id| *id >= 164));
+        let worksheet = workbook.get_worksheet(0).unwrap();
+        assert!(worksheet.dimensions().is_some());
+    }
+
+    #[test]
     fn reads_external_book_metadata_from_poi_corpus_when_available() {
         let path = std::path::Path::new(concat!(
             env!("CARGO_MANIFEST_DIR"),
