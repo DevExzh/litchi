@@ -922,6 +922,16 @@ mod tests {
                 array_range: None,
             },
         );
+        sheet.set_cell(
+            2,
+            0,
+            CellValue::Formula {
+                formula: "#REF!".to_string(),
+                cached_value: Some(Box::new(CellValue::Error("#REF!".to_string()))),
+                is_array: false,
+                array_range: None,
+            },
+        );
         workbook.add_worksheet(sheet);
 
         let mut output = Cursor::new(Vec::new());
@@ -957,6 +967,15 @@ mod tests {
                 cached_value: Some(cached),
                 ..
             } if matches!(cached.as_ref(), CellValue::Error(error) if error == "#DIV/0!")
+        ));
+        assert!(matches!(
+            worksheet.cell_value(2, 0).unwrap().as_ref(),
+            CellValue::Formula {
+                formula,
+                cached_value: Some(cached),
+                ..
+            } if formula == "#REF!"
+                && matches!(cached.as_ref(), CellValue::Error(error) if error == "#REF!")
         ));
     }
 

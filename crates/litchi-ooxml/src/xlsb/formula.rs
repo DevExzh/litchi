@@ -457,6 +457,12 @@ pub enum FormulaToken {
         col_first_relative: bool,
         col_last_relative: bool,
     },
+    /// Invalid single-cell or area reference. A sheet index is present for
+    /// the 3D token forms and retained even though the text form is `#REF!`.
+    ReferenceError {
+        is_area: bool,
+        sheet_index: Option<u16>,
+    },
     /// Binary operator
     BinaryOp(BinaryOperator),
     /// Unary operator
@@ -647,6 +653,10 @@ impl<'a> FormulaParser<'a> {
                 0x0C => self.parse_ref(true),
                 0x05 => self.parse_area(false),
                 0x0D => self.parse_area(true),
+                0x0A => self.parse_reference_error(false, false),
+                0x0B => self.parse_reference_error(true, false),
+                0x1C => self.parse_reference_error(false, true),
+                0x1D => self.parse_reference_error(true, true),
                 0x00 => self.parse_array(),
                 0x06 => self.parse_memory(FormulaMemoryKind::Area),
                 0x07 => self.parse_memory(FormulaMemoryKind::Error(0)),
@@ -722,10 +732,15 @@ impl<'a> FormulaParser<'a> {
     fn parse_bool(&mut self) -> XlsbResult<FormulaToken> {
         self.require(1, "PtgBool")?;
 
-        let value = self.data[self.offset] != 0;
+        let raw = self.data[self.offset];
         self.offset += 1;
+        if raw > 1 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "invalid PtgBool value {raw}"
+            )));
+        }
 
-        Ok(FormulaToken::Bool(value))
+        Ok(FormulaToken::Bool(raw != 0))
     }
 
     /// Parse error constant
@@ -734,6 +749,11 @@ impl<'a> FormulaParser<'a> {
 
         let error_code = self.data[self.offset];
         self.offset += 1;
+        if !is_formula_error_code(error_code) {
+            return Err(XlsbError::InvalidFormula(format!(
+                "invalid PtgErr code 0x{error_code:02X}"
+            )));
+        }
 
         Ok(FormulaToken::Error(error_code))
     }
@@ -1040,6 +1060,30 @@ impl<'a> FormulaParser<'a> {
         })
     }
 
+    fn parse_reference_error(&mut self, is_area: bool, is_3d: bool) -> XlsbResult<FormulaToken> {
+        let token = self.data[self.offset - 1];
+        if token & 0x80 != 0 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "reference-error token 0x{token:02X} has its reserved bit set"
+            )));
+        }
+        let sheet_index = if is_3d {
+            self.require(2, "3D reference-error sheet index")?;
+            let index = binary::read_u16_le_at(self.data, self.offset)?;
+            self.offset += 2;
+            Some(index)
+        } else {
+            None
+        };
+        let unused_len = if is_area { 12 } else { 6 };
+        self.require(unused_len, "reference-error payload")?;
+        self.offset += unused_len;
+        Ok(FormulaToken::ReferenceError {
+            is_area,
+            sheet_index,
+        })
+    }
+
     fn resolve_reference(
         &self,
         row_data: u32,
@@ -1285,6 +1329,7 @@ impl FormulaConverter {
                     );
                     stack.push(format!("{}:{}", first, last));
                 },
+                FormulaToken::ReferenceError { .. } => stack.push("#REF!".to_string()),
                 FormulaToken::BinaryOp(op) => {
                     if stack.len() < 2 {
                         return Err(XlsbError::InvalidFormula(
@@ -1485,6 +1530,7 @@ enum CompileExpr {
     Number(f64),
     String(String),
     Bool(bool),
+    Error(u8),
     MissingArg,
     Parenthesized(Box<CompileExpr>),
     Array {
@@ -1677,6 +1723,9 @@ impl<'a> FormulaCompiler<'a> {
         if self.peek_char() == Some('"') {
             return self.parse_string().map(CompileExpr::String);
         }
+        if self.peek_char() == Some('#') {
+            return self.parse_error_literal().map(CompileExpr::Error);
+        }
         if self
             .peek_char()
             .is_some_and(|ch| ch.is_ascii_digit() || ch == '.')
@@ -1793,17 +1842,8 @@ impl<'a> FormulaCompiler<'a> {
                 {
                     self.offset += self.peek_char().expect("checked").len_utf8();
                 }
-                let error = match self.input[start..self.offset].to_ascii_uppercase().as_str() {
-                    "#NULL!" => 0x00,
-                    "#DIV/0!" => 0x07,
-                    "#VALUE!" => 0x0F,
-                    "#REF!" => 0x17,
-                    "#NAME?" => 0x1D,
-                    "#NUM!" => 0x24,
-                    "#N/A" => 0x2A,
-                    "#GETTING_DATA" => 0x2B,
-                    _ => return Err(self.error("unknown array error literal")),
-                };
+                let error = formula_error_code(&self.input[start..self.offset])
+                    .ok_or_else(|| self.error("unknown array error literal"))?;
                 FormulaArrayValue::Error(error)
             } else if self.input[self.offset..]
                 .get(..4)
@@ -1886,6 +1926,19 @@ impl<'a> FormulaCompiler<'a> {
             .map_err(|_| self.error("invalid numeric literal"))
     }
 
+    fn parse_error_literal(&mut self) -> XlsbResult<u8> {
+        self.skip_spaces();
+        let rest = &self.input[self.offset..];
+        let Some((literal, code)) = FORMULA_ERRORS.iter().find(|(literal, _)| {
+            rest.get(..literal.len())
+                .is_some_and(|value| value.eq_ignore_ascii_case(literal))
+        }) else {
+            return Err(self.error("unknown formula error literal"));
+        };
+        self.offset += literal.len();
+        Ok(*code)
+    }
+
     fn parse_identifier(&mut self) -> XlsbResult<String> {
         self.skip_spaces();
         let start = self.offset;
@@ -1955,6 +2008,10 @@ impl<'a> FormulaCompiler<'a> {
             CompileExpr::Bool(value) => {
                 output.push(ptg_types::PTG_BOOL);
                 output.push(u8::from(*value));
+            },
+            CompileExpr::Error(error) => {
+                output.push(ptg_types::PTG_ERR);
+                output.push(*error);
             },
             CompileExpr::MissingArg => output.push(ptg_types::PTG_MISSING_ARG),
             CompileExpr::Parenthesized(expression) => {
@@ -2079,6 +2136,27 @@ fn validate_xnum(value: f64, context: &str) -> XlsbResult<()> {
         )));
     }
     Ok(())
+}
+
+const FORMULA_ERRORS: &[(&str, u8)] = &[
+    ("#GETTING_DATA", 0x2B),
+    ("#DIV/0!", 0x07),
+    ("#VALUE!", 0x0F),
+    ("#NULL!", 0x00),
+    ("#NAME?", 0x1D),
+    ("#REF!", 0x17),
+    ("#NUM!", 0x24),
+    ("#N/A", 0x2A),
+];
+
+fn formula_error_code(value: &str) -> Option<u8> {
+    FORMULA_ERRORS
+        .iter()
+        .find_map(|(literal, code)| literal.eq_ignore_ascii_case(value).then_some(*code))
+}
+
+fn is_formula_error_code(value: u8) -> bool {
+    FORMULA_ERRORS.iter().any(|(_, code)| *code == value)
 }
 
 fn parse_a1_reference(value: &str) -> Option<A1Reference> {
@@ -2404,6 +2482,91 @@ mod tests {
             FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
             "(A1,B2)"
         );
+    }
+
+    #[test]
+    fn parser_decodes_all_reference_error_token_forms() {
+        let cases = [
+            (
+                vec![0x4A, 1, 2, 3, 4, 5, 6],
+                FormulaToken::ReferenceError {
+                    is_area: false,
+                    sheet_index: None,
+                },
+            ),
+            (
+                vec![0x4B, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                FormulaToken::ReferenceError {
+                    is_area: true,
+                    sheet_index: None,
+                },
+            ),
+            (
+                vec![0x5C, 0x34, 0x12, 1, 2, 3, 4, 5, 6],
+                FormulaToken::ReferenceError {
+                    is_area: false,
+                    sheet_index: Some(0x1234),
+                },
+            ),
+            (
+                vec![0x7D, 0x78, 0x56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                FormulaToken::ReferenceError {
+                    is_area: true,
+                    sheet_index: Some(0x5678),
+                },
+            ),
+        ];
+
+        for (bytes, expected) in cases {
+            let tokens = FormulaParser::new(&bytes).parse().unwrap();
+            assert_eq!(tokens, vec![expected]);
+            assert_eq!(
+                FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
+                "#REF!"
+            );
+        }
+
+        assert!(matches!(
+            FormulaParser::new(&[0x4B; 12]).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+        assert!(matches!(
+            FormulaParser::new(&[0xAA, 0, 0, 0, 0, 0, 0]).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+    }
+
+    #[test]
+    fn scalar_errors_compile_and_roundtrip_canonically() {
+        for &(literal, code) in FORMULA_ERRORS {
+            let compiled = FormulaCompiler::compile(&literal.to_ascii_lowercase()).unwrap();
+            assert_eq!(compiled.rgce, vec![ptg_types::PTG_ERR, code]);
+            let tokens = FormulaParser::new(&compiled.rgce).parse().unwrap();
+            assert_eq!(
+                FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
+                literal
+            );
+        }
+
+        let compiled = FormulaCompiler::compile("#DIV/0!+1").unwrap();
+        let tokens = FormulaParser::new(&compiled.rgce).parse().unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
+            "(#DIV/0!+1)"
+        );
+        assert!(FormulaCompiler::compile("#SPILL!").is_err());
+    }
+
+    #[test]
+    fn parser_rejects_invalid_scalar_boolean_and_error_values() {
+        assert!(matches!(
+            FormulaParser::new(&[ptg_types::PTG_BOOL, 2]).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+        assert!(matches!(
+            FormulaParser::new(&[ptg_types::PTG_ERR, 1]).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
     }
 
     #[test]
