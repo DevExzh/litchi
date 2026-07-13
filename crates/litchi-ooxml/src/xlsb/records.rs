@@ -497,21 +497,6 @@ impl BundleSheetRecord {
     }
 }
 
-/// SST item record (shared string)
-#[derive(Debug, Clone)]
-pub struct SstItemRecord {
-    pub string: String,
-}
-
-impl SstItemRecord {
-    pub fn parse(data: &[u8]) -> XlsbResult<Self> {
-        let mut str_len = 0;
-        let string = wide_str(&data[1..], &mut str_len)?;
-
-        Ok(SstItemRecord { string })
-    }
-}
-
 /// Row header record
 #[derive(Debug, Clone)]
 #[allow(dead_code)]

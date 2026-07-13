@@ -121,6 +121,7 @@ mod cells_reader;
 /// Shared parsing utilities
 mod utils;
 
+mod shared_strings;
 /// Styles parsing (fonts, fills, borders, number formats)
 mod styles;
 mod styles_table;
@@ -155,6 +156,9 @@ pub mod formula;
 pub use calculation::{CalculationMode, CalculationProperties};
 pub use cell::XlsbCell;
 pub use error::{XlsbError, XlsbResult};
+pub use shared_strings::{
+    PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedString, SharedStringRun,
+};
 pub use styles::{
     Alignment, Border, BorderSide, BorderStyle, HorizontalAlignment, VerticalAlignment,
 };

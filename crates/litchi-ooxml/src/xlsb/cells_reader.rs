@@ -8,6 +8,7 @@ use crate::xlsb::formula::{
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
 use crate::xlsb::records::{RecordIter, record_types};
+use crate::xlsb::shared_strings::SharedString;
 use litchi_core::binary;
 use litchi_core::sheet::CellValue;
 use std::io::{Read, Seek};
@@ -42,7 +43,7 @@ where
     RS: Read + Seek,
 {
     iter: RecordIter<RS>,
-    shared_strings: &'a [String],
+    shared_strings: &'a [SharedString],
     formula_context: &'a FormulaResolutionContext,
     cell_xf_count: usize,
     dimensions: Dimensions,
@@ -62,7 +63,7 @@ where
 {
     pub fn new(
         mut iter: RecordIter<RS>,
-        shared_strings: &'a [String],
+        shared_strings: &'a [SharedString],
         formula_context: &'a FormulaResolutionContext,
         cell_xf_count: usize,
     ) -> XlsbResult<Self> {
@@ -223,7 +224,7 @@ where
                         let header = cell_header.unwrap();
                         let idx = binary::read_u32_le_at(&self.buf, 8)? as usize;
                         let value = if idx < self.shared_strings.len() {
-                            CellValue::String(self.shared_strings[idx].clone())
+                            CellValue::String(self.shared_strings[idx].text.clone())
                         } else {
                             CellValue::Error("Invalid SST index".to_string())
                         };

@@ -1,6 +1,6 @@
 //! Shared strings table writer for XLSB
 
-use crate::xlsb::error::XlsbResult;
+use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::records::record_types;
 use crate::xlsb::writer::RecordWriter;
 use std::collections::HashMap;
@@ -10,6 +10,7 @@ use std::io::Write;
 pub struct MutableSharedStringsWriter {
     strings: Vec<String>,
     string_map: HashMap<String, u32>,
+    total_count: u64,
 }
 
 impl MutableSharedStringsWriter {
@@ -18,6 +19,7 @@ impl MutableSharedStringsWriter {
         MutableSharedStringsWriter {
             strings: Vec::new(),
             string_map: HashMap::new(),
+            total_count: 0,
         }
     }
 
@@ -25,6 +27,7 @@ impl MutableSharedStringsWriter {
     ///
     /// Returns the index of the string (existing or newly added)
     pub fn add_string(&mut self, s: String) -> u32 {
+        self.total_count = self.total_count.saturating_add(1);
         if let Some(&index) = self.string_map.get(&s) {
             index
         } else {
@@ -45,13 +48,30 @@ impl MutableSharedStringsWriter {
         self.strings.is_empty()
     }
 
+    /// Total number of string-cell occurrences added, including duplicates.
+    pub fn total_count(&self) -> u64 {
+        self.total_count
+    }
+
     /// Write shared strings table to binary format
     pub(crate) fn write<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
         // Write BrtBeginSst
         let mut sst_header = Vec::new();
         let mut temp_writer = RecordWriter::new(&mut sst_header);
-        temp_writer.write_u32(self.strings.len() as u32)?; // Total unique strings
-        temp_writer.write_u32(self.strings.len() as u32)?; // Total string count (same for now)
+        let total_count = u32::try_from(self.total_count).map_err(|_| {
+            XlsbError::Encoding("shared-string occurrence count exceeds u32".to_string())
+        })?;
+        let unique_count = u32::try_from(self.strings.len()).map_err(|_| {
+            XlsbError::Encoding("shared-string unique count exceeds u32".to_string())
+        })?;
+        if total_count > 0x7FFF_FFFF || unique_count > total_count {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtBeginSst counts".to_string(),
+                val: format!("total={total_count}, unique={unique_count}"),
+            });
+        }
+        temp_writer.write_u32(total_count)?;
+        temp_writer.write_u32(unique_count)?;
 
         writer.write_record(record_types::BEGIN_SST, &sst_header)?;
 
@@ -126,6 +146,7 @@ mod tests {
         assert_eq!(idx2, 0); // Same index for duplicate
         assert_eq!(idx3, 1);
         assert_eq!(writer.len(), 2); // Only 2 unique strings
+        assert_eq!(writer.total_count(), 3);
     }
 
     #[test]
@@ -157,5 +178,21 @@ mod tests {
 
         assert_eq!(idx, 0);
         assert_eq!(writer.len(), 1);
+    }
+
+    #[test]
+    fn writes_total_and_unique_counts() {
+        let mut table = MutableSharedStringsWriter::new();
+        table.add_string("same".to_string());
+        table.add_string("same".to_string());
+        table.add_string("other".to_string());
+
+        let mut bytes = Vec::new();
+        table.write(&mut RecordWriter::new(&mut bytes)).unwrap();
+        let mut records = crate::xlsb::records::XlsbRecordIter::new(bytes.as_slice());
+        let begin = records.next().unwrap().unwrap();
+        assert_eq!(begin.header.record_type, record_types::BEGIN_SST);
+        assert_eq!(&begin.data[..4], &3u32.to_le_bytes());
+        assert_eq!(&begin.data[4..], &2u32.to_le_bytes());
     }
 }

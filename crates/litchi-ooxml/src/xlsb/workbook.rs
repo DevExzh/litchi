@@ -9,6 +9,7 @@ use crate::xlsb::formula::{
 };
 use crate::xlsb::named_ranges::{NamedRange, validate_defined_name};
 use crate::xlsb::records::{XlsbRecordIter, record_types};
+use crate::xlsb::shared_strings::SharedString;
 use crate::xlsb::styles_table::{CellFormat, StylesTable};
 use crate::xlsb::worksheet::XlsbWorksheet;
 use litchi_core::binary;
@@ -23,7 +24,7 @@ pub struct XlsbWorkbook {
     worksheets: Vec<XlsbWorksheet>,
     worksheet_rel_ids: Vec<Option<String>>,
     formula_context: FormulaResolutionContext,
-    shared_strings: Vec<String>,
+    shared_strings: Vec<SharedString>,
     styles: StylesTable,
     calculation_properties: CalculationProperties,
     is_1904: bool,
@@ -63,6 +64,12 @@ impl XlsbWorkbook {
     /// Workbook style table loaded from `xl/styles.bin`.
     pub fn styles(&self) -> &StylesTable {
         &self.styles
+    }
+
+    /// Unique strings loaded from `xl/sharedStrings.bin`, including rich-text
+    /// and phonetic metadata when present.
+    pub fn shared_strings(&self) -> &[SharedString] {
+        &self.shared_strings
     }
 
     /// Resolve a parsed cell's style reference to its cell XF.
@@ -239,26 +246,92 @@ impl XlsbWorkbook {
     /// Read shared strings from SST
     fn read_shared_strings(
         iter: &mut XlsbRecordIter<impl Read>,
-        strings: &mut Vec<String>,
+        strings: &mut Vec<SharedString>,
     ) -> XlsbResult<()> {
+        let initial_count = strings.len();
+        let mut expected_unique = None;
+        let mut ended = false;
         for record in iter.by_ref() {
             let record = record?;
             match record.header.record_type {
                 record_types::BEGIN_SST => {
-                    // SST header, continue reading
+                    if expected_unique.is_some() {
+                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtBeginSst".to_string(),
+                            val: "duplicate record".to_string(),
+                        });
+                    }
+                    if record.data.len() != 8 {
+                        return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                            expected: 8,
+                            found: record.data.len(),
+                        });
+                    }
+                    let total = binary::read_u32_le_at(&record.data, 0)?;
+                    let unique = binary::read_u32_le_at(&record.data, 4)?;
+                    if total > 0x7FFF_FFFF || unique > total {
+                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtBeginSst counts".to_string(),
+                            val: format!("total={total}, unique={unique}"),
+                        });
+                    }
+                    expected_unique = Some(unique as usize);
                 },
                 record_types::SST_ITEM => {
-                    if let Ok(sst_item) = crate::xlsb::records::SstItemRecord::parse(&record.data) {
-                        strings.push(sst_item.string);
+                    let expected = expected_unique.ok_or_else(|| {
+                        crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtSSTItem".to_string(),
+                            val: "record before BrtBeginSst".to_string(),
+                        }
+                    })?;
+                    let found = strings.len() - initial_count;
+                    if found >= expected {
+                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtSSTItem count".to_string(),
+                            val: format!("more than declared {expected}"),
+                        });
                     }
+                    strings.push(SharedString::parse(&record.data)?);
                 },
                 record_types::END_SST => {
+                    if !record.data.is_empty() {
+                        return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                            expected: 0,
+                            found: record.data.len(),
+                        });
+                    }
+                    let expected = expected_unique.ok_or_else(|| {
+                        crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtEndSst".to_string(),
+                            val: "record before BrtBeginSst".to_string(),
+                        }
+                    })?;
+                    let found = strings.len() - initial_count;
+                    if found != expected {
+                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtSSTItem count".to_string(),
+                            val: format!("declared {expected}, found {found}"),
+                        });
+                    }
+                    ended = true;
                     break;
                 },
                 _ => {
                     // Skip other records
                 },
             }
+        }
+        if expected_unique.is_none() {
+            return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                typ: "SST stream".to_string(),
+                val: "missing BrtBeginSst".to_string(),
+            });
+        }
+        if !ended {
+            return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                typ: "SST stream".to_string(),
+                val: "missing BrtEndSst".to_string(),
+            });
         }
         Ok(())
     }
@@ -357,7 +430,7 @@ impl XlsbWorkbook {
     fn read_worksheet(
         cursor: Cursor<&[u8]>,
         name: String,
-        shared_strings: &[String],
+        shared_strings: &[SharedString],
         formula_context: &FormulaResolutionContext,
         sheet_index: usize,
         cell_xf_count: usize,
@@ -830,6 +903,14 @@ mod tests {
         workbook.load_external_book(&uri)
     }
 
+    fn parse_shared_string_records(records: &[(u16, Vec<u8>)]) -> XlsbResult<Vec<SharedString>> {
+        let data = external_link_records(records);
+        let mut iter = XlsbRecordIter::new(data.as_slice());
+        let mut strings = Vec::new();
+        XlsbWorkbook::read_shared_strings(&mut iter, &mut strings)?;
+        Ok(strings)
+    }
+
     fn external_workbook_records() -> Vec<(u16, Vec<u8>)> {
         let mut begin = 0u16.to_le_bytes().to_vec();
         begin.extend_from_slice(&wide_string("rIdPath"));
@@ -897,6 +978,114 @@ mod tests {
             Some(litchi_core::sheet::CellValue::Float(11.0))
         ));
         assert!(formula_cells.iter().all(|cell| !cell.3.is_empty()));
+    }
+
+    #[test]
+    fn reads_rich_and_phonetic_shared_strings_from_reference_fixtures_when_available() {
+        let rich_path = std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/poi/test-data/spreadsheet/sample.xlsb"
+        ));
+        if rich_path.exists() {
+            let workbook = XlsbWorkbook::new(File::open(rich_path).unwrap()).unwrap();
+            let rich = workbook
+                .shared_strings()
+                .iter()
+                .find(|value| !value.runs.is_empty())
+                .expect("sample.xlsb should contain rich shared strings");
+            assert_eq!(rich.text, "hello, xssf");
+            assert_eq!(rich.runs[0].character_index, 0);
+            let mut found_cell_text = false;
+            for index in 0..workbook.formula_context.worksheet_names.len() {
+                let worksheet = workbook.get_worksheet(index).unwrap();
+                let Some((min_row, min_col, max_row, max_col)) = worksheet.dimensions() else {
+                    continue;
+                };
+                for row in min_row..=max_row {
+                    for col in min_col..=max_col {
+                        found_cell_text |= worksheet.get_cell(row, col).is_some_and(|cell| {
+                            matches!(cell.value(), litchi_core::sheet::CellValue::String(value) if value == "hello, xssf")
+                        });
+                    }
+                }
+            }
+            assert!(
+                found_cell_text,
+                "rich SST text should remain the cell value"
+            );
+        }
+
+        let phonetic_path = std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/poi/test-data/spreadsheet/51519.xlsb"
+        ));
+        if phonetic_path.exists() {
+            let workbook = XlsbWorkbook::new(File::open(phonetic_path).unwrap()).unwrap();
+            let phonetic = workbook
+                .shared_strings()
+                .iter()
+                .find_map(|value| {
+                    value
+                        .phonetic
+                        .as_ref()
+                        .filter(|value| !value.runs.is_empty())
+                })
+                .expect("51519.xlsb should contain phonetic shared strings");
+            assert_eq!(phonetic.font_id, 1);
+            assert_eq!(
+                phonetic.phonetic_type,
+                crate::xlsb::PhoneticType::FullWidthKatakana
+            );
+            assert_eq!(phonetic.alignment, crate::xlsb::PhoneticAlignment::Left);
+        }
+    }
+
+    #[test]
+    fn validates_shared_string_stream_structure_and_counts() {
+        let mut item = vec![0];
+        item.extend_from_slice(&wide_string("value"));
+        let valid = vec![
+            (
+                record_types::BEGIN_SST,
+                [1u32.to_le_bytes(), 1u32.to_le_bytes()].concat(),
+            ),
+            (record_types::SST_ITEM, item.clone()),
+            (record_types::END_SST, Vec::new()),
+        ];
+        let strings = parse_shared_string_records(&valid).unwrap();
+        assert_eq!(strings[0].text, "value");
+
+        let invalid_counts = vec![(
+            record_types::BEGIN_SST,
+            [0u32.to_le_bytes(), 1u32.to_le_bytes()].concat(),
+        )];
+        assert!(matches!(
+            parse_shared_string_records(&invalid_counts),
+            Err(crate::xlsb::error::XlsbError::Unrecognized { .. })
+        ));
+
+        let missing_item = vec![
+            (
+                record_types::BEGIN_SST,
+                [2u32.to_le_bytes(), 2u32.to_le_bytes()].concat(),
+            ),
+            (record_types::SST_ITEM, item),
+            (record_types::END_SST, Vec::new()),
+        ];
+        assert!(matches!(
+            parse_shared_string_records(&missing_item),
+            Err(crate::xlsb::error::XlsbError::Unrecognized { .. })
+        ));
+
+        let malformed_item = vec![
+            (
+                record_types::BEGIN_SST,
+                [1u32.to_le_bytes(), 1u32.to_le_bytes()].concat(),
+            ),
+            (record_types::SST_ITEM, vec![1]),
+            (record_types::END_SST, Vec::new()),
+        ];
+        assert!(parse_shared_string_records(&malformed_item).is_err());
     }
 
     #[test]
