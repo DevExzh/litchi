@@ -39,7 +39,13 @@ pub fn column_name_to_index(name: &str) -> Option<u32> {
 
 /// Convert row and column to Excel cell reference (e.g., "A1", "B2")
 pub fn cell_reference(row: u32, col: u32) -> String {
-    format!("{}{}", column_index_to_name(col + 1), row + 1)
+    let Some(column) = col.checked_add(1) else {
+        return format!("R{row}C{col}");
+    };
+    let Some(row) = row.checked_add(1) else {
+        return format!("R{row}C{col}");
+    };
+    format!("{}{}", column_index_to_name(column), row)
 }
 
 /// Parse Excel cell reference to row and column indices
@@ -75,6 +81,9 @@ pub fn parse_cell_reference(ref_str: &str) -> XlsbResult<(u32, u32)> {
     let row: u32 = row_str
         .parse()
         .map_err(|_| XlsbError::InvalidCellReference(ref_str.to_string()))?;
+    if row == 0 {
+        return Err(XlsbError::InvalidCellReference(ref_str));
+    }
 
     Ok((row - 1, col)) // Make 0-based
 }
@@ -139,5 +148,6 @@ mod tests {
         assert!(parse_cell_reference("1A").is_err()); // invalid
         assert!(parse_cell_reference("A").is_err()); // no row
         assert!(parse_cell_reference("1").is_err()); // no column
+        assert!(parse_cell_reference("A0").is_err()); // rows are 1-based in A1 notation
     }
 }

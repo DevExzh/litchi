@@ -3,8 +3,11 @@
 use crate::xlsb::comments::Comment;
 use crate::xlsb::conditional_formatting::ConditionalFormatting;
 use crate::xlsb::data_validation::DataValidation;
-use crate::xlsb::error::XlsbResult;
-use crate::xlsb::formula::{CellParsedFormula, FormulaCompiler};
+use crate::xlsb::error::{XlsbError, XlsbResult};
+use crate::xlsb::formula::{
+    CellParsedFormula, FormulaCompiler, FormulaConverter, FormulaGroup, FormulaGroupKind,
+    FormulaParser, FormulaRange,
+};
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
 use crate::xlsb::records::record_types;
@@ -110,6 +113,9 @@ pub struct MutableXlsbWorksheet {
     data_validations: Vec<DataValidation>,
     /// Conditional formatting rules.
     conditional_formattings: Vec<ConditionalFormatting>,
+    /// Array and shared formula definitions. Cell records contain only a
+    /// `PtgExp` reference to one of these definitions.
+    formula_groups: Vec<FormulaGroup>,
 }
 
 impl MutableXlsbWorksheet {
@@ -137,6 +143,7 @@ impl MutableXlsbWorksheet {
             sheet_protection: None,
             data_validations: Vec::new(),
             conditional_formattings: Vec::new(),
+            formula_groups: Vec::new(),
         }
     }
 
@@ -174,6 +181,7 @@ impl MutableXlsbWorksheet {
         value: V,
         style: u32,
     ) {
+        self.remove_formula_groups_containing(row, col);
         let cell_data = CellData {
             value: value.into(),
             style,
@@ -200,6 +208,7 @@ impl MutableXlsbWorksheet {
         always_calculate: bool,
         style: u32,
     ) {
+        self.remove_formula_groups_containing(row, col);
         let cell_data = CellData {
             value: CellValue::Formula {
                 formula: String::new(),
@@ -214,6 +223,191 @@ impl MutableXlsbWorksheet {
         self.cells.insert((row, col), cell_data);
         self.max_row = self.max_row.max(row);
         self.max_col = self.max_col.max(col);
+    }
+
+    /// Set an XLSB array formula over an inclusive, 0-based cell range.
+    ///
+    /// Existing values in the range are retained as cached formula results.
+    /// Cells without values are marked for recalculation.
+    pub fn set_array_formula(
+        &mut self,
+        row_first: u32,
+        col_first: u32,
+        row_last: u32,
+        col_last: u32,
+        formula: &str,
+    ) -> XlsbResult<()> {
+        let range = FormulaRange::new(row_first, row_last, col_first, col_last)?;
+        let definition = FormulaCompiler::compile(formula)?;
+        let group = FormulaGroup {
+            kind: FormulaGroupKind::Array,
+            range,
+            formula: definition,
+            always_calculate: true,
+        };
+        self.install_formula_group(group, Some(formula))
+    }
+
+    /// Set an XLSB shared formula over an inclusive, 0-based cell range.
+    ///
+    /// Relative references are encoded once relative to the top-left cell and
+    /// are expanded for each cell when the workbook is read.
+    pub fn set_shared_formula(
+        &mut self,
+        row_first: u32,
+        col_first: u32,
+        row_last: u32,
+        col_last: u32,
+        formula: &str,
+    ) -> XlsbResult<()> {
+        let range = FormulaRange::new(row_first, row_last, col_first, col_last)?;
+        let definition = FormulaCompiler::compile_shared(formula, row_first, col_first)?;
+        let group = FormulaGroup {
+            kind: FormulaGroupKind::Shared,
+            range,
+            formula: definition,
+            always_calculate: false,
+        };
+        self.install_formula_group(group, Some(formula))
+    }
+
+    /// Set an array or shared formula from an already encoded definition.
+    ///
+    /// This is the lossless path for grouped formulas containing tokens that
+    /// the text compiler or converter does not understand. Existing values in
+    /// the group range are retained as cached results.
+    pub fn set_formula_group_binary(&mut self, group: FormulaGroup) -> XlsbResult<()> {
+        // Validate both the range and parsed-formula framing before mutating
+        // the worksheet.
+        let _ = group.to_record_data()?;
+        if group.formula.exp_cell()?.is_some() {
+            return Err(XlsbError::InvalidFormula(
+                "array/shared formula definition cannot contain PtgExp".to_string(),
+            ));
+        }
+        self.install_formula_group(group, None)
+    }
+
+    fn install_formula_group(
+        &mut self,
+        group: FormulaGroup,
+        anchor_formula: Option<&str>,
+    ) -> XlsbResult<()> {
+        if let Some(index) = self
+            .formula_groups
+            .iter()
+            .position(|existing| existing.range.top_left() == group.range.top_left())
+        {
+            let replaced = self.formula_groups.remove(index);
+            if replaced.kind == FormulaGroupKind::Array {
+                self.normalize_array_formula_ranges(&[replaced.range.to_a1()]);
+            }
+        }
+
+        let range_text = group.range.to_a1();
+        for row in group.range.row_first..=group.range.row_last {
+            for col in group.range.col_first..=group.range.col_last {
+                let cached_value = self
+                    .cells
+                    .get(&(row, col))
+                    .and_then(|cell| match &cell.value {
+                        CellValue::Empty => None,
+                        CellValue::Formula { cached_value, .. } => cached_value.clone(),
+                        value => Some(Box::new(value.clone())),
+                    });
+                let style = self.cells.get(&(row, col)).map_or(0, |cell| cell.style);
+                let decoded = || -> XlsbResult<String> {
+                    let tokens = match group.kind {
+                        FormulaGroupKind::Array => {
+                            FormulaParser::new(&group.formula.rgce).parse()?
+                        },
+                        FormulaGroupKind::Shared => {
+                            FormulaParser::with_base_cell(&group.formula.rgce, row, col).parse()?
+                        },
+                    };
+                    FormulaConverter::try_tokens_to_string(&tokens)
+                };
+                let formula = match (group.kind, anchor_formula) {
+                    (FormulaGroupKind::Array, Some(formula)) => formula.to_string(),
+                    (FormulaGroupKind::Shared, _) => decoded().or_else(|error| {
+                        if anchor_formula.is_none() {
+                            Ok(String::new())
+                        } else {
+                            Err(error)
+                        }
+                    })?,
+                    (FormulaGroupKind::Array, None) => decoded().unwrap_or_default(),
+                };
+                self.cells.insert(
+                    (row, col),
+                    CellData {
+                        value: CellValue::Formula {
+                            formula,
+                            cached_value,
+                            is_array: group.kind == FormulaGroupKind::Array,
+                            array_range: (group.kind == FormulaGroupKind::Array)
+                                .then(|| range_text.clone()),
+                        },
+                        style,
+                        formula_binary: None,
+                        formula_flags: 0,
+                    },
+                );
+            }
+        }
+        self.max_row = self.max_row.max(group.range.row_last);
+        self.max_col = self.max_col.max(group.range.col_last);
+        self.formula_groups.push(group);
+        Ok(())
+    }
+
+    fn remove_formula_groups_containing(&mut self, row: u32, col: u32) {
+        let removed_array_ranges: Vec<String> = self
+            .formula_groups
+            .iter()
+            .filter(|group| group.kind == FormulaGroupKind::Array && group.range.contains(row, col))
+            .map(|group| group.range.to_a1())
+            .collect();
+        self.formula_groups
+            .retain(|group| !group.range.contains(row, col));
+        if removed_array_ranges.is_empty() {
+            return;
+        }
+        self.normalize_array_formula_ranges(&removed_array_ranges);
+    }
+
+    fn normalize_array_formula_ranges(&mut self, ranges: &[String]) {
+        for cell in self.cells.values_mut() {
+            if let CellValue::Formula {
+                is_array,
+                array_range,
+                ..
+            } = &mut cell.value
+            {
+                if array_range
+                    .as_ref()
+                    .is_some_and(|range| ranges.contains(range))
+                {
+                    *is_array = false;
+                    *array_range = None;
+                }
+            }
+        }
+    }
+
+    fn dissolve_formula_groups_for_structure_change(&mut self) {
+        self.formula_groups.clear();
+        for cell in self.cells.values_mut() {
+            if let CellValue::Formula {
+                is_array,
+                array_range,
+                ..
+            } = &mut cell.value
+            {
+                *is_array = false;
+                *array_range = None;
+            }
+        }
     }
 
     /// Get a cell value
@@ -234,6 +428,7 @@ impl MutableXlsbWorksheet {
     /// assert!(sheet.get_cell(0, 0).is_none());
     /// ```
     pub fn delete_cell(&mut self, row: u32, col: u32) -> Option<CellValue> {
+        self.remove_formula_groups_containing(row, col);
         self.cells.remove(&(row, col)).map(|c| c.value)
     }
 
@@ -251,6 +446,7 @@ impl MutableXlsbWorksheet {
         self.sheet_protection = None;
         self.data_validations.clear();
         self.conditional_formattings.clear();
+        self.formula_groups.clear();
     }
 
     /// Set a custom column width (in character units) for a 0-based column.
@@ -454,6 +650,7 @@ impl MutableXlsbWorksheet {
     /// assert_eq!(sheet.get_cell(1, 0).and_then(|v| v.as_str()), Some("Row 2"));
     /// ```
     pub fn delete_row(&mut self, row: u32) {
+        self.dissolve_formula_groups_for_structure_change();
         // Remove all cells in the row
         self.cells.retain(|(r, _), _| *r != row);
 
@@ -476,6 +673,7 @@ impl MutableXlsbWorksheet {
 
     /// Delete a column (shifts remaining columns left)
     pub fn delete_column(&mut self, col: u32) {
+        self.dissolve_formula_groups_for_structure_change();
         // Remove all cells in the column
         self.cells.retain(|(_, c), _| *c != col);
 
@@ -498,6 +696,7 @@ impl MutableXlsbWorksheet {
 
     /// Insert a row (shifts existing rows down)
     pub fn insert_row(&mut self, row: u32) {
+        self.dissolve_formula_groups_for_structure_change();
         // Shift rows at and after the insert position down
         let cells_to_move: Vec<_> = self
             .cells
@@ -517,6 +716,7 @@ impl MutableXlsbWorksheet {
 
     /// Insert a column (shifts existing columns right)
     pub fn insert_column(&mut self, col: u32) {
+        self.dissolve_formula_groups_for_structure_change();
         // Shift columns at and after the insert position right
         let cells_to_move: Vec<_> = self
             .cells
@@ -739,6 +939,12 @@ impl MutableXlsbWorksheet {
         let mut temp_writer = RecordWriter::new(&mut data);
 
         if let Some((min_row, min_col, max_row, max_col)) = self.dimensions() {
+            let (max_row, max_col) = self
+                .formula_groups_for_write()?
+                .iter()
+                .fold((max_row, max_col), |(row, col), group| {
+                    (row.max(group.range.row_last), col.max(group.range.col_last))
+                });
             temp_writer.write_u32(min_row)?;
             temp_writer.write_u32(max_row)?;
             temp_writer.write_u32(min_col)?;
@@ -761,19 +967,165 @@ impl MutableXlsbWorksheet {
         writer: &mut RecordWriter<W>,
         shared_strings: &mut crate::xlsb::writer::MutableSharedStringsWriter,
     ) -> XlsbResult<()> {
+        let formula_groups = self.formula_groups_for_write()?;
+        if formula_groups.is_empty() {
+            return self.write_cells_from(writer, shared_strings, &self.cells, &formula_groups);
+        }
+
+        // Grouped formulas require a formula cell record at every position in
+        // their range. Materialize only for this uncommon path, keeping the
+        // ordinary worksheet writer allocation-free.
+        let mut cells = self.cells.clone();
+        for group in &formula_groups {
+            for row in group.range.row_first..=group.range.row_last {
+                for col in group.range.col_first..=group.range.col_last {
+                    cells.entry((row, col)).or_insert_with(|| CellData {
+                        value: CellValue::Empty,
+                        style: 0,
+                        formula_binary: None,
+                        formula_flags: 0,
+                    });
+                }
+            }
+        }
+        self.write_cells_from(writer, shared_strings, &cells, &formula_groups)
+    }
+
+    fn write_cells_from<W: Write>(
+        &self,
+        writer: &mut RecordWriter<W>,
+        shared_strings: &mut crate::xlsb::writer::MutableSharedStringsWriter,
+        cells: &BTreeMap<(u32, u32), CellData>,
+        formula_groups: &[FormulaGroup],
+    ) -> XlsbResult<()> {
         let mut current_row: Option<u32> = None;
 
-        for ((row, col), cell_data) in &self.cells {
+        for ((row, col), cell_data) in cells {
             // Write row header if row changed
             if current_row != Some(*row) {
-                self.write_row_header(writer, *row)?;
+                self.write_row_header(writer, *row, cells)?;
                 current_row = Some(*row);
             }
 
-            // Write cell
-            self.write_cell(writer, *row, *col, cell_data, shared_strings)?;
+            if let Some(group) = Self::formula_group_for_cell(formula_groups, *row, *col) {
+                self.write_grouped_formula_cell(writer, *row, *col, cell_data, group)?;
+            } else {
+                self.write_cell(writer, *row, *col, cell_data, shared_strings)?;
+            }
         }
 
+        Ok(())
+    }
+
+    fn formula_groups_for_write(&self) -> XlsbResult<Vec<FormulaGroup>> {
+        let mut groups = self.formula_groups.clone();
+        for (&position, cell) in &self.cells {
+            let CellValue::Formula {
+                formula,
+                cached_value,
+                is_array: true,
+                array_range,
+            } = &cell.value
+            else {
+                continue;
+            };
+            let range_text = array_range.as_deref().ok_or_else(|| {
+                XlsbError::InvalidFormula(format!(
+                    "array formula at {} has no array range",
+                    crate::xlsb::utils::cell_reference(position.0, position.1)
+                ))
+            })?;
+            let range = FormulaRange::parse_a1(range_text)?;
+            if range.top_left() != position {
+                continue;
+            }
+            if groups
+                .iter()
+                .any(|group| group.kind == FormulaGroupKind::Array && group.range == range)
+            {
+                continue;
+            }
+            groups.push(FormulaGroup {
+                kind: FormulaGroupKind::Array,
+                range,
+                formula: FormulaCompiler::compile(formula)?,
+                always_calculate: cached_value.is_none(),
+            });
+        }
+
+        for (index, group) in groups.iter().enumerate() {
+            if group.formula.exp_cell()?.is_some() {
+                return Err(XlsbError::InvalidFormula(
+                    "array/shared formula definition cannot contain PtgExp".to_string(),
+                ));
+            }
+            if groups[..index]
+                .iter()
+                .any(|existing| existing.range.top_left() == group.range.top_left())
+            {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "multiple formula definitions cannot share anchor {}",
+                    crate::xlsb::utils::cell_reference(
+                        group.range.row_first,
+                        group.range.col_first
+                    )
+                )));
+            }
+        }
+        Ok(groups)
+    }
+
+    fn formula_group_for_cell(
+        groups: &[FormulaGroup],
+        row: u32,
+        col: u32,
+    ) -> Option<&FormulaGroup> {
+        groups
+            .iter()
+            .find(|group| group.range.top_left() == (row, col))
+            .or_else(|| {
+                groups
+                    .iter()
+                    .filter(|group| group.range.contains(row, col))
+                    .min_by_key(|group| {
+                        u64::from(group.range.row_last - group.range.row_first + 1)
+                            * u64::from(group.range.col_last - group.range.col_first + 1)
+                    })
+            })
+    }
+
+    fn write_grouped_formula_cell<W: Write>(
+        &self,
+        writer: &mut RecordWriter<W>,
+        row: u32,
+        col: u32,
+        cell_data: &CellData,
+        group: &FormulaGroup,
+    ) -> XlsbResult<()> {
+        let cached_value = match &cell_data.value {
+            CellValue::Formula { cached_value, .. } => cached_value.as_deref(),
+            CellValue::Empty => None,
+            value => Some(value),
+        };
+        let placeholder = CellParsedFormula::exp(group.range.row_first, group.range.col_first)?;
+        self.write_formula_cell(
+            writer,
+            col,
+            cell_data.style,
+            "",
+            cached_value,
+            false,
+            Some(&placeholder),
+            cell_data.formula_flags,
+        )?;
+
+        if group.range.top_left() == (row, col) {
+            let record_type = match group.kind {
+                FormulaGroupKind::Array => record_types::ARR_FMLA,
+                FormulaGroupKind::Shared => record_types::SHR_FMLA,
+            };
+            writer.write_record(record_type, &group.to_record_data()?)?;
+        }
         Ok(())
     }
 
@@ -789,7 +1141,12 @@ impl MutableXlsbWorksheet {
     /// - ccolspan (4 bytes): number of BrtColSpan elements
     /// - rgBrtColspan (variable): array of BrtColSpan, each 8 bytes
     ///   (colFirst (u32) + colLast (u32))
-    fn write_row_header<W: Write>(&self, writer: &mut RecordWriter<W>, row: u32) -> XlsbResult<()> {
+    fn write_row_header<W: Write>(
+        &self,
+        writer: &mut RecordWriter<W>,
+        row: u32,
+        cells: &BTreeMap<(u32, u32), CellData>,
+    ) -> XlsbResult<()> {
         let mut data = Vec::new();
         let mut temp_writer = RecordWriter::new(&mut data);
 
@@ -830,8 +1187,7 @@ impl MutableXlsbWorksheet {
         temp_writer.write_u8(0)?;
 
         // Collect all columns that have cells in this row (BTreeMap preserves sorted order)
-        let cells_in_row: Vec<u32> = self
-            .cells
+        let cells_in_row: Vec<u32> = cells
             .keys()
             .filter(|(r, _)| *r == row)
             .map(|(_, c)| *c)
@@ -1695,5 +2051,82 @@ mod tests {
 
         // Two-byte record header, then Cell (8) + cached xnum (8).
         assert_eq!(u16::from_le_bytes([buffer[18], buffer[19]]), 0x0002);
+    }
+
+    #[test]
+    fn writes_shared_definition_immediately_after_anchor_and_exp_followers() {
+        use crate::xlsb::records::RecordIter;
+        use std::io::Cursor;
+
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        sheet.set_cell(2, 2, 10.0);
+        sheet.set_cell(3, 2, 20.0);
+        sheet.set_shared_formula(2, 2, 3, 2, "B3").unwrap();
+
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+        let mut shared_strings = crate::xlsb::writer::MutableSharedStringsWriter::new();
+        sheet.write_cells(&mut writer, &mut shared_strings).unwrap();
+
+        let mut iter = RecordIter::new(Cursor::new(buffer));
+        let mut records = Vec::new();
+        while let Ok(record_type) = iter.read_type() {
+            let mut data = Vec::new();
+            iter.fill_buffer(&mut data).unwrap();
+            records.push((record_type, data));
+        }
+        assert_eq!(
+            records.iter().map(|record| record.0).collect::<Vec<_>>(),
+            vec![
+                record_types::ROW_HDR,
+                record_types::FMLA_NUM,
+                record_types::SHR_FMLA,
+                record_types::ROW_HDR,
+                record_types::FMLA_NUM,
+            ]
+        );
+
+        let group = FormulaGroup::parse_shared(&records[2].1).unwrap();
+        assert_eq!(group.range.to_a1(), "C3:C4");
+        for formula_record in [&records[1].1, &records[4].1] {
+            let (placeholder, consumed) = CellParsedFormula::parse(&formula_record[18..]).unwrap();
+            assert_eq!(18 + consumed, formula_record.len());
+            assert_eq!(placeholder.exp_cell().unwrap(), Some((2, 2)));
+        }
+    }
+
+    #[test]
+    fn writes_unsupported_group_definition_losslessly() {
+        use crate::xlsb::records::RecordIter;
+        use std::io::Cursor;
+
+        let group = FormulaGroup {
+            kind: FormulaGroupKind::Array,
+            range: FormulaRange::new(8, 8, 2, 2).unwrap(),
+            formula: CellParsedFormula {
+                rgce: vec![0x23, 0x02, 0x00, 0x00, 0x00, 0x42, 0x01, 0xFF, 0x00],
+                rgcb: Vec::new(),
+            },
+            always_calculate: true,
+        };
+        let expected = group.to_record_data().unwrap();
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        sheet.set_formula_group_binary(group).unwrap();
+
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+        let mut shared_strings = crate::xlsb::writer::MutableSharedStringsWriter::new();
+        sheet.write_cells(&mut writer, &mut shared_strings).unwrap();
+
+        let mut iter = RecordIter::new(Cursor::new(buffer));
+        let mut definition = None;
+        while let Ok(record_type) = iter.read_type() {
+            let mut data = Vec::new();
+            iter.fill_buffer(&mut data).unwrap();
+            if record_type == record_types::ARR_FMLA {
+                definition = Some(data);
+            }
+        }
+        assert_eq!(definition.as_deref(), Some(expected.as_slice()));
     }
 }

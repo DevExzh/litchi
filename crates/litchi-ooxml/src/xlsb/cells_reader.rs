@@ -2,13 +2,21 @@
 
 use crate::xlsb::cell::XlsbCell;
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::formula::CellParsedFormula;
+use crate::xlsb::formula::{CellParsedFormula, FormulaGroup, FormulaGroupKind};
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
-use crate::xlsb::records::RecordIter;
+use crate::xlsb::records::{RecordIter, record_types};
 use litchi_core::binary;
 use litchi_core::sheet::CellValue;
 use std::io::{Read, Seek};
+use std::sync::Arc;
+
+struct ParsedFormulaCell {
+    col: u32,
+    cached_value: CellValue,
+    formula: CellParsedFormula,
+    flags: u16,
+}
 
 /// Dimensions of a worksheet
 #[derive(Debug, Clone, Copy)]
@@ -36,6 +44,8 @@ where
     dimensions: Dimensions,
     current_row: u32,
     buf: Vec<u8>,
+    pending_record: Option<(u16, Vec<u8>)>,
+    formula_groups: Vec<Arc<FormulaGroup>>,
     /// Merged cells found in the worksheet
     pub merged_cells: Vec<MergedCell>,
     /// Hyperlinks found in the worksheet
@@ -78,6 +88,8 @@ where
             dimensions,
             current_row: 0,
             buf,
+            pending_record: None,
+            formula_groups: Vec::new(),
             merged_cells: Vec::new(),
             hyperlinks: Vec::new(),
         })
@@ -91,8 +103,14 @@ where
     pub fn next_cell(&mut self) -> XlsbResult<Option<XlsbCell>> {
         loop {
             self.buf.clear();
-            let typ = self.iter.read_type()?;
-            let _ = self.iter.fill_buffer(&mut self.buf)?;
+            let typ = if let Some((typ, data)) = self.pending_record.take() {
+                self.buf = data;
+                typ
+            } else {
+                let typ = self.iter.read_type()?;
+                let _ = self.iter.fill_buffer(&mut self.buf)?;
+                typ
+            };
 
             if typ == 0x0092 {
                 // BrtEndSheetData - continue to read advanced features
@@ -197,9 +215,9 @@ where
                     let col = binary::read_u32_le_at(&self.buf, 0)?;
                     let (string, consumed) =
                         super::records::wide_str_with_len(&self.buf[8..])?;
-                    return self
-                        .finish_formula_cell(col, CellValue::String(string), 8 + consumed)
-                        .map(Some);
+                    let parsed =
+                        self.parse_formula_cell(col, CellValue::String(string), 8 + consumed)?;
+                    return self.resolve_formula_record(parsed).map(Some);
                 },
                 0x0009 => {
                     // BrtFmlaNum - formula with numeric result
@@ -211,9 +229,9 @@ where
                     }
                     let col = binary::read_u32_le_at(&self.buf, 0)?;
                     let num_value = binary::read_f64_le_at(&self.buf, 8)?;
-                    return self
-                        .finish_formula_cell(col, CellValue::Float(num_value), 16)
-                        .map(Some);
+                    let parsed =
+                        self.parse_formula_cell(col, CellValue::Float(num_value), 16)?;
+                    return self.resolve_formula_record(parsed).map(Some);
                 },
                 0x000A => {
                     // BrtFmlaBool - formula with boolean result
@@ -225,9 +243,8 @@ where
                     }
                     let col = binary::read_u32_le_at(&self.buf, 0)?;
                     let bool_value = self.buf[8] != 0;
-                    return self
-                        .finish_formula_cell(col, CellValue::Bool(bool_value), 9)
-                        .map(Some);
+                    let parsed = self.parse_formula_cell(col, CellValue::Bool(bool_value), 9)?;
+                    return self.resolve_formula_record(parsed).map(Some);
                 },
                 0x000B => {
                     // BrtFmlaError - formula with error result
@@ -239,13 +256,18 @@ where
                     }
                     let col = binary::read_u32_le_at(&self.buf, 0)?;
                     let error_msg = Self::error_text(self.buf[8]);
-                    return self
-                        .finish_formula_cell(
-                            col,
-                            CellValue::Error(error_msg.to_string()),
-                            9,
-                        )
-                        .map(Some);
+                    let parsed = self.parse_formula_cell(
+                        col,
+                        CellValue::Error(error_msg.to_string()),
+                        9,
+                    )?;
+                    return self.resolve_formula_record(parsed).map(Some);
+                },
+                record_types::ARR_FMLA | record_types::SHR_FMLA => {
+                    return Err(XlsbError::InvalidFormula(
+                        "array/shared formula definition is not immediately preceded by a formula cell"
+                            .to_string(),
+                    ));
                 },
                 _ => {
                     // Skip unknown records
@@ -267,12 +289,12 @@ where
         }
     }
 
-    fn finish_formula_cell(
+    fn parse_formula_cell(
         &self,
         col: u32,
         cached_value: CellValue,
         flags_offset: usize,
-    ) -> XlsbResult<XlsbCell> {
+    ) -> XlsbResult<ParsedFormulaCell> {
         let formula_offset = flags_offset.checked_add(2).ok_or_else(|| {
             XlsbError::InvalidFormula("formula record offset overflow".to_string())
         })?;
@@ -283,6 +305,11 @@ where
             });
         }
         let flags = binary::read_u16_le_at(&self.buf, flags_offset)?;
+        if flags & !0x0002 != 0 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "invalid GrbitFmla flags 0x{flags:04X}"
+            )));
+        }
         let (formula, consumed) = CellParsedFormula::parse(&self.buf[formula_offset..])?;
         if formula_offset + consumed != self.buf.len() {
             return Err(XlsbError::InvalidFormula(format!(
@@ -290,13 +317,106 @@ where
                 self.buf.len() - formula_offset - consumed
             )));
         }
-        Ok(XlsbCell::new_formula_binary(
-            self.current_row,
+        Ok(ParsedFormulaCell {
             col,
             cached_value,
             formula,
             flags,
-        ))
+        })
+    }
+
+    fn resolve_formula_record(&mut self, parsed: ParsedFormulaCell) -> XlsbResult<XlsbCell> {
+        let position = (self.current_row, parsed.col);
+        let exp_cell = parsed.formula.exp_cell()?;
+
+        let next_type = self.iter.read_type()?;
+        let mut next_data = Vec::new();
+        let _ = self.iter.fill_buffer(&mut next_data)?;
+        let new_group = match next_type {
+            record_types::ARR_FMLA => Some(FormulaGroup::parse_array(&next_data)?),
+            record_types::SHR_FMLA => Some(FormulaGroup::parse_shared(&next_data)?),
+            _ => {
+                self.pending_record = Some((next_type, next_data));
+                None
+            },
+        };
+
+        let group = if let Some(group) = new_group {
+            if exp_cell.is_none() {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "{:?} formula definition is not preceded by PtgExp",
+                    group.kind
+                )));
+            }
+            if exp_cell != Some(position) {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "group definition at ({}, {}) is referenced by PtgExp ({}, {})",
+                    position.0,
+                    position.1,
+                    exp_cell.map_or(u32::MAX, |target| target.0),
+                    exp_cell.map_or(u32::MAX, |target| target.1)
+                )));
+            }
+            if group.formula.rgce.first() == Some(&crate::xlsb::formula::ptg_types::PTG_EXP) {
+                return Err(XlsbError::InvalidFormula(
+                    "array/shared formula definition cannot contain PtgExp".to_string(),
+                ));
+            }
+            match group.kind {
+                FormulaGroupKind::Array if group.range.top_left() != position => {
+                    return Err(XlsbError::InvalidFormula(format!(
+                        "BrtArrFmla range {} is not anchored at {}",
+                        group.range.to_a1(),
+                        crate::xlsb::utils::cell_reference(position.0, position.1)
+                    )));
+                },
+                FormulaGroupKind::Shared if group.range.top_left() != position => {
+                    return Err(XlsbError::InvalidFormula(format!(
+                        "BrtShrFmla range {} is not anchored at {}",
+                        group.range.to_a1(),
+                        crate::xlsb::utils::cell_reference(position.0, position.1)
+                    )));
+                },
+                _ => {},
+            }
+            let group = Arc::new(group);
+            self.formula_groups.push(Arc::clone(&group));
+            Some(group)
+        } else if let Some(target) = exp_cell {
+            self.formula_groups
+                .iter()
+                .rev()
+                .find(|group| {
+                    group.range.top_left() == target && group.range.contains(position.0, position.1)
+                })
+                .cloned()
+        } else {
+            None
+        };
+
+        if let Some(group) = group {
+            Ok(XlsbCell::new_grouped_formula(
+                position.0,
+                position.1,
+                parsed.cached_value,
+                parsed.formula,
+                parsed.flags,
+                group,
+            ))
+        } else if exp_cell.is_some() {
+            Err(XlsbError::InvalidFormula(format!(
+                "PtgExp cell {} has no array/shared formula definition",
+                crate::xlsb::utils::cell_reference(position.0, position.1)
+            )))
+        } else {
+            Ok(XlsbCell::new_formula_binary(
+                position.0,
+                position.1,
+                parsed.cached_value,
+                parsed.formula,
+                parsed.flags,
+            ))
+        }
     }
 
     fn error_text(error_code: u8) -> &'static str {

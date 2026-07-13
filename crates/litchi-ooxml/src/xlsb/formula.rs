@@ -31,6 +31,87 @@ use litchi_core::binary;
 /// 16,385 bytes.
 pub const MAX_CELL_FORMULA_BYTES: usize = 16_384;
 
+/// Inclusive worksheet range used by array and shared formulas.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FormulaRange {
+    pub row_first: u32,
+    pub row_last: u32,
+    pub col_first: u32,
+    pub col_last: u32,
+}
+
+impl FormulaRange {
+    pub fn new(row_first: u32, row_last: u32, col_first: u32, col_last: u32) -> XlsbResult<Self> {
+        let range = Self {
+            row_first,
+            row_last,
+            col_first,
+            col_last,
+        };
+        range.validate()?;
+        Ok(range)
+    }
+
+    pub fn parse_a1(value: &str) -> XlsbResult<Self> {
+        let (first, last) = value.split_once(':').unwrap_or((value, value));
+        let (row_first, col_first) = crate::xlsb::utils::parse_cell_reference(first.trim())?;
+        let (row_last, col_last) = crate::xlsb::utils::parse_cell_reference(last.trim())?;
+        Self::new(row_first, row_last, col_first, col_last)
+    }
+
+    pub fn parse_binary(data: &[u8]) -> XlsbResult<Self> {
+        if data.len() < 16 {
+            return Err(XlsbError::InvalidLength {
+                expected: 16,
+                found: data.len(),
+            });
+        }
+        Self::new(
+            binary::read_u32_le_at(data, 0)?,
+            binary::read_u32_le_at(data, 4)?,
+            binary::read_u32_le_at(data, 8)?,
+            binary::read_u32_le_at(data, 12)?,
+        )
+    }
+
+    pub fn to_binary(self) -> [u8; 16] {
+        let mut bytes = [0_u8; 16];
+        bytes[0..4].copy_from_slice(&self.row_first.to_le_bytes());
+        bytes[4..8].copy_from_slice(&self.row_last.to_le_bytes());
+        bytes[8..12].copy_from_slice(&self.col_first.to_le_bytes());
+        bytes[12..16].copy_from_slice(&self.col_last.to_le_bytes());
+        bytes
+    }
+
+    pub fn contains(self, row: u32, col: u32) -> bool {
+        (self.row_first..=self.row_last).contains(&row)
+            && (self.col_first..=self.col_last).contains(&col)
+    }
+
+    pub fn top_left(self) -> (u32, u32) {
+        (self.row_first, self.col_first)
+    }
+
+    pub fn to_a1(self) -> String {
+        format!(
+            "{}:{}",
+            crate::xlsb::utils::cell_reference(self.row_first, self.col_first),
+            crate::xlsb::utils::cell_reference(self.row_last, self.col_last)
+        )
+    }
+
+    fn validate(self) -> XlsbResult<()> {
+        if self.row_first > self.row_last
+            || self.col_first > self.col_last
+            || self.row_last >= 1_048_576
+            || self.col_last >= 16_384
+        {
+            return Err(XlsbError::InvalidCellReference(self.to_a1()));
+        }
+        Ok(())
+    }
+}
+
 /// The binary representation of a cell formula (`CellParsedFormula`).
 ///
 /// `rgce` contains the RPN token stream and `rgcb` contains ancillary data for
@@ -111,6 +192,128 @@ impl CellParsedFormula {
         bytes.extend_from_slice(&cb.to_le_bytes());
         bytes.extend_from_slice(&self.rgcb);
         Ok(bytes)
+    }
+
+    /// Create the `PtgExp` placeholder stored in every array/shared formula
+    /// cell record.
+    pub fn exp(row: u32, col: u32) -> XlsbResult<Self> {
+        if row >= 1_048_576 || col >= 16_384 {
+            return Err(XlsbError::InvalidCellReference(format!(
+                "grouped formula cell ({row}, {col})"
+            )));
+        }
+        let mut rgce = Vec::with_capacity(5);
+        rgce.push(ptg_types::PTG_EXP);
+        rgce.extend_from_slice(&row.to_le_bytes());
+        Ok(Self {
+            rgce,
+            rgcb: col.to_le_bytes().to_vec(),
+        })
+    }
+
+    /// Return the target cell encoded by a `PtgExp`/`PtgExtraCol` formula.
+    pub fn exp_cell(&self) -> XlsbResult<Option<(u32, u32)>> {
+        if self.rgce.first() != Some(&ptg_types::PTG_EXP) {
+            return Ok(None);
+        }
+        if self.rgce.len() != 5 || self.rgcb.len() != 4 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "PtgExp requires 5 rgce bytes and 4 rgcb bytes, found {} and {}",
+                self.rgce.len(),
+                self.rgcb.len()
+            )));
+        }
+        let row = binary::read_u32_le_at(&self.rgce, 1)?;
+        let col = binary::read_u32_le_at(&self.rgcb, 0)?;
+        if row >= 1_048_576 || col >= 16_384 {
+            return Err(XlsbError::InvalidCellReference(format!(
+                "PtgExp target ({row}, {col})"
+            )));
+        }
+        Ok(Some((row, col)))
+    }
+}
+
+/// Kind of formula definition following a `PtgExp` cell record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FormulaGroupKind {
+    Array,
+    Shared,
+}
+
+/// Parsed `BrtArrFmla` or `BrtShrFmla` definition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FormulaGroup {
+    pub kind: FormulaGroupKind,
+    pub range: FormulaRange,
+    pub formula: CellParsedFormula,
+    pub always_calculate: bool,
+}
+
+impl FormulaGroup {
+    pub fn parse_array(data: &[u8]) -> XlsbResult<Self> {
+        if data.len() < 17 {
+            return Err(XlsbError::InvalidLength {
+                expected: 17,
+                found: data.len(),
+            });
+        }
+        if data[16] & !1 != 0 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "BrtArrFmla has reserved flag bits 0x{:02X}",
+                data[16] & !1
+            )));
+        }
+        let range = FormulaRange::parse_binary(data)?;
+        let (formula, consumed) = CellParsedFormula::parse(&data[17..])?;
+        if 17 + consumed != data.len() {
+            return Err(XlsbError::InvalidFormula(format!(
+                "BrtArrFmla has {} trailing bytes",
+                data.len() - 17 - consumed
+            )));
+        }
+        Ok(Self {
+            kind: FormulaGroupKind::Array,
+            range,
+            formula,
+            always_calculate: data[16] & 1 != 0,
+        })
+    }
+
+    pub fn parse_shared(data: &[u8]) -> XlsbResult<Self> {
+        if data.len() < 16 {
+            return Err(XlsbError::InvalidLength {
+                expected: 16,
+                found: data.len(),
+            });
+        }
+        let range = FormulaRange::parse_binary(data)?;
+        let (formula, consumed) = CellParsedFormula::parse(&data[16..])?;
+        if 16 + consumed != data.len() {
+            return Err(XlsbError::InvalidFormula(format!(
+                "BrtShrFmla has {} trailing bytes",
+                data.len() - 16 - consumed
+            )));
+        }
+        Ok(Self {
+            kind: FormulaGroupKind::Shared,
+            range,
+            formula,
+            always_calculate: false,
+        })
+    }
+
+    pub fn to_record_data(&self) -> XlsbResult<Vec<u8>> {
+        self.range.validate()?;
+        let formula = self.formula.to_bytes()?;
+        let flag_len = usize::from(self.kind == FormulaGroupKind::Array);
+        let mut data = Vec::with_capacity(16 + flag_len + formula.len());
+        data.extend_from_slice(&self.range.to_binary());
+        if self.kind == FormulaGroupKind::Array {
+            data.push(u8::from(self.always_calculate));
+        }
+        data.extend_from_slice(&formula);
+        Ok(data)
     }
 }
 
@@ -260,12 +463,26 @@ pub enum UnaryOperator {
 pub struct FormulaParser<'a> {
     data: &'a [u8],
     offset: usize,
+    base_cell: Option<(u32, u32)>,
 }
 
 impl<'a> FormulaParser<'a> {
     /// Create a new formula parser
     pub fn new(data: &'a [u8]) -> Self {
-        FormulaParser { data, offset: 0 }
+        FormulaParser {
+            data,
+            offset: 0,
+            base_cell: None,
+        }
+    }
+
+    /// Parse a shared-formula definition relative to a concrete target cell.
+    pub fn with_base_cell(data: &'a [u8], row: u32, col: u32) -> Self {
+        FormulaParser {
+            data,
+            offset: 0,
+            base_cell: Some((row, col)),
+        }
     }
 
     /// Parse the formula into tokens
@@ -319,8 +536,10 @@ impl<'a> FormulaParser<'a> {
             PTG_ERR => self.parse_err(),
 
             _ if ptg_type >= 0x20 => match ptg_type & 0x1F {
-                0x04 | 0x0C => self.parse_ref(),
-                0x05 | 0x0D => self.parse_area(),
+                0x04 => self.parse_ref(false),
+                0x0C => self.parse_ref(true),
+                0x05 => self.parse_area(false),
+                0x0D => self.parse_area(true),
                 0x01 => self.parse_func(),
                 0x02 => self.parse_func_var(),
                 0x03 => self.parse_name(),
@@ -407,17 +626,23 @@ impl<'a> FormulaParser<'a> {
     }
 
     /// Parse cell reference
-    fn parse_ref(&mut self) -> XlsbResult<FormulaToken> {
+    fn parse_ref(&mut self, offset_reference: bool) -> XlsbResult<FormulaToken> {
         self.require(6, "PtgRef")?;
 
-        let row = binary::read_u32_le_at(self.data, self.offset)?;
+        let row_data = binary::read_u32_le_at(self.data, self.offset)?;
         let col_data = binary::read_u16_le_at(self.data, self.offset + 4)?;
         self.offset += 6;
 
         // Extract row and column (with relative flags)
-        let col = (col_data & 0x3FFF) as u32;
         let col_relative = (col_data & 0x4000) != 0;
         let row_relative = (col_data & 0x8000) != 0;
+        let (row, col) = self.resolve_reference(
+            row_data,
+            col_data & 0x3FFF,
+            row_relative,
+            col_relative,
+            offset_reference,
+        )?;
 
         Ok(FormulaToken::CellRef {
             row,
@@ -428,21 +653,33 @@ impl<'a> FormulaParser<'a> {
     }
 
     /// Parse area reference
-    fn parse_area(&mut self) -> XlsbResult<FormulaToken> {
+    fn parse_area(&mut self, offset_reference: bool) -> XlsbResult<FormulaToken> {
         self.require(12, "PtgArea")?;
 
-        let row_first = binary::read_u32_le_at(self.data, self.offset)?;
-        let row_last = binary::read_u32_le_at(self.data, self.offset + 4)?;
+        let row_first_data = binary::read_u32_le_at(self.data, self.offset)?;
+        let row_last_data = binary::read_u32_le_at(self.data, self.offset + 4)?;
         let col_first_data = binary::read_u16_le_at(self.data, self.offset + 8)?;
         let col_last_data = binary::read_u16_le_at(self.data, self.offset + 10)?;
         self.offset += 12;
 
-        let col_first = (col_first_data & 0x3FFF) as u32;
         let col_first_relative = (col_first_data & 0x4000) != 0;
         let row_first_relative = (col_first_data & 0x8000) != 0;
-        let col_last = (col_last_data & 0x3FFF) as u32;
         let col_last_relative = (col_last_data & 0x4000) != 0;
         let row_last_relative = (col_last_data & 0x8000) != 0;
+        let (row_first, col_first) = self.resolve_reference(
+            row_first_data,
+            col_first_data & 0x3FFF,
+            row_first_relative,
+            col_first_relative,
+            offset_reference,
+        )?;
+        let (row_last, col_last) = self.resolve_reference(
+            row_last_data,
+            col_last_data & 0x3FFF,
+            row_last_relative,
+            col_last_relative,
+            offset_reference,
+        )?;
 
         Ok(FormulaToken::AreaRef {
             row_first,
@@ -454,6 +691,46 @@ impl<'a> FormulaParser<'a> {
             col_first_relative,
             col_last_relative,
         })
+    }
+
+    fn resolve_reference(
+        &self,
+        row_data: u32,
+        col_data: u16,
+        row_relative: bool,
+        col_relative: bool,
+        offset_reference: bool,
+    ) -> XlsbResult<(u32, u32)> {
+        if !offset_reference {
+            return Ok((row_data, u32::from(col_data)));
+        }
+        let (base_row, base_col) = self.base_cell.ok_or_else(|| {
+            XlsbError::InvalidFormula(
+                "PtgRefN/PtgAreaN requires a target cell for offset resolution".to_string(),
+            )
+        })?;
+
+        let row = if row_relative {
+            add_wrapped_offset(base_row, row_data as i32, 1_048_576)
+        } else {
+            row_data
+        };
+        let col = if col_relative {
+            let signed = if col_data & 0x2000 != 0 {
+                i32::from(col_data) - 0x4000
+            } else {
+                i32::from(col_data)
+            };
+            add_wrapped_offset(base_col, signed, 16_384)
+        } else {
+            u32::from(col_data)
+        };
+        if row >= 1_048_576 || col >= 16_384 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "resolved reference ({row}, {col}) is outside the worksheet"
+            )));
+        }
+        Ok((row, col))
     }
 
     /// Parse function with fixed arguments
@@ -797,6 +1074,12 @@ pub struct FormulaCompiler<'a> {
     offset: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum FormulaEncoding {
+    Cell,
+    Shared { base_row: u32, base_col: u32 },
+}
+
 #[derive(Debug)]
 enum CompileExpr {
     Number(f64),
@@ -819,6 +1102,28 @@ struct A1Reference {
 
 impl<'a> FormulaCompiler<'a> {
     pub fn compile(formula: &'a str) -> XlsbResult<CellParsedFormula> {
+        Self::compile_with_encoding(formula, FormulaEncoding::Cell)
+    }
+
+    /// Compile a shared formula, encoding relative A1 references as
+    /// `PtgRefN`/`PtgAreaN` offsets from the first cell in the shared range.
+    pub fn compile_shared(
+        formula: &'a str,
+        base_row: u32,
+        base_col: u32,
+    ) -> XlsbResult<CellParsedFormula> {
+        if base_row >= 1_048_576 || base_col >= 16_384 {
+            return Err(XlsbError::InvalidCellReference(format!(
+                "shared formula base ({base_row}, {base_col})"
+            )));
+        }
+        Self::compile_with_encoding(formula, FormulaEncoding::Shared { base_row, base_col })
+    }
+
+    fn compile_with_encoding(
+        formula: &'a str,
+        encoding: FormulaEncoding,
+    ) -> XlsbResult<CellParsedFormula> {
         let input = formula.strip_prefix('=').unwrap_or(formula).trim();
         if input.is_empty() {
             return Err(XlsbError::InvalidFormula(
@@ -833,7 +1138,7 @@ impl<'a> FormulaCompiler<'a> {
         }
 
         let mut rgce = Vec::new();
-        Self::emit(&expression, &mut rgce)?;
+        Self::emit(&expression, &mut rgce, encoding)?;
         if rgce.len() > MAX_CELL_FORMULA_BYTES {
             return Err(XlsbError::InvalidFormula(format!(
                 "compiled formula is {} bytes; maximum is {MAX_CELL_FORMULA_BYTES}",
@@ -1114,7 +1419,11 @@ impl<'a> FormulaCompiler<'a> {
         XlsbError::InvalidFormula(format!("{message} at byte {}", self.offset))
     }
 
-    fn emit(expression: &CompileExpr, output: &mut Vec<u8>) -> XlsbResult<()> {
+    fn emit(
+        expression: &CompileExpr,
+        output: &mut Vec<u8>,
+        encoding: FormulaEncoding,
+    ) -> XlsbResult<()> {
         match expression {
             CompileExpr::Number(value) => {
                 if value.fract() == 0.0 && *value >= 0.0 && *value <= f64::from(u16::MAX) {
@@ -1137,16 +1446,36 @@ impl<'a> FormulaCompiler<'a> {
                 output.push(ptg_types::PTG_BOOL);
                 output.push(u8::from(*value));
             },
-            CompileExpr::Ref(reference) => emit_reference(output, 0x44, *reference),
+            CompileExpr::Ref(reference) => match encoding {
+                FormulaEncoding::Cell => emit_reference(output, 0x44, *reference),
+                FormulaEncoding::Shared { base_row, base_col } => {
+                    emit_shared_reference(output, 0x4C, *reference, base_row, base_col)?
+                },
+            },
             CompileExpr::Area(first, last) => {
-                output.push(0x25); // PtgArea, REFERENCE class
-                output.extend_from_slice(&first.row.to_le_bytes());
-                output.extend_from_slice(&last.row.to_le_bytes());
-                output.extend_from_slice(&reference_column_bits(*first).to_le_bytes());
-                output.extend_from_slice(&reference_column_bits(*last).to_le_bytes());
+                match encoding {
+                    FormulaEncoding::Cell => {
+                        output.push(0x25); // PtgArea, REFERENCE class
+                        output.extend_from_slice(&first.row.to_le_bytes());
+                        output.extend_from_slice(&last.row.to_le_bytes());
+                        output.extend_from_slice(&reference_column_bits(*first).to_le_bytes());
+                        output.extend_from_slice(&reference_column_bits(*last).to_le_bytes());
+                    },
+                    FormulaEncoding::Shared { base_row, base_col } => {
+                        output.push(0x2D); // PtgAreaN, REFERENCE class
+                        let (first_row, first_col) =
+                            encode_shared_reference(*first, base_row, base_col)?;
+                        let (last_row, last_col) =
+                            encode_shared_reference(*last, base_row, base_col)?;
+                        output.extend_from_slice(&first_row.to_le_bytes());
+                        output.extend_from_slice(&last_row.to_le_bytes());
+                        output.extend_from_slice(&first_col.to_le_bytes());
+                        output.extend_from_slice(&last_col.to_le_bytes());
+                    },
+                }
             },
             CompileExpr::Unary(operator, operand) => {
-                Self::emit(operand, output)?;
+                Self::emit(operand, output, encoding)?;
                 output.push(match operator {
                     UnaryOperator::Plus => ptg_types::PTG_UPLUS,
                     UnaryOperator::Minus => ptg_types::PTG_UMINUS,
@@ -1154,8 +1483,8 @@ impl<'a> FormulaCompiler<'a> {
                 });
             },
             CompileExpr::Binary(operator, left, right) => {
-                Self::emit(left, output)?;
-                Self::emit(right, output)?;
+                Self::emit(left, output, encoding)?;
+                Self::emit(right, output, encoding)?;
                 output.push(match operator {
                     BinaryOperator::Add => ptg_types::PTG_ADD,
                     BinaryOperator::Subtract => ptg_types::PTG_SUB,
@@ -1173,7 +1502,7 @@ impl<'a> FormulaCompiler<'a> {
             },
             CompileExpr::Function(function, arguments) => {
                 for argument in arguments {
-                    Self::emit(argument, output)?;
+                    Self::emit(argument, output, encoding)?;
                 }
                 if function.min_args == function.max_args {
                     output.push(0x41); // PtgFunc, VALUE class
@@ -1251,6 +1580,58 @@ fn emit_reference(output: &mut Vec<u8>, token: u8, reference: A1Reference) {
     output.push(token);
     output.extend_from_slice(&reference.row.to_le_bytes());
     output.extend_from_slice(&reference_column_bits(reference).to_le_bytes());
+}
+
+fn emit_shared_reference(
+    output: &mut Vec<u8>,
+    token: u8,
+    reference: A1Reference,
+    base_row: u32,
+    base_col: u32,
+) -> XlsbResult<()> {
+    let (row, col) = encode_shared_reference(reference, base_row, base_col)?;
+    output.push(token);
+    output.extend_from_slice(&row.to_le_bytes());
+    output.extend_from_slice(&col.to_le_bytes());
+    Ok(())
+}
+
+fn encode_shared_reference(
+    reference: A1Reference,
+    base_row: u32,
+    base_col: u32,
+) -> XlsbResult<(u32, u16)> {
+    let row = if reference.row_relative {
+        let offset = i64::from(reference.row) - i64::from(base_row);
+        i32::try_from(offset)
+            .map_err(|_| XlsbError::InvalidFormula("shared row offset overflow".to_string()))?
+            as u32
+    } else {
+        reference.row
+    };
+    let col_value = if reference.col_relative {
+        let offset = i64::from(reference.col) - i64::from(base_col);
+        if !(-16_383..=16_383).contains(&offset) {
+            return Err(XlsbError::InvalidFormula(format!(
+                "shared column offset {offset} is outside the XLSB range"
+            )));
+        }
+        (offset as i32 as u16) & 0x3FFF
+    } else {
+        reference.col as u16
+    };
+    let mut col = col_value;
+    if reference.col_relative {
+        col |= 0x4000;
+    }
+    if reference.row_relative {
+        col |= 0x8000;
+    }
+    Ok((row, col))
+}
+
+fn add_wrapped_offset(base: u32, offset: i32, modulus: u32) -> u32 {
+    (i64::from(base) + i64::from(offset)).rem_euclid(i64::from(modulus)) as u32
 }
 
 #[cfg(test)]
@@ -1332,6 +1713,105 @@ mod tests {
         let tokens = FormulaParser::new(&formula.rgce).parse().unwrap();
         let text = FormulaConverter::try_tokens_to_string(&tokens).unwrap();
         assert_eq!(text, "(SUM($A$1:B3)+\"荔枝\")");
+    }
+
+    #[test]
+    fn shared_formula_uses_relative_tokens_and_expands_per_target_cell() {
+        // Real shared-formula pattern from POI bug66682.xlsb: the C3:C10
+        // formula group references the cell one column earlier.
+        let formula = FormulaCompiler::compile_shared("B3", 2, 2).unwrap();
+        assert_eq!(formula.rgce, vec![0x4C, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF]);
+
+        let anchor_tokens = FormulaParser::with_base_cell(&formula.rgce, 2, 2)
+            .parse()
+            .unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string(&anchor_tokens).unwrap(),
+            "B3"
+        );
+        let follower_tokens = FormulaParser::with_base_cell(&formula.rgce, 3, 2)
+            .parse()
+            .unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string(&follower_tokens).unwrap(),
+            "B4"
+        );
+    }
+
+    #[test]
+    fn parses_real_poi_shared_formula_definition_losslessly() {
+        // BrtShrFmla from POI bug66682.xlsb: C3:C10 refers one column left.
+        let bytes = [
+            0x02, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x02, 0x00,
+            0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x4C, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00,
+            0x00, 0x00, 0x00,
+        ];
+        let group = FormulaGroup::parse_shared(&bytes).unwrap();
+        assert_eq!(group.kind, FormulaGroupKind::Shared);
+        assert_eq!(group.range.to_a1(), "C3:C10");
+        assert_eq!(group.to_record_data().unwrap(), bytes);
+
+        let tokens = FormulaParser::with_base_cell(&group.formula.rgce, 9, 2)
+            .parse()
+            .unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
+            "B10"
+        );
+    }
+
+    #[test]
+    fn parses_real_poi_array_formula_definition_losslessly() {
+        // BrtArrFmla from POI bug66682.xlsb. Its PtgName is retained even
+        // when the standalone formula converter cannot resolve that name.
+        let bytes = [
+            0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x02, 0x00,
+            0x00, 0x00, 0x01, 0x09, 0x00, 0x00, 0x00, 0x23, 0x02, 0x00, 0x00, 0x00, 0x42, 0x01,
+            0xFF, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let group = FormulaGroup::parse_array(&bytes).unwrap();
+        assert_eq!(group.kind, FormulaGroupKind::Array);
+        assert_eq!(group.range.to_a1(), "C9:C9");
+        assert!(group.always_calculate);
+        assert_eq!(group.to_record_data().unwrap(), bytes);
+    }
+
+    #[test]
+    fn rejects_malformed_ptg_exp_and_array_flags() {
+        let malformed = CellParsedFormula {
+            rgce: vec![ptg_types::PTG_EXP, 0, 0],
+            rgcb: vec![],
+        };
+        assert!(matches!(
+            malformed.exp_cell(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+
+        let mut array = FormulaGroup {
+            kind: FormulaGroupKind::Array,
+            range: FormulaRange::new(0, 0, 0, 0).unwrap(),
+            formula: FormulaCompiler::compile("1+1").unwrap(),
+            always_calculate: false,
+        }
+        .to_record_data()
+        .unwrap();
+        array[16] = 0x80;
+        assert!(matches!(
+            FormulaGroup::parse_array(&array),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+    }
+
+    #[test]
+    fn shared_formula_preserves_mixed_absolute_references() {
+        let formula = FormulaCompiler::compile_shared("$A1+B$2", 4, 3).unwrap();
+        let tokens = FormulaParser::with_base_cell(&formula.rgce, 7, 5)
+            .parse()
+            .unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
+            "($A4+D$2)"
+        );
     }
 
     #[test]

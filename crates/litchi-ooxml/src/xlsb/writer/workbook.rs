@@ -959,4 +959,75 @@ mod tests {
             } if matches!(cached.as_ref(), CellValue::Error(error) if error == "#DIV/0!")
         ));
     }
+
+    #[test]
+    fn array_and_shared_formulas_survive_package_roundtrip() {
+        let mut workbook = XlsbWorkbookWriter::new();
+        let mut sheet = MutableXlsbWorksheet::new("Grouped formulas");
+        sheet.set_cell(2, 2, 10.0);
+        sheet.set_cell(3, 2, 20.0);
+        sheet.set_shared_formula(2, 2, 3, 2, "B3").unwrap();
+        sheet.set_array_formula(0, 4, 1, 5, "A1*2").unwrap();
+        // The core CellValue representation remains a supported compatibility
+        // path; the writer fills missing follower records from array_range.
+        sheet.set_cell(
+            5,
+            0,
+            CellValue::Formula {
+                formula: "1+1".to_string(),
+                cached_value: None,
+                is_array: true,
+                array_range: Some("A6:B6".to_string()),
+            },
+        );
+        workbook.add_worksheet(sheet);
+
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let worksheet = reader.worksheet_by_index(0).unwrap();
+
+        assert!(matches!(
+            worksheet.cell_value(2, 2).unwrap().as_ref(),
+            CellValue::Formula {
+                formula,
+                cached_value: Some(cached),
+                is_array: false,
+                ..
+            } if formula == "B3" && matches!(cached.as_ref(), CellValue::Float(10.0))
+        ));
+        assert!(matches!(
+            worksheet.cell_value(3, 2).unwrap().as_ref(),
+            CellValue::Formula {
+                formula,
+                cached_value: Some(cached),
+                is_array: false,
+                ..
+            } if formula == "B4" && matches!(cached.as_ref(), CellValue::Float(20.0))
+        ));
+        for row in 0..=1 {
+            for col in 4..=5 {
+                assert!(matches!(
+                    worksheet.cell_value(row, col).unwrap().as_ref(),
+                    CellValue::Formula {
+                        formula,
+                        is_array: true,
+                        array_range: Some(range),
+                        ..
+                    } if formula == "(A1*2)" && range == "E1:F2"
+                ));
+            }
+        }
+        for col in 0..=1 {
+            assert!(matches!(
+                worksheet.cell_value(5, col).unwrap().as_ref(),
+                CellValue::Formula {
+                    formula,
+                    is_array: true,
+                    array_range: Some(range),
+                    ..
+                } if formula == "(1+1)" && range == "A6:B6"
+            ));
+        }
+    }
 }

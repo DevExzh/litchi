@@ -1,8 +1,11 @@
 //! Cell representation for XLSB files
 
-use crate::xlsb::formula::{CellParsedFormula, FormulaConverter, FormulaParser};
+use crate::xlsb::formula::{
+    CellParsedFormula, FormulaConverter, FormulaGroup, FormulaGroupKind, FormulaParser,
+};
 use crate::xlsb::records::CellRecord;
 use litchi_core::sheet::{Cell, CellValue};
+use std::sync::Arc;
 
 /// XLSB cell implementation
 ///
@@ -20,6 +23,8 @@ pub struct XlsbCell {
     is_formula: bool,
     /// Original binary formula, retained even if a token is not understood.
     formula: Option<CellParsedFormula>,
+    /// Shared array/shared-formula definition.
+    formula_group: Option<Arc<FormulaGroup>>,
     /// Formula calculation flags from `GrbitFmla`.
     formula_flags: u16,
 }
@@ -33,6 +38,7 @@ impl XlsbCell {
             value,
             is_formula: false,
             formula: None,
+            formula_group: None,
             formula_flags: 0,
         }
     }
@@ -45,6 +51,7 @@ impl XlsbCell {
             value,
             is_formula: true,
             formula: None,
+            formula_group: None,
             formula_flags: 0,
         }
     }
@@ -75,6 +82,42 @@ impl XlsbCell {
             col,
             is_formula: true,
             formula: Some(formula),
+            formula_group: None,
+            formula_flags,
+        }
+    }
+
+    pub(crate) fn new_grouped_formula(
+        row: u32,
+        col: u32,
+        cached_value: CellValue,
+        placeholder: CellParsedFormula,
+        formula_flags: u16,
+        group: Arc<FormulaGroup>,
+    ) -> Self {
+        let tokens = match group.kind {
+            FormulaGroupKind::Array => FormulaParser::new(&group.formula.rgce).parse(),
+            FormulaGroupKind::Shared => {
+                FormulaParser::with_base_cell(&group.formula.rgce, row, col).parse()
+            },
+        };
+        let is_array = group.kind == FormulaGroupKind::Array;
+        let value = tokens
+            .and_then(|tokens| FormulaConverter::try_tokens_to_string(&tokens))
+            .map(|formula_text| CellValue::Formula {
+                formula: formula_text,
+                cached_value: Some(Box::new(cached_value.clone())),
+                is_array,
+                array_range: is_array.then(|| group.range.to_a1()),
+            })
+            .unwrap_or(cached_value);
+        Self {
+            value,
+            row,
+            col,
+            is_formula: true,
+            formula: Some(placeholder),
+            formula_group: Some(group),
             formula_flags,
         }
     }
@@ -87,6 +130,39 @@ impl XlsbCell {
     /// Raw XLSB ancillary formula stream (`rgcb`).
     pub fn formula_extra_bytes(&self) -> Option<&[u8]> {
         self.formula.as_ref().map(|formula| formula.rgcb.as_slice())
+    }
+
+    /// Actual formula definition for an array/shared formula cell.
+    pub fn formula_definition_bytes(&self) -> Option<&[u8]> {
+        self.formula_group
+            .as_ref()
+            .map(|group| group.formula.rgce.as_slice())
+    }
+
+    /// Ancillary token data for an array/shared formula definition.
+    pub fn formula_definition_extra_bytes(&self) -> Option<&[u8]> {
+        self.formula_group
+            .as_ref()
+            .map(|group| group.formula.rgcb.as_slice())
+    }
+
+    /// Whether the grouped definition requests unconditional recalculation.
+    pub fn formula_group_always_calculates(&self) -> Option<bool> {
+        self.formula_group
+            .as_ref()
+            .map(|group| group.always_calculate)
+    }
+
+    /// Whether this cell belongs to an XLSB shared-formula group.
+    pub fn is_shared_formula(&self) -> bool {
+        self.formula_group
+            .as_ref()
+            .is_some_and(|group| group.kind == FormulaGroupKind::Shared)
+    }
+
+    /// Array/shared formula range in A1 notation.
+    pub fn formula_range(&self) -> Option<String> {
+        self.formula_group.as_ref().map(|group| group.range.to_a1())
     }
 
     /// Formula recalculation flags from `GrbitFmla`.
@@ -142,6 +218,7 @@ impl XlsbCell {
             value,
             is_formula,
             formula: None,
+            formula_group: None,
             formula_flags: 0,
         })
     }
