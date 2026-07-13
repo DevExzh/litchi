@@ -220,6 +220,10 @@ pub mod record_types {
     pub const EXTERN_CELL_BOOL: u16 = 0x0171;
     pub const EXTERN_CELL_ERROR: u16 = 0x0172;
     pub const EXTERN_CELL_STRING: u16 = 0x0173;
+    pub const SUP_NAME_START: u16 = 0x0241;
+    pub const SUP_NAME_FORMULA: u16 = 0x0249;
+    pub const SUP_NAME_BITS: u16 = 0x024A;
+    pub const SUP_NAME_END: u16 = 0x024B;
     pub const END_SUP_BOOK: u16 = 0x024C;
 
     // Style sheet records

@@ -42,12 +42,21 @@ pub struct FormulaExternalSheet {
     pub last_sheet: i32,
 }
 
+/// Metadata from one XLSB External Link part.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct FormulaExternalBook {
+    pub(crate) target: String,
+    pub(crate) sheet_names: std::sync::Arc<[String]>,
+    pub(crate) defined_names: std::sync::Arc<[String]>,
+    pub(crate) is_workbook: bool,
+}
+
 /// Kind of supporting link referenced by `BrtExternSheet` entries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FormulaSupportingLink {
     SelfWorkbook,
     SameSheet,
-    ExternalWorkbook,
+    ExternalWorkbook(u32),
     AddIn,
 }
 
@@ -60,6 +69,7 @@ pub struct FormulaResolutionContext {
     pub(crate) worksheet_names: std::sync::Arc<[String]>,
     pub(crate) supporting_links: std::sync::Arc<[FormulaSupportingLink]>,
     pub(crate) external_sheets: std::sync::Arc<[FormulaExternalSheet]>,
+    pub(crate) external_books: std::sync::Arc<[FormulaExternalBook]>,
     pub(crate) defined_names: std::sync::Arc<[String]>,
     pub(crate) current_sheet: Option<usize>,
 }
@@ -124,10 +134,8 @@ impl FormulaResolutionContext {
                 })?;
                 (sheet, sheet)
             },
-            FormulaSupportingLink::ExternalWorkbook => {
-                return Err(XlsbError::UnsupportedFeature(format!(
-                    "Xti index {index} refers to an external workbook"
-                )));
+            FormulaSupportingLink::ExternalWorkbook(book_index) => {
+                return self.resolve_external_sheet_prefix(index, xti, *book_index);
             },
             FormulaSupportingLink::AddIn => {
                 return Err(XlsbError::UnsupportedFeature(format!(
@@ -160,18 +168,125 @@ impl FormulaResolutionContext {
         } else {
             format!("{first}:{last}")
         };
-        if unquoted
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.'))
-            && !unquoted
-                .chars()
-                .next()
-                .is_some_and(|ch| ch.is_ascii_digit())
-        {
-            Ok(unquoted)
-        } else {
-            Ok(format!("'{}'", unquoted.replace('\'', "''")))
+        Ok(format_formula_prefix(&unquoted))
+    }
+
+    fn resolve_external_sheet_prefix(
+        &self,
+        xti_index: u16,
+        xti: &FormulaExternalSheet,
+        book_index: u32,
+    ) -> XlsbResult<String> {
+        let book_index = usize::try_from(book_index)
+            .map_err(|_| XlsbError::InvalidFormula("external book index overflow".to_string()))?;
+        let book = self.external_books.get(book_index).ok_or_else(|| {
+            XlsbError::InvalidFormula(format!(
+                "Xti index {xti_index} refers to missing external book {book_index}"
+            ))
+        })?;
+        if !book.is_workbook {
+            return Err(XlsbError::UnsupportedFeature(format!(
+                "Xti index {xti_index} refers to a DDE or OLE data source"
+            )));
         }
+        if xti.first_sheet < 0 || xti.last_sheet < xti.first_sheet {
+            return Err(XlsbError::InvalidFormula(format!(
+                "Xti index {xti_index} has invalid external sheet range {}..={}",
+                xti.first_sheet, xti.last_sheet
+            )));
+        }
+        let first_index = usize::try_from(xti.first_sheet)
+            .map_err(|_| XlsbError::InvalidFormula("external sheet index overflow".to_string()))?;
+        let last_index = usize::try_from(xti.last_sheet)
+            .map_err(|_| XlsbError::InvalidFormula("external sheet index overflow".to_string()))?;
+        let first = book.sheet_names.get(first_index).ok_or_else(|| {
+            XlsbError::InvalidFormula(format!(
+                "external sheet {} exceeds {} cached names",
+                xti.first_sheet,
+                book.sheet_names.len()
+            ))
+        })?;
+        let last = book.sheet_names.get(last_index).ok_or_else(|| {
+            XlsbError::InvalidFormula(format!(
+                "external sheet {} exceeds {} cached names",
+                xti.last_sheet,
+                book.sheet_names.len()
+            ))
+        })?;
+        let sheets = if first_index == last_index {
+            first.clone()
+        } else {
+            format!("{first}:{last}")
+        };
+        Ok(format_formula_prefix(&format!("[{}]{sheets}", book.target)))
+    }
+
+    fn resolve_external_name(&self, xti_index: u16, name_index: u32) -> XlsbResult<String> {
+        if name_index == 0 {
+            return Err(XlsbError::InvalidFormula(
+                "PtgNameX name index is one-based and cannot be zero".to_string(),
+            ));
+        }
+        let xti = self
+            .external_sheets
+            .get(usize::from(xti_index))
+            .ok_or_else(|| {
+                XlsbError::InvalidFormula(format!(
+                    "PtgNameX Xti index {xti_index} exceeds {} entries",
+                    self.external_sheets.len()
+                ))
+            })?;
+        let link_index = usize::try_from(xti.external_link)
+            .map_err(|_| XlsbError::InvalidFormula("external-link index overflow".to_string()))?;
+        let FormulaSupportingLink::ExternalWorkbook(book_index) =
+            self.supporting_links.get(link_index).ok_or_else(|| {
+                XlsbError::InvalidFormula(format!(
+                    "PtgNameX refers to missing supporting link {}",
+                    xti.external_link
+                ))
+            })?
+        else {
+            return Err(XlsbError::InvalidFormula(
+                "PtgNameX does not refer to an external workbook".to_string(),
+            ));
+        };
+        let external_book_index = usize::try_from(*book_index)
+            .map_err(|_| XlsbError::InvalidFormula("external book index overflow".to_string()))?;
+        let book = self
+            .external_books
+            .get(external_book_index)
+            .ok_or_else(|| {
+                XlsbError::InvalidFormula(format!("missing external book {book_index}"))
+            })?;
+        if !book.is_workbook {
+            return Err(XlsbError::UnsupportedFeature(
+                "PtgNameX refers to a DDE or OLE data source".to_string(),
+            ));
+        }
+        let index = usize::try_from(name_index - 1)
+            .map_err(|_| XlsbError::InvalidFormula("external name index overflow".to_string()))?;
+        let name = book.defined_names.get(index).ok_or_else(|| {
+            XlsbError::InvalidFormula(format!(
+                "external name index {name_index} exceeds {} names",
+                book.defined_names.len()
+            ))
+        })?;
+        Ok(format!(
+            "{}!{name}",
+            format_formula_prefix(&format!("[{}]", book.target))
+        ))
+    }
+}
+
+fn format_formula_prefix(value: &str) -> String {
+    if value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.'))
+        && !value.chars().next().is_some_and(|ch| ch.is_ascii_digit())
+    {
+        value.to_string()
+    } else {
+        format!("'{}'", value.replace('\'', "''"))
     }
 }
 
@@ -636,6 +751,8 @@ pub enum FormulaToken {
     },
     /// Defined name reference
     Name(u32),
+    /// Defined name in an external workbook.
+    ExternalName { sheet_index: u16, name_index: u32 },
     /// Unknown/unsupported token
     Unknown(u8),
 }
@@ -843,6 +960,7 @@ impl<'a> FormulaParser<'a> {
                 0x01 => self.parse_func(),
                 0x02 => self.parse_func_var(),
                 0x03 => self.parse_name(),
+                0x19 => self.parse_name_x(),
                 _ => Ok(FormulaToken::Unknown(ptg_type)),
             },
 
@@ -1465,6 +1583,22 @@ impl<'a> FormulaParser<'a> {
         Ok(FormulaToken::Name(name_index))
     }
 
+    fn parse_name_x(&mut self) -> XlsbResult<FormulaToken> {
+        self.require(6, "PtgNameX")?;
+        let sheet_index = binary::read_u16_le_at(self.data, self.offset)?;
+        let name_index = binary::read_u32_le_at(self.data, self.offset + 2)?;
+        self.offset += 6;
+        if name_index == 0 {
+            return Err(XlsbError::InvalidFormula(
+                "PtgNameX name index is one-based and cannot be zero".to_string(),
+            ));
+        }
+        Ok(FormulaToken::ExternalName {
+            sheet_index,
+            name_index,
+        })
+    }
+
     /// Resolve the parameter count of a fixed-arity `Ftab` function.
     fn get_function_arg_count(index: u16) -> XlsbResult<u8> {
         let function = builtin_function_by_index(index).ok_or_else(|| {
@@ -1742,6 +1876,17 @@ impl FormulaConverter {
                         ))
                     })?;
                     stack.push(name.clone());
+                },
+                FormulaToken::ExternalName {
+                    sheet_index,
+                    name_index,
+                } => {
+                    let context = context.ok_or_else(|| {
+                        XlsbError::UnsupportedFeature(
+                            "PtgNameX requires workbook external-link resolution".to_string(),
+                        )
+                    })?;
+                    stack.push(context.resolve_external_name(*sheet_index, *name_index)?);
                 },
                 FormulaToken::Unknown(t) => {
                     return Err(XlsbError::UnsupportedFeature(format!(
@@ -3284,6 +3429,7 @@ mod tests {
                 },
             ]
             .into(),
+            external_books: Vec::new().into(),
             defined_names: vec!["Rate".to_string()].into(),
             current_sheet: None,
         };
@@ -3317,6 +3463,7 @@ mod tests {
             worksheet_names: vec!["Sheet1".to_string()].into(),
             supporting_links: vec![FormulaSupportingLink::SelfWorkbook].into(),
             external_sheets: Vec::new().into(),
+            external_books: Vec::new().into(),
             defined_names: Vec::new().into(),
             current_sheet: None,
         };
@@ -3351,6 +3498,7 @@ mod tests {
                 last_sheet: -2,
             }]
             .into(),
+            external_books: Vec::new().into(),
             defined_names: Vec::new().into(),
             current_sheet: None,
         }
@@ -3362,6 +3510,54 @@ mod tests {
             FormulaConverter::try_tokens_to_string_with_context(&tokens, &context).unwrap(),
             "'Current Sheet'!$A$1"
         );
+    }
+
+    #[test]
+    fn parser_resolves_external_workbook_references_and_names() {
+        let context = FormulaResolutionContext {
+            worksheet_names: Vec::new().into(),
+            supporting_links: vec![FormulaSupportingLink::ExternalWorkbook(0)].into(),
+            external_sheets: vec![FormulaExternalSheet {
+                external_link: 0,
+                first_sheet: 0,
+                last_sheet: 0,
+            }]
+            .into(),
+            external_books: vec![FormulaExternalBook {
+                target: "Book.xlsx".to_string(),
+                sheet_names: vec!["Data Sheet".to_string()].into(),
+                defined_names: vec!["Rate".to_string()].into(),
+                is_workbook: true,
+            }]
+            .into(),
+            defined_names: Vec::new().into(),
+            current_sheet: None,
+        };
+
+        let reference = [0x5A, 0, 0, 0, 0, 0, 0, 0, 0];
+        let tokens = FormulaParser::new(&reference).parse().unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string_with_context(&tokens, &context).unwrap(),
+            "'[Book.xlsx]Data Sheet'!$A$1"
+        );
+
+        let name = [0x59, 0, 0, 1, 0, 0, 0];
+        let tokens = FormulaParser::new(&name).parse().unwrap();
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string_with_context(&tokens, &context).unwrap(),
+            "'[Book.xlsx]'!Rate"
+        );
+
+        let invalid_name = [0x59, 0, 0, 2, 0, 0, 0];
+        let tokens = FormulaParser::new(&invalid_name).parse().unwrap();
+        assert!(matches!(
+            FormulaConverter::try_tokens_to_string_with_context(&tokens, &context),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+        assert!(matches!(
+            FormulaParser::new(&[0x59, 0, 0, 0, 0, 0, 0]).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
     }
 
     #[test]
