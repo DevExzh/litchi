@@ -130,7 +130,7 @@ where
                 return Ok(None);
             }
 
-            let cell_header = if matches!(typ, 0x0001..=0x000B) {
+            let cell_header = if matches!(typ, 0x0001..=0x000B | record_types::CELL_R_STRING) {
                 Some(self.parse_cell_header()?)
             } else {
                 None
@@ -234,6 +234,21 @@ where
                             value,
                         )));
                     },
+                record_types::CELL_R_STRING => {
+                    if self.buf.len() < 9 {
+                        return Err(XlsbError::InvalidLength {
+                            expected: 9,
+                            found: self.buf.len(),
+                        });
+                    }
+                    let header = cell_header.unwrap();
+                    let rich_string = SharedString::parse(&self.buf[8..])?;
+                    return Ok(Some(XlsbCell::new_rich_string(
+                        self.current_row,
+                        header,
+                        rich_string,
+                    )));
+                },
                 0x0008 => {
                     // BrtFmlaString - formula with string result
                     if self.buf.len() < 12 {
@@ -609,6 +624,32 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::xlsb::writer::RecordWriter;
+    use litchi_core::sheet::Cell;
+
+    fn rich_string_worksheet() -> Vec<u8> {
+        let mut bytes = Vec::new();
+        let mut writer = RecordWriter::new(&mut bytes);
+        writer.write_record(0x0094, &[0; 16]).unwrap();
+        writer.write_record(0x0091, &[]).unwrap();
+        writer
+            .write_record(record_types::ROW_HDR, &4u32.to_le_bytes())
+            .unwrap();
+
+        let mut cell = 2u32.to_le_bytes().to_vec();
+        cell.extend_from_slice(&[0, 0, 0, 1]);
+        cell.push(1);
+        cell.extend_from_slice(&2u32.to_le_bytes());
+        cell.extend_from_slice(&[b'A', 0, b'B', 0]);
+        cell.extend_from_slice(&2u32.to_le_bytes());
+        cell.extend_from_slice(&[0, 0, 3, 0, 1, 0, 5, 0]);
+        writer
+            .write_record(record_types::CELL_R_STRING, &cell)
+            .unwrap();
+        writer.write_record(0x0092, &[]).unwrap();
+        writer.write_record(0x0082, &[]).unwrap();
+        bytes
+    }
 
     #[test]
     fn decodes_and_validates_cell_style_header() {
@@ -633,5 +674,25 @@ mod tests {
             Reader::decode_cell_header(&reserved, 1),
             Err(XlsbError::Unrecognized { .. })
         ));
+    }
+
+    #[test]
+    fn reads_inline_rich_string_cells() {
+        let bytes = rich_string_worksheet();
+        let formula_context = FormulaResolutionContext::default();
+        let iter = RecordIter::new(std::io::Cursor::new(bytes));
+        let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
+
+        let cell = reader.next_cell().unwrap().unwrap();
+        assert_eq!(cell.row(), 4);
+        assert_eq!(cell.column(), 2);
+        assert_eq!(cell.value(), &CellValue::String("AB".to_string()));
+        assert!(cell.show_phonetic());
+        let rich = cell.rich_string().unwrap();
+        assert_eq!(rich.text, "AB");
+        assert_eq!(rich.runs.len(), 2);
+        assert_eq!(rich.runs[0].font_id, 3);
+        assert_eq!(rich.runs[1].font_id, 5);
+        assert!(reader.next_cell().unwrap().is_none());
     }
 }

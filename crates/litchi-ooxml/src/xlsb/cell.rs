@@ -5,6 +5,7 @@ use crate::xlsb::formula::{
     FormulaResolutionContext,
 };
 use crate::xlsb::records::CellRecord;
+use crate::xlsb::shared_strings::SharedString;
 use litchi_core::sheet::{Cell, CellValue};
 use std::sync::Arc;
 
@@ -17,8 +18,7 @@ pub(crate) struct CellHeader {
 
 /// XLSB cell implementation
 ///
-/// Fields are ordered to minimize padding and optimize cache utilization.
-/// Layout: CellValue (largest), u32 fields, then bool.
+/// Dynamically sized values precede compact coordinate and flag metadata.
 #[derive(Debug, Clone)]
 pub struct XlsbCell {
     /// Cell value (largest field, aligned first)
@@ -35,6 +35,8 @@ pub struct XlsbCell {
     is_formula: bool,
     /// Original binary formula, retained even if a token is not understood.
     formula: Option<CellParsedFormula>,
+    /// Inline rich-text value from a `BrtCellRString` record.
+    rich_string: Option<SharedString>,
     /// Shared array/shared-formula definition.
     formula_group: Option<Arc<FormulaGroup>>,
     /// Formula calculation flags from `GrbitFmla`.
@@ -52,6 +54,7 @@ impl XlsbCell {
             value,
             is_formula: false,
             formula: None,
+            rich_string: None,
             formula_group: None,
             formula_flags: 0,
         }
@@ -67,6 +70,7 @@ impl XlsbCell {
             value,
             is_formula: true,
             formula: None,
+            rich_string: None,
             formula_group: None,
             formula_flags: 0,
         }
@@ -103,6 +107,7 @@ impl XlsbCell {
             show_phonetic: header.show_phonetic,
             is_formula: true,
             formula: Some(formula),
+            rich_string: None,
             formula_group: None,
             formula_flags,
         }
@@ -149,6 +154,7 @@ impl XlsbCell {
             show_phonetic: header.show_phonetic,
             is_formula: true,
             formula: Some(placeholder),
+            rich_string: None,
             formula_group: Some(group),
             formula_flags,
         }
@@ -212,6 +218,11 @@ impl XlsbCell {
         self.show_phonetic
     }
 
+    /// Complete inline rich-text value, when this cell came from `BrtCellRString`.
+    pub fn rich_string(&self) -> Option<&SharedString> {
+        self.rich_string.as_ref()
+    }
+
     pub(crate) fn new_styled(row: u32, header: CellHeader, value: CellValue) -> Self {
         Self {
             row,
@@ -221,6 +232,22 @@ impl XlsbCell {
             value,
             is_formula: false,
             formula: None,
+            rich_string: None,
+            formula_group: None,
+            formula_flags: 0,
+        }
+    }
+
+    pub(crate) fn new_rich_string(row: u32, header: CellHeader, rich_string: SharedString) -> Self {
+        Self {
+            value: CellValue::String(rich_string.text.clone()),
+            row,
+            col: header.col,
+            style_id: header.style_id,
+            show_phonetic: header.show_phonetic,
+            is_formula: false,
+            formula: None,
+            rich_string: Some(rich_string),
             formula_group: None,
             formula_flags: 0,
         }
@@ -276,6 +303,7 @@ impl XlsbCell {
             value,
             is_formula,
             formula: None,
+            rich_string: None,
             formula_group: None,
             formula_flags: 0,
         })
