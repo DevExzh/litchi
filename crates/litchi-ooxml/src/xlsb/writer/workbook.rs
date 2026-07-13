@@ -932,6 +932,16 @@ mod tests {
                 array_range: None,
             },
         );
+        sheet.set_cell(
+            2,
+            1,
+            CellValue::Formula {
+                formula: "IF(TRUE,1,2)".to_string(),
+                cached_value: Some(Box::new(CellValue::Float(1.0))),
+                is_array: false,
+                array_range: None,
+            },
+        );
         workbook.add_worksheet(sheet);
 
         let mut output = Cursor::new(Vec::new());
@@ -976,6 +986,15 @@ mod tests {
                 ..
             } if formula == "#REF!"
                 && matches!(cached.as_ref(), CellValue::Error(error) if error == "#REF!")
+        ));
+        assert!(matches!(
+            worksheet.cell_value(2, 1).unwrap().as_ref(),
+            CellValue::Formula {
+                formula,
+                cached_value: Some(cached),
+                ..
+            } if formula == "IF(TRUE,1,2)"
+                && matches!(cached.as_ref(), CellValue::Float(1.0))
         ));
     }
 

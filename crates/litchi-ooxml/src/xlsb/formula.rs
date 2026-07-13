@@ -517,6 +517,7 @@ pub struct FormulaParser<'a> {
     extra_offset: usize,
     validate_extra: bool,
     memory_expression_ends: Vec<usize>,
+    control_flow_targets: Vec<usize>,
     base_cell: Option<(u32, u32)>,
 }
 
@@ -530,6 +531,7 @@ impl<'a> FormulaParser<'a> {
             extra_offset: 0,
             validate_extra: false,
             memory_expression_ends: Vec::new(),
+            control_flow_targets: Vec::new(),
             base_cell: None,
         }
     }
@@ -543,6 +545,7 @@ impl<'a> FormulaParser<'a> {
             extra_offset: 0,
             validate_extra: true,
             memory_expression_ends: Vec::new(),
+            control_flow_targets: Vec::new(),
             base_cell: None,
         }
     }
@@ -556,6 +559,7 @@ impl<'a> FormulaParser<'a> {
             extra_offset: 0,
             validate_extra: false,
             memory_expression_ends: Vec::new(),
+            control_flow_targets: Vec::new(),
             base_cell: Some((row, col)),
         }
     }
@@ -569,6 +573,7 @@ impl<'a> FormulaParser<'a> {
             extra_offset: 0,
             validate_extra: true,
             memory_expression_ends: Vec::new(),
+            control_flow_targets: Vec::new(),
             base_cell: Some((row, col)),
         }
     }
@@ -592,6 +597,16 @@ impl<'a> FormulaParser<'a> {
         {
             return Err(XlsbError::InvalidFormula(format!(
                 "memory expression ends at byte {end}, which is not a token boundary"
+            )));
+        }
+
+        if let Some(target) = self
+            .control_flow_targets
+            .iter()
+            .find(|target| boundaries.binary_search(target).is_err())
+        {
+            return Err(XlsbError::InvalidFormula(format!(
+                "control-flow target byte {target} is not a token boundary"
             )));
         }
 
@@ -774,7 +789,30 @@ impl<'a> FormulaParser<'a> {
                 XlsbError::InvalidFormula("PtgAttrChoose offset count overflow".to_string())
             })?;
             self.require(byte_len, "PtgAttrChoose offsets")?;
+            let offsets = self.data[self.offset..self.offset + byte_len]
+                .chunks_exact(2)
+                .map(|bytes| usize::from(u16::from_le_bytes([bytes[0], bytes[1]])))
+                .collect::<Vec<_>>();
             self.offset += byte_len;
+            if offsets[0] != byte_len {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "PtgAttrChoose first offset is {}, expected {byte_len}",
+                    offsets[0]
+                )));
+            }
+            self.control_flow_targets.push(self.offset);
+            for offset in &offsets[1..] {
+                let target = self.offset.checked_add(*offset).ok_or_else(|| {
+                    XlsbError::InvalidFormula("PtgAttrChoose target overflow".to_string())
+                })?;
+                if target > self.data.len() {
+                    return Err(XlsbError::InvalidFormula(format!(
+                        "PtgAttrChoose target byte {target} exceeds formula length {}",
+                        self.data.len()
+                    )));
+                }
+                self.control_flow_targets.push(target);
+            }
             return Ok(FormulaToken::Attribute(selector));
         }
 
@@ -783,7 +821,25 @@ impl<'a> FormulaParser<'a> {
             // a two-byte selector-specific payload after the selector byte.
             0x01 | 0x02 | 0x08 | 0x10 | 0x20 | 0x21 | 0x40 | 0x41 | 0x80 => {
                 self.require(2, "PtgAttr payload")?;
+                let offset = usize::from(binary::read_u16_le_at(self.data, self.offset)?);
                 self.offset += 2;
+                if matches!(selector, 0x02 | 0x08 | 0x80) {
+                    let adjustment = usize::from(selector == 0x08);
+                    let target = self
+                        .offset
+                        .checked_add(offset)
+                        .and_then(|value| value.checked_add(adjustment))
+                        .ok_or_else(|| {
+                            XlsbError::InvalidFormula("PtgAttr target overflow".to_string())
+                        })?;
+                    if target > self.data.len() {
+                        return Err(XlsbError::InvalidFormula(format!(
+                            "PtgAttr target byte {target} exceeds formula length {}",
+                            self.data.len()
+                        )));
+                    }
+                    self.control_flow_targets.push(target);
+                }
                 if selector == 0x10 {
                     // PtgAttrSum is semantically SUM(expression).
                     Ok(FormulaToken::Function {
@@ -2109,6 +2165,15 @@ impl<'a> FormulaCompiler<'a> {
                 });
             },
             CompileExpr::Function(function, arguments) => {
+                if function.index == 1 {
+                    return Self::emit_if(arguments, output, extra, encoding);
+                }
+                if function.index == 100 {
+                    return Self::emit_choose(arguments, output, extra, encoding);
+                }
+                if function.index == 480 {
+                    return Self::emit_iferror(arguments, output, extra, encoding);
+                }
                 for argument in arguments {
                     Self::emit(argument, output, extra, encoding)?;
                 }
@@ -2124,6 +2189,122 @@ impl<'a> FormulaCompiler<'a> {
         }
         Ok(())
     }
+
+    fn emit_if(
+        arguments: &[CompileExpr],
+        output: &mut Vec<u8>,
+        extra: &mut Vec<u8>,
+        encoding: FormulaEncoding,
+    ) -> XlsbResult<()> {
+        debug_assert!(matches!(arguments.len(), 2 | 3));
+        Self::emit(&arguments[0], output, extra, encoding)?;
+        let attr_if = append_attribute(output, 0x02, 0);
+        Self::emit(&arguments[1], output, extra, encoding)?;
+        let goto_true = append_attribute(output, 0x08, 0);
+        let goto_false = if arguments.len() == 3 {
+            Self::emit(&arguments[2], output, extra, encoding)?;
+            Some(append_attribute(output, 0x08, 0))
+        } else {
+            None
+        };
+        output.extend_from_slice(&[0x42, arguments.len() as u8, 0x01, 0x00]);
+
+        patch_attribute_offset(output, attr_if, goto_true + 4 - (attr_if + 4))?;
+        patch_skip_to_end(output, goto_true)?;
+        if let Some(position) = goto_false {
+            patch_skip_to_end(output, position)?;
+        }
+        Ok(())
+    }
+
+    fn emit_iferror(
+        arguments: &[CompileExpr],
+        output: &mut Vec<u8>,
+        extra: &mut Vec<u8>,
+        encoding: FormulaEncoding,
+    ) -> XlsbResult<()> {
+        debug_assert_eq!(arguments.len(), 2);
+        Self::emit(&arguments[0], output, extra, encoding)?;
+        let attr_if_error = append_attribute(output, 0x80, 0);
+        Self::emit(&arguments[1], output, extra, encoding)?;
+        let goto = append_attribute(output, 0x08, 0);
+        output.extend_from_slice(&[0x41, 0xE0, 0x01]);
+
+        patch_attribute_offset(output, attr_if_error, goto + 4 - (attr_if_error + 4))?;
+        patch_skip_to_end(output, goto)?;
+        Ok(())
+    }
+
+    fn emit_choose(
+        arguments: &[CompileExpr],
+        output: &mut Vec<u8>,
+        extra: &mut Vec<u8>,
+        encoding: FormulaEncoding,
+    ) -> XlsbResult<()> {
+        debug_assert!((2..=255).contains(&arguments.len()));
+        Self::emit(&arguments[0], output, extra, encoding)?;
+        let choice_count = arguments.len() - 1;
+        let attr_choose = output.len();
+        output.extend_from_slice(&[ptg_types::PTG_ATTR, 0x04]);
+        output.extend_from_slice(&(choice_count as u16).to_le_bytes());
+        output.resize(output.len() + (choice_count + 1) * 2, 0);
+        let attr_size = output.len() - attr_choose;
+        patch_u16(
+            output,
+            attr_choose + 4,
+            attr_size - 4,
+            "PtgAttrChoose first offset",
+        )?;
+
+        let mut gotos = Vec::with_capacity(choice_count);
+        for (index, argument) in arguments[1..].iter().enumerate() {
+            Self::emit(argument, output, extra, encoding)?;
+            gotos.push(append_attribute(output, 0x08, 0));
+            let cumulative = output.len() - (attr_choose + attr_size);
+            patch_u16(
+                output,
+                attr_choose + 6 + index * 2,
+                cumulative,
+                "PtgAttrChoose branch offset",
+            )?;
+        }
+        output.extend_from_slice(&[0x42, arguments.len() as u8, 0x64, 0x00]);
+        for goto in gotos {
+            patch_skip_to_end(output, goto)?;
+        }
+        Ok(())
+    }
+}
+
+fn append_attribute(output: &mut Vec<u8>, selector: u8, offset: u16) -> usize {
+    let position = output.len();
+    output.extend_from_slice(&[ptg_types::PTG_ATTR, selector]);
+    output.extend_from_slice(&offset.to_le_bytes());
+    position
+}
+
+fn patch_attribute_offset(output: &mut [u8], position: usize, offset: usize) -> XlsbResult<()> {
+    patch_u16(output, position + 2, offset, "PtgAttr offset")
+}
+
+fn patch_skip_to_end(output: &mut [u8], position: usize) -> XlsbResult<()> {
+    let remaining = output.len().checked_sub(position + 4).ok_or_else(|| {
+        XlsbError::InvalidFormula("PtgAttrGoTo position exceeds formula".to_string())
+    })?;
+    let offset = remaining.checked_sub(1).ok_or_else(|| {
+        XlsbError::InvalidFormula("PtgAttrGoTo has no following token".to_string())
+    })?;
+    patch_attribute_offset(output, position, offset)
+}
+
+fn patch_u16(output: &mut [u8], position: usize, value: usize, context: &str) -> XlsbResult<()> {
+    let value = u16::try_from(value)
+        .map_err(|_| XlsbError::InvalidFormula(format!("{context} exceeds 65,535 bytes")))?;
+    let target = output.get_mut(position..position + 2).ok_or_else(|| {
+        XlsbError::InvalidFormula(format!("{context} position is outside formula"))
+    })?;
+    target.copy_from_slice(&value.to_le_bytes());
+    Ok(())
 }
 
 fn validate_xnum(value: f64, context: &str) -> XlsbResult<()> {
@@ -2346,6 +2527,54 @@ mod tests {
                 0x44, 0x0C, 0x00, 0x00, 0x00, 0x02, 0xC0, 0x1E, 0x02, 0x00, 0x05,
             ]
         );
+    }
+
+    #[test]
+    fn compiler_emits_conditional_control_flow_attributes() {
+        assert_eq!(
+            FormulaCompiler::compile("IF(TRUE,1,2)").unwrap().rgce,
+            vec![
+                0x1D, 0x01, 0x19, 0x02, 0x07, 0x00, 0x1E, 0x01, 0x00, 0x19, 0x08, 0x0A, 0x00, 0x1E,
+                0x02, 0x00, 0x19, 0x08, 0x03, 0x00, 0x42, 0x03, 0x01, 0x00,
+            ]
+        );
+        assert_eq!(
+            FormulaCompiler::compile("IFERROR(1,2)").unwrap().rgce,
+            vec![
+                0x1E, 0x01, 0x00, 0x19, 0x80, 0x07, 0x00, 0x1E, 0x02, 0x00, 0x19, 0x08, 0x02, 0x00,
+                0x41, 0xE0, 0x01,
+            ]
+        );
+        assert_eq!(
+            FormulaCompiler::compile("CHOOSE(2,10,20)").unwrap().rgce,
+            vec![
+                0x1E, 0x02, 0x00, 0x19, 0x04, 0x02, 0x00, 0x06, 0x00, 0x07, 0x00, 0x0E, 0x00, 0x1E,
+                0x0A, 0x00, 0x19, 0x08, 0x0A, 0x00, 0x1E, 0x14, 0x00, 0x19, 0x08, 0x03, 0x00, 0x42,
+                0x03, 0x64, 0x00,
+            ]
+        );
+
+        for source in ["IF(TRUE,1,2)", "IFERROR(1,2)", "CHOOSE(2,10,20)"] {
+            let compiled = FormulaCompiler::compile(source).unwrap();
+            let tokens = FormulaParser::new(&compiled.rgce).parse().unwrap();
+            assert_eq!(
+                FormulaConverter::try_tokens_to_string(&tokens).unwrap(),
+                source
+            );
+        }
+
+        let mut malformed_if = FormulaCompiler::compile("IF(TRUE,1,2)").unwrap().rgce;
+        malformed_if[4] = 6;
+        assert!(matches!(
+            FormulaParser::new(&malformed_if).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+        let mut malformed_choose = FormulaCompiler::compile("CHOOSE(2,10,20)").unwrap().rgce;
+        malformed_choose[7] = 5;
+        assert!(matches!(
+            FormulaParser::new(&malformed_choose).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
     }
 
     #[test]
@@ -2578,23 +2807,14 @@ mod tests {
             "SUM(1)"
         );
 
-        let attr_choose = [
-            ptg_types::PTG_ATTR,
-            0x04,
-            0x01,
-            0x00, // two offsets
-            0x02,
-            0x00,
-            0x04,
-            0x00,
-        ];
+        let attr_choose = [ptg_types::PTG_ATTR, 0x04, 0x00, 0x00, 0x02, 0x00];
         assert_eq!(
             FormulaParser::new(&attr_choose).parse().unwrap(),
             vec![FormulaToken::Attribute(0x04)]
         );
 
         assert!(matches!(
-            FormulaParser::new(&attr_choose[..7]).parse(),
+            FormulaParser::new(&attr_choose[..5]).parse(),
             Err(XlsbError::InvalidFormula(_))
         ));
     }
