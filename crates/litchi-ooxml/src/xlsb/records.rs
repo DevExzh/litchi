@@ -308,6 +308,7 @@ pub mod record_types {
     // Protection
     pub const BOOK_PROTECTION: u16 = 0x0216;
     pub const SHEET_PROTECTION: u16 = 0x0217;
+    pub const SHEET_PROTECTION_ISO: u16 = 0x02A6;
     pub const RANGE_PROTECTION: u16 = 0x0218;
 
     // Miscellaneous

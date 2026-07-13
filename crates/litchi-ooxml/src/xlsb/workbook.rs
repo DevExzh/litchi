@@ -497,6 +497,7 @@ impl XlsbWorkbook {
         worksheet.set_row_infos(cells_reader.row_infos);
         worksheet.set_auto_filter(cells_reader.auto_filter);
         worksheet.set_sheet_protection(cells_reader.sheet_protection);
+        worksheet.set_strong_sheet_protection(cells_reader.strong_sheet_protection);
 
         Ok(worksheet)
     }

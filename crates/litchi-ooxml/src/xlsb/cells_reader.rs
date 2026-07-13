@@ -9,7 +9,9 @@ use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
 use crate::xlsb::records::{RecordIter, record_types};
 use crate::xlsb::shared_strings::SharedString;
-use crate::xlsb::worksheet::{XlsbAutoFilter, XlsbColumnInfo, XlsbRowInfo, XlsbSheetProtection};
+use crate::xlsb::worksheet::{
+    XlsbAutoFilter, XlsbColumnInfo, XlsbRowInfo, XlsbSheetProtection, XlsbStrongProtection,
+};
 use litchi_core::binary;
 use litchi_core::sheet::CellValue;
 use std::io::{Read, Seek};
@@ -65,6 +67,8 @@ where
     pub auto_filter: Option<XlsbAutoFilter>,
     /// Worksheet protection settings.
     pub sheet_protection: Option<XlsbSheetProtection>,
+    /// ISO strong password-verifier metadata.
+    pub strong_sheet_protection: Option<XlsbStrongProtection>,
 }
 
 impl<'a, RS> XlsbCellsReader<'a, RS>
@@ -127,6 +131,7 @@ where
             row_infos: Vec::new(),
             auto_filter: None,
             sheet_protection: None,
+            strong_sheet_protection: None,
         })
     }
 
@@ -777,6 +782,35 @@ where
                     }
                     self.sheet_protection = Some(Self::parse_sheet_protection(&self.buf)?);
                 },
+                record_types::SHEET_PROTECTION_ISO => {
+                    if self.sheet_protection.is_some() || self.strong_sheet_protection.is_some() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtSheetProtectionIso".to_string(),
+                            val: "duplicate protection record".to_string(),
+                        });
+                    }
+                    let (strong, iso_flags) = Self::parse_strong_sheet_protection(&self.buf)?;
+                    self.buf.clear();
+                    let next_type = self.iter.read_type()?;
+                    let _ = self.iter.fill_buffer(&mut self.buf)?;
+                    if next_type != record_types::SHEET_PROTECTION {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtSheetProtectionIso".to_string(),
+                            val: "not immediately followed by BrtSheetProtection".to_string(),
+                        });
+                    }
+                    let base = Self::parse_sheet_protection(&self.buf)?;
+                    if base.password_hash.is_some()
+                        || Self::sheet_protection_flags(&base) != iso_flags
+                    {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtSheetProtectionIso".to_string(),
+                            val: "following protection record does not match".to_string(),
+                        });
+                    }
+                    self.sheet_protection = Some(base);
+                    self.strong_sheet_protection = Some(strong);
+                },
                 0x0082 => {
                     // BrtEndSheet - end of worksheet
                     break;
@@ -884,6 +918,151 @@ where
         })
     }
 
+    fn sheet_protection_flags(protection: &XlsbSheetProtection) -> [bool; 16] {
+        [
+            protection.locked,
+            protection.allow_edit_objects,
+            protection.allow_edit_scenarios,
+            protection.allow_format_cells,
+            protection.allow_format_columns,
+            protection.allow_format_rows,
+            protection.allow_insert_columns,
+            protection.allow_insert_rows,
+            protection.allow_insert_hyperlinks,
+            protection.allow_delete_columns,
+            protection.allow_delete_rows,
+            protection.allow_select_locked_cells,
+            protection.allow_sort,
+            protection.allow_auto_filter,
+            protection.allow_pivot_tables,
+            protection.allow_select_unlocked_cells,
+        ]
+    }
+
+    fn parse_strong_sheet_protection(
+        data: &[u8],
+    ) -> XlsbResult<(XlsbStrongProtection, [bool; 16])> {
+        if data.len() < 83 {
+            return Err(XlsbError::InvalidLength {
+                expected: 83,
+                found: data.len(),
+            });
+        }
+        let spin_count = binary::read_u32_le_at(data, 0)?;
+        if spin_count > 10_000_000 {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtSheetProtectionIso dwSpinCount".to_string(),
+                val: spin_count.to_string(),
+            });
+        }
+        let mut flags = [false; 16];
+        for (index, flag) in flags.iter_mut().enumerate() {
+            let value = binary::read_u32_le_at(data, 4 + index * 4)?;
+            if value > 1 {
+                return Err(XlsbError::Unrecognized {
+                    typ: "BrtSheetProtectionIso Boolean".to_string(),
+                    val: format!("field {index}: {value}"),
+                });
+            }
+            *flag = value != 0;
+        }
+        let mut offset = 68;
+        let hash = Self::read_length_prefixed_bytes(data, &mut offset, "rgbHash")?;
+        if hash.is_empty() {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtSheetProtectionIso rgbHash".to_string(),
+                val: "empty".to_string(),
+            });
+        }
+        let salt = Self::read_length_prefixed_bytes(data, &mut offset, "rgbSalt")?;
+        let algorithm = Self::read_nullable_wide_string(data, &mut offset)?
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| XlsbError::Unrecognized {
+                typ: "BrtSheetProtectionIso szAlgName".to_string(),
+                val: "null or empty".to_string(),
+            })?;
+        if offset != data.len() {
+            return Err(XlsbError::Unrecognized {
+                typ: "BrtSheetProtectionIso".to_string(),
+                val: format!("{} trailing bytes", data.len() - offset),
+            });
+        }
+        Ok((
+            XlsbStrongProtection {
+                spin_count,
+                hash,
+                salt,
+                algorithm,
+            },
+            flags,
+        ))
+    }
+
+    fn read_length_prefixed_bytes(
+        data: &[u8],
+        offset: &mut usize,
+        field: &str,
+    ) -> XlsbResult<Vec<u8>> {
+        let data_offset = offset.checked_add(4).ok_or_else(|| {
+            XlsbError::Encoding(format!("BrtSheetProtectionIso {field} offset overflow"))
+        })?;
+        if data_offset > data.len() {
+            return Err(XlsbError::InvalidLength {
+                expected: data_offset,
+                found: data.len(),
+            });
+        }
+        let count = binary::read_u32_le_at(data, *offset)? as usize;
+        let end = data_offset.checked_add(count).ok_or_else(|| {
+            XlsbError::Encoding(format!("BrtSheetProtectionIso {field} size overflow"))
+        })?;
+        if end > data.len() {
+            return Err(XlsbError::InvalidLength {
+                expected: end,
+                found: data.len(),
+            });
+        }
+        *offset = end;
+        Ok(data[data_offset..end].to_vec())
+    }
+
+    fn read_nullable_wide_string(data: &[u8], offset: &mut usize) -> XlsbResult<Option<String>> {
+        let text_offset = offset
+            .checked_add(4)
+            .ok_or_else(|| XlsbError::Encoding("ISO algorithm offset overflow".to_string()))?;
+        if text_offset > data.len() {
+            return Err(XlsbError::InvalidLength {
+                expected: text_offset,
+                found: data.len(),
+            });
+        }
+        let count = binary::read_u32_le_at(data, *offset)?;
+        if count == u32::MAX {
+            *offset = text_offset;
+            return Ok(None);
+        }
+        let byte_count = (count as usize)
+            .checked_mul(2)
+            .ok_or_else(|| XlsbError::Encoding("ISO algorithm size overflow".to_string()))?;
+        let end = text_offset
+            .checked_add(byte_count)
+            .ok_or_else(|| XlsbError::Encoding("ISO algorithm end overflow".to_string()))?;
+        if end > data.len() {
+            return Err(XlsbError::InvalidLength {
+                expected: end,
+                found: data.len(),
+            });
+        }
+        let units = data[text_offset..end]
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect::<Vec<_>>();
+        let value = String::from_utf16(&units)
+            .map_err(|error| XlsbError::Encoding(format!("invalid ISO algorithm: {error}")))?;
+        *offset = end;
+        Ok(Some(value))
+    }
+
     /// Read merged cells section
     fn read_merged_cells(&mut self) -> XlsbResult<()> {
         loop {
@@ -981,6 +1160,60 @@ mod tests {
             Reader::decode_cell_header(&reserved, 1),
             Err(XlsbError::Unrecognized { .. })
         ));
+    }
+
+    #[test]
+    fn parses_iso_sheet_protection_metadata_and_matching_flags() {
+        type Reader<'a> = XlsbCellsReader<'a, std::io::Cursor<&'a [u8]>>;
+        let flags = [
+            true, false, true, false, true, false, true, false, true, false, true, false, true,
+            false, true, false,
+        ];
+        let mut iso = 250_000u32.to_le_bytes().to_vec();
+        for flag in flags {
+            iso.extend_from_slice(&u32::from(flag).to_le_bytes());
+        }
+        iso.extend_from_slice(&3u32.to_le_bytes());
+        iso.extend_from_slice(&[1, 2, 3]);
+        iso.extend_from_slice(&2u32.to_le_bytes());
+        iso.extend_from_slice(&[4, 5]);
+        iso.extend_from_slice(&7u32.to_le_bytes());
+        for unit in "SHA-512".encode_utf16() {
+            iso.extend_from_slice(&unit.to_le_bytes());
+        }
+
+        let (strong, parsed_flags) = Reader::parse_strong_sheet_protection(&iso).unwrap();
+        assert_eq!(strong.spin_count, 250_000);
+        assert_eq!(strong.hash, vec![1, 2, 3]);
+        assert_eq!(strong.salt, vec![4, 5]);
+        assert_eq!(strong.algorithm, "SHA-512");
+        assert_eq!(parsed_flags, flags);
+
+        let mut base = 0u16.to_le_bytes().to_vec();
+        for flag in flags {
+            base.extend_from_slice(&u32::from(flag).to_le_bytes());
+        }
+        let protection = Reader::parse_sheet_protection(&base).unwrap();
+        assert_eq!(Reader::sheet_protection_flags(&protection), flags);
+
+        let mut worksheet = Vec::new();
+        let mut writer = RecordWriter::new(&mut worksheet);
+        writer.write_record(0x0094, &[0; 16]).unwrap();
+        writer.write_record(0x0091, &[]).unwrap();
+        writer.write_record(0x0092, &[]).unwrap();
+        writer
+            .write_record(record_types::SHEET_PROTECTION_ISO, &iso)
+            .unwrap();
+        writer
+            .write_record(record_types::SHEET_PROTECTION, &base)
+            .unwrap();
+        writer.write_record(0x0082, &[]).unwrap();
+        let formula_context = FormulaResolutionContext::default();
+        let iter = RecordIter::new(std::io::Cursor::new(worksheet));
+        let mut reader = XlsbCellsReader::new(iter, &[], &formula_context, 1).unwrap();
+        assert!(reader.next_cell().unwrap().is_none());
+        assert_eq!(reader.sheet_protection.unwrap(), protection);
+        assert_eq!(reader.strong_sheet_protection.unwrap(), strong);
     }
 
     #[test]

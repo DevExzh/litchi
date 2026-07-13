@@ -97,6 +97,19 @@ pub struct XlsbSheetProtection {
     pub allow_select_unlocked_cells: bool,
 }
 
+/// Strong password-verifier metadata from `BrtSheetProtectionIso`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsbStrongProtection {
+    /// Number of password-hash iterations, at most 10,000,000.
+    pub spin_count: u32,
+    /// Calculated password hash bytes.
+    pub hash: Vec<u8>,
+    /// Salt bytes used to calculate the hash.
+    pub salt: Vec<u8>,
+    /// Hash algorithm name, such as `SHA-512`.
+    pub algorithm: String,
+}
+
 /// XLSB worksheet implementation
 #[derive(Debug, Clone)]
 pub struct XlsbWorksheet {
@@ -111,6 +124,7 @@ pub struct XlsbWorksheet {
     row_infos: Vec<XlsbRowInfo>,
     auto_filter: Option<XlsbAutoFilter>,
     sheet_protection: Option<XlsbSheetProtection>,
+    strong_sheet_protection: Option<XlsbStrongProtection>,
 }
 
 impl XlsbWorksheet {
@@ -128,6 +142,7 @@ impl XlsbWorksheet {
             row_infos: Vec::new(),
             auto_filter: None,
             sheet_protection: None,
+            strong_sheet_protection: None,
         }
     }
 
@@ -175,6 +190,10 @@ impl XlsbWorksheet {
         self.sheet_protection = sheet_protection;
     }
 
+    pub(crate) fn set_strong_sheet_protection(&mut self, protection: Option<XlsbStrongProtection>) {
+        self.strong_sheet_protection = protection;
+    }
+
     /// Get all merged cells
     pub fn merged_cells(&self) -> &[MergedCell] {
         &self.merged_cells
@@ -208,6 +227,11 @@ impl XlsbWorksheet {
     /// Worksheet protection state and allowed operations, if enabled.
     pub fn sheet_protection(&self) -> Option<XlsbSheetProtection> {
         self.sheet_protection
+    }
+
+    /// Strong password-verifier metadata, if the ISO protection record exists.
+    pub fn strong_sheet_protection(&self) -> Option<&XlsbStrongProtection> {
+        self.strong_sheet_protection.as_ref()
     }
 }
 
