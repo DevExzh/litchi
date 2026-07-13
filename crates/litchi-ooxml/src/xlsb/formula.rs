@@ -983,6 +983,16 @@ impl<'a> FormulaParser<'a> {
         }
     }
 
+    fn validate_classed_token(&self, context: &str) -> XlsbResult<()> {
+        let token = self.data[self.offset - 1];
+        if token & 0x80 != 0 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "{context} token 0x{token:02X} has its reserved bit set"
+            )));
+        }
+        Ok(())
+    }
+
     /// Parse integer constant
     fn parse_int(&mut self) -> XlsbResult<FormulaToken> {
         self.require(2, "PtgInt")?;
@@ -1331,6 +1341,7 @@ impl<'a> FormulaParser<'a> {
 
     /// Parse cell reference
     fn parse_ref(&mut self, offset_reference: bool) -> XlsbResult<FormulaToken> {
+        self.validate_classed_token("PtgRef")?;
         self.require(6, "PtgRef")?;
 
         let row_data = binary::read_u32_le_at(self.data, self.offset)?;
@@ -1358,6 +1369,7 @@ impl<'a> FormulaParser<'a> {
 
     /// Parse area reference
     fn parse_area(&mut self, offset_reference: bool) -> XlsbResult<FormulaToken> {
+        self.validate_classed_token("PtgArea")?;
         self.require(12, "PtgArea")?;
 
         let row_first_data = binary::read_u32_le_at(self.data, self.offset)?;
@@ -1384,6 +1396,7 @@ impl<'a> FormulaParser<'a> {
             col_last_relative,
             offset_reference,
         )?;
+        FormulaRange::new(row_first, row_last, col_first, col_last)?;
 
         Ok(FormulaToken::AreaRef {
             row_first,
@@ -1487,6 +1500,11 @@ impl<'a> FormulaParser<'a> {
         offset_reference: bool,
     ) -> XlsbResult<(u32, u32)> {
         if !offset_reference {
+            if row_data >= 1_048_576 || col_data >= 16_384 {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "reference ({row_data}, {col_data}) is outside the worksheet"
+                )));
+            }
             return Ok((row_data, u32::from(col_data)));
         }
         let (base_row, base_col) = self.base_cell.ok_or_else(|| {
@@ -1520,6 +1538,7 @@ impl<'a> FormulaParser<'a> {
 
     /// Parse function with fixed arguments
     fn parse_func(&mut self) -> XlsbResult<FormulaToken> {
+        self.validate_classed_token("PtgFunc")?;
         self.require(2, "PtgFunc")?;
 
         let index = binary::read_u16_le_at(self.data, self.offset)?;
@@ -1536,6 +1555,7 @@ impl<'a> FormulaParser<'a> {
 
     /// Parse function with variable arguments
     fn parse_func_var(&mut self) -> XlsbResult<FormulaToken> {
+        self.validate_classed_token("PtgFuncVar")?;
         self.require(3, "PtgFuncVar")?;
 
         let arg_count = self.data[self.offset];
@@ -1570,6 +1590,7 @@ impl<'a> FormulaParser<'a> {
 
     /// Parse defined name reference
     fn parse_name(&mut self) -> XlsbResult<FormulaToken> {
+        self.validate_classed_token("PtgName")?;
         self.require(4, "PtgName")?;
 
         let name_index = binary::read_u32_le_at(self.data, self.offset)?;
@@ -1584,6 +1605,7 @@ impl<'a> FormulaParser<'a> {
     }
 
     fn parse_name_x(&mut self) -> XlsbResult<FormulaToken> {
+        self.validate_classed_token("PtgNameX")?;
         self.require(6, "PtgNameX")?;
         let sheet_index = binary::read_u16_le_at(self.data, self.offset)?;
         let name_index = binary::read_u32_le_at(self.data, self.offset + 2)?;
@@ -3601,6 +3623,33 @@ mod tests {
         assert!(matches!(
             FormulaParser::new(&[0x5B; 14]).parse(),
             Err(XlsbError::InvalidFormula(_))
+        ));
+    }
+
+    #[test]
+    fn parser_rejects_reserved_class_bits_and_invalid_absolute_ranges() {
+        for bytes in [
+            vec![0xA4, 0, 0, 0, 0, 0, 0],
+            vec![0xA1, 0, 0],
+            vec![0xC3, 1, 0, 0, 0],
+            vec![0xB9, 0, 0, 1, 0, 0, 0],
+        ] {
+            assert!(matches!(
+                FormulaParser::new(&bytes).parse(),
+                Err(XlsbError::InvalidFormula(_))
+            ));
+        }
+
+        let row_past_end = [0x44, 0x00, 0x00, 0x10, 0x00, 0, 0];
+        assert!(matches!(
+            FormulaParser::new(&row_past_end).parse(),
+            Err(XlsbError::InvalidFormula(_))
+        ));
+
+        let reversed_area = [0x45, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        assert!(matches!(
+            FormulaParser::new(&reversed_area).parse(),
+            Err(XlsbError::InvalidCellReference(_))
         ));
     }
 
