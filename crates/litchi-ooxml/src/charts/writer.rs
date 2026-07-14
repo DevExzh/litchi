@@ -4,8 +4,8 @@
 
 use crate::charts::axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
 use crate::charts::chart::{
-    Chart, ChartHeaderFooter, ChartPageMargins, ChartPageSetup, ChartPrintSettings, PivotFormat,
-    PivotSource, View3D, WallFloor,
+    Chart, ChartHeaderFooter, ChartPageMargins, ChartPageSetup, ChartPrintSettings,
+    ChartProtection, PivotFormat, PivotSource, View3D, WallFloor,
 };
 use crate::charts::legend::Legend;
 use crate::charts::models::{Layout, NumericData, StringData, TitleText};
@@ -120,6 +120,9 @@ pub fn write_chart<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<(
     if let Some(source) = chart.pivot_source.as_ref() {
         write_pivot_source(writer, source)?;
     }
+    if let Some(protection) = chart.protection.as_ref() {
+        write_chart_protection(writer, protection)?;
+    }
 
     write!(writer, "<c:chart>")?;
 
@@ -227,6 +230,30 @@ fn write_pivot_source<W: Write>(writer: &mut W, source: &PivotSource) -> std::io
         escape_xml(&source.name),
         source.format_id
     )?;
+    Ok(())
+}
+
+fn write_chart_protection<W: Write>(
+    writer: &mut W,
+    protection: &ChartProtection,
+) -> std::io::Result<()> {
+    write!(writer, "<c:protection>")?;
+    for (name, value) in [
+        ("chartObject", protection.chart_object),
+        ("data", protection.data),
+        ("formatting", protection.formatting),
+        ("selection", protection.selection),
+        ("userInterface", protection.user_interface),
+    ] {
+        if let Some(value) = value {
+            write!(
+                writer,
+                r#"<c:{name} val="{}"/>"#,
+                if value { "1" } else { "0" }
+            )?;
+        }
+    }
+    write!(writer, "</c:protection>")?;
     Ok(())
 }
 

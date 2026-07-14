@@ -9,7 +9,7 @@ use crate::charts::axis::{
 };
 use crate::charts::chart::{
     Chart, ChartHeaderFooter, ChartPageMargins, ChartPageOrientation, ChartPageSetup,
-    ChartPrintSettings, PivotFormat, PivotSource, View3D, WallFloor,
+    ChartPrintSettings, ChartProtection, PivotFormat, PivotSource, View3D, WallFloor,
 };
 use crate::charts::legend::{Legend, LegendEntry};
 use crate::charts::models::{
@@ -247,6 +247,22 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
                     "chart pivot source requires a name and format ID".into(),
                 ));
             },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"protection" => {
+                if chart.protection.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate protection settings".into(),
+                    ));
+                }
+                chart.protection = Some(parse_chart_protection(&mut xml_reader)?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"protection" => {
+                if chart.protection.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate protection settings".into(),
+                    ));
+                }
+                chart.protection = Some(ChartProtection::default());
+            },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"pivotFmts" => {
                 if chart.pivot_formats.is_some() {
                     return Err(OoxmlError::InvalidFormat(
@@ -412,6 +428,69 @@ fn parse_pivot_source<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
         name.ok_or_else(|| missing_attribute("chart pivot-source name"))?,
         format_id.ok_or_else(|| missing_attribute("chart pivot-source format ID"))?,
     ))
+}
+
+fn parse_chart_protection<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ChartProtection> {
+    let mut protection = ChartProtection::default();
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) => {
+                let field = match element.local_name().as_ref() {
+                    b"chartObject" => &mut protection.chart_object,
+                    b"data" => &mut protection.data,
+                    b"formatting" => &mut protection.formatting,
+                    b"selection" => &mut protection.selection,
+                    b"userInterface" => &mut protection.user_interface,
+                    _ => {
+                        buf.clear();
+                        continue;
+                    },
+                };
+                if field.is_some() {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "chart protection contains duplicate {} settings",
+                        String::from_utf8_lossy(element.local_name().as_ref())
+                    )));
+                }
+                *field = Some(parse_bool_attr(element)?);
+                let end_name = element.local_name().as_ref().to_vec();
+                consume_empty_chart_element(reader, &end_name, "chart protection switch")?;
+            },
+            Ok(Event::Empty(ref element)) => {
+                let field = match element.local_name().as_ref() {
+                    b"chartObject" => &mut protection.chart_object,
+                    b"data" => &mut protection.data,
+                    b"formatting" => &mut protection.formatting,
+                    b"selection" => &mut protection.selection,
+                    b"userInterface" => &mut protection.user_interface,
+                    _ => {
+                        buf.clear();
+                        continue;
+                    },
+                };
+                if field.is_some() {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "chart protection contains duplicate {} settings",
+                        String::from_utf8_lossy(element.local_name().as_ref())
+                    )));
+                }
+                *field = Some(parse_bool_attr(element)?);
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"protection" => {
+                return Ok(protection);
+            },
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart protection is not closed".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
 }
 
 fn parse_pivot_formats<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Vec<PivotFormat>> {
@@ -4434,6 +4513,49 @@ mod tests {
             br#"<c:pivotSource><c:fmtId val="1"/></c:pivotSource>"#.as_slice(),
             br#"<c:pivotSource><c:name>Pivot</c:name></c:pivotSource>"#.as_slice(),
             br#"<c:pivotSource/>"#.as_slice(),
+        ] {
+            let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">"#.to_vec();
+            document.extend_from_slice(invalid);
+            document.extend_from_slice(b"<c:chart><c:plotArea/></c:chart></c:chartSpace>");
+            assert!(parse_chart(document.as_slice()).is_err());
+        }
+    }
+
+    #[test]
+    fn round_trips_and_validates_chart_protection() {
+        let xml =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:protection><c:chartObject/><c:data val="0"/><c:formatting val="true"/>
+                <c:selection val="false"/><c:userInterface/></c:protection>
+            <c:chart><c:plotArea/></c:chart></c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let protection = chart.protection.as_ref().unwrap();
+        assert_eq!(protection.chart_object, Some(true));
+        assert_eq!(protection.data, Some(false));
+        assert_eq!(protection.formatting, Some(true));
+        assert_eq!(protection.selection, Some(false));
+        assert_eq!(protection.user_interface, Some(true));
+
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        let reparsed = parse_chart(output.as_slice()).unwrap();
+        let protection = reparsed.protection.as_ref().unwrap();
+        assert_eq!(protection.chart_object, Some(true));
+        assert_eq!(protection.selection, Some(false));
+
+        let empty =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:protection/><c:chart><c:plotArea/></c:chart></c:chartSpace>"#;
+        let empty = parse_chart(empty.as_slice()).unwrap();
+        let empty = empty.protection.as_ref().unwrap();
+        assert_eq!(empty.chart_object, None);
+        assert_eq!(empty.user_interface, None);
+
+        for invalid in [
+            br#"<c:protection><c:data/><c:data val="0"/></c:protection>"#.as_slice(),
+            br#"<c:protection><c:selection val="maybe"/></c:protection>"#.as_slice(),
+            br#"<c:protection/><c:protection/>"#.as_slice(),
+            br#"<c:protection><c:data><c:data/></c:data></c:protection>"#.as_slice(),
         ] {
             let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">"#.to_vec();
             document.extend_from_slice(invalid);

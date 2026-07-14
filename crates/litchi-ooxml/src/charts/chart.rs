@@ -209,6 +209,24 @@ impl PivotSource {
     }
 }
 
+/// Interaction restrictions applied when the containing sheet is protected.
+///
+/// Each switch is optional because an omitted switch is distinct from an
+/// explicitly enabled or disabled switch in the chart XML.
+#[derive(Debug, Clone, Default)]
+pub struct ChartProtection {
+    /// Prevent changes to the chart object
+    pub chart_object: Option<bool>,
+    /// Prevent changes to chart data
+    pub data: Option<bool>,
+    /// Prevent chart formatting changes
+    pub formatting: Option<bool>,
+    /// Prevent chart-element selection
+    pub selection: Option<bool>,
+    /// Prevent chart user-interface interaction
+    pub user_interface: Option<bool>,
+}
+
 impl PivotFormat {
     /// Create a pivot-format entry for one data point.
     #[inline]
@@ -341,6 +359,8 @@ pub struct Chart {
     pub language: Option<String>,
     /// Optional pivot-table source metadata
     pub pivot_source: Option<PivotSource>,
+    /// Optional chart interaction protection; `Some` preserves an empty wrapper
+    pub protection: Option<ChartProtection>,
     /// Use 1904 date system
     pub date_1904: bool,
     /// Rounding corners
@@ -371,6 +391,7 @@ impl Chart {
             style: None,
             language: None,
             pivot_source: None,
+            protection: None,
             date_1904: false,
             rounded_corners: false,
             print_settings: None,
