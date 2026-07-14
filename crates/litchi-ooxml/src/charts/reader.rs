@@ -10,7 +10,7 @@ use crate::charts::axis::{
 use crate::charts::chart::{Chart, View3D, WallFloor};
 use crate::charts::legend::Legend;
 use crate::charts::models::{
-    DataSourceRef, NumberFormat, NumericData, RichText, StringData, TitleText,
+    DataSourceRef, Layout, NumberFormat, NumericData, RichText, StringData, TitleText,
 };
 use crate::charts::plot_area::{
     Area3DTypeGroup, AreaTypeGroup, Bar3DTypeGroup, BarShape, BarTypeGroup, BubbleTypeGroup,
@@ -24,7 +24,8 @@ use crate::charts::series::{
 };
 use crate::charts::types::{
     AxisOrientation, AxisPosition, BarDirection, BarGrouping, DataLabelPosition, DisplayBlanks,
-    LegendPosition, MarkerStyle, RadarStyle, ScatterStyle, TickLabelPosition, TickMark,
+    LayoutMode, LayoutTarget, LegendPosition, MarkerStyle, RadarStyle, ScatterStyle,
+    TickLabelPosition, TickMark,
 };
 use crate::common::xml::decode_xml_reference;
 use crate::error::{OoxmlError, Result};
@@ -253,6 +254,9 @@ fn parse_plot_area<R: BufRead>(reader: &mut Reader<R>) -> Result<PlotArea> {
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"layout" => {
+                plot_area.layout = Some(parse_layout(reader)?);
+            },
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
@@ -367,6 +371,59 @@ fn parse_plot_area<R: BufRead>(reader: &mut Reader<R>) -> Result<PlotArea> {
     }
 
     Ok(plot_area)
+}
+
+fn parse_layout<R: BufRead>(reader: &mut Reader<R>) -> Result<Layout> {
+    let mut layout = Layout::new();
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => match e.local_name().as_ref() {
+                b"layoutTarget" => {
+                    layout.target = Some(
+                        match required_enum_attr(e, "chart layout target")?.as_str() {
+                            "inner" => LayoutTarget::Inner,
+                            "outer" => LayoutTarget::Outer,
+                            value => {
+                                return Err(invalid_attribute(
+                                    "chart layout target",
+                                    value.as_bytes(),
+                                ));
+                            },
+                        },
+                    );
+                },
+                b"xMode" => layout.x_mode = Some(parse_layout_mode(e)?),
+                b"yMode" => layout.y_mode = Some(parse_layout_mode(e)?),
+                b"wMode" => layout.width_mode = Some(parse_layout_mode(e)?),
+                b"hMode" => layout.height_mode = Some(parse_layout_mode(e)?),
+                b"x" => layout.x = Some(required_f64_attr(e, "chart layout X position")?),
+                b"y" => layout.y = Some(required_f64_attr(e, "chart layout Y position")?),
+                b"w" => layout.width = Some(required_f64_attr(e, "chart layout width")?),
+                b"h" => layout.height = Some(required_f64_attr(e, "chart layout height")?),
+                _ => {},
+            },
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"layout" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart layout".into(),
+                ));
+            },
+            Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok(layout)
+}
+
+fn parse_layout_mode(element: &BytesStart<'_>) -> Result<LayoutMode> {
+    let value = get_attr(element, b"val").ok_or_else(|| missing_attribute("chart layout mode"))?;
+    match value.as_slice() {
+        b"edge" => Ok(LayoutMode::Edge),
+        b"factor" => Ok(LayoutMode::Factor),
+        _ => Err(invalid_attribute("chart layout mode", &value)),
+    }
 }
 
 fn parse_common_type_group<R: BufRead>(
@@ -2568,6 +2625,11 @@ mod tests {
 
         let mut chart = Chart::new();
         chart.title = Some(TitleText::from_ref("Sheet1!$C$1"));
+        let mut layout = Layout::new().with_position(0.1, 0.2).with_size(0.7, 0.6);
+        layout.target = Some(LayoutTarget::Inner);
+        layout.x_mode = Some(LayoutMode::Factor);
+        layout.y_mode = Some(LayoutMode::Edge);
+        chart.plot_area.layout = Some(layout);
         chart.plot_area.axes = vec![
             Axis::Category(category),
             Axis::Value(value),
@@ -2584,6 +2646,14 @@ mod tests {
             panic!("expected chart title reference");
         };
         assert_eq!(title.formula, "Sheet1!$C$1");
+        let layout = parsed.plot_area.layout.as_ref().unwrap();
+        assert_eq!(layout.x, Some(0.1));
+        assert_eq!(layout.y, Some(0.2));
+        assert_eq!(layout.width, Some(0.7));
+        assert_eq!(layout.height, Some(0.6));
+        assert_eq!(layout.target, Some(LayoutTarget::Inner));
+        assert_eq!(layout.x_mode, Some(LayoutMode::Factor));
+        assert_eq!(layout.y_mode, Some(LayoutMode::Edge));
         assert_eq!(parsed.plot_area.axes.len(), 4);
 
         let Axis::Category(category) = &parsed.plot_area.axes[0] else {

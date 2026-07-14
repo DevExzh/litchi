@@ -5,7 +5,7 @@
 use crate::charts::axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
 use crate::charts::chart::{Chart, View3D, WallFloor};
 use crate::charts::legend::Legend;
-use crate::charts::models::{NumericData, StringData, TitleText};
+use crate::charts::models::{Layout, NumericData, StringData, TitleText};
 use crate::charts::plot_area::{
     Area3DTypeGroup, AreaTypeGroup, Bar3DTypeGroup, BarTypeGroup, BubbleTypeGroup,
     DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, Pie3DTypeGroup, PieTypeGroup, PlotArea,
@@ -251,7 +251,7 @@ fn write_wall_floor<W: Write>(writer: &mut W, wall_floor: &WallFloor) -> std::io
 
 fn write_plot_area<W: Write>(writer: &mut W, plot_area: &PlotArea) -> std::io::Result<()> {
     write!(writer, "<c:plotArea>")?;
-    write!(writer, "<c:layout/>")?;
+    write_layout(writer, plot_area.layout.as_ref())?;
 
     for type_group in &plot_area.type_groups {
         write_type_group(writer, type_group)?;
@@ -263,6 +263,50 @@ fn write_plot_area<W: Write>(writer: &mut W, plot_area: &PlotArea) -> std::io::R
 
     write!(writer, "</c:plotArea>")?;
 
+    Ok(())
+}
+
+fn write_layout<W: Write>(writer: &mut W, layout: Option<&Layout>) -> std::io::Result<()> {
+    let Some(layout) = layout else {
+        return write!(writer, "<c:layout/>");
+    };
+    for (name, value) in [
+        ("x", layout.x),
+        ("y", layout.y),
+        ("width", layout.width),
+        ("height", layout.height),
+    ] {
+        if value.is_some_and(|value| !value.is_finite()) {
+            return Err(invalid_chart_input(format!(
+                "chart layout {name} must be finite"
+            )));
+        }
+    }
+    write!(writer, "<c:layout><c:manualLayout>")?;
+    if let Some(target) = layout.target {
+        write!(writer, r#"<c:layoutTarget val="{}"/>"#, target.xml_value())?;
+    }
+    for (name, mode) in [
+        ("xMode", layout.x_mode),
+        ("yMode", layout.y_mode),
+        ("wMode", layout.width_mode),
+        ("hMode", layout.height_mode),
+    ] {
+        if let Some(mode) = mode {
+            write!(writer, r#"<c:{name} val="{}"/>"#, mode.xml_value())?;
+        }
+    }
+    for (name, value) in [
+        ("x", layout.x),
+        ("y", layout.y),
+        ("w", layout.width),
+        ("h", layout.height),
+    ] {
+        if let Some(value) = value {
+            write!(writer, r#"<c:{name} val="{value}"/>"#)?;
+        }
+    }
+    write!(writer, "</c:manualLayout></c:layout>")?;
     Ok(())
 }
 
