@@ -6,11 +6,13 @@
 use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
 use crate::ods::{
     CalculationSettings, Cell, CellAnnotation, CellDetective, CellRangeSource, CellValue, Column,
-    ContentValidation, DatabaseRange, LabelRange, NamedDefinition, NamedDefinitionScope,
-    NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings, SheetScenario, SheetStyle,
-    SheetTableSource, Spreadsheet, SpreadsheetProtection, TableStructure, TableVisibility,
+    Consolidation, ContentValidation, DatabaseRange, LabelRange, NamedDefinition,
+    NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings,
+    SheetScenario, SheetStyle, SheetTableSource, Spreadsheet, SpreadsheetProtection,
+    TableStructure, TableVisibility,
     calculation::write_calculation_settings,
     cell::{merge_cell_range, unmerge_cell_range},
+    consolidation::write_consolidation,
     data_validation::{validate_collection, write_content_validations},
     database_range::write_database_ranges,
     label_range::write_label_ranges,
@@ -67,6 +69,7 @@ pub struct MutableSpreadsheet {
     database_ranges: Vec<DatabaseRange>,
     calculation_settings: Option<CalculationSettings>,
     label_ranges: Vec<LabelRange>,
+    consolidation: Option<Consolidation>,
     protection: SpreadsheetProtection,
     /// Original package retained for copying auxiliary package parts.
     source_package: Option<OwnedPackage>,
@@ -152,6 +155,7 @@ impl MutableSpreadsheet {
         let database_ranges = spreadsheet.database_ranges().to_vec();
         let calculation_settings = spreadsheet.calculation_settings().cloned();
         let label_ranges = spreadsheet.label_ranges().to_vec();
+        let consolidation = spreadsheet.consolidation().cloned();
         let protection = spreadsheet.protection().clone();
         let mimetype = "application/vnd.oasis.opendocument.spreadsheet".to_string();
         let source_package = Some(spreadsheet.into_package());
@@ -168,6 +172,7 @@ impl MutableSpreadsheet {
             database_ranges,
             calculation_settings,
             label_ranges,
+            consolidation,
             protection,
             source_package,
         })
@@ -187,6 +192,7 @@ impl MutableSpreadsheet {
             database_ranges: Vec::new(),
             calculation_settings: None,
             label_ranges: Vec::new(),
+            consolidation: None,
             protection: SpreadsheetProtection::default(),
             source_package: None,
         }
@@ -259,6 +265,20 @@ impl MutableSpreadsheet {
     /// Remove a label range by index.
     pub fn remove_label_range(&mut self, index: usize) -> Option<LabelRange> {
         (index < self.label_ranges.len()).then(|| self.label_ranges.remove(index))
+    }
+
+    /// Return the inert spreadsheet consolidation declaration.
+    pub fn consolidation(&self) -> Option<&Consolidation> {
+        self.consolidation.as_ref()
+    }
+
+    /// Set or clear a validated spreadsheet consolidation declaration.
+    pub fn set_consolidation(&mut self, consolidation: Option<Consolidation>) -> Result<()> {
+        if let Some(consolidation) = &consolidation {
+            consolidation.validate()?;
+        }
+        self.consolidation = consolidation;
+        Ok(())
     }
 
     /// Return database ranges and their filter/sort metadata.
@@ -1362,6 +1382,7 @@ impl MutableSpreadsheet {
         );
 
         write_database_ranges(&mut body, &self.database_ranges)?;
+        write_consolidation(&mut body, self.consolidation.as_ref())?;
 
         let of_ns = if self.has_formulas() {
             " xmlns:of=\"urn:oasis:names:tc:opendocument:xmlns:of:1.2\""
@@ -1466,6 +1487,9 @@ impl MutableSpreadsheet {
         self.validate_content_validations()?;
         self.validate_database_ranges()?;
         self.validate_label_ranges()?;
+        if let Some(consolidation) = &self.consolidation {
+            consolidation.validate()?;
+        }
         let mut writer = PackageWriter::new();
 
         writer.set_mimetype(&self.mimetype)?;

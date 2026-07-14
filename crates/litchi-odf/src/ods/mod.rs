@@ -27,6 +27,7 @@
 //! - ✅ Inert formula-auditing highlights and operations (`table:detective`)
 //! - ✅ Formula calculation, null-date, and iteration settings
 //! - ✅ Row and column label ranges
+//! - ✅ Inert spreadsheet consolidation declarations
 //!
 //! ## ✅ Formula Support (`formula.rs`) - PARTIAL
 //! - ✅ Formula string representation
@@ -52,6 +53,7 @@
 //! - ✅ Create, edit, remove, and round-trip cell formula-auditing metadata
 //! - ✅ Create, edit, clear, and round-trip calculation settings
 //! - ✅ Create, edit, remove, and round-trip row/column label ranges
+//! - ✅ Create, edit, clear, and round-trip consolidation declarations
 //!
 //! ## 🚧 TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing (embedded charts)
@@ -70,6 +72,7 @@ mod annotation;
 mod builder;
 mod calculation;
 mod cell;
+mod consolidation;
 mod data_validation;
 mod database_range;
 mod detective;
@@ -94,6 +97,7 @@ pub use calculation::{
     CalculationIteration, CalculationNullDate, CalculationSettings, IterationStatus,
 };
 pub use cell::{Cell, CellMatrixSpan, CellMerge, CellValue};
+pub use consolidation::{Consolidation, ConsolidationUseLabels};
 pub use data_validation::{
     ContentValidation, ValidationDisplayList, ValidationErrorMacro, ValidationErrorMessage,
     ValidationEventListener, ValidationMessage, ValidationMessageType,

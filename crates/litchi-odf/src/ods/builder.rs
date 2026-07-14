@@ -5,11 +5,13 @@
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
     CalculationSettings, Cell, CellAnnotation, CellDetective, CellRangeSource, CellValue, Column,
-    ContentValidation, DatabaseRange, LabelRange, NamedDefinition, NamedDefinitionScope,
-    NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings, SheetScenario, SheetStyle,
-    SheetTableSource, SpreadsheetProtection, TableStructure, TableVisibility,
+    Consolidation, ContentValidation, DatabaseRange, LabelRange, NamedDefinition,
+    NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings,
+    SheetScenario, SheetStyle, SheetTableSource, SpreadsheetProtection, TableStructure,
+    TableVisibility,
     calculation::write_calculation_settings,
     cell::{merge_cell_range, unmerge_cell_range},
+    consolidation::write_consolidation,
     data_validation::{validate_collection, write_content_validations},
     database_range::write_database_ranges,
     label_range::write_label_ranges,
@@ -56,6 +58,7 @@ pub struct SpreadsheetBuilder {
     database_ranges: Vec<DatabaseRange>,
     calculation_settings: Option<CalculationSettings>,
     label_ranges: Vec<LabelRange>,
+    consolidation: Option<Consolidation>,
     protection: SpreadsheetProtection,
 }
 
@@ -84,6 +87,7 @@ impl SpreadsheetBuilder {
             database_ranges: Vec::new(),
             calculation_settings: None,
             label_ranges: Vec::new(),
+            consolidation: None,
             protection: SpreadsheetProtection::default(),
         }
     }
@@ -143,6 +147,20 @@ impl SpreadsheetBuilder {
 
     fn validate_label_ranges(&self) -> Result<()> {
         self.label_ranges.iter().try_for_each(LabelRange::validate)
+    }
+
+    /// Return the inert spreadsheet consolidation declaration.
+    pub fn consolidation(&self) -> Option<&Consolidation> {
+        self.consolidation.as_ref()
+    }
+
+    /// Set or clear a validated spreadsheet consolidation declaration.
+    pub fn set_consolidation(&mut self, consolidation: Option<Consolidation>) -> Result<&mut Self> {
+        if let Some(consolidation) = &consolidation {
+            consolidation.validate()?;
+        }
+        self.consolidation = consolidation;
+        Ok(self)
     }
 
     /// Return database ranges added to this spreadsheet.
@@ -1532,6 +1550,7 @@ impl SpreadsheetBuilder {
         );
 
         write_database_ranges(&mut body, &self.database_ranges)?;
+        write_consolidation(&mut body, self.consolidation.as_ref())?;
 
         Ok(body)
     }
@@ -1630,6 +1649,9 @@ impl SpreadsheetBuilder {
         self.validate_content_validations()?;
         self.validate_database_ranges()?;
         self.validate_label_ranges()?;
+        if let Some(consolidation) = &self.consolidation {
+            consolidation.validate()?;
+        }
         let mut writer = PackageWriter::new();
 
         // Set MIME type
