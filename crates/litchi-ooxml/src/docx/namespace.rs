@@ -1,6 +1,8 @@
 use crate::error::{OoxmlError, Result};
-use quick_xml::events::Event;
-use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::XmlVersion;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
 pub(crate) const WORDPROCESSINGML_NAMESPACE: &[u8] =
@@ -15,6 +17,41 @@ pub(crate) fn is_wordprocessing_namespace(namespace: &ResolveResult<'_>) -> bool
             if *value == WORDPROCESSINGML_NAMESPACE
                 || *value == STRICT_WORDPROCESSINGML_NAMESPACE
     )
+}
+
+pub(crate) fn word_attribute_value(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+) -> Result<Option<String>> {
+    let mut value = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        if attribute.key.local_name().as_ref() != name {
+            continue;
+        }
+        let (namespace, _) = resolver.resolve_attribute(attribute.key);
+        let is_word_attribute = is_wordprocessing_namespace(&namespace)
+            || matches!(namespace, ResolveResult::Unbound)
+            || matches!(namespace, ResolveResult::Unknown(prefix) if prefix.as_slice() == b"w");
+        if !is_word_attribute {
+            continue;
+        }
+        if value.is_some() {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "duplicate Word attribute '{}'",
+                String::from_utf8_lossy(name)
+            )));
+        }
+        value = Some(
+            attribute
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                .into_owned(),
+        );
+    }
+    Ok(value)
 }
 
 fn is_fragment_word_namespace(
