@@ -9,7 +9,8 @@ use crate::charts::axis::{
 };
 use crate::charts::chart::{
     Chart, ChartHeaderFooter, ChartPageMargins, ChartPageOrientation, ChartPageSetup,
-    ChartPrintSettings, ChartProtection, PivotFormat, PivotSource, View3D, WallFloor,
+    ChartPrintSettings, ChartProtection, ColorMapOverride, ColorMapping, ColorSchemeIndex,
+    PivotFormat, PivotSource, View3D, WallFloor,
 };
 use crate::charts::legend::{Legend, LegendEntry};
 use crate::charts::models::{
@@ -40,13 +41,15 @@ use quick_xml::reader::{Config, NsReader};
 use std::io::BufRead;
 
 const IGNORED_NAMESPACE_ELEMENT: &str = "ignoredNamespaceElement";
+const INVALID_COLOR_MAPPING_ELEMENT: &str = "invalidColorMappingElement";
 
 /// Namespace-aware streaming adapter for the chart model parser.
 ///
-/// Core chart elements are exposed unchanged, DrawingML text elements are kept so
-/// rich titles can be decoded, and all other namespaces are skipped as extension
-/// content. Rewriting the remaining DrawingML container names prevents them from
-/// being mistaken for same-local-name chart elements by the focused parsers below.
+/// Core chart elements are exposed unchanged. DrawingML text and color-map choice
+/// elements are also kept so their typed models can be decoded, while all other
+/// namespaces are skipped as extension content. Rewriting the remaining DrawingML
+/// container names prevents them from being mistaken for same-local-name chart
+/// elements by the focused parsers below.
 struct ChartXmlReader<R: BufRead> {
     inner: NsReader<R>,
     depth: usize,
@@ -99,12 +102,20 @@ impl<R: BufRead> ChartXmlReader<R> {
                     OoxmlError::InvalidFormat("chart XML nesting is too deep".to_string())
                 })?;
 
-                if self.skipped_depth > 0 || (!is_chart && !is_drawing) {
+                if self.skipped_depth > 0 {
                     self.skipped_depth = self.skipped_depth.checked_add(1).ok_or_else(|| {
                         OoxmlError::InvalidFormat("chart XML nesting is too deep".to_string())
                     })?;
                     element.set_name(IGNORED_NAMESPACE_ELEMENT.as_bytes());
-                } else if is_drawing && element.local_name().as_ref() != b"t" {
+                } else if is_chart && is_drawing_color_map_choice(element.local_name().as_ref()) {
+                    element.set_name(INVALID_COLOR_MAPPING_ELEMENT.as_bytes());
+                } else if !is_chart && !is_drawing {
+                    self.skipped_depth = self.skipped_depth.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("chart XML nesting is too deep".to_string())
+                    })?;
+                    element.set_name(IGNORED_NAMESPACE_ELEMENT.as_bytes());
+                } else if is_drawing && !is_preserved_drawing_element(element.local_name().as_ref())
+                {
                     element.set_name(IGNORED_NAMESPACE_ELEMENT.as_bytes());
                 }
                 Ok(Event::Start(element))
@@ -117,8 +128,12 @@ impl<R: BufRead> ChartXmlReader<R> {
                 }
                 let is_chart = is_chart_namespace(&namespace, &element);
                 let is_drawing = is_drawing_namespace(&namespace, &element);
-                if self.skipped_depth > 0
-                    || (!is_chart && (!is_drawing || element.local_name().as_ref() != b"t"))
+                if self.skipped_depth > 0 {
+                    element.set_name(IGNORED_NAMESPACE_ELEMENT.as_bytes());
+                } else if is_chart && is_drawing_color_map_choice(element.local_name().as_ref()) {
+                    element.set_name(INVALID_COLOR_MAPPING_ELEMENT.as_bytes());
+                } else if !is_chart
+                    && (!is_drawing || !is_preserved_drawing_element(element.local_name().as_ref()))
                 {
                     element.set_name(IGNORED_NAMESPACE_ELEMENT.as_bytes());
                 }
@@ -151,7 +166,7 @@ impl<R: BufRead> ChartXmlReader<R> {
                     }
                     self.closed_root = true;
                 }
-                if is_drawing && element.local_name().as_ref() != b"t" {
+                if is_drawing && !is_preserved_drawing_element(element.local_name().as_ref()) {
                     return Ok(Event::End(BytesEnd::new(IGNORED_NAMESPACE_ELEMENT)));
                 }
                 if is_chart || is_drawing {
@@ -193,6 +208,14 @@ fn is_chart_namespace(namespace: &ResolveResult<'_>, element: &BytesStart<'_>) -
 
 fn is_drawing_namespace(namespace: &ResolveResult<'_>, element: &BytesStart<'_>) -> bool {
     is_drawingml_name(namespace, element.name(), element.local_name().as_ref())
+}
+
+fn is_preserved_drawing_element(local_name: &[u8]) -> bool {
+    local_name == b"t" || is_drawing_color_map_choice(local_name)
+}
+
+fn is_drawing_color_map_choice(local_name: &[u8]) -> bool {
+    matches!(local_name, b"masterClrMapping" | b"overrideClrMapping")
 }
 
 /// Parse a chart XML document.
@@ -245,6 +268,19 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"pivotSource" => {
                 return Err(OoxmlError::InvalidFormat(
                     "chart pivot source requires a name and format ID".into(),
+                ));
+            },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"clrMapOvr" => {
+                if chart.color_map_override.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate color-map overrides".into(),
+                    ));
+                }
+                chart.color_map_override = Some(parse_color_map_override(&mut xml_reader)?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"clrMapOvr" => {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart color-map override requires a mapping choice".into(),
                 ));
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"protection" => {
@@ -490,6 +526,138 @@ fn parse_chart_protection<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<
             _ => {},
         }
         buf.clear();
+    }
+}
+
+fn parse_color_map_override<R: BufRead>(
+    reader: &mut ChartXmlReader<R>,
+) -> Result<ColorMapOverride> {
+    let mut mapping = None;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element))
+                if element.local_name().as_ref() == b"masterClrMapping" =>
+            {
+                if mapping.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart color-map override contains multiple choices".into(),
+                    ));
+                }
+                consume_empty_chart_element(
+                    reader,
+                    b"masterClrMapping",
+                    "chart master color mapping",
+                )?;
+                mapping = Some(ColorMapOverride::Master);
+            },
+            Ok(Event::Empty(ref element))
+                if element.local_name().as_ref() == b"masterClrMapping" =>
+            {
+                set_color_map_override_choice(&mut mapping, ColorMapOverride::Master)?;
+            },
+            Ok(Event::Start(ref element))
+                if element.local_name().as_ref() == b"overrideClrMapping" =>
+            {
+                if mapping.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart color-map override contains multiple choices".into(),
+                    ));
+                }
+                let value = parse_color_mapping(element)?;
+                consume_empty_chart_element(
+                    reader,
+                    b"overrideClrMapping",
+                    "chart override color mapping",
+                )?;
+                mapping = Some(ColorMapOverride::Override(value));
+            },
+            Ok(Event::Empty(ref element))
+                if element.local_name().as_ref() == b"overrideClrMapping" =>
+            {
+                let value = ColorMapOverride::Override(parse_color_mapping(element)?);
+                set_color_map_override_choice(&mut mapping, value)?;
+            },
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+                if element.local_name().as_ref() != IGNORED_NAMESPACE_ELEMENT.as_bytes() =>
+            {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart color-map override contains an unexpected choice".into(),
+                ));
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"clrMapOvr" => {
+                return mapping.ok_or_else(|| {
+                    OoxmlError::InvalidFormat(
+                        "chart color-map override requires a mapping choice".into(),
+                    )
+                });
+            },
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart color-map override is not closed".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+}
+
+fn set_color_map_override_choice(
+    target: &mut Option<ColorMapOverride>,
+    value: ColorMapOverride,
+) -> Result<()> {
+    if target.is_some() {
+        return Err(OoxmlError::InvalidFormat(
+            "chart color-map override contains multiple choices".into(),
+        ));
+    }
+    *target = Some(value);
+    Ok(())
+}
+
+fn parse_color_mapping(element: &BytesStart<'_>) -> Result<ColorMapping> {
+    Ok(ColorMapping {
+        background1: required_color_scheme_index(element, b"bg1")?,
+        text1: required_color_scheme_index(element, b"tx1")?,
+        background2: required_color_scheme_index(element, b"bg2")?,
+        text2: required_color_scheme_index(element, b"tx2")?,
+        accent1: required_color_scheme_index(element, b"accent1")?,
+        accent2: required_color_scheme_index(element, b"accent2")?,
+        accent3: required_color_scheme_index(element, b"accent3")?,
+        accent4: required_color_scheme_index(element, b"accent4")?,
+        accent5: required_color_scheme_index(element, b"accent5")?,
+        accent6: required_color_scheme_index(element, b"accent6")?,
+        hyperlink: required_color_scheme_index(element, b"hlink")?,
+        followed_hyperlink: required_color_scheme_index(element, b"folHlink")?,
+    })
+}
+
+fn required_color_scheme_index(
+    element: &BytesStart<'_>,
+    attribute: &[u8],
+) -> Result<ColorSchemeIndex> {
+    let value = get_attr(element, attribute).ok_or_else(|| {
+        OoxmlError::InvalidFormat(format!(
+            "chart color mapping is missing its {} assignment",
+            String::from_utf8_lossy(attribute)
+        ))
+    })?;
+    match value.as_slice() {
+        b"dk1" => Ok(ColorSchemeIndex::Dark1),
+        b"lt1" => Ok(ColorSchemeIndex::Light1),
+        b"dk2" => Ok(ColorSchemeIndex::Dark2),
+        b"lt2" => Ok(ColorSchemeIndex::Light2),
+        b"accent1" => Ok(ColorSchemeIndex::Accent1),
+        b"accent2" => Ok(ColorSchemeIndex::Accent2),
+        b"accent3" => Ok(ColorSchemeIndex::Accent3),
+        b"accent4" => Ok(ColorSchemeIndex::Accent4),
+        b"accent5" => Ok(ColorSchemeIndex::Accent5),
+        b"accent6" => Ok(ColorSchemeIndex::Accent6),
+        b"hlink" => Ok(ColorSchemeIndex::Hyperlink),
+        b"folHlink" => Ok(ColorSchemeIndex::FollowedHyperlink),
+        _ => Err(invalid_attribute("chart color-scheme index", &value)),
     }
 }
 
@@ -4565,6 +4733,53 @@ mod tests {
     }
 
     #[test]
+    fn round_trips_and_validates_chart_color_map_overrides() {
+        let xml =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+                xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+            <c:clrMapOvr><a:overrideClrMapping bg1="dk1" tx1="lt1" bg2="accent1"
+                tx2="accent2" accent1="accent3" accent2="accent4" accent3="accent5"
+                accent4="accent6" accent5="hlink" accent6="folHlink" hlink="dk2"
+                folHlink="lt2"/></c:clrMapOvr>
+            <c:chart><c:plotArea/></c:chart></c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let ColorMapOverride::Override(mapping) = chart.color_map_override.as_ref().unwrap() else {
+            panic!("expected explicit chart color mapping");
+        };
+        assert_eq!(mapping.background1, ColorSchemeIndex::Dark1);
+        assert_eq!(mapping.background2, ColorSchemeIndex::Accent1);
+        assert_eq!(mapping.accent5, ColorSchemeIndex::Hyperlink);
+        assert_eq!(mapping.followed_hyperlink, ColorSchemeIndex::Light2);
+
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        let reparsed = parse_chart(output.as_slice()).unwrap();
+        assert_eq!(reparsed.color_map_override, chart.color_map_override);
+
+        let master = br#"<c:chartSpace xmlns:c="http://purl.oclc.org/ooxml/drawingml/chart"
+                xmlns:d="http://purl.oclc.org/ooxml/drawingml/main">
+            <c:clrMapOvr><d:masterClrMapping></d:masterClrMapping></c:clrMapOvr>
+            <c:chart><c:plotArea/></c:chart></c:chartSpace>"#;
+        assert_eq!(
+            parse_chart(master.as_slice()).unwrap().color_map_override,
+            Some(ColorMapOverride::Master)
+        );
+
+        for invalid in [
+            br#"<c:clrMapOvr/>"#.as_slice(),
+            br#"<c:clrMapOvr><a:masterClrMapping/><a:masterClrMapping/></c:clrMapOvr>"#.as_slice(),
+            br#"<c:clrMapOvr><a:overrideClrMapping bg1="lt1"/></c:clrMapOvr>"#.as_slice(),
+            br#"<c:clrMapOvr><a:overrideClrMapping bg1="none" tx1="lt1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/></c:clrMapOvr>"#.as_slice(),
+            br#"<c:clrMapOvr><c:masterClrMapping/></c:clrMapOvr>"#.as_slice(),
+        ] {
+            let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">"#.to_vec();
+            document.extend_from_slice(invalid);
+            document.extend_from_slice(b"<c:chart><c:plotArea/></c:chart></c:chartSpace>");
+            assert!(parse_chart(document.as_slice()).is_err());
+        }
+    }
+
+    #[test]
     fn round_trips_and_validates_chart_print_settings() {
         let xml =
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
@@ -4796,7 +5011,7 @@ mod tests {
                 xmlns:x="urn:example:chart-extension">
             <x:style val="48"/>
             <c:chart><c:title><c:tx><c:strRef>
-                <c:f>Sheet<x:payload><c:style val="47"/>ignored</x:payload>1!$A$1</c:f>
+                <c:f>Sheet<x:payload><c:style val="47"/><c:masterClrMapping/>ignored</x:payload>1!$A$1</c:f>
             </c:strRef></c:tx></c:title><c:plotArea>
                 <x:barChart><c:barChart><c:ser><c:idx val="9"/></c:ser></c:barChart></x:barChart>
                 <c:lineChart></c:lineChart>

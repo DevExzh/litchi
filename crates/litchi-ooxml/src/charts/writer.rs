@@ -5,7 +5,7 @@
 use crate::charts::axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
 use crate::charts::chart::{
     Chart, ChartHeaderFooter, ChartPageMargins, ChartPageSetup, ChartPrintSettings,
-    ChartProtection, PivotFormat, PivotSource, View3D, WallFloor,
+    ChartProtection, ColorMapOverride, ColorMapping, PivotFormat, PivotSource, View3D, WallFloor,
 };
 use crate::charts::legend::Legend;
 use crate::charts::models::{Layout, NumericData, StringData, TitleText};
@@ -115,6 +115,9 @@ pub fn write_chart<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<(
 
     if let Some(ref style) = chart.style {
         write!(writer, r#"<c:style val="{}"/>"#, style)?;
+    }
+    if let Some(color_map) = chart.color_map_override.as_ref() {
+        write_color_map_override(writer, color_map)?;
     }
 
     if let Some(source) = chart.pivot_source.as_ref() {
@@ -230,6 +233,46 @@ fn write_pivot_source<W: Write>(writer: &mut W, source: &PivotSource) -> std::io
         escape_xml(&source.name),
         source.format_id
     )?;
+    Ok(())
+}
+
+fn write_color_map_override<W: Write>(
+    writer: &mut W,
+    color_map: &ColorMapOverride,
+) -> std::io::Result<()> {
+    match color_map {
+        ColorMapOverride::Master => {
+            write!(writer, "<c:clrMapOvr><a:masterClrMapping/></c:clrMapOvr>")?;
+        },
+        ColorMapOverride::Override(mapping) => {
+            write!(writer, "<c:clrMapOvr><a:overrideClrMapping")?;
+            write_color_mapping_attributes(writer, mapping)?;
+            write!(writer, "/></c:clrMapOvr>")?;
+        },
+    }
+    Ok(())
+}
+
+fn write_color_mapping_attributes<W: Write>(
+    writer: &mut W,
+    mapping: &ColorMapping,
+) -> std::io::Result<()> {
+    for (name, value) in [
+        ("bg1", mapping.background1),
+        ("tx1", mapping.text1),
+        ("bg2", mapping.background2),
+        ("tx2", mapping.text2),
+        ("accent1", mapping.accent1),
+        ("accent2", mapping.accent2),
+        ("accent3", mapping.accent3),
+        ("accent4", mapping.accent4),
+        ("accent5", mapping.accent5),
+        ("accent6", mapping.accent6),
+        ("hlink", mapping.hyperlink),
+        ("folHlink", mapping.followed_hyperlink),
+    ] {
+        write!(writer, r#" {name}="{}""#, value.as_str())?;
+    }
     Ok(())
 }
 

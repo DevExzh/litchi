@@ -227,6 +227,111 @@ pub struct ChartProtection {
     pub user_interface: Option<bool>,
 }
 
+/// A DrawingML theme color that can be selected by a color mapping.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorSchemeIndex {
+    /// Dark theme color 1
+    Dark1,
+    /// Light theme color 1
+    Light1,
+    /// Dark theme color 2
+    Dark2,
+    /// Light theme color 2
+    Light2,
+    /// Accent theme color 1
+    Accent1,
+    /// Accent theme color 2
+    Accent2,
+    /// Accent theme color 3
+    Accent3,
+    /// Accent theme color 4
+    Accent4,
+    /// Accent theme color 5
+    Accent5,
+    /// Accent theme color 6
+    Accent6,
+    /// Hyperlink theme color
+    Hyperlink,
+    /// Followed-hyperlink theme color
+    FollowedHyperlink,
+}
+
+impl ColorSchemeIndex {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Dark1 => "dk1",
+            Self::Light1 => "lt1",
+            Self::Dark2 => "dk2",
+            Self::Light2 => "lt2",
+            Self::Accent1 => "accent1",
+            Self::Accent2 => "accent2",
+            Self::Accent3 => "accent3",
+            Self::Accent4 => "accent4",
+            Self::Accent5 => "accent5",
+            Self::Accent6 => "accent6",
+            Self::Hyperlink => "hlink",
+            Self::FollowedHyperlink => "folHlink",
+        }
+    }
+}
+
+/// Complete DrawingML theme color mapping used by a chart override.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColorMapping {
+    /// Background color 1 mapping
+    pub background1: ColorSchemeIndex,
+    /// Text color 1 mapping
+    pub text1: ColorSchemeIndex,
+    /// Background color 2 mapping
+    pub background2: ColorSchemeIndex,
+    /// Text color 2 mapping
+    pub text2: ColorSchemeIndex,
+    /// Accent color 1 mapping
+    pub accent1: ColorSchemeIndex,
+    /// Accent color 2 mapping
+    pub accent2: ColorSchemeIndex,
+    /// Accent color 3 mapping
+    pub accent3: ColorSchemeIndex,
+    /// Accent color 4 mapping
+    pub accent4: ColorSchemeIndex,
+    /// Accent color 5 mapping
+    pub accent5: ColorSchemeIndex,
+    /// Accent color 6 mapping
+    pub accent6: ColorSchemeIndex,
+    /// Hyperlink color mapping
+    pub hyperlink: ColorSchemeIndex,
+    /// Followed-hyperlink color mapping
+    pub followed_hyperlink: ColorSchemeIndex,
+}
+
+impl Default for ColorMapping {
+    fn default() -> Self {
+        Self {
+            background1: ColorSchemeIndex::Light1,
+            text1: ColorSchemeIndex::Dark1,
+            background2: ColorSchemeIndex::Light2,
+            text2: ColorSchemeIndex::Dark2,
+            accent1: ColorSchemeIndex::Accent1,
+            accent2: ColorSchemeIndex::Accent2,
+            accent3: ColorSchemeIndex::Accent3,
+            accent4: ColorSchemeIndex::Accent4,
+            accent5: ColorSchemeIndex::Accent5,
+            accent6: ColorSchemeIndex::Accent6,
+            hyperlink: ColorSchemeIndex::Hyperlink,
+            followed_hyperlink: ColorSchemeIndex::FollowedHyperlink,
+        }
+    }
+}
+
+/// Chart color-map override selection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ColorMapOverride {
+    /// Inherit the color mapping from the chart's master context
+    Master,
+    /// Use the supplied complete color mapping
+    Override(ColorMapping),
+}
+
 impl PivotFormat {
     /// Create a pivot-format entry for one data point.
     #[inline]
@@ -355,6 +460,8 @@ pub struct Chart {
     pub show_data_labels_over_max: bool,
     /// Chart style index
     pub style: Option<u32>,
+    /// Optional DrawingML theme color-map override
+    pub color_map_override: Option<ColorMapOverride>,
     /// Chart content language
     pub language: Option<String>,
     /// Optional pivot-table source metadata
@@ -389,6 +496,7 @@ impl Chart {
             plot_visible_only: true,
             show_data_labels_over_max: false,
             style: None,
+            color_map_override: None,
             language: None,
             pivot_source: None,
             protection: None,
