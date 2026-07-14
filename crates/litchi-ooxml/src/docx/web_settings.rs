@@ -634,6 +634,14 @@ impl FramesetColor {
 }
 
 impl HtmlDiv {
+    /// Create an HTML division with its required identifier.
+    pub fn new(id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            ..Self::default()
+        }
+    }
+
     pub fn id(&self) -> &str {
         &self.id
     }
@@ -669,6 +677,114 @@ impl HtmlDiv {
     pub fn children(&self) -> &[HtmlDiv] {
         &self.children
     }
+
+    pub fn set_id(&mut self, value: impl Into<String>) -> &mut Self {
+        self.id = value.into();
+        self
+    }
+
+    pub fn set_block_quote(&mut self, value: bool) -> &mut Self {
+        self.block_quote = Some(value);
+        self
+    }
+
+    pub fn clear_block_quote(&mut self) -> &mut Self {
+        self.block_quote = None;
+        self
+    }
+
+    pub fn set_body_div(&mut self, value: bool) -> &mut Self {
+        self.body_div = Some(value);
+        self
+    }
+
+    pub fn clear_body_div(&mut self) -> &mut Self {
+        self.body_div = None;
+        self
+    }
+
+    pub fn set_margin_left_twips(&mut self, value: impl Into<String>) -> Result<&mut Self> {
+        self.margin_left_twips = Some(normalize_xml_integer(
+            value.into(),
+            "HTML division left margin",
+        )?);
+        Ok(self)
+    }
+
+    pub fn clear_margin_left_twips(&mut self) -> &mut Self {
+        self.margin_left_twips = None;
+        self
+    }
+
+    pub fn set_margin_right_twips(&mut self, value: impl Into<String>) -> Result<&mut Self> {
+        self.margin_right_twips = Some(normalize_xml_integer(
+            value.into(),
+            "HTML division right margin",
+        )?);
+        Ok(self)
+    }
+
+    pub fn clear_margin_right_twips(&mut self) -> &mut Self {
+        self.margin_right_twips = None;
+        self
+    }
+
+    pub fn set_margin_top_twips(&mut self, value: impl Into<String>) -> Result<&mut Self> {
+        self.margin_top_twips = Some(normalize_xml_integer(
+            value.into(),
+            "HTML division top margin",
+        )?);
+        Ok(self)
+    }
+
+    pub fn clear_margin_top_twips(&mut self) -> &mut Self {
+        self.margin_top_twips = None;
+        self
+    }
+
+    pub fn set_margin_bottom_twips(&mut self, value: impl Into<String>) -> Result<&mut Self> {
+        self.margin_bottom_twips = Some(normalize_xml_integer(
+            value.into(),
+            "HTML division bottom margin",
+        )?);
+        Ok(self)
+    }
+
+    pub fn clear_margin_bottom_twips(&mut self) -> &mut Self {
+        self.margin_bottom_twips = None;
+        self
+    }
+
+    pub fn set_borders(&mut self, value: HtmlDivBorders) -> &mut Self {
+        self.borders = Some(value);
+        self
+    }
+
+    pub fn borders_mut(&mut self) -> Option<&mut HtmlDivBorders> {
+        self.borders.as_mut()
+    }
+
+    pub fn clear_borders(&mut self) -> &mut Self {
+        self.borders = None;
+        self
+    }
+
+    /// Append a child division and return it for configuration.
+    pub fn add_child(&mut self, id: impl Into<String>) -> &mut HtmlDiv {
+        self.children.push(HtmlDiv::new(id));
+        self.children.last_mut().expect("a child was just appended")
+    }
+
+    /// Append a configured child division.
+    pub fn push_child(&mut self, child: HtmlDiv) -> &mut Self {
+        self.children.push(child);
+        self
+    }
+
+    pub fn clear_children(&mut self) -> &mut Self {
+        self.children.clear();
+        self
+    }
 }
 
 impl HtmlDivBorders {
@@ -687,9 +803,80 @@ impl HtmlDivBorders {
     pub fn right(&self) -> Option<&HtmlDivBorder> {
         self.right.as_ref()
     }
+
+    pub fn set_top(&mut self, value: HtmlDivBorder) -> &mut Self {
+        self.top = Some(value);
+        self
+    }
+
+    pub fn top_mut(&mut self) -> Option<&mut HtmlDivBorder> {
+        self.top.as_mut()
+    }
+
+    pub fn clear_top(&mut self) -> &mut Self {
+        self.top = None;
+        self
+    }
+
+    pub fn set_left(&mut self, value: HtmlDivBorder) -> &mut Self {
+        self.left = Some(value);
+        self
+    }
+
+    pub fn left_mut(&mut self) -> Option<&mut HtmlDivBorder> {
+        self.left.as_mut()
+    }
+
+    pub fn clear_left(&mut self) -> &mut Self {
+        self.left = None;
+        self
+    }
+
+    pub fn set_bottom(&mut self, value: HtmlDivBorder) -> &mut Self {
+        self.bottom = Some(value);
+        self
+    }
+
+    pub fn bottom_mut(&mut self) -> Option<&mut HtmlDivBorder> {
+        self.bottom.as_mut()
+    }
+
+    pub fn clear_bottom(&mut self) -> &mut Self {
+        self.bottom = None;
+        self
+    }
+
+    pub fn set_right(&mut self, value: HtmlDivBorder) -> &mut Self {
+        self.right = Some(value);
+        self
+    }
+
+    pub fn right_mut(&mut self) -> Option<&mut HtmlDivBorder> {
+        self.right.as_mut()
+    }
+
+    pub fn clear_right(&mut self) -> &mut Self {
+        self.right = None;
+        self
+    }
 }
 
 impl HtmlDivBorder {
+    /// Create a division border with its required style.
+    pub fn new(style: impl Into<String>) -> Self {
+        Self {
+            style: style.into(),
+            color: None,
+            theme_color: None,
+            theme_tint: None,
+            theme_shade: None,
+            size_eighth_points: None,
+            space_points: None,
+            shadow: None,
+            frame: None,
+        }
+    }
+
     pub fn style(&self) -> &str {
         &self.style
     }
@@ -725,6 +912,94 @@ impl HtmlDivBorder {
     pub fn frame(&self) -> Option<bool> {
         self.frame
     }
+
+    pub fn set_style(&mut self, value: impl Into<String>) -> &mut Self {
+        self.style = value.into();
+        self
+    }
+
+    pub fn set_color(&mut self, value: impl Into<String>) -> Result<&mut Self> {
+        self.color = Some(validate_word_color(
+            value.into(),
+            "HTML division border color",
+        )?);
+        Ok(self)
+    }
+
+    pub fn clear_color(&mut self) -> &mut Self {
+        self.color = None;
+        self
+    }
+
+    pub fn set_theme_color(&mut self, value: ThemeColor) -> &mut Self {
+        self.theme_color = Some(value);
+        self
+    }
+
+    pub fn clear_theme_color(&mut self) -> &mut Self {
+        self.theme_color = None;
+        self
+    }
+
+    pub fn set_theme_tint(&mut self, value: u8) -> &mut Self {
+        self.theme_tint = Some(value);
+        self
+    }
+
+    pub fn clear_theme_tint(&mut self) -> &mut Self {
+        self.theme_tint = None;
+        self
+    }
+
+    pub fn set_theme_shade(&mut self, value: u8) -> &mut Self {
+        self.theme_shade = Some(value);
+        self
+    }
+
+    pub fn clear_theme_shade(&mut self) -> &mut Self {
+        self.theme_shade = None;
+        self
+    }
+
+    pub fn set_size_eighth_points(&mut self, value: u64) -> &mut Self {
+        self.size_eighth_points = Some(value);
+        self
+    }
+
+    pub fn clear_size_eighth_points(&mut self) -> &mut Self {
+        self.size_eighth_points = None;
+        self
+    }
+
+    pub fn set_space_points(&mut self, value: u64) -> &mut Self {
+        self.space_points = Some(value);
+        self
+    }
+
+    pub fn clear_space_points(&mut self) -> &mut Self {
+        self.space_points = None;
+        self
+    }
+
+    pub fn set_shadow(&mut self, value: bool) -> &mut Self {
+        self.shadow = Some(value);
+        self
+    }
+
+    pub fn clear_shadow(&mut self) -> &mut Self {
+        self.shadow = None;
+        self
+    }
+
+    pub fn set_frame(&mut self, value: bool) -> &mut Self {
+        self.frame = Some(value);
+        self
+    }
+
+    pub fn clear_frame(&mut self) -> &mut Self {
+        self.frame = None;
+        self
+    }
 }
 
 impl WebSettings {
@@ -753,6 +1028,30 @@ impl WebSettings {
     /// Return the top-level HTML division definitions, preserving part absence.
     pub fn divs(&self) -> Option<&[HtmlDiv]> {
         self.divs.as_deref()
+    }
+
+    /// Replace the top-level HTML division definitions.
+    pub fn set_divs(&mut self, value: Vec<HtmlDiv>) -> &mut Self {
+        self.divs = Some(value);
+        self
+    }
+
+    /// Return mutable top-level HTML divisions, preserving container absence.
+    pub fn divs_mut(&mut self) -> Option<&mut Vec<HtmlDiv>> {
+        self.divs.as_mut()
+    }
+
+    /// Append a top-level HTML division and return it for configuration.
+    pub fn add_div(&mut self, id: impl Into<String>) -> &mut HtmlDiv {
+        let divs = self.divs.get_or_insert_with(Vec::new);
+        divs.push(HtmlDiv::new(id));
+        divs.last_mut().expect("a division was just appended")
+    }
+
+    /// Remove the complete top-level HTML division container.
+    pub fn clear_divs(&mut self) -> &mut Self {
+        self.divs = None;
+        self
     }
 
     /// Return the requested output encoding, if declared.
@@ -1835,15 +2134,9 @@ fn parse_html_div_border(
     resolver: &NamespaceResolver,
 ) -> Result<HtmlDivBorder> {
     let style = required_value(element, decoder, resolver, "HTML division border style")?;
-    let color = word_attribute_value(element, b"color", decoder, resolver)?;
-    if let Some(color) = &color
-        && color != "auto"
-        && (color.len() != 6 || !color.bytes().all(|byte| byte.is_ascii_hexdigit()))
-    {
-        return Err(OoxmlError::InvalidFormat(format!(
-            "invalid HTML division border color '{color}'"
-        )));
-    }
+    let color = word_attribute_value(element, b"color", decoder, resolver)?
+        .map(|value| validate_word_color(value, "HTML division border color"))
+        .transpose()?;
     let theme_color = word_attribute_value(element, b"themeColor", decoder, resolver)?
         .map(|value| {
             ThemeColor::from_xml(&value)
@@ -2735,6 +3028,111 @@ mod tests {
         assert_eq!(color.theme_color(), None);
         assert_eq!(color.theme_tint(), None);
         assert_eq!(color.theme_shade(), None);
+    }
+
+    #[test]
+    fn builds_and_edits_recursive_html_divisions_for_round_trip() {
+        let mut top = HtmlDivBorder::new("single");
+        top.set_color("A0b1C2")
+            .unwrap()
+            .set_theme_color(ThemeColor::Text2)
+            .set_theme_tint(0x10)
+            .set_theme_shade(0xff)
+            .set_size_eighth_points(u64::MAX)
+            .set_space_points(6)
+            .set_shadow(true)
+            .set_frame(false);
+        let mut borders = HtmlDivBorders::default();
+        borders
+            .set_top(top)
+            .set_left(HtmlDivBorder::new("zigZagStitch"))
+            .set_bottom(HtmlDivBorder::new("double"))
+            .set_right(HtmlDivBorder::new("nil"));
+
+        let mut div = HtmlDiv::new("root&division");
+        div.set_block_quote(true)
+            .set_body_div(false)
+            .set_borders(borders);
+        div.set_margin_left_twips(" -123456789012345678901234567890 ")
+            .unwrap();
+        div.set_margin_right_twips("+42").unwrap();
+        div.set_margin_top_twips("0").unwrap();
+        div.set_margin_bottom_twips("700").unwrap();
+        div.add_child("child")
+            .set_body_div(true)
+            .add_child("grandchild")
+            .set_block_quote(false);
+
+        let mut settings = WebSettings::default();
+        settings.set_divs(vec![div]);
+        let serialized = settings.to_xml().unwrap();
+        let reparsed = WebSettings::extract_from_xml(serialized.as_bytes()).unwrap();
+        assert_eq!(reparsed, settings);
+        assert!(serialized.contains("root&amp;division"));
+        assert_eq!(
+            reparsed.divs().unwrap()[0].margin_left_twips(),
+            Some("-123456789012345678901234567890")
+        );
+
+        settings.add_div("second").set_id("renamed");
+        assert_eq!(settings.divs().unwrap().len(), 2);
+        let first = &mut settings.divs_mut().unwrap()[0];
+        first
+            .clear_block_quote()
+            .clear_body_div()
+            .clear_margin_left_twips()
+            .clear_margin_right_twips()
+            .clear_margin_top_twips()
+            .clear_margin_bottom_twips()
+            .clear_children();
+        let borders = first.borders_mut().unwrap();
+        borders
+            .clear_top()
+            .clear_left()
+            .clear_bottom()
+            .clear_right();
+        first.clear_borders();
+        settings.clear_divs();
+        assert!(settings.divs().is_none());
+    }
+
+    #[test]
+    fn validates_mutable_html_division_values_atomically() {
+        let mut div = HtmlDiv::new("division");
+        div.set_margin_left_twips("-42").unwrap();
+        assert!(div.set_margin_left_twips("1.5").is_err());
+        assert_eq!(div.margin_left_twips(), Some("-42"));
+
+        let mut border = HtmlDivBorder::new("single");
+        border.set_color("auto").unwrap();
+        assert!(border.set_color("xyz").is_err());
+        assert_eq!(border.color(), Some("auto"));
+        border
+            .set_style("double")
+            .clear_color()
+            .set_theme_color(ThemeColor::Accent1)
+            .set_theme_tint(1)
+            .set_theme_shade(2)
+            .set_size_eighth_points(8)
+            .set_space_points(1)
+            .set_shadow(false)
+            .set_frame(true)
+            .clear_theme_color()
+            .clear_theme_tint()
+            .clear_theme_shade()
+            .clear_size_eighth_points()
+            .clear_space_points()
+            .clear_shadow()
+            .clear_frame();
+        assert_eq!(border.style(), "double");
+        assert_eq!(border.color(), None);
+        assert_eq!(border.theme_color(), None);
+        assert_eq!(border.theme_tint(), None);
+        assert_eq!(border.theme_shade(), None);
+        assert_eq!(border.size_eighth_points(), None);
+        assert_eq!(border.space_points(), None);
+        assert_eq!(border.shadow(), None);
+        assert_eq!(border.frame(), None);
     }
 
     #[test]
