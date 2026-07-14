@@ -1,6 +1,8 @@
 //! Sheet structures for ODS spreadsheets.
 
-use super::{Column, Row, SheetPrintSettings, SheetProtection, SheetStyle, TableStructure};
+use super::{
+    Column, Row, SheetPrintSettings, SheetProtection, SheetScenario, SheetStyle, TableStructure,
+};
 use litchi_core::Result;
 
 /// A sheet (worksheet) in an ODS spreadsheet.
@@ -22,6 +24,12 @@ pub struct Sheet {
     pub style: SheetStyle,
     /// Sheet printing controls and ranges.
     pub print_settings: SheetPrintSettings,
+    /// Optional human-readable table title.
+    pub title: Option<String>,
+    /// Optional human-readable table description.
+    pub description: Option<String>,
+    /// Optional what-if scenario metadata.
+    pub scenario: Option<SheetScenario>,
     /// Sheet protection metadata and edit permissions.
     pub protection: SheetProtection,
 }
@@ -62,6 +70,21 @@ impl Sheet {
         &self.print_settings
     }
 
+    /// Get the optional human-readable table title.
+    pub fn title(&self) -> Option<&str> {
+        self.title.as_deref()
+    }
+
+    /// Get the optional human-readable table description.
+    pub fn description(&self) -> Option<&str> {
+        self.description.as_deref()
+    }
+
+    /// Get the optional what-if scenario metadata.
+    pub fn scenario(&self) -> Option<&SheetScenario> {
+        self.scenario.as_ref()
+    }
+
     /// Get the number of rows in the sheet.
     ///
     /// Returns the total number of rows, including empty rows.
@@ -98,6 +121,9 @@ mod tests {
             row_structure: Vec::new(),
             style: Default::default(),
             print_settings: Default::default(),
+            title: None,
+            description: None,
+            scenario: None,
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![],
@@ -115,6 +141,9 @@ mod tests {
             row_structure: Vec::new(),
             style: Default::default(),
             print_settings: Default::default(),
+            title: None,
+            description: None,
+            scenario: None,
             protection: SheetProtection::default(),
             name: "Test Sheet".to_string(),
             rows: vec![],
@@ -130,6 +159,9 @@ mod tests {
             row_structure: Vec::new(),
             style: Default::default(),
             print_settings: Default::default(),
+            title: None,
+            description: None,
+            scenario: None,
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![
@@ -162,6 +194,9 @@ mod tests {
             row_structure: Vec::new(),
             style: Default::default(),
             print_settings: Default::default(),
+            title: None,
+            description: None,
+            scenario: None,
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![
@@ -265,6 +300,9 @@ mod tests {
             row_structure: Vec::new(),
             style: Default::default(),
             print_settings: Default::default(),
+            title: None,
+            description: None,
+            scenario: None,
             protection: SheetProtection::default(),
             name: "Empty".to_string(),
             rows: vec![],
@@ -280,6 +318,9 @@ mod tests {
             row_structure: Vec::new(),
             style: Default::default(),
             print_settings: Default::default(),
+            title: None,
+            description: None,
+            scenario: None,
             protection: SheetProtection::default(),
             name: "Data".to_string(),
             rows: vec![
@@ -376,6 +417,9 @@ mod tests {
             row_structure: Vec::new(),
             style: Default::default(),
             print_settings: Default::default(),
+            title: None,
+            description: None,
+            scenario: None,
             protection: SheetProtection::default(),
             name: "Original".to_string(),
             rows: vec![],

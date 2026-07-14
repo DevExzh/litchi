@@ -2,12 +2,13 @@
 
 use super::{
     Cell, CellMatrixSpan, CellMerge, CellValue, Column, NamedDefinition, NamedDefinitionScope,
-    NamedExpression, NamedRange, NamedRangeUsage, Row, Sheet, SheetPrintSettings, SheetStyle,
-    TableGroup, TableRange, TableStructure, TableVisibility,
+    NamedExpression, NamedRange, NamedRangeUsage, Row, Sheet, SheetPrintSettings, SheetScenario,
+    SheetStyle, TableGroup, TableRange, TableStructure, TableVisibility,
     annotation::{AnnotationBuilder, decode_reference},
+    scenario::validate_scenario,
     structure::{
         MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, MAX_TABLE_STRUCTURE_DEPTH,
-        split_print_ranges,
+        split_cell_range_addresses,
     },
 };
 use litchi_core::{Error, Result};
@@ -34,6 +35,21 @@ const MAX_EXPANDED_CELLS_PER_SHEET: usize = 4_194_304;
 /// including sheet, row, and cell parsing with proper type detection.
 pub(crate) struct OdsParser;
 
+#[derive(Clone, Copy)]
+enum SheetTextField {
+    Title,
+    Description,
+}
+
+impl SheetTextField {
+    fn local_name(self) -> &'static str {
+        match self {
+            Self::Title => "title",
+            Self::Description => "desc",
+        }
+    }
+}
+
 impl OdsParser {
     /// Parse all sheets from ODS content.xml
     pub fn parse_sheets(xml_content: &str) -> Result<Vec<Sheet>> {
@@ -49,6 +65,8 @@ impl OdsParser {
         let mut text_content = String::new();
         let mut annotation_builder: Option<AnnotationBuilder> = None;
         let mut annotation_depth = 0usize;
+        let mut sheet_text_field = None;
+        let mut sheet_text = String::new();
         let mut document_namespaces = BTreeMap::new();
         let mut namespace_scopes = Vec::new();
 
@@ -87,6 +105,56 @@ impl OdsParser {
                         )?;
                         current_sheet =
                             Some(SheetBuilder::with_formatting(name, style, print_settings));
+                    } else if current_sheet.is_some()
+                        && current_row.is_none()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "title",
+                        )
+                    {
+                        if sheet_text_field.replace(SheetTextField::Title).is_some() {
+                            return Err(Error::InvalidFormat(
+                                "table title or description elements must not be nested"
+                                    .to_string(),
+                            ));
+                        }
+                        sheet_text.clear();
+                    } else if current_sheet.is_some()
+                        && current_row.is_none()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "desc",
+                        )
+                    {
+                        if sheet_text_field
+                            .replace(SheetTextField::Description)
+                            .is_some()
+                        {
+                            return Err(Error::InvalidFormat(
+                                "table title or description elements must not be nested"
+                                    .to_string(),
+                            ));
+                        }
+                        sheet_text.clear();
+                    } else if current_sheet.is_some()
+                        && current_row.is_none()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "scenario",
+                        )
+                    {
+                        let scenario =
+                            Self::parse_scenario(e, reader.decoder(), &document_namespaces)?;
+                        current_sheet
+                            .as_mut()
+                            .expect("active sheet was checked")
+                            .set_scenario(scenario)?;
                     } else if current_row.is_none()
                         && Self::element_name_is(
                             e.name().as_ref(),
@@ -233,6 +301,44 @@ impl OdsParser {
                         )?;
                     } else if current_sheet.is_some()
                         && current_row.is_none()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "title",
+                        )
+                    {
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            sheet.set_title(String::new())?;
+                        }
+                    } else if current_sheet.is_some()
+                        && current_row.is_none()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "desc",
+                        )
+                    {
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            sheet.set_description(String::new())?;
+                        }
+                    } else if current_sheet.is_some()
+                        && current_row.is_none()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "scenario",
+                        )
+                    {
+                        let scenario =
+                            Self::parse_scenario(e, reader.decoder(), &document_namespaces)?;
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            sheet.set_scenario(scenario)?;
+                        }
+                    } else if current_sheet.is_some()
+                        && current_row.is_none()
                         && [
                             "table-column-group",
                             "table-header-columns",
@@ -324,6 +430,24 @@ impl OdsParser {
                         builder.reference(reference)?;
                     }
                 },
+                Ok(Event::Text(ref t)) if sheet_text_field.is_some() => {
+                    let decoded = t.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid table text: {error}"))
+                    })?;
+                    let decoded = quick_xml::escape::unescape(&decoded).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid table character reference: {error}"))
+                    })?;
+                    sheet_text.push_str(&decoded);
+                },
+                Ok(Event::CData(ref t)) if sheet_text_field.is_some() => {
+                    let decoded = t.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid table CDATA: {error}"))
+                    })?;
+                    sheet_text.push_str(&decoded);
+                },
+                Ok(Event::GeneralRef(ref reference)) if sheet_text_field.is_some() => {
+                    sheet_text.push_str(&decode_reference(reference)?);
+                },
                 Ok(Event::Text(ref t)) if text_element_depth > 0 && current_cell.is_some() => {
                     let decoded = t.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                         Error::InvalidFormat(format!("invalid cell text: {error}"))
@@ -373,7 +497,23 @@ impl OdsParser {
                         continue;
                     }
 
-                    if Self::element_name_is(
+                    if let Some(field) = sheet_text_field
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            field.local_name(),
+                        )
+                    {
+                        let value = std::mem::take(&mut sheet_text);
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            match field {
+                                SheetTextField::Title => sheet.set_title(value)?,
+                                SheetTextField::Description => sheet.set_description(value)?,
+                            }
+                        }
+                        sheet_text_field = None;
+                    } else if Self::element_name_is(
                         e.name().as_ref(),
                         &document_namespaces,
                         TABLE_NAMESPACE_URI,
@@ -975,7 +1115,7 @@ impl OdsParser {
             } else if is_table("print") {
                 print.printable = Self::parse_bool_attribute(&attribute, decoder)?;
             } else if is_table("print-ranges") {
-                print.ranges = split_print_ranges(&Self::decode_attribute(
+                print.ranges = split_cell_range_addresses(&Self::decode_attribute(
                     &attribute,
                     decoder,
                     "table:print-ranges",
@@ -983,6 +1123,82 @@ impl OdsParser {
             }
         }
         Ok((style, print))
+    }
+
+    fn parse_scenario(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<SheetScenario> {
+        let mut ranges = None;
+        let mut is_active = None;
+        let mut display_border = None;
+        let mut border_color = None;
+        let mut copy_back = None;
+        let mut copy_styles = None;
+        let mut copy_formulas = None;
+        let mut comment = None;
+        let mut protected = None;
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let is_table = |local_name| {
+                Self::attribute_name_is(
+                    attribute.key.as_ref(),
+                    namespaces,
+                    TABLE_NAMESPACE_URI,
+                    local_name,
+                )
+            };
+            if is_table("scenario-ranges") {
+                ranges = Some(split_cell_range_addresses(&Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "table:scenario-ranges",
+                )?)?);
+            } else if is_table("is-active") {
+                is_active = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_table("display-border") {
+                display_border = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_table("border-color") {
+                border_color = Some(Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "table:border-color",
+                )?);
+            } else if is_table("copy-back") {
+                copy_back = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_table("copy-styles") {
+                copy_styles = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_table("copy-formulas") {
+                copy_formulas = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_table("comment") {
+                comment = Some(Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "table:comment",
+                )?);
+            } else if is_table("protected") {
+                protected = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            }
+        }
+        let scenario = SheetScenario {
+            ranges: ranges.ok_or_else(|| {
+                Error::InvalidFormat("table:scenario requires table:scenario-ranges".to_string())
+            })?,
+            is_active: is_active.ok_or_else(|| {
+                Error::InvalidFormat("table:scenario requires table:is-active".to_string())
+            })?,
+            display_border,
+            border_color,
+            copy_back,
+            copy_styles,
+            copy_formulas,
+            comment,
+            protected,
+        };
+        validate_scenario(&scenario)?;
+        Ok(scenario)
     }
 
     fn parse_column(
@@ -1310,6 +1526,9 @@ pub(crate) struct SheetBuilder {
     column_structure: StructureStack,
     style: SheetStyle,
     print_settings: SheetPrintSettings,
+    title: Option<String>,
+    description: Option<String>,
+    scenario: Option<SheetScenario>,
     cell_count: usize,
 }
 
@@ -1332,8 +1551,38 @@ impl SheetBuilder {
             column_structure: StructureStack::new(),
             style,
             print_settings,
+            title: None,
+            description: None,
+            scenario: None,
             cell_count: 0,
         }
+    }
+
+    fn set_scenario(&mut self, scenario: SheetScenario) -> Result<()> {
+        if self.scenario.replace(scenario).is_some() {
+            return Err(Error::InvalidFormat(
+                "a table must not contain more than one scenario".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn set_title(&mut self, title: String) -> Result<()> {
+        if self.title.replace(title).is_some() {
+            return Err(Error::InvalidFormat(
+                "a table must not contain more than one title".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn set_description(&mut self, description: String) -> Result<()> {
+        if self.description.replace(description).is_some() {
+            return Err(Error::InvalidFormat(
+                "a table must not contain more than one description".to_string(),
+            ));
+        }
+        Ok(())
     }
 
     pub fn add_row(&mut self, mut row: Row) {
@@ -1403,6 +1652,9 @@ impl SheetBuilder {
             row_structure: self.row_structure.finish()?,
             style: self.style,
             print_settings: self.print_settings,
+            title: self.title,
+            description: self.description,
+            scenario: self.scenario,
             protection: super::SheetProtection::default(),
         })
     }
@@ -2037,6 +2289,28 @@ mod tests {
     }
 
     #[test]
+    fn parses_sheet_title_description_and_scenario() {
+        let xml = r##"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><o:body><o:spreadsheet><t:table t:name="Scenario"><t:title>Quarter &amp; Forecast</t:title><t:desc><![CDATA[Best < worst]]></t:desc><t:scenario t:scenario-ranges="$Scenario.$A$1:$B$2 'Q1 Sales'.$C$3:$D$4" t:is-active="true" t:display-border="0" t:border-color="#12AbEF" t:copy-back="1" t:copy-styles="false" t:copy-formulas="true" t:comment="Best &amp; worst" t:protected="false"/></t:table></o:spreadsheet></o:body></o:document-content>"##;
+        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let sheet = &sheets[0];
+        assert_eq!(sheet.title.as_deref(), Some("Quarter & Forecast"));
+        assert_eq!(sheet.description.as_deref(), Some("Best < worst"));
+        let scenario = sheet.scenario.as_ref().unwrap();
+        assert_eq!(
+            scenario.ranges,
+            ["$Scenario.$A$1:$B$2", "'Q1 Sales'.$C$3:$D$4"]
+        );
+        assert!(scenario.is_active);
+        assert_eq!(scenario.display_border, Some(false));
+        assert_eq!(scenario.border_color.as_deref(), Some("#12AbEF"));
+        assert_eq!(scenario.copy_back, Some(true));
+        assert_eq!(scenario.copy_styles, Some(false));
+        assert_eq!(scenario.copy_formulas, Some(true));
+        assert_eq!(scenario.comment.as_deref(), Some("Best & worst"));
+        assert_eq!(scenario.protected, Some(false));
+    }
+
+    #[test]
     fn rejects_invalid_or_dangerous_repetition_counts() {
         let zero = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-row table:number-rows-repeated="0"/></table:table></office:spreadsheet></office:body></office:document-content>"#;
         assert!(OdsParser::parse_sheets(zero).is_err());
@@ -2067,6 +2341,21 @@ mod tests {
 
         let invalid_print_ranges = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table table:print-ranges="'Unclosed Sheet.$A$1"></table:table></office:spreadsheet></office:body></office:document-content>"#;
         assert!(OdsParser::parse_sheets(invalid_print_ranges).is_err());
+
+        let incomplete_scenario = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:scenario table:scenario-ranges=".A1:.B2"/></table:table></office:spreadsheet></office:body></office:document-content>"#;
+        assert!(OdsParser::parse_sheets(incomplete_scenario).is_err());
+
+        let invalid_scenario_color = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:scenario table:scenario-ranges=".A1:.B2" table:is-active="false" table:border-color="red"/></table:table></office:spreadsheet></office:body></office:document-content>"#;
+        assert!(OdsParser::parse_sheets(invalid_scenario_color).is_err());
+
+        let duplicate_scenarios = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:scenario table:scenario-ranges=".A1:.B2" table:is-active="false"/><table:scenario table:scenario-ranges=".C1:.D2" table:is-active="true"/></table:table></office:spreadsheet></office:body></office:document-content>"#;
+        assert!(OdsParser::parse_sheets(duplicate_scenarios).is_err());
+
+        let duplicate_titles = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:title>First</table:title><table:title>Second</table:title></table:table></office:spreadsheet></office:body></office:document-content>"#;
+        assert!(OdsParser::parse_sheets(duplicate_titles).is_err());
+
+        let duplicate_descriptions = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:desc>First</table:desc><table:desc>Second</table:desc></table:table></office:spreadsheet></office:body></office:document-content>"#;
+        assert!(OdsParser::parse_sheets(duplicate_descriptions).is_err());
     }
 
     #[test]

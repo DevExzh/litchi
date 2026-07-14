@@ -102,13 +102,13 @@ impl Default for SheetPrintSettings {
 impl SheetPrintSettings {
     /// Create validated sheet printing settings.
     pub fn new(printable: bool, ranges: Vec<String>) -> Result<Self> {
-        validate_print_ranges(&ranges)?;
+        validate_cell_range_addresses(&ranges)?;
         Ok(Self { printable, ranges })
     }
 }
 
 pub(crate) fn validate_sheet_print_settings(settings: &SheetPrintSettings) -> Result<()> {
-    validate_print_ranges(&settings.ranges)
+    validate_cell_range_addresses(&settings.ranges)
 }
 
 pub(crate) fn write_sheet_formatting_attributes(
@@ -162,7 +162,7 @@ pub(crate) fn write_sheet_formatting_attributes(
     Ok(())
 }
 
-pub(crate) fn split_print_ranges(value: &str) -> Result<Vec<String>> {
+pub(crate) fn split_cell_range_addresses(value: &str) -> Result<Vec<String>> {
     let mut ranges = Vec::new();
     let mut current = String::new();
     let mut quoted = false;
@@ -194,9 +194,9 @@ pub(crate) fn split_print_ranges(value: &str) -> Result<Vec<String>> {
     Ok(ranges)
 }
 
-fn validate_print_ranges(ranges: &[String]) -> Result<()> {
+pub(crate) fn validate_cell_range_addresses(ranges: &[String]) -> Result<()> {
     for range in ranges {
-        let parsed = split_print_ranges(range)?;
+        let parsed = split_cell_range_addresses(range)?;
         if range != range.trim() || parsed.len() != 1 || parsed[0].as_str() != range.as_str() {
             return Err(Error::InvalidFormat(format!(
                 "invalid individual table print range '{range}'"
@@ -506,9 +506,10 @@ mod tests {
 
     #[test]
     fn splits_quoted_print_ranges_and_rejects_unterminated_names() {
-        let ranges =
-            split_print_ranges("$Sheet1.$A$1:$B$2 'Q1 Sales'.$C$3:$D$4 'Bob''s Sheet'.$E$5:$F$6")
-                .unwrap();
+        let ranges = split_cell_range_addresses(
+            "$Sheet1.$A$1:$B$2 'Q1 Sales'.$C$3:$D$4 'Bob''s Sheet'.$E$5:$F$6",
+        )
+        .unwrap();
         assert_eq!(
             ranges,
             [
@@ -517,7 +518,7 @@ mod tests {
                 "'Bob''s Sheet'.$E$5:$F$6",
             ]
         );
-        assert!(split_print_ranges("'Unclosed Sheet.$A$1").is_err());
+        assert!(split_cell_range_addresses("'Unclosed Sheet.$A$1").is_err());
     }
 
     #[test]

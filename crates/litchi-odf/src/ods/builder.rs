@@ -5,8 +5,8 @@
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
     Cell, CellAnnotation, CellValue, Column, ContentValidation, NamedDefinition,
-    NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings, SheetStyle,
-    SpreadsheetProtection, TableStructure, TableVisibility,
+    NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings,
+    SheetScenario, SheetStyle, SpreadsheetProtection, TableStructure, TableVisibility,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     named_expression::{ensure_unique, write_named_definitions},
@@ -14,6 +14,7 @@ use crate::ods::{
         has_extensions as has_protection_extensions, write_sheet_attributes, write_sheet_options,
         write_spreadsheet_attributes,
     },
+    scenario::{validate_scenario, write_sheet_preamble},
     structure::{
         MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, TableStructureAxis,
         validate_sheet_print_settings, validate_table_structure, write_columns,
@@ -268,6 +269,9 @@ impl SpreadsheetBuilder {
             row_structure: Vec::new(),
             style: Default::default(),
             print_settings: Default::default(),
+            title: None,
+            description: None,
+            scenario: None,
             protection: crate::ods::SheetProtection::default(),
         };
         self.sheets.push(sheet);
@@ -1037,6 +1041,45 @@ impl SpreadsheetBuilder {
         Ok(self)
     }
 
+    /// Set or clear the current sheet's human-readable title.
+    pub fn set_sheet_title(&mut self, title: Option<String>) -> Result<&mut Self> {
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        self.sheets
+            .last_mut()
+            .expect("default sheet was added")
+            .title = title;
+        Ok(self)
+    }
+
+    /// Set or clear the current sheet's human-readable description.
+    pub fn set_sheet_description(&mut self, description: Option<String>) -> Result<&mut Self> {
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        self.sheets
+            .last_mut()
+            .expect("default sheet was added")
+            .description = description;
+        Ok(self)
+    }
+
+    /// Set or clear the current sheet's what-if scenario metadata.
+    pub fn set_sheet_scenario(&mut self, scenario: Option<SheetScenario>) -> Result<&mut Self> {
+        if let Some(scenario) = &scenario {
+            validate_scenario(scenario)?;
+        }
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        self.sheets
+            .last_mut()
+            .expect("default sheet was added")
+            .scenario = scenario;
+        Ok(self)
+    }
+
     /// Merge a rectangular range in the current sheet.
     pub fn merge_cells(
         &mut self,
@@ -1193,6 +1236,12 @@ impl SpreadsheetBuilder {
         write_sheet_formatting_attributes(out, &sheet.style, &sheet.print_settings)?;
         write_sheet_attributes(out, &sheet.protection);
         out.push('>');
+        write_sheet_preamble(
+            out,
+            sheet.title.as_deref(),
+            sheet.description.as_deref(),
+            sheet.scenario.as_ref(),
+        )?;
         write_sheet_options(out, &sheet.protection.options);
         Ok(())
     }
@@ -1832,6 +1881,9 @@ mod tests {
             row_structure: vec![],
             style: Default::default(),
             print_settings: Default::default(),
+            title: None,
+            description: None,
+            scenario: None,
             protection: crate::ods::SheetProtection::default(),
         };
         builder.add_sheet_element(sheet).unwrap();
@@ -2266,5 +2318,39 @@ mod tests {
                 .is_err()
         );
         assert!(SheetPrintSettings::new(true, vec!["'Unclosed Sheet.$A$1".to_string()]).is_err());
+    }
+
+    #[test]
+    fn builder_round_trips_sheet_text_and_scenario() {
+        let mut scenario =
+            SheetScenario::new(vec!["'Q1 Sales'.$A$1:$B$2".to_string()], true).unwrap();
+        scenario.border_color = Some("#A1b2C3".to_string());
+        scenario.copy_formulas = Some(true);
+        scenario.comment = Some("Best & worst".to_string());
+        let mut builder = SpreadsheetBuilder::new();
+        builder
+            .set_sheet_title(Some("Quarter & Forecast".to_string()))
+            .unwrap()
+            .set_sheet_description(Some("Best < worst".to_string()))
+            .unwrap()
+            .set_sheet_scenario(Some(scenario.clone()))
+            .unwrap();
+
+        let mut spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+        let sheets = spreadsheet.sheets().unwrap();
+        assert_eq!(sheets[0].title.as_deref(), Some("Quarter & Forecast"));
+        assert_eq!(sheets[0].description.as_deref(), Some("Best < worst"));
+        assert_eq!(sheets[0].scenario.as_ref(), Some(&scenario));
+    }
+
+    #[test]
+    fn builder_rejects_invalid_scenario_metadata() {
+        let mut scenario = SheetScenario::new(vec![".A1:.B2".to_string()], false).unwrap();
+        scenario.border_color = Some("#12345Z".to_string());
+        assert!(
+            SpreadsheetBuilder::new()
+                .set_sheet_scenario(Some(scenario))
+                .is_err()
+        );
     }
 }

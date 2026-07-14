@@ -6,8 +6,8 @@
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
     Cell, CellAnnotation, CellValue, Column, ContentValidation, NamedDefinition,
-    NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings, SheetStyle,
-    Spreadsheet, SpreadsheetProtection, TableStructure, TableVisibility,
+    NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings,
+    SheetScenario, SheetStyle, Spreadsheet, SpreadsheetProtection, TableStructure, TableVisibility,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     named_expression::{ensure_unique, write_named_definitions},
@@ -15,6 +15,7 @@ use crate::ods::{
         has_extensions as has_protection_extensions, write_sheet_attributes, write_sheet_options,
         write_spreadsheet_attributes,
     },
+    scenario::{validate_scenario, write_sheet_preamble},
     structure::{
         MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, TableStructureAxis,
         validate_sheet_print_settings, validate_table_structure, write_columns,
@@ -378,6 +379,9 @@ impl MutableSpreadsheet {
             row_structure: Vec::new(),
             style: Default::default(),
             print_settings: Default::default(),
+            title: None,
+            description: None,
+            scenario: None,
             protection: crate::ods::SheetProtection::default(),
         };
         self.sheets.push(sheet);
@@ -950,6 +954,44 @@ impl MutableSpreadsheet {
         Ok(())
     }
 
+    /// Set or clear a sheet's human-readable title.
+    pub fn set_sheet_title(&mut self, sheet_index: usize, title: Option<String>) -> Result<()> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        sheet.title = title;
+        Ok(())
+    }
+
+    /// Set or clear a sheet's human-readable description.
+    pub fn set_sheet_description(
+        &mut self,
+        sheet_index: usize,
+        description: Option<String>,
+    ) -> Result<()> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        sheet.description = description;
+        Ok(())
+    }
+
+    /// Set or clear a sheet's what-if scenario metadata.
+    pub fn set_sheet_scenario(
+        &mut self,
+        sheet_index: usize,
+        scenario: Option<SheetScenario>,
+    ) -> Result<()> {
+        if let Some(scenario) = &scenario {
+            validate_scenario(scenario)?;
+        }
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        sheet.scenario = scenario;
+        Ok(())
+    }
+
     /// Merge a rectangular cell range in a sheet.
     pub fn merge_cells(
         &mut self,
@@ -1061,6 +1103,12 @@ impl MutableSpreadsheet {
             write_sheet_formatting_attributes(&mut body, &sheet.style, &sheet.print_settings)?;
             write_sheet_attributes(&mut body, &sheet.protection);
             body.push('>');
+            write_sheet_preamble(
+                &mut body,
+                sheet.title.as_deref(),
+                sheet.description.as_deref(),
+                sheet.scenario.as_ref(),
+            )?;
             write_sheet_options(&mut body, &sheet.protection.options);
 
             let total_columns = Self::sheet_max_cols(sheet).max(sheet.columns.len()).max(1);
@@ -1631,5 +1679,32 @@ mod tests {
         let sheets = output.sheets().unwrap();
         assert_eq!(sheets[0].style, style);
         assert_eq!(sheets[0].print_settings, print);
+    }
+
+    #[test]
+    fn mutable_spreadsheet_round_trips_sheet_text_and_scenario() {
+        let mut scenario = SheetScenario::new(vec![".A1:.C3".to_string()], false).unwrap();
+        scenario.display_border = Some(true);
+        scenario.comment = Some("Mutable & safe".to_string());
+        let mut mutable = MutableSpreadsheet::new();
+        mutable.add_sheet("Scenario").unwrap();
+        mutable
+            .set_sheet_title(0, Some("Mutable title".to_string()))
+            .unwrap();
+        mutable
+            .set_sheet_description(0, Some("Mutable description".to_string()))
+            .unwrap();
+        mutable
+            .set_sheet_scenario(0, Some(scenario.clone()))
+            .unwrap();
+
+        let mut output = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let sheets = output.sheets().unwrap();
+        assert_eq!(sheets[0].title.as_deref(), Some("Mutable title"));
+        assert_eq!(
+            sheets[0].description.as_deref(),
+            Some("Mutable description")
+        );
+        assert_eq!(sheets[0].scenario.as_ref(), Some(&scenario));
     }
 }

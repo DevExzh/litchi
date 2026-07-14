@@ -69,6 +69,7 @@ mod named_expression;
 mod parser;
 mod protection;
 mod row;
+mod scenario;
 mod sheet;
 mod spreadsheet;
 mod structure;
@@ -92,6 +93,7 @@ pub use protection::{
     ProtectionKey, SheetProtection, SheetProtectionOptions, SpreadsheetProtection,
 };
 pub use row::Row;
+pub use scenario::SheetScenario;
 pub use sheet::Sheet;
 pub use spreadsheet::Spreadsheet;
 pub use structure::{

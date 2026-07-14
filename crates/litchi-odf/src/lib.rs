@@ -238,11 +238,12 @@ pub use ods::{
     CellStyleProtection, CellValue, Column as SColumn, ContentValidation, FormulaNamespace,
     MutableSpreadsheet, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
     NamedRangeUsage, ProtectionKey, Row as SRow, Sheet, SheetPrintSettings, SheetProtection,
-    SheetProtectionOptions, SheetStyle, SheetStyleUsage, Spreadsheet, SpreadsheetBuilder,
-    SpreadsheetProtection, TableGroup, TableRange, TableStructure, TableVisibility,
-    ValidationDisplayList, ValidationErrorMacro, ValidationErrorMessage, ValidationEventListener,
-    ValidationMessage, ValidationMessageType, ValidationPresentationEventListener,
-    ValidationPresentationSound, ValidationScriptEventListener,
+    SheetProtectionOptions, SheetScenario, SheetStyle, SheetStyleUsage, Spreadsheet,
+    SpreadsheetBuilder, SpreadsheetProtection, TableGroup, TableRange, TableStructure,
+    TableVisibility, ValidationDisplayList, ValidationErrorMacro, ValidationErrorMessage,
+    ValidationEventListener, ValidationMessage, ValidationMessageType,
+    ValidationPresentationEventListener, ValidationPresentationSound,
+    ValidationScriptEventListener,
 };
 pub use odt::{Document, DocumentBuilder, MutableDocument};
 
