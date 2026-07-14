@@ -8,7 +8,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use crate::common::xml::unqualified_attribute_value;
+use crate::common::xml::{decode_xml_reference, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::namespace::{
     SPREADSHEETML_NAMESPACE, is_spreadsheetml_name, relationship_attribute_value,
@@ -24,7 +24,23 @@ enum WorkbookContext {
     Workbook,
     Sheets,
     BookViews,
+    DefinedNames,
+    DefinedName,
     Other,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DefinedName {
+    pub(crate) name: String,
+    pub(crate) local_sheet_id: Option<u32>,
+    pub(crate) value: String,
+}
+
+pub(crate) struct WorkbookParseResult {
+    pub(crate) sheets: Vec<WorksheetInfo>,
+    pub(crate) active_sheet_index: usize,
+    pub(crate) uses_1904_date_system: bool,
+    pub(crate) defined_names: Vec<DefinedName>,
 }
 
 struct WorkbookInfo {
@@ -34,9 +50,13 @@ struct WorkbookInfo {
     seen_workbook_properties: bool,
     seen_sheets: bool,
     seen_book_views: bool,
+    seen_defined_names: bool,
     seen_workbook_view: bool,
     sheet_ids: HashSet<u32>,
     relationship_ids: HashSet<String>,
+    defined_name_keys: HashSet<(Option<u32>, String)>,
+    defined_names: Vec<DefinedName>,
+    pending_defined_name: Option<DefinedName>,
 }
 
 impl WorkbookInfo {
@@ -48,9 +68,13 @@ impl WorkbookInfo {
             seen_workbook_properties: false,
             seen_sheets: false,
             seen_book_views: false,
+            seen_defined_names: false,
             seen_workbook_view: false,
             sheet_ids: HashSet::new(),
             relationship_ids: HashSet::new(),
+            defined_name_keys: HashSet::new(),
+            defined_names: Vec::new(),
+            pending_defined_name: None,
         }
     }
 
@@ -100,10 +124,32 @@ impl WorkbookInfo {
                     info.process_element(parent, &namespace, &element, decoder, &resolver)?;
                     info.observe_empty_container(parent, &namespace, &element)?;
                 },
+                Event::Text(text) if stack.last() == Some(&WorkbookContext::DefinedName) => {
+                    info.push_defined_name_text(
+                        &text
+                            .decode()
+                            .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                    )?;
+                },
+                Event::CData(text) if stack.last() == Some(&WorkbookContext::DefinedName) => {
+                    info.push_defined_name_text(
+                        &text
+                            .decode()
+                            .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                    )?;
+                },
+                Event::GeneralRef(reference)
+                    if stack.last() == Some(&WorkbookContext::DefinedName) =>
+                {
+                    info.push_defined_name_text(&decode_xml_reference(&reference)?)?;
+                },
                 Event::End(element) => {
                     let context = stack.pop().ok_or_else(|| {
                         invalid("workbook XML has a closing element outside its root")
                     })?;
+                    if context == WorkbookContext::DefinedName {
+                        info.finish_defined_name()?;
+                    }
                     if context == WorkbookContext::Workbook {
                         if !is_spreadsheetml_name(&namespace, element.name(), b"workbook") {
                             return Err(invalid(
@@ -131,6 +177,16 @@ impl WorkbookInfo {
                 "workbook activeTab {active_tab} exceeds the {} available sheets",
                 info.sheets.len()
             )));
+        }
+        for defined_name in &info.defined_names {
+            if let Some(local_sheet_id) = defined_name.local_sheet_id
+                && usize::try_from(local_sheet_id).map_or(true, |index| index >= info.sheets.len())
+            {
+                return Err(invalid(format!(
+                    "defined name '{}' has out-of-range localSheetId {local_sheet_id}",
+                    defined_name.name
+                )));
+            }
         }
         Ok(info)
     }
@@ -179,6 +235,27 @@ impl WorkbookInfo {
                 self.active_tab = active_tab;
                 self.seen_workbook_view = true;
             }
+        } else if parent == WorkbookContext::DefinedNames
+            && is_spreadsheetml_name(namespace, element.name(), b"definedName")
+        {
+            if self.pending_defined_name.is_some() {
+                return Err(invalid("nested workbook definedName element"));
+            }
+            let name = required_string(element, b"name", decoder, "defined name")?;
+            if name.is_empty() {
+                return Err(invalid("workbook defined name cannot be empty"));
+            }
+            let local_sheet_id = optional_u32(
+                element,
+                b"localSheetId",
+                decoder,
+                "defined name localSheetId",
+            )?;
+            self.pending_defined_name = Some(DefinedName {
+                name,
+                local_sheet_id,
+                value: String::new(),
+            });
         }
         Ok(())
     }
@@ -189,6 +266,11 @@ impl WorkbookInfo {
         namespace: &ResolveResult<'_>,
         element: &BytesStart<'_>,
     ) -> Result<WorkbookContext> {
+        if parent == WorkbookContext::DefinedNames
+            && is_spreadsheetml_name(namespace, element.name(), b"definedName")
+        {
+            return Ok(WorkbookContext::DefinedName);
+        }
         if parent != WorkbookContext::Workbook {
             return Ok(WorkbookContext::Other);
         }
@@ -198,6 +280,9 @@ impl WorkbookInfo {
         } else if is_spreadsheetml_name(namespace, element.name(), b"bookViews") {
             mark_once(&mut self.seen_book_views, "bookViews element")?;
             Ok(WorkbookContext::BookViews)
+        } else if is_spreadsheetml_name(namespace, element.name(), b"definedNames") {
+            mark_once(&mut self.seen_defined_names, "definedNames element")?;
+            Ok(WorkbookContext::DefinedNames)
         } else {
             Ok(WorkbookContext::Other)
         }
@@ -217,22 +302,67 @@ impl WorkbookInfo {
             && is_spreadsheetml_name(namespace, element.name(), b"bookViews")
         {
             mark_once(&mut self.seen_book_views, "bookViews element")?;
+        } else if parent == WorkbookContext::Workbook
+            && is_spreadsheetml_name(namespace, element.name(), b"definedNames")
+        {
+            mark_once(&mut self.seen_defined_names, "definedNames element")?;
+        } else if parent == WorkbookContext::DefinedNames
+            && is_spreadsheetml_name(namespace, element.name(), b"definedName")
+        {
+            self.finish_defined_name()?;
         }
+        Ok(())
+    }
+
+    fn push_defined_name_text(&mut self, text: &str) -> Result<()> {
+        self.pending_defined_name
+            .as_mut()
+            .ok_or_else(|| invalid("defined-name text outside a definedName element"))?
+            .value
+            .push_str(text);
+        Ok(())
+    }
+
+    fn finish_defined_name(&mut self) -> Result<()> {
+        let defined_name = self
+            .pending_defined_name
+            .take()
+            .ok_or_else(|| invalid("missing pending workbook defined name"))?;
+        let key = (
+            defined_name.local_sheet_id,
+            defined_name.name.to_ascii_lowercase(),
+        );
+        if !self.defined_name_keys.insert(key) {
+            return Err(invalid(format!(
+                "duplicate workbook defined name '{}' in the same scope",
+                defined_name.name
+            )));
+        }
+        self.defined_names.push(defined_name);
         Ok(())
     }
 }
 
-/// Parse workbook metadata, returning sheets, the active sheet index, and the date system.
-pub fn parse_workbook_xml(content: &str) -> SheetResult<(Vec<WorksheetInfo>, usize, bool)> {
+pub(crate) fn parse_workbook_details(content: &str) -> SheetResult<WorkbookParseResult> {
     WorkbookInfo::parse(content)
-        .map(|info| {
-            (
-                info.sheets,
-                info.active_tab.unwrap_or(0),
-                info.uses_1904_date_system,
-            )
+        .map(|info| WorkbookParseResult {
+            sheets: info.sheets,
+            active_sheet_index: info.active_tab.unwrap_or(0),
+            uses_1904_date_system: info.uses_1904_date_system,
+            defined_names: info.defined_names,
         })
         .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)
+}
+
+/// Parse workbook metadata, returning sheets, the active sheet index, and the date system.
+pub fn parse_workbook_xml(content: &str) -> SheetResult<(Vec<WorksheetInfo>, usize, bool)> {
+    parse_workbook_details(content).map(|details| {
+        (
+            details.sheets,
+            details.active_sheet_index,
+            details.uses_1904_date_system,
+        )
+    })
 }
 
 /// Parse a standalone `sheet` element.
@@ -398,6 +528,49 @@ mod tests {
             .unwrap();
         assert_eq!(sheet.name, "One & Two");
         assert_eq!(sheet.relationship_id, "r9");
+    }
+
+    #[test]
+    fn parses_namespaced_sheet_scoped_defined_names() {
+        let xml = format!(
+            r#"<s:workbook xmlns:s="{STRICT_S}" xmlns:r="{STRICT_R}" xmlns:f="urn:foreign">
+                <s:sheets><s:sheet name="A &amp; B" sheetId="1" r:id="r1"/></s:sheets>
+                <f:definedNames><s:definedName name="ignored" localSheetId="0">bad</s:definedName></f:definedNames>
+                <s:definedNames>
+                    <s:definedName name="_xlnm.Print_Area" localSheetId="0">'A &amp; B'!$A$1:$D$20</s:definedName>
+                    <s:definedName name="GlobalName">42</s:definedName>
+                </s:definedNames>
+            </s:workbook>"#
+        );
+        let details = parse_workbook_details(&xml).unwrap();
+
+        assert_eq!(details.defined_names.len(), 2);
+        assert_eq!(details.defined_names[0].name, "_xlnm.Print_Area");
+        assert_eq!(details.defined_names[0].local_sheet_id, Some(0));
+        assert_eq!(details.defined_names[0].value, "'A & B'!$A$1:$D$20");
+        assert_eq!(details.defined_names[1].value, "42");
+    }
+
+    #[test]
+    fn rejects_malformed_defined_names() {
+        let sheets = r#"<sheets><sheet name="One" sheetId="1" r:id="r1"/></sheets>"#;
+        let invalid = [
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames><definedName localSheetId="0">x</definedName></definedNames></workbook>"#
+            ),
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames><definedName name="x" localSheetId="1">x</definedName></definedNames></workbook>"#
+            ),
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames><definedName name="Same">1</definedName><definedName name="same">2</definedName></definedNames></workbook>"#
+            ),
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames/><definedNames/></workbook>"#
+            ),
+        ];
+        for xml in invalid {
+            assert!(parse_workbook_details(&xml).is_err(), "accepted {xml}");
+        }
     }
 
     #[test]

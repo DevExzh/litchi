@@ -10,7 +10,7 @@ use crate::xlsx::writer::workbook::{
     generate_pivot_table_definition_xml, render_pivot_table_sheet_cells,
 };
 use crate::xlsx::writer::{MutableWorkbookData, MutableWorksheet};
-use crate::xlsx::{SharedStrings, Styles};
+use crate::xlsx::{Cell, SharedStrings, Styles};
 use litchi_core::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator,
 };
@@ -171,7 +171,6 @@ impl Workbook {
         workbook.load_workbook_info()?;
         workbook.load_shared_strings()?;
         workbook.load_styles()?;
-        workbook.load_print_settings()?;
 
         Ok(workbook)
     }
@@ -185,14 +184,14 @@ impl Workbook {
         let content = std::str::from_utf8(workbook_part.blob())?;
 
         // Extract sheets from workbook.xml
-        let (worksheets, active_sheet_index, uses_1904_date_system) =
-            workbook_parser::parse_workbook_xml(content)?;
+        let mut details = workbook_parser::parse_workbook_details(content)?;
+        Self::apply_defined_name_print_settings(&details.defined_names, &mut details.sheets);
 
         // Cache worksheet names for zero-copy returns
-        self.worksheet_names = worksheets.iter().map(|ws| ws.name.clone()).collect();
-        self.worksheets = worksheets;
-        self.active_sheet_index = active_sheet_index;
-        self.is_1904_date_system = uses_1904_date_system;
+        self.worksheet_names = details.sheets.iter().map(|ws| ws.name.clone()).collect();
+        self.worksheets = details.sheets;
+        self.active_sheet_index = details.active_sheet_index;
+        self.is_1904_date_system = details.uses_1904_date_system;
 
         Ok(())
     }
@@ -219,115 +218,27 @@ impl Workbook {
         Ok(())
     }
 
-    /// Load worksheet print settings (print area, repeating rows/columns)
-    /// from workbook-level defined names.
-    fn load_print_settings(&mut self) -> SheetResult<()> {
-        use litchi_opc::PackURI as Uri;
-
-        let workbook_uri = Uri::new("/xl/workbook.xml")?;
-        let workbook_part = match self.package.get_part(&workbook_uri) {
-            Ok(part) => part,
-            Err(_) => return Ok(()),
-        };
-
-        let content = std::str::from_utf8(workbook_part.blob())?;
-
-        // Find the <definedNames> section if present.
-        let start = if let Some(pos) = content.find("<definedNames>") {
-            pos
-        } else {
-            return Ok(());
-        };
-
-        let end_rel = if let Some(pos) = content[start..].find("</definedNames>") {
-            pos
-        } else {
-            return Ok(());
-        };
-
-        let defined_names_xml = &content[start..start + end_rel + "</definedNames>".len()];
-
-        let mut pos = 0usize;
-        while let Some(rel) = defined_names_xml[pos..].find("<definedName ") {
-            let start_pos = pos + rel;
-            let after_start = &defined_names_xml[start_pos..];
-
-            // Find end of this definedName element (we assume well-formed XML)
-            let end_tag_rel = match after_start.find("</definedName>") {
-                Some(p) => p,
-                None => break,
-            };
-            let end_pos = start_pos + end_tag_rel + "</definedName>".len();
-            let dn_xml = &defined_names_xml[start_pos..end_pos];
-
-            Self::apply_defined_name_print_setting(dn_xml, &mut self.worksheets)?;
-
-            pos = end_pos;
-        }
-
-        Ok(())
-    }
-
-    /// Apply a single <definedName> element to worksheet print settings if it
-    /// represents _xlnm.Print_Area or _xlnm.Print_Titles.
-    fn apply_defined_name_print_setting(
-        dn_xml: &str,
+    /// Apply sheet-scoped print-area and print-title defined names.
+    fn apply_defined_name_print_settings(
+        defined_names: &[workbook_parser::DefinedName],
         worksheets: &mut [WorksheetInfo],
-    ) -> SheetResult<()> {
-        // Split into start tag and inner text.
-        let gt_pos = match dn_xml.find('>') {
-            Some(p) => p,
-            None => return Ok(()),
-        };
-
-        let (start_tag, inner) = dn_xml.split_at(gt_pos + 1);
-        let value_end = match inner.rfind("</definedName>") {
-            Some(p) => p,
-            None => return Ok(()),
-        };
-        let value_text = &inner[..value_end];
-
-        let name = Self::extract_defined_name_attr(start_tag, "name");
-        let local_sheet_id = Self::extract_defined_name_attr(start_tag, "localSheetId");
-
-        let (name, sheet_idx) = match (name, local_sheet_id) {
-            (Some(n), Some(sid)) => {
-                let idx: usize = match sid.parse::<u32>() {
-                    Ok(v) => v as usize,
-                    Err(_) => return Ok(()),
-                };
-                if idx >= worksheets.len() {
-                    return Ok(());
-                }
-                (n, idx)
-            },
-            _ => return Ok(()),
-        };
-
-        if name == "_xlnm.Print_Area" {
-            if let Some(range) = Self::parse_print_area(value_text) {
-                worksheets[sheet_idx].print_area = Some(range);
-            }
-        } else if name == "_xlnm.Print_Titles" {
-            let (rows, cols) = Self::parse_print_titles(value_text);
-            if let Some(r) = rows {
-                worksheets[sheet_idx].repeating_rows = Some(r);
-            }
-            if let Some(c) = cols {
-                worksheets[sheet_idx].repeating_columns = Some(c);
+    ) {
+        for defined_name in defined_names {
+            let Some(sheet_idx) = defined_name
+                .local_sheet_id
+                .and_then(|index| usize::try_from(index).ok())
+            else {
+                continue;
+            };
+            let worksheet = &mut worksheets[sheet_idx];
+            if defined_name.name == "_xlnm.Print_Area" {
+                worksheet.print_area = Self::parse_print_area(&defined_name.value);
+            } else if defined_name.name == "_xlnm.Print_Titles" {
+                let (rows, columns) = Self::parse_print_titles(&defined_name.value);
+                worksheet.repeating_rows = rows;
+                worksheet.repeating_columns = columns;
             }
         }
-
-        Ok(())
-    }
-
-    /// Extract a simple XML attribute value from a <definedName ...> start tag.
-    fn extract_defined_name_attr(tag: &str, attr: &str) -> Option<String> {
-        let pattern = format!("{}=\"", attr);
-        let start = tag.find(&pattern)? + pattern.len();
-        let tail = &tag[start..];
-        let end = tail.find('"')?;
-        Some(tail[..end].to_string())
     }
 
     /// Parse the print area reference from a defined name value.
@@ -336,14 +247,10 @@ impl Workbook {
     /// separated list of such references. We return the range part for the
     /// first entry (e.g., `A1:D20`).
     fn parse_print_area(value: &str) -> Option<String> {
-        let first = value.split(',').next()?.trim();
+        let first = Self::split_defined_name_areas(value).into_iter().next()?;
         let bang = first.rfind('!')?;
         let range = first[bang + 1..].trim();
-        if range.is_empty() {
-            None
-        } else {
-            Some(range.to_string())
-        }
+        Self::is_valid_print_cell_range(range).then(|| range.to_string())
     }
 
     /// Parse repeating rows/columns from a _xlnm.Print_Titles defined name
@@ -353,8 +260,7 @@ impl Workbook {
         let mut rows: Option<String> = None;
         let mut cols: Option<String> = None;
 
-        for part in value.split(',') {
-            let part = part.trim();
+        for part in Self::split_defined_name_areas(value) {
             let bang = match part.rfind('!') {
                 Some(p) => p,
                 None => continue,
@@ -368,10 +274,18 @@ impl Workbook {
             // row or column reference.
             let mut chars = range.chars().skip_while(|c| *c == '$');
             match chars.next() {
-                Some(ch) if ch.is_ascii_digit() && rows.is_none() => {
+                Some(ch)
+                    if ch.is_ascii_digit()
+                        && rows.is_none()
+                        && Self::is_valid_print_title_range(range, true) =>
+                {
                     rows = Some(range.to_string());
                 },
-                Some(ch) if ch.is_ascii_alphabetic() && cols.is_none() => {
+                Some(ch)
+                    if ch.is_ascii_alphabetic()
+                        && cols.is_none()
+                        && Self::is_valid_print_title_range(range, false) =>
+                {
                     cols = Some(range.to_string());
                 },
                 _ => {},
@@ -379,6 +293,53 @@ impl Workbook {
         }
 
         (rows, cols)
+    }
+
+    fn split_defined_name_areas(value: &str) -> Vec<&str> {
+        let bytes = value.as_bytes();
+        let mut areas = Vec::new();
+        let mut start = 0;
+        let mut quoted = false;
+        let mut index = 0;
+        while index < bytes.len() {
+            match bytes[index] {
+                b'\'' if quoted && bytes.get(index + 1) == Some(&b'\'') => index += 1,
+                b'\'' => quoted = !quoted,
+                b',' if !quoted => {
+                    areas.push(value[start..index].trim());
+                    start = index + 1;
+                },
+                _ => {},
+            }
+            index += 1;
+        }
+        areas.push(value[start..].trim());
+        areas
+    }
+
+    fn is_valid_print_cell_range(range: &str) -> bool {
+        let mut references = range.split(':');
+        let valid = references
+            .by_ref()
+            .take(2)
+            .all(|reference| Cell::reference_to_coords(&reference.replace('$', "")).is_ok());
+        valid && references.next().is_none()
+    }
+
+    fn is_valid_print_title_range(range: &str, rows: bool) -> bool {
+        let mut endpoints = range.split(':');
+        let mut count = 0;
+        let valid = endpoints.by_ref().take(2).all(|endpoint| {
+            count += 1;
+            let endpoint = endpoint.trim_matches('$');
+            let reference = if rows {
+                format!("A{endpoint}")
+            } else {
+                format!("{endpoint}1")
+            };
+            Cell::reference_to_coords(&reference).is_ok()
+        });
+        valid && count == 2 && endpoints.next().is_none()
     }
 
     /// Get a worksheet by index
@@ -1906,6 +1867,10 @@ mod tests {
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
           xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <sheets><sheet name="Sales" sheetId="42" r:id="rId1"/></sheets>
+  <definedNames>
+    <definedName name="_xlnm.Print_Area" localSheetId="0">Sales!$A$1:$D$20</definedName>
+    <definedName name="_xlnm.Print_Titles" localSheetId="0">Sales!$1:$2,Sales!$A:$B</definedName>
+  </definedNames>
 </workbook>"#;
 
     #[test]
@@ -1935,6 +1900,23 @@ mod tests {
         let mut invalid = comment;
         invalid.mentions[0].mention_person_id = missing_id.into();
         assert!(validate_threaded_comment_people([&invalid], Some(&people)).is_err());
+    }
+
+    #[test]
+    fn parses_quoted_and_bounded_print_defined_names() {
+        assert_eq!(
+            Workbook::parse_print_area("'Sales, West'!$A$1:$D$20,'Other'!$A$1"),
+            Some("$A$1:$D$20".to_string())
+        );
+        assert_eq!(
+            Workbook::parse_print_titles("'O''Brien, West'!$1:$2,'O''Brien, West'!$A:$B"),
+            (Some("$1:$2".to_string()), Some("$A:$B".to_string()))
+        );
+        assert_eq!(Workbook::parse_print_area("Sales!XFE1"), None);
+        assert_eq!(
+            Workbook::parse_print_titles("Sales!$0:$1,Sales!$A:$XFE"),
+            (None, None)
+        );
     }
 
     const WORKSHEET_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -2143,6 +2125,9 @@ mod tests {
         assert!(sparkline.options.date_axis);
         assert_eq!(sparkline.sparklines.len(), 2);
         assert_eq!(sparkline.sparklines[0].location, "F2");
+        assert_eq!(worksheet.get_print_area(), Some("$A$1:$D$20"));
+        assert_eq!(worksheet.get_repeating_rows(), Some("$1:$2"));
+        assert_eq!(worksheet.get_repeating_columns(), Some("$A:$B"));
         let comment = worksheet.get_cell_comment(3, 3).unwrap();
         assert_eq!(comment.author.as_deref(), Some("Alice & Bob"));
         assert_eq!(comment.author_id, 0);
