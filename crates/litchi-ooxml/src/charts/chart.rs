@@ -4,7 +4,7 @@
 //! all chart elements (plot area, legend, title, etc.).
 
 use crate::charts::legend::Legend;
-use crate::charts::models::TitleText;
+use crate::charts::models::{Layout, TitleText};
 use crate::charts::plot_area::PlotArea;
 use crate::charts::types::DisplayBlanks;
 
@@ -96,6 +96,10 @@ impl Default for WallFloor {
 pub struct Chart {
     /// Chart title
     pub title: Option<TitleText>,
+    /// Manual layout for the chart title
+    pub title_layout: Option<Layout>,
+    /// Whether the chart title overlays the plot area
+    pub title_overlay: bool,
     /// Whether auto-generated title has been deleted
     pub auto_title_deleted: bool,
     /// Plot area with series and axes
@@ -130,6 +134,8 @@ impl Chart {
     pub fn new() -> Self {
         Self {
             title: None,
+            title_layout: None,
+            title_overlay: false,
             auto_title_deleted: false,
             plot_area: PlotArea::new(),
             legend: None,

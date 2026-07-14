@@ -210,7 +210,15 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
                     b"chart" => saw_chart = true,
                     b"chartSpace" => {},
                     b"title" => {
-                        chart.title = Some(parse_title(&mut xml_reader)?);
+                        if chart.title.is_some() {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart contains duplicate titles".into(),
+                            ));
+                        }
+                        let title = parse_title(&mut xml_reader)?;
+                        chart.title = Some(title.text);
+                        chart.title_layout = title.layout;
+                        chart.title_overlay = title.overlay;
                     },
                     b"autoTitleDeleted" => {
                         chart.auto_title_deleted = parse_bool_attr(e)?;
@@ -272,15 +280,53 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
     Ok(chart)
 }
 
-fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<TitleText> {
+struct ParsedTitle {
+    text: TitleText,
+    layout: Option<Layout>,
+    overlay: bool,
+}
+
+fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle> {
     let mut text = String::new();
     let mut formula = None;
+    let mut layout = None;
+    let mut overlay = false;
+    let mut saw_overlay = false;
     let mut buf = Vec::new();
     let mut in_text = false;
     let mut saw_text = false;
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"layout" => {
+                if layout.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart title contains duplicate layouts".into(),
+                    ));
+                }
+                layout = Some(parse_layout(reader)?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"layout" => {
+                layout = Some(match layout {
+                    None => Layout::new(),
+                    Some(_) => {
+                        return Err(OoxmlError::InvalidFormat(
+                            "chart title contains duplicate layouts".into(),
+                        ));
+                    },
+                });
+            },
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+                if element.local_name().as_ref() == b"overlay" =>
+            {
+                if saw_overlay {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart title contains duplicate overlay flags".into(),
+                    ));
+                }
+                overlay = parse_bool_attr(element)?;
+                saw_overlay = true;
+            },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"f" => {
                 if formula.is_some() {
                     return Err(OoxmlError::InvalidFormat(
@@ -317,16 +363,21 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<TitleText> 
         buf.clear();
     }
 
-    if let Some(formula) = formula {
+    let text = if let Some(formula) = formula {
         if saw_text {
             return Err(OoxmlError::InvalidFormat(
                 "chart title mixes a formula reference with literal text".to_string(),
             ));
         }
-        Ok(TitleText::Reference(DataSourceRef::new(formula)))
+        TitleText::Reference(DataSourceRef::new(formula))
     } else {
-        Ok(TitleText::Literal(RichText::new(text)))
-    }
+        TitleText::Literal(RichText::new(text))
+    };
+    Ok(ParsedTitle {
+        text,
+        layout,
+        overlay,
+    })
 }
 
 fn parse_view_3d<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<View3D> {
@@ -1766,6 +1817,8 @@ struct ParsedAxisCommon {
     cross_axis_id: Option<u32>,
     position: Option<AxisPosition>,
     title: Option<TitleText>,
+    title_layout: Option<Layout>,
+    title_overlay: bool,
     number_format: Option<NumberFormat>,
     orientation: AxisOrientation,
     major_tick_mark: TickMark,
@@ -1785,6 +1838,8 @@ impl ParsedAxisCommon {
             cross_axis_id: None,
             position: None,
             title: None,
+            title_layout: None,
+            title_overlay: false,
             number_format: None,
             orientation: AxisOrientation::MinMax,
             major_tick_mark: TickMark::Out,
@@ -1810,6 +1865,8 @@ impl ParsedAxisCommon {
             .ok_or_else(|| missing_attribute("chart crossing-axis ID"))?;
         let mut common = AxisCommon::new(axis_id, position, cross_axis_id);
         common.title = self.title;
+        common.layout = self.title_layout;
+        common.title_overlay = self.title_overlay;
         common.number_format = self.number_format;
         common.orientation = self.orientation;
         common.major_tick_mark = self.major_tick_mark;
@@ -1822,6 +1879,22 @@ impl ParsedAxisCommon {
         common.show_minor_gridlines = self.show_minor_gridlines;
         Ok(common)
     }
+}
+
+fn parse_axis_title<R: BufRead>(
+    reader: &mut ChartXmlReader<R>,
+    common: &mut ParsedAxisCommon,
+) -> Result<()> {
+    if common.title.is_some() {
+        return Err(OoxmlError::InvalidFormat(
+            "chart axis contains duplicate titles".into(),
+        ));
+    }
+    let title = parse_title(reader)?;
+    common.title = Some(title.text);
+    common.title_layout = title.layout;
+    common.title_overlay = title.overlay;
+    Ok(())
 }
 
 fn parse_axis_common_element(
@@ -1865,7 +1938,7 @@ fn parse_category_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Opt
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"title" => {
-                common.title = Some(parse_title(reader)?);
+                parse_axis_title(reader, &mut common)?;
             },
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
                 if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
@@ -1929,7 +2002,7 @@ fn parse_value_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"title" => {
-                common.title = Some(parse_title(reader)?);
+                parse_axis_title(reader, &mut common)?;
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"dispUnits" => {
                 if display_units.is_some() {
@@ -2184,7 +2257,7 @@ fn parse_date_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"title" => {
-                common.title = Some(parse_title(reader)?);
+                parse_axis_title(reader, &mut common)?;
             },
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
                 if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
@@ -2247,7 +2320,7 @@ fn parse_series_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Optio
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"title" => {
-                common.title = Some(parse_title(reader)?);
+                parse_axis_title(reader, &mut common)?;
             },
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
                 if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
@@ -3117,6 +3190,8 @@ mod tests {
         let mut category = CategoryAxis::new(10, AxisPosition::Bottom, 20);
         category.common.orientation = AxisOrientation::MaxMin;
         category.common.title = Some(TitleText::from_string("Quarter"));
+        category.common.title_overlay = true;
+        category.common.layout = Some(Layout::new().with_position(0.3, 0.4));
         category.common.number_format =
             Some(NumberFormat::new("mmm-yy \"fiscal\"").with_source_linked(false));
         category.common.major_tick_mark = TickMark::Cross;
@@ -3163,6 +3238,8 @@ mod tests {
 
         let mut chart = Chart::new();
         chart.title = Some(TitleText::from_ref("Sheet1!$C$1"));
+        chart.title_layout = Some(Layout::new().with_size(0.5, 0.1));
+        chart.title_overlay = true;
         let mut layout = Layout::new().with_position(0.1, 0.2).with_size(0.7, 0.6);
         layout.target = Some(LayoutTarget::Inner);
         layout.x_mode = Some(LayoutMode::Factor);
@@ -3190,6 +3267,9 @@ mod tests {
             panic!("expected chart title reference");
         };
         assert_eq!(title.formula, "Sheet1!$C$1");
+        assert!(parsed.title_overlay);
+        assert_eq!(parsed.title_layout.as_ref().unwrap().width, Some(0.5));
+        assert_eq!(parsed.title_layout.as_ref().unwrap().height, Some(0.1));
         let layout = parsed.plot_area.layout.as_ref().unwrap();
         assert_eq!(layout.x, Some(0.1));
         assert_eq!(layout.y, Some(0.2));
@@ -3214,6 +3294,9 @@ mod tests {
             panic!("expected literal category-axis title");
         };
         assert_eq!(title.text, "Quarter");
+        assert!(category.common.title_overlay);
+        assert_eq!(category.common.layout.as_ref().unwrap().x, Some(0.3));
+        assert_eq!(category.common.layout.as_ref().unwrap().y, Some(0.4));
         assert_eq!(category.label_align, Some(AxisLabelAlign::Right));
         assert_eq!(category.label_offset, Some(250));
         assert_eq!(category.tick_label_skip, Some(2));

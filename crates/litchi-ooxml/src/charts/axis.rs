@@ -163,6 +163,8 @@ pub struct AxisCommon {
     pub position: AxisPosition,
     /// Axis title
     pub title: Option<TitleText>,
+    /// Whether the axis title overlays the plot area
+    pub title_overlay: bool,
     /// Number format for tick labels
     pub number_format: Option<NumberFormat>,
     /// Scaling orientation
@@ -185,7 +187,7 @@ pub struct AxisCommon {
     pub show_major_gridlines: bool,
     /// Show minor gridlines
     pub show_minor_gridlines: bool,
-    /// Axis layout
+    /// Manual layout for the axis title
     pub layout: Option<Layout>,
 }
 
@@ -197,6 +199,7 @@ impl AxisCommon {
             axis_id,
             position,
             title: None,
+            title_overlay: false,
             number_format: None,
             orientation: AxisOrientation::MinMax,
             major_tick_mark: TickMark::Out,

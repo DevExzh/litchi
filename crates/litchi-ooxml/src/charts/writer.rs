@@ -115,7 +115,12 @@ pub fn write_chart<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<(
     write!(writer, "<c:chart>")?;
 
     if let Some(ref title) = chart.title {
-        write_title(writer, title)?;
+        write_title(
+            writer,
+            title,
+            chart.title_layout.as_ref(),
+            chart.title_overlay,
+        )?;
     }
 
     write!(
@@ -183,12 +188,25 @@ pub fn write_chart<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<(
     Ok(())
 }
 
-fn write_title<W: Write>(writer: &mut W, title: &TitleText) -> std::io::Result<()> {
+fn write_title<W: Write>(
+    writer: &mut W,
+    title: &TitleText,
+    layout: Option<&Layout>,
+    overlay: bool,
+) -> std::io::Result<()> {
     write!(writer, "<c:title>")?;
 
     write_title_text(writer, title)?;
 
-    write!(writer, r#"<c:overlay val="0"/>"#)?;
+    if let Some(layout) = layout {
+        write_layout(writer, Some(layout))?;
+    }
+
+    write!(
+        writer,
+        r#"<c:overlay val="{}"/>"#,
+        if overlay { "1" } else { "0" }
+    )?;
     write!(writer, "</c:title>")?;
 
     Ok(())
@@ -1359,7 +1377,7 @@ fn write_axis_common<W: Write>(
     }
 
     if let Some(ref title) = common.title {
-        write_title(writer, title)?;
+        write_title(writer, title, common.layout.as_ref(), common.title_overlay)?;
     }
 
     if let Some(number_format) = &common.number_format {
