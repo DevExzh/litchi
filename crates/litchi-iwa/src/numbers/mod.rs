@@ -31,12 +31,25 @@
 
 pub mod cell;
 pub mod document;
+pub mod editor;
+pub mod formula;
 pub mod sheet;
 pub mod table;
 pub mod table_extractor;
 
-pub use cell::{CellType, CellValue};
+mod bnc;
+mod function_map;
+
+pub use cell::{APPLE_EPOCH_UNIX_OFFSET_SECONDS, CellType, CellValue};
 pub use document::NumbersDocument;
+pub use editor::{
+    NumbersCellCommentInfo, NumbersCellCommentReplyInfo, NumbersEditor, NumbersPivotCategoryInfo,
+    NumbersSheetInfo, NumbersTableInfo, NumbersTextBoxInfo, RemovedNumbersTextBox,
+};
+pub use formula::{
+    FormulaAxisReference, FormulaBinaryOperator, FormulaCellReference, FormulaExpression,
+    FormulaPivotCategoryReference, FormulaUuid,
+};
 pub use sheet::NumbersSheet;
-pub use table::NumbersTable;
+pub use table::{NumbersCellComment, NumbersCommentUuid, NumbersTable};
 pub use table_extractor::TableDataExtractor;

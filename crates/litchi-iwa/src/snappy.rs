@@ -5,7 +5,7 @@
 //! - No CRC-32C checksums
 //! - Custom chunk header format (4 bytes: type + 24-bit length)
 
-use snap::raw::Decoder;
+use snap::raw::{Decoder, Encoder, decompress_len};
 use std::io::{self, Cursor, Read};
 
 use crate::Error;
@@ -17,6 +17,16 @@ pub struct SnappyStream {
 }
 
 impl SnappyStream {
+    /// Maximum uncompressed size accepted for one Snappy block.
+    ///
+    /// iWork writers use small independent blocks. Capping individual blocks
+    /// prevents a forged length prefix from forcing a multi-gigabyte allocation.
+    pub const MAX_UNCOMPRESSED_CHUNK: usize = 64 * 1024 * 1024;
+    /// Maximum total size accepted for one decompressed IWA component.
+    pub const MAX_DECOMPRESSED_STREAM: usize = 512 * 1024 * 1024;
+    /// Block size emitted by the serializer.
+    pub const WRITE_CHUNK_SIZE: usize = 64 * 1024;
+
     /// Decompress an IWA file from a reader
     ///
     /// iWork IWA files use a custom Snappy framing format:
@@ -29,27 +39,27 @@ impl SnappyStream {
         let mut decoder = Decoder::new();
 
         loop {
-            // Read 4-byte header
-            let mut header = [0u8; 4];
-            match reader.read_exact(&mut header) {
+            // Read the type byte separately so a clean EOF can be distinguished
+            // from a truncated four-byte frame header.
+            let mut chunk_type = [0u8; 1];
+            match reader.read(&mut chunk_type) {
+                Ok(0) => break,
                 Ok(_) => {},
-                Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => {
-                    // End of stream
-                    break;
-                },
-                Err(e) => return Err(Error::Io(e)),
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                Err(error) => return Err(Error::Io(error)),
             }
+            let mut length_bytes = [0u8; 3];
+            reader.read_exact(&mut length_bytes)?;
 
-            let chunk_type = header[0];
-            if chunk_type != 0 {
+            if chunk_type[0] != 0 {
                 return Err(Error::Snappy(format!(
                     "Unexpected chunk type: {}, expected 0",
-                    chunk_type
+                    chunk_type[0]
                 )));
             }
 
             // Extract 24-bit length (little-endian)
-            let length = u32::from_le_bytes([header[1], header[2], header[3], 0]);
+            let length = u32::from_le_bytes([length_bytes[0], length_bytes[1], length_bytes[2], 0]);
 
             if length == 0 {
                 continue;
@@ -59,32 +69,65 @@ impl SnappyStream {
             let mut compressed = vec![0u8; length as usize];
             reader.read_exact(&mut compressed).map_err(Error::Io)?;
 
-            let mut chunk_decompressed = Vec::new();
-            let mut buffer_size = 1024; // Start with 1KB
-
-            loop {
-                chunk_decompressed.resize(buffer_size, 0);
-                match decoder.decompress(&compressed, &mut chunk_decompressed) {
-                    Ok(decompressed_size) => {
-                        // Success - truncate to actual size and break
-                        chunk_decompressed.truncate(decompressed_size);
-                        break;
-                    },
-                    Err(_) if buffer_size < 10 * 1024 * 1024 => {
-                        // Buffer too small, try with larger buffer (up to 10MB)
-                        buffer_size *= 2;
-                        continue;
-                    },
-                    Err(e) => {
-                        return Err(Error::Snappy(format!("Decompression failed: {}", e)));
-                    },
-                }
+            let expected_length = decompress_len(&compressed)
+                .map_err(|error| Error::Snappy(format!("Invalid Snappy block: {error}")))?;
+            if expected_length > Self::MAX_UNCOMPRESSED_CHUNK {
+                return Err(Error::Snappy(format!(
+                    "Snappy block expands to {expected_length} bytes, exceeding the {} byte limit",
+                    Self::MAX_UNCOMPRESSED_CHUNK
+                )));
             }
-
+            let total_length = decompressed
+                .len()
+                .checked_add(expected_length)
+                .ok_or_else(|| Error::Snappy("Decompressed stream length overflow".to_owned()))?;
+            if total_length > Self::MAX_DECOMPRESSED_STREAM {
+                return Err(Error::Snappy(format!(
+                    "Snappy stream expands to more than {} bytes",
+                    Self::MAX_DECOMPRESSED_STREAM
+                )));
+            }
+            decompressed.try_reserve(expected_length).map_err(|error| {
+                Error::Snappy(format!("Unable to reserve decompression buffer: {error}"))
+            })?;
+            let chunk_decompressed = decoder
+                .decompress_vec(&compressed)
+                .map_err(|error| Error::Snappy(format!("Decompression failed: {error}")))?;
+            if chunk_decompressed.len() != expected_length {
+                return Err(Error::Snappy(format!(
+                    "Snappy block decoded to {} bytes, expected {expected_length}",
+                    chunk_decompressed.len()
+                )));
+            }
             decompressed.extend(chunk_decompressed);
         }
 
         Ok(SnappyStream { decompressed })
+    }
+
+    /// Compress a decompressed IWA stream using Apple's checksum-free Snappy
+    /// framing variant.
+    pub fn compress(data: &[u8]) -> Result<Vec<u8>, Error> {
+        let mut output = Vec::new();
+        let mut encoder = Encoder::new();
+
+        for chunk in data.chunks(Self::WRITE_CHUNK_SIZE) {
+            let compressed = encoder
+                .compress_vec(chunk)
+                .map_err(|error| Error::Snappy(format!("Compression failed: {error}")))?;
+            let length = u32::try_from(compressed.len()).map_err(|_| {
+                Error::Snappy("Compressed Snappy block exceeds the 24-bit limit".to_string())
+            })?;
+            if length > 0x00ff_ffff {
+                return Err(Error::Snappy(
+                    "Compressed Snappy block exceeds the 24-bit limit".to_string(),
+                ));
+            }
+            output.extend_from_slice(&[0, length as u8, (length >> 8) as u8, (length >> 16) as u8]);
+            output.extend_from_slice(&compressed);
+        }
+
+        Ok(output)
     }
 
     /// Get the decompressed data as a slice
@@ -142,6 +185,22 @@ mod tests {
             Error::Snappy(msg) => assert!(msg.contains("Unexpected chunk type")),
             _ => panic!("Expected Snappy error"),
         }
+    }
+
+    #[test]
+    fn test_compression_round_trip_across_blocks() {
+        let input: Vec<u8> = (0..(SnappyStream::WRITE_CHUNK_SIZE * 3 + 17))
+            .map(|index| (index % 251) as u8)
+            .collect();
+        let compressed = SnappyStream::compress(&input).unwrap();
+        let decompressed = SnappyStream::decompress(&mut Cursor::new(compressed)).unwrap();
+        assert_eq!(decompressed.data(), input);
+    }
+
+    #[test]
+    fn test_truncated_header_is_rejected() {
+        let error = SnappyStream::decompress(&mut Cursor::new([0, 1])).unwrap_err();
+        assert!(matches!(error, Error::Io(_)));
     }
 
     #[test]

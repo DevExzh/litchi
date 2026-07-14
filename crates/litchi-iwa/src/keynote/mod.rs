@@ -31,9 +31,22 @@
 //! ```
 
 pub mod document;
+pub mod editor;
 pub mod show;
 pub mod slide;
 
 pub use document::KeynoteDocument;
+pub use editor::{
+    KeynoteBuildAcceleration, KeynoteBuildChunkInfo, KeynoteBuildCustomParameters,
+    KeynoteBuildInfo, KeynoteBuildSettings, KeynoteBuildStart, KeynoteEditor,
+    KeynoteEmphasisAction, KeynoteFlipDirection, KeynoteHorizontalBuildDirection,
+    KeynoteJiggleIntensity, KeynoteKeyboardBuild, KeynoteKeyboardDirection, KeynoteMotionPath,
+    KeynoteMotionPathNode, KeynoteMotionPathNodeType, KeynoteMotionPathPoint, KeynoteMotionSubpath,
+    KeynoteMoveAction, KeynoteObjectBuildEffect, KeynoteOpacityAction, KeynoteRotationAction,
+    KeynoteRotationDirection, KeynoteScaleAction, KeynoteShowSettings, KeynoteSlideInfo,
+    KeynoteSlideTextInfo, KeynoteSlideTextRole, KeynoteSwooshDirection,
+    KeynoteTransitionAnimationParameters, KeynoteTransitionCustomParameters,
+    KeynoteTransitionSettings, RemovedKeynoteTextBox,
+};
 pub use show::KeynoteShow;
 pub use slide::{BuildAnimation, KeynoteSlide, SlideTransition};

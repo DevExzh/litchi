@@ -30,7 +30,13 @@
 //! ```
 
 pub mod document;
+pub mod editor;
 pub mod section;
 
 pub use document::PagesDocument;
+pub use editor::{
+    PagesDrawableTextInfo, PagesEditor, PagesHeaderFooterInfo, PagesHeaderFooterKind,
+    PagesPageLayout, PagesRgbColorSpace, PagesRgbaColor, PagesSectionBackground, PagesSectionInfo,
+    PagesSectionSettings, PagesTemplateKind, RemovedPagesTextBox,
+};
 pub use section::{PagesSection, PagesSectionType};

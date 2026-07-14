@@ -57,28 +57,12 @@ impl ObjectIndex {
     pub fn from_bundle(bundle: &Bundle) -> Result<Self> {
         let mut index = Self::new();
 
-        // Look for the object index, typically in Metadata.iwa or a similar file
-        if let Some(metadata_archive) = bundle.get_archive("Index/Metadata.iwa") {
-            index.parse_metadata_archive(metadata_archive)?;
-        }
-
         // Parse all archives to build the index
         for (archive_name, archive) in bundle.archives() {
             index.parse_archive(archive_name, archive)?;
         }
 
         Ok(index)
-    }
-
-    /// Parse the metadata archive to find object references
-    fn parse_metadata_archive(&mut self, archive: &Archive) -> Result<()> {
-        for object in &archive.objects {
-            if let Some(identifier) = object.archive_info.identifier {
-                // Look for object references in message data
-                self.parse_object_references(identifier, object)?;
-            }
-        }
-        Ok(())
     }
 
     /// Parse an archive to extract object information
@@ -114,6 +98,23 @@ impl ObjectIndex {
                     .entry(archive_name.to_string())
                     .or_default()
                     .push(identifier);
+
+                // MessageInfo is the authoritative, application-independent
+                // reference index emitted by iWork for every payload.
+                let mut has_indexed_references = false;
+                for message_info in &object.archive_info.message_infos {
+                    for &reference in &message_info.object_references {
+                        has_indexed_references = true;
+                        self.reference_graph.add_reference(identifier, reference);
+                    }
+                }
+
+                // Some old archives omit MessageInfo references. Decode only
+                // unambiguous high-numbered payloads as a compatibility fallback;
+                // low message types overlap between Numbers and Keynote.
+                if !has_indexed_references && object_type >= 2000 {
+                    self.parse_object_references(identifier, object)?;
+                }
             }
         }
         Ok(())
@@ -162,31 +163,49 @@ impl ObjectIndex {
 
                         // Extract data store sub-references
                         // DataStore contains references to column_headers, string_table, style_table, etc.
-                        self.extract_reference(object_id, &table.data_store.column_headers);
-                        self.extract_reference(object_id, &table.data_store.string_table);
-                        self.extract_reference(object_id, &table.data_store.style_table);
-                        self.extract_reference(object_id, &table.data_store.formula_table);
-                        self.extract_reference(object_id, &table.data_store.format_table);
+                        let data_store = &table.base_data_store;
+                        self.extract_reference(object_id, &data_store.column_headers);
+                        self.extract_reference(object_id, &data_store.string_table);
+                        self.extract_reference(object_id, &data_store.style_table);
+                        self.extract_reference(object_id, &data_store.formula_table);
+                        self.extract_reference(object_id, &data_store.format_table_pre_bnc);
+                        if let Some(format_table) = &data_store.format_table {
+                            self.extract_reference(object_id, format_table);
+                        }
 
                         // Optional references
-                        if let Some(ref formula_error_table) = table.data_store.formula_error_table
-                        {
+                        if let Some(ref formula_error_table) = data_store.formula_error_table {
                             self.extract_reference(object_id, formula_error_table);
                         }
-                        if let Some(ref choice_list) =
-                            table.data_store.multiple_choice_list_format_table
+                        if let Some(ref choice_list) = data_store.multiple_choice_list_format_table
                         {
                             self.extract_reference(object_id, choice_list);
                         }
-                        if let Some(ref merge_map) = table.data_store.merge_region_map {
+                        if let Some(ref merge_map) = data_store.merge_region_map {
                             self.extract_reference(object_id, merge_map);
                         }
                     }
                 },
 
                 6005 | 6201 => {
-                    // TST.TableDataList - may contain references to other data structures
-                    // The actual cell data is stored here
+                    if let Ok(list) = crate::protobuf::tst::TableDataList::decode(&*raw_msg.data) {
+                        for segment in &list.segments {
+                            self.extract_reference(object_id, segment);
+                        }
+                        for entry in &list.entries {
+                            extract_table_data_list_entry_references(self, object_id, entry);
+                        }
+                    }
+                },
+
+                6011 => {
+                    if let Ok(segment) =
+                        crate::protobuf::tst::TableDataListSegment::decode(&*raw_msg.data)
+                    {
+                        for entry in &segment.entries {
+                            extract_table_data_list_entry_references(self, object_id, entry);
+                        }
+                    }
                 },
 
                 // TSWP (Word Processing/Text) types
@@ -213,7 +232,7 @@ impl ObjectIndex {
                         self.extract_reference(object_id, &slide.style);
 
                         // Extract drawable references (shapes, images, text boxes)
-                        for drawable in &slide.drawables {
+                        for drawable in &slide.owned_drawables {
                             self.extract_reference(object_id, drawable);
                         }
 
@@ -278,12 +297,16 @@ impl ObjectIndex {
                             self.extract_reference(object_id, drawable_ref);
                         }
 
-                        // Extract header/footer storage references if present
-                        if let Some(ref header) = sheet.header_storage {
+                        for header in &sheet.headers {
                             self.extract_reference(object_id, header);
                         }
-                        if let Some(ref footer) = sheet.footer_storage {
+                        for footer in &sheet.footers {
                             self.extract_reference(object_id, footer);
+                        }
+
+                        // Old documents used one storage reference for each area.
+                        if sheet.headers.is_empty() && sheet.footers.is_empty() {
+                            self.extract_legacy_sheet_headers(object_id, &sheet);
                         }
                     }
                 },
@@ -410,6 +433,18 @@ impl ObjectIndex {
                         }
                     }
                 },
+                3056 => {
+                    if let Ok(comment) =
+                        crate::protobuf::tsd::CommentStorageArchive::decode(&*raw_msg.data)
+                    {
+                        if let Some(author) = &comment.author {
+                            self.extract_reference(object_id, author);
+                        }
+                        for reply in &comment.replies {
+                            self.extract_reference(object_id, reply);
+                        }
+                    }
+                },
 
                 // TSCH (Chart) types
                 // Implementation Status: ✓ COMPLETED (2025-11-04)
@@ -482,22 +517,106 @@ impl ObjectIndex {
                 10000 => {
                     // TP.DocumentArchive
                     if let Ok(doc) = crate::protobuf::tp::DocumentArchive::decode(&*raw_msg.data) {
-                        // Extract theme reference
-                        if let Some(ref theme) = doc.theme {
-                            self.extract_reference(object_id, theme);
+                        for reference in [
+                            doc.stylesheet.as_ref(),
+                            doc.floating_drawables.as_ref(),
+                            doc.body_storage.as_ref(),
+                            doc.section.as_ref(),
+                            doc.theme.as_ref(),
+                            doc.settings.as_ref(),
+                            doc.deprecated_layout_state.as_ref(),
+                            doc.deprecated_view_state.as_ref(),
+                            doc.most_recent_change_session.as_ref(),
+                            doc.drawables_zorder.as_ref(),
+                            doc.tables_custom_format_list.as_ref(),
+                            doc.flow_info_container.as_ref(),
+                            doc.merge_data.as_ref(),
+                        ]
+                        .into_iter()
+                        .flatten()
+                        {
+                            self.extract_reference(object_id, reference);
                         }
-
-                        // Extract stylesheet reference
-                        if let Some(ref stylesheet) = doc.stylesheet {
-                            self.extract_reference(object_id, stylesheet);
+                        for reference in doc
+                            .citation_records
+                            .iter()
+                            .chain(&doc.toc_styles)
+                            .chain(&doc.change_sessions)
+                            .chain(&doc.page_templates)
+                        {
+                            self.extract_reference(object_id, reference);
+                        }
+                        let tsa = &doc.super_;
+                        for reference in [
+                            tsa.calculation_engine.as_ref(),
+                            tsa.view_state.as_ref(),
+                            tsa.function_browser_state.as_ref(),
+                            tsa.tables_custom_format_list.as_ref(),
+                            tsa.shortcut_controller.as_ref(),
+                            tsa.annotation_cache_deprecated.as_ref(),
+                            tsa.custom_format_list.as_ref(),
+                            tsa.annotation_cache_deprecated_2.as_ref(),
+                        ]
+                        .into_iter()
+                        .flatten()
+                        {
+                            self.extract_reference(object_id, reference);
+                        }
+                        let tsk = &tsa.super_;
+                        for reference in [
+                            tsk.annotation_author_storage.as_ref(),
+                            tsk.collaboration_operation_history.as_ref(),
+                            tsk.activity_stream.as_ref(),
+                        ]
+                        .into_iter()
+                        .flatten()
+                        {
+                            self.extract_reference(object_id, reference);
+                        }
+                        for reference in &tsk.activity_log_entries {
+                            self.extract_reference(object_id, reference);
                         }
                     }
                 },
 
                 10011 => {
-                    // TP.SectionArchive
-                    // Note: SectionArchive has a complex structure
-                    // References are embedded in nested structures
+                    if let Ok(section) = crate::protobuf::tp::SectionArchive::decode(&*raw_msg.data)
+                    {
+                        for reference in section
+                            .obsolete_headers
+                            .iter()
+                            .chain(&section.obsolete_footers)
+                            .chain(&section.obsolete_section_template_drawables)
+                        {
+                            self.extract_reference(object_id, reference);
+                        }
+                        for reference in [
+                            section.first_section_template_page.as_ref(),
+                            section.even_section_template_page.as_ref(),
+                            section.odd_section_template_page.as_ref(),
+                            section.user_defined_guide_storage.as_ref(),
+                        ]
+                        .into_iter()
+                        .flatten()
+                        {
+                            self.extract_reference(object_id, reference);
+                        }
+                    }
+                },
+
+                10143 => {
+                    if let Ok(template) =
+                        crate::protobuf::tp::SectionTemplateArchive::decode(&*raw_msg.data)
+                    {
+                        for reference in template
+                            .headers
+                            .iter()
+                            .chain(&template.footers)
+                            .chain(&template.section_template_drawables)
+                        {
+                            self.extract_reference(object_id, reference);
+                        }
+                    }
                 },
 
                 _ => {
@@ -843,6 +962,37 @@ impl ObjectIndex {
             avg_refs_per_object,
         }
     }
+
+    #[allow(deprecated)]
+    fn extract_legacy_sheet_headers(
+        &mut self,
+        object_id: u64,
+        sheet: &crate::protobuf::tn::SheetArchive,
+    ) {
+        if let Some(header) = &sheet.header_storage {
+            self.extract_reference(object_id, header);
+        }
+        if let Some(footer) = &sheet.footer_storage {
+            self.extract_reference(object_id, footer);
+        }
+    }
+}
+
+fn extract_table_data_list_entry_references(
+    index: &mut ObjectIndex,
+    object_id: u64,
+    entry: &crate::protobuf::tst::table_data_list::ListEntry,
+) {
+    for reference in [
+        entry.reference.as_ref(),
+        entry.rich_text_payload.as_ref(),
+        entry.comment_storage.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        index.extract_reference(object_id, reference);
+    }
 }
 
 /// Statistics about the object index
@@ -884,6 +1034,11 @@ impl ResolvedObject {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::archive::{Archive, ArchiveObject, RawMessage};
+    use crate::protobuf::tp::{DocumentArchive, SectionArchive, SectionTemplateArchive};
+    use crate::protobuf::tsp::Reference;
+    use crate::protobuf::tst::{self, TableDataList, TableDataListSegment};
+    use prost::Message;
 
     #[test]
     fn test_object_index_creation() {
@@ -916,5 +1071,162 @@ mod tests {
         assert_eq!(index.get_dependents(1), None);
         assert!(!index.has_circular_reference(1));
         assert_eq!(index.get_transitive_dependencies(1), vec![1]);
+    }
+
+    #[test]
+    fn indexes_authoritative_message_info_references() {
+        let mut object = ArchiveObject::new(
+            10,
+            vec![RawMessage {
+                type_: 42,
+                data: Vec::new(),
+            }],
+        )
+        .unwrap();
+        object.archive_info.message_infos[0].object_references = vec![20, 30, 20];
+        let archive = Archive {
+            objects: vec![object],
+        };
+        let mut index = ObjectIndex::new();
+        index.parse_archive("Index/Test.iwa", &archive).unwrap();
+
+        assert_eq!(index.get_dependencies(10), Some([20, 30].as_slice()));
+        assert_eq!(index.get_dependents(20), Some([10].as_slice()));
+        assert_eq!(index.stats().total_references, 2);
+    }
+
+    #[test]
+    fn fallback_indexes_segmented_table_data_list_references() {
+        let root = TableDataList {
+            list_type: tst::table_data_list::ListType::RichTextPayload as i32,
+            next_list_id: 2,
+            entries: Vec::new(),
+            segments: vec![Reference {
+                identifier: 20,
+                ..Default::default()
+            }],
+            is_new_for_bnc: Some(true),
+        };
+        let segment = TableDataListSegment {
+            list_type: root.list_type,
+            key_range: crate::protobuf::tsp::Range {
+                location: 1,
+                length: 1,
+            },
+            entries: vec![tst::table_data_list::ListEntry {
+                key: 1,
+                refcount: 1,
+                rich_text_payload: Some(Reference {
+                    identifier: 30,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }],
+        };
+        let archive = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    10,
+                    vec![RawMessage {
+                        type_: 6005,
+                        data: root.encode_to_vec(),
+                    }],
+                )
+                .unwrap(),
+                ArchiveObject::new(
+                    20,
+                    vec![RawMessage {
+                        type_: 6011,
+                        data: segment.encode_to_vec(),
+                    }],
+                )
+                .unwrap(),
+            ],
+        };
+        let mut index = ObjectIndex::new();
+        index.parse_archive("Index/Test.iwa", &archive).unwrap();
+        assert_eq!(index.get_dependencies(10), Some([20].as_slice()));
+        assert_eq!(index.get_dependencies(20), Some([30].as_slice()));
+    }
+
+    #[test]
+    fn fallback_indexes_comment_author_and_replies() {
+        let comment = crate::protobuf::tsd::CommentStorageArchive {
+            author: Some(Reference {
+                identifier: 20,
+                ..Default::default()
+            }),
+            replies: vec![Reference {
+                identifier: 30,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let archive = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    10,
+                    vec![RawMessage {
+                        type_: 3056,
+                        data: comment.encode_to_vec(),
+                    }],
+                )
+                .unwrap(),
+            ],
+        };
+        let mut index = ObjectIndex::new();
+        index.parse_archive("Index/Comments.iwa", &archive).unwrap();
+        assert_eq!(index.get_dependencies(10), Some([20, 30].as_slice()));
+    }
+
+    #[test]
+    fn pages_fallback_indexes_document_section_and_template_graph() {
+        let reference = |identifier| Reference {
+            identifier,
+            ..Default::default()
+        };
+        let document = DocumentArchive {
+            body_storage: Some(reference(42)),
+            section: Some(reference(43)),
+            theme: Some(reference(44)),
+            page_templates: vec![reference(45)],
+            ..Default::default()
+        };
+        let section = SectionArchive {
+            first_section_template_page: Some(reference(50)),
+            even_section_template_page: Some(reference(51)),
+            odd_section_template_page: Some(reference(52)),
+            user_defined_guide_storage: Some(reference(53)),
+            ..Default::default()
+        };
+        let template = SectionTemplateArchive {
+            headers: vec![reference(60)],
+            footers: vec![reference(61)],
+            section_template_drawables: vec![reference(62)],
+            ..Default::default()
+        };
+        let object = |identifier, type_, data| {
+            ArchiveObject::new(identifier, vec![RawMessage { type_, data }]).unwrap()
+        };
+        let archive = Archive {
+            objects: vec![
+                object(1, 10000, document.encode_to_vec()),
+                object(43, 10011, section.encode_to_vec()),
+                object(50, 10143, template.encode_to_vec()),
+            ],
+        };
+        let mut index = ObjectIndex::new();
+        index.parse_archive("Index/Document.iwa", &archive).unwrap();
+
+        let document_dependencies = index.get_dependencies(1).unwrap();
+        for identifier in [42, 43, 44, 45] {
+            assert!(document_dependencies.contains(&identifier));
+        }
+        let section_dependencies = index.get_dependencies(43).unwrap();
+        for identifier in [50, 51, 52, 53] {
+            assert!(section_dependencies.contains(&identifier));
+        }
+        let template_dependencies = index.get_dependencies(50).unwrap();
+        assert_eq!(template_dependencies, [60, 61, 62]);
     }
 }

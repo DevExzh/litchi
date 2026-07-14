@@ -5,6 +5,12 @@
 use super::cell::CellValue;
 use std::collections::HashMap;
 
+/// Stable UUID stored on a Numbers comment archive.
+pub type NumbersCommentUuid = crate::comments::IWorkCommentUuid;
+
+/// A comment attached to a Numbers table cell.
+pub type NumbersCellComment = crate::comments::IWorkComment;
+
 /// Represents a table in a Numbers spreadsheet
 #[derive(Debug, Clone)]
 pub struct NumbersTable {
@@ -16,6 +22,8 @@ pub struct NumbersTable {
     pub column_count: usize,
     /// Cell data indexed by (row, column)
     pub cells: HashMap<(usize, usize), CellValue>,
+    /// Comments indexed independently from cell values by (row, column).
+    pub comments: HashMap<(usize, usize), NumbersCellComment>,
     /// Column headers (if present)
     pub column_headers: Vec<String>,
     /// Row headers (if present)
@@ -30,6 +38,7 @@ impl NumbersTable {
             row_count: 0,
             column_count: 0,
             cells: HashMap::new(),
+            comments: HashMap::new(),
             column_headers: Vec::new(),
             row_headers: Vec::new(),
         }
@@ -45,6 +54,23 @@ impl NumbersTable {
         self.cells.insert((row, col), value);
         self.row_count = self.row_count.max(row + 1);
         self.column_count = self.column_count.max(col + 1);
+    }
+
+    /// Get the comment attached to a cell, if any.
+    pub fn get_comment(&self, row: usize, col: usize) -> Option<&NumbersCellComment> {
+        self.comments.get(&(row, col))
+    }
+
+    /// Attach or replace an in-memory comment.
+    pub fn set_comment(&mut self, row: usize, col: usize, comment: NumbersCellComment) {
+        self.comments.insert((row, col), comment);
+        self.row_count = self.row_count.max(row + 1);
+        self.column_count = self.column_count.max(col + 1);
+    }
+
+    /// Remove an in-memory comment and return it.
+    pub fn clear_comment(&mut self, row: usize, col: usize) -> Option<NumbersCellComment> {
+        self.comments.remove(&(row, col))
     }
 
     /// Get all cell values in a specific row

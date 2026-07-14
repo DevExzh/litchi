@@ -116,6 +116,8 @@ fn register_common_types(registry: &mut MessageRegistry) {
 /// Register Keynote-specific message types
 fn register_keynote_types(registry: &mut MessageRegistry) {
     // KN Archives (Keynote Archives)
+    registry.register(8, "KN.BuildArchive", Application::Keynote);
+    registry.register(153, "KN.BuildChunkArchive", Application::Keynote);
     registry.register(100, "KN.ArchiveInfo", Application::Keynote);
     registry.register(101, "KN.ShowArchive", Application::Keynote);
     registry.register(102, "KN.SlideArchive", Application::Keynote);
@@ -259,6 +261,76 @@ pub fn detect_application(message_type_ids: &[u32]) -> Option<Application> {
         .map(|(app, _)| app)
 }
 
+/// Detect the owning iWork application from the root `DocumentArchive` payload.
+///
+/// Message type identifiers overlap between Pages, Numbers, and Keynote, so they
+/// cannot reliably identify an application. The root protobuf schemas have
+/// stable, application-specific required fields: Pages uses field 15, Numbers
+/// uses fields 4/5/6/8, and Keynote uses fields 2/3.
+pub fn detect_application_from_document(payload: &[u8]) -> Option<Application> {
+    let fields = top_level_field_numbers(payload)?;
+
+    if fields.contains(&15) {
+        Some(Application::Pages)
+    } else if [4, 5, 6, 8].iter().all(|field| fields.contains(field)) {
+        Some(Application::Numbers)
+    } else if fields.contains(&2) && fields.contains(&3) {
+        Some(Application::Keynote)
+    } else {
+        None
+    }
+}
+
+fn top_level_field_numbers(payload: &[u8]) -> Option<std::collections::HashSet<u32>> {
+    let mut fields = std::collections::HashSet::new();
+    let mut position = 0;
+
+    while position < payload.len() {
+        let tag = read_varint(payload, &mut position)?;
+        let field = u32::try_from(tag >> 3).ok()?;
+        let wire_type = (tag & 0x07) as u8;
+        if field == 0 {
+            return None;
+        }
+        fields.insert(field);
+
+        match wire_type {
+            0 => {
+                read_varint(payload, &mut position)?;
+            },
+            1 => position = position.checked_add(8)?,
+            2 => {
+                let length = usize::try_from(read_varint(payload, &mut position)?).ok()?;
+                position = position.checked_add(length)?;
+            },
+            5 => position = position.checked_add(4)?,
+            _ => return None,
+        }
+
+        if position > payload.len() {
+            return None;
+        }
+    }
+
+    Some(fields)
+}
+
+fn read_varint(payload: &[u8], position: &mut usize) -> Option<u64> {
+    let mut value = 0u64;
+    for shift in (0..=63).step_by(7) {
+        let byte = *payload.get(*position)?;
+        *position += 1;
+        if shift == 63 && byte > 1 {
+            return None;
+        }
+        value |= u64::from(byte & 0x7f) << shift;
+        if byte & 0x80 == 0 {
+            return Some(value);
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292,6 +364,25 @@ mod tests {
 
         // Test empty input
         assert_eq!(detect_application(&[]), None);
+    }
+
+    #[test]
+    fn test_document_payload_detection() {
+        // Length-delimited fields with empty payloads are sufficient because
+        // detection only inspects top-level field numbers.
+        assert_eq!(
+            detect_application_from_document(&[0x7a, 0x00]),
+            Some(Application::Pages)
+        );
+        assert_eq!(
+            detect_application_from_document(&[0x22, 0x00, 0x2a, 0x00, 0x32, 0x00, 0x42, 0x00,]),
+            Some(Application::Numbers)
+        );
+        assert_eq!(
+            detect_application_from_document(&[0x12, 0x00, 0x1a, 0x00]),
+            Some(Application::Keynote)
+        );
+        assert_eq!(detect_application_from_document(&[0x80]), None);
     }
 
     #[test]

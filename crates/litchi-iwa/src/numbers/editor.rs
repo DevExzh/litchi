@@ -1,0 +1,1842 @@
+//! Transactional semantic editing for Numbers spreadsheets.
+
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::ops::Range;
+use std::path::Path;
+
+use prost::Message;
+
+use super::bnc::{BncCell, StoredValue};
+use super::cell::CellValue;
+use super::formula::{
+    ExternalFormulaTable, ExternalPivotCategory, FormulaExpression, FormulaPivotCategoryReference,
+    FormulaUuid, PivotFormulaKey,
+};
+use super::table::{NumbersCellComment, NumbersCommentUuid};
+use crate::archive::{Archive, ArchiveObject, RawMessage};
+use crate::comments::{
+    DrawableCommentInfo, DrawableCommentReplyInfo, IWorkDrawableCommentEditor, IWorkDrawableInfo,
+    advance_save_tokens_for_entries, clone_comment_storage_exact, current_apple_reference_date,
+    fresh_comment_storage_uuid, insert_comment_storage, preferred_annotation_author,
+    remove_generated_annotation_author_if_unused, update_comment_reply_reference,
+};
+use crate::media::reachable_embedded_assets;
+use crate::package_metadata::{
+    add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
+    component_uuid_identifiers, next_object_identifier, release_package_identifier_suffix,
+    remove_component_external_references_to_object, remove_component_object_uuids,
+    set_package_last_object_identifier,
+};
+use crate::protobuf::tst::{
+    self, TableDataList, TableDataListSegment, TableModelArchive, Tile, TileRowInfo,
+};
+use crate::protobuf::{tn, tsce, tsd, tsp, tswp};
+use crate::registry::{Application, detect_application_from_document};
+use crate::shapes::{
+    DrawableGeometry, DrawableProperties, set_shape_geometry, set_shape_properties, shape_geometry,
+    shape_properties,
+};
+use crate::text::{IWorkTextEditor, TextStorageInfo};
+use crate::wire::{
+    patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
+    patch_nested_varint_field, patch_varint_field, repeated_length_delimited_payloads,
+    repeated_varint_values, rewrite_repeated_length_delimited_fields,
+    rewrite_repeated_varint_fields, transform_length_delimited_field,
+    transform_length_delimited_fields_at_path,
+};
+use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
+
+const MAX_TABLE_UIDS: usize = 1_100_000;
+const HEADER_BUCKET_ROWS: usize = 65_536;
+const FORMULA_DEPENDENCY_TILE_COLUMNS: u32 = 32;
+const FORMULA_DEPENDENCY_TILE_ROWS: u32 = 128;
+const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
+const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3_097;
+const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
+const DOCUMENT_COMPONENT_IDENTIFIER: u64 = 1;
+const TEXT_BOX_DUPLICATE_OFFSET: f32 = 10.0;
+const TABLE_DUPLICATE_OFFSET: f32 = 10.0;
+
+/// Stable identity and dimensions of a Numbers table.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NumbersTableInfo {
+    pub object_id: u64,
+    pub name: String,
+    pub rows: usize,
+    pub columns: usize,
+}
+
+/// Stable identity and name of a sheet in workbook order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NumbersSheetInfo {
+    pub object_id: u64,
+    pub index: usize,
+    pub name: String,
+}
+
+/// A writable ordinary text box owned by one Numbers sheet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NumbersTextBoxInfo {
+    pub sheet_id: u64,
+    pub drawable_object_id: u64,
+    pub storage: TextStorageInfo,
+}
+
+/// A Numbers text box removed from a sheet with its final text state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemovedNumbersTextBox {
+    pub text_box: NumbersTextBoxInfo,
+}
+
+#[derive(Debug, Clone)]
+struct NumbersTextBoxGraph {
+    sheet_id: u64,
+    archive_name: String,
+    drawable_id: u64,
+    storage_id: u64,
+    object_ids: Vec<u64>,
+    uuid_object_ids: Vec<u64>,
+}
+
+/// A pivot aggregate category that can be used in a formula expression.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NumbersPivotCategoryInfo {
+    pub reference: FormulaPivotCategoryReference,
+    pub label: Option<String>,
+}
+
+/// Address and storage identity of a comment attached to a Numbers cell.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NumbersCellCommentInfo {
+    pub table_id: u64,
+    pub row: usize,
+    pub column: usize,
+    pub list_identifier: u32,
+    pub storage_object_id: u64,
+    pub comment: NumbersCellComment,
+}
+
+/// A resolved direct reply in a Numbers cell-comment thread.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NumbersCellCommentReplyInfo {
+    pub table_id: u64,
+    pub row: usize,
+    pub column: usize,
+    pub root_storage_object_id: u64,
+    pub storage_object_id: u64,
+    pub comment: NumbersCellComment,
+}
+
+/// Mutable, transactional Numbers package editor.
+///
+/// Each semantic edit is applied to a cloned package and committed only after
+/// all affected IWA components serialize successfully.
+#[derive(Debug, Clone)]
+pub struct NumbersEditor {
+    package: IWorkPackage,
+}
+
+impl NumbersEditor {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_package(IWorkPackage::open(path)?)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_package(IWorkPackage::from_bytes(bytes)?)
+    }
+
+    pub fn from_package(package: IWorkPackage) -> Result<Self> {
+        numbers_document(&package)?;
+        Ok(Self { package })
+    }
+
+    pub fn sheets(&self) -> Result<Vec<NumbersSheetInfo>> {
+        let document = numbers_document(&self.package)?;
+        let locations = object_locations(&self.package)?;
+        document
+            .sheets
+            .into_iter()
+            .enumerate()
+            .map(|(index, reference)| {
+                let archive_name = locations.get(&reference.identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers sheet object {} is missing",
+                        reference.identifier
+                    ))
+                })?;
+                let archive = self.package.archive(archive_name)?;
+                let object = archive.object(reference.identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers sheet object {} is missing",
+                        reference.identifier
+                    ))
+                })?;
+                let (_, sheet) = decode_sheet(object)?;
+                Ok(NumbersSheetInfo {
+                    object_id: reference.identifier,
+                    index,
+                    name: sheet.name,
+                })
+            })
+            .collect()
+    }
+
+    pub fn tables(&self) -> Result<Vec<NumbersTableInfo>> {
+        let mut tables = table_models(&self.package)?
+            .into_iter()
+            .map(|descriptor| NumbersTableInfo {
+                object_id: descriptor.object_id,
+                name: descriptor.model.table_name,
+                rows: descriptor.model.number_of_rows as usize,
+                columns: descriptor.model.number_of_columns as usize,
+            })
+            .collect::<Vec<_>>();
+        tables.sort_by_key(|table| table.object_id);
+        Ok(tables)
+    }
+
+    /// List supported direct-comment drawables owned by one reachable sheet.
+    pub fn sheet_drawables(&self, sheet_id: u64) -> Result<Vec<IWorkDrawableInfo>> {
+        let owned = self.sheet_owned_drawable_ids(sheet_id)?;
+        let mut drawables = IWorkDrawableCommentEditor::from_package(self.package.clone())?
+            .drawables()?
+            .into_iter()
+            .filter(|drawable| owned.contains(&drawable.object_id))
+            .collect::<Vec<_>>();
+        drawables.sort_by_key(|drawable| drawable.object_id);
+        Ok(drawables)
+    }
+
+    /// Read a comment attached directly to a drawable owned by one sheet.
+    pub fn sheet_drawable_comment(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<Option<DrawableCommentInfo>> {
+        self.require_sheet_drawable(sheet_id, drawable_object_id)?;
+        IWorkDrawableCommentEditor::from_package(self.package.clone())?.comment(drawable_object_id)
+    }
+
+    /// Create or replace a direct comment on a drawable owned by one sheet.
+    pub fn set_sheet_drawable_comment(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        text: impl Into<String>,
+    ) -> Result<()> {
+        self.require_sheet_drawable(sheet_id, drawable_object_id)?;
+        let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
+        comments.set_comment(drawable_object_id, text)?;
+        *self = Self::from_package(comments.into_package())?;
+        Ok(())
+    }
+
+    /// Delete a direct comment from a drawable owned by one sheet.
+    pub fn clear_sheet_drawable_comment(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<()> {
+        self.require_sheet_drawable(sheet_id, drawable_object_id)?;
+        let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
+        comments.clear_comment(drawable_object_id)?;
+        *self = Self::from_package(comments.into_package())?;
+        Ok(())
+    }
+
+    /// Read direct replies in a comment thread on one sheet drawable.
+    pub fn sheet_drawable_comment_replies(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<Vec<DrawableCommentReplyInfo>> {
+        self.require_sheet_drawable(sheet_id, drawable_object_id)?;
+        IWorkDrawableCommentEditor::from_package(self.package.clone())?.replies(drawable_object_id)
+    }
+
+    /// Add a reply to a direct comment on one sheet drawable.
+    pub fn add_sheet_drawable_comment_reply(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        text: impl Into<String>,
+    ) -> Result<u64> {
+        self.require_sheet_drawable(sheet_id, drawable_object_id)?;
+        let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
+        let reply_id = comments.add_reply(drawable_object_id, text)?;
+        *self = Self::from_package(comments.into_package())?;
+        Ok(reply_id)
+    }
+
+    /// Update a direct reply, returning its current storage identifier.
+    pub fn set_sheet_drawable_comment_reply(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        reply_storage_object_id: u64,
+        text: impl Into<String>,
+    ) -> Result<u64> {
+        self.require_sheet_drawable(sheet_id, drawable_object_id)?;
+        let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
+        let reply_id = comments.set_reply(drawable_object_id, reply_storage_object_id, text)?;
+        *self = Self::from_package(comments.into_package())?;
+        Ok(reply_id)
+    }
+
+    /// Remove a direct reply from a comment on one sheet drawable.
+    pub fn remove_sheet_drawable_comment_reply(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        reply_storage_object_id: u64,
+    ) -> Result<()> {
+        self.require_sheet_drawable(sheet_id, drawable_object_id)?;
+        let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
+        comments.remove_reply(drawable_object_id, reply_storage_object_id)?;
+        *self = Self::from_package(comments.into_package())?;
+        Ok(())
+    }
+
+    /// List ordinary text boxes owned by a reachable Numbers sheet.
+    pub fn sheet_text_boxes(&self, sheet_id: u64) -> Result<Vec<NumbersTextBoxInfo>> {
+        let (_, _, sheet) = numbers_sheet(&self.package, sheet_id)?;
+        let locations = object_locations(&self.package)?;
+        let text_editor = IWorkTextEditor::from_package(self.package.clone());
+        let mut result = Vec::new();
+        for reference in sheet.drawable_infos {
+            let archive_name = locations.get(&reference.identifier).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers sheet {sheet_id} drawable {} is missing",
+                    reference.identifier
+                ))
+            })?;
+            let archive = self.package.archive(archive_name)?;
+            let object = archive.object(reference.identifier).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers sheet {sheet_id} drawable {} is missing",
+                    reference.identifier
+                ))
+            })?;
+            let shape_messages = object
+                .messages
+                .iter()
+                .filter(|message| message.type_ == SHAPE_INFO_MESSAGE_TYPE)
+                .collect::<Vec<_>>();
+            if shape_messages.is_empty() {
+                continue;
+            }
+            if shape_messages.len() != 1 {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers drawable {} has multiple shape payloads",
+                    reference.identifier
+                )));
+            }
+            let shape = tswp::ShapeInfoArchive::decode(shape_messages[0].data.as_slice())?;
+            if shape.is_text_box != Some(true) {
+                continue;
+            }
+            let graph = numbers_text_box_graph(&self.package, sheet_id, reference.identifier)?;
+            let storage = text_editor.storage(graph.storage_id)?;
+            result.push(NumbersTextBoxInfo {
+                sheet_id,
+                drawable_object_id: reference.identifier,
+                storage,
+            });
+        }
+        Ok(result)
+    }
+
+    /// Replace a UTF-16 range in an ordinary Numbers text box.
+    pub fn replace_sheet_text_box_text(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        range: Range<usize>,
+        replacement: &str,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.replace_text(graph.storage_id, range, replacement)?;
+        let verified = Self::from_package(text.into_package())?;
+        numbers_text_box_graph(verified.package(), sheet_id, drawable_object_id)?;
+        self.package = verified.package;
+        Ok(())
+    }
+
+    /// Replace all text in an ordinary Numbers text box.
+    pub fn set_sheet_text_box_text(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        replacement: &str,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_text(graph.storage_id, replacement)?;
+        let verified = Self::from_package(text.into_package())?;
+        let updated = verified
+            .sheet_text_boxes(sheet_id)?
+            .into_iter()
+            .find(|item| item.drawable_object_id == drawable_object_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Numbers text-box update lost its drawable".to_owned())
+            })?;
+        if updated.storage.text != replacement {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box update failed validation".to_owned(),
+            ));
+        }
+        self.package = verified.package;
+        Ok(())
+    }
+
+    /// Clear an ordinary Numbers text box without deleting it.
+    pub fn clear_sheet_text_box_text(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<()> {
+        self.set_sheet_text_box_text(sheet_id, drawable_object_id, "")
+    }
+
+    /// Read the geometry of an ordinary Numbers text box.
+    pub fn sheet_text_box_geometry(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<DrawableGeometry> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        shape_geometry(&self.package, &graph.archive_name, drawable_object_id)
+    }
+
+    /// Update position, size, flags, and rotation on an ordinary Numbers text box.
+    pub fn set_sheet_text_box_geometry(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        geometry: DrawableGeometry,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut staged = self.package.clone();
+        set_shape_geometry(
+            &mut staged,
+            &graph.archive_name,
+            drawable_object_id,
+            geometry,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_text_box_geometry(sheet_id, drawable_object_id)? != geometry {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box geometry update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read shared drawable properties from an ordinary Numbers text box.
+    pub fn sheet_text_box_properties(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<DrawableProperties> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        shape_properties(&self.package, &graph.archive_name, drawable_object_id)
+    }
+
+    /// Update shared drawable properties on an ordinary Numbers text box.
+    pub fn set_sheet_text_box_properties(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        properties: DrawableProperties,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut staged = self.package.clone();
+        set_shape_properties(
+            &mut staged,
+            &graph.archive_name,
+            drawable_object_id,
+            &properties,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_text_box_properties(sheet_id, drawable_object_id)? != properties {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box properties update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Duplicate an ordinary sheet-owned text box with independent storage.
+    ///
+    /// The shape, stand-in title and caption, and writable storage are cloned
+    /// into the document component with fresh object identifiers and UUIDs.
+    /// The clone is appended to the sheet's drawable list and offset by ten
+    /// points, matching Numbers' native duplicate behavior.
+    pub fn duplicate_sheet_text_box(
+        &mut self,
+        sheet_id: u64,
+        source_drawable_object_id: u64,
+        text: &str,
+    ) -> Result<NumbersTextBoxInfo> {
+        let source = numbers_text_box_graph(&self.package, sheet_id, source_drawable_object_id)?;
+        let mut staged = self.package.clone();
+        let first_identifier = next_object_identifier(&staged)?;
+        let mut remap = HashMap::with_capacity(source.object_ids.len());
+        for (offset, identifier) in source.object_ids.iter().copied().enumerate() {
+            let offset = u64::try_from(offset)
+                .map_err(|_| Error::ParseError("Numbers text-box graph is too large".to_owned()))?;
+            let replacement = first_identifier
+                .checked_add(offset)
+                .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+            remap.insert(identifier, replacement);
+        }
+
+        for identifier in &source.object_ids {
+            let cloned = {
+                let archive = staged.archive(&source.archive_name)?;
+                let source_object = archive.object(*identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!("Numbers text-box object {identifier} is missing"))
+                })?;
+                clone_numbers_text_box_object(source_object, &remap)?
+            };
+            staged.update_archive(&source.archive_name, |archive| {
+                archive.insert_object(cloned)
+            })?;
+        }
+
+        let new_drawable_id = remap[&source.drawable_id];
+        let new_storage_id = remap[&source.storage_id];
+        offset_numbers_text_box(
+            &mut staged,
+            &source.archive_name,
+            new_drawable_id,
+            TEXT_BOX_DUPLICATE_OFFSET,
+        )?;
+        let mut text_editor = IWorkTextEditor::from_package(staged);
+        text_editor.set_text(new_storage_id, text)?;
+        staged = text_editor.into_package();
+        patch_numbers_sheet_drawable_reference(
+            &mut staged,
+            &source.archive_name,
+            sheet_id,
+            None,
+            Some(new_drawable_id),
+        )?;
+        let last_identifier = remap.values().copied().max().ok_or_else(|| {
+            Error::InvalidFormat("Numbers text-box graph has no object identifiers".to_owned())
+        })?;
+        set_package_last_object_identifier(&mut staged, last_identifier)?;
+        let new_uuid_object_ids = source
+            .uuid_object_ids
+            .iter()
+            .map(|identifier| remap[identifier])
+            .collect::<Vec<_>>();
+        add_component_object_uuids(
+            &mut staged,
+            DOCUMENT_COMPONENT_IDENTIFIER,
+            &new_uuid_object_ids,
+        )?;
+
+        let verified = Self::from_package(staged)?;
+        let created = verified
+            .sheet_text_boxes(sheet_id)?
+            .into_iter()
+            .find(|item| item.drawable_object_id == new_drawable_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Numbers text-box duplication failed validation".to_owned())
+            })?;
+        let created_graph = numbers_text_box_graph(verified.package(), sheet_id, new_drawable_id)?;
+        if created.storage.object_id != new_storage_id
+            || created.storage.text != text
+            || created_graph.object_ids.len() != source.object_ids.len()
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box duplication produced an inconsistent graph".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(created)
+    }
+
+    /// Remove an ordinary sheet-owned text box and its private object graph.
+    pub fn remove_sheet_text_box(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<RemovedNumbersTextBox> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let text_box = self
+            .sheet_text_boxes(sheet_id)?
+            .into_iter()
+            .find(|item| item.drawable_object_id == drawable_object_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers text box {drawable_object_id} lost its writable storage"
+                ))
+            })?;
+
+        let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
+        comments.clear_comment(drawable_object_id)?;
+        let mut staged = comments.into_package();
+        patch_numbers_sheet_drawable_reference(
+            &mut staged,
+            &graph.archive_name,
+            graph.sheet_id,
+            Some(drawable_object_id),
+            None,
+        )?;
+        staged.update_archive(&graph.archive_name, |archive| {
+            for identifier in &graph.object_ids {
+                archive.remove_object(*identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!("Numbers text-box object {identifier} is missing"))
+                })?;
+            }
+            Ok(())
+        })?;
+        let locations = object_locations(&staged)?;
+        for identifier in &graph.object_ids {
+            if package_references_object(&staged, &locations, *identifier)? {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers text-box object {identifier} remains referenced after deletion"
+                )));
+            }
+        }
+        remove_component_object_uuids(
+            &mut staged,
+            DOCUMENT_COMPONENT_IDENTIFIER,
+            &graph.uuid_object_ids,
+        )?;
+        release_package_identifier_suffix(&mut staged, &graph.object_ids)?;
+
+        let verified = Self::from_package(staged)?;
+        if verified
+            .sheet_text_boxes(sheet_id)?
+            .iter()
+            .any(|item| item.drawable_object_id == drawable_object_id)
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box deletion failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(RemovedNumbersTextBox { text_box })
+    }
+
+    /// List absolute pivot categories backed by valid calculation-engine
+    /// aggregate coordinates.
+    pub fn pivot_categories(&self) -> Result<Vec<NumbersPivotCategoryInfo>> {
+        let mut categories = formula_pivot_categories(&self.package)?
+            .into_iter()
+            .map(|(key, value)| NumbersPivotCategoryInfo {
+                reference: FormulaPivotCategoryReference::new(
+                    key.group_by_uid,
+                    key.column_uid,
+                    key.group_uid,
+                    value.aggregate_type,
+                    value.group_level,
+                ),
+                label: value.label,
+            })
+            .collect::<Vec<_>>();
+        categories.sort_by(|left, right| {
+            left.reference
+                .group_by_uid
+                .cmp(&right.reference.group_by_uid)
+                .then_with(|| left.reference.column_uid.cmp(&right.reference.column_uid))
+                .then_with(|| left.reference.group_level.cmp(&right.reference.group_level))
+                .then_with(|| left.label.cmp(&right.label))
+                .then_with(|| left.reference.group_uid.cmp(&right.reference.group_uid))
+        });
+        Ok(categories)
+    }
+
+    /// Set or clear a cell in a table identified by its IWA object ID.
+    pub fn set_cell(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        value: CellValue,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_cell_in_package(&mut staged, table_id, row, column, value)?;
+        // Exercise every serialization boundary before committing the edit.
+        let bytes = staged.to_bytes()?;
+        IWorkPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(())
+    }
+
+    pub fn clear_cell(&mut self, table_id: u64, row: usize, column: usize) -> Result<()> {
+        self.set_cell(table_id, row, column, CellValue::Empty)
+    }
+
+    /// Read the comment attached to a writable BNC cell.
+    pub fn cell_comment(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<NumbersCellCommentInfo>> {
+        cell_comment_in_package(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a cell comment without changing the cell value or style.
+    pub fn set_cell_comment(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        text: impl Into<String>,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_cell_comment_in_package(&mut staged, table_id, row, column, text.into())?;
+        let bytes = staged.to_bytes()?;
+        IWorkPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Delete a cell comment without changing the cell value or style.
+    pub fn clear_cell_comment(&mut self, table_id: u64, row: usize, column: usize) -> Result<()> {
+        let mut staged = self.package.clone();
+        clear_cell_comment_in_package(&mut staged, table_id, row, column)?;
+        let bytes = staged.to_bytes()?;
+        IWorkPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Read the direct replies attached to a cell comment in stored order.
+    pub fn cell_comment_replies(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Vec<NumbersCellCommentReplyInfo>> {
+        cell_comment_replies_in_package(&self.package, table_id, row, column)
+    }
+
+    /// Append a direct reply to an existing cell comment.
+    pub fn add_cell_comment_reply(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        text: impl Into<String>,
+    ) -> Result<u64> {
+        let mut staged = self.package.clone();
+        let reply_id =
+            add_cell_comment_reply_in_package(&mut staged, table_id, row, column, text.into())?;
+        let bytes = staged.to_bytes()?;
+        IWorkPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(reply_id)
+    }
+
+    /// Replace one direct reply and return its new copy-on-write object ID.
+    pub fn set_cell_comment_reply(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        reply_storage_object_id: u64,
+        text: impl Into<String>,
+    ) -> Result<u64> {
+        let mut staged = self.package.clone();
+        let reply_id = set_cell_comment_reply_in_package(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            reply_storage_object_id,
+            text.into(),
+        )?;
+        let bytes = staged.to_bytes()?;
+        IWorkPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(reply_id)
+    }
+
+    /// Remove one direct reply from an existing cell comment.
+    pub fn remove_cell_comment_reply(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        reply_storage_object_id: u64,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        remove_cell_comment_reply_in_package(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            reply_storage_object_id,
+        )?;
+        let bytes = staged.to_bytes()?;
+        IWorkPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Set a cell to a formula expression.
+    ///
+    /// The expression is compiled to Numbers' native postfix AST and interned
+    /// in the table's formula list. Local and cross-table cells, rectangles,
+    /// and whole-row/column references are mirrored into CalculationEngine
+    /// dependency records in lockstep with the formula table. Unsupported volatile, lazy,
+    /// remote-data, and spill expressions fail before the package is changed.
+    pub fn set_formula(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        expression: FormulaExpression,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        let descriptors = table_models(&staged)?;
+        let descriptor = descriptors
+            .iter()
+            .find(|table| table.object_id == table_id)
+            .cloned()
+            .ok_or_else(|| {
+                Error::ParseError(format!("Numbers table object {table_id} not found"))
+            })?;
+        let external_tables = formula_external_tables(&staged, &descriptors)?;
+        let pivot_categories = formula_pivot_categories(&staged)?;
+        let compiled = expression.compile(
+            row,
+            column,
+            descriptor.model.number_of_rows as usize,
+            descriptor.model.number_of_columns as usize,
+            &external_tables,
+            &pivot_categories,
+        )?;
+        let formula = compiled.archive;
+
+        let locations = object_locations(&staged)?;
+        let (old_formula, old_formula_error) = {
+            let location = locate_cell(&staged, table_id, row, column)?;
+            let cell = read_tile_cell(
+                &staged,
+                &location.tile_archive,
+                location.tile_id,
+                location.tile_row,
+                column,
+            )?
+            .as_deref()
+            .map(BncCell::parse)
+            .transpose()?;
+            let formula = cell.as_ref().and_then(|cell| match cell.stored_value() {
+                StoredValue::Formula(identifier) => Some(identifier),
+                _ => None,
+            });
+            let error = cell.as_ref().and_then(BncCell::formula_error_identifier);
+            (formula, error)
+        };
+        if old_formula.is_some()
+            && let Some(identifier) = old_formula_error
+        {
+            decrement_formula_error_table(&mut staged, &locations, &descriptor.model, identifier)?;
+        }
+        if let Some(identifier) = old_formula {
+            // Formula-to-formula replacement keeps the app's cached result and
+            // only swaps the formula reference. Numbers can then display the
+            // prior value until its calculation engine refreshes the cell.
+            decrement_formula_table(
+                &mut staged,
+                &locations,
+                descriptor.model.base_data_store.formula_table.identifier,
+                identifier,
+            )?;
+            update_formula_dependencies(
+                &mut staged,
+                descriptor.table_info_id,
+                row,
+                column,
+                false,
+                &[],
+                &[],
+            )?;
+        } else {
+            // Reuse the primitive mutation path to validate the target and
+            // release any string reference owned by the previous cell.
+            set_cell_in_package(&mut staged, table_id, row, column, CellValue::Number(0.0))?;
+        }
+
+        let formula_id = insert_formula_table(
+            &mut staged,
+            &locations,
+            descriptor.model.base_data_store.formula_table.identifier,
+            formula.clone(),
+        )?;
+        set_encoded_cell_value(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            EncodedValue::Formula(formula_id),
+        )?;
+        update_formula_dependencies(
+            &mut staged,
+            descriptor.table_info_id,
+            row,
+            column,
+            true,
+            &compiled.local_precedents,
+            &compiled.external_precedents,
+        )?;
+
+        // Reparse the complete ZIP and verify both sides of the reference
+        // before committing the staged package.
+        let verified = IWorkPackage::from_bytes(&staged.to_bytes()?)?;
+        verify_formula_link(&verified, table_id, row, column, formula_id, &formula)?;
+        verify_formula_dependency(
+            &verified,
+            descriptor.table_info_id,
+            row,
+            column,
+            &compiled.local_precedents,
+            &compiled.external_precedents,
+        )?;
+        self.package = staged;
+        Ok(())
+    }
+
+    pub fn rename_sheet(&mut self, sheet_id: u64, name: &str) -> Result<()> {
+        validate_name(name, "sheet")?;
+        if !numbers_document(&self.package)?
+            .sheets
+            .iter()
+            .any(|reference| reference.identifier == sheet_id)
+        {
+            return Err(Error::ParseError(format!(
+                "Numbers sheet object {sheet_id} is not in the workbook"
+            )));
+        }
+        let locations = object_locations(&self.package)?;
+        let archive_name = locations
+            .get(&sheet_id)
+            .ok_or_else(|| Error::InvalidFormat(format!("Numbers sheet {sheet_id} is missing")))?
+            .to_owned();
+        let mut staged = self.package.clone();
+        staged.update_archive(&archive_name, |archive| {
+            let object = archive.object_mut(sheet_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers sheet {sheet_id} is missing"))
+            })?;
+            let (message_index, _) = decode_sheet(object)?;
+            let message_type = object.messages[message_index].type_;
+            let original = object.messages[message_index].data.as_slice();
+            let data = if message_type == 3 {
+                patch_nested_length_delimited_field(original, &[1, 1], true, Some(name.as_bytes()))?
+            } else {
+                patch_length_delimited_field(original, 1, true, Some(name.as_bytes()))?
+            };
+            let verified_name = if message_type == 3 {
+                tn::FormBasedSheetArchive::decode(data.as_slice())?
+                    .super_
+                    .name
+            } else {
+                tn::SheetArchive::decode(data.as_slice())?.name
+            };
+            if verified_name != name {
+                return Err(Error::InvalidFormat(
+                    "Numbers sheet-name wire patch failed validation".to_owned(),
+                ));
+            }
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: message_type,
+                    data,
+                },
+            )?;
+            Ok(())
+        })?;
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        if verified
+            .sheets()?
+            .iter()
+            .find(|sheet| sheet.object_id == sheet_id)
+            .map(|sheet| sheet.name.as_str())
+            != Some(name)
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers sheet rename failed validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    pub fn rename_table(&mut self, table_id: u64, name: &str) -> Result<()> {
+        validate_name(name, "table")?;
+        if !self
+            .tables()?
+            .iter()
+            .any(|table| table.object_id == table_id)
+        {
+            return Err(Error::ParseError(format!(
+                "Numbers table object {table_id} is not attached to a workbook sheet"
+            )));
+        }
+        let locations = object_locations(&self.package)?;
+        let archive_name = locations
+            .get(&table_id)
+            .ok_or_else(|| Error::InvalidFormat(format!("Numbers table {table_id} is missing")))?
+            .to_owned();
+        let mut staged = self.package.clone();
+        staged.update_archive(&archive_name, |archive| {
+            let object = archive.object_mut(table_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers table {table_id} is missing"))
+            })?;
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| {
+                    (message.type_ == 6000 || message.type_ == 6001)
+                        && TableModelArchive::decode(message.data.as_slice()).is_ok()
+                })
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Object {table_id} has no Numbers table model payload"
+                    ))
+                })?;
+            let message_type = object.messages[message_index].type_;
+            let original = object.messages[message_index].data.as_slice();
+            let data = patch_length_delimited_field(original, 8, true, Some(name.as_bytes()))?;
+            let verified = TableModelArchive::decode(data.as_slice())?;
+            if verified.table_name != name {
+                return Err(Error::InvalidFormat(
+                    "Numbers table-name wire patch failed validation".to_owned(),
+                ));
+            }
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: message_type,
+                    data,
+                },
+            )?;
+            Ok(())
+        })?;
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        if verified
+            .tables()?
+            .iter()
+            .find(|table| table.object_id == table_id)
+            .map(|table| table.name.as_str())
+            != Some(name)
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table rename failed validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Resize a table while preserving existing cells and stable row/column UIDs.
+    ///
+    /// Growth creates blank trailing rows or columns. Shrinkage is accepted only
+    /// when the removed trailing region contains no stored cells; this prevents
+    /// silently orphaning strings, formulas, rich text, comments, or styles.
+    pub fn resize_table(&mut self, table_id: u64, rows: usize, columns: usize) -> Result<()> {
+        let (rows_u32, columns_u32) = validate_table_dimensions(rows, columns)?;
+        let descriptor = table_models(&self.package)?
+            .into_iter()
+            .find(|table| table.object_id == table_id)
+            .ok_or_else(|| {
+                Error::ParseError(format!("Numbers table object {table_id} not found"))
+            })?;
+        let old_rows = descriptor.model.number_of_rows as usize;
+        let old_columns = descriptor.model.number_of_columns as usize;
+        if (rows, columns) == (old_rows, old_columns) {
+            return Ok(());
+        }
+
+        let locations = object_locations(&self.package)?;
+        let mut staged = self.package.clone();
+        validate_and_trim_tiles(&mut staged, &locations, &descriptor.model, rows, columns)?;
+        resize_header_buckets(
+            &mut staged,
+            &locations,
+            &descriptor.model,
+            rows_u32,
+            columns_u32,
+        )?;
+        if let Some(reference) = &descriptor.model.base_column_row_uids {
+            resize_uid_map(
+                &mut staged,
+                &locations,
+                reference.identifier,
+                old_rows,
+                rows,
+                old_columns,
+                columns,
+            )?;
+        }
+        if let Some(reference) = &descriptor.model.stroke_sidecar {
+            resize_stroke_sidecar(
+                &mut staged,
+                &locations,
+                reference.identifier,
+                rows_u32,
+                columns_u32,
+            )?;
+        }
+        let table_archive = locations.get(&table_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Numbers table object {table_id} is missing"))
+        })?;
+        staged.update_archive(table_archive, |archive| {
+            let object = archive.object_mut(table_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers table object {table_id} is missing"))
+            })?;
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| {
+                    (message.type_ == 6000 || message.type_ == 6001)
+                        && TableModelArchive::decode(message.data.as_slice()).is_ok()
+                })
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Object {table_id} has no Numbers table model payload"
+                    ))
+                })?;
+            let message_type = object.messages[message_index].type_;
+            let original = object.messages[message_index].data.as_slice();
+            let mut data = patch_varint_field(original, 6, true, Some(u64::from(rows_u32)))?;
+            data = patch_varint_field(&data, 7, true, Some(u64::from(columns_u32)))?;
+            let verified = TableModelArchive::decode(data.as_slice())?;
+            if (verified.number_of_rows, verified.number_of_columns) != (rows_u32, columns_u32) {
+                return Err(Error::InvalidFormat(
+                    "Numbers table-dimension wire patch failed validation".to_owned(),
+                ));
+            }
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: message_type,
+                    data,
+                },
+            )?;
+            Ok(())
+        })?;
+
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let resized = verified
+            .tables()?
+            .into_iter()
+            .find(|table| table.object_id == table_id)
+            .ok_or_else(|| Error::InvalidFormat("Numbers resized table disappeared".to_owned()))?;
+        if (resized.rows, resized.columns) != (rows, columns) {
+            return Err(Error::InvalidFormat(
+                "Numbers table resize failed validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Unlink and remove a table model from its owning sheet.
+    ///
+    /// Shared styles and data-list objects are retained because other table
+    /// structures may legally reference them. Dedicated now-empty IWA members
+    /// containing the table-info or model object are removed.
+    pub fn remove_table(&mut self, table_id: u64) -> Result<NumbersTableInfo> {
+        let table = self
+            .tables()?
+            .into_iter()
+            .find(|table| table.object_id == table_id)
+            .ok_or_else(|| {
+                Error::ParseError(format!("Numbers table object {table_id} not found"))
+            })?;
+        let owner = find_table_owner(&self.package, table_id)?;
+        let locations = object_locations(&self.package)?;
+        let sheet_archive = locations.get(&owner.sheet_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Numbers sheet {} is missing", owner.sheet_id))
+        })?;
+        let mut staged = self.package.clone();
+        staged.update_archive(sheet_archive, |archive| {
+            let object = archive.object_mut(owner.sheet_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers sheet {} is missing", owner.sheet_id))
+            })?;
+            let (message_index, sheet) = decode_sheet(object)?;
+            let previous = sheet
+                .drawable_infos
+                .iter()
+                .map(|reference| reference.identifier)
+                .collect::<Vec<_>>();
+            let current = previous
+                .iter()
+                .copied()
+                .filter(|identifier| *identifier != owner.table_info_id)
+                .collect::<Vec<_>>();
+            if current.len() + 1 != previous.len() {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers sheet {} does not reference table info {} exactly once",
+                    owner.sheet_id, owner.table_info_id
+                )));
+            }
+            replace_sheet_drawable_references(object, message_index, &previous, &current)?;
+            object.archive_info.message_infos[message_index]
+                .object_references
+                .retain(|&identifier| identifier != owner.table_info_id);
+            for field in &mut object.archive_info.message_infos[message_index].field_infos {
+                field
+                    .object_references
+                    .retain(|&identifier| identifier != owner.table_info_id);
+            }
+            Ok(())
+        })?;
+        let info_archive = locations.get(&owner.table_info_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers table info {} is missing",
+                owner.table_info_id
+            ))
+        })?;
+        let model_archive = locations.get(&table_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Numbers table model {table_id} is missing"))
+        })?;
+        let dedicated_component = format!("Index/Tables/Table-{}.iwa", owner.table_info_id);
+        if info_archive == model_archive && info_archive == &dedicated_component {
+            staged.remove_entry(info_archive).ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers table component {info_archive} is missing"))
+            })?;
+        } else {
+            remove_object_or_empty_entry(&mut staged, &locations, owner.table_info_id)?;
+            remove_object_or_empty_entry(&mut staged, &locations, table_id)?;
+        }
+
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        if verified
+            .tables()?
+            .iter()
+            .any(|candidate| candidate.object_id == table_id)
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table deletion failed validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(table)
+    }
+
+    /// Move a sheet to another zero-based workbook position.
+    pub fn move_sheet(&mut self, from: usize, to: usize) -> Result<()> {
+        let sheets = self.sheets()?;
+        if from >= sheets.len() || to >= sheets.len() {
+            return Err(Error::ParseError(format!(
+                "Numbers sheet move {from} -> {to} is out of range for {} sheets",
+                sheets.len()
+            )));
+        }
+        if from == to {
+            return Ok(());
+        }
+        let moved_id = sheets[from].object_id;
+        let mut staged = self.package.clone();
+        update_numbers_document(&mut staged, |document| {
+            let reference = document.sheets.remove(from);
+            document.sheets.insert(to, reference);
+            Ok(())
+        })?;
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        if verified.sheets()?.get(to).map(|sheet| sheet.object_id) != Some(moved_id) {
+            return Err(Error::InvalidFormat(
+                "Numbers sheet move failed validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Append an empty sheet to the workbook and return its allocated object ID.
+    pub fn add_empty_sheet(&mut self, name: &str) -> Result<NumbersSheetInfo> {
+        validate_name(name, "sheet")?;
+        let locations = object_locations(&self.package)?;
+        let identifier = locations
+            .keys()
+            .copied()
+            .max()
+            .unwrap_or(0)
+            .checked_add(1)
+            .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+        let mut staged = self.package.clone();
+        staged.update_archive("Index/Document.iwa", |archive| {
+            archive.insert_object(crate::archive::ArchiveObject::new(
+                identifier,
+                vec![RawMessage {
+                    type_: 2,
+                    data: tn::SheetArchive {
+                        name: name.to_owned(),
+                        ..Default::default()
+                    }
+                    .encode_to_vec(),
+                }],
+            )?)?;
+            Ok(())
+        })?;
+        update_numbers_document(&mut staged, |document| {
+            document.sheets.push(crate::protobuf::tsp::Reference {
+                identifier,
+                ..Default::default()
+            });
+            Ok(())
+        })?;
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let created = verified
+            .sheets()?
+            .into_iter()
+            .find(|sheet| sheet.object_id == identifier)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Numbers sheet creation failed validation".to_owned())
+            })?;
+        self.package = staged;
+        Ok(created)
+    }
+
+    /// Add an empty table to an existing sheet using another table as a style template.
+    ///
+    /// Cell stores, data lists, row/column UIDs, headers, and stroke state are
+    /// allocated independently. Workbook styles are shared intentionally.
+    #[allow(deprecated)]
+    pub fn add_empty_table(
+        &mut self,
+        sheet_id: u64,
+        name: &str,
+        rows: usize,
+        columns: usize,
+    ) -> Result<NumbersTableInfo> {
+        validate_name(name, "table")?;
+        let (rows_u32, columns_u32) = validate_table_dimensions(rows, columns)?;
+        let sheets = self.sheets()?;
+        if !sheets.iter().any(|sheet| sheet.object_id == sheet_id) {
+            return Err(Error::ParseError(format!(
+                "Numbers sheet object {sheet_id} is not in the workbook"
+            )));
+        }
+
+        let descriptors = table_models(&self.package)?;
+        let template = descriptors.first().ok_or_else(|| {
+            Error::ParseError(
+                "Adding a Numbers table requires an existing table style template".to_owned(),
+            )
+        })?;
+        let template_owner = find_table_owner(&self.package, template.object_id)?;
+        let locations = object_locations(&self.package)?;
+        let template_info_archive = locations
+            .get(&template_owner.table_info_id)
+            .ok_or_else(|| Error::InvalidFormat("Numbers table info is missing".to_owned()))?;
+        let template_info_component = self.package.archive(template_info_archive)?;
+        let template_info_object = template_info_component
+            .object(template_owner.table_info_id)
+            .ok_or_else(|| Error::InvalidFormat("Numbers table info is missing".to_owned()))?;
+        let (info_message_index, mut table_info) = decode_table_info(template_info_object)?;
+        let template_model_archive = locations
+            .get(&template.object_id)
+            .ok_or_else(|| Error::InvalidFormat("Numbers table model is missing".to_owned()))?;
+        let template_model_component = self.package.archive(template_model_archive)?;
+        let template_model_object = template_model_component
+            .object(template.object_id)
+            .ok_or_else(|| Error::InvalidFormat("Numbers table model is missing".to_owned()))?;
+        let model_message_index = find_table_model_message(template_model_object)?;
+
+        let mut next_identifier = locations
+            .keys()
+            .copied()
+            .max()
+            .unwrap_or(0)
+            .checked_add(1)
+            .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+        let new_info_id = take_identifier(&mut next_identifier)?;
+        let new_model_id = take_identifier(&mut next_identifier)?;
+        let owned_kinds = table_owned_objects(&template.model)?;
+        let mut remap = HashMap::with_capacity(owned_kinds.len());
+        for &identifier in owned_kinds.keys() {
+            remap.insert(identifier, take_identifier(&mut next_identifier)?);
+        }
+
+        let existing_table_ids = descriptors
+            .iter()
+            .map(|descriptor| descriptor.model.table_id.as_str())
+            .collect::<HashSet<_>>();
+        let table_uuid = allocate_table_uuid(new_model_id, &existing_table_ids);
+        let mut model = template.model.clone();
+        prepare_empty_table_model(&mut model, &remap, table_uuid, name, rows_u32, columns_u32)?;
+
+        table_info.super_.parent = Some(crate::protobuf::tsp::Reference {
+            identifier: sheet_id,
+            ..Default::default()
+        });
+        if template_owner.sheet_id == sheet_id
+            && let Some(position) = table_info
+                .super_
+                .geometry
+                .as_mut()
+                .and_then(|geometry| geometry.position.as_mut())
+        {
+            position.x += 40.0;
+            position.y += 40.0;
+        }
+        table_info.super_.comment = None;
+        table_info.super_.pencil_annotations.clear();
+        table_info.super_.title = None;
+        table_info.super_.caption = None;
+        table_info.table_model = crate::protobuf::tsp::Reference {
+            identifier: new_model_id,
+            ..Default::default()
+        };
+        table_info.editing_state = None;
+        table_info.summary_model = None;
+        table_info.category_order = None;
+        table_info.view_column_row_uids = None;
+        table_info.pivot_data_model = None;
+        table_info.pivot_order = None;
+
+        let mut objects = Vec::with_capacity(owned_kinds.len() + 2);
+        let mut info_remap = remap.clone();
+        info_remap.insert(template.object_id, new_model_id);
+        info_remap.insert(template_owner.sheet_id, sheet_id);
+        objects.push(clone_single_payload_object(
+            template_info_object,
+            new_info_id,
+            info_message_index,
+            table_info.encode_to_vec(),
+            vec![sheet_id, new_model_id],
+            &info_remap,
+            false,
+        )?);
+        objects.push(clone_single_payload_object(
+            template_model_object,
+            new_model_id,
+            model_message_index,
+            model.encode_to_vec(),
+            table_model_references(&model),
+            &remap,
+            false,
+        )?);
+        for (&source_id, &kind) in &owned_kinds {
+            let archive_name = locations.get(&source_id).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers table storage object {source_id} is missing"
+                ))
+            })?;
+            let source_archive = self.package.archive(archive_name)?;
+            let source = source_archive.object(source_id).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers table storage object {source_id} is missing"
+                ))
+            })?;
+            objects.push(clone_empty_table_storage(
+                source,
+                remap[&source_id],
+                kind,
+                rows_u32,
+                columns_u32,
+                new_model_id,
+            )?);
+        }
+
+        let mut staged = self.package.clone();
+        let component = format!("Index/Tables/Table-{new_info_id}.iwa");
+        staged.replace_archive(&component, &Archive { objects })?;
+        let sheet_archive_name = locations
+            .get(&sheet_id)
+            .ok_or_else(|| Error::InvalidFormat(format!("Numbers sheet {sheet_id} is missing")))?;
+        staged.update_archive(sheet_archive_name, |archive| {
+            let object = archive.object_mut(sheet_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers sheet {sheet_id} is missing"))
+            })?;
+            let (message_index, sheet) = decode_sheet(object)?;
+            let existing_drawables = sheet
+                .drawable_infos
+                .iter()
+                .map(|reference| reference.identifier)
+                .collect::<Vec<_>>();
+            let existing_drawable_set = existing_drawables.iter().copied().collect::<HashSet<_>>();
+            let mut current_drawables = existing_drawables.clone();
+            current_drawables.push(new_info_id);
+            replace_sheet_drawable_references(
+                object,
+                message_index,
+                &existing_drawables,
+                &current_drawables,
+            )?;
+            let references =
+                &mut object.archive_info.message_infos[message_index].object_references;
+            if !references.contains(&new_info_id) {
+                references.push(new_info_id);
+            }
+            for field in &mut object.archive_info.message_infos[message_index].field_infos {
+                if field
+                    .object_references
+                    .iter()
+                    .any(|identifier| existing_drawable_set.contains(identifier))
+                    && !field.object_references.contains(&new_info_id)
+                {
+                    field.object_references.push(new_info_id);
+                }
+            }
+            Ok(())
+        })?;
+
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let created = verified
+            .tables()?
+            .into_iter()
+            .find(|table| table.object_id == new_model_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Numbers table creation failed validation".to_owned())
+            })?;
+        if (created.rows, created.columns, created.name.as_str()) != (rows, columns, name) {
+            return Err(Error::InvalidFormat(
+                "Numbers table creation produced unexpected properties".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(created)
+    }
+
+    /// Duplicate a populated table on its owning sheet.
+    ///
+    /// Cell tiles, headers, data lists, UID maps, and stroke state are cloned
+    /// independently while workbook styles and referenced rich-text/comment
+    /// payloads retain their native copy-on-write sharing. Tables containing
+    /// formulas are rejected until their calculation-engine graph can also be
+    /// cloned safely.
+    #[allow(deprecated)]
+    pub fn duplicate_table(&mut self, table_id: u64) -> Result<NumbersTableInfo> {
+        let descriptors = table_models(&self.package)?;
+        let source = descriptors
+            .iter()
+            .find(|descriptor| descriptor.object_id == table_id)
+            .ok_or_else(|| Error::ParseError(format!("Numbers table {table_id} not found")))?;
+        reject_formula_table_duplication(&self.package, &source.model)?;
+        let owner = find_table_owner(&self.package, table_id)?;
+        let locations = object_locations(&self.package)?;
+        let info_archive_name = locations.get(&owner.table_info_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers table info {} is missing",
+                owner.table_info_id
+            ))
+        })?;
+        let info_archive = self.package.archive(info_archive_name)?;
+        let info_object = info_archive.object(owner.table_info_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers table info {} is missing",
+                owner.table_info_id
+            ))
+        })?;
+        let (info_message_index, source_info) = decode_table_info(info_object)?;
+        let model_archive_name = locations.get(&table_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Numbers table model {table_id} is missing"))
+        })?;
+        let model_archive = self.package.archive(model_archive_name)?;
+        let model_object = model_archive.object(table_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Numbers table model {table_id} is missing"))
+        })?;
+        let model_message_index = find_table_model_message(model_object)?;
+
+        let graph = table_owned_graph(&self.package, &locations, &source.model)?;
+        let mut next_identifier = locations
+            .keys()
+            .copied()
+            .max()
+            .unwrap_or(0)
+            .checked_add(1)
+            .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+        let new_info_id = take_identifier(&mut next_identifier)?;
+        let new_model_id = take_identifier(&mut next_identifier)?;
+        let mut remap = HashMap::with_capacity(graph.len() + 2);
+        remap.insert(owner.table_info_id, new_info_id);
+        remap.insert(table_id, new_model_id);
+        for &identifier in graph.keys() {
+            remap.insert(identifier, take_identifier(&mut next_identifier)?);
+        }
+
+        let existing_table_ids = descriptors
+            .iter()
+            .map(|descriptor| descriptor.model.table_id.as_str())
+            .collect::<HashSet<_>>();
+        let table_uuid = allocate_table_uuid(new_model_id, &existing_table_ids);
+        let existing_names = descriptors
+            .iter()
+            .filter_map(|descriptor| {
+                find_table_owner(&self.package, descriptor.object_id)
+                    .ok()
+                    .filter(|candidate| candidate.sheet_id == owner.sheet_id)
+                    .map(|_| descriptor.model.table_name.as_str())
+            })
+            .collect::<HashSet<_>>();
+        let name = duplicate_table_name(&source.model.table_name, &existing_names)?;
+
+        let model_data = duplicate_table_model_wire(
+            model_object.messages[model_message_index].data.as_slice(),
+            &source.model,
+            &remap,
+            &table_uuid,
+            &name,
+        )?;
+        let mut objects = Vec::with_capacity(graph.len() + 2);
+        objects.push(clone_numbers_object_metadata(
+            model_object,
+            new_model_id,
+            vec![RawMessage {
+                type_: model_object.messages[model_message_index].type_,
+                data: model_data,
+            }],
+            &remap,
+        )?);
+
+        let info_data = duplicate_table_info_wire(
+            info_object.messages[info_message_index].data.as_slice(),
+            &source_info,
+            &remap,
+            TABLE_DUPLICATE_OFFSET,
+        )?;
+        objects.push(clone_numbers_object_metadata(
+            info_object,
+            new_info_id,
+            vec![RawMessage {
+                type_: info_object.messages[info_message_index].type_,
+                data: info_data,
+            }],
+            &remap,
+        )?);
+
+        for &source_id in graph.keys() {
+            let archive_name = locations.get(&source_id).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers table storage object {source_id} is missing"
+                ))
+            })?;
+            let archive = self.package.archive(archive_name)?;
+            let source_object = archive.object(source_id).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers table storage object {source_id} is missing"
+                ))
+            })?;
+            objects.push(clone_table_storage_object(source_object, &remap)?);
+        }
+
+        let mut staged = self.package.clone();
+        let component = format!("Index/Tables/Table-{new_info_id}.iwa");
+        staged.replace_archive(&component, &Archive { objects })?;
+        let sheet_archive_name = locations.get(&owner.sheet_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Numbers sheet {} is missing", owner.sheet_id))
+        })?;
+        staged.update_archive(sheet_archive_name, |archive| {
+            let object = archive.object_mut(owner.sheet_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers sheet {} is missing", owner.sheet_id))
+            })?;
+            let (message_index, sheet) = decode_sheet(object)?;
+            let previous = sheet
+                .drawable_infos
+                .iter()
+                .map(|reference| reference.identifier)
+                .collect::<Vec<_>>();
+            let mut current = previous.clone();
+            current.push(new_info_id);
+            replace_sheet_drawable_references(object, message_index, &previous, &current)?;
+            let info = &mut object.archive_info.message_infos[message_index];
+            info.object_references.push(new_info_id);
+            for field in &mut info.field_infos {
+                if field
+                    .object_references
+                    .iter()
+                    .any(|identifier| previous.contains(identifier))
+                {
+                    field.object_references.push(new_info_id);
+                }
+            }
+            Ok(())
+        })?;
+
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let created = verified
+            .tables()?
+            .into_iter()
+            .find(|table| table.object_id == new_model_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Numbers table duplication failed validation".to_owned())
+            })?;
+        if (created.name.as_str(), created.rows, created.columns)
+            != (
+                name.as_str(),
+                source.model.number_of_rows as usize,
+                source.model.number_of_columns as usize,
+            )
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table duplicate has unexpected properties".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(created)
+    }
+
+    /// Remove a sheet from the workbook, retaining unreachable drawable data.
+    ///
+    /// The final sheet cannot be removed. Retaining detached drawable objects is
+    /// deliberate: styles and calculation objects can be shared across sheets.
+    pub fn remove_sheet(&mut self, sheet_id: u64) -> Result<NumbersSheetInfo> {
+        let sheets = self.sheets()?;
+        if sheets.len() <= 1 {
+            return Err(Error::ParseError(
+                "Cannot remove the final Numbers sheet".to_owned(),
+            ));
+        }
+        let removed = sheets
+            .iter()
+            .find(|sheet| sheet.object_id == sheet_id)
+            .cloned()
+            .ok_or_else(|| Error::ParseError(format!("Numbers sheet {sheet_id} not found")))?;
+        let locations = object_locations(&self.package)?;
+        let mut staged = self.package.clone();
+        update_numbers_document(&mut staged, |document| {
+            let old_len = document.sheets.len();
+            document
+                .sheets
+                .retain(|reference| reference.identifier != sheet_id);
+            if document.sheets.len() + 1 != old_len {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers root does not reference sheet {sheet_id} exactly once"
+                )));
+            }
+            Ok(())
+        })?;
+        remove_object_or_empty_entry(&mut staged, &locations, sheet_id)?;
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        if verified
+            .sheets()?
+            .iter()
+            .any(|sheet| sheet.object_id == sheet_id)
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers sheet deletion failed validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(removed)
+    }
+
+    pub fn package(&self) -> &IWorkPackage {
+        &self.package
+    }
+
+    fn sheet_owned_drawable_ids(&self, sheet_id: u64) -> Result<HashSet<u64>> {
+        if !self
+            .sheets()?
+            .iter()
+            .any(|sheet| sheet.object_id == sheet_id)
+        {
+            return Err(Error::ParseError(format!(
+                "Numbers sheet object {sheet_id} is not reachable"
+            )));
+        }
+        Ok(numbers_sheet_drawable_owners(&self.package)?
+            .into_iter()
+            .filter_map(|(drawable_id, owner_id)| (owner_id == sheet_id).then_some(drawable_id))
+            .collect())
+    }
+
+    fn require_sheet_drawable(&self, sheet_id: u64, drawable_object_id: u64) -> Result<()> {
+        if !self
+            .sheet_owned_drawable_ids(sheet_id)?
+            .contains(&drawable_object_id)
+        {
+            return Err(Error::ParseError(format!(
+                "drawable object {drawable_object_id} is not owned by Numbers sheet {sheet_id}"
+            )));
+        }
+        if !self
+            .sheet_drawables(sheet_id)?
+            .iter()
+            .any(|drawable| drawable.object_id == drawable_object_id)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers sheet drawable {drawable_object_id} has no supported direct drawable payload"
+            )));
+        }
+        Ok(())
+    }
+
+    /// List metadata-backed media reachable from this spreadsheet package.
+    pub fn media_assets(&self) -> Result<Vec<EmbeddedMediaAsset>> {
+        reachable_embedded_assets(&self.package, [1])
+    }
+
+    /// List media reachable from one sheet and its drawable object graph.
+    pub fn sheet_media_assets(&self, sheet_id: u64) -> Result<Vec<EmbeddedMediaAsset>> {
+        if !self
+            .sheets()?
+            .iter()
+            .any(|sheet| sheet.object_id == sheet_id)
+        {
+            return Err(Error::ParseError(format!(
+                "Numbers sheet object {sheet_id} is not reachable"
+            )));
+        }
+        reachable_embedded_assets(&self.package, [sheet_id])
+    }
+
+    pub fn extract_media(&self, data_identifier: u64) -> Result<Vec<u8>> {
+        if !self
+            .media_assets()?
+            .iter()
+            .any(|asset| asset.data_identifier == data_identifier)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Data identifier {data_identifier} is not reachable from the Numbers object graph"
+            )));
+        }
+        IWorkMediaEditor::from_package(self.package.clone())?.extract(data_identifier)
+    }
+
+    /// Replace a referenced materialized asset without changing its data identifier.
+    pub fn replace_media(&mut self, data_identifier: u64, replacement: &[u8]) -> Result<Vec<u8>> {
+        if !self
+            .media_assets()?
+            .iter()
+            .any(|asset| asset.data_identifier == data_identifier)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Data identifier {data_identifier} is not reachable from the Numbers object graph"
+            )));
+        }
+        let mut media = IWorkMediaEditor::from_package(self.package.clone())?;
+        let old = media.replace(data_identifier, replacement)?;
+        let staged = media.into_package();
+        Self::from_package(staged.clone())?;
+        self.package = staged;
+        Ok(old)
+    }
+
+    pub fn into_package(self) -> IWorkPackage {
+        self.package
+    }
+
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        self.package.to_bytes()
+    }
+
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
+        self.package.save(path)
+    }
+}
+
+mod model;
+mod storage;
+mod table_duplicate;
+
+use model::*;
+use storage::*;
+use table_duplicate::*;
+#[cfg(test)]
+mod tests;

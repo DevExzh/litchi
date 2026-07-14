@@ -4,12 +4,15 @@
 
 use std::path::Path;
 
+use prost::Message;
+
 use super::section::{PagesSection, PagesSectionType};
-use crate::Result;
 use crate::bundle::Bundle;
 use crate::object_index::ObjectIndex;
+use crate::protobuf::{tp, tswp};
 use crate::registry::Application;
-use crate::text::TextExtractor;
+use crate::text::{TextExtractor, TextStorage};
+use crate::{Error, Result};
 
 /// High-level interface for Pages documents
 pub struct PagesDocument {
@@ -81,22 +84,52 @@ impl PagesDocument {
 
     /// Verify that the bundle is a Pages document
     fn verify_application(bundle: &Bundle) -> Result<()> {
-        // Check for Pages-specific message types (TP.* types in range 10000-10999)
-        // Message type 10000 is TP.DocumentArchive
-        let has_pages_types = bundle.archives().values().any(|archive| {
-            archive.objects.iter().any(|obj| {
-                obj.messages
-                    .iter()
-                    .any(|msg| msg.type_ == 10000 || (10000..11000).contains(&msg.type_))
-            })
-        });
-
-        if !has_pages_types {
-            // Be lenient - if we can't definitively identify it as another type, allow it
-            // This helps with documents that might not have explicit Pages markers
+        if Self::root_document(bundle).is_none() {
+            return Err(Error::InvalidFormat(
+                "package does not contain a Pages root document".to_owned(),
+            ));
         }
-
         Ok(())
+    }
+
+    fn root_document(bundle: &Bundle) -> Option<tp::DocumentArchive> {
+        bundle
+            .get_archive("Index/Document.iwa")?
+            .object(1)?
+            .messages
+            .iter()
+            .find(|message| message.type_ == 10000)
+            .and_then(|message| tp::DocumentArchive::decode(message.data.as_slice()).ok())
+    }
+
+    fn body_storage(&self) -> Result<Option<TextStorage>> {
+        let Some(reference) = Self::root_document(&self.bundle).and_then(|doc| doc.body_storage)
+        else {
+            return Ok(None);
+        };
+        let Some(object) = self
+            .object_index
+            .resolve_object(&self.bundle, reference.identifier)?
+        else {
+            return Err(Error::InvalidFormat(format!(
+                "Pages body storage object {} is missing",
+                reference.identifier
+            )));
+        };
+        let storage = object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == 2001 || message.type_ == 2022)
+            .find_map(|message| tswp::StorageArchive::decode(message.data.as_slice()).ok())
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Pages body object {} has no text storage payload",
+                    reference.identifier
+                ))
+            })?;
+        let mut result = TextStorage::from_text(storage.text.concat());
+        result.identifier = Some(reference.identifier);
+        Ok(Some(result))
     }
 
     /// Extract all text content from the document
@@ -137,84 +170,29 @@ impl PagesDocument {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn sections(&self) -> Result<Vec<PagesSection>> {
-        let mut sections = Vec::new();
-
-        // Find section archives (message type 10011 is TP.SectionArchive)
-        let section_objects = self.bundle.find_objects_by_type(10011);
-
-        if section_objects.is_empty() {
-            // If no explicit sections found, create a single body section
-            // with all text content
+        if let Some(storage) = self.body_storage()? {
             let mut section = PagesSection::new(0, PagesSectionType::Body);
-
-            // Extract text from all TSWP storage objects
-            let mut extractor = TextExtractor::new();
-            extractor.extract_from_bundle(&self.bundle)?;
-
-            for storage in extractor.storages() {
-                if !storage.is_empty() {
-                    section.text_storages.push(storage.clone());
-                    section.paragraphs.push(storage.plain_text().to_string());
-                }
-            }
-
-            if !section.is_empty() {
-                sections.push(section);
-            }
-        } else {
-            // Parse explicit sections
-            for (index, (_archive_name, object)) in section_objects.iter().enumerate() {
-                let section = self.parse_section(index, object)?;
-                if !section.is_empty() {
-                    sections.push(section);
-                }
-            }
-        }
-
-        Ok(sections)
-    }
-
-    /// Parse a single section from an object
-    fn parse_section(
-        &self,
-        index: usize,
-        object: &crate::archive::ArchiveObject,
-    ) -> Result<PagesSection> {
-        let mut section = PagesSection::new(index, PagesSectionType::Body);
-
-        // Extract text content from the section object
-        let text_parts = object.extract_text();
-        section.paragraphs = text_parts;
-
-        // Parse the SectionArchive protobuf message
-        // TP.SectionArchive contains references to:
-        // - Body storage (main text content)
-        // - Header/footer storages
-        // - Section properties (margins, columns, etc.)
-
-        if let Some(_raw_message) = object.messages.first() {
-            // The SectionArchive structure is complex with many references
-            // For a production implementation, we would:
-            // 1. Parse the SectionArchive protobuf message
-            // 2. Resolve references to text storage objects
-            // 3. Extract section-specific properties (margins, headers, footers)
-            // 4. Build the complete section structure
-            //
-            // Note: The SectionArchive fields use names like:
-            // - obsolete_headers, obsolete_footers (legacy)
-            // - current implementations use different field names
-            // This would require careful mapping from the proto definitions
-        }
-
-        // Extract text storages
-        let extractor = TextExtractor::new();
-        if let Ok(storage) = extractor.extract_from_object(object)
-            && !storage.is_empty()
-        {
             section.text_storages.push(storage);
+            return Ok(vec![section]);
         }
 
-        Ok(section)
+        // Older and page-layout packages may not expose a root body storage.
+        // Keep the conservative fallback, but only after verifying the Pages root.
+        let mut sections = Vec::new();
+        let mut section = PagesSection::new(0, PagesSectionType::Body);
+        let mut extractor = TextExtractor::new();
+        extractor.extract_from_bundle(&self.bundle)?;
+        section.text_storages.extend(
+            extractor
+                .storages()
+                .iter()
+                .filter(|s| !s.is_empty())
+                .cloned(),
+        );
+        if !section.is_empty() {
+            sections.push(section);
+        }
+        Ok(sections)
     }
 
     /// Get the underlying bundle
@@ -255,6 +233,9 @@ pub struct PagesDocumentStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::IWorkPackage;
+    use crate::archive::{Archive, ArchiveObject, RawMessage};
+    use crate::protobuf::tsp::Reference;
 
     #[test]
     fn test_pages_document_open() {
@@ -288,5 +269,57 @@ mod tests {
 
         // Text might be empty for some documents, but extraction should succeed
         let _text = text_result.unwrap();
+    }
+
+    #[test]
+    fn resolves_body_storage_from_pages_root() {
+        let body_id = 42;
+        let root = tp::DocumentArchive {
+            body_storage: Some(Reference {
+                identifier: body_id,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let body = tswp::StorageArchive {
+            text: vec!["Pages body — café 東京 🚀".to_owned()],
+            ..Default::default()
+        };
+        let archive = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 10000,
+                        data: root.encode_to_vec(),
+                    }],
+                )
+                .unwrap(),
+                ArchiveObject::new(
+                    body_id,
+                    vec![RawMessage {
+                        type_: 2001,
+                        data: body.encode_to_vec(),
+                    }],
+                )
+                .unwrap(),
+            ],
+        };
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive("Index/Document.iwa", &archive)
+            .unwrap();
+
+        let document = PagesDocument::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let sections = document.sections().unwrap();
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0].text_storages[0].identifier, Some(body_id));
+        assert_eq!(sections[0].plain_text(), "Pages body — café 東京 🚀");
+
+        let structured =
+            crate::structured::extract_sections(document.bundle(), document.object_index())
+                .unwrap();
+        assert_eq!(structured.len(), 1);
+        assert_eq!(structured[0].paragraphs, ["Pages body — café 東京 🚀"]);
     }
 }

@@ -6,11 +6,11 @@ use std::path::Path;
 
 use super::show::KeynoteShow;
 use super::slide::KeynoteSlide;
-use crate::Result;
 use crate::bundle::Bundle;
 use crate::object_index::ObjectIndex;
-use crate::registry::Application;
+use crate::registry::{Application, detect_application_from_document};
 use crate::text::TextExtractor;
+use crate::{Error, Result};
 
 /// High-level interface for Keynote documents
 pub struct KeynoteDocument {
@@ -34,6 +34,7 @@ impl KeynoteDocument {
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let bundle = Bundle::open(path)?;
+        Self::verify_application(&bundle)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
         Ok(Self {
@@ -56,6 +57,7 @@ impl KeynoteDocument {
     /// ```
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let bundle = Bundle::from_bytes(bytes)?;
+        Self::verify_application(&bundle)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
         Ok(Self {
@@ -70,6 +72,31 @@ impl KeynoteDocument {
     /// been validated during format detection. It avoids double-parsing.
     pub fn from_archive_bytes(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes(bytes)
+    }
+
+    fn verify_application(bundle: &Bundle) -> Result<()> {
+        Self::root_document(bundle).map(|_| ())
+    }
+
+    fn root_document(bundle: &Bundle) -> Result<crate::protobuf::kn::DocumentArchive> {
+        use prost::Message;
+
+        let object = bundle
+            .get_archive("Index/Document.iwa")
+            .and_then(|archive| archive.object(1))
+            .ok_or_else(|| Error::InvalidFormat("Keynote root object 1 is missing".to_owned()))?;
+        object
+            .messages
+            .iter()
+            .find(|message| {
+                detect_application_from_document(&message.data) == Some(Application::Keynote)
+            })
+            .and_then(|message| {
+                crate::protobuf::kn::DocumentArchive::decode(message.data.as_slice()).ok()
+            })
+            .ok_or_else(|| {
+                Error::InvalidFormat("package does not contain a Keynote root document".to_owned())
+            })
     }
 
     /// Extract all text content from the presentation
@@ -117,53 +144,74 @@ impl KeynoteDocument {
     pub fn slides(&self) -> Result<Vec<KeynoteSlide>> {
         let mut slides = Vec::new();
 
-        // Find slide archives (message type 5/6 is KN.SlideArchive, type 1102 in our decoder)
-        let slide_objects = self.bundle.find_objects_by_type(1102);
-
-        if slide_objects.is_empty() {
-            // Try alternate slide message types (5 and 6 from JSON)
-            let alt_slide_objects_5 = self.bundle.find_objects_by_type(5);
-            let alt_slide_objects_6 = self.bundle.find_objects_by_type(6);
-
-            for (index, (_archive_name, object)) in alt_slide_objects_5
-                .iter()
-                .chain(alt_slide_objects_6.iter())
-                .enumerate()
-            {
-                let slide = self.parse_slide(index, object)?;
-                if !slide.is_empty() {
-                    slides.push(slide);
-                }
-            }
-        } else {
-            for (index, (_archive_name, object)) in slide_objects.iter().enumerate() {
-                let slide = self.parse_slide(index, object)?;
-                if !slide.is_empty() {
-                    slides.push(slide);
-                }
-            }
-        }
-
-        // If no slides found, create a default slide with all text
-        if slides.is_empty() {
-            let mut extractor = TextExtractor::new();
-            extractor.extract_from_bundle(&self.bundle)?;
-
-            if extractor.storage_count() > 0 {
-                let mut slide = KeynoteSlide::new(0);
-                for storage in extractor.storages() {
-                    if !storage.is_empty() {
-                        slide.text_storages.push(storage.clone());
-                        slide.text_content.push(storage.plain_text().to_string());
-                    }
-                }
-                if !slide.is_empty() {
-                    slides.push(slide);
-                }
-            }
+        for (index, slide_id) in self.slide_ids()?.into_iter().enumerate() {
+            let object = self.bundle_object(slide_id).ok_or_else(|| {
+                crate::Error::ParseError(format!(
+                    "Keynote slide tree references missing object {slide_id}"
+                ))
+            })?;
+            slides.push(self.parse_slide(index, object)?);
         }
 
         Ok(slides)
+    }
+
+    fn slide_ids(&self) -> Result<Vec<u64>> {
+        use prost::Message;
+
+        let document = Self::root_document(&self.bundle)?;
+        let show_object = self
+            .bundle_object(document.show.identifier)
+            .ok_or_else(|| {
+                crate::Error::ParseError(format!(
+                    "Keynote show object {} is missing",
+                    document.show.identifier
+                ))
+            })?;
+        let show = show_object
+            .messages
+            .iter()
+            .find_map(|message| {
+                crate::protobuf::kn::ShowArchive::decode(message.data.as_slice()).ok()
+            })
+            .ok_or_else(|| {
+                crate::Error::ParseError("Keynote show payload is missing".to_string())
+            })?;
+
+        let mut slide_ids = Vec::with_capacity(show.slide_tree.slides.len());
+        for node_reference in show.slide_tree.slides {
+            let node_object = self
+                .bundle_object(node_reference.identifier)
+                .ok_or_else(|| {
+                    crate::Error::ParseError(format!(
+                        "Keynote slide node {} is missing",
+                        node_reference.identifier
+                    ))
+                })?;
+            let node = node_object
+                .messages
+                .iter()
+                .find_map(|message| {
+                    crate::protobuf::kn::SlideNodeArchive::decode(message.data.as_slice()).ok()
+                })
+                .ok_or_else(|| {
+                    crate::Error::ParseError(format!(
+                        "Object {} has no KN.SlideNodeArchive payload",
+                        node_reference.identifier
+                    ))
+                })?;
+            if let Some(slide) = node.slide {
+                slide_ids.push(slide.identifier);
+            }
+        }
+        Ok(slide_ids)
+    }
+
+    fn bundle_object(&self, identifier: u64) -> Option<&crate::archive::ArchiveObject> {
+        self.bundle
+            .archives()
+            .values()
+            .find_map(|archive| archive.object(identifier))
     }
 
     /// Parse a single slide from an object
@@ -208,7 +256,7 @@ impl KeynoteDocument {
                 }
 
                 // Extract master slide reference
-                if let Some(ref master) = slide_archive.master {
+                if let Some(ref master) = slide_archive.template_slide {
                     slide.master_slide_id = Some(master.identifier);
                 }
 
@@ -222,8 +270,35 @@ impl KeynoteDocument {
                 // Extract transition
                 slide.transition = self.parse_transition(&slide_archive.transition);
 
-                // Resolve drawable references to get text boxes and other content
-                for drawable_ref in &slide_archive.drawables {
+                let title_placeholder = slide_archive
+                    .title_placeholder
+                    .as_ref()
+                    .map(|reference| reference.identifier);
+                let body_placeholder = slide_archive
+                    .body_placeholder
+                    .as_ref()
+                    .map(|reference| reference.identifier);
+
+                if let Some(identifier) = title_placeholder {
+                    let title = self.extract_drawable_text(identifier)?;
+                    if !title.is_empty() {
+                        slide.title = Some(title);
+                    }
+                }
+                if let Some(identifier) = body_placeholder {
+                    let body = self.extract_drawable_text(identifier)?;
+                    if !body.is_empty() {
+                        slide.text_content.push(body);
+                    }
+                }
+
+                // Resolve other drawable references to get text boxes.
+                for drawable_ref in &slide_archive.owned_drawables {
+                    if Some(drawable_ref.identifier) == title_placeholder
+                        || Some(drawable_ref.identifier) == body_placeholder
+                    {
+                        continue;
+                    }
                     if let Ok(text_content) = self.extract_drawable_text(drawable_ref.identifier)
                         && !text_content.is_empty()
                     {
@@ -260,8 +335,14 @@ impl KeynoteDocument {
             for msg in &resolved.messages {
                 if let Ok(build_archive) = crate::protobuf::kn::BuildArchive::decode(&*msg.data) {
                     let animation_type = Self::parse_build_delivery(&build_archive.delivery);
-                    let target_id = Some(build_archive.drawable.identifier);
-                    let duration = build_archive.duration as f32;
+                    let target_id = build_archive.drawable.as_ref().map(|r| r.identifier);
+                    let duration = build_archive
+                        .attributes
+                        .animation_attributes
+                        .as_ref()
+                        .and_then(|attributes| attributes.duration)
+                        .or_else(|| Self::legacy_build_duration(&build_archive))
+                        .unwrap_or(0.0) as f32;
 
                     return Ok(BuildAnimation {
                         animation_type,
@@ -303,7 +384,13 @@ impl KeynoteDocument {
 
         // Extract duration from attributes
         // The attributes field is required (not Optional)
-        let duration = transition.attributes.database_duration.unwrap_or(0.0) as f32;
+        let duration = transition
+            .attributes
+            .animation_attributes
+            .as_ref()
+            .and_then(|attributes| attributes.duration)
+            .or_else(|| Self::legacy_transition_duration(&transition.attributes))
+            .unwrap_or(0.0) as f32;
 
         // Determine transition type from attributes
         // The actual transition type is embedded in the attributes structure
@@ -316,6 +403,18 @@ impl KeynoteDocument {
         })
     }
 
+    #[allow(deprecated)]
+    fn legacy_build_duration(build: &crate::protobuf::kn::BuildArchive) -> Option<f64> {
+        build.attributes.database_duration.or(build.duration)
+    }
+
+    #[allow(deprecated)]
+    fn legacy_transition_duration(
+        attributes: &crate::protobuf::kn::TransitionAttributesArchive,
+    ) -> Option<f64> {
+        attributes.database_duration
+    }
+
     /// Extract text content from a drawable object
     fn extract_drawable_text(&self, drawable_id: u64) -> Result<String> {
         use prost::Message;
@@ -324,24 +423,34 @@ impl KeynoteDocument {
             .object_index
             .resolve_object(&self.bundle, drawable_id)?
         {
-            // Drawables can contain text storages
+            let mut storage_id = None;
             for msg in &resolved.messages {
-                // Try to extract text from TSWP storage messages (types 2001-2022)
-                if msg.type_ >= 2001
-                    && msg.type_ <= 2022
-                    && let Ok(storage) = crate::protobuf::tswp::StorageArchive::decode(&*msg.data)
-                    && !storage.text.is_empty()
+                if let Ok(placeholder) =
+                    crate::protobuf::kn::PlaceholderArchive::decode(msg.data.as_slice())
+                    && let Some(reference) = placeholder.super_.owned_storage
                 {
-                    return Ok(storage.text.join(" "));
+                    storage_id = Some(reference.identifier);
+                    break;
+                }
+                if let Ok(shape) =
+                    crate::protobuf::tswp::ShapeInfoArchive::decode(msg.data.as_slice())
+                    && let Some(reference) = shape.owned_storage
+                {
+                    storage_id = Some(reference.identifier);
+                    break;
                 }
             }
 
-            // Also try generic text extraction from the resolved object
-            for msg in &resolved.messages {
-                if let Ok(storage) = crate::protobuf::tswp::StorageArchive::decode(&*msg.data)
-                    && !storage.text.is_empty()
-                {
-                    return Ok(storage.text.join(" "));
+            if let Some(storage_id) = storage_id
+                && let Some(storage_object) =
+                    self.object_index.resolve_object(&self.bundle, storage_id)?
+            {
+                for message in storage_object.messages {
+                    if let Ok(storage) =
+                        crate::protobuf::tswp::StorageArchive::decode(message.data.as_slice())
+                    {
+                        return Ok(storage.text.concat());
+                    }
                 }
             }
         }

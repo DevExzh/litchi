@@ -28,6 +28,21 @@ fn decode_pages_document(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
     Ok(Box::new(PagesDocumentWrapper(msg)) as Box<dyn DecodedMessage>)
 }
 
+fn decode_pages_theme(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = tp::ThemeArchive::decode(data)?;
+    Ok(Box::new(PagesThemeWrapper(msg)) as Box<dyn DecodedMessage>)
+}
+
+fn decode_pages_section(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = tp::SectionArchive::decode(data)?;
+    Ok(Box::new(PagesSectionWrapper(msg)) as Box<dyn DecodedMessage>)
+}
+
+fn decode_pages_section_template(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = tp::SectionTemplateArchive::decode(data)?;
+    Ok(Box::new(PagesSectionTemplateWrapper(msg)) as Box<dyn DecodedMessage>)
+}
+
 /// Static decoder function for Numbers SheetArchive messages
 fn decode_numbers_sheet(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
     let msg = tn::SheetArchive::decode(data)?;
@@ -38,6 +53,16 @@ fn decode_numbers_sheet(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
 fn decode_keynote_slide(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
     let msg = kn::SlideArchive::decode(data)?;
     Ok(Box::new(KeynoteSlideWrapper(msg)) as Box<dyn DecodedMessage>)
+}
+
+fn decode_keynote_build(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = kn::BuildArchive::decode(data)?;
+    Ok(Box::new(KeynoteBuildWrapper(msg)) as Box<dyn DecodedMessage>)
+}
+
+fn decode_keynote_build_chunk(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = kn::BuildChunkArchive::decode(data)?;
+    Ok(Box::new(KeynoteBuildChunkWrapper(msg)) as Box<dyn DecodedMessage>)
 }
 
 /// Static decoder function for StorageArchive messages
@@ -58,6 +83,12 @@ fn decode_table_data_list(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
     Ok(Box::new(TableDataListWrapper(msg)) as Box<dyn DecodedMessage>)
 }
 
+/// Static decoder function for segmented TableDataList payloads.
+fn decode_table_data_list_segment(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = tst::TableDataListSegment::decode(data)?;
+    Ok(Box::new(TableDataListSegmentWrapper(msg)) as Box<dyn DecodedMessage>)
+}
+
 /// Static decoder function for ShapeArchive messages
 fn decode_shape_archive(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
     let msg = tsd::ShapeArchive::decode(data)?;
@@ -68,6 +99,11 @@ fn decode_shape_archive(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
 fn decode_drawable_archive(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
     let msg = tsd::DrawableArchive::decode(data)?;
     Ok(Box::new(DrawableArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
+}
+
+fn decode_comment_storage_archive(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let msg = tsd::CommentStorageArchive::decode(data)?;
+    Ok(Box::new(CommentStorageArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
 }
 
 /// Static decoder function for ChartArchive messages
@@ -106,6 +142,7 @@ static DECODERS: DecoderMap = phf_map! {
     6000u32 => decode_table_model,
     6001u32 => decode_table_model,
     6005u32 => decode_table_data_list,
+    6011u32 => decode_table_data_list_segment,
     6201u32 => decode_table_data_list,
 
     // TSD (Drawing) types - Shapes, images, and drawables
@@ -117,6 +154,7 @@ static DECODERS: DecoderMap = phf_map! {
     3007u32 => decode_shape_archive,     // MovieArchive
     3008u32 => decode_shape_archive,     // GroupArchive
     3009u32 => decode_shape_archive,     // ConnectionLineArchive
+    3056u32 => decode_comment_storage_archive,
 
     // TSCH (Charts) types
     5000u32 => decode_chart_archive,
@@ -142,8 +180,9 @@ static DECODERS: DecoderMap = phf_map! {
 
     // Pages-specific document types (TP namespace)
     10000u32 => decode_pages_document,
-    10001u32 => decode_pages_document,  // ThemeArchive
-    10011u32 => decode_pages_document,  // SectionArchive
+    10001u32 => decode_pages_theme,
+    10011u32 => decode_pages_section,
+    10143u32 => decode_pages_section_template,
 
     // Numbers-specific document types (TN namespace)
     // Note: Numbers uses low message type numbers that conflict with TSP types
@@ -159,7 +198,8 @@ static DECODERS: DecoderMap = phf_map! {
     // Type 5/6 are KN.SlideArchive
     5u32 => decode_keynote_slide,       // KN.SlideArchive
     6u32 => decode_keynote_slide,       // KN.SlideArchive (variant)
-    8u32 => decode_keynote_slide,       // KN.BuildArchive (slide-related)
+    8u32 => decode_keynote_build,       // KN.BuildArchive
+    153u32 => decode_keynote_build_chunk, // KN.BuildChunkArchive
 };
 
 /// Decode a message of the given type using the perfect hash map for O(1) lookup
@@ -230,11 +270,50 @@ pub struct PagesDocumentWrapper(pub tp::DocumentArchive);
 
 impl DecodedMessage for PagesDocumentWrapper {
     fn message_type(&self) -> u32 {
-        1001
+        10000
     }
 
     fn extract_text(&self) -> Vec<String> {
         Vec::new() // Document metadata doesn't contain direct text
+    }
+}
+
+/// Wrapper for TP.ThemeArchive.
+#[derive(Debug)]
+pub struct PagesThemeWrapper(pub tp::ThemeArchive);
+
+impl DecodedMessage for PagesThemeWrapper {
+    fn message_type(&self) -> u32 {
+        10001
+    }
+}
+
+/// Wrapper for TP.SectionArchive.
+#[derive(Debug)]
+pub struct PagesSectionWrapper(pub tp::SectionArchive);
+
+impl DecodedMessage for PagesSectionWrapper {
+    fn message_type(&self) -> u32 {
+        10011
+    }
+
+    fn extract_text(&self) -> Vec<String> {
+        self.0
+            .name
+            .iter()
+            .filter(|name| !name.is_empty())
+            .cloned()
+            .collect()
+    }
+}
+
+/// Wrapper for TP.SectionTemplateArchive.
+#[derive(Debug)]
+pub struct PagesSectionTemplateWrapper(pub tp::SectionTemplateArchive);
+
+impl DecodedMessage for PagesSectionTemplateWrapper {
+    fn message_type(&self) -> u32 {
+        10143
     }
 }
 
@@ -277,6 +356,26 @@ impl DecodedMessage for KeynoteSlideWrapper {
         //     // without additional processing
         // }
         text
+    }
+}
+
+/// Wrapper for a Keynote object build.
+#[derive(Debug)]
+pub struct KeynoteBuildWrapper(pub kn::BuildArchive);
+
+impl DecodedMessage for KeynoteBuildWrapper {
+    fn message_type(&self) -> u32 {
+        8
+    }
+}
+
+/// Wrapper for a Keynote build timing chunk.
+#[derive(Debug)]
+pub struct KeynoteBuildChunkWrapper(pub kn::BuildChunkArchive);
+
+impl DecodedMessage for KeynoteBuildChunkWrapper {
+    fn message_type(&self) -> u32 {
+        153
     }
 }
 
@@ -324,6 +423,26 @@ impl DecodedMessage for TableDataListWrapper {
         }
 
         strings
+    }
+}
+
+/// Wrapper for a segmented TableDataList payload.
+#[derive(Debug)]
+pub struct TableDataListSegmentWrapper(pub tst::TableDataListSegment);
+
+impl DecodedMessage for TableDataListSegmentWrapper {
+    fn message_type(&self) -> u32 {
+        6011
+    }
+
+    fn extract_text(&self) -> Vec<String> {
+        self.0
+            .entries
+            .iter()
+            .filter_map(|entry| entry.string.as_ref())
+            .filter(|value| !value.is_empty())
+            .cloned()
+            .collect()
     }
 }
 
@@ -378,6 +497,25 @@ impl DecodedMessage for DrawableArchiveWrapper {
     }
 }
 
+/// Wrapper for TSD comment storage used by cell and drawable comments.
+#[derive(Debug)]
+pub struct CommentStorageArchiveWrapper(pub tsd::CommentStorageArchive);
+
+impl DecodedMessage for CommentStorageArchiveWrapper {
+    fn message_type(&self) -> u32 {
+        3056
+    }
+
+    fn extract_text(&self) -> Vec<String> {
+        self.0
+            .text
+            .iter()
+            .filter(|text| !text.is_empty())
+            .cloned()
+            .collect()
+    }
+}
+
 /// Wrapper for Chart Archive
 #[derive(Debug)]
 pub struct ChartArchiveWrapper(pub tsch::ChartArchive);
@@ -423,14 +561,84 @@ mod tests {
         assert!(DECODERS.contains_key(&1)); // ArchiveInfo / TN.DocumentArchive
         assert!(DECODERS.contains_key(&2)); // MessageInfo / TN.SheetArchive
         assert!(DECODERS.contains_key(&6001)); // TST.TableModelArchive
+        assert!(DECODERS.contains_key(&6011)); // TST.TableDataListSegment
         assert!(DECODERS.contains_key(&2001)); // TSWP.StorageArchive
         assert!(DECODERS.contains_key(&2002)); // StorageArchive variant
         assert!(DECODERS.contains_key(&2003)); // StorageArchive variant
         assert!(DECODERS.contains_key(&2022)); // Common StorageArchive type
+        assert!(DECODERS.contains_key(&3056)); // TSD.CommentStorageArchive
         assert!(DECODERS.contains_key(&10000)); // TP.DocumentArchive (Pages)
+        assert!(DECODERS.contains_key(&10001)); // TP.ThemeArchive (Pages)
+        assert!(DECODERS.contains_key(&10011)); // TP.SectionArchive (Pages)
+        assert!(DECODERS.contains_key(&10143)); // TP.SectionTemplateArchive (Pages)
         assert!(DECODERS.contains_key(&3)); // TN.FormBasedSheetArchive (Numbers)
         assert!(DECODERS.contains_key(&5)); // KN.SlideArchive (Keynote)
         assert!(DECODERS.contains_key(&6)); // KN.SlideArchive variant (Keynote)
+        assert!(DECODERS.contains_key(&8)); // KN.BuildArchive (Keynote)
+        assert!(DECODERS.contains_key(&153)); // KN.BuildChunkArchive (Keynote)
+    }
+
+    #[test]
+    fn keynote_build_types_use_their_concrete_decoders() {
+        let build = kn::BuildArchive {
+            delivery: "All at Once".to_owned(),
+            attributes: kn::BuildAttributesArchive::default(),
+            ..Default::default()
+        };
+        assert_eq!(decode(8, &build.encode_to_vec()).unwrap().message_type(), 8);
+
+        let chunk = kn::BuildChunkArchive::default();
+        assert_eq!(
+            decode(153, &chunk.encode_to_vec()).unwrap().message_type(),
+            153
+        );
+    }
+
+    #[test]
+    fn table_data_list_segments_use_their_concrete_decoder() {
+        let segment = tst::TableDataListSegment {
+            list_type: tst::table_data_list::ListType::String as i32,
+            key_range: tsp::Range {
+                location: 7,
+                length: 1,
+            },
+            entries: vec![tst::table_data_list::ListEntry {
+                key: 7,
+                refcount: 1,
+                string: Some("Segmented".to_owned()),
+                ..Default::default()
+            }],
+        };
+        let decoded = decode(6011, &segment.encode_to_vec()).unwrap();
+        assert_eq!(decoded.message_type(), 6011);
+        assert_eq!(decoded.extract_text(), ["Segmented"]);
+    }
+
+    #[test]
+    fn comment_storage_uses_its_concrete_decoder() {
+        let comment = tsd::CommentStorageArchive {
+            text: Some("Review this".to_owned()),
+            ..Default::default()
+        };
+        let decoded = decode(3056, &comment.encode_to_vec()).unwrap();
+        assert_eq!(decoded.message_type(), 3056);
+        assert_eq!(decoded.extract_text(), ["Review this"]);
+    }
+
+    #[test]
+    fn pages_section_types_use_their_concrete_decoders() {
+        let section = tp::SectionArchive {
+            name: Some("Chapter".to_owned()),
+            ..Default::default()
+        };
+        let decoded = decode(10011, &section.encode_to_vec()).unwrap();
+        assert_eq!(decoded.message_type(), 10011);
+        assert_eq!(decoded.extract_text(), ["Chapter"]);
+
+        let template = tp::SectionTemplateArchive::default();
+        let decoded = decode(10143, &template.encode_to_vec()).unwrap();
+        assert_eq!(decoded.message_type(), 10143);
+        assert!(decoded.extract_text().is_empty());
     }
 
     #[test]

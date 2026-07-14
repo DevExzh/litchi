@@ -59,6 +59,8 @@ pub struct ArchiveReader<'data> {
     archive: ZipSliceArchive<&'data [u8]>,
     /// Pre-built index for fast file lookup by name
     index: HashMap<String, EntryInfo>,
+    /// Physical member order, retained for order-sensitive package formats.
+    order: Vec<String>,
 }
 
 /// Information about an archive entry for fast lookup
@@ -80,6 +82,7 @@ impl<'data> ArchiveReader<'data> {
 
         // Build index for fast lookup
         let mut index = HashMap::new();
+        let mut ordered_names = Vec::new();
         for entry_result in archive.entries() {
             let entry = entry_result?;
             let path = entry.file_path();
@@ -97,6 +100,7 @@ impl<'data> ArchiveReader<'data> {
                 },
             };
 
+            ordered_names.push((entry.local_header_offset(), name.clone()));
             index.insert(
                 name,
                 EntryInfo {
@@ -107,7 +111,14 @@ impl<'data> ArchiveReader<'data> {
             );
         }
 
-        Ok(Self { archive, index })
+        ordered_names.sort_by_key(|(offset, _)| *offset);
+        let order = ordered_names.into_iter().map(|(_, name)| name).collect();
+
+        Ok(Self {
+            archive,
+            index,
+            order,
+        })
     }
 
     /// Get the number of files in the archive (excluding directories).
@@ -136,7 +147,7 @@ impl<'data> ArchiveReader<'data> {
 
     /// Get an iterator over all file names in the archive.
     pub fn file_names(&self) -> impl Iterator<Item = &str> {
-        self.index.keys().map(|s| s.as_str())
+        self.order.iter().map(String::as_str)
     }
 
     /// Read and decompress a file from the archive.

@@ -132,12 +132,15 @@ pub mod archive;
 pub mod bundle;
 pub mod media;
 pub mod object_index;
+pub mod package;
+mod package_metadata;
 pub mod protobuf;
 pub mod ref_graph;
 pub mod registry;
 pub mod snappy;
 pub mod structured;
 pub mod varint;
+pub(crate) mod wire;
 pub mod zip_utils;
 
 /// Shared text extraction utilities
@@ -152,14 +155,23 @@ pub mod numbers;
 pub mod pages;
 
 pub mod charts;
+/// Cross-application direct drawable comments.
+pub mod comments;
 /// Cross-application content extractors
 pub mod shapes;
 
 /// Re-export commonly used types
 pub use archive::{ArchiveInfo, MessageInfo};
 pub use bundle::{Bundle, BundleMetadata, PropertyValue};
+pub use comments::{
+    DrawableCommentInfo, DrawableCommentReplyInfo, IWorkComment, IWorkCommentUuid,
+    IWorkDrawableCommentEditor, IWorkDrawableInfo,
+};
 pub use document::Document;
-pub use media::{MediaAsset, MediaManager, MediaStats, MediaType};
+pub use media::{
+    EmbeddedMediaAsset, IWorkMediaEditor, MediaAsset, MediaManager, MediaStats, MediaType,
+};
+pub use package::IWorkPackage;
 pub use ref_graph::ReferenceGraph;
 pub use snappy::SnappyStream;
 pub use structured::{CellValue, Section, Slide, StructuredData, Table};

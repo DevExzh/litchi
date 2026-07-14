@@ -14,8 +14,10 @@ once_cell     = { workspace = true }
 phf           = { workspace = true }
 plist         = { workspace = true }
 prost         = { workspace = true }
+sha1          = { workspace = true }
 snap          = { workspace = true }
 soapberry-zip = { workspace = true }
+tempfile      = { workspace = true }
 thiserror     = { workspace = true }
 
 [build-dependencies]

@@ -33,8 +33,10 @@ pub fn decode_varint<R: Read>(reader: &mut R) -> io::Result<u64> {
         reader.read_exact(&mut buf)?;
         let byte = buf[0];
 
-        // Check for overflow
-        if shift >= 64 {
+        // A u64 varint is at most ten bytes and its tenth byte can only
+        // contribute bit 63. Reject overlong encodings instead of silently
+        // truncating their high bits.
+        if shift >= 64 || (shift == 63 && byte > 1) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "Variable-length integer overflow",
@@ -60,8 +62,7 @@ pub fn decode_varint_from_bytes(data: &[u8]) -> Result<(u64, usize), &'static st
     let mut consumed = 0;
 
     for &byte in data {
-        // Check for overflow
-        if shift >= 64 {
+        if shift >= 64 || (shift == 63 && byte > 1) {
             return Err("Variable-length integer overflow");
         }
 
@@ -69,13 +70,13 @@ pub fn decode_varint_from_bytes(data: &[u8]) -> Result<(u64, usize), &'static st
         consumed += 1;
 
         if (byte & 0x80) == 0 {
-            break;
+            return Ok((value, consumed));
         }
 
         shift += 7;
     }
 
-    Ok((value, consumed))
+    Err("Truncated variable-length integer")
 }
 
 /// Encode a signed integer using zigzag encoding (as used in Protocol Buffers)
@@ -147,5 +148,25 @@ mod tests {
             let decoded = (unsigned >> 1) as i64 ^ -((unsigned & 1) as i64);
             assert_eq!(decoded, value, "Decoding failed for value {}", value);
         }
+    }
+
+    #[test]
+    fn rejects_truncated_and_overflowing_varints() {
+        assert_eq!(
+            decode_varint_from_bytes(&[]),
+            Err("Truncated variable-length integer")
+        );
+        assert_eq!(
+            decode_varint_from_bytes(&[0x80]),
+            Err("Truncated variable-length integer")
+        );
+        assert_eq!(
+            decode_varint_from_bytes(&[0xff; 10]),
+            Err("Variable-length integer overflow")
+        );
+        assert_eq!(
+            decode_varint_from_bytes(&[0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 1]),
+            Ok((u64::MAX, 10))
+        );
     }
 }

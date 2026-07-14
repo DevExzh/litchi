@@ -18,7 +18,7 @@ use std::path::Path;
 use crate::bundle::Bundle;
 use crate::media::{MediaManager, MediaStats};
 use crate::object_index::{ObjectIndex, ResolvedObject};
-use crate::registry::{Application, detect_application};
+use crate::registry::{Application, detect_application, detect_application_from_document};
 use crate::structured::{self, StructuredData};
 use crate::text::TextExtractor;
 use crate::{Error, Result};
@@ -52,7 +52,9 @@ impl Document {
             .map(|msg| msg.type_)
             .collect();
 
-        let application = detect_application(&all_message_types).unwrap_or(Application::Common);
+        let application = detect_bundle_application(&bundle)
+            .or_else(|| detect_application(&all_message_types))
+            .unwrap_or(Application::Common);
 
         // Try to create media manager (may fail for single-file bundles)
         let media_manager = MediaManager::new(path_ref).ok();
@@ -85,6 +87,7 @@ impl Document {
     /// ```
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let bundle = Bundle::from_bytes(bytes)?;
+        let media_manager = MediaManager::from_bytes(bytes).ok();
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
         // Detect application type from message types
@@ -96,13 +99,15 @@ impl Document {
             .map(|msg| msg.type_)
             .collect();
 
-        let application = detect_application(&all_message_types).unwrap_or(Application::Common);
+        let application = detect_bundle_application(&bundle)
+            .or_else(|| detect_application(&all_message_types))
+            .unwrap_or(Application::Common);
 
         Ok(Document {
             bundle,
             object_index,
             application,
-            media_manager: None, // No media access from bytes
+            media_manager,
         })
     }
 
@@ -199,6 +204,17 @@ impl Document {
             media_stats,
         }
     }
+}
+
+fn detect_bundle_application(bundle: &Bundle) -> Option<Application> {
+    bundle
+        .archives()
+        .iter()
+        .filter(|(name, _)| name.ends_with("/Document.iwa") || name.as_str() == "Document.iwa")
+        .flat_map(|(_, archive)| &archive.objects)
+        .filter(|object| object.archive_info.identifier == Some(1))
+        .flat_map(|object| &object.messages)
+        .find_map(|message| detect_application_from_document(&message.data))
 }
 
 /// Statistics about a document

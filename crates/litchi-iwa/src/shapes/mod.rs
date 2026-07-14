@@ -7,6 +7,12 @@
 //! purely visual elements. This module helps extract meaningful content
 //! from these elements.
 
+mod geometry;
+mod properties;
 pub mod text_extractor;
 
+pub use geometry::{DrawableGeometry, DrawablePoint, DrawableSize};
+pub(crate) use geometry::{set_shape_geometry, shape_geometry};
+pub use properties::DrawableProperties;
+pub(crate) use properties::{set_shape_properties, shape_properties};
 pub use text_extractor::ShapeTextExtractor;

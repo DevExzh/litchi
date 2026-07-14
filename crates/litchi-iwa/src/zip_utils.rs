@@ -41,6 +41,39 @@ use crate::{Error, Result};
 pub fn parse_iwa_files_from_archive(
     archive: &ArchiveReader<'_>,
 ) -> Result<HashMap<String, Archive>> {
+    if is_encrypted_iwork_archive(archive) {
+        return Err(Error::InvalidFormat(
+            "password-protected iWork documents are not supported".to_owned(),
+        ));
+    }
+
+    if archive.file_names().any(|name| name.ends_with(".iwa")) {
+        return parse_direct_iwa_files(archive);
+    }
+
+    let Some(index_name) = nested_index_zip_name(archive)? else {
+        return Ok(HashMap::new());
+    };
+    let index_data = archive.read(&index_name).map_err(|error| {
+        Error::Bundle(format!(
+            "Failed to read legacy package index {index_name}: {error}"
+        ))
+    })?;
+    let index = ArchiveReader::new(&index_data).map_err(|error| {
+        Error::Bundle(format!(
+            "Failed to open legacy package index {index_name}: {error}"
+        ))
+    })?;
+    let archives = parse_direct_iwa_files(&index)?;
+    if archives.is_empty() {
+        return Err(Error::InvalidFormat(format!(
+            "legacy package index {index_name} contains no IWA components"
+        )));
+    }
+    Ok(archives)
+}
+
+fn parse_direct_iwa_files(archive: &ArchiveReader<'_>) -> Result<HashMap<String, Archive>> {
     let mut archives = HashMap::new();
 
     for name in archive.file_names() {
@@ -48,6 +81,17 @@ pub fn parse_iwa_files_from_archive(
             let compressed_data = archive
                 .read(name)
                 .map_err(|e| Error::Bundle(format!("Failed to read zip entry: {}", e)))?;
+
+            // OperationStorage is a separate persistence format despite its
+            // `.iwa` suffix in some legacy documents (its stream starts with
+            // the `bvxn` magic rather than an IWA Snappy frame). It remains a
+            // raw package member for round-trip preservation, but is not part
+            // of the IWA object graph.
+            if name.rsplit('/').next() == Some("OperationStorage.iwa")
+                && compressed_data.starts_with(b"bvxn")
+            {
+                continue;
+            }
 
             // Decompress IWA file
             let mut cursor = Cursor::new(&compressed_data);
@@ -60,6 +104,27 @@ pub fn parse_iwa_files_from_archive(
     }
 
     Ok(archives)
+}
+
+pub(crate) fn is_encrypted_iwork_archive(archive: &ArchiveReader<'_>) -> bool {
+    archive
+        .file_names()
+        .any(|name| matches!(name.rsplit('/').next(), Some(".iwpv2") | Some(".iwph")))
+}
+
+pub(crate) fn nested_index_zip_name(archive: &ArchiveReader<'_>) -> Result<Option<String>> {
+    let mut candidates = archive
+        .file_names()
+        .filter(|name| name.rsplit('/').next() == Some("Index.zip"))
+        .map(str::to_owned);
+    let first = candidates.next();
+    if let Some(second) = candidates.next() {
+        return Err(Error::InvalidFormat(format!(
+            "iWork package contains ambiguous nested indexes: {} and {second}",
+            first.as_deref().unwrap_or("Index.zip")
+        )));
+    }
+    Ok(first)
 }
 
 /// Extract message types from all IWA files in a ZIP archive.
@@ -90,27 +155,10 @@ pub fn parse_iwa_files_from_archive(
 pub fn extract_message_types_from_archive(archive: &ArchiveReader<'_>) -> Result<Vec<u32>> {
     let mut all_message_types = Vec::new();
 
-    for name in archive.file_names() {
-        if name.ends_with(".iwa") {
-            let Ok(compressed_data) = archive.read(name) else {
-                continue; // Skip files we can't read
-            };
-
-            // Try to decompress and parse the IWA file
-            let mut cursor = Cursor::new(&compressed_data);
-            let Ok(decompressed) = SnappyStream::decompress(&mut cursor) else {
-                continue; // Skip files we can't decompress
-            };
-
-            let Ok(iwa_archive) = Archive::parse(decompressed.data()) else {
-                continue; // Skip files we can't parse
-            };
-
-            // Extract message types from all objects in this archive
-            for object in &iwa_archive.objects {
-                for message in &object.messages {
-                    all_message_types.push(message.type_);
-                }
+    for iwa_archive in parse_iwa_files_from_archive(archive)?.values() {
+        for object in &iwa_archive.objects {
+            for message in &object.messages {
+                all_message_types.push(message.type_);
             }
         }
     }
@@ -194,6 +242,8 @@ impl FileStructureInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::archive::{ArchiveObject, RawMessage};
+    use soapberry_zip::office::StreamingArchiveWriter;
 
     #[test]
     fn test_file_structure_detection() {
@@ -229,5 +279,68 @@ mod tests {
         assert!(!pages_info.is_likely_keynote());
         assert!(!pages_info.is_likely_numbers());
         assert!(pages_info.is_likely_pages());
+    }
+
+    #[test]
+    fn parses_iwa_from_legacy_nested_index() {
+        let iwa = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 6000,
+                        data: vec![1, 2, 3],
+                    }],
+                )
+                .unwrap(),
+            ],
+        };
+        let compressed = SnappyStream::compress(&iwa.to_bytes().unwrap()).unwrap();
+        let mut index = StreamingArchiveWriter::new();
+        index
+            .write_stored("Index/Document.iwa", &compressed)
+            .unwrap();
+        let index = index.finish_to_bytes().unwrap();
+        let mut outer = StreamingArchiveWriter::new();
+        outer
+            .write_stored("legacy.pages/Index.zip", &index)
+            .unwrap();
+        let outer = outer.finish_to_bytes().unwrap();
+
+        let zip = ArchiveReader::new(&outer).unwrap();
+        let archives = parse_iwa_files_from_archive(&zip).unwrap();
+        assert_eq!(
+            archives["Index/Document.iwa"].objects[0].messages[0].type_,
+            6000
+        );
+        assert_eq!(extract_message_types_from_archive(&zip).unwrap(), [6000]);
+    }
+
+    #[test]
+    fn reports_encrypted_packages_explicitly() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored(".iwpv2", b"encryption metadata")
+            .unwrap();
+        writer
+            .write_stored("Index/Document.iwa", b"ciphertext")
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let zip = ArchiveReader::new(&bytes).unwrap();
+
+        let error = parse_iwa_files_from_archive(&zip).unwrap_err();
+        assert!(error.to_string().contains("password-protected"));
+    }
+
+    #[test]
+    fn skips_legacy_operation_storage_that_is_not_an_iwa_stream() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored("Index/OperationStorage.iwa", b"bvxn payload")
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let zip = ArchiveReader::new(&bytes).unwrap();
+
+        assert!(parse_iwa_files_from_archive(&zip).unwrap().is_empty());
     }
 }
