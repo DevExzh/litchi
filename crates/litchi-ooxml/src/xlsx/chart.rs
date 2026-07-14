@@ -19,6 +19,11 @@ use crate::charts::{
     },
 };
 use crate::error::{OoxmlError, Result};
+use quick_xml::XmlVersion;
+use quick_xml::events::Event;
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
+use std::collections::HashSet;
 
 /// Storage target for a chart's external-data relationship.
 #[derive(Debug, Clone)]
@@ -46,6 +51,55 @@ pub struct ChartExternalDataPart {
     pub relationship_type: String,
     /// Embedded or linked relationship target
     pub target: ChartExternalDataTarget,
+}
+
+/// Target of a relationship owned by a chart user-shapes drawing.
+#[derive(Debug, Clone)]
+pub enum ChartUserShapesRelationshipTarget {
+    /// A directly related part embedded in the containing package
+    Embedded {
+        /// Complete target-part bytes
+        data: Vec<u8>,
+        /// OPC content type for the target part
+        content_type: String,
+        /// Filename extension without a leading dot
+        extension: String,
+    },
+    /// An external relationship target
+    External {
+        /// External target URI
+        target: String,
+    },
+}
+
+/// One relationship owned by a chart user-shapes drawing part.
+#[derive(Debug, Clone)]
+pub struct ChartUserShapesRelationship {
+    /// Relationship identifier referenced by the drawing XML
+    pub relationship_id: String,
+    /// Relationship type URI
+    pub relationship_type: String,
+    /// Internal payload or external target
+    pub target: ChartUserShapesRelationshipTarget,
+}
+
+/// Lossless chart user-shapes XML and its direct relationship targets.
+#[derive(Debug, Clone)]
+pub struct ChartUserShapesPart {
+    /// Complete chart user-shapes XML document
+    pub xml: Vec<u8>,
+    /// Relationships owned by the chart user-shapes part
+    pub relationships: Vec<ChartUserShapesRelationship>,
+}
+
+impl ChartUserShapesPart {
+    /// Create a relationship-free user-shapes drawing part.
+    pub fn new(xml: Vec<u8>) -> Self {
+        Self {
+            xml,
+            relationships: Vec::new(),
+        }
+    }
 }
 
 impl ChartExternalDataPart {
@@ -88,6 +142,14 @@ pub(crate) fn chart_external_data_content_type(relationship_type: &str) -> Optio
         },
         _ => None,
     }
+}
+
+pub(crate) fn is_chart_user_shapes_relationship_type(relationship_type: &str) -> bool {
+    matches!(
+        relationship_type,
+        litchi_opc::constants::relationship_type::CHART_USER_SHAPES
+            | "http://purl.oclc.org/ooxml/officeDocument/relationships/chartUserShapes"
+    )
 }
 
 /// Chart anchor position in a worksheet.
@@ -184,6 +246,8 @@ pub struct WorksheetChart {
     pub anchor: ChartAnchor,
     /// Optional package payload targeted by `chart.external_data`
     pub external_data_part: Option<ChartExternalDataPart>,
+    /// Optional chart user-shapes drawing and its direct related resources
+    pub user_shapes_part: Option<ChartUserShapesPart>,
 }
 
 impl WorksheetChart {
@@ -193,6 +257,7 @@ impl WorksheetChart {
             chart,
             anchor,
             external_data_part: None,
+            user_shapes_part: None,
         }
     }
 
@@ -213,6 +278,13 @@ impl WorksheetChart {
         metadata.auto_update = auto_update;
         self.chart.external_data = Some(metadata);
         self.external_data_part = Some(part);
+        self
+    }
+
+    /// Attach a chart user-shapes drawing part.
+    pub fn with_user_shapes_part(mut self, part: ChartUserShapesPart) -> Self {
+        self.chart.user_shapes = Some(crate::charts::ChartUserShapes::pending());
+        self.user_shapes_part = Some(part);
         self
     }
 
@@ -585,10 +657,135 @@ pub fn generate_chart_xml(chart: &ChartModel) -> Result<Vec<u8>> {
 
 pub(crate) fn generate_chart_xml_with_external_data_id(
     chart: &ChartModel,
-    relationship_id: Option<&str>,
+    external_data_relationship_id: Option<&str>,
+    user_shapes_relationship_id: Option<&str>,
 ) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    crate::charts::writer::write_chart_with_external_data_id(&mut output, chart, relationship_id)
-        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+    crate::charts::writer::write_chart_with_relationship_ids(
+        &mut output,
+        chart,
+        external_data_relationship_id,
+        user_shapes_relationship_id,
+    )
+    .map_err(|e| OoxmlError::Xml(e.to_string()))?;
     Ok(output)
+}
+
+pub(crate) fn chart_user_shapes_relationship_ids(xml: &[u8]) -> Result<HashSet<String>> {
+    const RELATIONSHIPS_NAMESPACE: &[u8] =
+        b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const STRICT_RELATIONSHIPS_NAMESPACE: &[u8] =
+        b"http://purl.oclc.org/ooxml/officeDocument/relationships";
+
+    let mut reader = NsReader::from_reader(xml);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut saw_root = false;
+    let mut closed_root = false;
+    let mut relationship_ids = HashSet::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        match event {
+            Event::Start(ref element) | Event::Empty(ref element) => {
+                if depth == 0 {
+                    if saw_root
+                        || !crate::common::xml::is_drawingml_chart_name(
+                            &namespace,
+                            element.name(),
+                            b"userShapes",
+                        )
+                    {
+                        return Err(OoxmlError::InvalidFormat(
+                            "chart user-shapes XML must have one chart userShapes root".into(),
+                        ));
+                    }
+                    saw_root = true;
+                }
+                for attribute in element.attributes() {
+                    let attribute =
+                        attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    let (attribute_namespace, _) =
+                        reader.resolver().resolve_attribute(attribute.key);
+                    if matches!(
+                        attribute_namespace,
+                        ResolveResult::Bound(Namespace(value))
+                            if value == RELATIONSHIPS_NAMESPACE
+                                || value == STRICT_RELATIONSHIPS_NAMESPACE
+                    ) {
+                        relationship_ids.insert(
+                            attribute
+                                .decoded_and_normalized_value(
+                                    XmlVersion::Explicit1_0,
+                                    reader.decoder(),
+                                )
+                                .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                                .into_owned(),
+                        );
+                    }
+                }
+                if matches!(event, Event::Start(_)) {
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "chart user-shapes XML nesting is too deep".into(),
+                        )
+                    })?;
+                } else if depth == 0 {
+                    closed_root = true;
+                }
+            },
+            Event::End(ref element) => {
+                if depth == 0 {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart user-shapes XML has an unmatched closing element".into(),
+                    ));
+                }
+                depth -= 1;
+                if depth == 0 {
+                    if !crate::common::xml::is_drawingml_chart_name(
+                        &namespace,
+                        element.name(),
+                        b"userShapes",
+                    ) {
+                        return Err(OoxmlError::InvalidFormat(
+                            "chart user-shapes XML has an invalid root closing element".into(),
+                        ));
+                    }
+                    closed_root = true;
+                }
+            },
+            Event::Text(ref text)
+                if depth == 0
+                    && !text
+                        .decode()
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                        .trim()
+                        .is_empty() =>
+            {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart user-shapes XML contains text outside its root".into(),
+                ));
+            },
+            Event::CData(_) | Event::GeneralRef(_) if depth == 0 => {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart user-shapes XML contains data outside its root".into(),
+                ));
+            },
+            Event::DocType(_) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart user-shapes XML cannot contain a document type".into(),
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    if !saw_root || !closed_root || depth != 0 {
+        return Err(OoxmlError::InvalidFormat(
+            "chart user-shapes XML has no complete root".into(),
+        ));
+    }
+    Ok(relationship_ids)
 }

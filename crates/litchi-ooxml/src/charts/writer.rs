@@ -5,8 +5,8 @@
 use crate::charts::axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
 use crate::charts::chart::{
     Chart, ChartExternalData, ChartHeaderFooter, ChartPageMargins, ChartPageSetup,
-    ChartPrintSettings, ChartProtection, ColorMapOverride, ColorMapping, PivotFormat, PivotSource,
-    View3D, WallFloor,
+    ChartPrintSettings, ChartProtection, ChartUserShapes, ColorMapOverride, ColorMapping,
+    PivotFormat, PivotSource, View3D, WallFloor,
 };
 use crate::charts::legend::Legend;
 use crate::charts::models::{Layout, NumericData, StringData, TitleText};
@@ -83,13 +83,14 @@ impl SeriesFeatures {
 
 /// Write a chart to XML.
 pub fn write_chart<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<()> {
-    write_chart_with_external_data_id(writer, chart, None)
+    write_chart_with_relationship_ids(writer, chart, None, None)
 }
 
-pub(crate) fn write_chart_with_external_data_id<W: Write>(
+pub(crate) fn write_chart_with_relationship_ids<W: Write>(
     writer: &mut W,
     chart: &Chart,
     external_data_relationship_id: Option<&str>,
+    user_shapes_relationship_id: Option<&str>,
 ) -> std::io::Result<()> {
     write!(
         writer,
@@ -213,9 +214,33 @@ pub(crate) fn write_chart_with_external_data_id<W: Write>(
     if let Some(settings) = chart.print_settings.as_ref() {
         write_print_settings(writer, settings)?;
     }
+    if let Some(user_shapes) = chart.user_shapes.as_ref() {
+        write_user_shapes(writer, user_shapes, user_shapes_relationship_id)?;
+    } else if user_shapes_relationship_id.is_some() {
+        return Err(invalid_chart_input(
+            "chart package supplied user shapes without chart metadata",
+        ));
+    }
 
     write!(writer, "</c:chartSpace>")?;
 
+    Ok(())
+}
+
+fn write_user_shapes<W: Write>(
+    writer: &mut W,
+    user_shapes: &ChartUserShapes,
+    relationship_id_override: Option<&str>,
+) -> std::io::Result<()> {
+    let relationship_id = relationship_id_override
+        .or(user_shapes.relationship_id.as_deref())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| invalid_chart_input("chart user shapes have no relationship ID"))?;
+    write!(
+        writer,
+        r#"<c:userShapes r:id="{}"/>"#,
+        escape_xml(relationship_id)
+    )?;
     Ok(())
 }
 

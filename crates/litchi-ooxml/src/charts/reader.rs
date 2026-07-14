@@ -9,8 +9,8 @@ use crate::charts::axis::{
 };
 use crate::charts::chart::{
     Chart, ChartExternalData, ChartHeaderFooter, ChartPageMargins, ChartPageOrientation,
-    ChartPageSetup, ChartPrintSettings, ChartProtection, ColorMapOverride, ColorMapping,
-    ColorSchemeIndex, PivotFormat, PivotSource, View3D, WallFloor,
+    ChartPageSetup, ChartPrintSettings, ChartProtection, ChartUserShapes, ColorMapOverride,
+    ColorMapping, ColorSchemeIndex, PivotFormat, PivotSource, View3D, WallFloor,
 };
 use crate::charts::legend::{Legend, LegendEntry};
 use crate::charts::models::{
@@ -391,6 +391,33 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
                     ));
                 }
                 chart.external_data = Some(ChartExternalData::new(required_chart_relationship_id(
+                    &xml_reader,
+                    e,
+                )?));
+            },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"userShapes" => {
+                if chart.user_shapes.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate user-shapes relationships".into(),
+                    ));
+                }
+                chart.user_shapes = Some(ChartUserShapes::new(required_chart_relationship_id(
+                    &xml_reader,
+                    e,
+                )?));
+                consume_empty_chart_element(
+                    &mut xml_reader,
+                    b"userShapes",
+                    "chart user-shapes relationship",
+                )?;
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"userShapes" => {
+                if chart.user_shapes.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate user-shapes relationships".into(),
+                    ));
+                }
+                chart.user_shapes = Some(ChartUserShapes::new(required_chart_relationship_id(
                     &xml_reader,
                     e,
                 )?));
@@ -4954,6 +4981,42 @@ mod tests {
         let mut pending = Chart::new();
         pending.external_data = Some(ChartExternalData::pending());
         assert!(crate::charts::writer::write_chart(&mut Vec::new(), &pending).is_err());
+    }
+
+    #[test]
+    fn round_trips_and_validates_chart_user_shapes_relationships() {
+        let xml = br#"<c:chartSpace
+                xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+                xmlns:q="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+            <c:chart><c:plotArea/></c:chart><c:userShapes q:id="shapeRel"/>
+        </c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        assert_eq!(
+            chart
+                .user_shapes
+                .as_ref()
+                .unwrap()
+                .relationship_id
+                .as_deref(),
+            Some("shapeRel")
+        );
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        assert_eq!(
+            parse_chart(output.as_slice()).unwrap().user_shapes,
+            chart.user_shapes
+        );
+
+        for invalid in [
+            br#"<c:userShapes/>"#.as_slice(),
+            br#"<c:userShapes r:id="one"><c:autoUpdate/></c:userShapes>"#.as_slice(),
+            br#"<c:userShapes r:id="one"/><c:userShapes r:id="two"/>"#.as_slice(),
+        ] {
+            let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:chart></c:chart>"#.to_vec();
+            document.extend_from_slice(invalid);
+            document.extend_from_slice(b"</c:chartSpace>");
+            assert!(parse_chart(document.as_slice()).is_err());
+        }
     }
 
     #[test]

@@ -341,6 +341,29 @@ pub struct ChartExternalData {
     pub auto_update: Option<bool>,
 }
 
+/// Relationship metadata for a chart user-shapes drawing part.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChartUserShapes {
+    /// Relationship identifier in the chart part, if already allocated
+    pub relationship_id: Option<String>,
+}
+
+impl ChartUserShapes {
+    /// Create user-shapes metadata for an existing chart relationship.
+    pub fn new(relationship_id: impl Into<String>) -> Self {
+        Self {
+            relationship_id: Some(relationship_id.into()),
+        }
+    }
+
+    /// Create metadata whose relationship will be allocated by a package writer.
+    pub fn pending() -> Self {
+        Self {
+            relationship_id: None,
+        }
+    }
+}
+
 impl ChartExternalData {
     /// Create external-data metadata for an existing chart relationship.
     pub fn new(relationship_id: impl Into<String>) -> Self {
@@ -501,6 +524,8 @@ pub struct Chart {
     pub rounded_corners: bool,
     /// Optional external or embedded chart data relationship metadata
     pub external_data: Option<ChartExternalData>,
+    /// Optional chart user-shapes drawing relationship metadata
+    pub user_shapes: Option<ChartUserShapes>,
     /// Optional chart printing configuration
     pub print_settings: Option<ChartPrintSettings>,
 }
@@ -532,6 +557,7 @@ impl Chart {
             date_1904: false,
             rounded_corners: false,
             external_data: None,
+            user_shapes: None,
             print_settings: None,
         }
     }

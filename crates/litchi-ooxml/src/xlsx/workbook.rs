@@ -1280,6 +1280,13 @@ impl Workbook {
                         )
                         .into());
                     }
+                    if chart.chart.user_shapes.is_some() != chart.user_shapes_part.is_some() {
+                        return Err(format!(
+                            "Worksheet chart {} user-shapes metadata and package payload disagree",
+                            idx + 1
+                        )
+                        .into());
+                    }
 
                     let mut chart_part =
                         BlobPart::new(chart_uri.clone(), ct::DML_CHART.to_string(), Vec::new());
@@ -1353,14 +1360,133 @@ impl Workbook {
                         None
                     };
 
+                    let mut user_shapes_part_to_add = None;
+                    let mut user_shape_resources = Vec::new();
+                    let user_shapes_relationship_id = if let Some(user_shapes) =
+                        chart.user_shapes_part.as_ref()
+                    {
+                        let referenced_ids =
+                            crate::xlsx::chart::chart_user_shapes_relationship_ids(
+                                &user_shapes.xml,
+                            )?;
+                        let declared_ids: std::collections::HashSet<&str> = user_shapes
+                            .relationships
+                            .iter()
+                            .map(|relationship| relationship.relationship_id.as_str())
+                            .collect();
+                        if declared_ids.len() != user_shapes.relationships.len()
+                            || referenced_ids.len() != declared_ids.len()
+                            || !referenced_ids
+                                .iter()
+                                .all(|id| declared_ids.contains(id.as_str()))
+                        {
+                            return Err(format!(
+                                "Worksheet chart {} user-shapes relationship declarations do not match its XML",
+                                idx + 1
+                            )
+                            .into());
+                        }
+
+                        let user_shapes_name =
+                            format!("chartDrawing{}_{}.xml", ws.sheet_id(), idx + 1);
+                        let user_shapes_uri =
+                            PackURI::new(format!("/xl/drawings/{user_shapes_name}"))?;
+                        let mut part = BlobPart::new(
+                            user_shapes_uri,
+                            ct::DML_CHARTSHAPES.to_string(),
+                            user_shapes.xml.clone(),
+                        );
+                        for (relationship_index, relationship) in
+                            user_shapes.relationships.iter().enumerate()
+                        {
+                            if relationship.relationship_id.is_empty()
+                                || relationship.relationship_type.is_empty()
+                            {
+                                return Err(format!(
+                                    "Worksheet chart {} has invalid user-shapes relationship metadata",
+                                    idx + 1
+                                )
+                                .into());
+                            }
+                            let (target, external) = match &relationship.target {
+                                crate::xlsx::ChartUserShapesRelationshipTarget::Embedded {
+                                    data,
+                                    content_type,
+                                    extension,
+                                } => {
+                                    if content_type.is_empty()
+                                        || extension.is_empty()
+                                        || !extension
+                                            .bytes()
+                                            .all(|byte| byte.is_ascii_alphanumeric())
+                                    {
+                                        return Err(format!(
+                                            "Worksheet chart {} has invalid embedded user-shapes resource",
+                                            idx + 1
+                                        )
+                                        .into());
+                                    }
+                                    let resource_name = format!(
+                                        "chartShape{}_{}_{}.{}",
+                                        ws.sheet_id(),
+                                        idx + 1,
+                                        relationship_index + 1,
+                                        extension.to_ascii_lowercase()
+                                    );
+                                    let resource_uri =
+                                        PackURI::new(format!("/xl/media/{resource_name}"))?;
+                                    user_shape_resources.push(BlobPart::new(
+                                        resource_uri,
+                                        content_type.clone(),
+                                        data.clone(),
+                                    ));
+                                    (format!("../media/{resource_name}"), false)
+                                },
+                                crate::xlsx::ChartUserShapesRelationshipTarget::External {
+                                    target,
+                                } => {
+                                    if target.is_empty() {
+                                        return Err(format!(
+                                            "Worksheet chart {} has an empty external user-shapes target",
+                                            idx + 1
+                                        )
+                                        .into());
+                                    }
+                                    (target.clone(), true)
+                                },
+                            };
+                            part.rels_mut().add_relationship(
+                                relationship.relationship_type.clone(),
+                                target,
+                                relationship.relationship_id.clone(),
+                                external,
+                            );
+                        }
+                        let relationship_id = chart_part.relate_to(
+                            &format!("../drawings/{user_shapes_name}"),
+                            rt::CHART_USER_SHAPES,
+                        );
+                        user_shapes_part_to_add = Some(part);
+                        Some(relationship_id)
+                    } else {
+                        None
+                    };
+
                     let chart_xml = crate::xlsx::chart::generate_chart_xml_with_external_data_id(
                         &chart.chart,
                         external_data_relationship_id.as_deref(),
+                        user_shapes_relationship_id.as_deref(),
                     )
                     .map_err(|e| format!("Failed to generate chart XML: {e}"))?;
                     chart_part.set_blob(chart_xml);
                     if let Some(external_part) = embedded_external_part {
                         self.package.add_part(Box::new(external_part));
+                    }
+                    for resource in user_shape_resources {
+                        self.package.add_part(Box::new(resource));
+                    }
+                    if let Some(user_shapes_part) = user_shapes_part_to_add {
+                        self.package.add_part(Box::new(user_shapes_part));
                     }
                     self.package.add_part(Box::new(chart_part));
 
@@ -2040,8 +2166,9 @@ mod tests {
     use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 
     use crate::xlsx::{
-        ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, Mention, Person, PersonList,
-        Table, TableColumn, ThreadedComment, WorksheetChart,
+        ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart,
+        ChartUserShapesRelationship, ChartUserShapesRelationshipTarget, Mention, Person,
+        PersonList, Table, TableColumn, ThreadedComment, WorksheetChart,
     };
 
     const WORKBOOK_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -2089,7 +2216,19 @@ mod tests {
             .with_external_data_part(
                 ChartExternalDataPart::embedded_workbook(b"PK chart workbook".to_vec()),
                 Some(false),
-            ),
+            )
+            .with_user_shapes_part(ChartUserShapesPart {
+                xml: br#"<c:userShapes xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:cdr="http://schemas.openxmlformats.org/drawingml/2006/chartDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><cdr:relSizeAnchor><cdr:from><cdr:x>0</cdr:x><cdr:y>0</cdr:y></cdr:from><cdr:to><cdr:x>1</cdr:x><cdr:y>1</cdr:y></cdr:to><cdr:pic><a:blip r:embed="rId5"/></cdr:pic></cdr:relSizeAnchor></c:userShapes>"#.to_vec(),
+                relationships: vec![ChartUserShapesRelationship {
+                    relationship_id: "rId5".to_string(),
+                    relationship_type: rt::IMAGE.to_string(),
+                    target: ChartUserShapesRelationshipTarget::Embedded {
+                        data: b"shape image".to_vec(),
+                        content_type: ct::PNG.to_string(),
+                        extension: "png".to_string(),
+                    },
+                }],
+            }),
         );
 
         workbook.save(&path).unwrap();
@@ -2133,6 +2272,21 @@ mod tests {
         let chart_xml = std::str::from_utf8(chart_part.blob()).unwrap();
         assert!(chart_xml.contains(r#"<c:externalData r:id="rId1">"#));
         assert!(chart_xml.contains(r#"<c:autoUpdate val="0"/>"#));
+        let user_shapes_relationship = chart_part.rels().get("rId2").unwrap();
+        assert_eq!(user_shapes_relationship.reltype(), rt::CHART_USER_SHAPES);
+        let user_shapes_part = package
+            .get_part(&user_shapes_relationship.target_partname().unwrap())
+            .unwrap();
+        assert_eq!(user_shapes_part.content_type(), ct::DML_CHARTSHAPES);
+        let shape_image_relationship = user_shapes_part.rels().get("rId5").unwrap();
+        assert_eq!(shape_image_relationship.reltype(), rt::IMAGE);
+        assert_eq!(
+            package
+                .get_part(&shape_image_relationship.target_partname().unwrap())
+                .unwrap()
+                .blob(),
+            b"shape image"
+        );
 
         let reopened = Workbook::open(&path).unwrap();
         let worksheet = reopened.get_worksheet(0).unwrap();
@@ -2174,6 +2328,15 @@ mod tests {
         assert_eq!(data, b"PK chart workbook");
         assert_eq!(content_type, ct::OFC_PACKAGE);
         assert_eq!(extension, "xlsx");
+        let user_shapes = worksheet.charts()[0].user_shapes_part.as_ref().unwrap();
+        assert_eq!(user_shapes.relationships.len(), 1);
+        assert_eq!(user_shapes.relationships[0].relationship_id, "rId5");
+        let ChartUserShapesRelationshipTarget::Embedded { data, .. } =
+            &user_shapes.relationships[0].target
+        else {
+            panic!("expected embedded chart user-shape resource");
+        };
+        assert_eq!(data, b"shape image");
         let TypeGroup::Bar(group) = &worksheet.charts()[0].chart.plot_area.type_groups[0] else {
             panic!("expected reopened bar chart");
         };

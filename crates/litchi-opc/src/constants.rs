@@ -286,6 +286,8 @@ pub mod relationship_type {
     // Chart and drawing
     pub const CHART: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart";
+    pub const CHART_USER_SHAPES: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes";
     /// ISO/IEC 29500 Strict chart relationship type.
     pub const STRICT_CHART: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/chart";
     pub const DRAWING: &str =

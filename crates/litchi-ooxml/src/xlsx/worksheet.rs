@@ -25,10 +25,11 @@ use super::table::{Table, parse_table_xml};
 use super::views::SheetView;
 use super::writer::sheet::Image;
 use super::{
-    ChartExternalDataPart, ChartExternalDataTarget, WorksheetChart,
+    ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart,
+    ChartUserShapesRelationship, ChartUserShapesRelationshipTarget, WorksheetChart,
     chart::{
         chart_external_data_content_type, is_chart_external_data_relationship_type,
-        parse_chart_from_xml,
+        is_chart_user_shapes_relationship_type, parse_chart_from_xml,
     },
 };
 
@@ -524,6 +525,83 @@ impl<'a> Worksheet<'a> {
                 worksheet_chart.external_data_part = Some(ChartExternalDataPart {
                     relationship_type: relationship.reltype().to_string(),
                     target,
+                });
+            }
+            if let Some(user_shapes) = worksheet_chart.chart.user_shapes.as_ref() {
+                let relationship_id = user_shapes.relationship_id.as_deref().ok_or_else(|| {
+                    "Parsed chart user shapes have no relationship ID".to_string()
+                })?;
+                let relationship = chart_part.rels().get(relationship_id).ok_or_else(|| {
+                    format!("Chart user shapes reference missing relationship '{relationship_id}'")
+                })?;
+                if !is_chart_user_shapes_relationship_type(relationship.reltype()) {
+                    return Err(format!(
+                        "Chart user-shapes relationship '{relationship_id}' has invalid type '{}'",
+                        relationship.reltype()
+                    )
+                    .into());
+                }
+                if relationship.is_external() {
+                    return Err("Chart user-shapes relationship cannot be external".into());
+                }
+                let user_shapes_uri = relationship.target_partname()?;
+                let user_shapes_part = self.workbook.package().get_part(&user_shapes_uri)?;
+                if user_shapes_part.content_type() != ct::DML_CHARTSHAPES {
+                    return Err(format!(
+                        "Chart user-shapes part '{user_shapes_uri}' has content type '{}', expected '{}'",
+                        user_shapes_part.content_type(),
+                        ct::DML_CHARTSHAPES
+                    )
+                    .into());
+                }
+                let referenced_ids = crate::xlsx::chart::chart_user_shapes_relationship_ids(
+                    user_shapes_part.blob(),
+                )?;
+                if referenced_ids.len() != user_shapes_part.rels().iter().count()
+                    || !referenced_ids
+                        .iter()
+                        .all(|id| user_shapes_part.rels().get(id).is_some())
+                {
+                    return Err(format!(
+                        "Chart user-shapes part '{user_shapes_uri}' has inconsistent relationships"
+                    )
+                    .into());
+                }
+                let mut relationships = Vec::with_capacity(referenced_ids.len());
+                for referenced_id in referenced_ids {
+                    let related = user_shapes_part.rels().get(&referenced_id).ok_or_else(|| {
+                        format!(
+                            "Chart user shapes reference missing relationship '{referenced_id}'"
+                        )
+                    })?;
+                    let target = if related.is_external() {
+                        ChartUserShapesRelationshipTarget::External {
+                            target: related.target_ref().to_string(),
+                        }
+                    } else {
+                        let target_uri = related.target_partname()?;
+                        let target_part = self.workbook.package().get_part(&target_uri)?;
+                        if target_part.rels().iter().next().is_some() {
+                            return Err(format!(
+                                "Chart user-shapes resource '{target_uri}' has nested relationships"
+                            )
+                            .into());
+                        }
+                        ChartUserShapesRelationshipTarget::Embedded {
+                            data: target_part.blob().to_vec(),
+                            content_type: target_part.content_type().to_string(),
+                            extension: target_uri.ext().to_string(),
+                        }
+                    };
+                    relationships.push(ChartUserShapesRelationship {
+                        relationship_id: referenced_id,
+                        relationship_type: related.reltype().to_string(),
+                        target,
+                    });
+                }
+                worksheet_chart.user_shapes_part = Some(ChartUserShapesPart {
+                    xml: user_shapes_part.blob().to_vec(),
+                    relationships,
                 });
             }
             charts.push(worksheet_chart);
