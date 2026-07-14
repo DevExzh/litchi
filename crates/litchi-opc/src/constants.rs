@@ -103,6 +103,8 @@ pub mod content_type {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml";
     pub const SML_PIVOT_TABLE: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml";
+    pub const SML_TABLE: &str =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml";
     pub const SML_COMMENTS: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml";
     pub const SML_THREADED_COMMENTS: &str = "application/vnd.ms-excel.threadedcomments+xml";
@@ -254,6 +256,10 @@ pub mod relationship_type {
     /// ISO/IEC 29500 Strict pivot-table relationship type.
     pub const STRICT_PIVOT_TABLE: &str =
         "http://purl.oclc.org/ooxml/officeDocument/relationships/pivotTable";
+    pub const TABLE: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/table";
+    /// ISO/IEC 29500 Strict table relationship type.
+    pub const STRICT_TABLE: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/table";
     pub const THREADED_COMMENTS: &str =
         "http://schemas.microsoft.com/office/2017/10/relationships/threadedComment";
     pub const PERSONS: &str = "http://schemas.microsoft.com/office/2017/10/relationships/person";

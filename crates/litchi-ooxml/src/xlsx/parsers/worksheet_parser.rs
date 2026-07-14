@@ -45,6 +45,7 @@ pub(crate) struct ParsedWorksheetData {
     pub(crate) auto_filter: Option<AutoFilter>,
     pub(crate) sheet_views: Vec<SheetView>,
     pub(crate) dimensions: Option<(u32, u32, u32, u32)>,
+    pub(crate) table_relationship_ids: Vec<String>,
 }
 
 pub(crate) struct ParsedHyperlink {
@@ -70,6 +71,7 @@ enum Context {
     AutoFilter,
     SortState,
     MergeCells,
+    TableParts,
     SheetData,
     Row,
     Cell,
@@ -188,6 +190,9 @@ struct Parser {
     seen_auto_filter: bool,
     seen_merge_cells: bool,
     expected_merge_count: Option<usize>,
+    seen_table_parts: bool,
+    expected_table_part_count: Option<u32>,
+    table_relationship_ids: HashSet<String>,
     min_row: u32,
     min_column: u32,
     max_row: u32,
@@ -222,6 +227,9 @@ impl Parser {
             seen_auto_filter: false,
             seen_merge_cells: false,
             expected_merge_count: None,
+            seen_table_parts: false,
+            expected_table_part_count: None,
+            table_relationship_ids: HashSet::new(),
             min_row: u32::MAX,
             min_column: u32::MAX,
             max_row: 0,
@@ -355,6 +363,18 @@ impl Parser {
             && is_spreadsheetml_name(namespace, element.name(), b"selection")
         {
             self.sheet_selection(element, decoder)?;
+            return Ok(Context::Other);
+        }
+        if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"tableParts")
+        {
+            self.start_table_parts(element, decoder)?;
+            return Ok(Context::TableParts);
+        }
+        if parent == Context::TableParts
+            && is_spreadsheetml_name(namespace, element.name(), b"tablePart")
+        {
+            self.table_part(element, decoder, resolver)?;
             return Ok(Context::Other);
         }
         if parent == Context::Worksheet
@@ -545,6 +565,15 @@ impl Parser {
         {
             self.sheet_selection(element, decoder)?;
         } else if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"tableParts")
+        {
+            self.start_table_parts(element, decoder)?;
+            self.finish_table_parts()?;
+        } else if parent == Context::TableParts
+            && is_spreadsheetml_name(namespace, element.name(), b"tablePart")
+        {
+            self.table_part(element, decoder, resolver)?;
+        } else if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"sheetData")
         {
             self.sheet_data()?;
@@ -675,6 +704,54 @@ impl Parser {
             return Err(invalid("duplicate worksheet sheetData element"));
         }
         self.seen_sheet_data = true;
+        Ok(())
+    }
+
+    fn start_table_parts(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+        if self.seen_table_parts {
+            return Err(invalid("duplicate worksheet tableParts element"));
+        }
+        self.seen_table_parts = true;
+        self.expected_table_part_count = Some(required_u32(
+            element,
+            b"count",
+            decoder,
+            "worksheet tableParts count",
+        )?);
+        Ok(())
+    }
+
+    fn table_part(
+        &mut self,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        resolver: &NamespaceResolver,
+    ) -> Result<()> {
+        let relationship_id = relationship_attribute_value(element, b"id", decoder, resolver)?
+            .ok_or_else(|| invalid("worksheet tablePart is missing relationship ID"))?;
+        if relationship_id.is_empty() {
+            return Err(invalid(
+                "worksheet tablePart relationship ID cannot be empty",
+            ));
+        }
+        if !self.table_relationship_ids.insert(relationship_id.clone()) {
+            return Err(invalid(format!(
+                "duplicate worksheet tablePart relationship ID '{relationship_id}'"
+            )));
+        }
+        self.data.table_relationship_ids.push(relationship_id);
+        Ok(())
+    }
+
+    fn finish_table_parts(&self) -> Result<()> {
+        if let Some(expected) = self.expected_table_part_count
+            && usize::try_from(expected) != Ok(self.data.table_relationship_ids.len())
+        {
+            return Err(invalid(format!(
+                "worksheet tableParts count is {expected}, but {} tablePart elements were found",
+                self.data.table_relationship_ids.len()
+            )));
+        }
         Ok(())
     }
 
@@ -1899,6 +1976,7 @@ impl Parser {
             Context::Cell => self.finish_cell(),
             Context::Row => self.finish_row(),
             Context::MergeCells => self.finish_merge_cells(),
+            Context::TableParts => self.finish_table_parts(),
             Context::DataValidation => self.finish_data_validation(),
             Context::DataValidations => self.finish_data_validations(),
             Context::ConditionalFormatting => self.finish_conditional_formatting(),
@@ -2880,6 +2958,37 @@ mod tests {
             format!(r#"<worksheet xmlns="{S}"><sheetData/><sheetData/></worksheet>"#),
             format!(r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1">"#),
         ] {
+            assert!(parse_worksheet_data(&xml).is_err(), "accepted {xml}");
+        }
+    }
+
+    #[test]
+    fn parses_strict_table_part_relationships() {
+        let xml = format!(
+            r#"<s:worksheet xmlns:s="{STRICT_S}"
+                    xmlns:r="http://purl.oclc.org/ooxml/officeDocument/relationships"
+                    xmlns:f="urn:foreign">
+                <f:tableParts count="1"><s:tablePart r:id="ignored"/></f:tableParts>
+                <s:tableParts count="2"><s:tablePart r:id="custom-one"/>
+                    <s:tablePart r:id="custom-two"/></s:tableParts>
+            </s:worksheet>"#
+        );
+        let data = parse_worksheet_data(&xml).unwrap();
+        assert_eq!(data.table_relationship_ids, ["custom-one", "custom-two"]);
+    }
+
+    #[test]
+    fn rejects_malformed_table_part_references() {
+        const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+        for body in [
+            r#"<tableParts><tablePart r:id="r1"/></tableParts>"#,
+            r#"<tableParts count="1"><tablePart/></tableParts>"#,
+            r#"<tableParts count="1"><tablePart r:id=""/></tableParts>"#,
+            r#"<tableParts count="2"><tablePart r:id="r1"/></tableParts>"#,
+            r#"<tableParts count="2"><tablePart r:id="r1"/><tablePart r:id="r1"/></tableParts>"#,
+            r#"<tableParts count="0"/><tableParts count="0"/>"#,
+        ] {
+            let xml = format!(r#"<worksheet xmlns="{S}" xmlns:r="{R}">{body}</worksheet>"#);
             assert!(parse_worksheet_data(&xml).is_err(), "accepted {xml}");
         }
     }

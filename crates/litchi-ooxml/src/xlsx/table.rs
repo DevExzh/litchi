@@ -2,7 +2,18 @@
 //!
 //! Tables in Excel provide structured references and enhanced formatting for data ranges.
 
-use crate::xlsx::sort::SortState;
+use std::collections::HashSet;
+
+use litchi_core::sheet::Result as SheetResult;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::ResolveResult;
+use quick_xml::reader::NsReader;
+
+use crate::common::xml::{decode_xml_reference, unqualified_attribute_value};
+use crate::xlsx::cell::Cell;
+use crate::xlsx::namespace::is_spreadsheetml_name;
+use crate::xlsx::sort::{SortBy, SortCondition, SortMethod, SortState};
 
 /// Table style information for visual formatting.
 #[derive(Debug, Clone)]
@@ -265,6 +276,599 @@ impl Table {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TableContext {
+    Root,
+    AutoFilter,
+    SortState,
+    TableColumns,
+    TableColumn,
+    Formula(FormulaKind),
+    Other,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FormulaKind {
+    Calculated,
+    Totals,
+}
+
+struct TableParser {
+    table: Table,
+    expected_columns: Option<u32>,
+    pending_column: Option<TableColumn>,
+    pending_formula: Option<TableFormula>,
+    column_ids: HashSet<u32>,
+    column_names: HashSet<String>,
+    saw_auto_filter: bool,
+    saw_sort_state: bool,
+    saw_table_columns: bool,
+    saw_style_info: bool,
+    saw_calculated_formula: bool,
+    saw_totals_formula: bool,
+}
+
+impl TableParser {
+    fn from_root(element: &BytesStart<'_>, decoder: Decoder) -> SheetResult<Self> {
+        let id = required_u32(element, b"id", decoder, "table ID")?;
+        if id == 0 {
+            return Err("table ID must be positive".into());
+        }
+        let display_name = required_string(element, b"displayName", decoder, "table displayName")?;
+        if display_name.is_empty() {
+            return Err("table displayName cannot be empty".into());
+        }
+        let name = unqualified_attribute_value(element, b"name", decoder)?
+            .unwrap_or_else(|| display_name.clone());
+        if name.is_empty() {
+            return Err("table name cannot be empty".into());
+        }
+        let ref_range = required_string(element, b"ref", decoder, "table reference")?;
+        validate_table_range(&ref_range, "table reference")?;
+        let table_type = unqualified_attribute_value(element, b"tableType", decoder)?
+            .map(|value| {
+                TableType::parse(&value).ok_or_else(|| format!("invalid table type '{value}'"))
+            })
+            .transpose()?;
+        Ok(Self {
+            table: Table {
+                id,
+                name,
+                display_name,
+                comment: unqualified_attribute_value(element, b"comment", decoder)?,
+                ref_range,
+                table_type,
+                header_row_count: Some(
+                    optional_u32(element, b"headerRowCount", decoder, "table headerRowCount")?
+                        .unwrap_or(1),
+                ),
+                totals_row_count: optional_u32(
+                    element,
+                    b"totalsRowCount",
+                    decoder,
+                    "table totalsRowCount",
+                )?,
+                totals_row_shown: optional_bool(
+                    element,
+                    b"totalsRowShown",
+                    decoder,
+                    "table totalsRowShown",
+                )?,
+                published: optional_bool(element, b"published", decoder, "table published")?,
+                columns: Vec::new(),
+                auto_filter_range: None,
+                sort_state: None,
+                style_info: None,
+            },
+            expected_columns: None,
+            pending_column: None,
+            pending_formula: None,
+            column_ids: HashSet::new(),
+            column_names: HashSet::new(),
+            saw_auto_filter: false,
+            saw_sort_state: false,
+            saw_table_columns: false,
+            saw_style_info: false,
+            saw_calculated_formula: false,
+            saw_totals_formula: false,
+        })
+    }
+
+    fn parse(xml: &str) -> SheetResult<Option<Table>> {
+        let mut reader = NsReader::from_reader(xml.as_bytes());
+        let mut parser: Option<Self> = None;
+        let mut stack = Vec::new();
+        let mut closed_root = false;
+        loop {
+            let decoder = reader.decoder();
+            let event = reader.read_event()?.into_owned();
+            let resolver = reader.resolver().clone();
+            let (namespace, event) = resolver.resolve_event(event);
+            match event {
+                Event::Start(element) if stack.is_empty() => {
+                    if closed_root {
+                        return Err("table XML contains multiple root elements".into());
+                    }
+                    if !is_spreadsheetml_name(&namespace, element.name(), b"table") {
+                        return Ok(None);
+                    }
+                    parser = Some(Self::from_root(&element, decoder)?);
+                    stack.push(TableContext::Root);
+                },
+                Event::Empty(element) if stack.is_empty() => {
+                    if !is_spreadsheetml_name(&namespace, element.name(), b"table") {
+                        return Ok(None);
+                    }
+                    let parser = Self::from_root(&element, decoder)?;
+                    parser.validate_root()?;
+                    return Ok(Some(parser.table));
+                },
+                Event::Start(element) => {
+                    let parent = *stack.last().ok_or("table XML is missing its root")?;
+                    let context = parser
+                        .as_mut()
+                        .ok_or("table parser is not initialized")?
+                        .start(parent, &namespace, &element, decoder)?;
+                    stack.push(context);
+                },
+                Event::Empty(element) => {
+                    let parent = *stack.last().ok_or("table XML is missing its root")?;
+                    let parser = parser.as_mut().ok_or("table parser is not initialized")?;
+                    let context = parser.start(parent, &namespace, &element, decoder)?;
+                    parser.finish(context)?;
+                },
+                Event::Text(text) => {
+                    if matches!(stack.last(), Some(TableContext::Formula(_))) {
+                        parser
+                            .as_mut()
+                            .ok_or("table parser is not initialized")?
+                            .push_formula_text(&text.decode()?)?;
+                    }
+                },
+                Event::CData(text) => {
+                    if matches!(stack.last(), Some(TableContext::Formula(_))) {
+                        parser
+                            .as_mut()
+                            .ok_or("table parser is not initialized")?
+                            .push_formula_text(&text.decode()?)?;
+                    }
+                },
+                Event::GeneralRef(reference) => {
+                    if matches!(stack.last(), Some(TableContext::Formula(_))) {
+                        parser
+                            .as_mut()
+                            .ok_or("table parser is not initialized")?
+                            .push_formula_text(&decode_xml_reference(&reference)?)?;
+                    }
+                },
+                Event::End(element) => {
+                    let context = stack
+                        .pop()
+                        .ok_or("table XML has a closing element outside its root")?;
+                    parser
+                        .as_mut()
+                        .ok_or("table parser is not initialized")?
+                        .finish(context)?;
+                    if context == TableContext::Root {
+                        if !is_spreadsheetml_name(&namespace, element.name(), b"table") {
+                            return Err("table XML has an invalid root closing element".into());
+                        }
+                        closed_root = true;
+                    }
+                },
+                Event::Eof if parser.is_none() => return Ok(None),
+                Event::Eof if !closed_root || !stack.is_empty() => {
+                    return Err("table XML has a missing or unterminated root".into());
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+        }
+        Ok(parser.map(|parser| parser.table))
+    }
+
+    fn start(
+        &mut self,
+        parent: TableContext,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+    ) -> SheetResult<TableContext> {
+        if parent == TableContext::Root
+            && is_spreadsheetml_name(namespace, element.name(), b"autoFilter")
+        {
+            mark_once(&mut self.saw_auto_filter, "table autoFilter")?;
+            let range = required_string(element, b"ref", decoder, "table autoFilter reference")?;
+            validate_table_range(&range, "table autoFilter reference")?;
+            self.table.auto_filter_range = Some(range);
+            return Ok(TableContext::AutoFilter);
+        }
+        if parent == TableContext::AutoFilter
+            && is_spreadsheetml_name(namespace, element.name(), b"sortState")
+        {
+            mark_once(&mut self.saw_sort_state, "table sortState")?;
+            self.table.sort_state = Some(parse_sort_state(element, decoder)?);
+            return Ok(TableContext::SortState);
+        }
+        if parent == TableContext::SortState
+            && is_spreadsheetml_name(namespace, element.name(), b"sortCondition")
+        {
+            let condition = parse_sort_condition(element, decoder)?;
+            let sort_state = self
+                .table
+                .sort_state
+                .as_mut()
+                .ok_or("table sort condition outside sortState")?;
+            if sort_state.conditions.len() >= 64 {
+                return Err("table sortState exceeds 64 sort conditions".into());
+            }
+            sort_state.conditions.push(condition);
+            return Ok(TableContext::Other);
+        }
+        if parent == TableContext::Root
+            && is_spreadsheetml_name(namespace, element.name(), b"tableColumns")
+        {
+            mark_once(&mut self.saw_table_columns, "tableColumns")?;
+            self.expected_columns = Some(required_u32(
+                element,
+                b"count",
+                decoder,
+                "tableColumns count",
+            )?);
+            return Ok(TableContext::TableColumns);
+        }
+        if parent == TableContext::TableColumns
+            && is_spreadsheetml_name(namespace, element.name(), b"tableColumn")
+        {
+            if self.pending_column.is_some() {
+                return Err("nested table column".into());
+            }
+            let id = required_u32(element, b"id", decoder, "table column ID")?;
+            if id == 0 || !self.column_ids.insert(id) {
+                return Err(format!("invalid or duplicate table column ID {id}").into());
+            }
+            let name = required_string(element, b"name", decoder, "table column name")?;
+            if name.is_empty() || !self.column_names.insert(name.to_ascii_lowercase()) {
+                return Err(format!("empty or duplicate table column name '{name}'").into());
+            }
+            let totals_row_function =
+                unqualified_attribute_value(element, b"totalsRowFunction", decoder)?
+                    .map(|value| {
+                        TotalsRowFunction::parse(&value)
+                            .ok_or_else(|| format!("invalid table totals-row function '{value}'"))
+                    })
+                    .transpose()?;
+            self.pending_column = Some(TableColumn {
+                id,
+                unique_name: unqualified_attribute_value(element, b"uniqueName", decoder)?,
+                name,
+                totals_row_function,
+                totals_row_label: unqualified_attribute_value(element, b"totalsRowLabel", decoder)?,
+                calculated_column_formula: None,
+                totals_row_formula: None,
+            });
+            self.saw_calculated_formula = false;
+            self.saw_totals_formula = false;
+            return Ok(TableContext::TableColumn);
+        }
+        if parent == TableContext::TableColumn
+            && is_spreadsheetml_name(namespace, element.name(), b"calculatedColumnFormula")
+        {
+            mark_once(&mut self.saw_calculated_formula, "calculatedColumnFormula")?;
+            self.start_formula(element, decoder)?;
+            return Ok(TableContext::Formula(FormulaKind::Calculated));
+        }
+        if parent == TableContext::TableColumn
+            && is_spreadsheetml_name(namespace, element.name(), b"totalsRowFormula")
+        {
+            mark_once(&mut self.saw_totals_formula, "totalsRowFormula")?;
+            self.start_formula(element, decoder)?;
+            return Ok(TableContext::Formula(FormulaKind::Totals));
+        }
+        if parent == TableContext::Root
+            && is_spreadsheetml_name(namespace, element.name(), b"tableStyleInfo")
+        {
+            mark_once(&mut self.saw_style_info, "tableStyleInfo")?;
+            self.table.style_info = Some(TableStyleInfo {
+                name: unqualified_attribute_value(element, b"name", decoder)?,
+                show_first_column: optional_bool(
+                    element,
+                    b"showFirstColumn",
+                    decoder,
+                    "table style showFirstColumn",
+                )?,
+                show_last_column: optional_bool(
+                    element,
+                    b"showLastColumn",
+                    decoder,
+                    "table style showLastColumn",
+                )?,
+                show_row_stripes: optional_bool(
+                    element,
+                    b"showRowStripes",
+                    decoder,
+                    "table style showRowStripes",
+                )?,
+                show_column_stripes: optional_bool(
+                    element,
+                    b"showColumnStripes",
+                    decoder,
+                    "table style showColumnStripes",
+                )?,
+            });
+            return Ok(TableContext::Other);
+        }
+        Ok(TableContext::Other)
+    }
+
+    fn start_formula(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> SheetResult<()> {
+        if self.pending_formula.is_some() {
+            return Err("nested table formula".into());
+        }
+        self.pending_formula = Some(TableFormula {
+            array: optional_bool(element, b"array", decoder, "table formula array")?,
+            text: String::new(),
+        });
+        Ok(())
+    }
+
+    fn push_formula_text(&mut self, text: &str) -> SheetResult<()> {
+        self.pending_formula
+            .as_mut()
+            .ok_or("table formula text outside a formula element")?
+            .text
+            .push_str(text);
+        Ok(())
+    }
+
+    fn finish(&mut self, context: TableContext) -> SheetResult<()> {
+        match context {
+            TableContext::Formula(kind) => {
+                let formula = self.pending_formula.take().ok_or("missing table formula")?;
+                let column = self
+                    .pending_column
+                    .as_mut()
+                    .ok_or("table formula outside a table column")?;
+                match kind {
+                    FormulaKind::Calculated => column.calculated_column_formula = Some(formula),
+                    FormulaKind::Totals => column.totals_row_formula = Some(formula),
+                }
+                Ok(())
+            },
+            TableContext::TableColumn => {
+                self.table.columns.push(
+                    self.pending_column
+                        .take()
+                        .ok_or("missing pending table column")?,
+                );
+                Ok(())
+            },
+            TableContext::TableColumns => validate_count(
+                self.expected_columns,
+                self.table.columns.len(),
+                "tableColumns",
+            ),
+            TableContext::Root => self.validate_root(),
+            _ => Ok(()),
+        }
+    }
+
+    fn validate_root(&self) -> SheetResult<()> {
+        if !self.saw_table_columns {
+            return Err("table is missing its required tableColumns".into());
+        }
+        let width = table_range_width(&self.table.ref_range)?;
+        if usize::try_from(width) != Ok(self.table.columns.len()) {
+            return Err(format!(
+                "table range spans {width} columns, but {} table columns were defined",
+                self.table.columns.len()
+            )
+            .into());
+        }
+        if let Some(filter_range) = self.table.auto_filter_range.as_deref() {
+            ensure_range_contains(
+                &self.table.ref_range,
+                filter_range,
+                "table autoFilter reference",
+            )?;
+        }
+        if let Some(sort_state) = self.table.sort_state.as_ref() {
+            let container = self
+                .table
+                .auto_filter_range
+                .as_deref()
+                .unwrap_or(&self.table.ref_range);
+            ensure_range_contains(
+                container,
+                &sort_state.ref_range,
+                "table sortState reference",
+            )?;
+            for condition in &sort_state.conditions {
+                ensure_range_contains(
+                    &sort_state.ref_range,
+                    &condition.ref_range,
+                    "table sort condition reference",
+                )?;
+            }
+        }
+        Ok(())
+    }
+}
+
+pub fn parse_table_xml(xml: &str) -> SheetResult<Option<Table>> {
+    TableParser::parse(xml)
+}
+
+fn parse_sort_state(element: &BytesStart<'_>, decoder: Decoder) -> SheetResult<SortState> {
+    let range = required_string(element, b"ref", decoder, "table sortState reference")?;
+    validate_table_range(&range, "table sortState reference")?;
+    let sort_method = unqualified_attribute_value(element, b"sortMethod", decoder)?
+        .map(|value| {
+            SortMethod::parse(&value).ok_or_else(|| format!("invalid table sort method '{value}'"))
+        })
+        .transpose()?;
+    Ok(SortState {
+        ref_range: range,
+        column_sort: optional_bool(
+            element,
+            b"columnSort",
+            decoder,
+            "table sortState columnSort",
+        )?,
+        case_sensitive: optional_bool(
+            element,
+            b"caseSensitive",
+            decoder,
+            "table sortState caseSensitive",
+        )?,
+        sort_method,
+        conditions: Vec::new(),
+    })
+}
+
+fn parse_sort_condition(element: &BytesStart<'_>, decoder: Decoder) -> SheetResult<SortCondition> {
+    let range = required_string(element, b"ref", decoder, "table sort condition reference")?;
+    validate_table_range(&range, "table sort condition reference")?;
+    let sort_by = unqualified_attribute_value(element, b"sortBy", decoder)?
+        .map(|value| {
+            SortBy::parse(&value).ok_or_else(|| format!("invalid table sort criterion '{value}'"))
+        })
+        .transpose()?;
+    Ok(SortCondition {
+        ref_range: range,
+        descending: optional_bool(
+            element,
+            b"descending",
+            decoder,
+            "table sort condition descending",
+        )?,
+        sort_by,
+        custom_list: unqualified_attribute_value(element, b"customList", decoder)?,
+        dxf_id: optional_u32(element, b"dxfId", decoder, "table sort condition dxfId")?,
+        icon_set: unqualified_attribute_value(element, b"iconSet", decoder)?,
+        icon_id: optional_u32(element, b"iconId", decoder, "table sort condition iconId")?,
+    })
+}
+
+fn required_string(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> SheetResult<String> {
+    unqualified_attribute_value(element, name, decoder)?
+        .ok_or_else(|| format!("missing {description} attribute").into())
+}
+
+fn optional_u32(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> SheetResult<Option<u32>> {
+    unqualified_attribute_value(element, name, decoder)?
+        .map(|value| {
+            value
+                .parse::<u32>()
+                .map_err(|_| format!("invalid {description} '{value}'").into())
+        })
+        .transpose()
+}
+
+fn required_u32(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> SheetResult<u32> {
+    optional_u32(element, name, decoder, description)?
+        .ok_or_else(|| format!("missing {description} attribute").into())
+}
+
+fn optional_bool(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> SheetResult<Option<bool>> {
+    unqualified_attribute_value(element, name, decoder)?
+        .map(|value| match value.as_str() {
+            "1" | "true" => Ok(true),
+            "0" | "false" => Ok(false),
+            _ => Err(format!("invalid {description} '{value}'").into()),
+        })
+        .transpose()
+}
+
+fn mark_once(seen: &mut bool, description: &str) -> SheetResult<()> {
+    if *seen {
+        return Err(format!("duplicate {description} element").into());
+    }
+    *seen = true;
+    Ok(())
+}
+
+fn validate_count(expected: Option<u32>, actual: usize, description: &str) -> SheetResult<()> {
+    if let Some(expected) = expected
+        && usize::try_from(expected) != Ok(actual)
+    {
+        return Err(
+            format!("{description} count is {expected}, but {actual} elements were found").into(),
+        );
+    }
+    Ok(())
+}
+
+fn validate_table_range(range: &str, description: &str) -> SheetResult<()> {
+    let mut references = range.split(':');
+    let first = references
+        .next()
+        .ok_or_else(|| format!("empty {description}"))?;
+    let (first_column, first_row) = Cell::reference_to_coords(&first.replace('$', ""))?;
+    if let Some(second) = references.next() {
+        let (second_column, second_row) = Cell::reference_to_coords(&second.replace('$', ""))?;
+        if second_column < first_column || second_row < first_row {
+            return Err(format!("{description} range '{range}' is descending").into());
+        }
+    }
+    if references.next().is_some() {
+        return Err(format!("invalid {description} range '{range}'").into());
+    }
+    Ok(())
+}
+
+fn ensure_range_contains(container: &str, nested: &str, description: &str) -> SheetResult<()> {
+    let (container_start, container_end) = table_range_bounds(container)?;
+    let (nested_start, nested_end) = table_range_bounds(nested)?;
+    if nested_start.0 < container_start.0
+        || nested_start.1 < container_start.1
+        || nested_end.0 > container_end.0
+        || nested_end.1 > container_end.1
+    {
+        return Err(
+            format!("{description} '{nested}' is outside containing range '{container}'").into(),
+        );
+    }
+    Ok(())
+}
+
+fn table_range_bounds(range: &str) -> SheetResult<((u32, u32), (u32, u32))> {
+    let mut references = range.split(':');
+    let first = references.next().ok_or("empty table range")?;
+    let second = references.next().unwrap_or(first);
+    let start = Cell::reference_to_coords(&first.replace('$', ""))?;
+    let end = Cell::reference_to_coords(&second.replace('$', ""))?;
+    Ok((start, end))
+}
+
+fn table_range_width(range: &str) -> SheetResult<u32> {
+    let ((first_column, _), (second_column, _)) = table_range_bounds(range)?;
+    if second_column < first_column {
+        return Err(format!("table range '{range}' has descending columns").into());
+    }
+    Ok(second_column - first_column + 1)
+}
+
 /// Parse a cell range like "A1:D10" into (min_col, min_row, max_col, max_row).
 /// Returns 1-based indices.
 fn parse_range(range: &str) -> Option<(u32, u32, u32, u32)> {
@@ -463,5 +1067,95 @@ mod tests {
         assert_eq!(parse_range("B2:C5"), Some((2, 2, 3, 5)));
         assert_eq!(parse_range("A1"), None); // Missing colon
         assert_eq!(parse_range(""), None);
+    }
+
+    #[test]
+    fn parses_prefixed_strict_table_definition() {
+        let xml = r#"<s:table xmlns:s="http://purl.oclc.org/ooxml/spreadsheetml/main"
+                xmlns:f="urn:foreign" id="3" name="Sales_Internal" displayName="Sales &amp; Margin"
+                ref="$A$1:$B$3" tableType="worksheet" headerRowCount="1"
+                totalsRowCount="1" totalsRowShown="true" published="0">
+                <f:tableColumns count="1"><s:tableColumn id="99" name="Ignored"/></f:tableColumns>
+                <s:autoFilter ref="$A$1:$B$3"><s:sortState ref="$A$2:$B$3" caseSensitive="0" sortMethod="pinYin">
+                    <s:sortCondition ref="$B$2:$B$3" descending="1" sortBy="value" customList="High,Low"/>
+                </s:sortState></s:autoFilter>
+                <s:tableColumns count="2">
+                    <s:tableColumn id="1" name="Region &amp; Area" uniqueName="Region" totalsRowLabel="Total"/>
+                    <s:tableColumn id="2" name="Sales" totalsRowFunction="sum">
+                        <s:calculatedColumnFormula array="false">SUM([Sales])&amp;1</s:calculatedColumnFormula>
+                        <s:totalsRowFormula>SUBTOTAL(109,[Sales])</s:totalsRowFormula>
+                    </s:tableColumn>
+                </s:tableColumns>
+                <s:tableStyleInfo name="TableStyleMedium2" showFirstColumn="0"
+                    showLastColumn="1" showRowStripes="true" showColumnStripes="false"/>
+            </s:table>"#;
+        let table = parse_table_xml(xml).unwrap().unwrap();
+
+        assert_eq!(table.id, 3);
+        assert_eq!(table.display_name, "Sales & Margin");
+        assert_eq!(table.columns.len(), 2);
+        assert_eq!(table.columns[0].name, "Region & Area");
+        assert_eq!(
+            table.columns[1]
+                .calculated_column_formula
+                .as_ref()
+                .unwrap()
+                .text,
+            "SUM([Sales])&1"
+        );
+        assert_eq!(table.sort_state.as_ref().unwrap().conditions.len(), 1);
+        assert_eq!(
+            table.style_info.as_ref().unwrap().show_last_column,
+            Some(true)
+        );
+        assert_eq!(table.published, Some(false));
+    }
+
+    #[test]
+    fn rejects_malformed_table_definitions() {
+        const S: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+        let root = |body: &str, attributes: &str| {
+            format!(
+                r#"<table xmlns="{S}" id="1" displayName="Table1" ref="A1:B3" {attributes}>{body}</table>"#
+            )
+        };
+        for xml in [
+            root("", ""),
+            root(
+                r#"<tableColumns count="2"><tableColumn id="1" name="One"/></tableColumns>"#,
+                "",
+            ),
+            root(
+                r#"<tableColumns count="2"><tableColumn id="1" name="One"/><tableColumn id="1" name="Two"/></tableColumns>"#,
+                "",
+            ),
+            root(
+                r#"<tableColumns count="2"><tableColumn id="1" name="Same"/><tableColumn id="2" name="same"/></tableColumns>"#,
+                "",
+            ),
+            root(
+                r#"<autoFilter ref="A1:C3"/><tableColumns count="2"><tableColumn id="1" name="One"/><tableColumn id="2" name="Two"/></tableColumns>"#,
+                "",
+            ),
+            root(
+                r#"<tableColumns count="2"><tableColumn id="1" name="One"/><tableColumn id="2" name="Two" totalsRowFunction="median"/></tableColumns>"#,
+                "",
+            ),
+            root(
+                r#"<tableColumns count="2"><tableColumn id="1" name="One"/><tableColumn id="2" name="Two"/></tableColumns><tableStyleInfo showRowStripes="yes"/>"#,
+                "",
+            ),
+            root(
+                r#"<tableColumns count="2"><tableColumn id="1" name="One"/><tableColumn id="2" name="Two"/></tableColumns>"#,
+                r#"tableType="bad""#,
+            ),
+        ] {
+            assert!(parse_table_xml(&xml).is_err(), "accepted {xml}");
+        }
+        assert!(
+            parse_table_xml(r#"<table xmlns="urn:foreign" id="1" displayName="T" ref="A1"/>"#)
+                .unwrap()
+                .is_none()
+        );
     }
 }

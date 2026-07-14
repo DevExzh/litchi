@@ -61,7 +61,9 @@ pub use sparkline::{
     SparklineGroupColors, SparklineGroupOptions, SparklineType,
 };
 pub use styles::{Alignment, Border, BorderStyle, CellStyle, Fill, Font, NumberFormat, Styles};
-pub use table::{Table, TableColumn, TableFormula, TableStyleInfo, TableType, TotalsRowFunction};
+pub use table::{
+    Table, TableColumn, TableFormula, TableStyleInfo, TableType, TotalsRowFunction, parse_table_xml,
+};
 pub use views::{
     SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
 };

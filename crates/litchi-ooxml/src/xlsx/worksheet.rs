@@ -4,7 +4,7 @@
 //! for Excel (.xlsx) files.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use litchi_core::sheet::{
     Cell as CellTrait, CellIterator, CellValue, Result, RowIterator, Worksheet as WorksheetTrait,
@@ -20,6 +20,7 @@ use super::format::{CellBorder, CellFill, CellFont, CellFormat};
 use super::parsers::worksheet_parser;
 use super::sort::SortState;
 use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
+use super::table::{Table, parse_table_xml};
 use super::views::SheetView;
 
 /// Information about a worksheet
@@ -217,6 +218,7 @@ pub struct Worksheet<'a> {
     col_breaks: Vec<PageBreak>,
     rich_text_cells: HashMap<(u32, u32), Vec<RichTextRun>>,
     sparkline_groups: Vec<SparklineGroup>,
+    tables: Vec<Table>,
 }
 
 impl<'a> Worksheet<'a> {
@@ -242,6 +244,7 @@ impl<'a> Worksheet<'a> {
             col_breaks: Vec::new(),
             rich_text_cells: HashMap::new(),
             sparkline_groups: Vec::new(),
+            tables: Vec::new(),
         }
     }
 
@@ -259,8 +262,9 @@ impl<'a> Worksheet<'a> {
 
     /// Parse worksheet XML to extract cell data.
     fn parse_worksheet_xml(&mut self, content: &str, relationships: &Relationships) -> Result<()> {
-        let hyperlinks = self.parse_sheet_data(content)?;
+        let (hyperlinks, table_relationship_ids) = self.parse_sheet_data(content)?;
         self.resolve_hyperlinks(hyperlinks, relationships)?;
+        self.load_tables(table_relationship_ids, relationships)?;
         self.load_comments(relationships)?;
 
         self.sparkline_groups = parse_sparkline_groups_from_worksheet_xml(content)?;
@@ -302,11 +306,16 @@ impl<'a> Worksheet<'a> {
         &self.sparkline_groups
     }
 
+    /// Structured tables defined on this worksheet.
+    pub fn tables(&self) -> &[Table] {
+        &self.tables
+    }
+
     /// Parse sheetData content.
     fn parse_sheet_data(
         &mut self,
         sheet_data: &str,
-    ) -> Result<Vec<worksheet_parser::ParsedHyperlink>> {
+    ) -> Result<(Vec<worksheet_parser::ParsedHyperlink>, Vec<String>)> {
         let parsed = worksheet_parser::parse_worksheet_data(sheet_data)?;
         self.cells = parsed.cells;
         self.cell_styles = parsed.cell_styles;
@@ -322,7 +331,61 @@ impl<'a> Worksheet<'a> {
         self.auto_filter = parsed.auto_filter;
         self.sheet_views = parsed.sheet_views;
         self.dimensions = parsed.dimensions;
-        Ok(parsed.hyperlinks)
+        Ok((parsed.hyperlinks, parsed.table_relationship_ids))
+    }
+
+    fn load_tables(
+        &mut self,
+        relationship_ids: Vec<String>,
+        relationships: &Relationships,
+    ) -> Result<()> {
+        let mut tables = Vec::with_capacity(relationship_ids.len());
+        let mut table_ids = HashSet::with_capacity(relationship_ids.len());
+        let mut table_names = HashSet::with_capacity(relationship_ids.len());
+        for relationship_id in relationship_ids {
+            let relationship = relationships.get(&relationship_id).ok_or_else(|| {
+                format!("Worksheet tablePart references missing relationship '{relationship_id}'")
+            })?;
+            if !matches!(relationship.reltype(), rt::TABLE | rt::STRICT_TABLE) {
+                return Err(format!(
+                    "Worksheet tablePart relationship '{relationship_id}' has invalid type '{}'",
+                    relationship.reltype()
+                )
+                .into());
+            }
+            if relationship.is_external() {
+                return Err(format!(
+                    "Worksheet tablePart relationship '{relationship_id}' cannot be external"
+                )
+                .into());
+            }
+            let table_uri = relationship.target_partname()?;
+            let table_part = self.workbook.package().get_part(&table_uri)?;
+            if table_part.content_type() != ct::SML_TABLE {
+                return Err(format!(
+                    "Worksheet table part '{table_uri}' has content type '{}', expected '{}'",
+                    table_part.content_type(),
+                    ct::SML_TABLE
+                )
+                .into());
+            }
+            let xml = std::str::from_utf8(table_part.blob())?;
+            let table = parse_table_xml(xml)?
+                .ok_or_else(|| format!("Table part '{table_uri}' has no table root"))?;
+            if !table_ids.insert(table.id) {
+                return Err(format!("Duplicate worksheet table ID {}", table.id).into());
+            }
+            if !table_names.insert(table.display_name.to_ascii_lowercase()) {
+                return Err(format!(
+                    "Duplicate worksheet table display name '{}'",
+                    table.display_name
+                )
+                .into());
+            }
+            tables.push(table);
+        }
+        self.tables = tables;
+        Ok(())
     }
 
     /// Parse a single row XML.

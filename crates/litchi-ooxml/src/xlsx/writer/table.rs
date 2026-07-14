@@ -1,12 +1,97 @@
 //! Table XML serialization for XLSX.
 
+use crate::xlsx::Cell;
 use crate::xlsx::table::{Table, TableColumn, TableFormula, TableStyleInfo};
 use litchi_core::sheet::Result as SheetResult;
 use litchi_core::xml::escape::escape_xml;
+use std::collections::HashSet;
 use std::fmt::Write as FmtWrite;
+
+fn validate_table(table: &Table) -> SheetResult<()> {
+    if table.id == 0 {
+        return Err("table ID must be positive".into());
+    }
+    if table.name.is_empty() || table.display_name.is_empty() {
+        return Err("table name and display name cannot be empty".into());
+    }
+    if table.columns.is_empty() {
+        return Err("table must contain at least one column".into());
+    }
+    let width = table_range_width(&table.ref_range)?;
+    if usize::try_from(width) != Ok(table.columns.len()) {
+        return Err(format!(
+            "table range spans {width} columns, but {} columns were provided",
+            table.columns.len()
+        )
+        .into());
+    }
+    if let Some(auto_filter_range) = &table.auto_filter_range {
+        validate_nested_range(&table.ref_range, auto_filter_range, "auto-filter")?;
+    }
+    if let Some(sort_state) = &table.sort_state {
+        let auto_filter_range = table
+            .auto_filter_range
+            .as_deref()
+            .ok_or("table sort state requires an auto-filter")?;
+        validate_nested_range(auto_filter_range, &sort_state.ref_range, "sort state")?;
+        for condition in &sort_state.conditions {
+            validate_nested_range(
+                &sort_state.ref_range,
+                &condition.ref_range,
+                "sort condition",
+            )?;
+        }
+    }
+    let mut ids = HashSet::with_capacity(table.columns.len());
+    let mut names = HashSet::with_capacity(table.columns.len());
+    for column in &table.columns {
+        if column.id == 0 || !ids.insert(column.id) {
+            return Err(format!("invalid or duplicate table column ID {}", column.id).into());
+        }
+        if column.name.is_empty() || !names.insert(column.name.to_ascii_lowercase()) {
+            return Err(format!("empty or duplicate table column name '{}'", column.name).into());
+        }
+    }
+    Ok(())
+}
+
+fn table_range_width(range: &str) -> SheetResult<u32> {
+    let ((first_column, _), (second_column, _)) = table_range_bounds(range)?;
+    Ok(second_column - first_column + 1)
+}
+
+fn validate_nested_range(container: &str, nested: &str, description: &str) -> SheetResult<()> {
+    let ((first_column, first_row), (last_column, last_row)) = table_range_bounds(container)?;
+    let ((nested_first_column, nested_first_row), (nested_last_column, nested_last_row)) =
+        table_range_bounds(nested)?;
+    if nested_first_column < first_column
+        || nested_first_row < first_row
+        || nested_last_column > last_column
+        || nested_last_row > last_row
+    {
+        return Err(format!("{description} range '{nested}' is outside '{container}'").into());
+    }
+    Ok(())
+}
+
+fn table_range_bounds(range: &str) -> SheetResult<((u32, u32), (u32, u32))> {
+    let mut references = range.split(':');
+    let first = references.next().ok_or("empty table range")?;
+    let second = references.next().unwrap_or(first);
+    if references.next().is_some() {
+        return Err(format!("invalid table range '{range}'").into());
+    }
+    let (first_column, first_row) = Cell::reference_to_coords(&first.replace('$', ""))?;
+    let (second_column, second_row) = Cell::reference_to_coords(&second.replace('$', ""))?;
+    if second_column < first_column || second_row < first_row {
+        return Err(format!("table range '{range}' is descending").into());
+    }
+    Ok(((first_column, first_row), (second_column, second_row)))
+}
 
 /// Serialize a table to XML.
 pub fn serialize_table(table: &Table) -> SheetResult<String> {
+    validate_table(table)?;
     let mut xml = String::with_capacity(2048);
 
     // Table root element with namespace
@@ -41,22 +126,32 @@ pub fn serialize_table(table: &Table) -> SheetResult<String> {
         write!(xml, r#" totalsRowShown="{}""#, if shown { 1 } else { 0 })
             .map_err(|e| format!("XML write error: {}", e))?;
     }
+    if let Some(published) = table.published {
+        write!(xml, r#" published="{}""#, if published { 1 } else { 0 })
+            .map_err(|e| format!("XML write error: {}", e))?;
+    }
 
     xml.push('>');
 
     // Auto-filter
     if let Some(ref auto_filter_range) = table.auto_filter_range {
-        write!(
-            xml,
-            r#"<autoFilter ref="{}"/>"#,
-            escape_xml(auto_filter_range)
-        )
-        .map_err(|e| format!("XML write error: {}", e))?;
-    }
-
-    // Sort state
-    if let Some(ref sort_state) = table.sort_state {
-        serialize_sort_state(&mut xml, sort_state)?;
+        if let Some(ref sort_state) = table.sort_state {
+            write!(
+                xml,
+                r#"<autoFilter ref="{}">"#,
+                escape_xml(auto_filter_range)
+            )
+            .map_err(|e| format!("XML write error: {}", e))?;
+            serialize_sort_state(&mut xml, sort_state)?;
+            xml.push_str("</autoFilter>");
+        } else {
+            write!(
+                xml,
+                r#"<autoFilter ref="{}"/>"#,
+                escape_xml(auto_filter_range)
+            )
+            .map_err(|e| format!("XML write error: {}", e))?;
+        }
     }
 
     // Table columns
@@ -122,6 +217,22 @@ fn serialize_sort_state(
             }
             if let Some(sort_by) = condition.sort_by {
                 write!(xml, r#" sortBy="{}""#, sort_by.as_str())
+                    .map_err(|e| format!("XML write error: {}", e))?;
+            }
+            if let Some(custom_list) = &condition.custom_list {
+                write!(xml, r#" customList="{}""#, escape_xml(custom_list))
+                    .map_err(|e| format!("XML write error: {}", e))?;
+            }
+            if let Some(dxf_id) = condition.dxf_id {
+                write!(xml, r#" dxfId="{}""#, dxf_id)
+                    .map_err(|e| format!("XML write error: {}", e))?;
+            }
+            if let Some(icon_set) = &condition.icon_set {
+                write!(xml, r#" iconSet="{}""#, escape_xml(icon_set))
+                    .map_err(|e| format!("XML write error: {}", e))?;
+            }
+            if let Some(icon_id) = condition.icon_id {
+                write!(xml, r#" iconId="{}""#, icon_id)
                     .map_err(|e| format!("XML write error: {}", e))?;
             }
 
@@ -227,7 +338,7 @@ mod tests {
     use crate::xlsx::table::{TableColumn, TableFormula, TableStyleInfo, TotalsRowFunction};
 
     fn create_test_table() -> Table {
-        let mut table = Table::new(1u32, "TestTable", "A1:D5");
+        let mut table = Table::new(1u32, "TestTable", "A1:B5");
         table.display_name = "Test Table".to_string();
         table.comment = Some("Test comment".to_string());
         table.header_row_count = Some(1);
@@ -249,7 +360,7 @@ mod tests {
         assert!(xml.contains(r#"id="1""#));
         assert!(xml.contains(r#"name="TestTable""#));
         assert!(xml.contains(r#"displayName="Test Table""#));
-        assert!(xml.contains(r#"ref="A1:D5""#));
+        assert!(xml.contains(r#"ref="A1:B5""#));
         assert!(xml.contains(r#"comment="Test comment""#));
         assert!(xml.contains(r#"headerRowCount="1""#));
         assert!(xml.contains(r#"totalsRowCount="1""#));
@@ -271,10 +382,10 @@ mod tests {
     #[test]
     fn test_serialize_table_with_auto_filter() {
         let mut table = create_test_table();
-        table.auto_filter_range = Some("A1:D5".to_string());
+        table.auto_filter_range = Some("A1:B5".to_string());
         let xml = serialize_table(&table).unwrap();
 
-        assert!(xml.contains(r#"<autoFilter ref="A1:D5"/>"#));
+        assert!(xml.contains(r#"<autoFilter ref="A1:B5"/>"#));
     }
 
     #[test]
@@ -299,6 +410,7 @@ mod tests {
         let mut col = TableColumn::new(1u32, "Sales");
         col.totals_row_function = Some(TotalsRowFunction::Sum);
         table.columns = vec![col];
+        table.ref_range = "A1:A5".to_string();
 
         let xml = serialize_table(&table).unwrap();
         assert!(xml.contains(r#"totalsRowFunction="sum""#));
@@ -313,6 +425,7 @@ mod tests {
             text: "=[@Price]*[@Qty]".to_string(),
         });
         table.columns = vec![col];
+        table.ref_range = "A1:A5".to_string();
 
         let xml = serialize_table(&table).unwrap();
         // The formula is serialized with array="0" attribute when array is Some(false)
@@ -332,7 +445,7 @@ mod tests {
     fn test_serialize_table_with_sort_state() {
         let mut table = create_test_table();
         let sort_condition = SortCondition {
-            ref_range: "A2:A10".to_string(),
+            ref_range: "A2:A5".to_string(),
             descending: Some(true),
             sort_by: None,
             custom_list: None,
@@ -341,16 +454,17 @@ mod tests {
             icon_id: None,
         };
         table.sort_state = Some(SortState {
-            ref_range: "A2:D10".to_string(),
+            ref_range: "A2:B5".to_string(),
             column_sort: Some(true),
             case_sensitive: Some(false),
             sort_method: None,
             conditions: vec![sort_condition],
         });
+        table.auto_filter_range = Some("A1:B5".to_string());
 
         let xml = serialize_table(&table).unwrap();
-        assert!(xml.contains(r#"<sortState ref="A2:D10" columnSort="1" caseSensitive="0">"#));
-        assert!(xml.contains(r#"<sortCondition ref="A2:A10" descending="1"/>"#));
+        assert!(xml.contains(r#"<sortState ref="A2:B5" columnSort="1" caseSensitive="0">"#));
+        assert!(xml.contains(r#"<sortCondition ref="A2:A5" descending="1"/>"#));
         assert!(xml.contains("</sortState>"));
     }
 
@@ -362,5 +476,83 @@ mod tests {
 
         let xml = serialize_table(&table).unwrap();
         assert!(xml.contains("Table&lt;&gt;&amp;")); // XML escaped
+    }
+
+    #[test]
+    fn serialized_table_round_trips_through_parser() {
+        use crate::xlsx::sort::SortBy;
+        use crate::xlsx::table::parse_table_xml;
+
+        let mut table = create_test_table();
+        table.published = Some(true);
+        table.auto_filter_range = Some("A1:B4".to_string());
+        table.sort_state = Some(SortState {
+            ref_range: "A2:B4".to_string(),
+            column_sort: Some(false),
+            case_sensitive: Some(true),
+            sort_method: None,
+            conditions: vec![SortCondition {
+                ref_range: "B2:B4".to_string(),
+                descending: Some(true),
+                sort_by: Some(SortBy::Icon),
+                custom_list: Some("High,Low".to_string()),
+                dxf_id: Some(3),
+                icon_set: Some("3Arrows".to_string()),
+                icon_id: Some(2),
+            }],
+        });
+        table.columns[0].calculated_column_formula = Some(TableFormula {
+            array: Some(false),
+            text: "=[@[Column B]]*2".to_string(),
+        });
+
+        let xml = serialize_table(&table).unwrap();
+        let parsed = parse_table_xml(&xml).unwrap().unwrap();
+
+        assert_eq!(parsed.id, table.id);
+        assert_eq!(parsed.display_name, table.display_name);
+        assert_eq!(parsed.ref_range, table.ref_range);
+        assert_eq!(parsed.published, Some(true));
+        assert_eq!(parsed.auto_filter_range.as_deref(), Some("A1:B4"));
+        assert_eq!(parsed.columns.len(), 2);
+        assert_eq!(
+            parsed.columns[0]
+                .calculated_column_formula
+                .as_ref()
+                .map(|formula| formula.text.as_str()),
+            Some("=[@[Column B]]*2")
+        );
+        let condition = &parsed.sort_state.unwrap().conditions[0];
+        assert_eq!(condition.sort_by, Some(SortBy::Icon));
+        assert_eq!(condition.custom_list.as_deref(), Some("High,Low"));
+        assert_eq!(condition.dxf_id, Some(3));
+        assert_eq!(condition.icon_set.as_deref(), Some("3Arrows"));
+        assert_eq!(condition.icon_id, Some(2));
+    }
+
+    #[test]
+    fn rejects_invalid_table_models() {
+        let mut table = create_test_table();
+        table.columns[1].id = 1;
+        assert!(serialize_table(&table).is_err());
+
+        let mut table = create_test_table();
+        table.auto_filter_range = Some("A1:C5".to_string());
+        assert!(serialize_table(&table).is_err());
+
+        let mut table = create_test_table();
+        table.sort_state = Some(SortState {
+            ref_range: "A2:B5".to_string(),
+            column_sort: None,
+            case_sensitive: None,
+            sort_method: None,
+            conditions: vec![SortCondition::new("C2:C5")],
+        });
+        table.auto_filter_range = Some("A1:B5".to_string());
+        assert!(serialize_table(&table).is_err());
+
+        let mut table = create_test_table();
+        table.sort_state = Some(SortState::new("A2:B5"));
+        assert!(serialize_table(&table).is_err());
     }
 }

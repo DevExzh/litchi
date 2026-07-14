@@ -2327,10 +2327,10 @@ impl MutableWorksheet {
 
         // Write tableParts if tables are present
         if let Some(table_rels) = table_rel_ids.filter(|rels| !rels.is_empty()) {
-            write!(xml, r#"<tableParts count=\"{}\">"#, table_rels.len())
+            write!(xml, r#"<tableParts count="{}">"#, table_rels.len())
                 .map_err(|e| format!("XML write error: {}", e))?;
             for rel_id in table_rels {
-                write!(xml, r#"<tablePart r:id=\"{}\"/>"#, rel_id)
+                write!(xml, r#"<tablePart r:id="{}"/>"#, rel_id)
                     .map_err(|e| format!("XML write error: {}", e))?;
             }
             xml.push_str("</tableParts>");
@@ -3218,7 +3218,7 @@ impl MutableWorksheet {
     fn write_sort_state(&self, xml: &mut String, sort_state: &SortState) -> SheetResult<()> {
         write!(
             xml,
-            r#"<sortState ref="{}">"#,
+            r#"<sortState ref="{}""#,
             escape_xml(&sort_state.ref_range)
         )
         .map_err(|e| format!("XML write error: {}", e))?;
@@ -3654,6 +3654,42 @@ mod tests {
         let filter = xml.find("<autoFilter").unwrap();
         let phonetic = xml.find("<phoneticPr").unwrap();
         assert!(filter < phonetic);
+    }
+
+    #[test]
+    fn auto_filter_sort_state_round_trips() {
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+        ws.set_auto_filter("A1:B5");
+        ws.set_auto_filter_sort_state(SortState {
+            ref_range: "A2:B5".to_string(),
+            column_sort: Some(false),
+            case_sensitive: Some(true),
+            sort_method: Some(crate::xlsx::sort::SortMethod::PinYin),
+            conditions: vec![SortCondition {
+                ref_range: "B2:B5".to_string(),
+                descending: Some(true),
+                sort_by: Some(crate::xlsx::sort::SortBy::Value),
+                custom_list: None,
+                dxf_id: None,
+                icon_set: None,
+                icon_id: None,
+            }],
+        });
+
+        let mut shared_strings = MutableSharedStrings::new();
+        let styles = HashMap::new();
+        let xml = ws.to_xml(&mut shared_strings, &styles).unwrap();
+        let parsed = crate::xlsx::parsers::worksheet_parser::parse_worksheet_data(&xml).unwrap();
+        let sort = parsed.auto_filter.unwrap().sort_state.unwrap();
+
+        assert_eq!(sort.ref_range, "A2:B5");
+        assert_eq!(sort.case_sensitive, Some(true));
+        assert_eq!(
+            sort.sort_method,
+            Some(crate::xlsx::sort::SortMethod::PinYin)
+        );
+        assert_eq!(sort.conditions[0].ref_range, "B2:B5");
+        assert_eq!(sort.conditions[0].descending, Some(true));
     }
 
     #[test]

@@ -922,6 +922,8 @@ impl Workbook {
         use litchi_opc::constants::relationship_type as rt;
         use litchi_opc::part::{BlobPart, Part};
 
+        validate_workbook_tables(data)?;
+
         let workbook_uri = PackURI::new("/xl/workbook.xml")?;
 
         // Create temporary workbook part to manage relationships
@@ -1205,19 +1207,13 @@ impl Workbook {
 
                 let table_xml = serialize_table(table)?;
                 let table_uri = PackURI::new(format!("/xl/tables/table{}.xml", table.id))?;
-                let table_part = BlobPart::new(
-                    table_uri,
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"
-                        .to_string(),
-                    table_xml.into_bytes(),
-                );
+                let table_part =
+                    BlobPart::new(table_uri, ct::SML_TABLE.to_string(), table_xml.into_bytes());
                 self.package.add_part(Box::new(table_part));
 
                 // Add relationship from worksheet to table and capture the ID
-                let rel_id = ws_part.relate_to(
-                    &format!("../tables/table{}.xml", table.id),
-                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/table",
-                );
+                let rel_id =
+                    ws_part.relate_to(&format!("../tables/table{}.xml", table.id), rt::TABLE);
                 table_rel_ids.push(rel_id);
             }
 
@@ -1885,6 +1881,37 @@ impl Workbook {
     // - The library is production-ready for standard Excel CRUD operations
 }
 
+fn validate_workbook_tables(data: &MutableWorkbookData) -> SheetResult<()> {
+    use std::collections::HashSet;
+
+    let table_count = data
+        .worksheets
+        .iter()
+        .map(|worksheet| worksheet.tables().len())
+        .sum();
+    let mut ids = HashSet::with_capacity(table_count);
+    let mut names = HashSet::with_capacity(table_count);
+    let mut display_names = HashSet::with_capacity(table_count);
+    for worksheet in &data.worksheets {
+        for table in worksheet.tables() {
+            if !ids.insert(table.id) {
+                return Err(format!("duplicate workbook table ID {}", table.id).into());
+            }
+            if !names.insert(table.name.to_ascii_lowercase()) {
+                return Err(format!("duplicate workbook table name '{}'", table.name).into());
+            }
+            if !display_names.insert(table.display_name.to_ascii_lowercase()) {
+                return Err(format!(
+                    "duplicate workbook table display name '{}'",
+                    table.display_name
+                )
+                .into());
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_threaded_comment_people<'a>(
     comments: impl IntoIterator<Item = &'a crate::xlsx::ThreadedComment>,
     person_list: Option<&crate::xlsx::PersonList>,
@@ -1928,7 +1955,7 @@ mod tests {
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
     use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 
-    use crate::xlsx::{Mention, Person, PersonList, ThreadedComment};
+    use crate::xlsx::{Mention, Person, PersonList, Table, TableColumn, ThreadedComment};
 
     const WORKBOOK_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -1939,6 +1966,49 @@ mod tests {
     <definedName name="_xlnm.Print_Titles" localSheetId="0">Sales!$1:$2,Sales!$A:$B</definedName>
   </definedNames>
 </workbook>"#;
+
+    #[test]
+    fn saves_and_reloads_worksheet_tables() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("tables.xlsx");
+        let mut workbook = Workbook::create().unwrap();
+        let mut table = Table::new(7, "SalesTable", "A1:B4");
+        table.columns = vec![
+            TableColumn::new(1, "Region"),
+            TableColumn::new(2, "Revenue"),
+        ];
+        table.auto_filter_range = Some("A1:B4".to_string());
+        workbook.worksheet_mut(0).unwrap().add_table(table);
+
+        workbook.save(&path).unwrap();
+        let reopened = Workbook::open(&path).unwrap();
+        let worksheet = reopened.get_worksheet(0).unwrap();
+
+        assert_eq!(worksheet.tables().len(), 1);
+        let table = &worksheet.tables()[0];
+        assert_eq!(table.id, 7);
+        assert_eq!(table.name, "SalesTable");
+        assert_eq!(table.ref_range, "A1:B4");
+        assert_eq!(table.column_names(), vec!["Region", "Revenue"]);
+    }
+
+    #[test]
+    fn rejects_duplicate_table_identity_across_worksheets() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("duplicate-tables.xlsx");
+        let mut workbook = Workbook::create().unwrap();
+        let mut first = Table::new(1, "Sales", "A1:A2");
+        first.columns.push(TableColumn::new(1, "Value"));
+        workbook.worksheet_mut(0).unwrap().add_table(first);
+
+        let worksheet = workbook.add_worksheet("Other");
+        let mut duplicate = Table::new(1, "OtherTable", "A1:A2");
+        duplicate.columns.push(TableColumn::new(1, "Value"));
+        worksheet.add_table(duplicate);
+
+        let error = workbook.save(path).unwrap_err().to_string();
+        assert!(error.contains("duplicate workbook table ID 1"));
+    }
 
     #[test]
     fn validates_threaded_comment_people_references() {
