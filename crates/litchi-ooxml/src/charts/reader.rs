@@ -77,6 +77,9 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
                     b"dispBlanksAs" => {
                         chart.display_blanks_as = parse_display_blanks(e)?;
                     },
+                    b"showDLblsOverMax" => {
+                        chart.show_data_labels_over_max = parse_bool_attr(e)?;
+                    },
                     b"date1904" => {
                         chart.date_1904 = parse_bool_attr(e)?;
                     },
@@ -84,7 +87,7 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
                         chart.rounded_corners = parse_bool_attr(e)?;
                     },
                     b"style" => {
-                        chart.style = parse_u32_attr(e, b"val");
+                        chart.style = Some(bounded_u32_attr(e, "chart style", 1, 48)?);
                     },
                     _ => {},
                 }
@@ -171,11 +174,23 @@ fn parse_view_3d<R: BufRead>(reader: &mut Reader<R>) -> Result<View3D> {
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
-                    b"rotX" => view.rot_x = parse_u32_attr(e, b"val"),
-                    b"rotY" => view.rot_y = parse_u32_attr(e, b"val"),
-                    b"perspective" => view.perspective = parse_u32_attr(e, b"val"),
-                    b"hPercent" => view.height_percent = parse_u32_attr(e, b"val"),
-                    b"depthPercent" => view.depth_percent = parse_u32_attr(e, b"val"),
+                    b"rotX" => {
+                        view.rot_x = Some(bounded_u32_attr(e, "chart X rotation", 0, 90)?);
+                    },
+                    b"rotY" => {
+                        view.rot_y = Some(bounded_u32_attr(e, "chart Y rotation", 0, 360)?);
+                    },
+                    b"perspective" => {
+                        view.perspective = Some(bounded_u32_attr(e, "chart perspective", 0, 240)?);
+                    },
+                    b"hPercent" => {
+                        view.height_percent =
+                            Some(bounded_u32_attr(e, "chart height percentage", 5, 500)?);
+                    },
+                    b"depthPercent" => {
+                        view.depth_percent =
+                            Some(bounded_u32_attr(e, "chart depth percentage", 20, 2000)?);
+                    },
                     b"rAngAx" => view.right_angle_axes = parse_bool_attr(e)?,
                     _ => {},
                 }
@@ -204,7 +219,7 @@ fn parse_wall_floor<R: BufRead>(reader: &mut Reader<R>) -> Result<WallFloor> {
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e))
                 if e.local_name().as_ref() == b"thickness" =>
             {
-                wall_floor.thickness = parse_u32_attr(e, b"val");
+                wall_floor.thickness = Some(bounded_u32_attr(e, "chart wall thickness", 0, 4096)?);
             },
             Ok(Event::End(ref e)) => {
                 let tag_name = e.local_name();
@@ -1515,16 +1530,16 @@ fn parse_legend<R: BufRead>(reader: &mut Reader<R>) -> Result<Legend> {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
                     b"legendPos" => {
-                        if let Some(val) = get_attr(e, b"val") {
-                            position = match val.as_slice() {
-                                b"b" => LegendPosition::Bottom,
-                                b"l" => LegendPosition::Left,
-                                b"r" => LegendPosition::Right,
-                                b"t" => LegendPosition::Top,
-                                b"tr" => LegendPosition::TopRight,
-                                _ => LegendPosition::Right,
-                            };
-                        }
+                        let value = get_attr(e, b"val")
+                            .ok_or_else(|| missing_attribute("chart legend position"))?;
+                        position = match value.as_slice() {
+                            b"b" => LegendPosition::Bottom,
+                            b"l" => LegendPosition::Left,
+                            b"r" => LegendPosition::Right,
+                            b"t" => LegendPosition::Top,
+                            b"tr" => LegendPosition::TopRight,
+                            _ => return Err(invalid_attribute("chart legend position", &value)),
+                        };
                     },
                     b"overlay" => {
                         overlay = parse_bool_attr(e)?;
@@ -1820,7 +1835,8 @@ mod tests {
                         </c:numCache></c:numRef></c:val>
                 </c:ser></c:barChart></c:plotArea>
                 <c:legend><c:legendPos val="b"/><c:overlay val="1"/></c:legend>
-            </c:chart></c:chartSpace>"#;
+                <c:showDLblsOverMax val="1"/>
+            </c:chart><c:style val="12"/></c:chartSpace>"#;
 
         let chart = parse_chart(xml.as_slice()).unwrap();
         let Some(TitleText::Literal(title)) = chart.title.as_ref() else {
@@ -1858,6 +1874,8 @@ mod tests {
         assert_eq!(values.source_ref.as_ref().unwrap().formula, "Sheet1!$B$1");
         assert_eq!(values.format_code.as_deref(), Some("0.0"));
         assert_eq!(chart.legend.unwrap().position, LegendPosition::Bottom);
+        assert!(chart.show_data_labels_over_max);
+        assert_eq!(chart.style, Some(12));
     }
 
     #[test]
@@ -1866,6 +1884,9 @@ mod tests {
             br#"<c:chartSpace xmlns:c="urn:test"><c:chart><c:plotArea>"#.as_slice(),
             br#"<c:chartSpace xmlns:c="urn:test"><c:chart><c:plotVisOnly val="yes"/></c:chart></c:chartSpace>"#.as_slice(),
             br#"<c:chartSpace xmlns:c="urn:test"><c:chart><c:dispBlanksAs val="empty"/></c:chart></c:chartSpace>"#.as_slice(),
+            br#"<c:chartSpace xmlns:c="urn:test"><c:style val="0"/><c:chart></c:chart></c:chartSpace>"#.as_slice(),
+            br#"<c:chartSpace xmlns:c="urn:test"><c:chart><c:view3D><c:perspective val="241"/></c:view3D></c:chart></c:chartSpace>"#.as_slice(),
+            br#"<c:chartSpace xmlns:c="urn:test"><c:chart><c:legend><c:legendPos val="center"/></c:legend></c:chart></c:chartSpace>"#.as_slice(),
         ] {
             assert!(parse_chart(xml).is_err());
         }
