@@ -3,7 +3,7 @@
 /// This module provides types and methods for accessing footnotes and endnotes
 /// in Word documents. Footnotes appear at the bottom of pages, while endnotes
 /// appear at the end of the document or section.
-use crate::docx::paragraph::Paragraph;
+use crate::docx::paragraph::{Paragraph, extract_word_text};
 use crate::error::{OoxmlError, Result};
 use litchi_opc::part::Part;
 use quick_xml::Reader;
@@ -129,34 +129,7 @@ impl Note {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn text(&self) -> Result<String> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
-
-        // Pre-allocate with estimated capacity
-        let estimated_capacity = self.xml_bytes.len() / 8;
-        let mut result = String::with_capacity(estimated_capacity);
-        let mut in_text_element = false;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"t" => {
-                    in_text_element = true;
-                },
-                Ok(Event::Text(e)) if in_text_element => {
-                    let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
-                    result.push_str(text);
-                },
-                Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
-                    in_text_element = false;
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
-        result.shrink_to_fit();
-        Ok(result)
+        extract_word_text(&self.xml_bytes)
     }
 
     /// Get all paragraphs in this note.
@@ -497,6 +470,14 @@ mod tests {
         let note = Note::new(1, xml.to_vec(), NoteType::Normal);
 
         assert_eq!(note.text().unwrap(), "");
+    }
+
+    #[test]
+    fn test_note_decodes_text_and_special_characters() {
+        let xml =
+            b"<w:footnote><w:p><w:r><w:t>A &lt; B</w:t><w:tab/><w:cr/></w:r></w:p></w:footnote>";
+        let note = Note::new(1, xml.to_vec(), NoteType::Normal);
+        assert_eq!(note.text().unwrap(), "A < B\t\n");
     }
 
     #[test]

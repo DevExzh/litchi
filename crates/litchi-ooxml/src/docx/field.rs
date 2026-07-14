@@ -2,9 +2,10 @@
 ///
 /// This module provides types and methods for accessing fields in Word documents.
 /// Fields are dynamic content like page numbers, dates, formulas, and cross-references.
+use crate::docx::paragraph::decode_xml_reference;
 use crate::error::{OoxmlError, Result};
-use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::{Reader, XmlVersion};
 
 /// A field in a Word document.
 ///
@@ -109,11 +110,12 @@ impl Field {
     /// A vector of fields
     pub(crate) fn extract_from_document(doc_xml: &[u8]) -> Result<Vec<Field>> {
         let mut reader = Reader::from_reader(doc_xml);
-        reader.config_mut().trim_text(true);
+        reader.config_mut().trim_text(false);
 
         let mut fields = Vec::new();
         let mut in_instr_text = false;
         let mut in_field_result = false;
+        let mut in_result_text = false;
         let mut current_instruction = String::new();
         let mut current_result = String::new();
         let mut current_dirty = false;
@@ -121,20 +123,30 @@ impl Field {
 
         loop {
             match reader.read_event() {
+                Ok(Event::Empty(e)) if e.local_name().as_ref() == b"t" => {
+                    in_result_text = false;
+                },
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     match e.local_name().as_ref() {
                         b"fldChar" => {
                             // Field character marks field boundaries
                             let mut fld_char_type = None;
+                            let mut dirty = None;
 
-                            for attr in e.attributes().flatten() {
+                            for attr in e.attributes() {
+                                let attr = attr
+                                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                                let value = attr
+                                    .decoded_and_normalized_value(
+                                        XmlVersion::Explicit1_0,
+                                        reader.decoder(),
+                                    )
+                                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
                                 if attr.key.local_name().as_ref() == b"fldCharType" {
-                                    fld_char_type =
-                                        Some(String::from_utf8_lossy(&attr.value).into_owned());
+                                    fld_char_type = Some(value.to_string());
                                 }
                                 if attr.key.local_name().as_ref() == b"dirty" {
-                                    let dirty_val = String::from_utf8_lossy(&attr.value);
-                                    current_dirty = dirty_val == "true" || dirty_val == "1";
+                                    dirty = Some(matches!(value.as_ref(), "true" | "1"));
                                 }
                             }
 
@@ -146,9 +158,10 @@ impl Field {
                                         if field_depth == 1 {
                                             current_instruction.clear();
                                             current_result.clear();
-                                            current_dirty = false;
+                                            current_dirty = dirty.unwrap_or(false);
                                             in_instr_text = false;
                                             in_field_result = false;
+                                            in_result_text = false;
                                         }
                                     },
                                     "separate"
@@ -156,12 +169,14 @@ impl Field {
                                         if field_depth == 1 => {
                                             in_instr_text = false;
                                             in_field_result = true;
+                                            in_result_text = false;
                                         },
                                     "end" => {
                                         // End of field
                                         if field_depth == 1 {
                                             in_field_result = false;
                                             in_instr_text = false;
+                                            in_result_text = false;
 
                                             if !current_instruction.is_empty() {
                                                 let result = if current_result.is_empty() {
@@ -187,26 +202,71 @@ impl Field {
                             if field_depth > 0 => {
                                 in_instr_text = true;
                             },
-                        b"t" => {
-                            // Text element - could be part of field result
-                            // Will be handled in Text event
+                        b"t" if in_field_result => in_result_text = true,
+                        b"tab" if in_field_result && field_depth == 1 => {
+                            current_result.push('\t');
+                        },
+                        b"br" | b"cr" if in_field_result && field_depth == 1 => {
+                            current_result.push('\n');
+                        },
+                        b"noBreakHyphen" if in_field_result && field_depth == 1 => {
+                            current_result.push('\u{2011}');
+                        },
+                        b"softHyphen" if in_field_result && field_depth == 1 => {
+                            current_result.push('\u{00ad}');
                         },
                         _ => {},
                     }
                 },
                 Ok(Event::Text(e)) => {
-                    if in_instr_text && field_depth == 1 {
-                        // Accumulate instruction text
-                        let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
-                        current_instruction.push_str(text);
-                    } else if in_field_result && field_depth == 1 {
-                        // Accumulate result text
-                        let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
-                        current_result.push_str(text);
+                    let target = if in_instr_text && field_depth == 1 {
+                        Some(&mut current_instruction)
+                    } else if in_field_result && in_result_text && field_depth == 1 {
+                        Some(&mut current_result)
+                    } else {
+                        None
+                    };
+                    if let Some(target) = target {
+                        let decoded = e
+                            .xml_content(XmlVersion::Explicit1_0)
+                            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                        let unescaped = quick_xml::escape::unescape(&decoded)
+                            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                        target.push_str(&unescaped);
+                    }
+                },
+                Ok(Event::CData(e)) => {
+                    let target = if in_instr_text && field_depth == 1 {
+                        Some(&mut current_instruction)
+                    } else if in_field_result && in_result_text && field_depth == 1 {
+                        Some(&mut current_result)
+                    } else {
+                        None
+                    };
+                    if let Some(target) = target {
+                        let decoded = e
+                            .xml_content(XmlVersion::Explicit1_0)
+                            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                        target.push_str(&decoded);
+                    }
+                },
+                Ok(Event::GeneralRef(reference)) => {
+                    let target = if in_instr_text && field_depth == 1 {
+                        Some(&mut current_instruction)
+                    } else if in_field_result && in_result_text && field_depth == 1 {
+                        Some(&mut current_result)
+                    } else {
+                        None
+                    };
+                    if let Some(target) = target {
+                        target.push_str(&decode_xml_reference(&reference)?);
                     }
                 },
                 Ok(Event::End(e)) if e.local_name().as_ref() == b"instrText" => {
                     in_instr_text = false;
+                },
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
+                    in_result_text = false;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -243,5 +303,21 @@ mod tests {
         );
         assert_eq!(field.field_type(), "REF");
         assert!(field.is_dirty());
+    }
+
+    #[test]
+    fn extracts_decoded_field_instruction_and_result() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:r><w:fldChar w:fldCharType="begin" w:dirty="true"/></w:r>
+            <w:r><w:instrText xml:space="preserve"> IF &quot;A&amp;B&quot; = &quot;A&amp;B&quot; </w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+            <w:r><w:t xml:space="preserve"> Yes &amp; no </w:t><w:tab/><w:br/></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].instruction(), r#"IF "A&B" = "A&B""#);
+        assert_eq!(fields[0].result(), Some(" Yes & no \t\n"));
+        assert!(fields[0].is_dirty());
     }
 }

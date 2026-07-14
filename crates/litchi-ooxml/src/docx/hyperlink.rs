@@ -4,8 +4,8 @@
 /// Hyperlinks can point to external URLs, email addresses, or internal document locations (bookmarks).
 use crate::error::{OoxmlError, Result};
 use litchi_opc::rel::Relationships;
-use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::{Reader, XmlVersion};
 
 /// A hyperlink in a Word document.
 ///
@@ -126,102 +126,7 @@ impl Hyperlink {
         para_xml: &[u8],
         rels: &Relationships,
     ) -> Result<Vec<Hyperlink>> {
-        let mut reader = Reader::from_reader(para_xml);
-        reader.config_mut().trim_text(true);
-
-        let mut hyperlinks = Vec::new();
-        let mut in_hyperlink = false;
-        let mut current_text = String::new();
-        let mut current_r_id: Option<String> = None;
-        let mut current_anchor: Option<String> = None;
-        let mut current_tooltip: Option<String> = None;
-        let mut in_text = false;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    match e.local_name().as_ref() {
-                        b"hyperlink" => {
-                            in_hyperlink = true;
-                            current_text.clear();
-                            current_r_id = None;
-                            current_anchor = None;
-                            current_tooltip = None;
-
-                            // Parse attributes
-                            for attr in e.attributes().flatten() {
-                                match attr.key.local_name().as_ref() {
-                                    b"id" => {
-                                        // External link - has relationship ID
-                                        current_r_id =
-                                            Some(String::from_utf8_lossy(&attr.value).into_owned());
-                                    },
-                                    b"anchor" => {
-                                        // Internal link - has anchor/bookmark
-                                        current_anchor =
-                                            Some(String::from_utf8_lossy(&attr.value).into_owned());
-                                    },
-                                    b"tooltip" => {
-                                        current_tooltip =
-                                            Some(String::from_utf8_lossy(&attr.value).into_owned());
-                                    },
-                                    _ => {},
-                                }
-                            }
-                        },
-                        b"t" if in_hyperlink => {
-                            in_text = true;
-                        },
-                        _ => {},
-                    }
-                },
-                Ok(Event::Text(e)) if in_hyperlink && in_text => {
-                    let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
-                    current_text.push_str(text);
-                },
-                Ok(Event::End(e)) => {
-                    match e.local_name().as_ref() {
-                        b"hyperlink" => {
-                            // End of hyperlink element - create Hyperlink object
-                            let url = if let Some(ref rid) = current_r_id {
-                                // Look up the URL from relationships
-                                rels.get(rid).and_then(|rel| {
-                                    if rel.is_external() {
-                                        Some(rel.target_ref().to_string())
-                                    } else {
-                                        None
-                                    }
-                                })
-                            } else {
-                                None
-                            };
-
-                            hyperlinks.push(Hyperlink::new(
-                                current_text.clone(),
-                                url,
-                                current_r_id.clone(),
-                                current_anchor.clone(),
-                                current_tooltip.clone(),
-                            ));
-
-                            in_hyperlink = false;
-                        },
-                        b"t" => {
-                            in_text = false;
-                        },
-                        _ => {},
-                    }
-                },
-                Ok(Event::Empty(e)) if in_hyperlink && e.local_name().as_ref() == b"t" => {
-                    // Empty text element
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
-        Ok(hyperlinks)
+        Self::extract_from_xml(para_xml, rels)
     }
 
     /// Extract all hyperlinks from document XML bytes.
@@ -238,8 +143,12 @@ impl Hyperlink {
         doc_xml: &[u8],
         rels: &Relationships,
     ) -> Result<Vec<Hyperlink>> {
-        let mut reader = Reader::from_reader(doc_xml);
-        reader.config_mut().trim_text(true);
+        Self::extract_from_xml(doc_xml, rels)
+    }
+
+    fn extract_from_xml(xml: &[u8], rels: &Relationships) -> Result<Vec<Hyperlink>> {
+        let mut reader = Reader::from_reader(xml);
+        reader.config_mut().trim_text(false);
 
         let mut hyperlinks = Vec::new();
         let mut in_hyperlink = false;
@@ -251,43 +160,62 @@ impl Hyperlink {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    match e.local_name().as_ref() {
-                        b"hyperlink" => {
-                            in_hyperlink = true;
-                            current_text.clear();
-                            current_r_id = None;
-                            current_anchor = None;
-                            current_tooltip = None;
+                Ok(Event::Start(e)) => match e.local_name().as_ref() {
+                    b"hyperlink" => {
+                        in_hyperlink = true;
+                        current_text.clear();
+                        current_r_id = None;
+                        current_anchor = None;
+                        current_tooltip = None;
 
-                            // Parse attributes
-                            for attr in e.attributes().flatten() {
-                                match attr.key.local_name().as_ref() {
-                                    b"id" => {
-                                        current_r_id =
-                                            Some(String::from_utf8_lossy(&attr.value).into_owned());
-                                    },
-                                    b"anchor" => {
-                                        current_anchor =
-                                            Some(String::from_utf8_lossy(&attr.value).into_owned());
-                                    },
-                                    b"tooltip" => {
-                                        current_tooltip =
-                                            Some(String::from_utf8_lossy(&attr.value).into_owned());
-                                    },
-                                    _ => {},
-                                }
+                        for attr in e.attributes() {
+                            let attr = attr.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                            let value = attr
+                                .decoded_and_normalized_value(
+                                    XmlVersion::Explicit1_0,
+                                    reader.decoder(),
+                                )
+                                .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                                .into_owned();
+                            match attr.key.local_name().as_ref() {
+                                b"id" => {
+                                    current_r_id = Some(value);
+                                },
+                                b"anchor" => {
+                                    current_anchor = Some(value);
+                                },
+                                b"tooltip" => {
+                                    current_tooltip = Some(value);
+                                },
+                                _ => {},
                             }
-                        },
-                        b"t" if in_hyperlink => {
-                            in_text = true;
-                        },
-                        _ => {},
-                    }
+                        }
+                    },
+                    b"t" if in_hyperlink => {
+                        in_text = true;
+                    },
+                    b"tab" if in_hyperlink => current_text.push('\t'),
+                    b"br" | b"cr" if in_hyperlink => current_text.push('\n'),
+                    b"noBreakHyphen" if in_hyperlink => current_text.push('\u{2011}'),
+                    b"softHyphen" if in_hyperlink => current_text.push('\u{00ad}'),
+                    _ => {},
                 },
                 Ok(Event::Text(e)) if in_hyperlink && in_text => {
-                    let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
-                    current_text.push_str(text);
+                    let decoded = e
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    let unescaped = quick_xml::escape::unescape(&decoded)
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    current_text.push_str(&unescaped);
+                },
+                Ok(Event::CData(e)) if in_hyperlink && in_text => {
+                    let decoded = e
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    current_text.push_str(&decoded);
+                },
+                Ok(Event::GeneralRef(reference)) if in_hyperlink && in_text => {
+                    current_text.push_str(&super::paragraph::decode_xml_reference(&reference)?);
                 },
                 Ok(Event::End(e)) => {
                     match e.local_name().as_ref() {
@@ -320,6 +248,14 @@ impl Hyperlink {
                         },
                         _ => {},
                     }
+                },
+                Ok(Event::Empty(e)) if in_hyperlink => match e.local_name().as_ref() {
+                    b"t" => {},
+                    b"tab" => current_text.push('\t'),
+                    b"br" | b"cr" => current_text.push('\n'),
+                    b"noBreakHyphen" => current_text.push('\u{2011}'),
+                    b"softHyphen" => current_text.push('\u{00ad}'),
+                    _ => {},
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -507,8 +443,8 @@ mod tests {
     #[test]
     fn test_extract_from_paragraph_internal() {
         let para_xml = r#"<w:p>
-            <w:hyperlink w:anchor="section1" w:tooltip="Go to section">
-                <w:r><w:t>Jump to Section</w:t></w:r>
+            <w:hyperlink w:anchor="section&amp;1" w:tooltip="Go &amp; see">
+                <w:r><w:t xml:space="preserve"> Jump &amp; see </w:t><w:tab/><w:br/></w:r>
             </w:hyperlink>
         </w:p>"#;
 
@@ -516,9 +452,9 @@ mod tests {
         let hyperlinks = Hyperlink::extract_from_paragraph(para_xml.as_bytes(), &rels).unwrap();
 
         assert_eq!(hyperlinks.len(), 1);
-        assert_eq!(hyperlinks[0].text(), "Jump to Section");
-        assert_eq!(hyperlinks[0].anchor(), Some("section1"));
-        assert_eq!(hyperlinks[0].tooltip(), Some("Go to section"));
+        assert_eq!(hyperlinks[0].text(), " Jump & see \t\n");
+        assert_eq!(hyperlinks[0].anchor(), Some("section&1"));
+        assert_eq!(hyperlinks[0].tooltip(), Some("Go & see"));
         assert!(!hyperlinks[0].is_external());
         assert!(hyperlinks[0].is_internal());
     }

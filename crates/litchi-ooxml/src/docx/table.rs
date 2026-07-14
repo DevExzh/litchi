@@ -1,5 +1,5 @@
 /// Table, Row, and Cell structures for Word documents.
-use crate::docx::paragraph::Paragraph;
+use crate::docx::paragraph::{Paragraph, extract_word_text};
 use crate::error::{OoxmlError, Result};
 use litchi_core::XmlSlice;
 use quick_xml::Reader;
@@ -580,31 +580,7 @@ impl Cell {
     ///
     /// Uses proper XML event parsing to correctly extract text nodes.
     fn extract_text(&self) -> Result<String> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
-
-        let mut result = String::new();
-        let mut in_text_element = false;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"t" => {
-                    in_text_element = true;
-                },
-                Ok(Event::Text(e)) if in_text_element => {
-                    let text = std::str::from_utf8(e.as_ref()).unwrap_or("");
-                    result.push_str(text);
-                },
-                Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
-                    in_text_element = false;
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
-        Ok(result)
+        extract_word_text(&self.xml_bytes)
     }
 
     /// Get all paragraphs in this cell.
@@ -698,11 +674,11 @@ mod tests {
     #[test]
     fn test_cell_text() {
         let xml = br#"<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-            <w:p><w:r><w:t>Cell text</w:t></w:r></w:p>
+            <w:p><w:r><w:t xml:space="preserve"> Cell &amp; text </w:t><w:tab/><w:br/></w:r></w:p>
         </w:tc>"#;
 
         let cell = Cell::new(xml.to_vec());
         let text = cell.text().unwrap();
-        assert_eq!(text, "Cell text");
+        assert_eq!(text, " Cell & text \t\n");
     }
 }

@@ -2,6 +2,7 @@
 ///
 /// This module provides types and methods for accessing comments in Word documents.
 /// Comments contain author information, text content, and timestamps.
+use crate::docx::paragraph::extract_word_text;
 use crate::error::{OoxmlError, Result};
 use litchi_opc::part::Part;
 use quick_xml::Reader;
@@ -111,33 +112,7 @@ impl Comment {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn text(&self) -> Result<String> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
-
-        let estimated_capacity = self.xml_bytes.len() / 8;
-        let mut result = String::with_capacity(estimated_capacity);
-        let mut in_text_element = false;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"t" => {
-                    in_text_element = true;
-                },
-                Ok(Event::Text(e)) if in_text_element => {
-                    let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
-                    result.push_str(text);
-                },
-                Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
-                    in_text_element = false;
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
-        result.shrink_to_fit();
-        Ok(result)
+        extract_word_text(&self.xml_bytes)
     }
 
     /// Extract all comments from a comments.xml part.
@@ -271,7 +246,7 @@ mod tests {
 
     #[test]
     fn test_comment_creation() {
-        let xml = b"<w:comment><w:p><w:r><w:t>Test comment</w:t></w:r></w:p></w:comment>";
+        let xml = b"<w:comment><w:p><w:r><w:t xml:space=\"preserve\"> Test &amp; comment </w:t><w:tab/><w:br/></w:r></w:p></w:comment>";
         let comment = Comment::new(
             1,
             "John Doe".to_string(),
@@ -284,6 +259,6 @@ mod tests {
         assert_eq!(comment.author(), "John Doe");
         assert_eq!(comment.initials(), Some("JD"));
         assert_eq!(comment.date(), Some("2024-01-01"));
-        assert_eq!(comment.text().unwrap(), "Test comment");
+        assert_eq!(comment.text().unwrap(), " Test & comment \t\n");
     }
 }

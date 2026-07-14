@@ -60,7 +60,7 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
     Ok(result)
 }
 
-fn decode_xml_reference(reference: &BytesRef<'_>) -> Result<String> {
+pub(crate) fn decode_xml_reference(reference: &BytesRef<'_>) -> Result<String> {
     if let Some(character) = reference
         .resolve_char_ref()
         .map_err(|error| OoxmlError::Xml(error.to_string()))?
