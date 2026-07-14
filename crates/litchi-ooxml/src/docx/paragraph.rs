@@ -10,7 +10,7 @@ use litchi_core::VerticalPosition;
 use litchi_core::XmlSlice;
 use litchi_opc::rel::Relationships;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::ResolveResult;
+use quick_xml::name::{QName, ResolveResult};
 use quick_xml::reader::NsReader;
 use quick_xml::{Reader, XmlVersion};
 use smallvec::SmallVec;
@@ -19,11 +19,11 @@ use std::sync::Arc;
 
 fn is_fragment_word_name(
     namespace: &ResolveResult<'_>,
-    element: &BytesStart<'_>,
+    name: QName<'_>,
     local_name: &[u8],
     fragment_prefix: &Option<Option<Vec<u8>>>,
 ) -> bool {
-    if element.local_name().as_ref() != local_name {
+    if name.local_name().as_ref() != local_name {
         return false;
     }
     if is_wordprocessing_namespace(namespace) {
@@ -42,24 +42,52 @@ fn is_fragment_word_name(
 }
 
 pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
-    let mut reader = Reader::from_reader(xml_bytes);
-    reader.config_mut().trim_text(false);
+    let mut reader = NsReader::from_reader(xml_bytes);
     let mut result = String::with_capacity(xml_bytes.len() / 8);
-    let mut in_text_element = false;
+    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut depth = 0usize;
+    let mut text_depth = None;
+
     loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) if e.local_name().as_ref() == b"t" => {
-                in_text_element = true;
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+
+        if fragment_prefix.is_none()
+            && let Event::Start(element) = &event
+            && !matches!(namespace, ResolveResult::Bound(_))
+        {
+            fragment_prefix = Some(
+                element
+                    .name()
+                    .prefix()
+                    .map(|prefix| prefix.into_inner().to_vec()),
+            );
+        }
+
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("Word XML nesting is too deep".to_string())
+                })?;
+                if text_depth.is_none()
+                    && is_fragment_word_name(&namespace, element.name(), b"t", &fragment_prefix)
+                {
+                    text_depth = Some(depth);
+                } else if let Some(character) =
+                    word_special_character(&namespace, element.name(), &fragment_prefix)
+                {
+                    result.push(character);
+                }
             },
-            Ok(Event::Empty(e)) if e.local_name().as_ref() == b"t" => {},
-            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => match e.local_name().as_ref() {
-                b"tab" => result.push('\t'),
-                b"br" | b"cr" => result.push('\n'),
-                b"noBreakHyphen" => result.push('\u{2011}'),
-                b"softHyphen" => result.push('\u{00ad}'),
-                _ => {},
+            Event::Empty(element) => {
+                if let Some(character) =
+                    word_special_character(&namespace, element.name(), &fragment_prefix)
+                {
+                    result.push(character);
+                }
             },
-            Ok(Event::Text(text)) if in_text_element => {
+            Event::Text(text) if text_depth.is_some() => {
                 let decoded = text
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| OoxmlError::Xml(error.to_string()))?;
@@ -67,25 +95,56 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
                     .map_err(|error| OoxmlError::Xml(error.to_string()))?;
                 result.push_str(&unescaped);
             },
-            Ok(Event::CData(text)) if in_text_element => {
+            Event::CData(text) if text_depth.is_some() => {
                 let decoded = text
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| OoxmlError::Xml(error.to_string()))?;
                 result.push_str(&decoded);
             },
-            Ok(Event::GeneralRef(reference)) if in_text_element => {
+            Event::GeneralRef(reference) if text_depth.is_some() => {
                 result.push_str(&decode_xml_reference(&reference)?);
             },
-            Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
-                in_text_element = false;
+            Event::End(element) => {
+                if text_depth == Some(depth)
+                    && is_fragment_word_name(&namespace, element.name(), b"t", &fragment_prefix)
+                {
+                    text_depth = None;
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("invalid Word XML nesting".to_string())
+                })?;
             },
-            Ok(Event::Eof) => break,
-            Err(error) => return Err(OoxmlError::Xml(error.to_string())),
+            Event::Eof if depth != 0 || text_depth.is_some() => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated Word XML".to_string(),
+                ));
+            },
+            Event::Eof => break,
             _ => {},
         }
     }
     result.shrink_to_fit();
     Ok(result)
+}
+
+fn word_special_character(
+    namespace: &ResolveResult<'_>,
+    name: QName<'_>,
+    fragment_prefix: &Option<Option<Vec<u8>>>,
+) -> Option<char> {
+    if is_fragment_word_name(namespace, name, b"tab", fragment_prefix) {
+        Some('\t')
+    } else if is_fragment_word_name(namespace, name, b"br", fragment_prefix)
+        || is_fragment_word_name(namespace, name, b"cr", fragment_prefix)
+    {
+        Some('\n')
+    } else if is_fragment_word_name(namespace, name, b"noBreakHyphen", fragment_prefix) {
+        Some('\u{2011}')
+    } else if is_fragment_word_name(namespace, name, b"softHyphen", fragment_prefix) {
+        Some('\u{00ad}')
+    } else {
+        None
+    }
 }
 
 /// A paragraph in a Word document.
@@ -238,7 +297,12 @@ impl Paragraph {
                     },
                     Event::Start(_) if run_start.is_some() => RunEvent::NestedStart,
                     Event::Start(element)
-                        if is_fragment_word_name(&namespace, &element, b"r", &fragment_prefix) =>
+                        if is_fragment_word_name(
+                            &namespace,
+                            element.name(),
+                            b"r",
+                            &fragment_prefix,
+                        ) =>
                     {
                         RunEvent::Start
                     },
@@ -246,7 +310,7 @@ impl Paragraph {
                         if run_start.is_none()
                             && is_fragment_word_name(
                                 &namespace,
-                                &element,
+                                element.name(),
                                 b"r",
                                 &fragment_prefix,
                             ) =>
@@ -1523,14 +1587,16 @@ mod tests {
     #[test]
     fn runs_resolve_namespace_aliases_and_ignore_lookalikes() {
         let xml = br#"<wp:p xmlns:wp="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:false="urn:not-wordprocessingml">
-            <false:r><false:t>ignored</false:t></false:r>
-            <wp:r><wp:t>kept</wp:t></wp:r>
+            <false:r><false:t>ignored outer</false:t></false:r>
+            <wp:r><false:t>ignored inner</false:t><false:tab/><false:br/><wp:t>kept</wp:t><wp:tab/></wp:r>
             <wp:r/>
         </wp:p>"#;
 
-        let runs = Paragraph::new(xml.to_vec()).runs().unwrap();
+        let paragraph = Paragraph::new(xml.to_vec());
+        assert_eq!(paragraph.text().unwrap(), "kept\t");
+        let runs = paragraph.runs().unwrap();
         assert_eq!(runs.len(), 2);
-        assert_eq!(runs[0].text().unwrap(), "kept");
+        assert_eq!(runs[0].text().unwrap(), "kept\t");
         assert_eq!(runs[1].text().unwrap(), "");
     }
 
@@ -1540,7 +1606,9 @@ mod tests {
             <s:r><s:t>strict</s:t></s:r>
         </s:p>"#;
 
-        let runs = Paragraph::new(xml.to_vec()).runs().unwrap();
+        let paragraph = Paragraph::new(xml.to_vec());
+        assert_eq!(paragraph.text().unwrap(), "strict");
+        let runs = paragraph.runs().unwrap();
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].text().unwrap(), "strict");
     }
@@ -1549,7 +1617,9 @@ mod tests {
     fn runs_accept_fragments_with_an_inherited_namespace_binding() {
         let xml = br#"<wp:p><wp:r><wp:t>inherited</wp:t></wp:r></wp:p>"#;
 
-        let runs = Paragraph::new(xml.to_vec()).runs().unwrap();
+        let paragraph = Paragraph::new(xml.to_vec());
+        assert_eq!(paragraph.text().unwrap(), "inherited");
+        let runs = paragraph.runs().unwrap();
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].text().unwrap(), "inherited");
     }
@@ -1557,7 +1627,9 @@ mod tests {
     #[test]
     fn runs_reject_unterminated_run_xml() {
         let xml = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:t>truncated</w:t>"#;
-        assert!(Paragraph::new(xml.to_vec()).runs().is_err());
+        let paragraph = Paragraph::new(xml.to_vec());
+        assert!(paragraph.text().is_err());
+        assert!(paragraph.runs().is_err());
     }
 
     #[test]
