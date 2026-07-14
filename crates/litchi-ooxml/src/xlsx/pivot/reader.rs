@@ -5,13 +5,13 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::ResolveResult;
+use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::cache::{PivotCacheDefinition, PivotCacheField, SharedItem};
 use crate::common::xml::unqualified_attribute_value;
 use crate::xlsx::Cell;
-use crate::xlsx::namespace::is_spreadsheetml_name;
+use crate::xlsx::namespace::{is_spreadsheetml_name, relationship_attribute_value};
 
 pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
     let workbook_part = package.main_document_part()?;
@@ -466,196 +466,442 @@ pub fn read_pivot_table_definition(xml: &str) -> SheetResult<Option<PivotTable>>
     parse_pivot_table_definition(xml, "")
 }
 
-pub fn read_pivot_cache_definition(xml: &str) -> SheetResult<Option<PivotCacheDefinition>> {
-    let mut cache_def = PivotCacheDefinition::default();
-
-    let root_start = match xml.find("<pivotCacheDefinition") {
-        Some(s) => s,
-        None => return Ok(None),
-    };
-    let root_after = &xml[root_start..];
-    let root_end = match root_after.find('>') {
-        Some(e) => e,
-        None => return Ok(None),
-    };
-    let root_tag = &xml[root_start..root_start + root_end + 1];
-
-    if let Some(id) = extract_attr(root_tag, "id") {
-        cache_def.id = Some(id);
-    }
-    if let Some(val) = extract_attr(root_tag, "invalid") {
-        cache_def.invalid = val == "1" || val.to_lowercase() == "true";
-    }
-    if let Some(val) = extract_attr(root_tag, "saveData") {
-        cache_def.save_data = val == "1" || val.to_lowercase() == "true";
-    }
-    if let Some(val) = extract_attr(root_tag, "refreshOnLoad") {
-        cache_def.refresh_on_load = val == "1" || val.to_lowercase() == "true";
-    }
-    if let Some(val) = extract_attr(root_tag, "backgroundQuery") {
-        cache_def.background_query = val == "1" || val.to_lowercase() == "true";
-    }
-
-    if let Some(ws_source_start) = xml.find("<worksheetSource") {
-        let ws_source_after = &xml[ws_source_start..];
-        if let Some(ws_source_end) = ws_source_after.find("/>") {
-            let ws_source_tag = &xml[ws_source_start..ws_source_start + ws_source_end + 2];
-            cache_def.source_worksheet = extract_attr(ws_source_tag, "sheet");
-            cache_def.source_ref = extract_attr(ws_source_tag, "ref");
-            cache_def.source_name = extract_attr(ws_source_tag, "name");
-        }
-    }
-
-    cache_def.cache_fields = parse_cache_fields(xml);
-
-    Ok(Some(cache_def))
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CacheContext {
+    Root,
+    CacheSource,
+    WorksheetSource,
+    CacheFields,
+    CacheField,
+    SharedItems,
+    Item,
+    Other,
 }
 
-fn parse_cache_fields(xml: &str) -> Vec<PivotCacheField> {
-    let mut fields = Vec::new();
+struct PivotCacheParser {
+    cache: PivotCacheDefinition,
+    pending_field: Option<PivotCacheField>,
+    expected_fields: Option<u32>,
+    expected_shared_items: Option<u32>,
+    saw_cache_source: bool,
+    saw_worksheet_source: bool,
+    saw_cache_fields: bool,
+    field_saw_shared_items: bool,
+}
 
-    let start = match xml.find("<cacheFields") {
-        Some(s) => s,
-        None => return fields,
-    };
-
-    let end_rel = match xml[start..].find("</cacheFields>") {
-        Some(e) => e,
-        None => return fields,
-    };
-
-    let section = &xml[start..start + end_rel];
-    let mut pos = 0;
-
-    while let Some(rel) = section[pos..].find("<cacheField") {
-        let field_start = pos + rel;
-        let field_after = &section[field_start..];
-
-        let field_end = match field_after.find("</cacheField>") {
-            Some(e) => field_start + e + 13,
-            None => match field_after.find("/>") {
-                Some(e) => field_start + e + 2,
-                None => break,
-            },
+impl PivotCacheParser {
+    fn from_root(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        resolver: &NamespaceResolver,
+    ) -> SheetResult<Self> {
+        let mut cache = PivotCacheDefinition {
+            background_query: false,
+            created_version: 0,
+            refreshed_version: 0,
+            min_refreshable_version: 0,
+            ..Default::default()
         };
-
-        let field_xml = &section[field_start..field_end];
-        if let Some(field) = parse_cache_field(field_xml) {
-            fields.push(field);
-        }
-
-        pos = field_end;
-    }
-
-    fields
-}
-
-fn parse_cache_field(xml: &str) -> Option<PivotCacheField> {
-    let tag_end = xml.find('>')?;
-    let tag = &xml[..tag_end + 1];
-
-    let name = extract_attr(tag, "name")?;
-    let database_field = extract_attr(tag, "databaseField")
-        .map(|val| val == "1" || val.to_lowercase() == "true")
+        cache.id = relationship_attribute_value(element, b"id", decoder, resolver)?;
+        cache.invalid =
+            optional_bool(element, b"invalid", decoder, "pivot cache invalid")?.unwrap_or(false);
+        cache.save_data =
+            optional_bool(element, b"saveData", decoder, "pivot cache saveData")?.unwrap_or(true);
+        cache.refresh_on_load = optional_bool(
+            element,
+            b"refreshOnLoad",
+            decoder,
+            "pivot cache refreshOnLoad",
+        )?
+        .unwrap_or(false);
+        cache.optimize_memory = optional_bool(
+            element,
+            b"optimizeMemory",
+            decoder,
+            "pivot cache optimizeMemory",
+        )?;
+        cache.enable_refresh = optional_bool(
+            element,
+            b"enableRefresh",
+            decoder,
+            "pivot cache enableRefresh",
+        )?
         .unwrap_or(true);
-    let caption = extract_attr(tag, "caption");
-    let num_fmt_id = extract_attr(tag, "numFmtId").and_then(|val| val.parse().ok());
-    let shared_items = parse_shared_items(xml);
-
-    Some(PivotCacheField {
-        name,
-        database_field,
-        caption,
-        num_fmt_id,
-        shared_items,
-        ..Default::default()
-    })
-}
-
-fn parse_shared_items(xml: &str) -> Vec<SharedItem> {
-    let mut items = Vec::new();
-
-    let start = match xml.find("<sharedItems") {
-        Some(s) => s,
-        None => return items,
-    };
-
-    let end = match xml[start..].find("</sharedItems>") {
-        Some(e) => start + e,
-        None => return items,
-    };
-
-    let section = &xml[start..end];
-
-    let mut pos = 0;
-    while pos < section.len() {
-        if let Some(m_pos) = section[pos..].find("<m") {
-            items.push(SharedItem::Missing);
-            pos += m_pos + 1;
-        } else if let Some(n_pos) = section[pos..].find("<n ") {
-            let n_start = pos + n_pos;
-            if let Some(n_end) = section[n_start..].find("/>") {
-                let n_tag = &section[n_start..n_start + n_end + 2];
-                if let Some(v_str) = extract_attr(n_tag, "v")
-                    && let Ok(v) = v_str.parse::<f64>()
-                {
-                    items.push(SharedItem::Number(v));
-                }
-                pos = n_start + n_end + 2;
-            } else {
-                break;
-            }
-        } else if let Some(s_pos) = section[pos..].find("<s ") {
-            let s_start = pos + s_pos;
-            if let Some(s_end) = section[s_start..].find("/>") {
-                let s_tag = &section[s_start..s_start + s_end + 2];
-                if let Some(v) = extract_attr(s_tag, "v") {
-                    items.push(SharedItem::String(v));
-                }
-                pos = s_start + s_end + 2;
-            } else {
-                break;
-            }
-        } else if let Some(b_pos) = section[pos..].find("<b ") {
-            let b_start = pos + b_pos;
-            if let Some(b_end) = section[b_start..].find("/>") {
-                let b_tag = &section[b_start..b_start + b_end + 2];
-                if let Some(v_str) = extract_attr(b_tag, "v") {
-                    let v = v_str == "1" || v_str.to_lowercase() == "true";
-                    items.push(SharedItem::Boolean(v));
-                }
-                pos = b_start + b_end + 2;
-            } else {
-                break;
-            }
-        } else if let Some(e_pos) = section[pos..].find("<e ") {
-            let e_start = pos + e_pos;
-            if let Some(e_end) = section[e_start..].find("/>") {
-                let e_tag = &section[e_start..e_start + e_end + 2];
-                if let Some(v) = extract_attr(e_tag, "v") {
-                    items.push(SharedItem::Error(v));
-                }
-                pos = e_start + e_end + 2;
-            } else {
-                break;
-            }
-        } else if let Some(d_pos) = section[pos..].find("<d ") {
-            let d_start = pos + d_pos;
-            if let Some(d_end) = section[d_start..].find("/>") {
-                let d_tag = &section[d_start..d_start + d_end + 2];
-                if let Some(v) = extract_attr(d_tag, "v") {
-                    items.push(SharedItem::DateTime(v));
-                }
-                pos = d_start + d_end + 2;
-            } else {
-                break;
-            }
-        } else {
-            break;
-        }
+        cache.refreshed_by = unqualified_attribute_value(element, b"refreshedBy", decoder)?;
+        cache.refreshed_date = optional_f64(
+            element,
+            b"refreshedDate",
+            decoder,
+            "pivot cache refreshedDate",
+        )?;
+        cache.refreshed_date_iso =
+            unqualified_attribute_value(element, b"refreshedDateIso", decoder)?;
+        cache.background_query = optional_bool(
+            element,
+            b"backgroundQuery",
+            decoder,
+            "pivot cache backgroundQuery",
+        )?
+        .unwrap_or(false);
+        cache.missing_items_limit = optional_u32(
+            element,
+            b"missingItemsLimit",
+            decoder,
+            "pivot cache missingItemsLimit",
+        )?;
+        cache.created_version = optional_u8(
+            element,
+            b"createdVersion",
+            decoder,
+            "pivot cache createdVersion",
+        )?
+        .unwrap_or(0);
+        cache.refreshed_version = optional_u8(
+            element,
+            b"refreshedVersion",
+            decoder,
+            "pivot cache refreshedVersion",
+        )?
+        .unwrap_or(0);
+        cache.min_refreshable_version = optional_u8(
+            element,
+            b"minRefreshableVersion",
+            decoder,
+            "pivot cache minRefreshableVersion",
+        )?
+        .unwrap_or(0);
+        cache.record_count =
+            optional_u32(element, b"recordCount", decoder, "pivot cache recordCount")?;
+        cache.upgrade_on_refresh = optional_bool(
+            element,
+            b"upgradeOnRefresh",
+            decoder,
+            "pivot cache upgradeOnRefresh",
+        )?;
+        cache.tuples_cache =
+            optional_bool(element, b"tupleCache", decoder, "pivot cache tupleCache")?;
+        cache.supports_subquery = optional_bool(
+            element,
+            b"supportSubquery",
+            decoder,
+            "pivot cache supportSubquery",
+        )?;
+        cache.supports_advanced_drill = optional_bool(
+            element,
+            b"supportAdvancedDrill",
+            decoder,
+            "pivot cache supportAdvancedDrill",
+        )?;
+        Ok(Self {
+            cache,
+            pending_field: None,
+            expected_fields: None,
+            expected_shared_items: None,
+            saw_cache_source: false,
+            saw_worksheet_source: false,
+            saw_cache_fields: false,
+            field_saw_shared_items: false,
+        })
     }
 
-    items
+    fn parse(xml: &str) -> SheetResult<Option<PivotCacheDefinition>> {
+        let mut reader = NsReader::from_reader(xml.as_bytes());
+        let mut parser: Option<Self> = None;
+        let mut stack = Vec::new();
+        let mut closed_root = false;
+
+        loop {
+            let decoder = reader.decoder();
+            let event = reader.read_event()?.into_owned();
+            let resolver = reader.resolver().clone();
+            let (namespace, event) = resolver.resolve_event(event);
+            match event {
+                Event::Start(element) if stack.is_empty() => {
+                    if closed_root {
+                        return Err("pivot cache contains multiple root elements".into());
+                    }
+                    if !is_spreadsheetml_name(&namespace, element.name(), b"pivotCacheDefinition") {
+                        return Ok(None);
+                    }
+                    parser = Some(Self::from_root(&element, decoder, &resolver)?);
+                    stack.push(CacheContext::Root);
+                },
+                Event::Empty(element) if stack.is_empty() => {
+                    if !is_spreadsheetml_name(&namespace, element.name(), b"pivotCacheDefinition") {
+                        return Ok(None);
+                    }
+                    let mut parser = Self::from_root(&element, decoder, &resolver)?;
+                    parser.finish(CacheContext::Root)?;
+                    return Ok(Some(parser.cache));
+                },
+                Event::Start(element) => {
+                    let parent = *stack.last().ok_or("pivot cache is missing its root")?;
+                    let context = parser
+                        .as_mut()
+                        .ok_or("pivot cache parser is not initialized")?
+                        .start(parent, &namespace, &element, decoder, &resolver)?;
+                    stack.push(context);
+                },
+                Event::Empty(element) => {
+                    let parent = *stack.last().ok_or("pivot cache is missing its root")?;
+                    let parser = parser
+                        .as_mut()
+                        .ok_or("pivot cache parser is not initialized")?;
+                    let context = parser.start(parent, &namespace, &element, decoder, &resolver)?;
+                    parser.finish(context)?;
+                },
+                Event::End(element) => {
+                    let context = stack
+                        .pop()
+                        .ok_or("pivot cache has a closing element outside its root")?;
+                    parser
+                        .as_mut()
+                        .ok_or("pivot cache parser is not initialized")?
+                        .finish(context)?;
+                    if context == CacheContext::Root {
+                        if !is_spreadsheetml_name(
+                            &namespace,
+                            element.name(),
+                            b"pivotCacheDefinition",
+                        ) {
+                            return Err("pivot cache has an invalid root closing element".into());
+                        }
+                        closed_root = true;
+                    }
+                },
+                Event::Eof if parser.is_none() => return Ok(None),
+                Event::Eof if !closed_root || !stack.is_empty() => {
+                    return Err("pivot cache has a missing or unterminated root".into());
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+        }
+        Ok(parser.map(|parser| parser.cache))
+    }
+
+    fn start(
+        &mut self,
+        parent: CacheContext,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        resolver: &NamespaceResolver,
+    ) -> SheetResult<CacheContext> {
+        if parent == CacheContext::Root
+            && is_spreadsheetml_name(namespace, element.name(), b"cacheSource")
+        {
+            mark_once(&mut self.saw_cache_source, "pivot cacheSource")?;
+            if self.saw_cache_fields {
+                return Err("pivot cacheSource must precede cacheFields".into());
+            }
+            let source_type =
+                required_string(element, b"type", decoder, "pivot cache source type")?;
+            if !matches!(
+                source_type.as_str(),
+                "worksheet" | "external" | "consolidation" | "scenario"
+            ) {
+                return Err(format!("invalid pivot cache source type '{source_type}'").into());
+            }
+            self.cache.source_type = source_type;
+            self.cache.source_connection_id = optional_u32(
+                element,
+                b"connectionId",
+                decoder,
+                "pivot cache source connection ID",
+            )?;
+            return Ok(CacheContext::CacheSource);
+        }
+        if parent == CacheContext::CacheSource
+            && is_spreadsheetml_name(namespace, element.name(), b"worksheetSource")
+        {
+            mark_once(
+                &mut self.saw_worksheet_source,
+                "pivot cache worksheetSource",
+            )?;
+            if self.cache.source_type != "worksheet" {
+                return Err("worksheetSource requires a worksheet pivot-cache source".into());
+            }
+            self.cache.source_worksheet = unqualified_attribute_value(element, b"sheet", decoder)?;
+            self.cache.source_ref = unqualified_attribute_value(element, b"ref", decoder)?;
+            if let Some(reference) = self.cache.source_ref.as_deref() {
+                validate_cell_range(reference, "pivot cache source")?;
+            }
+            self.cache.source_name = unqualified_attribute_value(element, b"name", decoder)?;
+            self.cache.source_relationship_id =
+                relationship_attribute_value(element, b"id", decoder, resolver)?;
+            return Ok(CacheContext::WorksheetSource);
+        }
+        if parent == CacheContext::Root
+            && is_spreadsheetml_name(namespace, element.name(), b"cacheFields")
+        {
+            mark_once(&mut self.saw_cache_fields, "pivot cacheFields")?;
+            if !self.saw_cache_source {
+                return Err("pivot cacheFields must follow cacheSource".into());
+            }
+            self.expected_fields =
+                optional_u32(element, b"count", decoder, "pivot cacheFields count")?;
+            return Ok(CacheContext::CacheFields);
+        }
+        if parent == CacheContext::CacheFields
+            && is_spreadsheetml_name(namespace, element.name(), b"cacheField")
+        {
+            if self.pending_field.is_some() {
+                return Err("nested pivot cache field".into());
+            }
+            self.pending_field = Some(parse_cache_field_element(element, decoder)?);
+            self.field_saw_shared_items = false;
+            return Ok(CacheContext::CacheField);
+        }
+        if parent == CacheContext::CacheField
+            && is_spreadsheetml_name(namespace, element.name(), b"sharedItems")
+        {
+            mark_once(&mut self.field_saw_shared_items, "pivot cache sharedItems")?;
+            self.expected_shared_items =
+                optional_u32(element, b"count", decoder, "pivot sharedItems count")?;
+            return Ok(CacheContext::SharedItems);
+        }
+        if parent == CacheContext::SharedItems {
+            let item = parse_shared_item(namespace, element, decoder)?;
+            if let Some(item) = item {
+                self.pending_field
+                    .as_mut()
+                    .ok_or("pivot shared item outside a cache field")?
+                    .shared_items
+                    .push(item);
+                return Ok(CacheContext::Item);
+            }
+        }
+        Ok(CacheContext::Other)
+    }
+
+    fn finish(&mut self, context: CacheContext) -> SheetResult<()> {
+        match context {
+            CacheContext::Root if !self.saw_cache_source => {
+                Err("pivot cache is missing cacheSource".into())
+            },
+            CacheContext::Root if !self.saw_cache_fields => {
+                Err("pivot cache is missing cacheFields".into())
+            },
+            CacheContext::SharedItems => validate_count(
+                self.expected_shared_items,
+                self.pending_field
+                    .as_ref()
+                    .ok_or("missing pending pivot cache field")?
+                    .shared_items
+                    .len(),
+                "pivot sharedItems",
+            ),
+            CacheContext::CacheField => {
+                self.cache.cache_fields.push(
+                    self.pending_field
+                        .take()
+                        .ok_or("missing pending pivot cache field")?,
+                );
+                self.expected_shared_items = None;
+                Ok(())
+            },
+            CacheContext::CacheFields => validate_count(
+                self.expected_fields,
+                self.cache.cache_fields.len(),
+                "pivot cacheFields",
+            ),
+            _ => Ok(()),
+        }
+    }
+}
+
+pub fn read_pivot_cache_definition(xml: &str) -> SheetResult<Option<PivotCacheDefinition>> {
+    PivotCacheParser::parse(xml)
+}
+
+fn parse_cache_field_element(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+) -> SheetResult<PivotCacheField> {
+    let mut field = PivotCacheField {
+        name: required_string(element, b"name", decoder, "pivot cache field name")?,
+        ..Default::default()
+    };
+    field.caption = unqualified_attribute_value(element, b"caption", decoder)?;
+    field.property_name = unqualified_attribute_value(element, b"propertyName", decoder)?;
+    field.server_field =
+        optional_bool(element, b"serverField", decoder, "pivot cache serverField")?;
+    field.unique_list =
+        optional_bool(element, b"uniqueList", decoder, "pivot cache uniqueList")?.unwrap_or(true);
+    field.num_fmt_id = optional_u32(
+        element,
+        b"numFmtId",
+        decoder,
+        "pivot cache number format ID",
+    )?;
+    field.formula = unqualified_attribute_value(element, b"formula", decoder)?;
+    field.sql_type = optional_i32(element, b"sqlType", decoder, "pivot cache SQL type")?;
+    field.hierarchy = optional_i32(element, b"hierarchy", decoder, "pivot cache hierarchy")?;
+    field.level = optional_u32(element, b"level", decoder, "pivot cache level")?;
+    field.mapping_count = optional_u32(
+        element,
+        b"mappingCount",
+        decoder,
+        "pivot cache mapping count",
+    )?;
+    field.database_field = optional_bool(
+        element,
+        b"databaseField",
+        decoder,
+        "pivot cache databaseField",
+    )?
+    .unwrap_or(true);
+    field.member_property_field = optional_bool(
+        element,
+        b"memberPropertyField",
+        decoder,
+        "pivot cache memberPropertyField",
+    )?;
+    Ok(field)
+}
+
+fn parse_shared_item(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+) -> SheetResult<Option<SharedItem>> {
+    if is_spreadsheetml_name(namespace, element.name(), b"m") {
+        return Ok(Some(SharedItem::Missing));
+    }
+    if is_spreadsheetml_name(namespace, element.name(), b"n") {
+        let value = required_f64(element, b"v", decoder, "pivot shared number")?;
+        return Ok(Some(SharedItem::Number(value)));
+    }
+    if is_spreadsheetml_name(namespace, element.name(), b"b") {
+        let value = required_bool(element, b"v", decoder, "pivot shared boolean")?;
+        return Ok(Some(SharedItem::Boolean(value)));
+    }
+    if is_spreadsheetml_name(namespace, element.name(), b"e") {
+        return Ok(Some(SharedItem::Error(required_string(
+            element,
+            b"v",
+            decoder,
+            "pivot shared error",
+        )?)));
+    }
+    if is_spreadsheetml_name(namespace, element.name(), b"s") {
+        return Ok(Some(SharedItem::String(required_string(
+            element,
+            b"v",
+            decoder,
+            "pivot shared string",
+        )?)));
+    }
+    if is_spreadsheetml_name(namespace, element.name(), b"d") {
+        return Ok(Some(SharedItem::DateTime(required_string(
+            element,
+            b"v",
+            decoder,
+            "pivot shared date-time",
+        )?)));
+    }
+    Ok(None)
 }
 
 fn build_roles(
@@ -739,6 +985,90 @@ fn required_i32(
         .map_err(|_| format!("invalid {description} '{value}'").into())
 }
 
+fn optional_i32(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> SheetResult<Option<i32>> {
+    unqualified_attribute_value(element, name, decoder)?
+        .map(|value| {
+            value
+                .parse::<i32>()
+                .map_err(|_| format!("invalid {description} '{value}'").into())
+        })
+        .transpose()
+}
+
+fn optional_u8(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> SheetResult<Option<u8>> {
+    unqualified_attribute_value(element, name, decoder)?
+        .map(|value| {
+            value
+                .parse::<u8>()
+                .map_err(|_| format!("invalid {description} '{value}'").into())
+        })
+        .transpose()
+}
+
+fn optional_bool(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> SheetResult<Option<bool>> {
+    unqualified_attribute_value(element, name, decoder)?
+        .map(|value| match value.as_str() {
+            "1" | "true" => Ok(true),
+            "0" | "false" => Ok(false),
+            _ => Err(format!("invalid {description} '{value}'").into()),
+        })
+        .transpose()
+}
+
+fn required_bool(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> SheetResult<bool> {
+    optional_bool(element, name, decoder, description)?
+        .ok_or_else(|| format!("missing {description} attribute").into())
+}
+
+fn optional_f64(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> SheetResult<Option<f64>> {
+    unqualified_attribute_value(element, name, decoder)?
+        .map(|value| {
+            let parsed = value
+                .parse::<f64>()
+                .map_err(|_| format!("invalid {description} '{value}'"))?;
+            if !parsed.is_finite() {
+                return Err(format!("{description} must be finite").into());
+            }
+            Ok(parsed)
+        })
+        .transpose()
+}
+
+fn required_f64(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> SheetResult<f64> {
+    optional_f64(element, name, decoder, description)?
+        .ok_or_else(|| format!("missing {description} attribute").into())
+}
+
 fn mark_once(seen: &mut bool, description: &str) -> SheetResult<()> {
     if *seen {
         return Err(format!("duplicate {description} element").into());
@@ -771,14 +1101,6 @@ fn validate_cell_range(range: &str, description: &str) -> SheetResult<()> {
         return Err(format!("invalid {description} range '{range}'").into());
     }
     Ok(())
-}
-
-fn extract_attr(tag: &str, attr: &str) -> Option<String> {
-    let pattern = format!("{}=\"", attr);
-    let start = tag.find(&pattern)? + pattern.len();
-    let rest = &tag[start..];
-    let end = rest.find('"')?;
-    Some(rest[..end].to_string())
 }
 
 #[cfg(test)]
@@ -932,6 +1254,99 @@ mod tests {
         }
         assert!(
             read_pivot_table_definition(r#"<pivotTableDefinition xmlns="urn:foreign"/>"#)
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn parses_prefixed_pivot_cache_definition_and_shared_items() {
+        let xml = r##"<p:pivotCacheDefinition
+                xmlns:p="http://purl.oclc.org/ooxml/spreadsheetml/main"
+                xmlns:r="http://purl.oclc.org/ooxml/officeDocument/relationships"
+                xmlns:f="urn:foreign" r:id="records" invalid="true" saveData="0"
+                refreshOnLoad="1" optimizeMemory="false" enableRefresh="0"
+                refreshedBy="Alice &amp; Bob" refreshedDate="42.5" backgroundQuery="true"
+                missingItemsLimit="10" createdVersion="7" recordCount="6"
+                upgradeOnRefresh="1" tupleCache="0" supportSubquery="true">
+                <f:cacheSource type="worksheet"><p:worksheetSource ref="XFE1"/></f:cacheSource>
+                <p:cacheSource type="worksheet" connectionId="8"><p:worksheetSource
+                    sheet="Data &amp; More" ref="$A$1:$B$4" r:id="source-sheet"/></p:cacheSource>
+                <p:cacheFields count="2">
+                    <p:cacheField name="Region" caption="Area" databaseField="false"
+                            uniqueList="0" numFmtId="4" formula="x" sqlType="-1"
+                            hierarchy="2" level="3" mappingCount="4" memberPropertyField="true">
+                        <p:sharedItems count="6"><p:m/><p:n v="2.5"/><p:b v="true"/>
+                            <p:e v="#N/A"/><p:s v="North &amp; West"/><p:d v="2026-07-14T00:00:00Z"/>
+                        </p:sharedItems>
+                    </p:cacheField>
+                    <p:cacheField name="Sales"/>
+                </p:cacheFields>
+            </p:pivotCacheDefinition>"##;
+        let cache = read_pivot_cache_definition(xml).unwrap().unwrap();
+
+        assert_eq!(cache.id.as_deref(), Some("records"));
+        assert!(cache.invalid);
+        assert!(!cache.save_data);
+        assert_eq!(cache.refreshed_by.as_deref(), Some("Alice & Bob"));
+        assert_eq!(cache.source_worksheet.as_deref(), Some("Data & More"));
+        assert_eq!(cache.source_ref.as_deref(), Some("$A$1:$B$4"));
+        assert_eq!(cache.source_connection_id, Some(8));
+        assert_eq!(
+            cache.source_relationship_id.as_deref(),
+            Some("source-sheet")
+        );
+        assert_eq!(cache.cache_fields.len(), 2);
+        let field = &cache.cache_fields[0];
+        assert!(!field.database_field);
+        assert_eq!(field.sql_type, Some(-1));
+        assert_eq!(field.mapping_count, Some(4));
+        assert_eq!(field.member_property_field, Some(true));
+        assert_eq!(field.shared_items.len(), 6);
+        assert!(matches!(field.shared_items[0], SharedItem::Missing));
+        assert!(matches!(field.shared_items[1], SharedItem::Number(2.5)));
+        assert!(matches!(field.shared_items[2], SharedItem::Boolean(true)));
+        assert!(
+            matches!(&field.shared_items[4], SharedItem::String(value) if value == "North & West")
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_pivot_cache_definitions() {
+        const S: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+        let valid_source = r#"<cacheSource type="worksheet"><worksheetSource sheet="Data" ref="A1:B2"/></cacheSource>"#;
+        let invalid = [
+            format!(r#"<pivotCacheDefinition xmlns="{S}"><cacheFields/></pivotCacheDefinition>"#),
+            format!(
+                r#"<pivotCacheDefinition xmlns="{S}" invalid="yes">{valid_source}<cacheFields/></pivotCacheDefinition>"#
+            ),
+            format!(
+                r#"<pivotCacheDefinition xmlns="{S}"><cacheSource type="bad"/><cacheFields/></pivotCacheDefinition>"#
+            ),
+            format!(
+                r#"<pivotCacheDefinition xmlns="{S}">{valid_source}<cacheFields count="2"><cacheField name="One"/></cacheFields></pivotCacheDefinition>"#
+            ),
+            format!(
+                r#"<pivotCacheDefinition xmlns="{S}">{valid_source}<cacheSource type="worksheet"/><cacheFields/></pivotCacheDefinition>"#
+            ),
+            format!(
+                r#"<pivotCacheDefinition xmlns="{S}"><cacheFields/>{valid_source}</pivotCacheDefinition>"#
+            ),
+            format!(
+                r#"<pivotCacheDefinition xmlns="{S}">{valid_source}<cacheFields><cacheField/></cacheFields></pivotCacheDefinition>"#
+            ),
+            format!(
+                r#"<pivotCacheDefinition xmlns="{S}">{valid_source}<cacheFields><cacheField name="One"><sharedItems><n v="NaN"/></sharedItems></cacheField></cacheFields></pivotCacheDefinition>"#
+            ),
+            format!(
+                r#"<pivotCacheDefinition xmlns="{S}">{valid_source}<cacheFields><cacheField name="One"><sharedItems count="1"/></cacheField></cacheFields></pivotCacheDefinition>"#
+            ),
+        ];
+        for xml in invalid {
+            assert!(read_pivot_cache_definition(&xml).is_err(), "accepted {xml}");
+        }
+        assert!(
+            read_pivot_cache_definition(r#"<pivotCacheDefinition xmlns="urn:foreign"/>"#)
                 .unwrap()
                 .is_none()
         );

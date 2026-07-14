@@ -34,7 +34,8 @@ pub struct PivotCacheField {
     pub formula: Option<String>,
     pub sql_type: Option<i32>,
     pub hierarchy: Option<i32>,
-    pub member_property_field: Option<u32>,
+    pub mapping_count: Option<u32>,
+    pub member_property_field: Option<bool>,
     pub shared_items: Vec<SharedItem>,
 }
 
@@ -52,6 +53,7 @@ impl Default for PivotCacheField {
             formula: None,
             sql_type: None,
             hierarchy: None,
+            mapping_count: None,
             member_property_field: None,
             shared_items: Vec::new(),
         }
@@ -80,9 +82,11 @@ pub struct PivotCacheDefinition {
     pub supports_subquery: Option<bool>,
     pub supports_advanced_drill: Option<bool>,
     pub source_type: String,
+    pub source_connection_id: Option<u32>,
     pub source_worksheet: Option<String>,
     pub source_ref: Option<String>,
     pub source_name: Option<String>,
+    pub source_relationship_id: Option<String>,
     pub cache_fields: Vec<PivotCacheField>,
 }
 
@@ -109,9 +113,11 @@ impl Default for PivotCacheDefinition {
             supports_subquery: None,
             supports_advanced_drill: None,
             source_type: "worksheet".to_string(),
+            source_connection_id: None,
             source_worksheet: None,
             source_ref: None,
             source_name: None,
+            source_relationship_id: None,
             cache_fields: Vec::new(),
         }
     }
