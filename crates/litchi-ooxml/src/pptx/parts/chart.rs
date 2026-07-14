@@ -226,6 +226,10 @@ pub struct ChartSeries {
     pub values: Vec<f64>,
     /// Category names (for the X-axis)
     pub categories: Vec<String>,
+    /// Numeric X values for scatter and bubble charts.
+    pub x_values: Vec<f64>,
+    /// Bubble sizes for bubble charts.
+    pub bubble_sizes: Vec<f64>,
 }
 
 impl ChartSeries {
@@ -235,6 +239,8 @@ impl ChartSeries {
             name: name.into(),
             values: Vec::new(),
             categories: Vec::new(),
+            x_values: Vec::new(),
+            bubble_sizes: Vec::new(),
         }
     }
 
@@ -247,6 +253,18 @@ impl ChartSeries {
     /// Set the category names.
     pub fn with_categories(mut self, categories: Vec<String>) -> Self {
         self.categories = categories;
+        self
+    }
+
+    /// Set numeric X values for a scatter or bubble series.
+    pub fn with_x_values(mut self, x_values: Vec<f64>) -> Self {
+        self.x_values = x_values;
+        self
+    }
+
+    /// Set bubble sizes for a bubble series.
+    pub fn with_bubble_sizes(mut self, bubble_sizes: Vec<f64>) -> Self {
+        self.bubble_sizes = bubble_sizes;
         self
     }
 }
@@ -307,7 +325,8 @@ impl ChartData {
 }
 
 /// Generate chart XML from ChartData.
-pub fn generate_chart_xml(chart: &ChartData) -> String {
+pub fn generate_chart_xml(chart: &ChartData) -> Result<String> {
+    validate_chart_data(chart)?;
     let mut xml = String::with_capacity(8192);
 
     xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
@@ -366,29 +385,26 @@ pub fn generate_chart_xml(chart: &ChartData) -> String {
         ChartType::Doughnut => {
             generate_doughnut_chart(&mut xml, chart);
         },
-        _ => {
-            // Default to bar chart for unsupported types
-            generate_bar_chart(&mut xml, chart, false);
+        ChartType::Bubble => {
+            generate_bubble_chart(&mut xml, chart);
         },
+        ChartType::Radar => {
+            generate_radar_chart(&mut xml, chart);
+        },
+        ChartType::Surface => {
+            generate_surface_chart(&mut xml, chart);
+        },
+        ChartType::Stock => {
+            generate_stock_chart(&mut xml, chart);
+        },
+        ChartType::Unknown => unreachable!("validated above"),
     }
 
-    // Category axis (for non-scatter charts)
-    if chart.chart_type != ChartType::Scatter
-        && chart.chart_type != ChartType::Pie
-        && chart.chart_type != ChartType::Doughnut
-    {
-        xml.push_str(
-            r#"<c:catAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling>"#,
-        );
-        xml.push_str(r#"<c:delete val="0"/><c:axPos val="b"/><c:majorTickMark val="out"/>"#);
-        xml.push_str(r#"<c:minorTickMark val="none"/><c:crossAx val="2"/><c:crosses val="autoZero"/></c:catAx>"#);
-
-        // Value axis
-        xml.push_str(
-            r#"<c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling>"#,
-        );
-        xml.push_str(r#"<c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/>"#);
-        xml.push_str(r#"<c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:crossAx val="1"/><c:crosses val="autoZero"/></c:valAx>"#);
+    match chart.chart_type {
+        ChartType::Pie | ChartType::Doughnut => {},
+        ChartType::Scatter | ChartType::Bubble => write_value_axes(&mut xml),
+        ChartType::Surface => write_surface_axes(&mut xml),
+        _ => write_category_value_axes(&mut xml),
     }
 
     xml.push_str("</c:plotArea>");
@@ -410,7 +426,66 @@ pub fn generate_chart_xml(chart: &ChartData) -> String {
 
     xml.push_str("</c:chartSpace>");
 
-    xml
+    Ok(xml)
+}
+
+pub(crate) fn validate_chart_data(chart: &ChartData) -> Result<()> {
+    if chart.chart_type == ChartType::Unknown {
+        return Err(OoxmlError::InvalidFormat(
+            "cannot generate XML for an unknown chart type".to_string(),
+        ));
+    }
+
+    for series in &chart.series {
+        if series.values.iter().any(|value| !value.is_finite())
+            || series.x_values.iter().any(|value| !value.is_finite())
+            || series.bubble_sizes.iter().any(|value| !value.is_finite())
+        {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "chart series {:?} contains a non-finite number",
+                series.name
+            )));
+        }
+    }
+
+    if chart.chart_type == ChartType::Bubble {
+        for series in &chart.series {
+            if series.x_values.len() != series.values.len()
+                || series.bubble_sizes.len() != series.values.len()
+            {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "bubble series {:?} must have equal X, Y, and bubble-size lengths",
+                    series.name
+                )));
+            }
+            if series.bubble_sizes.iter().any(|size| *size < 0.0) {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "bubble series {:?} contains a negative bubble size",
+                    series.name
+                )));
+            }
+        }
+    }
+
+    if chart.chart_type == ChartType::Scatter {
+        for series in &chart.series {
+            if !series.x_values.is_empty() && series.x_values.len() != series.values.len() {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "scatter series {:?} must have equal X and Y lengths",
+                    series.name
+                )));
+            }
+        }
+    }
+
+    if chart.chart_type == ChartType::Stock && !matches!(chart.series.len(), 3 | 4) {
+        return Err(OoxmlError::InvalidFormat(
+            "stock charts require three (high-low-close) or four (open-high-low-close) series"
+                .to_string(),
+        ));
+    }
+
+    Ok(())
 }
 
 fn generate_bar_chart(xml: &mut String, chart: &ChartData, horizontal: bool) {
@@ -488,14 +563,20 @@ fn generate_scatter_chart(xml: &mut String, chart: &ChartData) {
             escape_xml(&series.name)
         ));
 
-        // X values (use categories or index)
-        xml.push_str("<c:xVal><c:numRef><c:f>Sheet1!$A$1</c:f><c:numCache>");
+        // X values (prefer explicit values, then numeric categories, then indexes)
+        let x_column = idx * 2;
+        let y_column = x_column + 1;
+        xml.push_str("<c:xVal><c:numRef><c:f>");
+        xml.push_str(&worksheet_range(x_column, series.values.len()));
+        xml.push_str("</c:f><c:numCache>");
         xml.push_str(&format!(
             r#"<c:formatCode>General</c:formatCode><c:ptCount val="{}"/>"#,
             series.values.len()
         ));
         for (i, _) in series.values.iter().enumerate() {
-            let x_val = if i < series.categories.len() {
+            let x_val = if let Some(value) = series.x_values.get(i) {
+                *value
+            } else if i < series.categories.len() {
                 series.categories[i].parse::<f64>().unwrap_or(i as f64)
             } else {
                 i as f64
@@ -505,7 +586,9 @@ fn generate_scatter_chart(xml: &mut String, chart: &ChartData) {
         xml.push_str("</c:numCache></c:numRef></c:xVal>");
 
         // Y values
-        xml.push_str("<c:yVal><c:numRef><c:f>Sheet1!$B$1</c:f><c:numCache>");
+        xml.push_str("<c:yVal><c:numRef><c:f>");
+        xml.push_str(&worksheet_range(y_column, series.values.len()));
+        xml.push_str("</c:f><c:numCache>");
         xml.push_str(&format!(
             r#"<c:formatCode>General</c:formatCode><c:ptCount val="{}"/>"#,
             series.values.len()
@@ -521,19 +604,6 @@ fn generate_scatter_chart(xml: &mut String, chart: &ChartData) {
     xml.push_str(r#"<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>"#);
     xml.push_str(r#"<c:axId val="1"/><c:axId val="2"/>"#);
     xml.push_str("</c:scatterChart>");
-
-    // Add X and Y axes for scatter chart
-    xml.push_str(
-        r#"<c:valAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling>"#,
-    );
-    xml.push_str(r#"<c:delete val="0"/><c:axPos val="b"/><c:majorGridlines/>"#);
-    xml.push_str(r#"<c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:crossAx val="2"/><c:crosses val="autoZero"/></c:valAx>"#);
-
-    xml.push_str(
-        r#"<c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling>"#,
-    );
-    xml.push_str(r#"<c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/>"#);
-    xml.push_str(r#"<c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:crossAx val="1"/><c:crosses val="autoZero"/></c:valAx>"#);
 }
 
 fn generate_doughnut_chart(xml: &mut String, chart: &ChartData) {
@@ -550,6 +620,153 @@ fn generate_doughnut_chart(xml: &mut String, chart: &ChartData) {
     xml.push_str("</c:doughnutChart>");
 }
 
+fn generate_bubble_chart(xml: &mut String, chart: &ChartData) {
+    xml.push_str("<c:bubbleChart><c:varyColors val=\"0\"/>");
+
+    for (idx, series) in chart.series.iter().enumerate() {
+        let x_column = idx * 3;
+        write_xy_size_series(xml, series, idx as u32, x_column);
+    }
+
+    xml.push_str(r#"<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>"#);
+    xml.push_str(r#"<c:bubble3D val="0"/><c:bubbleScale val="100"/><c:showNegBubbles val="0"/><c:sizeRepresents val="area"/>"#);
+    xml.push_str(r#"<c:axId val="1"/><c:axId val="2"/></c:bubbleChart>"#);
+}
+
+fn generate_radar_chart(xml: &mut String, chart: &ChartData) {
+    xml.push_str(r#"<c:radarChart><c:radarStyle val="marker"/><c:varyColors val="0"/>"#);
+    for (idx, series) in chart.series.iter().enumerate() {
+        write_series(xml, series, idx as u32, false);
+    }
+    xml.push_str(r#"<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>"#);
+    xml.push_str(r#"<c:axId val="1"/><c:axId val="2"/></c:radarChart>"#);
+}
+
+fn generate_stock_chart(xml: &mut String, chart: &ChartData) {
+    xml.push_str("<c:stockChart>");
+    for (idx, series) in chart.series.iter().enumerate() {
+        write_series(xml, series, idx as u32, false);
+    }
+    xml.push_str(r#"<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>"#);
+    xml.push_str("<c:hiLowLines/>");
+    if chart.series.len() == 4 {
+        xml.push_str(
+            r#"<c:upDownBars><c:gapWidth val="150"/><c:upBars/><c:downBars/></c:upDownBars>"#,
+        );
+    }
+    xml.push_str(r#"<c:axId val="1"/><c:axId val="2"/></c:stockChart>"#);
+}
+
+fn generate_surface_chart(xml: &mut String, chart: &ChartData) {
+    xml.push_str(r#"<c:surfaceChart><c:wireframe val="0"/>"#);
+    for (idx, series) in chart.series.iter().enumerate() {
+        write_series(xml, series, idx as u32, false);
+    }
+    xml.push_str(
+        r#"<c:bandFmts/><c:axId val="1"/><c:axId val="2"/><c:axId val="3"/></c:surfaceChart>"#,
+    );
+}
+
+fn write_xy_size_series(xml: &mut String, series: &ChartSeries, idx: u32, x_column: usize) {
+    xml.push_str("<c:ser>");
+    xml.push_str(&format!(
+        r#"<c:idx val="{}"/><c:order val="{}"/>"#,
+        idx, idx
+    ));
+    xml.push_str(&format!(
+        "<c:tx><c:v>{}</c:v></c:tx>",
+        escape_xml(&series.name)
+    ));
+    write_numeric_reference(
+        xml,
+        "xVal",
+        &worksheet_range(x_column, series.x_values.len()),
+        &series.x_values,
+    );
+    write_numeric_reference(
+        xml,
+        "yVal",
+        &worksheet_range(x_column + 1, series.values.len()),
+        &series.values,
+    );
+    write_numeric_reference(
+        xml,
+        "bubbleSize",
+        &worksheet_range(x_column + 2, series.bubble_sizes.len()),
+        &series.bubble_sizes,
+    );
+    xml.push_str(r#"<c:bubble3D val="0"/></c:ser>"#);
+}
+
+fn write_numeric_reference(xml: &mut String, tag: &str, formula: &str, values: &[f64]) {
+    xml.push_str(&format!(
+        "<c:{tag}><c:numRef><c:f>{formula}</c:f><c:numCache>"
+    ));
+    xml.push_str(&format!(
+        r#"<c:formatCode>General</c:formatCode><c:ptCount val="{}"/>"#,
+        values.len()
+    ));
+    for (index, value) in values.iter().enumerate() {
+        xml.push_str(&format!(
+            r#"<c:pt idx="{}"><c:v>{}</c:v></c:pt>"#,
+            index, value
+        ));
+    }
+    xml.push_str(&format!("</c:numCache></c:numRef></c:{tag}>"));
+}
+
+fn write_category_value_axes(xml: &mut String) {
+    xml.push_str(
+        r#"<c:catAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling>"#,
+    );
+    xml.push_str(r#"<c:delete val="0"/><c:axPos val="b"/><c:majorTickMark val="out"/>"#);
+    xml.push_str(
+        r#"<c:minorTickMark val="none"/><c:crossAx val="2"/><c:crosses val="autoZero"/></c:catAx>"#,
+    );
+    write_value_axis(xml, 2, "l", 1);
+}
+
+fn write_value_axes(xml: &mut String) {
+    write_value_axis(xml, 1, "b", 2);
+    write_value_axis(xml, 2, "l", 1);
+}
+
+fn write_surface_axes(xml: &mut String) {
+    write_category_value_axes(xml);
+    xml.push_str(
+        r#"<c:serAx><c:axId val="3"/><c:scaling><c:orientation val="minMax"/></c:scaling>"#,
+    );
+    xml.push_str(r#"<c:delete val="0"/><c:axPos val="b"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:crossAx val="2"/><c:crosses val="autoZero"/></c:serAx>"#);
+}
+
+fn write_value_axis(xml: &mut String, id: u32, position: &str, cross_axis: u32) {
+    xml.push_str(&format!(
+        r#"<c:valAx><c:axId val="{}"/><c:scaling><c:orientation val="minMax"/></c:scaling>"#,
+        id
+    ));
+    xml.push_str(&format!(
+        r#"<c:delete val="0"/><c:axPos val="{}"/><c:majorGridlines/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:crossAx val="{}"/><c:crosses val="autoZero"/></c:valAx>"#,
+        position, cross_axis
+    ));
+}
+
+fn worksheet_range(column: usize, len: usize) -> String {
+    let column = worksheet_column(column);
+    let end_row = len.saturating_add(1).max(2);
+    format!("Sheet1!${column}$2:${column}${end_row}")
+}
+
+fn worksheet_column(mut index: usize) -> String {
+    let mut result = String::new();
+    loop {
+        result.insert(0, (b'A' + (index % 26) as u8) as char);
+        if index < 26 {
+            return result;
+        }
+        index = index / 26 - 1;
+    }
+}
+
 fn write_series(xml: &mut String, series: &ChartSeries, idx: u32, is_pie: bool) {
     xml.push_str("<c:ser>");
     xml.push_str(&format!(r#"<c:idx val="{}"/>"#, idx));
@@ -561,7 +778,9 @@ fn write_series(xml: &mut String, series: &ChartSeries, idx: u32, is_pie: bool) 
 
     // Categories (if present)
     if !series.categories.is_empty() {
-        xml.push_str("<c:cat><c:strRef><c:f>Sheet1!$A$1</c:f><c:strCache>");
+        xml.push_str("<c:cat><c:strRef><c:f>");
+        xml.push_str(&worksheet_range(0, series.categories.len()));
+        xml.push_str("</c:f><c:strCache>");
         xml.push_str(&format!(
             r#"<c:ptCount val="{}"/>"#,
             series.categories.len()
@@ -577,7 +796,9 @@ fn write_series(xml: &mut String, series: &ChartSeries, idx: u32, is_pie: bool) 
     }
 
     // Values
-    xml.push_str("<c:val><c:numRef><c:f>Sheet1!$B$1</c:f><c:numCache>");
+    xml.push_str("<c:val><c:numRef><c:f>");
+    xml.push_str(&worksheet_range(idx as usize + 1, series.values.len()));
+    xml.push_str("</c:f><c:numCache>");
     xml.push_str(&format!(
         r#"<c:formatCode>General</c:formatCode><c:ptCount val="{}"/>"#,
         series.values.len()
@@ -709,9 +930,102 @@ mod tests {
             .with_title("Test Chart")
             .add_series(ChartSeries::new("Data").with_values(vec![1.0, 2.0, 3.0]));
 
-        let xml = generate_chart_xml(&chart);
+        let xml = generate_chart_xml(&chart).unwrap();
         assert!(xml.contains("<c:chartSpace"));
         assert!(xml.contains("Test Chart"));
         assert!(xml.contains("<c:barChart>"));
+    }
+
+    fn chart_with_series(chart_type: ChartType, series_count: usize) -> ChartData {
+        (0..series_count).fold(
+            ChartData::new(chart_type, 0, 0, 100, 100),
+            |chart, index| {
+                chart.add_series(
+                    ChartSeries::new(format!("Series {index}"))
+                        .with_categories(vec!["A".to_string(), "B".to_string()])
+                        .with_values(vec![index as f64 + 1.0, index as f64 + 2.0]),
+                )
+            },
+        )
+    }
+
+    #[test]
+    fn declared_chart_types_are_not_downgraded_to_columns() {
+        for (chart_type, expected_tag, series_count) in [
+            (ChartType::Radar, "radarChart", 2),
+            (ChartType::Surface, "surfaceChart", 2),
+            (ChartType::Stock, "stockChart", 3),
+        ] {
+            let xml = generate_chart_xml(&chart_with_series(chart_type, series_count)).unwrap();
+            assert!(xml.contains(&format!("<c:{expected_tag}>")));
+            assert!(!xml.contains("<c:barChart>"));
+            assert_eq!(parse_chart_info(&xml).chart_type, chart_type);
+        }
+    }
+
+    #[test]
+    fn bubble_chart_writes_all_three_numeric_dimensions() {
+        let chart = ChartData::new(ChartType::Bubble, 0, 0, 100, 100).add_series(
+            ChartSeries::new("Reach")
+                .with_x_values(vec![1.0, 2.0])
+                .with_values(vec![10.0, 20.0])
+                .with_bubble_sizes(vec![5.0, 8.0]),
+        );
+        let xml = generate_chart_xml(&chart).unwrap();
+
+        assert!(xml.contains("<c:bubbleChart>"));
+        assert!(xml.contains("<c:xVal>"));
+        assert!(xml.contains("<c:yVal>"));
+        assert!(xml.contains("<c:bubbleSize>"));
+        assert!(xml.contains("Sheet1!$A$2:$A$3"));
+        assert!(xml.contains("Sheet1!$B$2:$B$3"));
+        assert!(xml.contains("Sheet1!$C$2:$C$3"));
+        assert_eq!(parse_chart_info(&xml).chart_type, ChartType::Bubble);
+    }
+
+    #[test]
+    fn surface_chart_writes_its_series_axis() {
+        let xml = generate_chart_xml(&chart_with_series(ChartType::Surface, 2)).unwrap();
+        assert!(xml.contains("<c:serAx>"));
+        assert!(xml.contains(r#"<c:axId val="3"/>"#));
+    }
+
+    #[test]
+    fn chart_formulas_reference_real_workbook_ranges() {
+        let chart = chart_with_series(ChartType::Column, 2);
+        let xml = generate_chart_xml(&chart).unwrap();
+
+        assert!(xml.contains("Sheet1!$A$2:$A$3"));
+        assert!(xml.contains("Sheet1!$B$2:$B$3"));
+        assert!(xml.contains("Sheet1!$C$2:$C$3"));
+        assert!(!xml.contains("Sheet1!$A$1"));
+    }
+
+    #[test]
+    fn invalid_specialized_chart_data_is_rejected() {
+        let unknown = ChartData::new(ChartType::Unknown, 0, 0, 100, 100);
+        assert!(generate_chart_xml(&unknown).is_err());
+
+        let bad_bubble = ChartData::new(ChartType::Bubble, 0, 0, 100, 100).add_series(
+            ChartSeries::new("Bad")
+                .with_x_values(vec![1.0])
+                .with_values(vec![2.0, 3.0])
+                .with_bubble_sizes(vec![4.0, 5.0]),
+        );
+        assert!(generate_chart_xml(&bad_bubble).is_err());
+
+        let bad_stock = chart_with_series(ChartType::Stock, 2);
+        assert!(generate_chart_xml(&bad_stock).is_err());
+
+        let bad_scatter = ChartData::new(ChartType::Scatter, 0, 0, 100, 100).add_series(
+            ChartSeries::new("Bad")
+                .with_x_values(vec![1.0])
+                .with_values(vec![2.0, 3.0]),
+        );
+        assert!(generate_chart_xml(&bad_scatter).is_err());
+
+        let non_finite = ChartData::new(ChartType::Line, 0, 0, 100, 100)
+            .add_series(ChartSeries::new("Bad").with_values(vec![f64::NAN]));
+        assert!(generate_chart_xml(&non_finite).is_err());
     }
 }

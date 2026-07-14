@@ -33,6 +33,8 @@ use litchi_core::xml::escape_xml;
 pub fn generate_chart_excel_data(chart: &ChartData) -> Result<Vec<u8>> {
     use soapberry_zip::office::StreamingArchiveWriter;
 
+    crate::pptx::parts::chart::validate_chart_data(chart)?;
+
     let mut writer = StreamingArchiveWriter::new();
 
     // [Content_Types].xml
@@ -131,6 +133,14 @@ fn generate_styles_xml() -> String {
 fn generate_worksheet_xml(chart: &ChartData) -> String {
     use std::fmt::Write;
 
+    if matches!(
+        chart.chart_type,
+        crate::pptx::parts::chart::ChartType::Scatter
+            | crate::pptx::parts::chart::ChartType::Bubble
+    ) {
+        return generate_xy_worksheet_xml(chart);
+    }
+
     let mut xml = String::with_capacity(4096);
 
     xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
@@ -156,8 +166,6 @@ fn generate_worksheet_xml(chart: &ChartData) -> String {
 
     // Row 1: Header row with series names
     xml.push_str(r#"<row r="1">"#);
-    // A1 is empty (category header)
-    xml.push_str(r#"<c r="A1" t="s"><v>0</v></c>"#); // Placeholder for shared string
 
     for (col_idx, series) in chart.series.iter().enumerate() {
         let col_letter = column_letter(col_idx + 1); // B, C, D, ...
@@ -210,6 +218,104 @@ fn generate_worksheet_xml(chart: &ChartData) -> String {
     xml.push_str("</sheetData>");
     xml.push_str("</worksheet>");
 
+    xml
+}
+
+fn generate_xy_worksheet_xml(chart: &ChartData) -> String {
+    use crate::pptx::parts::chart::ChartType;
+    use std::fmt::Write;
+
+    let is_bubble = chart.chart_type == ChartType::Bubble;
+    let columns_per_series = if is_bubble { 3 } else { 2 };
+    let num_data_rows = chart
+        .series
+        .iter()
+        .map(|series| {
+            series
+                .values
+                .len()
+                .max(series.x_values.len())
+                .max(series.bubble_sizes.len())
+                .max(series.categories.len())
+        })
+        .max()
+        .unwrap_or(0);
+
+    let mut xml = String::with_capacity(4096);
+    xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
+    xml.push_str(
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>"#,
+    );
+    xml.push_str(r#"<row r="1">"#);
+    for (series_index, series) in chart.series.iter().enumerate() {
+        let first_column = series_index * columns_per_series;
+        for (offset, suffix) in [(0, " X"), (1, "")] {
+            let column = column_letter(first_column + offset);
+            let _ = write!(
+                xml,
+                r#"<c r="{}1" t="inlineStr"><is><t>{}{}</t></is></c>"#,
+                column,
+                escape_xml(&series.name),
+                suffix
+            );
+        }
+        if is_bubble {
+            let column = column_letter(first_column + 2);
+            let _ = write!(
+                xml,
+                r#"<c r="{}1" t="inlineStr"><is><t>{} Size</t></is></c>"#,
+                column,
+                escape_xml(&series.name)
+            );
+        }
+    }
+    xml.push_str("</row>");
+
+    for row_index in 0..num_data_rows {
+        let row_number = row_index + 2;
+        let _ = write!(xml, r#"<row r="{}">"#, row_number);
+        for (series_index, series) in chart.series.iter().enumerate() {
+            let first_column = series_index * columns_per_series;
+            let x_value = series.x_values.get(row_index).copied().or_else(|| {
+                if is_bubble {
+                    None
+                } else {
+                    Some(
+                        series
+                            .categories
+                            .get(row_index)
+                            .and_then(|value| value.parse::<f64>().ok())
+                            .unwrap_or(row_index as f64),
+                    )
+                }
+            });
+            for (offset, value) in [
+                (0, x_value),
+                (1, series.values.get(row_index).copied()),
+                (
+                    2,
+                    is_bubble
+                        .then(|| series.bubble_sizes.get(row_index).copied())
+                        .flatten(),
+                ),
+            ] {
+                if offset >= columns_per_series {
+                    continue;
+                }
+                if let Some(value) = value {
+                    let column = column_letter(first_column + offset);
+                    let _ = write!(
+                        xml,
+                        r#"<c r="{}{}"><v>{}</v></c>"#,
+                        column, row_number, value
+                    );
+                }
+            }
+        }
+        xml.push_str("</row>");
+    }
+
+    xml.push_str("</sheetData></worksheet>");
     xml
 }
 
@@ -277,6 +383,55 @@ mod tests {
         assert!(xml.contains("Test")); // Series name
         assert!(xml.contains("<v>1</v>")); // First value
         assert!(xml.contains("<v>2</v>")); // Second value
+        assert!(!xml.contains(r#"t="s""#)); // No dangling shared-string reference
+    }
+
+    #[test]
+    fn bubble_worksheet_uses_x_y_and_size_columns() {
+        let chart = ChartData::new(ChartType::Bubble, 0, 0, 100, 100).add_series(
+            ChartSeries::new("Reach")
+                .with_x_values(vec![1.0, 2.0])
+                .with_values(vec![10.0, 20.0])
+                .with_bubble_sizes(vec![4.0, 8.0]),
+        );
+
+        let xml = generate_worksheet_xml(&chart);
+        assert!(xml.contains(r#"r="A2"><v>1</v>"#));
+        assert!(xml.contains(r#"r="B2"><v>10</v>"#));
+        assert!(xml.contains(r#"r="C2"><v>4</v>"#));
+        assert!(xml.contains("Reach Size"));
+    }
+
+    #[test]
+    fn scatter_worksheet_allocates_a_pair_of_columns_per_series() {
+        let chart = ChartData::new(ChartType::Scatter, 0, 0, 100, 100)
+            .add_series(
+                ChartSeries::new("First")
+                    .with_x_values(vec![1.0])
+                    .with_values(vec![2.0]),
+            )
+            .add_series(
+                ChartSeries::new("Second")
+                    .with_x_values(vec![3.0])
+                    .with_values(vec![4.0]),
+            );
+
+        let xml = generate_worksheet_xml(&chart);
+        assert!(xml.contains(r#"r="A2"><v>1</v>"#));
+        assert!(xml.contains(r#"r="B2"><v>2</v>"#));
+        assert!(xml.contains(r#"r="C2"><v>3</v>"#));
+        assert!(xml.contains(r#"r="D2"><v>4</v>"#));
+    }
+
+    #[test]
+    fn embedded_workbook_rejects_invalid_chart_dimensions() {
+        let chart = ChartData::new(ChartType::Bubble, 0, 0, 100, 100).add_series(
+            ChartSeries::new("Bad")
+                .with_x_values(vec![1.0])
+                .with_values(vec![2.0, 3.0])
+                .with_bubble_sizes(vec![4.0]),
+        );
+        assert!(generate_chart_excel_data(&chart).is_err());
     }
 
     /// **Feature: charts-smartart-integration, Property 5: Excel data is valid ZIP**

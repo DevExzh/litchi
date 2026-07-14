@@ -82,7 +82,7 @@ fn test_column_charts(
         .add_series(series2)
         .with_legend(true);
 
-    let xml = generate_chart_xml(&chart);
+    let xml = generate_chart_xml(&chart)?;
     println!("  ✓ Quarterly Sales chart: {} bytes XML", xml.len());
     slide.add_text_box(
         &format!("Quarterly Sales Comparison\n\nData:\n- Q1-Q4 2023/2024\n- Chart Type: Column\n- Generated XML: {} bytes", xml.len()),
@@ -108,7 +108,7 @@ fn test_column_charts(
         .add_series(revenue_series)
         .with_legend(false);
 
-    let xml = generate_chart_xml(&revenue_chart);
+    let xml = generate_chart_xml(&revenue_chart)?;
     println!("  ✓ Monthly Revenue chart: {} bytes XML", xml.len());
     println!();
 
@@ -148,7 +148,7 @@ fn test_bar_charts(
         .add_series(market_share)
         .with_legend(false);
 
-    let xml = generate_chart_xml(&chart);
+    let xml = generate_chart_xml(&chart)?;
     println!("  ✓ Market Share chart: {} bytes XML", xml.len());
 
     // Department budget comparison
@@ -178,7 +178,7 @@ fn test_bar_charts(
         .add_series(budget_2024)
         .with_legend(true);
 
-    let xml = generate_chart_xml(&budget_chart);
+    let xml = generate_chart_xml(&budget_chart)?;
     println!("  ✓ Budget Allocation chart: {} bytes XML", xml.len());
     slide.add_text_box(
         &format!("Department Budget Allocation\n\nComparing:\n- 2023 vs 2024 budgets\n- 6 departments\n- Generated XML: {} bytes", xml.len()),
@@ -219,7 +219,7 @@ fn test_line_charts(
         .add_series(stock_price)
         .with_legend(false);
 
-    let xml = generate_chart_xml(&chart);
+    let xml = generate_chart_xml(&chart)?;
     println!("  ✓ Stock Price chart: {} bytes XML", xml.len());
 
     // Website traffic (multiple metrics)
@@ -243,7 +243,7 @@ fn test_line_charts(
         .add_series(pageviews)
         .with_legend(true);
 
-    let xml = generate_chart_xml(&traffic_chart);
+    let xml = generate_chart_xml(&traffic_chart)?;
     println!("  ✓ Website Traffic chart: {} bytes XML", xml.len());
     slide.add_text_box(
         &format!("Website Traffic 2024\n\nMetrics:\n- Unique Visitors\n- Page Views\n- 12 months of data\n- Generated XML: {} bytes", xml.len()),
@@ -286,7 +286,7 @@ fn test_pie_charts(
         .add_series(regional_revenue)
         .with_legend(true);
 
-    let xml = generate_chart_xml(&chart);
+    let xml = generate_chart_xml(&chart)?;
     println!("  ✓ Regional Revenue chart: {} bytes XML", xml.len());
 
     // Customer segments
@@ -304,7 +304,7 @@ fn test_pie_charts(
         .add_series(customer_distribution)
         .with_legend(true);
 
-    let xml = generate_chart_xml(&segment_chart);
+    let xml = generate_chart_xml(&segment_chart)?;
     println!("  ✓ Customer Segmentation chart: {} bytes XML", xml.len());
     slide.add_text_box(
         &format!("Revenue by Region & Customer Segments\n\nShowing:\n- Regional distribution\n- Customer segments\n- Generated XML: {} + {} bytes", xml.len(), xml.len()),
@@ -351,7 +351,7 @@ fn test_area_charts(
         .add_series(product_c)
         .with_legend(true);
 
-    let xml = generate_chart_xml(&chart);
+    let xml = generate_chart_xml(&chart)?;
     println!("  ✓ Cumulative Sales chart: {} bytes XML", xml.len());
     slide.add_text_box(
         &format!("Cumulative Sales by Product Line\n\nData:\n- 3 product lines\n- Q1-Q4 quarterly data\n- Stacked area chart\n- Generated XML: {} bytes", xml.len()),
@@ -390,7 +390,7 @@ fn test_scatter_charts(
         .add_series(revenue_impact)
         .with_legend(false);
 
-    let xml = generate_chart_xml(&chart);
+    let xml = generate_chart_xml(&chart)?;
     println!("  ✓ Scatter chart: {} bytes XML", xml.len());
     slide.add_text_box(
         &format!("Ad Spend vs Revenue Correlation\n\nAnalysis:\n- Ad spend: $10K-$50K\n- Revenue impact measured\n- Correlation visualization\n- Generated XML: {} bytes", xml.len()),
@@ -442,7 +442,7 @@ fn test_multi_series_charts(
         .add_series(team_delta)
         .with_legend(true);
 
-    let xml = generate_chart_xml(&chart);
+    let xml = generate_chart_xml(&chart)?;
     println!(
         "  ✓ Multi-series Performance chart: {} bytes XML",
         xml.len()

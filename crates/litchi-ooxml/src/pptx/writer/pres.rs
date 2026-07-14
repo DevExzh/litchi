@@ -684,7 +684,7 @@ impl MutablePresentation {
         use crate::pptx::parts::chart::generate_chart_xml;
 
         // Generate chart XML
-        let chart_xml = generate_chart_xml(chart_data);
+        let chart_xml = generate_chart_xml(chart_data)?;
 
         // Generate embedded Excel data
         let excel_data = generate_chart_excel_data(chart_data)?;
