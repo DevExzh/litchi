@@ -1,6 +1,6 @@
 //! Sheet structures for ODS spreadsheets.
 
-use super::{Row, SheetProtection};
+use super::{Column, Row, SheetProtection};
 use litchi_core::Result;
 
 /// A sheet (worksheet) in an ODS spreadsheet.
@@ -12,6 +12,8 @@ pub struct Sheet {
     pub name: String,
     /// Rows in this sheet
     pub rows: Vec<Row>,
+    /// Logical table columns and their structural metadata.
+    pub columns: Vec<Column>,
     /// Sheet protection metadata and edit permissions.
     pub protection: SheetProtection,
 }
@@ -25,6 +27,11 @@ impl Sheet {
     /// Get all rows in the sheet.
     pub fn rows(&self) -> Result<&[Row]> {
         Ok(&self.rows)
+    }
+
+    /// Get all explicitly declared logical columns.
+    pub fn columns(&self) -> &[Column] {
+        &self.columns
     }
 
     /// Get the number of rows in the sheet.
@@ -45,7 +52,7 @@ impl Sheet {
             .map(|row| row.cells.len())
             .max()
             .unwrap_or(0);
-        Ok(max_cols)
+        Ok(max_cols.max(self.columns.len()))
     }
 }
 
@@ -58,6 +65,7 @@ mod tests {
     #[test]
     fn test_sheet_new() {
         let sheet = Sheet {
+            columns: Vec::new(),
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![],
@@ -70,6 +78,7 @@ mod tests {
     #[test]
     fn test_sheet_name() {
         let sheet = Sheet {
+            columns: Vec::new(),
             protection: SheetProtection::default(),
             name: "Test Sheet".to_string(),
             rows: vec![],
@@ -80,16 +89,23 @@ mod tests {
     #[test]
     fn test_sheet_rows() {
         let sheet = Sheet {
+            columns: Vec::new(),
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![
                 Row {
                     cells: vec![],
                     index: 0,
+                    style_name: None,
+                    default_cell_style_name: None,
+                    visibility: Default::default(),
                 },
                 Row {
                     cells: vec![],
                     index: 1,
+                    style_name: None,
+                    default_cell_style_name: None,
+                    visibility: Default::default(),
                 },
             ],
         };
@@ -101,6 +117,7 @@ mod tests {
     #[test]
     fn test_sheet_column_count() {
         let sheet = Sheet {
+            columns: Vec::new(),
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![
@@ -150,6 +167,9 @@ mod tests {
                         },
                     ],
                     index: 0,
+                    style_name: None,
+                    default_cell_style_name: None,
+                    visibility: Default::default(),
                 },
                 Row {
                     cells: vec![
@@ -183,6 +203,9 @@ mod tests {
                         },
                     ],
                     index: 1,
+                    style_name: None,
+                    default_cell_style_name: None,
+                    visibility: Default::default(),
                 },
             ],
         };
@@ -193,6 +216,7 @@ mod tests {
     #[test]
     fn test_sheet_column_count_empty() {
         let sheet = Sheet {
+            columns: Vec::new(),
             protection: SheetProtection::default(),
             name: "Empty".to_string(),
             rows: vec![],
@@ -203,6 +227,7 @@ mod tests {
     #[test]
     fn test_sheet_with_data() {
         let sheet = Sheet {
+            columns: Vec::new(),
             protection: SheetProtection::default(),
             name: "Data".to_string(),
             rows: vec![
@@ -238,6 +263,9 @@ mod tests {
                         },
                     ],
                     index: 0,
+                    style_name: None,
+                    default_cell_style_name: None,
+                    visibility: Default::default(),
                 },
                 Row {
                     cells: vec![
@@ -271,6 +299,9 @@ mod tests {
                         },
                     ],
                     index: 1,
+                    style_name: None,
+                    default_cell_style_name: None,
+                    visibility: Default::default(),
                 },
             ],
         };
@@ -288,6 +319,7 @@ mod tests {
     #[test]
     fn test_sheet_clone() {
         let sheet = Sheet {
+            columns: Vec::new(),
             protection: SheetProtection::default(),
             name: "Original".to_string(),
             rows: vec![],

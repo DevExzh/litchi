@@ -235,12 +235,12 @@ pub use litchi_core::unit::{Length, LengthUnit};
 pub use odp::{MutablePresentation, Presentation, PresentationBuilder};
 pub use ods::{
     AnnotationElement, AnnotationNode, Cell as SCell, CellAnnotation, CellMatrixSpan, CellMerge,
-    CellStyleProtection, CellValue, ContentValidation, FormulaNamespace, MutableSpreadsheet,
-    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, NamedRangeUsage,
-    ProtectionKey, Row as SRow, Sheet, SheetProtection, SheetProtectionOptions, Spreadsheet,
-    SpreadsheetBuilder, SpreadsheetProtection, ValidationDisplayList, ValidationErrorMacro,
-    ValidationErrorMessage, ValidationEventListener, ValidationMessage, ValidationMessageType,
-    ValidationPresentationEventListener, ValidationPresentationSound,
+    CellStyleProtection, CellValue, Column as SColumn, ContentValidation, FormulaNamespace,
+    MutableSpreadsheet, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
+    NamedRangeUsage, ProtectionKey, Row as SRow, Sheet, SheetProtection, SheetProtectionOptions,
+    Spreadsheet, SpreadsheetBuilder, SpreadsheetProtection, TableVisibility, ValidationDisplayList,
+    ValidationErrorMacro, ValidationErrorMessage, ValidationEventListener, ValidationMessage,
+    ValidationMessageType, ValidationPresentationEventListener, ValidationPresentationSound,
     ValidationScriptEventListener,
 };
 pub use odt::{Document, DocumentBuilder, MutableDocument};

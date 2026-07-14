@@ -1,9 +1,10 @@
 //! ODS-specific parsing utilities.
 
 use super::{
-    Cell, CellMatrixSpan, CellMerge, CellValue, NamedDefinition, NamedDefinitionScope,
-    NamedExpression, NamedRange, NamedRangeUsage, Row, Sheet,
+    Cell, CellMatrixSpan, CellMerge, CellValue, Column, NamedDefinition, NamedDefinitionScope,
+    NamedExpression, NamedRange, NamedRangeUsage, Row, Sheet, TableVisibility,
     annotation::{AnnotationBuilder, decode_reference},
+    structure::{MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET},
 };
 use litchi_core::{Error, Result};
 use quick_xml::Reader;
@@ -20,7 +21,6 @@ const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0
 const TABLE_NAMESPACE_URI: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
-const MAX_EXPANDED_ROWS_PER_SHEET: usize = 1_048_576;
 const MAX_EXPANDED_CELLS_PER_ROW: usize = 1_048_576;
 const MAX_EXPANDED_CELLS_PER_SHEET: usize = 4_194_304;
 
@@ -77,6 +77,19 @@ impl OdsParser {
                         let name =
                             Self::extract_table_name(e, reader.decoder(), &document_namespaces)?;
                         current_sheet = Some(SheetBuilder::new(name));
+                    } else if current_row.is_none()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "table-column",
+                        )
+                    {
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            let (column, repeated) =
+                                Self::parse_column(e, reader.decoder(), &document_namespaces)?;
+                            sheet.add_repeated_column(column, repeated)?;
+                        }
                     } else if current_sheet.is_some()
                         && Self::element_name_is(
                             e.name().as_ref(),
@@ -85,12 +98,11 @@ impl OdsParser {
                             "table-row",
                         )
                     {
-                        current_row = Some(RowBuilder::with_repeated(Self::parse_repeated(
+                        current_row = Some(RowBuilder::from_element(
                             e,
                             reader.decoder(),
                             &document_namespaces,
-                            "number-rows-repeated",
-                        )?));
+                        )?);
                     } else if current_row.is_some()
                         && (Self::element_name_is(
                             e.name().as_ref(),
@@ -155,6 +167,19 @@ impl OdsParser {
                             &document_namespaces,
                             &mut text_content,
                         )?;
+                    } else if current_row.is_none()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "table-column",
+                        )
+                    {
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            let (column, repeated) =
+                                Self::parse_column(e, reader.decoder(), &document_namespaces)?;
+                            sheet.add_repeated_column(column, repeated)?;
+                        }
                     } else if current_row.is_some()
                         && (Self::element_name_is(
                             e.name().as_ref(),
@@ -190,14 +215,11 @@ impl OdsParser {
                             "table-row",
                         )
                     {
-                        let repeated = Self::parse_repeated(
-                            e,
-                            reader.decoder(),
-                            &document_namespaces,
-                            "number-rows-repeated",
-                        )?;
+                        let row_builder =
+                            RowBuilder::from_element(e, reader.decoder(), &document_namespaces)?;
+                        let repeated = row_builder.repeated;
                         if let Some(sheet) = current_sheet.as_mut() {
-                            sheet.add_repeated_row(RowBuilder::new().build(), repeated)?;
+                            sheet.add_repeated_row(row_builder.build(), repeated)?;
                         }
                     }
                     Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
@@ -719,6 +741,68 @@ impl OdsParser {
         Ok(1)
     }
 
+    fn parse_structural_attributes(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<(Option<String>, Option<String>, TableVisibility)> {
+        let mut style_name = None;
+        let mut default_cell_style_name = None;
+        let mut visibility = TableVisibility::Visible;
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let is_table = |local_name| {
+                Self::attribute_name_is(
+                    attribute.key.as_ref(),
+                    namespaces,
+                    TABLE_NAMESPACE_URI,
+                    local_name,
+                )
+            };
+            if is_table("style-name") {
+                style_name = Some(Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "table:style-name",
+                )?);
+            } else if is_table("default-cell-style-name") {
+                default_cell_style_name = Some(Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "table:default-cell-style-name",
+                )?);
+            } else if is_table("visibility") {
+                visibility = TableVisibility::parse(&Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "table:visibility",
+                )?)?;
+            }
+        }
+        Ok((style_name, default_cell_style_name, visibility))
+    }
+
+    fn parse_column(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<(Column, usize)> {
+        let repeated =
+            Self::parse_repeated(element, decoder, namespaces, "number-columns-repeated")?;
+        let (style_name, default_cell_style_name, visibility) =
+            Self::parse_structural_attributes(element, decoder, namespaces)?;
+        Ok((
+            Column {
+                index: 0,
+                style_name,
+                default_cell_style_name,
+                visibility,
+            },
+            repeated,
+        ))
+    }
+
     fn parse_positive_usize(
         attribute: &quick_xml::events::attributes::Attribute<'_>,
         decoder: Decoder,
@@ -878,6 +962,7 @@ impl OdsParser {
 pub(crate) struct SheetBuilder {
     name: String,
     rows: Vec<Row>,
+    columns: Vec<Column>,
     cell_count: usize,
 }
 
@@ -886,6 +971,7 @@ impl SheetBuilder {
         Self {
             name,
             rows: Vec::new(),
+            columns: Vec::new(),
             cell_count: 0,
         }
     }
@@ -927,10 +1013,28 @@ impl SheetBuilder {
         Ok(())
     }
 
+    fn add_repeated_column(&mut self, column: Column, repeated: usize) -> Result<()> {
+        let expanded = self.columns.len().checked_add(repeated).ok_or_else(|| {
+            Error::InvalidFormat("table column repetition overflows address space".to_string())
+        })?;
+        if expanded > MAX_EXPANDED_COLUMNS_PER_SHEET {
+            return Err(Error::InvalidFormat(format!(
+                "expanded sheet exceeds the {MAX_EXPANDED_COLUMNS_PER_SHEET} column safety limit"
+            )));
+        }
+        for _ in 0..repeated {
+            let mut item = column.clone();
+            item.index = self.columns.len();
+            self.columns.push(item);
+        }
+        Ok(())
+    }
+
     pub fn build(self) -> Sheet {
         Sheet {
             name: self.name,
             rows: self.rows,
+            columns: self.columns,
             protection: super::SheetProtection::default(),
         }
     }
@@ -940,18 +1044,39 @@ impl SheetBuilder {
 pub(crate) struct RowBuilder {
     cells: Vec<Cell>,
     repeated: usize,
+    style_name: Option<String>,
+    default_cell_style_name: Option<String>,
+    visibility: TableVisibility,
 }
 
 impl RowBuilder {
+    #[cfg(test)]
     pub fn new() -> Self {
-        Self::with_repeated(1)
-    }
-
-    fn with_repeated(repeated: usize) -> Self {
         Self {
             cells: Vec::new(),
-            repeated,
+            repeated: 1,
+            style_name: None,
+            default_cell_style_name: None,
+            visibility: TableVisibility::Visible,
         }
+    }
+
+    fn from_element(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<Self> {
+        let repeated =
+            OdsParser::parse_repeated(element, decoder, namespaces, "number-rows-repeated")?;
+        let (style_name, default_cell_style_name, visibility) =
+            OdsParser::parse_structural_attributes(element, decoder, namespaces)?;
+        Ok(Self {
+            cells: Vec::new(),
+            repeated,
+            style_name,
+            default_cell_style_name,
+            visibility,
+        })
     }
 
     pub fn add_cell(&mut self, mut cell: Cell) {
@@ -988,6 +1113,9 @@ impl RowBuilder {
         Row {
             cells: self.cells,
             index: 0, // Will be set by parent
+            style_name: self.style_name,
+            default_cell_style_name: self.default_cell_style_name,
+            visibility: self.visibility,
         }
     }
 }
@@ -1466,6 +1594,29 @@ mod tests {
     }
 
     #[test]
+    fn parses_repeated_row_and_column_structural_metadata() {
+        let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><o:body><o:spreadsheet><t:table t:name="Structure"><t:table-column t:number-columns-repeated="2" t:style-name="Col&amp;Style" t:default-cell-style-name="CellStyle" t:visibility="collapse"/><t:table-column t:visibility="filter"></t:table-column><t:table-row t:number-rows-repeated="2" t:style-name="RowStyle" t:default-cell-style-name="RowCell" t:visibility="filter"><t:table-cell/></t:table-row></t:table></o:spreadsheet></o:body></o:document-content>"#;
+        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let sheet = &sheets[0];
+        assert_eq!(sheet.columns.len(), 3);
+        assert_eq!(sheet.columns[0].index, 0);
+        assert_eq!(sheet.columns[1].index, 1);
+        assert_eq!(sheet.columns[0].style_name.as_deref(), Some("Col&Style"));
+        assert_eq!(
+            sheet.columns[0].default_cell_style_name.as_deref(),
+            Some("CellStyle")
+        );
+        assert_eq!(sheet.columns[0].visibility, TableVisibility::Collapse);
+        assert_eq!(sheet.columns[2].visibility, TableVisibility::Filter);
+        assert_eq!(sheet.rows.len(), 2);
+        assert!(sheet.rows.iter().all(|row| {
+            row.style_name.as_deref() == Some("RowStyle")
+                && row.default_cell_style_name.as_deref() == Some("RowCell")
+                && row.visibility == TableVisibility::Filter
+        }));
+    }
+
+    #[test]
     fn rejects_invalid_or_dangerous_repetition_counts() {
         let zero = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-row table:number-rows-repeated="0"/></table:table></office:spreadsheet></office:body></office:document-content>"#;
         assert!(OdsParser::parse_sheets(zero).is_err());
@@ -1475,6 +1626,15 @@ mod tests {
             MAX_EXPANDED_ROWS_PER_SHEET + 1
         );
         assert!(OdsParser::parse_sheets(&excessive).is_err());
+
+        let excessive_columns = format!(
+            r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-column table:number-columns-repeated="{}"/></table:table></office:spreadsheet></office:body></office:document-content>"#,
+            MAX_EXPANDED_COLUMNS_PER_SHEET + 1
+        );
+        assert!(OdsParser::parse_sheets(&excessive_columns).is_err());
+
+        let invalid_visibility = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-column table:visibility="hidden"/></table:table></office:spreadsheet></office:body></office:document-content>"#;
+        assert!(OdsParser::parse_sheets(invalid_visibility).is_err());
     }
 
     #[test]
@@ -1484,6 +1644,9 @@ mod tests {
         let row1 = Row {
             cells: vec![],
             index: 0,
+            style_name: None,
+            default_cell_style_name: None,
+            visibility: Default::default(),
         };
         builder.add_row(row1);
 
@@ -1503,6 +1666,9 @@ mod tests {
                 col: 0,
             }],
             index: 0,
+            style_name: None,
+            default_cell_style_name: None,
+            visibility: Default::default(),
         };
         builder.add_row(row2);
 

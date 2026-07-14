@@ -472,6 +472,9 @@ pub(crate) fn merge_cell_range(
         rows.push(Row {
             cells: Vec::new(),
             index: rows.len(),
+            style_name: None,
+            default_cell_style_name: None,
+            visibility: Default::default(),
         });
     }
     for (row_index, row) in rows.iter_mut().enumerate().take(end_row).skip(start_row) {

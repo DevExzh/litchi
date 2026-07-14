@@ -4,14 +4,19 @@
 
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
-    Cell, CellAnnotation, CellValue, ContentValidation, NamedDefinition, NamedDefinitionScope,
-    NamedExpression, NamedRange, Row, Sheet, SpreadsheetProtection,
+    Cell, CellAnnotation, CellValue, Column, ContentValidation, NamedDefinition,
+    NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SpreadsheetProtection,
+    TableVisibility,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     named_expression::{ensure_unique, write_named_definitions},
     protection::{
         has_extensions as has_protection_extensions, write_sheet_attributes, write_sheet_options,
         write_spreadsheet_attributes,
+    },
+    structure::{
+        MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, write_columns,
+        write_row_attributes,
     },
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
@@ -257,6 +262,7 @@ impl SpreadsheetBuilder {
         let sheet = Sheet {
             name: name.to_string(),
             rows: Vec::new(),
+            columns: Vec::new(),
             protection: crate::ods::SheetProtection::default(),
         };
         self.sheets.push(sheet);
@@ -314,6 +320,9 @@ impl SpreadsheetBuilder {
         let row = Row {
             cells,
             index: row_index,
+            style_name: None,
+            default_cell_style_name: None,
+            visibility: Default::default(),
         };
 
         if let Some(sheet) = self.sheets.last_mut() {
@@ -374,6 +383,9 @@ impl SpreadsheetBuilder {
         let row = Row {
             cells,
             index: row_index,
+            style_name: None,
+            default_cell_style_name: None,
+            visibility: Default::default(),
         };
 
         if let Some(sheet) = self.sheets.last_mut() {
@@ -450,6 +462,9 @@ impl SpreadsheetBuilder {
         let row = Row {
             cells,
             index: row_index,
+            style_name: None,
+            default_cell_style_name: None,
+            visibility: Default::default(),
         };
 
         if let Some(sheet) = self.sheets.last_mut() {
@@ -491,6 +506,9 @@ impl SpreadsheetBuilder {
                 sheet.rows.push(Row {
                     cells: Vec::new(),
                     index: sheet.rows.len(),
+                    style_name: None,
+                    default_cell_style_name: None,
+                    visibility: Default::default(),
                 });
             }
 
@@ -583,6 +601,9 @@ impl SpreadsheetBuilder {
                 sheet.rows.push(Row {
                     cells: Vec::new(),
                     index: sheet.rows.len(),
+                    style_name: None,
+                    default_cell_style_name: None,
+                    visibility: Default::default(),
                 });
             }
 
@@ -631,6 +652,9 @@ impl SpreadsheetBuilder {
             sheet.rows.push(Row {
                 cells: Vec::new(),
                 index: sheet.rows.len(),
+                style_name: None,
+                default_cell_style_name: None,
+                visibility: Default::default(),
             });
         }
         let row_data = &mut sheet.rows[row];
@@ -692,6 +716,9 @@ impl SpreadsheetBuilder {
             sheet.rows.push(Row {
                 cells: Vec::new(),
                 index: sheet.rows.len(),
+                style_name: None,
+                default_cell_style_name: None,
+                visibility: Default::default(),
             });
         }
         let row_data = &mut sheet.rows[row];
@@ -741,6 +768,9 @@ impl SpreadsheetBuilder {
             sheet.rows.push(Row {
                 cells: Vec::new(),
                 index: sheet.rows.len(),
+                style_name: None,
+                default_cell_style_name: None,
+                visibility: Default::default(),
             });
         }
         let row_data = &mut sheet.rows[row];
@@ -779,6 +809,9 @@ impl SpreadsheetBuilder {
             sheet.rows.push(Row {
                 cells: Vec::new(),
                 index: sheet.rows.len(),
+                style_name: None,
+                default_cell_style_name: None,
+                visibility: Default::default(),
             });
         }
         let row_data = &mut sheet.rows[row];
@@ -829,6 +862,9 @@ impl SpreadsheetBuilder {
             sheet.rows.push(Row {
                 cells: Vec::new(),
                 index: sheet.rows.len(),
+                style_name: None,
+                default_cell_style_name: None,
+                visibility: Default::default(),
             });
         }
         let row_data = &mut sheet.rows[row];
@@ -859,6 +895,69 @@ impl SpreadsheetBuilder {
             .and_then(|sheet| sheet.rows.get_mut(row))
             .and_then(|row| row.cells.get_mut(col))
             .is_some_and(|cell| cell.matrix_span.take().is_some())
+    }
+
+    /// Set structural metadata for a row in the current sheet.
+    pub fn set_row_metadata(
+        &mut self,
+        row: usize,
+        style_name: Option<String>,
+        default_cell_style_name: Option<String>,
+        visibility: TableVisibility,
+    ) -> Result<&mut Self> {
+        if row >= MAX_EXPANDED_ROWS_PER_SHEET {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "row index {row} exceeds the spreadsheet safety limit"
+            )));
+        }
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        let sheet = self.sheets.last_mut().expect("default sheet was added");
+        while sheet.rows.len() <= row {
+            sheet.rows.push(Row {
+                cells: Vec::new(),
+                index: sheet.rows.len(),
+                style_name: None,
+                default_cell_style_name: None,
+                visibility: TableVisibility::Visible,
+            });
+        }
+        let row = &mut sheet.rows[row];
+        row.style_name = style_name;
+        row.default_cell_style_name = default_cell_style_name;
+        row.visibility = visibility;
+        Ok(self)
+    }
+
+    /// Set structural metadata for a logical column in the current sheet.
+    pub fn set_column_metadata(
+        &mut self,
+        column: usize,
+        style_name: Option<String>,
+        default_cell_style_name: Option<String>,
+        visibility: TableVisibility,
+    ) -> Result<&mut Self> {
+        if column >= MAX_EXPANDED_COLUMNS_PER_SHEET {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "column index {column} exceeds the spreadsheet safety limit"
+            )));
+        }
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        let sheet = self.sheets.last_mut().expect("default sheet was added");
+        while sheet.columns.len() <= column {
+            sheet.columns.push(Column {
+                index: sheet.columns.len(),
+                ..Column::default()
+            });
+        }
+        let item = &mut sheet.columns[column];
+        item.style_name = style_name;
+        item.default_cell_style_name = default_cell_style_name;
+        item.visibility = visibility;
+        Ok(self)
     }
 
     /// Merge a rectangular range in the current sheet.
@@ -964,6 +1063,9 @@ impl SpreadsheetBuilder {
         let row = Row {
             cells,
             index: row_index,
+            style_name: None,
+            default_cell_style_name: None,
+            visibility: Default::default(),
         };
 
         if let Some(sheet) = self.sheets.last_mut() {
@@ -1059,10 +1161,26 @@ impl SpreadsheetBuilder {
 
         for sheet in &self.sheets {
             Self::push_table_start(&mut body, sheet);
-            Self::push_table_columns(&mut body, Self::sheet_max_cols(sheet));
+            if sheet.columns.is_empty() {
+                Self::push_table_columns(&mut body, Self::sheet_max_cols(sheet));
+            } else {
+                write_columns(&mut body, &sheet.columns);
+                let trailing_columns =
+                    Self::sheet_max_cols(sheet).saturating_sub(sheet.columns.len());
+                if trailing_columns > 0 {
+                    Self::push_table_columns(&mut body, trailing_columns);
+                }
+            }
 
             for row in &sheet.rows {
-                body.push_str("<table:table-row>");
+                body.push_str("<table:table-row");
+                write_row_attributes(
+                    &mut body,
+                    row.style_name.as_deref(),
+                    row.default_cell_style_name.as_deref(),
+                    row.visibility,
+                );
+                body.push('>');
                 for cell in &row.cells {
                     Self::push_cell(&mut body, cell);
                 }
@@ -1222,6 +1340,7 @@ impl SpreadsheetBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Spreadsheet;
     use tempfile::tempdir;
 
     #[test]
@@ -1610,6 +1729,7 @@ mod tests {
         let sheet = Sheet {
             name: "CustomSheet".to_string(),
             rows: vec![],
+            columns: vec![],
             protection: crate::ods::SheetProtection::default(),
         };
         builder.add_sheet_element(sheet).unwrap();
@@ -1867,5 +1987,79 @@ mod tests {
         assert!(xml.contains(r#"table:number-matrix-columns-spanned="2""#));
         assert!(builder.clear_cell_matrix_span(0, 0));
         assert!(!builder.clear_cell_matrix_span(0, 0));
+    }
+
+    #[test]
+    fn builder_writes_row_and_column_metadata() {
+        let mut builder = SpreadsheetBuilder::new();
+        assert!(
+            builder
+                .set_row_metadata(
+                    MAX_EXPANDED_ROWS_PER_SHEET,
+                    None,
+                    None,
+                    TableVisibility::Visible,
+                )
+                .is_err()
+        );
+        assert!(
+            builder
+                .set_column_metadata(
+                    MAX_EXPANDED_COLUMNS_PER_SHEET,
+                    None,
+                    None,
+                    TableVisibility::Visible,
+                )
+                .is_err()
+        );
+        builder
+            .set_row_metadata(
+                2,
+                Some("RowStyle".to_string()),
+                Some("RowCell".to_string()),
+                TableVisibility::Filter,
+            )
+            .unwrap()
+            .set_column_metadata(
+                1,
+                Some("ColumnStyle".to_string()),
+                Some("ColumnCell".to_string()),
+                TableVisibility::Collapse,
+            )
+            .unwrap();
+        let xml = builder.generate_content_xml();
+        assert!(xml.contains(r#"table:style-name="RowStyle""#));
+        assert!(xml.contains(r#"table:default-cell-style-name="ColumnCell""#));
+        assert!(xml.contains(r#"table:visibility="filter""#));
+        assert!(xml.contains(r#"table:visibility="collapse""#));
+
+        let mut spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+        let sheets = spreadsheet.sheets().unwrap();
+        assert_eq!(sheets[0].rows[2].style_name.as_deref(), Some("RowStyle"));
+        assert_eq!(sheets[0].rows[2].visibility, TableVisibility::Filter);
+        assert_eq!(
+            sheets[0].columns[1].default_cell_style_name.as_deref(),
+            Some("ColumnCell")
+        );
+        assert_eq!(sheets[0].columns[1].visibility, TableVisibility::Collapse);
+    }
+
+    #[test]
+    fn builder_declares_default_columns_after_explicit_metadata() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder
+            .set_cell(0, 3, CellValue::Text("wide".to_string()))
+            .unwrap()
+            .set_column_metadata(
+                0,
+                Some("FirstColumn".to_string()),
+                None,
+                TableVisibility::Visible,
+            )
+            .unwrap();
+
+        let xml = builder.generate_content_xml();
+        assert!(xml.contains(r#"table:style-name="FirstColumn""#));
+        assert!(xml.contains(r#"table:number-columns-repeated="3""#));
     }
 }

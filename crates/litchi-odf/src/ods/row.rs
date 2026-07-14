@@ -1,6 +1,6 @@
 //! Row structures for ODS spreadsheets.
 
-use super::Cell;
+use super::{Cell, TableVisibility};
 use litchi_core::Result;
 
 /// A row in an ODS spreadsheet.
@@ -12,6 +12,12 @@ pub struct Row {
     pub cells: Vec<Cell>,
     /// Row index (0-based)
     pub index: usize,
+    /// Direct table-row style reference.
+    pub style_name: Option<String>,
+    /// Default table-cell style for cells in this row.
+    pub default_cell_style_name: Option<String>,
+    /// Row visibility.
+    pub visibility: TableVisibility,
 }
 
 impl Row {
@@ -68,6 +74,9 @@ mod tests {
         let row = Row {
             cells: vec![],
             index: 0,
+            style_name: None,
+            default_cell_style_name: None,
+            visibility: Default::default(),
         };
         assert_eq!(row.index(), 0);
         assert_eq!(row.cell_count().unwrap(), 0);
@@ -107,6 +116,9 @@ mod tests {
                 },
             ],
             index: 5,
+            style_name: None,
+            default_cell_style_name: None,
+            visibility: Default::default(),
         };
         assert_eq!(row.index(), 5);
         assert_eq!(row.cell_count().unwrap(), 2);
@@ -130,6 +142,9 @@ mod tests {
                 col: 0,
             }],
             index: 0,
+            style_name: None,
+            default_cell_style_name: None,
+            visibility: Default::default(),
         };
         let cells = row.cells().unwrap();
         assert_eq!(cells.len(), 1);
@@ -169,6 +184,9 @@ mod tests {
                 },
             ],
             index: 0,
+            style_name: None,
+            default_cell_style_name: None,
+            visibility: Default::default(),
         };
 
         assert!(row.cell(0).unwrap().is_some());
@@ -194,6 +212,9 @@ mod tests {
                 col: 0,
             }],
             index: 0,
+            style_name: None,
+            default_cell_style_name: None,
+            visibility: Default::default(),
         };
 
         let cell = row.cell_at(0).unwrap();
@@ -206,6 +227,9 @@ mod tests {
         let row = Row {
             cells: vec![],
             index: 42,
+            style_name: None,
+            default_cell_style_name: None,
+            visibility: Default::default(),
         };
         assert_eq!(row.index(), 42);
     }
@@ -215,6 +239,9 @@ mod tests {
         let row = Row {
             cells: vec![],
             index: 0,
+            style_name: None,
+            default_cell_style_name: None,
+            visibility: Default::default(),
         };
         assert_eq!(row.cell_count().unwrap(), 0);
         assert!(row.cell(0).unwrap().is_none());
@@ -240,7 +267,13 @@ mod tests {
             });
         }
 
-        let row = Row { cells, index: 1 };
+        let row = Row {
+            cells,
+            index: 1,
+            style_name: None,
+            default_cell_style_name: None,
+            visibility: Default::default(),
+        };
         assert_eq!(row.cell_count().unwrap(), 10);
 
         for i in 0..10 {

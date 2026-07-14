@@ -5,14 +5,19 @@
 
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
-    Cell, CellAnnotation, CellValue, ContentValidation, NamedDefinition, NamedDefinitionScope,
-    NamedExpression, NamedRange, Row, Sheet, Spreadsheet, SpreadsheetProtection,
+    Cell, CellAnnotation, CellValue, Column, ContentValidation, NamedDefinition,
+    NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, Spreadsheet,
+    SpreadsheetProtection, TableVisibility,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     named_expression::{ensure_unique, write_named_definitions},
     protection::{
         has_extensions as has_protection_extensions, write_sheet_attributes, write_sheet_options,
         write_spreadsheet_attributes,
+    },
+    structure::{
+        MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, write_columns,
+        write_row_attributes,
     },
     style_protection::{PreservedXmlFragment, extract_automatic_styles, extract_font_face_decls},
 };
@@ -352,6 +357,7 @@ impl MutableSpreadsheet {
         let sheet = Sheet {
             name: name.to_string(),
             rows: Vec::new(),
+            columns: Vec::new(),
             protection: crate::ods::SheetProtection::default(),
         };
         self.sheets.push(sheet);
@@ -380,6 +386,9 @@ impl MutableSpreadsheet {
             let row = Row {
                 cells,
                 index: row_index,
+                style_name: None,
+                default_cell_style_name: None,
+                visibility: Default::default(),
             };
             self.sheets[sheet_index].rows.push(row);
             Ok(())
@@ -448,6 +457,9 @@ impl MutableSpreadsheet {
                 sheet.rows.push(Row {
                     cells: Vec::new(),
                     index: row_index,
+                    style_name: None,
+                    default_cell_style_name: None,
+                    visibility: Default::default(),
                 });
             }
 
@@ -509,6 +521,9 @@ impl MutableSpreadsheet {
             sheet.rows.push(Row {
                 cells: Vec::new(),
                 index: sheet.rows.len(),
+                style_name: None,
+                default_cell_style_name: None,
+                visibility: Default::default(),
             });
         }
         let row_data = &mut sheet.rows[row];
@@ -573,6 +588,9 @@ impl MutableSpreadsheet {
             sheet.rows.push(Row {
                 cells: Vec::new(),
                 index: sheet.rows.len(),
+                style_name: None,
+                default_cell_style_name: None,
+                visibility: Default::default(),
             });
         }
         let row_data = &mut sheet.rows[row];
@@ -629,6 +647,9 @@ impl MutableSpreadsheet {
             sheet.rows.push(Row {
                 cells: Vec::new(),
                 index: sheet.rows.len(),
+                style_name: None,
+                default_cell_style_name: None,
+                visibility: Default::default(),
             });
         }
         let row_data = &mut sheet.rows[row];
@@ -667,6 +688,9 @@ impl MutableSpreadsheet {
             sheet.rows.push(Row {
                 cells: Vec::new(),
                 index: sheet.rows.len(),
+                style_name: None,
+                default_cell_style_name: None,
+                visibility: Default::default(),
             });
         }
         let row_data = &mut sheet.rows[row];
@@ -724,6 +748,9 @@ impl MutableSpreadsheet {
             sheet.rows.push(Row {
                 cells: Vec::new(),
                 index: sheet.rows.len(),
+                style_name: None,
+                default_cell_style_name: None,
+                visibility: Default::default(),
             });
         }
         let row_data = &mut sheet.rows[row];
@@ -762,6 +789,69 @@ impl MutableSpreadsheet {
             .get_mut(row)
             .and_then(|row| row.cells.get_mut(col))
             .is_some_and(|cell| cell.matrix_span.take().is_some()))
+    }
+
+    /// Set structural metadata for a row.
+    pub fn set_row_metadata(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        style_name: Option<String>,
+        default_cell_style_name: Option<String>,
+        visibility: TableVisibility,
+    ) -> Result<()> {
+        if row >= MAX_EXPANDED_ROWS_PER_SHEET {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "row index {row} exceeds the spreadsheet safety limit"
+            )));
+        }
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        while sheet.rows.len() <= row {
+            sheet.rows.push(Row {
+                cells: Vec::new(),
+                index: sheet.rows.len(),
+                style_name: None,
+                default_cell_style_name: None,
+                visibility: TableVisibility::Visible,
+            });
+        }
+        let item = &mut sheet.rows[row];
+        item.style_name = style_name;
+        item.default_cell_style_name = default_cell_style_name;
+        item.visibility = visibility;
+        Ok(())
+    }
+
+    /// Set structural metadata for a logical column.
+    pub fn set_column_metadata(
+        &mut self,
+        sheet_index: usize,
+        column: usize,
+        style_name: Option<String>,
+        default_cell_style_name: Option<String>,
+        visibility: TableVisibility,
+    ) -> Result<()> {
+        if column >= MAX_EXPANDED_COLUMNS_PER_SHEET {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "column index {column} exceeds the spreadsheet safety limit"
+            )));
+        }
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        while sheet.columns.len() <= column {
+            sheet.columns.push(Column {
+                index: sheet.columns.len(),
+                ..Column::default()
+            });
+        }
+        let item = &mut sheet.columns[column];
+        item.style_name = style_name;
+        item.default_cell_style_name = default_cell_style_name;
+        item.visibility = visibility;
+        Ok(())
     }
 
     /// Merge a rectangular cell range in a sheet.
@@ -875,10 +965,26 @@ impl MutableSpreadsheet {
             body.push('>');
             write_sheet_options(&mut body, &sheet.protection.options);
 
-            Self::push_table_columns(&mut body, Self::sheet_max_cols(sheet));
+            if sheet.columns.is_empty() {
+                Self::push_table_columns(&mut body, Self::sheet_max_cols(sheet));
+            } else {
+                write_columns(&mut body, &sheet.columns);
+                let trailing_columns =
+                    Self::sheet_max_cols(sheet).saturating_sub(sheet.columns.len());
+                if trailing_columns > 0 {
+                    Self::push_table_columns(&mut body, trailing_columns);
+                }
+            }
 
             for row in &sheet.rows {
-                body.push_str("<table:table-row>");
+                body.push_str("<table:table-row");
+                write_row_attributes(
+                    &mut body,
+                    row.style_name.as_deref(),
+                    row.default_cell_style_name.as_deref(),
+                    row.visibility,
+                );
+                body.push('>');
                 for cell in &row.cells {
                     Self::push_cell(&mut body, cell);
                 }
@@ -1303,5 +1409,82 @@ mod tests {
         );
         assert!(mutable.clear_cell_matrix_span(0, 0, 0).unwrap());
         assert!(!mutable.clear_cell_matrix_span(0, 0, 0).unwrap());
+    }
+
+    #[test]
+    fn mutable_spreadsheet_round_trips_row_and_column_metadata() {
+        let mut mutable = MutableSpreadsheet::new();
+        mutable.add_sheet("Structure").unwrap();
+        assert!(
+            mutable
+                .set_row_metadata(
+                    0,
+                    MAX_EXPANDED_ROWS_PER_SHEET,
+                    None,
+                    None,
+                    TableVisibility::Visible,
+                )
+                .is_err()
+        );
+        assert!(
+            mutable
+                .set_column_metadata(
+                    0,
+                    MAX_EXPANDED_COLUMNS_PER_SHEET,
+                    None,
+                    None,
+                    TableVisibility::Visible,
+                )
+                .is_err()
+        );
+        mutable
+            .set_cell(0, 0, 0, CellValue::Text("value".to_string()))
+            .unwrap();
+        for column in 0..2 {
+            mutable
+                .set_column_metadata(
+                    0,
+                    column,
+                    Some("Col&Style".to_string()),
+                    Some("DefaultCell".to_string()),
+                    crate::ods::TableVisibility::Collapse,
+                )
+                .unwrap();
+        }
+        mutable
+            .set_row_metadata(
+                0,
+                0,
+                Some("RowStyle".to_string()),
+                Some("RowCell".to_string()),
+                crate::ods::TableVisibility::Filter,
+            )
+            .unwrap();
+
+        let bytes = mutable.to_bytes().unwrap();
+        let package = crate::core::OwnedPackage::from_bytes(bytes.clone()).unwrap();
+        let content = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
+        assert!(content.contains(r#"table:number-columns-repeated="2""#));
+        assert!(content.contains(r#"table:visibility="filter""#));
+
+        let mut output = Spreadsheet::from_bytes(bytes).unwrap();
+        let sheets = output.sheets().unwrap();
+        assert_eq!(sheets[0].columns.len(), 2);
+        assert_eq!(
+            sheets[0].columns[0].style_name.as_deref(),
+            Some("Col&Style")
+        );
+        assert_eq!(
+            sheets[0].columns[0].visibility,
+            crate::ods::TableVisibility::Collapse
+        );
+        assert_eq!(
+            sheets[0].rows[0].visibility,
+            crate::ods::TableVisibility::Filter
+        );
+        assert_eq!(
+            sheets[0].rows[0].default_cell_style_name.as_deref(),
+            Some("RowCell")
+        );
     }
 }
