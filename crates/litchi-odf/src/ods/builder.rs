@@ -1175,17 +1175,7 @@ impl SpreadsheetBuilder {
     /// let mut builder = SpreadsheetBuilder::new();
     /// builder.add_sheet("Sheet1")?;
     ///
-    /// let cells = vec![
-    ///     SCell {
-    ///         value: CellValue::Number(100.0),
-    ///         text: "100".to_string(),
-    ///         formula: None,
-    ///         annotation: None,
-    ///         validation_name: None,
-    ///         row: 0,
-    ///         col: 0,
-    ///     },
-    /// ];
+    /// let cells = vec![SCell::new(CellValue::Number(100.0), "100", 0, 0)];
     /// builder.add_row(cells)?;
     /// # Ok(())
     /// # }

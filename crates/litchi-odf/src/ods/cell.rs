@@ -105,6 +105,24 @@ pub struct Cell {
 }
 
 impl Cell {
+    /// Create a cell with a typed value, displayed text, and zero-based position.
+    pub fn new(value: CellValue, text: impl Into<String>, row: usize, col: usize) -> Self {
+        Self {
+            value,
+            text: text.into(),
+            formula: None,
+            annotation: None,
+            validation_name: None,
+            style_name: None,
+            merge: CellMerge::None,
+            matrix_span: None,
+            protect: None,
+            protected: None,
+            row,
+            col,
+        }
+    }
+
     /// Get the text content of the cell.
     ///
     /// Returns the displayed text value, which may differ from the
@@ -660,6 +678,19 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cell_new_initializes_optional_metadata() {
+        let cell = Cell::new(CellValue::Number(42.0), "42", 3, 4);
+        assert_eq!(cell.value, CellValue::Number(42.0));
+        assert_eq!(cell.text, "42");
+        assert_eq!((cell.row, cell.col), (3, 4));
+        assert!(cell.formula.is_none());
+        assert_eq!(cell.merge, CellMerge::None);
+        assert!(cell.matrix_span.is_none());
+        assert_eq!(cell.protect, None);
+        assert_eq!(cell.protected, None);
+    }
 
     #[test]
     fn test_cell_value_empty() {
