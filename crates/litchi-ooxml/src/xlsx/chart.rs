@@ -980,6 +980,16 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                         .extension_list
                         .as_ref()
                         .map(crate::charts::ChartExtensionList::as_xml),
+                    format
+                        .marker
+                        .as_ref()
+                        .and_then(|marker| marker.shape_properties.as_ref())
+                        .map(crate::charts::ChartShapeProperties::as_xml),
+                    format
+                        .marker
+                        .as_ref()
+                        .and_then(|marker| marker.extension_list.as_ref())
+                        .map(crate::charts::ChartExtensionList::as_xml),
                 ]
                 .into_iter()
                 .flatten(),
@@ -1102,6 +1112,14 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                         .extension_list
                         .as_ref()
                         .map(crate::charts::ChartExtensionList::as_xml),
+                    series
+                        .marker_shape_properties
+                        .as_ref()
+                        .map(crate::charts::ChartShapeProperties::as_xml),
+                    series
+                        .marker_extension_list
+                        .as_ref()
+                        .map(crate::charts::ChartExtensionList::as_xml),
                 ]
                 .into_iter()
                 .flatten(),
@@ -1115,6 +1133,14 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                             .map(crate::charts::ChartShapeProperties::as_xml),
                         point
                             .extension_list
+                            .as_ref()
+                            .map(crate::charts::ChartExtensionList::as_xml),
+                        point
+                            .marker_shape_properties
+                            .as_ref()
+                            .map(crate::charts::ChartShapeProperties::as_xml),
+                        point
+                            .marker_extension_list
                             .as_ref()
                             .map(crate::charts::ChartExtensionList::as_xml),
                     ]

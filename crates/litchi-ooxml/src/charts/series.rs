@@ -9,12 +9,16 @@ use crate::charts::plot_area::BarShape;
 use crate::charts::types::{DataLabelPosition, MarkerStyle};
 
 /// Marker formatting shared by chart elements that support point symbols.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Marker {
     /// Marker symbol
     pub symbol: Option<MarkerStyle>,
     /// Marker size in points (2-72)
     pub size: Option<u32>,
+    /// DrawingML shape properties for the marker
+    pub shape_properties: Option<ChartShapeProperties>,
+    /// Marker extension list
+    pub extension_list: Option<ChartExtensionList>,
 }
 
 impl Marker {
@@ -44,6 +48,12 @@ pub struct DataPoint {
     pub marker_size: Option<u32>,
     /// Marker symbol
     pub marker_symbol: Option<MarkerStyle>,
+    /// Whether an explicit marker element is present, including an empty default marker
+    pub marker_present: bool,
+    /// DrawingML shape properties for the marker
+    pub marker_shape_properties: Option<ChartShapeProperties>,
+    /// Marker extension list
+    pub marker_extension_list: Option<ChartExtensionList>,
     /// Invert colors if negative
     pub invert_if_negative: bool,
     /// Show bubble in 3D
@@ -65,6 +75,9 @@ impl DataPoint {
             explosion: None,
             marker_size: None,
             marker_symbol: None,
+            marker_present: false,
+            marker_shape_properties: None,
+            marker_extension_list: None,
             invert_if_negative: false,
             bubble_3d: None,
             shape_properties: None,
@@ -83,6 +96,7 @@ impl DataPoint {
     /// Set marker properties.
     #[inline]
     pub fn with_marker(mut self, size: u32, symbol: MarkerStyle) -> Self {
+        self.marker_present = true;
         self.marker_size = Some(size);
         self.marker_symbol = Some(symbol);
         self
@@ -364,6 +378,12 @@ pub struct Series {
     pub marker_size: Option<u32>,
     /// Marker symbol
     pub marker_symbol: Option<MarkerStyle>,
+    /// Whether an explicit series marker is present, including an empty default marker
+    pub marker_present: bool,
+    /// DrawingML shape properties for the series marker
+    pub marker_shape_properties: Option<ChartShapeProperties>,
+    /// Series-marker extension list
+    pub marker_extension_list: Option<ChartExtensionList>,
     /// Explosion (for pie/doughnut, in percent)
     pub explosion: Option<u32>,
     /// Smooth line (for line/scatter charts)
@@ -403,6 +423,9 @@ impl Series {
             data_labels: None,
             marker_size: None,
             marker_symbol: None,
+            marker_present: false,
+            marker_shape_properties: None,
+            marker_extension_list: None,
             explosion: None,
             smooth: false,
             invert_if_negative: false,

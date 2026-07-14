@@ -21,6 +21,7 @@ use crate::charts::series::{
     DataLabel, DataLabels, DataPoint, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType,
     Marker, Series, Trendline, TrendlineType,
 };
+use crate::charts::types::MarkerStyle;
 use litchi_core::xml::escape_xml;
 use std::io::Write;
 
@@ -547,17 +548,41 @@ fn write_marker<W: Write>(
     marker: &Marker,
     description: &str,
 ) -> std::io::Result<()> {
-    if marker.size.is_some_and(|size| !(2..=72).contains(&size)) {
+    write_marker_parts(
+        writer,
+        marker.symbol,
+        marker.size,
+        marker.shape_properties.as_ref(),
+        marker.extension_list.as_ref(),
+        description,
+    )
+}
+
+fn write_marker_parts<W: Write>(
+    writer: &mut W,
+    symbol: Option<MarkerStyle>,
+    size: Option<u32>,
+    shape_properties: Option<&ChartShapeProperties>,
+    extension_list: Option<&ChartExtensionList>,
+    description: &str,
+) -> std::io::Result<()> {
+    if size.is_some_and(|size| !(2..=72).contains(&size)) {
         return Err(invalid_chart_input(format!(
             "{description} marker size must be 2-72"
         )));
     }
     write!(writer, "<c:marker>")?;
-    if let Some(symbol) = marker.symbol {
+    if let Some(symbol) = symbol {
         write!(writer, r#"<c:symbol val="{}"/>"#, symbol.xml_value())?;
     }
-    if let Some(size) = marker.size {
+    if let Some(size) = size {
         write!(writer, r#"<c:size val="{size}"/>"#)?;
+    }
+    if let Some(shape_properties) = shape_properties {
+        writer.write_all(shape_properties.as_xml())?;
+    }
+    if let Some(extension_list) = extension_list {
+        writer.write_all(extension_list.as_xml())?;
     }
     write!(writer, "</c:marker>")?;
     Ok(())
@@ -1408,7 +1433,13 @@ fn write_series_presentation<W: Write>(
     series: &Series,
     features: SeriesFeatures,
 ) -> std::io::Result<()> {
-    if !features.marker && (series.marker_symbol.is_some() || series.marker_size.is_some()) {
+    if !features.marker
+        && (series.marker_symbol.is_some()
+            || series.marker_size.is_some()
+            || series.marker_present
+            || series.marker_shape_properties.is_some()
+            || series.marker_extension_list.is_some())
+    {
         return Err(invalid_chart_input(
             "chart type does not support series markers",
         ));
@@ -1456,15 +1487,21 @@ fn write_series_presentation<W: Write>(
     {
         return Err(invalid_chart_input("chart series marker size must be 2-72"));
     }
-    if features.marker && (series.marker_symbol.is_some() || series.marker_size.is_some()) {
-        write!(writer, "<c:marker>")?;
-        if let Some(symbol) = series.marker_symbol {
-            write!(writer, r#"<c:symbol val="{}"/>"#, symbol.xml_value())?;
-        }
-        if let Some(size) = series.marker_size {
-            write!(writer, r#"<c:size val="{}"/>"#, size)?;
-        }
-        write!(writer, "</c:marker>")?;
+    if features.marker
+        && (series.marker_symbol.is_some()
+            || series.marker_size.is_some()
+            || series.marker_present
+            || series.marker_shape_properties.is_some()
+            || series.marker_extension_list.is_some())
+    {
+        write_marker_parts(
+            writer,
+            series.marker_symbol,
+            series.marker_size,
+            series.marker_shape_properties.as_ref(),
+            series.marker_extension_list.as_ref(),
+            "chart series",
+        )?;
     }
 
     if features.invert_if_negative && series.invert_if_negative {
@@ -1517,15 +1554,20 @@ fn write_data_point<W: Write>(writer: &mut W, point: &DataPoint) -> std::io::Res
     if point.invert_if_negative {
         write!(writer, r#"<c:invertIfNegative val="1"/>"#)?;
     }
-    if point.marker_symbol.is_some() || point.marker_size.is_some() {
-        write!(writer, "<c:marker>")?;
-        if let Some(symbol) = point.marker_symbol {
-            write!(writer, r#"<c:symbol val="{}"/>"#, symbol.xml_value())?;
-        }
-        if let Some(size) = point.marker_size {
-            write!(writer, r#"<c:size val="{}"/>"#, size)?;
-        }
-        write!(writer, "</c:marker>")?;
+    if point.marker_present
+        || point.marker_symbol.is_some()
+        || point.marker_size.is_some()
+        || point.marker_shape_properties.is_some()
+        || point.marker_extension_list.is_some()
+    {
+        write_marker_parts(
+            writer,
+            point.marker_symbol,
+            point.marker_size,
+            point.marker_shape_properties.as_ref(),
+            point.marker_extension_list.as_ref(),
+            "chart data-point",
+        )?;
     }
     if let Some(bubble_3d) = point.bubble_3d {
         write!(

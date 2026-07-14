@@ -2654,6 +2654,34 @@ mod tests {
             ),
             ..crate::charts::UpDownBars::default()
         });
+        let mut line_series = crate::charts::Series::new(0);
+        line_series.marker_shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId424"/></a:blipFill></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        line_series.marker_extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="series-marker"><x:reference r:id="rId425"/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        let mut line_point = crate::charts::DataPoint::new(0);
+        line_point.marker_shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId426"/></a:blipFill></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        line_point.marker_extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="point-marker"><x:reference r:id="rId427"/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        line_series.data_points.push(line_point);
+        line.common.series.push(line_series);
         chart
             .chart
             .plot_area
@@ -2755,6 +2783,21 @@ mod tests {
             )
             .unwrap(),
         );
+        pivot_format.marker = Some(crate::charts::Marker {
+            shape_properties: Some(
+                ChartShapeProperties::from_xml(
+                    br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId428"/></a:blipFill></c:spPr>"#.to_vec(),
+                )
+                .unwrap(),
+            ),
+            extension_list: Some(
+                ChartExtensionList::from_xml(
+                    br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="pivot-marker"><x:reference r:id="rId429"/></c:ext></c:extLst>"#.to_vec(),
+                )
+                .unwrap(),
+            ),
+            ..crate::charts::Marker::default()
+        });
         chart.chart.pivot_formats = Some(vec![pivot_format]);
         let fragment_ids = crate::xlsx::chart::chart_fragment_relationship_ids(&chart.chart)
             .expect("relationship-bearing fragments should be valid XML");
@@ -2782,6 +2825,12 @@ mod tests {
                 "rId421".to_string(),
                 "rId422".to_string(),
                 "rId423".to_string(),
+                "rId424".to_string(),
+                "rId425".to_string(),
+                "rId426".to_string(),
+                "rId427".to_string(),
+                "rId428".to_string(),
+                "rId429".to_string(),
             ]
             .into()
         );
@@ -2793,7 +2842,8 @@ mod tests {
             [
                 "rId403", "rId404", "rId405", "rId406", "rId407", "rId408", "rId409", "rId410",
                 "rId411", "rId412", "rId413", "rId414", "rId415", "rId416", "rId417", "rId418",
-                "rId419", "rId420", "rId421", "rId422", "rId423",
+                "rId419", "rId420", "rId421", "rId422", "rId423", "rId424", "rId425", "rId426",
+                "rId427", "rId428", "rId429",
             ]
             .iter()
             .any(|relationship_id| error.contains(relationship_id))

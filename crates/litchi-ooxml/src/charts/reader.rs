@@ -1149,8 +1149,7 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
                         "chart pivot format contains duplicate markers".into(),
                     ));
                 }
-                let (symbol, size) = parse_series_marker(reader)?;
-                marker = Some(Marker { symbol, size });
+                marker = Some(parse_series_marker(reader)?);
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"marker" => {
                 if marker.is_some() {
@@ -3645,6 +3644,29 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
                     reader.capture_empty_fragment(e)?,
                 )?);
             },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"marker" => {
+                if saw_marker {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart series has duplicate marker".to_string(),
+                    ));
+                }
+                saw_marker = true;
+                series.marker_present = true;
+                let marker = parse_series_marker(reader)?;
+                series.marker_symbol = marker.symbol;
+                series.marker_size = marker.size;
+                series.marker_shape_properties = marker.shape_properties;
+                series.marker_extension_list = marker.extension_list;
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"marker" => {
+                if saw_marker {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart series has duplicate marker".to_string(),
+                    ));
+                }
+                saw_marker = true;
+                series.marker_present = true;
+            },
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
@@ -3668,15 +3690,6 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
                     },
                     b"tx" => {
                         series.title = parse_series_title(reader)?;
-                    },
-                    b"marker" => {
-                        if saw_marker {
-                            return Err(OoxmlError::InvalidFormat(
-                                "chart series has duplicate marker".to_string(),
-                            ));
-                        }
-                        saw_marker = true;
-                        (series.marker_symbol, series.marker_size) = parse_series_marker(reader)?;
                     },
                     b"invertIfNegative" => {
                         series.invert_if_negative = parse_bool_attr(e)?;
@@ -3786,14 +3799,54 @@ fn parse_bar_shape(element: &BytesStart<'_>, description: &str) -> Result<BarSha
     }
 }
 
-fn parse_series_marker<R: BufRead>(
-    reader: &mut ChartXmlReader<R>,
-) -> Result<(Option<MarkerStyle>, Option<u32>)> {
+fn parse_series_marker<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Marker> {
     let mut symbol = None;
     let mut size = None;
+    let mut shape_properties = None;
+    let mut extension_list = None;
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart marker has duplicate shape properties".into(),
+                    ));
+                }
+                shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_fragment(element, "chart marker shape properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart marker has duplicate shape properties".into(),
+                    ));
+                }
+                shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart marker has duplicate extension lists".into(),
+                    ));
+                }
+                extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_fragment(element, "chart marker extension list")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart marker has duplicate extension lists".into(),
+                    ));
+                }
+                extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
                 match element.local_name().as_ref() {
                     b"symbol" => {
@@ -3826,14 +3879,18 @@ fn parse_series_marker<R: BufRead>(
         }
         buf.clear();
     }
-    Ok((symbol, size))
+    Ok(Marker {
+        symbol,
+        size,
+        shape_properties,
+        extension_list,
+    })
 }
 
 fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPoint> {
     let mut index = None;
     let mut explosion = None;
-    let mut marker_size = None;
-    let mut marker_symbol = None;
+    let mut marker = None;
     let mut invert_if_negative = false;
     let mut bubble_3d = None;
     let mut shape_properties = None;
@@ -3843,7 +3900,20 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"marker" => {
-                (marker_symbol, marker_size) = parse_series_marker(reader)?;
+                if marker.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data point contains duplicate markers".into(),
+                    ));
+                }
+                marker = Some(parse_series_marker(reader)?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"marker" => {
+                if marker.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data point contains duplicate markers".into(),
+                    ));
+                }
+                marker = Some(Marker::new());
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
                 if shape_properties.is_some() {
@@ -3928,8 +3998,13 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
     let mut point =
         DataPoint::new(index.ok_or_else(|| missing_attribute("chart data-point index"))?);
     point.explosion = explosion;
-    point.marker_size = marker_size;
-    point.marker_symbol = marker_symbol;
+    if let Some(marker) = marker {
+        point.marker_present = true;
+        point.marker_size = marker.size;
+        point.marker_symbol = marker.symbol;
+        point.marker_shape_properties = marker.shape_properties;
+        point.marker_extension_list = marker.extension_list;
+    }
     point.invert_if_negative = invert_if_negative;
     point.bubble_3d = bubble_3d;
     point.shape_properties = shape_properties;
@@ -6812,7 +6887,8 @@ mod tests {
             <c:chart><c:pivotFmts>
                 <c:pivotFmt><c:idx val="2"/><c:spPr><a:solidFill><a:srgbClr val="123456"/></a:solidFill></c:spPr>
                     <c:txPr><a:bodyPr rot="600000"/><a:lstStyle/><a:p/></c:txPr><c:marker>
-                    <c:symbol val="diamond"/><c:size val="8"/>
+                    <c:symbol val="diamond"/><c:size val="8"/><c:spPr><a:ln w="25400"/></c:spPr>
+                    <c:extLst><c:ext uri="marker"><x:markerPayload/></c:ext></c:extLst>
                 </c:marker><c:dLbl><c:idx val="2"/><c:showVal val="1"/></c:dLbl>
                     <c:extLst><c:ext uri="pivot"><x:payload/></c:ext></c:extLst></c:pivotFmt>
                 <c:pivotFmt><c:idx val="7"/><c:marker/></c:pivotFmt>
@@ -6824,6 +6900,12 @@ mod tests {
         let marker = formats[0].marker.as_ref().unwrap();
         assert_eq!(marker.symbol, Some(MarkerStyle::Diamond));
         assert_eq!(marker.size, Some(8));
+        assert!(
+            std::str::from_utf8(marker.shape_properties.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("25400")
+        );
+        assert!(marker.extension_list.is_some());
         assert!(formats[0].data_label.as_ref().unwrap().show_value);
         assert!(
             std::str::from_utf8(formats[0].shape_properties.as_ref().unwrap().as_xml())
@@ -6884,9 +6966,35 @@ mod tests {
         format.marker = Some(Marker {
             symbol: None,
             size: Some(73),
+            ..Marker::default()
         });
         invalid.pivot_formats = Some(vec![format]);
         assert!(crate::charts::writer::write_chart(&mut Vec::new(), &invalid).is_err());
+    }
+
+    #[test]
+    fn preserves_explicit_empty_series_and_point_markers() {
+        let xml =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea><c:lineChart><c:ser><c:idx val="0"/><c:order val="0"/>
+                <c:marker/><c:dPt><c:idx val="0"/><c:marker/></c:dPt>
+            </c:ser></c:lineChart></c:plotArea></c:chart></c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let TypeGroup::Line(group) = &chart.plot_area.type_groups[0] else {
+            panic!("expected line chart");
+        };
+        let series = &group.common.series[0];
+        assert!(series.marker_present);
+        assert!(series.data_points[0].marker_present);
+
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        let reparsed = parse_chart(output.as_slice()).unwrap();
+        let TypeGroup::Line(group) = &reparsed.plot_area.type_groups[0] else {
+            panic!("expected line chart");
+        };
+        assert!(group.common.series[0].marker_present);
+        assert!(group.common.series[0].data_points[0].marker_present);
     }
 
     #[test]
@@ -7891,8 +7999,32 @@ mod tests {
         let mut scatter_series = Series::new(4);
         scatter_series.marker_symbol = Some(MarkerStyle::Star);
         scatter_series.marker_size = Some(9);
+        scatter_series.marker_shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:solidFill><a:srgbClr val="AABBCC"/></a:solidFill></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        scatter_series.marker_extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:x="urn:example:marker"><c:ext uri="series-marker"><x:payload/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
         scatter_series.smooth = true;
         let mut point = DataPoint::new(2).with_marker(7, MarkerStyle::Diamond);
+        point.marker_shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:ln w="12700"/></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        point.marker_extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:x="urn:example:marker"><c:ext uri="point-marker"><x:payload/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
         point.invert_if_negative = true;
         point.bubble_3d = Some(false);
         point.explosion = Some(15);
@@ -8123,6 +8255,12 @@ mod tests {
         let series = &group.common.series[0];
         assert_eq!(series.marker_symbol, Some(MarkerStyle::Star));
         assert_eq!(series.marker_size, Some(9));
+        assert!(
+            std::str::from_utf8(series.marker_shape_properties.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("AABBCC")
+        );
+        assert!(series.marker_extension_list.is_some());
         assert!(series.smooth);
         assert_eq!(series.data_points.len(), 1);
         assert_eq!(series.data_points[0].index, 2);
@@ -8131,6 +8269,18 @@ mod tests {
             series.data_points[0].marker_symbol,
             Some(MarkerStyle::Diamond)
         );
+        assert!(
+            std::str::from_utf8(
+                series.data_points[0]
+                    .marker_shape_properties
+                    .as_ref()
+                    .unwrap()
+                    .as_xml()
+            )
+            .unwrap()
+            .contains("12700")
+        );
+        assert!(series.data_points[0].marker_extension_list.is_some());
         assert!(series.data_points[0].invert_if_negative);
         assert_eq!(series.data_points[0].bubble_3d, Some(false));
         assert_eq!(series.data_points[0].explosion, Some(15));
