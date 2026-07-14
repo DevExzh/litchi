@@ -241,10 +241,19 @@ pub mod relationship_type {
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings";
     pub const PIVOT_CACHE_DEFINITION: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition";
+    /// ISO/IEC 29500 Strict pivot-cache-definition relationship type.
+    pub const STRICT_PIVOT_CACHE_DEFINITION: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/pivotCacheDefinition";
     pub const PIVOT_CACHE_RECORDS: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords";
+    /// ISO/IEC 29500 Strict pivot-cache-records relationship type.
+    pub const STRICT_PIVOT_CACHE_RECORDS: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/pivotCacheRecords";
     pub const PIVOT_TABLE: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable";
+    /// ISO/IEC 29500 Strict pivot-table relationship type.
+    pub const STRICT_PIVOT_TABLE: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/pivotTable";
     pub const THREADED_COMMENTS: &str =
         "http://schemas.microsoft.com/office/2017/10/relationships/threadedComment";
     pub const PERSONS: &str = "http://schemas.microsoft.com/office/2017/10/relationships/person";

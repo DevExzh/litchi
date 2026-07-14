@@ -1,14 +1,13 @@
 use crate::pivot::{PivotAxis, PivotDataField, PivotFieldRole, PivotTable, PivotValueFunction};
 use crate::xlsx::parsers::workbook_parser;
 use litchi_core::sheet::Result as SheetResult;
-use litchi_opc::constants::relationship_type as rt;
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI};
 
 use super::cache::{PivotCacheDefinition, PivotCacheField, SharedItem};
 
 pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
-    let workbook_uri = PackURI::new("/xl/workbook.xml")?;
-    let workbook_part = package.get_part(&workbook_uri)?;
+    let workbook_part = package.main_document_part()?;
     let workbook_xml = std::str::from_utf8(workbook_part.blob())?;
 
     let (worksheets, _, _) = workbook_parser::parse_workbook_xml(workbook_xml)?;
@@ -21,22 +20,50 @@ pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
     let mut tables = Vec::new();
 
     for ws_info in worksheets {
-        let rel = match workbook_rels.get(ws_info.relationship_id.as_str()) {
-            Some(r) => r,
-            None => continue,
-        };
+        let rel = workbook_rels
+            .get(ws_info.relationship_id.as_str())
+            .ok_or_else(|| {
+                format!(
+                    "worksheet '{}' references missing relationship '{}'",
+                    ws_info.name, ws_info.relationship_id
+                )
+            })?;
+        if !matches!(rel.reltype(), rt::WORKSHEET | rt::STRICT_WORKSHEET) {
+            return Err(format!(
+                "worksheet '{}' relationship has invalid type '{}'",
+                ws_info.name,
+                rel.reltype()
+            )
+            .into());
+        }
+        if rel.is_external() {
+            return Err(format!(
+                "worksheet '{}' relationship cannot be external",
+                ws_info.name
+            )
+            .into());
+        }
 
         let sheet_uri = rel.target_partname()?;
         let sheet_part = package.get_part(&sheet_uri)?;
+        require_content_type(&sheet_uri, sheet_part.content_type(), ct::SML_WORKSHEET)?;
         let sheet_rels = sheet_part.rels();
 
         for rel in sheet_rels.iter() {
-            if rel.reltype() != rt::PIVOT_TABLE {
+            if !matches!(rel.reltype(), rt::PIVOT_TABLE | rt::STRICT_PIVOT_TABLE) {
                 continue;
+            }
+            if rel.is_external() {
+                return Err(format!(
+                    "worksheet '{}' pivot-table relationship cannot be external",
+                    ws_info.name
+                )
+                .into());
             }
 
             let table_uri = rel.target_partname()?;
             let table_part = package.get_part(&table_uri)?;
+            require_content_type(&table_uri, table_part.content_type(), ct::SML_PIVOT_TABLE)?;
             let xml = std::str::from_utf8(table_part.blob())?;
 
             if let Some(table) = parse_pivot_table_definition(xml, &ws_info.name)? {
@@ -46,6 +73,15 @@ pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
     }
 
     Ok(tables)
+}
+
+fn require_content_type(uri: &PackURI, actual: &str, expected: &str) -> SheetResult<()> {
+    if actual != expected {
+        return Err(
+            format!("part '{uri}' has content type '{actual}', expected '{expected}'").into(),
+        );
+    }
+    Ok(())
 }
 
 fn parse_pivot_table_definition(xml: &str, sheet_name: &str) -> SheetResult<Option<PivotTable>> {
@@ -314,7 +350,7 @@ fn parse_pivot_field_names(xml: &str) -> Vec<String> {
 
     let section = &xml[start..start + end_rel];
     let mut pos = 0;
-    let marker = "<pivotField";
+    let marker = "<pivotField ";
 
     while let Some(rel) = section[pos..].find(marker) {
         let s = pos + rel;
@@ -466,4 +502,85 @@ fn extract_attr(tag: &str, attr: &str) -> Option<String> {
     let rest = &tag[start..];
     let end = rest.find('"')?;
     Some(rest[..end].to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use litchi_opc::Part;
+    use litchi_opc::part::BlobPart;
+
+    use super::*;
+
+    fn package_with_pivot_table() -> (OpcPackage, PackURI) {
+        let mut package = OpcPackage::new();
+        let workbook_uri = PackURI::new("/custom/book.xml").unwrap();
+        let worksheet_uri = PackURI::new("/custom/sheets/data.xml").unwrap();
+        let table_uri = PackURI::new("/custom/pivots/table.xml").unwrap();
+        let mut workbook_part = BlobPart::new(
+            workbook_uri,
+            ct::SML_SHEET_MAIN.to_string(),
+            br#"<workbook xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"
+                    xmlns:r="http://purl.oclc.org/ooxml/officeDocument/relationships">
+                    <sheets><sheet name="Pivot" sheetId="1" r:id="rId1"/></sheets>
+                </workbook>"#
+                .to_vec(),
+        );
+        workbook_part.relate_to("sheets/data.xml", rt::STRICT_WORKSHEET);
+        let mut worksheet_part = BlobPart::new(
+            worksheet_uri.clone(),
+            ct::SML_WORKSHEET.to_string(),
+            Vec::new(),
+        );
+        worksheet_part.relate_to("../pivots/table.xml", rt::STRICT_PIVOT_TABLE);
+        package.relate_to("custom/book.xml", rt::STRICT_OFFICE_DOCUMENT);
+        package.add_part(Box::new(workbook_part));
+        package.add_part(Box::new(worksheet_part));
+        package.add_part(Box::new(BlobPart::new(
+            table_uri,
+            ct::SML_PIVOT_TABLE.to_string(),
+            br#"<pivotTableDefinition xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"
+                    name="PivotOne" cacheId="7" dataCaption="Values">
+                    <location ref="A1:C5" firstHeaderRow="1" firstDataRow="2" firstDataCol="1"/>
+                    <pivotFields count="1"><pivotField name="Region"/></pivotFields>
+                    <rowFields count="1"><field x="0"/></rowFields>
+                </pivotTableDefinition>"#
+                .to_vec(),
+        )));
+        (package, worksheet_uri)
+    }
+
+    #[test]
+    fn resolves_strict_custom_pivot_table_parts() {
+        let (package, _) = package_with_pivot_table();
+        let tables = read_pivot_tables(&package).unwrap();
+
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables[0].name, "PivotOne");
+        assert_eq!(tables[0].sheet_name, "Pivot");
+        assert_eq!(tables[0].row_fields[0].field_name, "Region");
+    }
+
+    #[test]
+    fn rejects_external_and_wrong_content_type_pivot_parts() {
+        let (mut package, worksheet_uri) = package_with_pivot_table();
+        package
+            .get_part_mut(&worksheet_uri)
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                rt::STRICT_PIVOT_TABLE.to_string(),
+                "https://example.com/pivot.xml".to_string(),
+                "rId1".to_string(),
+                true,
+            );
+        assert!(read_pivot_tables(&package).is_err());
+
+        let (mut package, _) = package_with_pivot_table();
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/custom/pivots/table.xml").unwrap(),
+            ct::SML_WORKSHEET.to_string(),
+            Vec::new(),
+        )));
+        assert!(read_pivot_tables(&package).is_err());
+    }
 }
