@@ -35,6 +35,8 @@ pub struct MutableDocument {
     comments: Vec<MutableComment>,
     /// Document protection settings
     protection: Option<DocumentProtection>,
+    /// Whether document protection was explicitly changed.
+    protection_dirty: bool,
     /// Section properties (page setup, margins, orientation)
     section: SectionProperties,
     /// Theme (optional)
@@ -192,6 +194,7 @@ impl MutableDocument {
             endnotes: Vec::new(),
             comments: Vec::new(),
             protection: None,
+            protection_dirty: false,
             toc_config: None,
             section: SectionProperties::default(),
             theme: None,
@@ -215,6 +218,7 @@ impl MutableDocument {
             endnotes: Vec::new(),
             comments: Vec::new(),
             protection: None,
+            protection_dirty: false,
             section: SectionProperties::default(),
             theme: None,
             watermark: None,
@@ -432,6 +436,7 @@ impl MutableDocument {
             password_hash: None,
             salt: None,
         });
+        self.protection_dirty = true;
         self.modified = true;
     }
 
@@ -456,12 +461,14 @@ impl MutableDocument {
             password_hash: Some(password_hash),
             salt: Some(salt),
         });
+        self.protection_dirty = true;
         self.modified = true;
     }
 
     /// Remove document protection.
     pub fn remove_protection(&mut self) {
         self.protection = None;
+        self.protection_dirty = true;
         self.modified = true;
     }
 
@@ -473,6 +480,10 @@ impl MutableDocument {
     /// Get the protection type if set.
     pub fn protection_type(&self) -> Option<ProtectionType> {
         self.protection.as_ref().map(|p| p.protection_type)
+    }
+
+    pub(crate) fn protection_is_dirty(&self) -> bool {
+        self.protection_dirty
     }
 
     /// Set the document theme.
@@ -930,37 +941,21 @@ impl MutableDocument {
         Ok(Some(xml))
     }
 
-    /// Generate settings XML content with protection if set.
-    ///
-    /// This generates a complete settings.xml file including document protection
-    /// if protection is enabled.
-    pub(crate) fn generate_settings_xml(&self) -> Result<String> {
-        let mut xml = String::with_capacity(1024);
-        xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
-        xml.push_str(r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#);
-
-        // Add document protection if set
-        if let Some(ref protection) = self.protection {
-            xml.push_str(r#"<w:documentProtection w:edit=""#);
-            xml.push_str(protection.protection_type.to_xml());
-            xml.push_str(r#"" w:enforcement="1""#);
-
-            if let Some(ref hash) = protection.password_hash {
-                write!(xml, r#" w:hash="{}""#, hash).map_err(|e| OoxmlError::Xml(e.to_string()))?;
-            }
-
-            if let Some(ref salt) = protection.salt {
-                write!(xml, r#" w:salt="{}""#, salt).map_err(|e| OoxmlError::Xml(e.to_string()))?;
-            }
-
-            xml.push_str("/>");
+    /// Patch document protection while preserving every unrelated setting byte-for-byte.
+    pub(crate) fn generate_settings_xml(&self, existing: Option<&[u8]>) -> Result<Vec<u8>> {
+        match existing {
+            Some(existing) => patch_document_protection(existing, self.protection.as_ref()),
+            None => {
+                let mut xml = String::with_capacity(512);
+                xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
+                xml.push_str(r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#);
+                if let Some(protection) = &self.protection {
+                    write_document_protection(&mut xml, protection, "w", None)?;
+                }
+                xml.push_str("</w:settings>");
+                Ok(xml.into_bytes())
+            },
         }
-
-        // Add default zoom
-        xml.push_str(r#"<w:zoom w:percent="100"/>"#);
-
-        xml.push_str("</w:settings>");
-        Ok(xml)
     }
 
     /// Get a reference to a paragraph by index.
@@ -1115,6 +1110,289 @@ impl Default for MutableDocument {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn write_document_protection(
+    xml: &mut String,
+    protection: &DocumentProtection,
+    prefix: &str,
+    local_namespace: Option<&str>,
+) -> Result<()> {
+    write!(xml, "<{prefix}:documentProtection")
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    if let Some(namespace) = local_namespace {
+        write!(
+            xml,
+            " xmlns:{prefix}=\"{}\"",
+            litchi_core::xml::escape_xml(namespace)
+        )
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    write!(
+        xml,
+        " {prefix}:edit=\"{}\" {prefix}:enforcement=\"1\"",
+        protection.protection_type.to_xml()
+    )
+    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    if let Some(hash) = &protection.password_hash {
+        write!(
+            xml,
+            " {prefix}:hash=\"{}\"",
+            litchi_core::xml::escape_xml(hash)
+        )
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    if let Some(salt) = &protection.salt {
+        write!(
+            xml,
+            " {prefix}:salt=\"{}\"",
+            litchi_core::xml::escape_xml(salt)
+        )
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    xml.push_str("/>");
+    Ok(())
+}
+
+fn patch_document_protection(
+    existing: &[u8],
+    protection: Option<&DocumentProtection>,
+) -> Result<Vec<u8>> {
+    use crate::docx::namespace::scan_word_element_ranges;
+
+    let existing = std::str::from_utf8(existing).map_err(|_| {
+        OoxmlError::InvalidFormat("settings.xml must be UTF-8 to modify document protection".into())
+    })?;
+    let mut ranges = Vec::new();
+    scan_word_element_ranges(
+        existing.as_bytes(),
+        &[b"documentProtection"],
+        |_, start, len| {
+            let start = usize::try_from(start).map_err(|_| {
+                OoxmlError::InvalidFormat("settings protection offset does not fit usize".into())
+            })?;
+            let len = usize::try_from(len).map_err(|_| {
+                OoxmlError::InvalidFormat("settings protection length does not fit usize".into())
+            })?;
+            let end = start.checked_add(len).ok_or_else(|| {
+                OoxmlError::InvalidFormat("settings protection range overflows usize".into())
+            })?;
+            ranges.push((start, end));
+            Ok(())
+        },
+    )?;
+    if ranges.len() > 1 {
+        return Err(OoxmlError::InvalidFormat(
+            "settings.xml contains duplicate documentProtection elements".into(),
+        ));
+    }
+
+    let root = locate_settings_root(existing.as_bytes())?;
+    let (root_name, root_namespace) = root.name_and_namespace();
+    let (prefix, local_namespace) = match root_name.split_once(':') {
+        Some((prefix, _)) => (prefix, None),
+        None => ("w", Some(root_namespace)),
+    };
+    let mut replacement = String::new();
+    if let Some(protection) = protection {
+        write_document_protection(&mut replacement, protection, prefix, local_namespace)?;
+    }
+
+    if let Some((start, end)) = ranges.first().copied() {
+        let mut output = String::with_capacity(existing.len() - (end - start) + replacement.len());
+        output.push_str(&existing[..start]);
+        output.push_str(&replacement);
+        output.push_str(&existing[end..]);
+        return Ok(output.into_bytes());
+    }
+    if replacement.is_empty() {
+        return Ok(existing.as_bytes().to_vec());
+    }
+
+    match root {
+        SettingsRoot::Paired { close_offset, .. } => {
+            let mut output = String::with_capacity(existing.len() + replacement.len());
+            output.push_str(&existing[..close_offset]);
+            output.push_str(&replacement);
+            output.push_str(&existing[close_offset..]);
+            Ok(output.into_bytes())
+        },
+        SettingsRoot::Empty { end, name, .. } => {
+            let empty_close = end.checked_sub(2).ok_or_else(|| {
+                OoxmlError::InvalidFormat("invalid empty settings root range".into())
+            })?;
+            if existing.as_bytes().get(empty_close..end) != Some(b"/>") {
+                return Err(OoxmlError::InvalidFormat(
+                    "invalid empty settings root syntax".into(),
+                ));
+            }
+            let mut output =
+                String::with_capacity(existing.len() + replacement.len() + name.len() + 4);
+            output.push_str(&existing[..empty_close]);
+            output.push('>');
+            output.push_str(&replacement);
+            output.push_str("</");
+            output.push_str(&name);
+            output.push('>');
+            output.push_str(&existing[end..]);
+            Ok(output.into_bytes())
+        },
+    }
+}
+
+enum SettingsRoot {
+    Paired {
+        close_offset: usize,
+        name: String,
+        namespace: String,
+    },
+    Empty {
+        end: usize,
+        name: String,
+        namespace: String,
+    },
+}
+
+impl SettingsRoot {
+    fn name_and_namespace(&self) -> (&str, &str) {
+        match self {
+            Self::Paired {
+                name, namespace, ..
+            }
+            | Self::Empty {
+                name, namespace, ..
+            } => (name, namespace),
+        }
+    }
+}
+
+fn locate_settings_root(xml: &[u8]) -> Result<SettingsRoot> {
+    use crate::docx::namespace::is_wordprocessing_namespace;
+    use quick_xml::events::Event;
+    use quick_xml::reader::NsReader;
+
+    enum RootEvent {
+        Start(Option<(String, String)>),
+        Empty(Option<(String, String)>),
+        End(bool),
+        Eof,
+        Other,
+    }
+
+    let mut reader = NsReader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut saw_root = false;
+    let mut root_info = None;
+    loop {
+        let event_start = usize::try_from(reader.buffer_position()).map_err(|_| {
+            OoxmlError::InvalidFormat("settings root offset does not fit usize".into())
+        })?;
+        let event = {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            match event {
+                Event::Start(element) => RootEvent::Start(settings_root_info(
+                    &namespace,
+                    element.name().as_ref(),
+                    element.local_name().as_ref(),
+                )),
+                Event::Empty(element) => RootEvent::Empty(settings_root_info(
+                    &namespace,
+                    element.name().as_ref(),
+                    element.local_name().as_ref(),
+                )),
+                Event::End(element) => RootEvent::End(
+                    is_wordprocessing_namespace(&namespace)
+                        && element.local_name().as_ref() == b"settings",
+                ),
+                Event::Eof => RootEvent::Eof,
+                _ => RootEvent::Other,
+            }
+        };
+        let event_end = usize::try_from(reader.buffer_position()).map_err(|_| {
+            OoxmlError::InvalidFormat("settings root offset does not fit usize".into())
+        })?;
+
+        match event {
+            RootEvent::Start(info) if depth == 0 => {
+                if saw_root || info.is_none() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "settings.xml has an invalid or trailing root".into(),
+                    ));
+                }
+                saw_root = true;
+                root_info = info;
+                depth = 1;
+            },
+            RootEvent::Start(_) => {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("settings XML nesting is too deep".into())
+                })?;
+            },
+            RootEvent::Empty(info) if depth == 0 => {
+                if saw_root || info.is_none() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "settings.xml has an invalid or trailing root".into(),
+                    ));
+                }
+                let (name, namespace) = info.ok_or_else(|| {
+                    OoxmlError::InvalidFormat("empty settings root has no name".into())
+                })?;
+                return Ok(SettingsRoot::Empty {
+                    end: event_end,
+                    name,
+                    namespace,
+                });
+            },
+            RootEvent::End(is_root) => {
+                if depth == 1 {
+                    if !is_root {
+                        return Err(OoxmlError::InvalidFormat(
+                            "settings.xml has an invalid root closing element".into(),
+                        ));
+                    }
+                    let (name, namespace) = root_info.take().ok_or_else(|| {
+                        OoxmlError::InvalidFormat("settings root metadata is missing".into())
+                    })?;
+                    return Ok(SettingsRoot::Paired {
+                        close_offset: event_start,
+                        name,
+                        namespace,
+                    });
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("invalid settings XML nesting".into())
+                })?;
+            },
+            RootEvent::Eof => {
+                return Err(OoxmlError::InvalidFormat(
+                    "settings.xml has no complete settings root".into(),
+                ));
+            },
+            _ => {},
+        }
+    }
+}
+
+fn settings_root_info(
+    namespace: &quick_xml::name::ResolveResult<'_>,
+    qualified_name: &[u8],
+    local_name: &[u8],
+) -> Option<(String, String)> {
+    use quick_xml::name::{Namespace, ResolveResult};
+
+    if local_name != b"settings" || !crate::docx::namespace::is_wordprocessing_namespace(namespace)
+    {
+        return None;
+    }
+    let ResolveResult::Bound(Namespace(namespace)) = namespace else {
+        return None;
+    };
+    Some((
+        String::from_utf8_lossy(qualified_name).into_owned(),
+        String::from_utf8_lossy(namespace).into_owned(),
+    ))
 }
 
 /// The document body containing all content elements.
@@ -1709,5 +1987,58 @@ mod tests {
             r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>"#
         )
         .is_err());
+    }
+
+    #[test]
+    fn protection_patching_preserves_unrelated_settings_exactly() {
+        let input = br#"<?xml version="1.0"?><q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:extension"><!--before--><q:smartTagType q:namespaceuri="urn:test" q:name="person" q:url="https://example.test"/><q:documentProtection q:edit="readOnly" q:enforcement="1" x:keep="yes"/><x:opaque><![CDATA[a < b]]></x:opaque><q:doNotEmbedSmartTags/></q:settings>"#;
+        let mut document = MutableDocument::new();
+        document.set_protection_with_password(
+            ProtectionType::Comments,
+            "hash&\"value".into(),
+            "salt<value".into(),
+        );
+
+        let output = document.generate_settings_xml(Some(input)).unwrap();
+        let output = String::from_utf8(output).unwrap();
+        assert!(output.contains(r#"<q:smartTagType q:namespaceuri="urn:test" q:name="person" q:url="https://example.test"/>"#));
+        assert!(output.contains(r#"<x:opaque><![CDATA[a < b]]></x:opaque>"#));
+        assert!(output.contains("<q:doNotEmbedSmartTags/>"));
+        assert!(output.contains(r#"<q:documentProtection q:edit="comments" q:enforcement="1" q:hash="hash&amp;&quot;value" q:salt="salt&lt;value"/>"#));
+        assert_eq!(output.matches("documentProtection").count(), 1);
+    }
+
+    #[test]
+    fn protection_patching_removes_only_protection_and_handles_empty_roots() {
+        let input = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:zoom w:percent="125"/><w:documentProtection w:edit="forms"/><w:savePreviewPicture/></w:settings>"#;
+        let mut document = MutableDocument::new();
+        document.remove_protection();
+        let output = document.generate_settings_xml(Some(input)).unwrap();
+        assert_eq!(
+            String::from_utf8(output).unwrap(),
+            r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:zoom w:percent="125"/><w:savePreviewPicture/></w:settings>"#
+        );
+
+        document.set_protection(ProtectionType::ReadOnly);
+        let empty = br#"<s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"/>"#;
+        let output =
+            String::from_utf8(document.generate_settings_xml(Some(empty)).unwrap()).unwrap();
+        assert_eq!(
+            output,
+            r#"<s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:documentProtection s:edit="readOnly" s:enforcement="1"/></s:settings>"#
+        );
+
+        let default_namespace =
+            br#"<settings xmlns="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#;
+        let output = String::from_utf8(
+            document
+                .generate_settings_xml(Some(default_namespace))
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            output,
+            r#"<settings xmlns="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:documentProtection xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:edit="readOnly" w:enforcement="1"/></settings>"#
+        );
     }
 }

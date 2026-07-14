@@ -896,9 +896,20 @@ impl Package {
                     self.update_comments_part(comments_xml)?;
                 }
 
-                // Update settings.xml with protection if modified
-                let settings_xml = mutable_doc.generate_settings_xml()?;
-                self.update_settings_part(settings_xml)?;
+                // Patch only explicitly changed protection, preserving every other setting.
+                if mutable_doc.protection_is_dirty() {
+                    let settings_uri = PackURI::new("/word/settings.xml").map_err(|error| {
+                        OoxmlError::InvalidUri(format!("settings URI: {error}"))
+                    })?;
+                    let existing_settings = self
+                        .opc
+                        .get_part(&settings_uri)
+                        .ok()
+                        .map(|part| part.blob().to_vec());
+                    let settings_xml =
+                        mutable_doc.generate_settings_xml(existing_settings.as_deref())?;
+                    self.update_settings_part(settings_xml)?;
+                }
 
                 // Update theme if present
                 if let Some(theme_xml) = mutable_doc.generate_theme_xml()? {
@@ -1139,18 +1150,25 @@ impl Package {
     }
 
     /// Update the settings.xml part with new content.
-    fn update_settings_part(&mut self, xml: String) -> Result<()> {
+    fn update_settings_part(&mut self, xml: Vec<u8>) -> Result<()> {
         use litchi_opc::constants::content_type as ct;
+        use litchi_opc::constants::relationship_type as rt;
         use litchi_opc::part::BlobPart;
 
         let settings_uri = PackURI::new("/word/settings.xml")
             .map_err(|e| OoxmlError::InvalidUri(format!("settings URI: {}", e)))?;
 
         let content_type = ct::WML_SETTINGS.to_string();
-        let settings_part = BlobPart::new(settings_uri, content_type, xml.into_bytes());
+        let settings_part = BlobPart::new(settings_uri, content_type, xml);
 
         // Add/replace the settings part
         self.opc.add_part(Box::new(settings_part));
+
+        let doc_uri = PackURI::new("/word/document.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("document URI: {}", e)))?;
+        if let Ok(doc_part) = self.opc.get_part_mut(&doc_uri) {
+            let _ = doc_part.relate_to("settings.xml", rt::SETTINGS);
+        }
 
         Ok(())
     }
@@ -1284,6 +1302,7 @@ impl Package {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Cursor;
     use tempfile::NamedTempFile;
 
     #[test]
@@ -1315,5 +1334,20 @@ mod tests {
         let text = reopened_again.document().unwrap().text().unwrap();
         assert!(text.contains("round-trip text"));
         assert!(text.contains("appended after reopen"));
+    }
+
+    #[test]
+    fn body_edits_preserve_settings_part_byte_for_byte() {
+        let mut package = Package::new().unwrap();
+        let settings_uri = PackURI::new("/word/settings.xml").unwrap();
+        let before = package.opc.get_part(&settings_uri).unwrap().blob().to_vec();
+
+        package
+            .document_mut()
+            .unwrap()
+            .add_paragraph_with_text("body-only edit");
+        package.to_stream(Cursor::new(Vec::new())).unwrap();
+
+        assert_eq!(package.opc.get_part(&settings_uri).unwrap().blob(), before);
     }
 }
