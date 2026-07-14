@@ -231,6 +231,51 @@ impl<'doc> Slide<'doc> {
                 Some(ShapeEnum::Group(group))
             },
 
+            EscherShapeType::Table => {
+                use std::collections::BTreeSet;
+
+                let cells: Vec<_> = escher_shape
+                    .children()
+                    .iter()
+                    .filter(|child| {
+                        matches!(
+                            child.shape_type(),
+                            EscherShapeType::Rectangle
+                                | EscherShapeType::TextBox
+                                | EscherShapeType::AutoShape
+                        )
+                    })
+                    .filter_map(|child| child.anchor().map(|anchor| (child, anchor)))
+                    .filter(|(_, anchor)| anchor.width() > 0 && anchor.height() > 0)
+                    .collect();
+
+                let columns: BTreeSet<i32> = cells.iter().map(|(_, anchor)| anchor.left).collect();
+                let rows: BTreeSet<i32> = cells.iter().map(|(_, anchor)| anchor.top).collect();
+                let column_positions: Vec<_> = columns.into_iter().collect();
+                let row_positions: Vec<_> = rows.into_iter().collect();
+
+                let mut table = shape_enum::TableShape::new(
+                    shape_id,
+                    row_positions.len(),
+                    column_positions.len(),
+                );
+                if let Some(a) = anchor {
+                    table.set_bounds(a.left, a.top, a.width(), a.height());
+                }
+
+                for (cell, cell_anchor) in cells {
+                    let Ok(row) = row_positions.binary_search(&cell_anchor.top) else {
+                        continue;
+                    };
+                    let Ok(column) = column_positions.binary_search(&cell_anchor.left) else {
+                        continue;
+                    };
+                    table.set_cell_text(row, column, cell.text().unwrap_or_default());
+                }
+
+                Some(ShapeEnum::Table(table))
+            },
+
             EscherShapeType::Rectangle | EscherShapeType::Ellipse | EscherShapeType::AutoShape => {
                 // Create AutoShape
                 let mut properties = shape::ShapeProperties {
@@ -524,6 +569,88 @@ mod tests {
 
         let mut drawing = Vec::new();
         write_container(&mut drawing, 0, record_type::DG_CONTAINER, &shape_container).unwrap();
+        drawing
+    }
+
+    fn create_table_escher_drawing() -> Vec<u8> {
+        use crate::escher::writer::{
+            ShapeBuilder, record_type, write_atom, write_child_anchor, write_container, write_spgr,
+        };
+
+        fn shape_container(children: &[u8]) -> Vec<u8> {
+            let mut container = Vec::new();
+            write_container(&mut container, 0, record_type::SP_CONTAINER, children).unwrap();
+            container
+        }
+
+        fn table_cell(shape_id: u32, text: &str, left: i32, top: i32) -> Vec<u8> {
+            let mut children = Vec::new();
+            ShapeBuilder::new(1, shape_id).write(&mut children).unwrap();
+            write_child_anchor(&mut children, left, top, left + 100, top + 50).unwrap();
+
+            let utf16: Vec<u8> = text.encode_utf16().flat_map(u16::to_le_bytes).collect();
+            let mut embedded_text = Vec::new();
+            write_atom(&mut embedded_text, 0, 0, 4000, &utf16).unwrap();
+            write_atom(
+                &mut children,
+                0,
+                0,
+                record_type::CLIENT_TEXTBOX,
+                &embedded_text,
+            )
+            .unwrap();
+            shape_container(&children)
+        }
+
+        let mut patriarch_children = Vec::new();
+        ShapeBuilder::new(0, 1)
+            .write(&mut patriarch_children)
+            .unwrap();
+        let patriarch = shape_container(&patriarch_children);
+
+        let mut table_header_children = Vec::new();
+        write_spgr(&mut table_header_children, 0, 0, 200, 100).unwrap();
+        ShapeBuilder::new(0, 10)
+            .write(&mut table_header_children)
+            .unwrap();
+        let mut table_properties = Vec::new();
+        table_properties.extend_from_slice(&0x039Fu16.to_le_bytes());
+        table_properties.extend_from_slice(&1i32.to_le_bytes());
+        write_atom(&mut table_header_children, 3, 1, 0xF122, &table_properties).unwrap();
+        write_child_anchor(&mut table_header_children, 20, 30, 220, 130).unwrap();
+        let table_header = shape_container(&table_header_children);
+
+        let mut table_children = table_header;
+        for (shape_id, text, left, top) in [
+            (11, "A1", 0, 0),
+            (12, "B1", 100, 0),
+            (13, "A2", 0, 50),
+            (14, "B2", 100, 50),
+        ] {
+            table_children.extend_from_slice(&table_cell(shape_id, text, left, top));
+        }
+        let mut table_group = Vec::new();
+        write_container(
+            &mut table_group,
+            0,
+            record_type::SPGR_CONTAINER,
+            &table_children,
+        )
+        .unwrap();
+
+        let mut root_group_children = patriarch;
+        root_group_children.extend_from_slice(&table_group);
+        let mut root_group = Vec::new();
+        write_container(
+            &mut root_group,
+            0,
+            record_type::SPGR_CONTAINER,
+            &root_group_children,
+        )
+        .unwrap();
+
+        let mut drawing = Vec::new();
+        write_container(&mut drawing, 0, record_type::DG_CONTAINER, &root_group).unwrap();
         drawing
     }
 
@@ -861,6 +988,31 @@ mod tests {
         assert_eq!(picture.properties.y, 20);
         assert_eq!(picture.properties.width, 200);
         assert_eq!(picture.properties.height, 100);
+    }
+
+    #[test]
+    fn table_group_is_exposed_with_grid_and_text() {
+        let doc_data = vec![0u8; 32];
+        let ppdrawing = create_test_record(
+            PptRecordType::PPDrawing,
+            create_table_escher_drawing(),
+            Vec::new(),
+        );
+        let record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
+
+        let shapes = slide.shapes().unwrap();
+        assert_eq!(shapes.len(), 1);
+        let table = shapes[0].as_table().expect("table group");
+        assert_eq!(table.id(), 10);
+        assert_eq!(table.rows(), 2);
+        assert_eq!(table.columns(), 2);
+        assert_eq!(table.cell(0, 0), Some("A1"));
+        assert_eq!(table.cell(0, 1), Some("B1"));
+        assert_eq!(table.cell(1, 0), Some("A2"));
+        assert_eq!(table.cell(1, 1), Some("B2"));
+        assert_eq!((table.left(), table.top()), (20, 30));
+        assert_eq!((table.width(), table.height()), (200, 100));
     }
 
     #[test]

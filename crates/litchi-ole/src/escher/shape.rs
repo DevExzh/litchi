@@ -19,6 +19,7 @@ pub enum EscherShapeType {
     Line,
     Polygon,
     Group,
+    Table,
     Picture,
     AutoShape,
     Connector,
@@ -50,7 +51,8 @@ impl<'data> EscherShape<'data> {
         // A group is represented by an SpgrContainer whose first SpContainer
         // carries the group's ID, properties, and anchor. Keep the outer
         // container for child traversal, but read metadata from that header.
-        let group_header = if shape_type == EscherShapeType::Group {
+        let group_header = if matches!(shape_type, EscherShapeType::Group | EscherShapeType::Table)
+        {
             container
                 .find_child(EscherRecordType::SpContainer)
                 .map(EscherContainer::new)
@@ -69,7 +71,7 @@ impl<'data> EscherShape<'data> {
                 None
             };
 
-        let is_group = shape_type == EscherShapeType::Group;
+        let is_group = matches!(shape_type, EscherShapeType::Group | EscherShapeType::Table);
 
         let mut children = Vec::new();
 
@@ -163,7 +165,11 @@ impl<'data> EscherShape<'data> {
 
     fn detect_shape_type(container: &EscherContainer<'data>) -> EscherShapeType {
         if container.record().record_type == EscherRecordType::SpgrContainer {
-            return EscherShapeType::Group;
+            return if Self::is_table_group(container) {
+                EscherShapeType::Table
+            } else {
+                EscherShapeType::Group
+            };
         }
 
         if let Some(sp) = container.find_child(EscherRecordType::Sp) {
@@ -200,6 +206,20 @@ impl<'data> EscherShape<'data> {
         }
 
         EscherShapeType::Unknown
+    }
+
+    fn is_table_group(container: &EscherContainer<'data>) -> bool {
+        let Some(header) = container.find_child(EscherRecordType::SpContainer) else {
+            return false;
+        };
+        let header = EscherContainer::new(header);
+        let Some(user_defined) = header.find_child(EscherRecordType::TertiaryOpt) else {
+            return false;
+        };
+        let properties = EscherProperties::from_opt_record(&user_defined);
+        properties
+            .get_int(super::properties::EscherPropertyId::GroupTableProperties)
+            .is_some_and(|value| value & 1 != 0)
     }
 
     fn extract_shape_id(container: &EscherContainer<'data>) -> Option<u32> {

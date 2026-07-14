@@ -27,7 +27,7 @@ pub enum ShapeEnum<'a> {
     AutoShape(AutoShape<'a>),
     /// Picture/image shape
     Picture(PictureShape),
-    /// Table shape (not yet implemented)
+    /// Table shape
     Table(TableShape),
     /// Group shape containing other shapes
     Group(GroupShape<'a>),
@@ -182,6 +182,14 @@ pub struct TableShape {
     columns: usize,
     /// Table cells (row-major order)
     cells: Vec<Vec<String>>,
+    /// Left coordinate
+    left: i32,
+    /// Top coordinate
+    top: i32,
+    /// Width
+    width: i32,
+    /// Height
+    height: i32,
 }
 
 impl TableShape {
@@ -193,7 +201,24 @@ impl TableShape {
             rows,
             columns,
             cells,
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 0,
         }
+    }
+
+    pub(crate) fn set_cell_text(&mut self, row: usize, col: usize, text: String) {
+        if let Some(cell) = self.cells.get_mut(row).and_then(|cells| cells.get_mut(col)) {
+            *cell = text;
+        }
+    }
+
+    pub(crate) fn set_bounds(&mut self, left: i32, top: i32, width: i32, height: i32) {
+        self.left = left;
+        self.top = top;
+        self.width = width;
+        self.height = height;
     }
 
     /// Get shape ID.
@@ -217,6 +242,26 @@ impl TableShape {
             .get(row)
             .and_then(|r| r.get(col))
             .map(|s| s.as_str())
+    }
+
+    /// Get the left coordinate.
+    pub fn left(&self) -> i32 {
+        self.left
+    }
+
+    /// Get the top coordinate.
+    pub fn top(&self) -> i32 {
+        self.top
+    }
+
+    /// Get the table width.
+    pub fn width(&self) -> i32 {
+        self.width
+    }
+
+    /// Get the table height.
+    pub fn height(&self) -> i32 {
+        self.height
     }
 }
 
