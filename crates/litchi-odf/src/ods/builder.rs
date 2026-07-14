@@ -5,13 +5,14 @@
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
     CalculationSettings, Cell, CellAnnotation, CellDetective, CellRangeSource, CellValue, Column,
-    ContentValidation, DatabaseRange, NamedDefinition, NamedDefinitionScope, NamedExpression,
-    NamedRange, Row, Sheet, SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource,
-    SpreadsheetProtection, TableStructure, TableVisibility,
+    ContentValidation, DatabaseRange, LabelRange, NamedDefinition, NamedDefinitionScope,
+    NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings, SheetScenario, SheetStyle,
+    SheetTableSource, SpreadsheetProtection, TableStructure, TableVisibility,
     calculation::write_calculation_settings,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     database_range::write_database_ranges,
+    label_range::write_label_ranges,
     named_expression::{ensure_unique, write_named_definitions},
     protection::{
         has_extensions as has_protection_extensions, write_sheet_attributes, write_sheet_options,
@@ -54,6 +55,7 @@ pub struct SpreadsheetBuilder {
     content_validations: Vec<ContentValidation>,
     database_ranges: Vec<DatabaseRange>,
     calculation_settings: Option<CalculationSettings>,
+    label_ranges: Vec<LabelRange>,
     protection: SpreadsheetProtection,
 }
 
@@ -81,6 +83,7 @@ impl SpreadsheetBuilder {
             content_validations: Vec::new(),
             database_ranges: Vec::new(),
             calculation_settings: None,
+            label_ranges: Vec::new(),
             protection: SpreadsheetProtection::default(),
         }
     }
@@ -119,6 +122,27 @@ impl SpreadsheetBuilder {
         }
         self.calculation_settings = settings;
         Ok(self)
+    }
+
+    /// Return row and column label ranges in document order.
+    pub fn label_ranges(&self) -> &[LabelRange] {
+        &self.label_ranges
+    }
+
+    /// Add a validated row or column label range.
+    pub fn add_label_range(&mut self, range: LabelRange) -> Result<&mut Self> {
+        range.validate()?;
+        self.label_ranges.push(range);
+        Ok(self)
+    }
+
+    /// Remove a label range by index.
+    pub fn remove_label_range(&mut self, index: usize) -> Option<LabelRange> {
+        (index < self.label_ranges.len()).then(|| self.label_ranges.remove(index))
+    }
+
+    fn validate_label_ranges(&self) -> Result<()> {
+        self.label_ranges.iter().try_for_each(LabelRange::validate)
     }
 
     /// Return database ranges added to this spreadsheet.
@@ -1456,6 +1480,7 @@ impl SpreadsheetBuilder {
 
         write_calculation_settings(&mut body, self.calculation_settings.as_ref())?;
         write_content_validations(&mut body, &self.content_validations);
+        write_label_ranges(&mut body, &self.label_ranges)?;
 
         for sheet in &self.sheets {
             Self::push_table_start(&mut body, sheet)?;
@@ -1604,6 +1629,7 @@ impl SpreadsheetBuilder {
         self.validate_annotations()?;
         self.validate_content_validations()?;
         self.validate_database_ranges()?;
+        self.validate_label_ranges()?;
         let mut writer = PackageWriter::new();
 
         // Set MIME type

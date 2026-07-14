@@ -6,13 +6,14 @@
 use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
 use crate::ods::{
     CalculationSettings, Cell, CellAnnotation, CellDetective, CellRangeSource, CellValue, Column,
-    ContentValidation, DatabaseRange, NamedDefinition, NamedDefinitionScope, NamedExpression,
-    NamedRange, Row, Sheet, SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource,
-    Spreadsheet, SpreadsheetProtection, TableStructure, TableVisibility,
+    ContentValidation, DatabaseRange, LabelRange, NamedDefinition, NamedDefinitionScope,
+    NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings, SheetScenario, SheetStyle,
+    SheetTableSource, Spreadsheet, SpreadsheetProtection, TableStructure, TableVisibility,
     calculation::write_calculation_settings,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     database_range::write_database_ranges,
+    label_range::write_label_ranges,
     named_expression::{ensure_unique, write_named_definitions},
     protection::{
         has_extensions as has_protection_extensions, write_sheet_attributes, write_sheet_options,
@@ -65,6 +66,7 @@ pub struct MutableSpreadsheet {
     content_validations: Vec<ContentValidation>,
     database_ranges: Vec<DatabaseRange>,
     calculation_settings: Option<CalculationSettings>,
+    label_ranges: Vec<LabelRange>,
     protection: SpreadsheetProtection,
     /// Original package retained for copying auxiliary package parts.
     source_package: Option<OwnedPackage>,
@@ -149,6 +151,7 @@ impl MutableSpreadsheet {
         let content_validations = spreadsheet.content_validations().to_vec();
         let database_ranges = spreadsheet.database_ranges().to_vec();
         let calculation_settings = spreadsheet.calculation_settings().cloned();
+        let label_ranges = spreadsheet.label_ranges().to_vec();
         let protection = spreadsheet.protection().clone();
         let mimetype = "application/vnd.oasis.opendocument.spreadsheet".to_string();
         let source_package = Some(spreadsheet.into_package());
@@ -164,6 +167,7 @@ impl MutableSpreadsheet {
             content_validations,
             database_ranges,
             calculation_settings,
+            label_ranges,
             protection,
             source_package,
         })
@@ -182,6 +186,7 @@ impl MutableSpreadsheet {
             content_validations: Vec::new(),
             database_ranges: Vec::new(),
             calculation_settings: None,
+            label_ranges: Vec::new(),
             protection: SpreadsheetProtection::default(),
             source_package: None,
         }
@@ -232,6 +237,28 @@ impl MutableSpreadsheet {
         }
         self.calculation_settings = settings;
         Ok(())
+    }
+
+    /// Return row and column label ranges in document order.
+    pub fn label_ranges(&self) -> &[LabelRange] {
+        &self.label_ranges
+    }
+
+    /// Mutably access row and column label ranges.
+    pub fn label_ranges_mut(&mut self) -> &mut Vec<LabelRange> {
+        &mut self.label_ranges
+    }
+
+    /// Add a validated row or column label range.
+    pub fn add_label_range(&mut self, range: LabelRange) -> Result<()> {
+        range.validate()?;
+        self.label_ranges.push(range);
+        Ok(())
+    }
+
+    /// Remove a label range by index.
+    pub fn remove_label_range(&mut self, index: usize) -> Option<LabelRange> {
+        (index < self.label_ranges.len()).then(|| self.label_ranges.remove(index))
     }
 
     /// Return database ranges and their filter/sort metadata.
@@ -420,6 +447,10 @@ impl MutableSpreadsheet {
         self.database_ranges
             .iter()
             .try_for_each(DatabaseRange::validate)
+    }
+
+    fn validate_label_ranges(&self) -> Result<()> {
+        self.label_ranges.iter().try_for_each(LabelRange::validate)
     }
 
     fn has_validation_event_listeners(&self) -> bool {
@@ -1264,6 +1295,7 @@ impl MutableSpreadsheet {
         let mut body = String::new();
         write_calculation_settings(&mut body, self.calculation_settings.as_ref())?;
         write_content_validations(&mut body, &self.content_validations);
+        write_label_ranges(&mut body, &self.label_ranges)?;
 
         for sheet in &self.sheets {
             let escaped_name = escape_xml(&sheet.name);
@@ -1433,6 +1465,7 @@ impl MutableSpreadsheet {
         self.validate_annotations()?;
         self.validate_content_validations()?;
         self.validate_database_ranges()?;
+        self.validate_label_ranges()?;
         let mut writer = PackageWriter::new();
 
         writer.set_mimetype(&self.mimetype)?;

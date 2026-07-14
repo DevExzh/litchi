@@ -26,6 +26,7 @@
 //! - ✅ What-if scenarios and inert external cell-range sources
 //! - ✅ Inert formula-auditing highlights and operations (`table:detective`)
 //! - ✅ Formula calculation, null-date, and iteration settings
+//! - ✅ Row and column label ranges
 //!
 //! ## ✅ Formula Support (`formula.rs`) - PARTIAL
 //! - ✅ Formula string representation
@@ -50,6 +51,7 @@
 //! - ✅ Create, edit, remove, and round-trip scenarios and external range links
 //! - ✅ Create, edit, remove, and round-trip cell formula-auditing metadata
 //! - ✅ Create, edit, clear, and round-trip calculation settings
+//! - ✅ Create, edit, remove, and round-trip row/column label ranges
 //!
 //! ## 🚧 TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing (embedded charts)
@@ -73,6 +75,7 @@ mod database_range;
 mod detective;
 /// OpenFormula parsing and support
 pub mod formula;
+mod label_range;
 mod mutable;
 mod named_expression;
 mod parser;
@@ -106,6 +109,7 @@ pub use detective::{
     CellDetective, DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation,
     DetectiveOperationKind,
 };
+pub use label_range::{LabelRange, LabelRangeOrientation};
 pub use mutable::MutableSpreadsheet;
 pub use named_expression::{
     FormulaNamespace, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,

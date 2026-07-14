@@ -94,6 +94,7 @@
 //! - ✅ Cell annotations with metadata, rich text/lists, extensions, and drawing geometry
 //! - ✅ Database ranges, recursive filters, sort keys, and subtotal rules
 //! - ✅ Inert database query/table/SQL source metadata
+//! - ✅ Spreadsheet calculation settings and row/column label ranges
 //!
 //! ### Writing (`ods/builder.rs`, `ods/mutable.rs`)
 //! - ✅ SpreadsheetBuilder for creating new ODS files
@@ -108,6 +109,7 @@
 //! - ✅ Content-validation definitions, prompts, cell bindings, and inert event metadata
 //! - ✅ Document/sheet keys, direct cell protection flags, and LibreOffice permissions
 //! - ✅ Database ranges, filters, sorting, subtotals, and inert source metadata
+//! - ✅ Calculation settings and row/column label ranges
 //! - ✅ Save to file or bytes
 //!
 //! ### TODO - Advanced Features
@@ -245,12 +247,13 @@ pub use ods::{
     DatabaseFilter, DatabaseOrientation, DatabaseRange, DatabaseSort, DatabaseSortKey,
     DatabaseSource, DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation,
     DetectiveOperationKind, EmbeddedNumberBehavior, FilterCondition, FilterConditionSource,
-    FilterDataType, FilterExpression, FormulaNamespace, IterationStatus, MutableSpreadsheet,
-    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, NamedRangeUsage,
-    ProtectionKey, Row as SRow, Sheet, SheetPrintSettings, SheetProtection, SheetProtectionOptions,
-    SheetScenario, SheetStyle, SheetStyleUsage, SheetTableSource, SortOrder, Spreadsheet,
-    SpreadsheetBuilder, SpreadsheetProtection, SubtotalField, SubtotalRule, SubtotalRules,
-    SubtotalSortGroups, TableGroup, TableRange, TableSourceMode, TableStructure, TableVisibility,
+    FilterDataType, FilterExpression, FormulaNamespace, IterationStatus, LabelRange,
+    LabelRangeOrientation, MutableSpreadsheet, NamedDefinition, NamedDefinitionScope,
+    NamedExpression, NamedRange, NamedRangeUsage, ProtectionKey, Row as SRow, Sheet,
+    SheetPrintSettings, SheetProtection, SheetProtectionOptions, SheetScenario, SheetStyle,
+    SheetStyleUsage, SheetTableSource, SortOrder, Spreadsheet, SpreadsheetBuilder,
+    SpreadsheetProtection, SubtotalField, SubtotalRule, SubtotalRules, SubtotalSortGroups,
+    TableGroup, TableRange, TableSourceMode, TableStructure, TableVisibility,
     ValidationDisplayList, ValidationErrorMacro, ValidationErrorMessage, ValidationEventListener,
     ValidationMessage, ValidationMessageType, ValidationPresentationEventListener,
     ValidationPresentationSound, ValidationScriptEventListener,
