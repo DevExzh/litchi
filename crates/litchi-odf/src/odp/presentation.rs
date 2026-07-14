@@ -39,6 +39,10 @@ pub struct Presentation {
 }
 
 impl Presentation {
+    pub(crate) fn into_package(self) -> OwnedPackage {
+        self.package
+    }
+
     /// Open an ODP presentation from a file path.
     ///
     /// # Arguments
@@ -188,6 +192,10 @@ impl Presentation {
         } else {
             Ok(Metadata::default())
         }
+    }
+
+    pub(crate) fn styles_xml(&self) -> Option<&str> {
+        self.styles.as_ref().map(Styles::xml_content)
     }
 
     // Note: For presentation modification operations, see `MutablePresentation` which provides

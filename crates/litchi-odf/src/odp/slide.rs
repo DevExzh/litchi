@@ -77,6 +77,8 @@ pub struct Shape {
     pub height: Option<String>,
     /// Style name reference
     pub style_name: Option<String>,
+    /// Image source referenced by `draw:image`, when this is a picture shape.
+    pub image_href: Option<String>,
 }
 
 impl Shape {
@@ -91,6 +93,7 @@ impl Shape {
             width: None,
             height: None,
             style_name: None,
+            image_href: None,
         }
     }
 
@@ -122,6 +125,18 @@ impl Shape {
     /// Get the shape dimensions as (width, height).
     pub fn dimensions(&self) -> (Option<&str>, Option<&str>) {
         (self.width.as_deref(), self.height.as_deref())
+    }
+
+    /// Get the image source referenced by this shape.
+    pub fn image_href(&self) -> Option<&str> {
+        self.image_href.as_deref()
+    }
+
+    /// Set the image source and mark this shape as a picture.
+    pub fn with_image_href(mut self, href: impl Into<String>) -> Self {
+        self.shape_type = litchi_core::ShapeType::Picture;
+        self.image_href = Some(href.into());
+        self
     }
 }
 
@@ -210,6 +225,7 @@ mod tests {
             width: Some("5cm".to_string()),
             height: Some("3cm".to_string()),
             style_name: None,
+            image_href: None,
         }];
         let slide = Slide {
             title: None,
@@ -303,6 +319,7 @@ mod tests {
             width: None,
             height: None,
             style_name: None,
+            image_href: None,
         };
         assert_eq!(shape.text().unwrap(), "Hello");
     }
@@ -318,6 +335,7 @@ mod tests {
             width: None,
             height: None,
             style_name: None,
+            image_href: None,
         };
         assert_eq!(shape.shape_type(), litchi_core::ShapeType::Picture);
     }
@@ -345,6 +363,7 @@ mod tests {
             width: None,
             height: None,
             style_name: None,
+            image_href: None,
         };
         assert_eq!(shape.name(), Some("MyShape"));
     }
@@ -360,6 +379,7 @@ mod tests {
             width: None,
             height: None,
             style_name: None,
+            image_href: None,
         };
         assert_eq!(shape.name(), None);
     }
@@ -375,6 +395,7 @@ mod tests {
             width: None,
             height: None,
             style_name: None,
+            image_href: None,
         };
         let (x, y) = shape.position();
         assert_eq!(x, Some("10cm"));
@@ -392,6 +413,7 @@ mod tests {
             width: Some("20cm".to_string()),
             height: Some("15cm".to_string()),
             style_name: None,
+            image_href: None,
         };
         let (w, h) = shape.dimensions();
         assert_eq!(w, Some("20cm"));
@@ -409,6 +431,7 @@ mod tests {
             width: Some("10cm".to_string()),
             height: Some("5cm".to_string()),
             style_name: Some("Style1".to_string()),
+            image_href: None,
         };
         let cloned = shape.clone();
         assert_eq!(shape.shape_type, cloned.shape_type);

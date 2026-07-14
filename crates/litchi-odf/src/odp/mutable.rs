@@ -3,7 +3,7 @@
 //! This module provides a mutable wrapper around ODP presentations that allows
 //! for in-place modification of slides, shapes, and content.
 
-use crate::core::{OdfStructure, PackageWriter};
+use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
 use crate::odp::{Presentation, Shape, Slide};
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
@@ -41,6 +41,8 @@ pub struct MutablePresentation {
     mimetype: String,
     /// Original styles XML (preserved as-is)
     styles_xml: Option<String>,
+    /// Original package retained for lazy copying of embedded media and settings.
+    source_package: Option<OwnedPackage>,
 }
 
 impl MutablePresentation {
@@ -68,15 +70,15 @@ impl MutablePresentation {
         let metadata = presentation.metadata()?;
         let mimetype = "application/vnd.oasis.opendocument.presentation".to_string();
 
-        // Extract styles XML from the presentation's package
-        // TODO: Add method to Presentation to expose get_file for extracting styles.xml
-        let styles_xml = None;
+        let styles_xml = presentation.styles_xml().map(str::to_owned);
+        let source_package = Some(presentation.into_package());
 
         Ok(Self {
             slides,
             metadata,
             mimetype,
             styles_xml,
+            source_package,
         })
     }
 
@@ -95,6 +97,7 @@ impl MutablePresentation {
             metadata: Metadata::default(),
             mimetype: "application/vnd.oasis.opendocument.presentation".to_string(),
             styles_xml: None,
+            source_package: None,
         }
     }
 
@@ -440,42 +443,16 @@ impl MutablePresentation {
 
             // Add shapes
             for (shape_idx, shape) in slide.shapes.iter().enumerate() {
-                use litchi_core::ShapeType;
-
-                let x = shape.x.as_deref().unwrap_or("2cm");
-                let y = shape.y.as_deref().unwrap_or("8cm");
-                let width = shape.width.as_deref().unwrap_or("10cm");
-                let height = shape.height.as_deref().unwrap_or("5cm");
-                let default_name = format!("Shape{}", shape_idx + 1);
-                let name = shape.name.as_deref().unwrap_or(&default_name);
-                let style_name = shape.style_name.as_deref().unwrap_or("gr3");
-
-                match shape.shape_type {
-                    ShapeType::TextBox | ShapeType::AutoShape | ShapeType::Placeholder
-                        if shape.has_text() =>
-                    {
-                        let escaped_name = escape_xml(name);
-                        let escaped_shape_text = escape_xml(&shape.text);
-                        body.push_str(&xml_minifier::minified_xml_format!(
-                                r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
-                                escaped_name,
-                                style_name,
-                                x,
-                                y,
-                                width,
-                                height,
-                                escaped_shape_text
-                            ));
-                    },
-                    _ => {},
-                }
+                body.push_str(&super::builder::PresentationBuilder::generate_shape_xml(
+                    shape, shape_idx,
+                ));
             }
 
             body.push_str("</draw:page>");
         }
 
         xml_minifier::minified_xml_format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles/><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles/><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
             body
         )
     }
@@ -582,6 +559,17 @@ impl MutablePresentation {
         let meta_xml = self.generate_meta_xml();
         writer.add_file("meta.xml", meta_xml.as_bytes())?;
 
+        if let Some(package) = &self.source_package {
+            if package.has_file("settings.xml")? {
+                writer.add_file("settings.xml", &package.get_file("settings.xml")?)?;
+            }
+            for media_path in package.media_files()? {
+                if let Ok(media) = package.get_file(&media_path) {
+                    writer.add_file(&media_path, &media)?;
+                }
+            }
+        }
+
         writer.finish_to_bytes()
     }
 }
@@ -589,5 +577,57 @@ impl MutablePresentation {
 impl Default for MutablePresentation {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const STYLES: &str = r#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:styles><office:marker>preserve-me</office:marker></office:styles></office:document-styles>"#;
+    const SETTINGS: &[u8] = b"<settings>presentation-settings</settings>";
+    const IMAGE: &[u8] = b"\x89PNG\r\n\x1a\nimage-payload";
+
+    fn presentation_with_image() -> Presentation {
+        let content = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:presentation><draw:page draw:name="Media"><draw:frame draw:name="Photo" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm"><draw:image xlink:href="Pictures/a&amp;b.png" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame><draw:line draw:name="Rule" svg:x1="1cm" svg:y1="1cm" svg:x2="5cm" svg:y2="1cm"/></draw:page></office:presentation></office:body></office:document-content>"#;
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.presentation")
+            .unwrap();
+        writer.add_file("content.xml", content.as_bytes()).unwrap();
+        writer.add_file("styles.xml", STYLES.as_bytes()).unwrap();
+        writer.add_file("settings.xml", SETTINGS).unwrap();
+        writer.add_file("Pictures/a&b.png", IMAGE).unwrap();
+        Presentation::from_bytes(writer.finish_to_bytes().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn mutable_presentation_round_trips_images_styles_and_settings() {
+        let presentation = presentation_with_image();
+        let source_shapes = presentation.slides().unwrap().remove(0).shapes;
+        assert_eq!(source_shapes[0].image_href(), Some("Pictures/a&b.png"));
+
+        let mutable = MutablePresentation::from_presentation(presentation).unwrap();
+        let bytes = mutable.to_bytes().unwrap();
+        let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
+
+        assert_eq!(package.get_file("Pictures/a&b.png").unwrap(), IMAGE);
+        assert_eq!(package.get_file("settings.xml").unwrap(), SETTINGS);
+        assert_eq!(package.get_file("styles.xml").unwrap(), STYLES.as_bytes());
+
+        let content = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
+        assert!(content.contains("<draw:image"));
+        assert!(content.contains(r#"xlink:href="Pictures/a&amp;b.png""#));
+        assert!(content.contains(r#"xlink:show="embed""#));
+        assert!(content.contains("<draw:line"));
+
+        let reparsed = Presentation::from_bytes(bytes).unwrap();
+        let slides = reparsed.slides().unwrap();
+        let picture = slides[0]
+            .shapes
+            .iter()
+            .find(|shape| shape.shape_type == litchi_core::ShapeType::Picture)
+            .unwrap();
+        assert_eq!(picture.image_href(), Some("Pictures/a&b.png"));
     }
 }

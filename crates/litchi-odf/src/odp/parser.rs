@@ -3,7 +3,8 @@
 use super::{Shape, Slide};
 use litchi_core::{Error, Result, ShapeType};
 use quick_xml::Reader;
-use quick_xml::events::Event;
+use quick_xml::XmlVersion;
+use quick_xml::events::{BytesStart, Event, attributes::Attribute};
 
 /// Parser for ODP-specific structures.
 ///
@@ -22,6 +23,7 @@ struct ShapeBuilder {
     width: Option<String>,
     height: Option<String>,
     style_name: Option<String>,
+    image_href: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -36,6 +38,7 @@ impl ShapeBuilder {
             width: None,
             height: None,
             style_name: None,
+            image_href: None,
         }
     }
 
@@ -49,11 +52,56 @@ impl ShapeBuilder {
             width: self.width,
             height: self.height,
             style_name: self.style_name,
+            image_href: self.image_href,
         }
     }
 }
 
 impl OdpParser {
+    fn is_shape_element(name: &[u8]) -> bool {
+        matches!(
+            name,
+            b"draw:frame"
+                | b"draw:rect"
+                | b"draw:ellipse"
+                | b"draw:line"
+                | b"draw:custom-shape"
+                | b"draw:circle"
+                | b"draw:path"
+                | b"draw:polygon"
+                | b"draw:polyline"
+        )
+    }
+
+    fn shape_builder(element: &BytesStart<'_>) -> ShapeBuilder {
+        let mut builder = ShapeBuilder::new();
+        builder.shape_type = match element.name().as_ref() {
+            b"draw:frame" => {
+                match Self::get_attr(element.attributes(), b"presentation:class").as_deref() {
+                    Some("title" | "subtitle" | "object") => ShapeType::Placeholder,
+                    _ => ShapeType::TextBox,
+                }
+            },
+            b"draw:line" => ShapeType::Line,
+            _ => ShapeType::AutoShape,
+        };
+        builder.name = Self::get_attr(element.attributes(), b"draw:name");
+        if element.name().as_ref() == b"draw:line" {
+            builder.x = Self::get_attr(element.attributes(), b"svg:x1");
+            builder.y = Self::get_attr(element.attributes(), b"svg:y1");
+            builder.width = Self::get_attr(element.attributes(), b"svg:x2");
+            builder.height = Self::get_attr(element.attributes(), b"svg:y2");
+        } else {
+            builder.x = Self::get_attr(element.attributes(), b"svg:x");
+            builder.y = Self::get_attr(element.attributes(), b"svg:y");
+            builder.width = Self::get_attr(element.attributes(), b"svg:width");
+            builder.height = Self::get_attr(element.attributes(), b"svg:height");
+        }
+        builder.style_name = Self::get_attr(element.attributes(), b"draw:style-name")
+            .or_else(|| Self::get_attr(element.attributes(), b"presentation:style-name"));
+        builder
+    }
+
     /// Parse all slides from ODP content.xml
     pub fn parse_slides(xml_content: &str) -> Result<Vec<Slide>> {
         let mut reader = Reader::from_str(xml_content);
@@ -97,53 +145,9 @@ impl OdpParser {
                                 .or_else(|| Some(format!("Slide{}", slide_index + 1)));
                             in_slide = true;
                         },
-                        b"draw:frame" | b"draw:rect" | b"draw:ellipse" | b"draw:line"
-                        | b"draw:custom-shape" | b"draw:circle" | b"draw:path"
-                        | b"draw:polygon" | b"draw:polyline" => {
+                        name if Self::is_shape_element(name) => {
                             if in_slide && current_shape.is_none() {
-                                let mut builder = ShapeBuilder::new();
-
-                                // Determine shape type
-                                builder.shape_type = match e.name().as_ref() {
-                                    b"draw:frame" => {
-                                        // Check presentation:class to determine if it's a placeholder
-                                        if let Some(pres_class) =
-                                            Self::get_attr(e.attributes(), b"presentation:class")
-                                        {
-                                            match pres_class.as_str() {
-                                                "title" | "subtitle" | "object" => {
-                                                    ShapeType::Placeholder
-                                                },
-                                                _ => ShapeType::TextBox,
-                                            }
-                                        } else {
-                                            ShapeType::TextBox
-                                        }
-                                    },
-                                    b"draw:rect" | b"draw:ellipse" | b"draw:circle" => {
-                                        ShapeType::AutoShape
-                                    },
-                                    b"draw:line" => ShapeType::Line,
-                                    b"draw:custom-shape" | b"draw:path" | b"draw:polygon"
-                                    | b"draw:polyline" => ShapeType::AutoShape,
-                                    _ => ShapeType::AutoShape,
-                                };
-
-                                // Extract attributes
-                                builder.name = Self::get_attr(e.attributes(), b"draw:name");
-                                builder.x = Self::get_attr(e.attributes(), b"svg:x");
-                                builder.y = Self::get_attr(e.attributes(), b"svg:y");
-                                builder.width = Self::get_attr(e.attributes(), b"svg:width");
-                                builder.height = Self::get_attr(e.attributes(), b"svg:height");
-                                builder.style_name = Self::get_attr(
-                                    e.attributes(),
-                                    b"draw:style-name",
-                                )
-                                .or_else(|| {
-                                    Self::get_attr(e.attributes(), b"presentation:style-name")
-                                });
-
-                                current_shape = Some(builder);
+                                current_shape = Some(Self::shape_builder(e));
                                 shape_depth = 0;
                             } else if current_shape.is_some() {
                                 shape_depth += 1;
@@ -151,6 +155,11 @@ impl OdpParser {
                         },
                         b"draw:text-box" if current_shape.is_some() => {
                             in_text_box = true;
+                        },
+                        b"draw:image" if current_shape.is_some() => {
+                            let builder = current_shape.as_mut().expect("shape checked above");
+                            builder.shape_type = ShapeType::Picture;
+                            builder.image_href = Self::get_attr(e.attributes(), b"xlink:href");
                         },
                         b"text:p" | b"text:span" => {
                             // Text will be collected in Text event
@@ -179,6 +188,18 @@ impl OdpParser {
                             }
                         }
                     }
+                },
+                Ok(Event::Empty(ref e)) => match e.name().as_ref() {
+                    b"draw:image" => {
+                        if let Some(builder) = current_shape.as_mut() {
+                            builder.shape_type = ShapeType::Picture;
+                            builder.image_href = Self::get_attr(e.attributes(), b"xlink:href");
+                        }
+                    },
+                    name if in_slide && current_shape.is_none() && Self::is_shape_element(name) => {
+                        current_shapes.push(Self::shape_builder(e).build());
+                    },
+                    _ => {},
                 },
                 Ok(Event::End(ref e)) => {
                     match e.name().as_ref() {
@@ -233,10 +254,16 @@ impl OdpParser {
             if let Ok(attr) = attr_result
                 && attr.key.as_ref() == name
             {
-                return String::from_utf8(attr.value.to_vec()).ok();
+                return Self::normalize_attr(&attr);
             }
         }
         None
+    }
+
+    fn normalize_attr(attr: &Attribute<'_>) -> Option<String> {
+        attr.normalized_value(XmlVersion::Implicit1_0)
+            .ok()
+            .map(|value| value.into_owned())
     }
 }
 
@@ -377,6 +404,7 @@ mod tests {
             width: Some("10cm".to_string()),
             height: Some("5cm".to_string()),
             style_name: Some("Style1".to_string()),
+            image_href: None,
         };
         let debug_str = format!("{:?}", shape);
         assert!(debug_str.contains("Shape"));
@@ -394,6 +422,7 @@ mod tests {
             width: Some("5cm".to_string()),
             height: Some("3cm".to_string()),
             style_name: None,
+            image_href: None,
         };
         let cloned = shape.clone();
         assert_eq!(shape.shape_type, cloned.shape_type);
@@ -426,6 +455,7 @@ mod tests {
                 width: None,
                 height: None,
                 style_name: None,
+                image_href: None,
             };
             let _ = format!("{:?}", shape);
         }
@@ -483,5 +513,15 @@ mod tests {
         let builder = ShapeBuilder::new();
         let cloned = builder.build().clone();
         assert_eq!(cloned.shape_type, ShapeType::AutoShape);
+    }
+
+    #[test]
+    fn parses_picture_shape_and_unescapes_href() {
+        let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:presentation><draw:page draw:name="Images"><draw:frame draw:name="Picture"><draw:image xlink:href="Pictures/a&amp;b.png"/></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#;
+
+        let slides = OdpParser::parse_slides(xml).unwrap();
+        let shape = &slides[0].shapes[0];
+        assert_eq!(shape.shape_type, ShapeType::Picture);
+        assert_eq!(shape.image_href(), Some("Pictures/a&b.png"));
     }
 }

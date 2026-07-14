@@ -152,7 +152,7 @@ impl PresentationBuilder {
     }
 
     /// Generate XML for a shape
-    fn generate_shape_xml(shape: &crate::odp::Shape, idx: usize) -> String {
+    pub(super) fn generate_shape_xml(shape: &crate::odp::Shape, idx: usize) -> String {
         use litchi_core::ShapeType;
 
         // Determine default position and size if not provided
@@ -163,6 +163,12 @@ impl PresentationBuilder {
         let default_name = format!("Shape{}", idx + 1);
         let name = shape.name.as_deref().unwrap_or(&default_name);
         let style_name = shape.style_name.as_deref().unwrap_or("gr3");
+        let escaped_name = escape_xml(name);
+        let escaped_style_name = escape_xml(style_name);
+        let escaped_x = escape_xml(x);
+        let escaped_y = escape_xml(y);
+        let escaped_width = escape_xml(width);
+        let escaped_height = escape_xml(height);
 
         match shape.shape_type {
             ShapeType::TextBox | ShapeType::AutoShape | ShapeType::Placeholder => {
@@ -170,37 +176,46 @@ impl PresentationBuilder {
                 if shape.has_text() {
                     format!(
                         r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
-                        escape_xml(name),
-                        style_name,
-                        x,
-                        y,
-                        width,
-                        height,
+                        escaped_name,
+                        escaped_style_name,
+                        escaped_x,
+                        escaped_y,
+                        escaped_width,
+                        escaped_height,
                         escape_xml(&shape.text)
                     )
                 } else {
                     // Empty frame
                     format!(
                         r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"/>"#,
-                        escape_xml(name),
-                        style_name,
-                        x,
-                        y,
-                        width,
-                        height
+                        escaped_name,
+                        escaped_style_name,
+                        escaped_x,
+                        escaped_y,
+                        escaped_width,
+                        escaped_height
                     )
                 }
             },
             ShapeType::Picture => {
-                // Image frame (basic support - would need actual image path)
+                let image = shape.image_href.as_deref().map_or_else(
+                    || "<draw:image/>".to_string(),
+                    |href| {
+                        format!(
+                            r#"<draw:image xlink:href="{}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>"#,
+                            escape_xml(href)
+                        )
+                    },
+                );
                 format!(
-                    r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><draw:image/></draw:frame>"#,
-                    escape_xml(name),
-                    style_name,
-                    x,
-                    y,
-                    width,
-                    height
+                    r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}">{}</draw:frame>"#,
+                    escaped_name,
+                    escaped_style_name,
+                    escaped_x,
+                    escaped_y,
+                    escaped_width,
+                    escaped_height,
+                    image
                 )
             },
             ShapeType::Line | ShapeType::Connector => {
@@ -209,12 +224,12 @@ impl PresentationBuilder {
                 let y2 = shape.height.as_deref().unwrap_or("8cm");
                 format!(
                     r#"<draw:line draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x1="{}" svg:y1="{}" svg:x2="{}" svg:y2="{}"/>"#,
-                    escape_xml(name),
-                    style_name,
-                    x,
-                    y,
-                    x2,
-                    y2
+                    escaped_name,
+                    escaped_style_name,
+                    escaped_x,
+                    escaped_y,
+                    escape_xml(x2),
+                    escape_xml(y2)
                 )
             },
             _ => {
@@ -222,12 +237,12 @@ impl PresentationBuilder {
                 if shape.has_text() {
                     format!(
                         r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
-                        escape_xml(name),
-                        style_name,
-                        x,
-                        y,
-                        width,
-                        height,
+                        escaped_name,
+                        escaped_style_name,
+                        escaped_x,
+                        escaped_y,
+                        escaped_width,
+                        escaped_height,
                         escape_xml(&shape.text)
                     )
                 } else {
