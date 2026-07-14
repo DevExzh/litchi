@@ -5,8 +5,8 @@
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
     Cell, CellAnnotation, CellValue, Column, ContentValidation, NamedDefinition,
-    NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SpreadsheetProtection,
-    TableStructure, TableVisibility,
+    NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings, SheetStyle,
+    SpreadsheetProtection, TableStructure, TableVisibility,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     named_expression::{ensure_unique, write_named_definitions},
@@ -16,7 +16,8 @@ use crate::ods::{
     },
     structure::{
         MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, TableStructureAxis,
-        validate_table_structure, write_columns, write_row_attributes, write_table_structure,
+        validate_sheet_print_settings, validate_table_structure, write_columns,
+        write_row_attributes, write_sheet_formatting_attributes, write_table_structure,
     },
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
@@ -265,6 +266,8 @@ impl SpreadsheetBuilder {
             columns: Vec::new(),
             column_structure: Vec::new(),
             row_structure: Vec::new(),
+            style: Default::default(),
+            print_settings: Default::default(),
             protection: crate::ods::SheetProtection::default(),
         };
         self.sheets.push(sheet);
@@ -1009,6 +1012,31 @@ impl SpreadsheetBuilder {
         Ok(self)
     }
 
+    /// Replace sheet-level table style and template settings in the current sheet.
+    pub fn set_sheet_style(&mut self, style: SheetStyle) -> Result<&mut Self> {
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        self.sheets
+            .last_mut()
+            .expect("default sheet was added")
+            .style = style;
+        Ok(self)
+    }
+
+    /// Replace printing controls and ranges in the current sheet.
+    pub fn set_sheet_print_settings(&mut self, settings: SheetPrintSettings) -> Result<&mut Self> {
+        validate_sheet_print_settings(&settings)?;
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        self.sheets
+            .last_mut()
+            .expect("default sheet was added")
+            .print_settings = settings;
+        Ok(self)
+    }
+
     /// Merge a rectangular range in the current sheet.
     pub fn merge_cells(
         &mut self,
@@ -1158,13 +1186,15 @@ impl SpreadsheetBuilder {
             .any(Cell::has_annotation)
     }
 
-    fn push_table_start(out: &mut String, sheet: &Sheet) {
+    fn push_table_start(out: &mut String, sheet: &Sheet) -> Result<()> {
         out.push_str("<table:table table:name=\"");
         out.push_str(&escape_xml(&sheet.name));
         out.push('"');
+        write_sheet_formatting_attributes(out, &sheet.style, &sheet.print_settings)?;
         write_sheet_attributes(out, &sheet.protection);
         out.push('>');
         write_sheet_options(out, &sheet.protection.options);
+        Ok(())
     }
 
     fn push_table_columns(out: &mut String, max_cols: usize) {
@@ -1224,7 +1254,7 @@ impl SpreadsheetBuilder {
         write_content_validations(&mut body, &self.content_validations);
 
         for sheet in &self.sheets {
-            Self::push_table_start(&mut body, sheet);
+            Self::push_table_start(&mut body, sheet)?;
             let total_columns = Self::sheet_max_cols(sheet).max(sheet.columns.len()).max(1);
             write_table_structure(
                 &mut body,
@@ -1800,6 +1830,8 @@ mod tests {
             columns: vec![],
             column_structure: vec![],
             row_structure: vec![],
+            style: Default::default(),
+            print_settings: Default::default(),
             protection: crate::ods::SheetProtection::default(),
         };
         builder.add_sheet_element(sheet).unwrap();
@@ -2188,5 +2220,51 @@ mod tests {
             });
         }
         assert!(builder.set_row_structure(vec![too_deep]).is_err());
+    }
+
+    #[test]
+    fn builder_round_trips_sheet_style_and_print_settings() {
+        let style = SheetStyle {
+            style_name: Some("Sheet&Style".to_string()),
+            template_name: Some("TemplateOne".to_string()),
+            usage: crate::SheetStyleUsage {
+                use_first_row_styles: Some(true),
+                use_last_column_styles: Some(false),
+                ..crate::SheetStyleUsage::default()
+            },
+        };
+        let print = SheetPrintSettings::new(
+            false,
+            vec![
+                "$Sheet1.$A$1:$B$2".to_string(),
+                "'Q1 Sales'.$C$3:$D$4".to_string(),
+            ],
+        )
+        .unwrap();
+        let mut builder = SpreadsheetBuilder::new();
+        builder
+            .set_sheet_style(style.clone())
+            .unwrap()
+            .set_sheet_print_settings(print.clone())
+            .unwrap();
+
+        let mut spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+        let sheets = spreadsheet.sheets().unwrap();
+        assert_eq!(sheets[0].style, style);
+        assert_eq!(sheets[0].print_settings, print);
+    }
+
+    #[test]
+    fn builder_rejects_invalid_individual_print_ranges() {
+        let mut builder = SpreadsheetBuilder::new();
+        assert!(
+            builder
+                .set_sheet_print_settings(SheetPrintSettings {
+                    printable: true,
+                    ranges: vec!["A1:B2 C3:D4".to_string()],
+                })
+                .is_err()
+        );
+        assert!(SheetPrintSettings::new(true, vec!["'Unclosed Sheet.$A$1".to_string()]).is_err());
     }
 }

@@ -53,6 +53,175 @@ pub struct Column {
     pub visibility: TableVisibility,
 }
 
+/// Optional style-selection flags associated with an ODF table template.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SheetStyleUsage {
+    /// Apply the template's first-row style.
+    pub use_first_row_styles: Option<bool>,
+    /// Apply the template's last-row style.
+    pub use_last_row_styles: Option<bool>,
+    /// Apply the template's first-column style.
+    pub use_first_column_styles: Option<bool>,
+    /// Apply the template's last-column style.
+    pub use_last_column_styles: Option<bool>,
+    /// Apply alternating row styles from the template.
+    pub use_banding_row_styles: Option<bool>,
+    /// Apply alternating column styles from the template.
+    pub use_banding_column_styles: Option<bool>,
+}
+
+/// Sheet-level table style and template references.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SheetStyle {
+    /// Direct table-style reference.
+    pub style_name: Option<String>,
+    /// Table-template reference.
+    pub template_name: Option<String>,
+    /// Optional template component selection flags.
+    pub usage: SheetStyleUsage,
+}
+
+/// Sheet printing controls and ODF cell-range addresses.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SheetPrintSettings {
+    /// Whether the sheet participates in printing.
+    pub printable: bool,
+    /// ODF cell-range addresses printed for this sheet.
+    pub ranges: Vec<String>,
+}
+
+impl Default for SheetPrintSettings {
+    fn default() -> Self {
+        Self {
+            printable: true,
+            ranges: Vec::new(),
+        }
+    }
+}
+
+impl SheetPrintSettings {
+    /// Create validated sheet printing settings.
+    pub fn new(printable: bool, ranges: Vec<String>) -> Result<Self> {
+        validate_print_ranges(&ranges)?;
+        Ok(Self { printable, ranges })
+    }
+}
+
+pub(crate) fn validate_sheet_print_settings(settings: &SheetPrintSettings) -> Result<()> {
+    validate_print_ranges(&settings.ranges)
+}
+
+pub(crate) fn write_sheet_formatting_attributes(
+    out: &mut String,
+    style: &SheetStyle,
+    print: &SheetPrintSettings,
+) -> Result<()> {
+    if let Some(value) = &style.style_name {
+        write_escaped_attribute(out, "table:style-name", value);
+    }
+    if let Some(value) = &style.template_name {
+        write_escaped_attribute(out, "table:template-name", value);
+    }
+    write_optional_bool_attribute(
+        out,
+        "table:use-first-row-styles",
+        style.usage.use_first_row_styles,
+    );
+    write_optional_bool_attribute(
+        out,
+        "table:use-last-row-styles",
+        style.usage.use_last_row_styles,
+    );
+    write_optional_bool_attribute(
+        out,
+        "table:use-first-column-styles",
+        style.usage.use_first_column_styles,
+    );
+    write_optional_bool_attribute(
+        out,
+        "table:use-last-column-styles",
+        style.usage.use_last_column_styles,
+    );
+    write_optional_bool_attribute(
+        out,
+        "table:use-banding-rows-styles",
+        style.usage.use_banding_row_styles,
+    );
+    write_optional_bool_attribute(
+        out,
+        "table:use-banding-columns-styles",
+        style.usage.use_banding_column_styles,
+    );
+    if !print.printable {
+        out.push_str(" table:print=\"false\"");
+    }
+    validate_sheet_print_settings(print)?;
+    if !print.ranges.is_empty() {
+        write_escaped_attribute(out, "table:print-ranges", &print.ranges.join(" "));
+    }
+    Ok(())
+}
+
+pub(crate) fn split_print_ranges(value: &str) -> Result<Vec<String>> {
+    let mut ranges = Vec::new();
+    let mut current = String::new();
+    let mut quoted = false;
+    let mut chars = value.chars().peekable();
+    while let Some(character) = chars.next() {
+        if character == '\'' {
+            current.push(character);
+            if quoted && chars.peek() == Some(&'\'') {
+                current.push(chars.next().expect("peeked quote is present"));
+            } else {
+                quoted = !quoted;
+            }
+        } else if character.is_whitespace() && !quoted {
+            if !current.is_empty() {
+                ranges.push(std::mem::take(&mut current));
+            }
+        } else {
+            current.push(character);
+        }
+    }
+    if quoted {
+        return Err(Error::InvalidFormat(
+            "table print range contains an unterminated quoted sheet name".to_string(),
+        ));
+    }
+    if !current.is_empty() {
+        ranges.push(current);
+    }
+    Ok(ranges)
+}
+
+fn validate_print_ranges(ranges: &[String]) -> Result<()> {
+    for range in ranges {
+        let parsed = split_print_ranges(range)?;
+        if range != range.trim() || parsed.len() != 1 || parsed[0].as_str() != range.as_str() {
+            return Err(Error::InvalidFormat(format!(
+                "invalid individual table print range '{range}'"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn write_escaped_attribute(out: &mut String, name: &str, value: &str) {
+    out.push(' ');
+    out.push_str(name);
+    out.push_str("=\"");
+    out.push_str(&escape_xml(value));
+    out.push('"');
+}
+
+fn write_optional_bool_attribute(out: &mut String, name: &str, value: Option<bool>) {
+    if let Some(value) = value {
+        out.push(' ');
+        out.push_str(name);
+        out.push_str(if value { "=\"true\"" } else { "=\"false\"" });
+    }
+}
+
 /// A half-open range of logical rows or columns.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TableRange {
@@ -333,5 +502,44 @@ mod tests {
         assert!(xml.contains(r#"table:style-name="Col&amp;One""#));
         assert!(xml.contains(r#"table:default-cell-style-name="Cell&quot;Default""#));
         assert!(xml.contains(r#"table:visibility="collapse""#));
+    }
+
+    #[test]
+    fn splits_quoted_print_ranges_and_rejects_unterminated_names() {
+        let ranges =
+            split_print_ranges("$Sheet1.$A$1:$B$2 'Q1 Sales'.$C$3:$D$4 'Bob''s Sheet'.$E$5:$F$6")
+                .unwrap();
+        assert_eq!(
+            ranges,
+            [
+                "$Sheet1.$A$1:$B$2",
+                "'Q1 Sales'.$C$3:$D$4",
+                "'Bob''s Sheet'.$E$5:$F$6",
+            ]
+        );
+        assert!(split_print_ranges("'Unclosed Sheet.$A$1").is_err());
+    }
+
+    #[test]
+    fn writes_sheet_style_and_print_attributes_safely() {
+        let style = SheetStyle {
+            style_name: Some("Sheet&Style".to_string()),
+            template_name: Some("Template\"One".to_string()),
+            usage: SheetStyleUsage {
+                use_first_row_styles: Some(true),
+                use_banding_column_styles: Some(false),
+                ..SheetStyleUsage::default()
+            },
+        };
+        let print =
+            SheetPrintSettings::new(false, vec!["'Q1 Sales'.$A$1:$B$2".to_string()]).unwrap();
+        let mut xml = String::new();
+        write_sheet_formatting_attributes(&mut xml, &style, &print).unwrap();
+        assert!(xml.contains(r#"table:style-name="Sheet&amp;Style""#));
+        assert!(xml.contains(r#"table:template-name="Template&quot;One""#));
+        assert!(xml.contains(r#"table:use-first-row-styles="true""#));
+        assert!(xml.contains(r#"table:use-banding-columns-styles="false""#));
+        assert!(xml.contains(r#"table:print="false""#));
+        assert!(xml.contains(r#"table:print-ranges="&apos;Q1 Sales&apos;.$A$1:$B$2""#));
     }
 }

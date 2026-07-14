@@ -2,11 +2,12 @@
 
 use super::{
     Cell, CellMatrixSpan, CellMerge, CellValue, Column, NamedDefinition, NamedDefinitionScope,
-    NamedExpression, NamedRange, NamedRangeUsage, Row, Sheet, TableGroup, TableRange,
-    TableStructure, TableVisibility,
+    NamedExpression, NamedRange, NamedRangeUsage, Row, Sheet, SheetPrintSettings, SheetStyle,
+    TableGroup, TableRange, TableStructure, TableVisibility,
     annotation::{AnnotationBuilder, decode_reference},
     structure::{
         MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, MAX_TABLE_STRUCTURE_DEPTH,
+        split_print_ranges,
     },
 };
 use litchi_core::{Error, Result};
@@ -79,7 +80,13 @@ impl OdsParser {
                     ) {
                         let name =
                             Self::extract_table_name(e, reader.decoder(), &document_namespaces)?;
-                        current_sheet = Some(SheetBuilder::new(name));
+                        let (style, print_settings) = Self::parse_sheet_formatting(
+                            e,
+                            reader.decoder(),
+                            &document_namespaces,
+                        )?;
+                        current_sheet =
+                            Some(SheetBuilder::with_formatting(name, style, print_settings));
                     } else if current_row.is_none()
                         && Self::element_name_is(
                             e.name().as_ref(),
@@ -917,6 +924,67 @@ impl OdsParser {
         Ok(true)
     }
 
+    fn parse_sheet_formatting(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<(SheetStyle, SheetPrintSettings)> {
+        let mut style = SheetStyle::default();
+        let mut print = SheetPrintSettings::default();
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let is_table = |local_name| {
+                Self::attribute_name_is(
+                    attribute.key.as_ref(),
+                    namespaces,
+                    TABLE_NAMESPACE_URI,
+                    local_name,
+                )
+            };
+            if is_table("style-name") {
+                style.style_name = Some(Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "table:style-name",
+                )?);
+            } else if is_table("template-name") {
+                style.template_name = Some(Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "table:template-name",
+                )?);
+            } else if is_table("use-first-row-styles") {
+                style.usage.use_first_row_styles =
+                    Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_table("use-last-row-styles") {
+                style.usage.use_last_row_styles =
+                    Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_table("use-first-column-styles") {
+                style.usage.use_first_column_styles =
+                    Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_table("use-last-column-styles") {
+                style.usage.use_last_column_styles =
+                    Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_table("use-banding-rows-styles") {
+                style.usage.use_banding_row_styles =
+                    Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_table("use-banding-columns-styles") {
+                style.usage.use_banding_column_styles =
+                    Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_table("print") {
+                print.printable = Self::parse_bool_attribute(&attribute, decoder)?;
+            } else if is_table("print-ranges") {
+                print.ranges = split_print_ranges(&Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "table:print-ranges",
+                )?)?;
+            }
+        }
+        Ok((style, print))
+    }
+
     fn parse_column(
         element: &BytesStart<'_>,
         decoder: Decoder,
@@ -1240,17 +1308,30 @@ pub(crate) struct SheetBuilder {
     columns: Vec<Column>,
     row_structure: StructureStack,
     column_structure: StructureStack,
+    style: SheetStyle,
+    print_settings: SheetPrintSettings,
     cell_count: usize,
 }
 
 impl SheetBuilder {
+    #[cfg(test)]
     pub fn new(name: String) -> Self {
+        Self::with_formatting(name, SheetStyle::default(), SheetPrintSettings::default())
+    }
+
+    fn with_formatting(
+        name: String,
+        style: SheetStyle,
+        print_settings: SheetPrintSettings,
+    ) -> Self {
         Self {
             name,
             rows: Vec::new(),
             columns: Vec::new(),
             row_structure: StructureStack::new(),
             column_structure: StructureStack::new(),
+            style,
+            print_settings,
             cell_count: 0,
         }
     }
@@ -1320,6 +1401,8 @@ impl SheetBuilder {
             columns: self.columns,
             column_structure: self.column_structure.finish()?,
             row_structure: self.row_structure.finish()?,
+            style: self.style,
+            print_settings: self.print_settings,
             protection: super::SheetProtection::default(),
         })
     }
@@ -1934,6 +2017,26 @@ mod tests {
     }
 
     #[test]
+    fn parses_sheet_style_and_print_settings() {
+        let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><o:body><o:spreadsheet><t:table t:name="Print" t:style-name="Sheet&amp;Style" t:template-name="TemplateOne" t:use-first-row-styles="true" t:use-last-row-styles="0" t:use-first-column-styles="1" t:use-last-column-styles="false" t:use-banding-rows-styles="true" t:use-banding-columns-styles="false" t:print="false" t:print-ranges="$Print.$A$1:$B$2 'Q1 Sales'.$C$3:$D$4"></t:table></o:spreadsheet></o:body></o:document-content>"#;
+        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let sheet = &sheets[0];
+        assert_eq!(sheet.style.style_name.as_deref(), Some("Sheet&Style"));
+        assert_eq!(sheet.style.template_name.as_deref(), Some("TemplateOne"));
+        assert_eq!(sheet.style.usage.use_first_row_styles, Some(true));
+        assert_eq!(sheet.style.usage.use_last_row_styles, Some(false));
+        assert_eq!(sheet.style.usage.use_first_column_styles, Some(true));
+        assert_eq!(sheet.style.usage.use_last_column_styles, Some(false));
+        assert_eq!(sheet.style.usage.use_banding_row_styles, Some(true));
+        assert_eq!(sheet.style.usage.use_banding_column_styles, Some(false));
+        assert!(!sheet.print_settings.printable);
+        assert_eq!(
+            sheet.print_settings.ranges,
+            ["$Print.$A$1:$B$2", "'Q1 Sales'.$C$3:$D$4"]
+        );
+    }
+
+    #[test]
     fn rejects_invalid_or_dangerous_repetition_counts() {
         let zero = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-row table:number-rows-repeated="0"/></table:table></office:spreadsheet></office:body></office:document-content>"#;
         assert!(OdsParser::parse_sheets(zero).is_err());
@@ -1958,6 +2061,12 @@ mod tests {
 
         let empty_group = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-column-group/></table:table></office:spreadsheet></office:body></office:document-content>"#;
         assert!(OdsParser::parse_sheets(empty_group).is_err());
+
+        let invalid_print = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table table:print="yes"></table:table></office:spreadsheet></office:body></office:document-content>"#;
+        assert!(OdsParser::parse_sheets(invalid_print).is_err());
+
+        let invalid_print_ranges = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table table:print-ranges="'Unclosed Sheet.$A$1"></table:table></office:spreadsheet></office:body></office:document-content>"#;
+        assert!(OdsParser::parse_sheets(invalid_print_ranges).is_err());
     }
 
     #[test]

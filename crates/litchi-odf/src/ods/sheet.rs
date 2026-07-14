@@ -1,6 +1,6 @@
 //! Sheet structures for ODS spreadsheets.
 
-use super::{Column, Row, SheetProtection, TableStructure};
+use super::{Column, Row, SheetPrintSettings, SheetProtection, SheetStyle, TableStructure};
 use litchi_core::Result;
 
 /// A sheet (worksheet) in an ODS spreadsheet.
@@ -18,6 +18,10 @@ pub struct Sheet {
     pub column_structure: Vec<TableStructure>,
     /// Nested grouping and header structure for logical rows.
     pub row_structure: Vec<TableStructure>,
+    /// Sheet-level table style and template references.
+    pub style: SheetStyle,
+    /// Sheet printing controls and ranges.
+    pub print_settings: SheetPrintSettings,
     /// Sheet protection metadata and edit permissions.
     pub protection: SheetProtection,
 }
@@ -46,6 +50,16 @@ impl Sheet {
     /// Get the nested row grouping and header structure.
     pub fn row_structure(&self) -> &[TableStructure] {
         &self.row_structure
+    }
+
+    /// Get the sheet-level table style and template settings.
+    pub fn style(&self) -> &SheetStyle {
+        &self.style
+    }
+
+    /// Get the sheet printing controls and ranges.
+    pub fn print_settings(&self) -> &SheetPrintSettings {
+        &self.print_settings
     }
 
     /// Get the number of rows in the sheet.
@@ -82,6 +96,8 @@ mod tests {
             columns: Vec::new(),
             column_structure: Vec::new(),
             row_structure: Vec::new(),
+            style: Default::default(),
+            print_settings: Default::default(),
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![],
@@ -97,6 +113,8 @@ mod tests {
             columns: Vec::new(),
             column_structure: Vec::new(),
             row_structure: Vec::new(),
+            style: Default::default(),
+            print_settings: Default::default(),
             protection: SheetProtection::default(),
             name: "Test Sheet".to_string(),
             rows: vec![],
@@ -110,6 +128,8 @@ mod tests {
             columns: Vec::new(),
             column_structure: Vec::new(),
             row_structure: Vec::new(),
+            style: Default::default(),
+            print_settings: Default::default(),
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![
@@ -140,6 +160,8 @@ mod tests {
             columns: Vec::new(),
             column_structure: Vec::new(),
             row_structure: Vec::new(),
+            style: Default::default(),
+            print_settings: Default::default(),
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![
@@ -241,6 +263,8 @@ mod tests {
             columns: Vec::new(),
             column_structure: Vec::new(),
             row_structure: Vec::new(),
+            style: Default::default(),
+            print_settings: Default::default(),
             protection: SheetProtection::default(),
             name: "Empty".to_string(),
             rows: vec![],
@@ -254,6 +278,8 @@ mod tests {
             columns: Vec::new(),
             column_structure: Vec::new(),
             row_structure: Vec::new(),
+            style: Default::default(),
+            print_settings: Default::default(),
             protection: SheetProtection::default(),
             name: "Data".to_string(),
             rows: vec![
@@ -348,6 +374,8 @@ mod tests {
             columns: Vec::new(),
             column_structure: Vec::new(),
             row_structure: Vec::new(),
+            style: Default::default(),
+            print_settings: Default::default(),
             protection: SheetProtection::default(),
             name: "Original".to_string(),
             rows: vec![],

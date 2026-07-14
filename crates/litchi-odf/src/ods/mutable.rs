@@ -6,8 +6,8 @@
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
     Cell, CellAnnotation, CellValue, Column, ContentValidation, NamedDefinition,
-    NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, Spreadsheet,
-    SpreadsheetProtection, TableStructure, TableVisibility,
+    NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings, SheetStyle,
+    Spreadsheet, SpreadsheetProtection, TableStructure, TableVisibility,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     named_expression::{ensure_unique, write_named_definitions},
@@ -17,7 +17,8 @@ use crate::ods::{
     },
     structure::{
         MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, TableStructureAxis,
-        validate_table_structure, write_columns, write_row_attributes, write_table_structure,
+        validate_sheet_print_settings, validate_table_structure, write_columns,
+        write_row_attributes, write_sheet_formatting_attributes, write_table_structure,
     },
     style_protection::{PreservedXmlFragment, extract_automatic_styles, extract_font_face_decls},
 };
@@ -375,6 +376,8 @@ impl MutableSpreadsheet {
             columns: Vec::new(),
             column_structure: Vec::new(),
             row_structure: Vec::new(),
+            style: Default::default(),
+            print_settings: Default::default(),
             protection: crate::ods::SheetProtection::default(),
         };
         self.sheets.push(sheet);
@@ -924,6 +927,29 @@ impl MutableSpreadsheet {
         Ok(())
     }
 
+    /// Replace sheet-level table style and template settings.
+    pub fn set_sheet_style(&mut self, sheet_index: usize, style: SheetStyle) -> Result<()> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        sheet.style = style;
+        Ok(())
+    }
+
+    /// Replace sheet printing controls and ranges.
+    pub fn set_sheet_print_settings(
+        &mut self,
+        sheet_index: usize,
+        settings: SheetPrintSettings,
+    ) -> Result<()> {
+        validate_sheet_print_settings(&settings)?;
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        sheet.print_settings = settings;
+        Ok(())
+    }
+
     /// Merge a rectangular cell range in a sheet.
     pub fn merge_cells(
         &mut self,
@@ -1032,6 +1058,7 @@ impl MutableSpreadsheet {
             body.push_str("<table:table table:name=\"");
             body.push_str(&escaped_name);
             body.push('"');
+            write_sheet_formatting_attributes(&mut body, &sheet.style, &sheet.print_settings)?;
             write_sheet_attributes(&mut body, &sheet.protection);
             body.push('>');
             write_sheet_options(&mut body, &sheet.protection.options);
@@ -1581,5 +1608,28 @@ mod tests {
         let sheets = output.sheets().unwrap();
         assert_eq!(sheets[0].column_structure, structure);
         assert_eq!(sheets[0].row_structure, sheets[0].column_structure);
+    }
+
+    #[test]
+    fn mutable_spreadsheet_round_trips_sheet_style_and_print_settings() {
+        let style = SheetStyle {
+            style_name: Some("MutableStyle".to_string()),
+            template_name: None,
+            usage: crate::SheetStyleUsage {
+                use_banding_row_styles: Some(true),
+                ..crate::SheetStyleUsage::default()
+            },
+        };
+        let print =
+            SheetPrintSettings::new(false, vec!["'Q1 Sales'.$A$1:$C$9".to_string()]).unwrap();
+        let mut mutable = MutableSpreadsheet::new();
+        mutable.add_sheet("Print").unwrap();
+        mutable.set_sheet_style(0, style.clone()).unwrap();
+        mutable.set_sheet_print_settings(0, print.clone()).unwrap();
+
+        let mut output = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let sheets = output.sheets().unwrap();
+        assert_eq!(sheets[0].style, style);
+        assert_eq!(sheets[0].print_settings, print);
     }
 }
