@@ -138,6 +138,33 @@ where
             _ => None,
         }
     }
+
+    /// Get shape as TableShape if it is one.
+    #[inline]
+    pub fn as_table(&self) -> Option<&TableShape> {
+        match self {
+            ShapeEnum::Table(table) => Some(table),
+            _ => None,
+        }
+    }
+
+    /// Get shape as GroupShape if it is one.
+    #[inline]
+    pub fn as_group(&self) -> Option<&GroupShape<'_>> {
+        match self {
+            ShapeEnum::Group(group) => Some(group),
+            _ => None,
+        }
+    }
+
+    /// Get shape as LineShape if it is one.
+    #[inline]
+    pub fn as_line(&self) -> Option<&LineShape> {
+        match self {
+            ShapeEnum::Line(line) => Some(line),
+            _ => None,
+        }
+    }
 }
 
 // PictureShape is now defined in picture.rs and re-exported
@@ -246,6 +273,26 @@ impl<'a> GroupShape<'a> {
     /// Get shape ID.
     pub fn id(&self) -> u32 {
         self.id
+    }
+
+    /// Get the left coordinate.
+    pub fn left(&self) -> i32 {
+        self.left
+    }
+
+    /// Get the top coordinate.
+    pub fn top(&self) -> i32 {
+        self.top
+    }
+
+    /// Get the group width.
+    pub fn width(&self) -> i32 {
+        self.width
+    }
+
+    /// Get the group height.
+    pub fn height(&self) -> i32 {
+        self.height
     }
 }
 

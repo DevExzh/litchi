@@ -29,7 +29,11 @@ impl EscherShapeFactory {
 
         if let Some(root_result) = parser.root_container() {
             let root = root_result?;
-            Self::extract_shapes_from_container(&root, &mut shapes);
+            if root.record().record_type == EscherRecordType::SpgrContainer {
+                Self::extract_shapes_from_root_group(&root, &mut shapes);
+            } else {
+                Self::extract_shapes_from_container(&root, &mut shapes);
+            }
         }
 
         Ok(shapes)
@@ -46,6 +50,15 @@ impl EscherShapeFactory {
         container: &EscherContainer<'data>,
         shapes: &mut Vec<EscherShape<'data>>,
     ) {
+        // A drawing container can also hold a background SpContainer. Public
+        // sheet shapes are the user children of its root SpgrContainer only.
+        if container.record().record_type == EscherRecordType::DgContainer
+            && let Some(root_group) = container.find_child(EscherRecordType::SpgrContainer)
+        {
+            Self::extract_shapes_from_root_group(&EscherContainer::new(root_group), shapes);
+            return;
+        }
+
         for child in container.children().flatten() {
             match child.record_type {
                 EscherRecordType::SpContainer => {
@@ -55,7 +68,7 @@ impl EscherShapeFactory {
                 },
                 EscherRecordType::SpgrContainer => {
                     let group_container = EscherContainer::new(child);
-                    Self::extract_shapes_from_spgr_container(&group_container, shapes);
+                    shapes.push(EscherShape::from_container(group_container));
                 },
                 _ if child.is_container() => {
                     let child_container = EscherContainer::new(child);
@@ -66,12 +79,12 @@ impl EscherShapeFactory {
         }
     }
 
-    /// Extract shapes from SpgrContainer with proper skip-first logic.
+    /// Extract user shapes from the root SpgrContainer.
     ///
     /// Based on Apache POI's HSLFGroupShape.getShapes():
     /// - The first SpContainer in SpgrContainer is the group shape itself
     /// - Remaining SpContainer children are the actual child shapes
-    fn extract_shapes_from_spgr_container<'data>(
+    fn extract_shapes_from_root_group<'data>(
         container: &EscherContainer<'data>,
         shapes: &mut Vec<EscherShape<'data>>,
     ) {
@@ -80,20 +93,17 @@ impl EscherShapeFactory {
         for child in container.children().flatten() {
             match child.record_type {
                 EscherRecordType::SpContainer => {
-                    let sp_container = EscherContainer::new(child);
-
                     if is_first {
                         is_first = false;
-                        let group_shape = EscherShape::from_container(sp_container);
-                        shapes.push(group_shape);
                     } else {
+                        let sp_container = EscherContainer::new(child);
                         let child_shape = EscherShape::from_container(sp_container);
                         shapes.push(child_shape);
                     }
                 },
                 EscherRecordType::SpgrContainer => {
                     let nested_group = EscherContainer::new(child);
-                    Self::extract_shapes_from_spgr_container(&nested_group, shapes);
+                    shapes.push(EscherShape::from_container(nested_group));
                 },
                 _ if child.is_container() => {
                     let child_container = EscherContainer::new(child);
@@ -108,7 +118,7 @@ impl EscherShapeFactory {
     ///
     /// # Performance
     ///
-    /// - Counts SpContainer records only
+    /// - Counts only shapes exposed by extraction
     /// - No shape object allocation
     /// - Early termination on errors
     pub fn count_shapes_in_drawing(data: &[u8]) -> usize {
@@ -117,7 +127,11 @@ impl EscherShapeFactory {
         if let Some(root_result) = parser.root_container()
             && let Ok(root) = root_result
         {
-            return Self::count_shapes_in_container(&root);
+            return if root.record().record_type == EscherRecordType::SpgrContainer {
+                Self::count_shapes_in_root_group(&root)
+            } else {
+                Self::count_shapes_in_container(&root)
+            };
         }
 
         0
@@ -125,11 +139,20 @@ impl EscherShapeFactory {
 
     /// Recursively count shapes in a container.
     fn count_shapes_in_container(container: &EscherContainer<'_>) -> usize {
+        if container.record().record_type == EscherRecordType::DgContainer
+            && let Some(root_group) = container.find_child(EscherRecordType::SpgrContainer)
+        {
+            return Self::count_shapes_in_root_group(&EscherContainer::new(root_group));
+        }
+
         let mut count = 0;
 
         for child in container.children().flatten() {
             match child.record_type {
                 EscherRecordType::SpContainer => {
+                    count += 1;
+                },
+                EscherRecordType::SpgrContainer => {
                     count += 1;
                 },
                 _ if child.is_container() => {
@@ -141,5 +164,150 @@ impl EscherShapeFactory {
         }
 
         count
+    }
+
+    /// Count the top-level user shapes in a drawing group without allocating.
+    fn count_shapes_in_root_group(container: &EscherContainer<'_>) -> usize {
+        let mut count = 0;
+        let mut is_first = true;
+
+        for child in container.children().flatten() {
+            match child.record_type {
+                EscherRecordType::SpContainer if is_first => {
+                    is_first = false;
+                },
+                EscherRecordType::SpContainer | EscherRecordType::SpgrContainer => {
+                    count += 1;
+                },
+                _ if child.is_container() => {
+                    let child_container = EscherContainer::new(child);
+                    count += Self::count_shapes_in_container(&child_container);
+                },
+                _ => {},
+            }
+        }
+
+        count
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::escher::writer::{
+        ShapeBuilder, record_type, write_child_anchor, write_client_anchor, write_container,
+        write_spgr,
+    };
+
+    fn shape_container(shape_type: u16, shape_id: u32, child_anchor: bool) -> Vec<u8> {
+        let mut children = Vec::new();
+        ShapeBuilder::new(shape_type, shape_id)
+            .write(&mut children)
+            .unwrap();
+        if child_anchor {
+            write_child_anchor(&mut children, 10, 20, 110, 70).unwrap();
+        } else {
+            write_client_anchor(&mut children, 10, 20, 110, 70).unwrap();
+        }
+
+        let mut container = Vec::new();
+        write_container(&mut container, 0, record_type::SP_CONTAINER, &children).unwrap();
+        container
+    }
+
+    fn grouped_drawing() -> Vec<u8> {
+        let patriarch = shape_container(0, 1, false);
+        let rectangle = shape_container(1, 2, false);
+
+        let mut group_header_children = Vec::new();
+        write_spgr(&mut group_header_children, 0, 0, 1000, 500).unwrap();
+        ShapeBuilder::new(0, 3)
+            .write(&mut group_header_children)
+            .unwrap();
+        write_child_anchor(&mut group_header_children, 100, 200, 500, 400).unwrap();
+        let mut group_header = Vec::new();
+        write_container(
+            &mut group_header,
+            0,
+            record_type::SP_CONTAINER,
+            &group_header_children,
+        )
+        .unwrap();
+
+        let ellipse = shape_container(3, 4, true);
+        let mut nested_group_children = group_header;
+        nested_group_children.extend_from_slice(&ellipse);
+        let mut nested_group = Vec::new();
+        write_container(
+            &mut nested_group,
+            0,
+            record_type::SPGR_CONTAINER,
+            &nested_group_children,
+        )
+        .unwrap();
+
+        let mut root_group_children = patriarch;
+        root_group_children.extend_from_slice(&rectangle);
+        root_group_children.extend_from_slice(&nested_group);
+        let mut root_group = Vec::new();
+        write_container(
+            &mut root_group,
+            0,
+            record_type::SPGR_CONTAINER,
+            &root_group_children,
+        )
+        .unwrap();
+
+        let mut drawing = Vec::new();
+        let background = shape_container(1, 5, false);
+        let mut drawing_children = root_group;
+        drawing_children.extend_from_slice(&background);
+        write_container(
+            &mut drawing,
+            0,
+            record_type::DG_CONTAINER,
+            &drawing_children,
+        )
+        .unwrap();
+        drawing
+    }
+
+    #[test]
+    fn root_patriarch_is_hidden_and_nested_group_is_preserved() {
+        let drawing = grouped_drawing();
+        let shapes = EscherShapeFactory::extract_shapes_from_drawing(&drawing).unwrap();
+
+        assert_eq!(shapes.len(), 2);
+        assert_eq!(shapes[0].shape_id(), Some(2));
+        assert_eq!(
+            shapes[0].shape_type(),
+            super::super::shape::EscherShapeType::Rectangle
+        );
+
+        let group = &shapes[1];
+        assert_eq!(
+            group.shape_type(),
+            super::super::shape::EscherShapeType::Group
+        );
+        assert_eq!(group.shape_id(), Some(3));
+        assert_eq!(group.anchor().map(|anchor| anchor.left), Some(100));
+        assert_eq!(group.anchor().map(|anchor| anchor.top), Some(200));
+        assert_eq!(group.children.len(), 1);
+        assert_eq!(group.children[0].shape_id(), Some(4));
+        assert_eq!(
+            group.children[0].shape_type(),
+            super::super::shape::EscherShapeType::Ellipse
+        );
+    }
+
+    #[test]
+    fn shape_count_matches_extracted_top_level_shapes() {
+        let drawing = grouped_drawing();
+        let shapes = EscherShapeFactory::extract_shapes_from_drawing(&drawing).unwrap();
+
+        assert_eq!(
+            EscherShapeFactory::count_shapes_in_drawing(&drawing),
+            shapes.len()
+        );
     }
 }

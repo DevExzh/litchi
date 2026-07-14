@@ -222,8 +222,7 @@ impl<'doc> Slide<'doc> {
 
                 // Recursively parse child shapes
                 // This follows Apache POI's approach: iterate child shapes and convert them
-                let child_escher_shapes = escher_shape.child_shapes();
-                for child_escher in &child_escher_shapes {
+                for child_escher in escher_shape.children() {
                     if let Some(child_shape) = Self::convert_escher_to_shape_enum(child_escher) {
                         group.add_child(child_shape);
                     }

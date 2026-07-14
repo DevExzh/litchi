@@ -44,18 +44,30 @@ pub struct EscherShape<'data> {
 }
 
 impl<'data> EscherShape<'data> {
-    /// Parse an Escher shape from an SpContainer record.
+    /// Parse an Escher shape from an SpContainer or SpgrContainer record.
     pub fn from_container(container: EscherContainer<'data>) -> Self {
         let shape_type = Self::detect_shape_type(&container);
-        let shape_id = Self::extract_shape_id(&container);
-        let properties = EscherProperties::from_container(&container);
-        let anchor = Self::extract_anchor(&container);
-
-        let text = if let Some(textbox) = container.find_child(EscherRecordType::ClientTextbox) {
-            super::text::extract_text_from_textbox(&textbox)
+        // A group is represented by an SpgrContainer whose first SpContainer
+        // carries the group's ID, properties, and anchor. Keep the outer
+        // container for child traversal, but read metadata from that header.
+        let group_header = if shape_type == EscherShapeType::Group {
+            container
+                .find_child(EscherRecordType::SpContainer)
+                .map(EscherContainer::new)
         } else {
             None
         };
+        let metadata_container = group_header.as_ref().unwrap_or(&container);
+        let shape_id = Self::extract_shape_id(metadata_container);
+        let properties = EscherProperties::from_container(metadata_container);
+        let anchor = Self::extract_anchor(metadata_container);
+
+        let text =
+            if let Some(textbox) = metadata_container.find_child(EscherRecordType::ClientTextbox) {
+                super::text::extract_text_from_textbox(&textbox)
+            } else {
+                None
+            };
 
         let is_group = shape_type == EscherShapeType::Group;
 
@@ -138,36 +150,15 @@ impl<'data> EscherShape<'data> {
         &self.container
     }
 
+    /// Return parsed child shapes without reparsing or allocating.
+    #[inline]
+    pub fn children(&self) -> &[EscherShape<'data>] {
+        &self.children
+    }
+
+    /// Return owned copies of the child shapes.
     pub fn child_shapes(&self) -> Vec<EscherShape<'data>> {
-        if self.shape_type != EscherShapeType::Group {
-            return Vec::new();
-        }
-
-        let mut children = Vec::new();
-        let mut is_first = true;
-
-        for child in self.container.children().flatten() {
-            match child.record_type {
-                EscherRecordType::SpContainer => {
-                    if is_first {
-                        is_first = false;
-                        continue;
-                    }
-
-                    let sp_container = EscherContainer::new(child);
-                    let child_shape = EscherShape::from_container(sp_container);
-                    children.push(child_shape);
-                },
-                EscherRecordType::SpgrContainer => {
-                    let group_container = EscherContainer::new(child);
-                    let group_shape = EscherShape::from_container(group_container);
-                    children.push(group_shape);
-                },
-                _ => {},
-            }
-        }
-
-        children
+        self.children.clone()
     }
 
     fn detect_shape_type(container: &EscherContainer<'data>) -> EscherShapeType {
