@@ -1,10 +1,10 @@
 /// Text frame for accessing text content in shapes.
 use crate::common::xml::decode_xml_reference;
 use crate::error::{OoxmlError, Result};
+use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
-use quick_xml::{Reader, XmlVersion};
 
 const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
@@ -142,6 +142,129 @@ pub(crate) fn extract_drawingml_text(
     Ok(result)
 }
 
+pub(crate) fn scan_drawingml_element_ranges(
+    xml_bytes: &[u8],
+    target: &[u8],
+    mut emit: impl FnMut(u32, u32) -> Result<()>,
+) -> Result<()> {
+    enum ScanEvent {
+        Start,
+        NestedStart,
+        Empty,
+        End,
+        Eof,
+        Other,
+    }
+
+    let mut reader = NsReader::from_reader(xml_bytes);
+    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut capture: Option<(usize, usize)> = None;
+    loop {
+        let event_start = usize::try_from(reader.buffer_position()).map_err(|_| {
+            OoxmlError::InvalidFormat("DrawingML offset does not fit usize".to_string())
+        })?;
+        let event = {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            if fragment_prefix.is_none()
+                && let Event::Start(element) = &event
+                && !matches!(namespace, ResolveResult::Bound(_))
+            {
+                fragment_prefix = Some(
+                    element
+                        .name()
+                        .prefix()
+                        .map(|prefix| prefix.into_inner().to_vec()),
+                );
+            }
+            match event {
+                Event::Start(_) if capture.is_some() => ScanEvent::NestedStart,
+                Event::Start(element)
+                    if is_drawingml_name(&namespace, element.name(), target, &fragment_prefix) =>
+                {
+                    ScanEvent::Start
+                },
+                Event::Empty(element)
+                    if capture.is_none()
+                        && is_drawingml_name(
+                            &namespace,
+                            element.name(),
+                            target,
+                            &fragment_prefix,
+                        ) =>
+                {
+                    ScanEvent::Empty
+                },
+                Event::End(_) if capture.is_some() => ScanEvent::End,
+                Event::Eof => ScanEvent::Eof,
+                _ => ScanEvent::Other,
+            }
+        };
+        let event_end = usize::try_from(reader.buffer_position()).map_err(|_| {
+            OoxmlError::InvalidFormat("DrawingML offset does not fit usize".to_string())
+        })?;
+
+        match event {
+            ScanEvent::Start => capture = Some((event_start, 1)),
+            ScanEvent::NestedStart => {
+                let Some((_, depth)) = capture.as_mut() else {
+                    return Err(OoxmlError::InvalidFormat(
+                        "missing captured DrawingML element".to_string(),
+                    ));
+                };
+                *depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("DrawingML nesting is too deep".to_string())
+                })?;
+            },
+            ScanEvent::Empty => emit_drawingml_range(event_start, event_end, &mut emit)?,
+            ScanEvent::End => {
+                let Some((_, depth)) = capture.as_mut() else {
+                    return Err(OoxmlError::InvalidFormat(
+                        "missing captured DrawingML element".to_string(),
+                    ));
+                };
+                *depth = depth.checked_sub(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("invalid DrawingML nesting".to_string())
+                })?;
+                if *depth == 0 {
+                    let Some((start, _)) = capture.take() else {
+                        return Err(OoxmlError::InvalidFormat(
+                            "missing DrawingML element range".to_string(),
+                        ));
+                    };
+                    emit_drawingml_range(start, event_end, &mut emit)?;
+                }
+            },
+            ScanEvent::Eof if capture.is_some() => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated DrawingML element".to_string(),
+                ));
+            },
+            ScanEvent::Eof => break,
+            ScanEvent::Other => {},
+        }
+    }
+    Ok(())
+}
+
+fn emit_drawingml_range(
+    start: usize,
+    end: usize,
+    emit: &mut impl FnMut(u32, u32) -> Result<()>,
+) -> Result<()> {
+    let length = end
+        .checked_sub(start)
+        .ok_or_else(|| OoxmlError::InvalidFormat("invalid DrawingML element range".to_string()))?;
+    emit(
+        u32::try_from(start)
+            .map_err(|_| OoxmlError::InvalidFormat("DrawingML offset exceeds u32".to_string()))?,
+        u32::try_from(length).map_err(|_| {
+            OoxmlError::InvalidFormat("DrawingML element length exceeds u32".to_string())
+        })?,
+    )
+}
+
 /// A text frame containing text content.
 ///
 /// Text frames are found in shape objects and provide access to the
@@ -187,69 +310,14 @@ impl TextFrame {
     ///
     /// Returns a vector of Paragraph objects.
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
-
         let mut paragraphs = Vec::new();
-        let mut current_para_xml = Vec::new();
-        let mut in_para = false;
-        let mut depth = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    // DrawingML paragraphs are <a:p>
-                    if e.local_name().as_ref() == b"p" && !in_para {
-                        in_para = true;
-                        depth = 1;
-                        current_para_xml.clear();
-                        current_para_xml.extend_from_slice(b"<a:p>");
-                    } else if in_para {
-                        depth += 1;
-                        current_para_xml.push(b'<');
-                        current_para_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_para_xml.push(b' ');
-                            current_para_xml.extend_from_slice(attr.key.as_ref());
-                            current_para_xml.extend_from_slice(b"=\"");
-                            current_para_xml.extend_from_slice(&attr.value);
-                            current_para_xml.push(b'"');
-                        }
-                        current_para_xml.push(b'>');
-                    }
-                },
-                Ok(Event::End(e)) if in_para => {
-                    current_para_xml.extend_from_slice(b"</");
-                    current_para_xml.extend_from_slice(e.name().as_ref());
-                    current_para_xml.push(b'>');
-
-                    depth -= 1;
-                    if depth == 0 && e.local_name().as_ref() == b"p" {
-                        paragraphs.push(Paragraph::new(current_para_xml.clone()));
-                        in_para = false;
-                    }
-                },
-                Ok(Event::Text(e)) if in_para => {
-                    current_para_xml.extend_from_slice(e.as_ref());
-                },
-                Ok(Event::Empty(e)) if in_para => {
-                    current_para_xml.push(b'<');
-                    current_para_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        current_para_xml.push(b' ');
-                        current_para_xml.extend_from_slice(attr.key.as_ref());
-                        current_para_xml.extend_from_slice(b"=\"");
-                        current_para_xml.extend_from_slice(&attr.value);
-                        current_para_xml.push(b'"');
-                    }
-                    current_para_xml.extend_from_slice(b"/>");
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_drawingml_element_ranges(&self.xml_bytes, b"p", |start, length| {
+            let start = start as usize;
+            paragraphs.push(Paragraph::new(
+                self.xml_bytes[start..start + length as usize].to_vec(),
+            ));
+            Ok(())
+        })?;
         Ok(paragraphs)
     }
 
@@ -308,6 +376,10 @@ mod tests {
         </p:sp>"#;
         let frame = TextFrame::from_xml(xml).unwrap();
         assert_eq!(frame.text().unwrap(), " A & B < C\t\nSecond");
+        let paragraphs = frame.paragraphs().unwrap();
+        assert_eq!(paragraphs.len(), 2);
+        assert_eq!(paragraphs[0].text().unwrap(), " A & B < C\t\n");
+        assert_eq!(paragraphs[1].text().unwrap(), "Second");
     }
 
     #[test]

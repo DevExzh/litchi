@@ -1,8 +1,6 @@
 /// Table shape implementation for PowerPoint presentations.
 use crate::error::{OoxmlError, Result};
-use crate::pptx::shapes::textframe::extract_drawingml_text;
-use quick_xml::Reader;
-use quick_xml::events::Event;
+use crate::pptx::shapes::textframe::{extract_drawingml_text, scan_drawingml_element_ranges};
 
 /// A table in a PowerPoint presentation.
 ///
@@ -39,91 +37,27 @@ impl Table {
     /// GraphicFrames contain the table within their structure, so we need
     /// to extract just the table portion.
     pub fn from_graphic_frame_xml(xml_bytes: &[u8]) -> Result<Self> {
-        let mut reader = Reader::from_reader(xml_bytes);
-        reader.config_mut().trim_text(true);
-
-        let mut table_xml = Vec::new();
-        let mut in_table = false;
-        let mut depth = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"tbl" && !in_table {
-                        in_table = true;
-                        depth = 1;
-                        table_xml.clear();
-                        table_xml.extend_from_slice(b"<a:tbl>");
-                    } else if in_table {
-                        depth += 1;
-                        table_xml.push(b'<');
-                        table_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            table_xml.push(b' ');
-                            table_xml.extend_from_slice(attr.key.as_ref());
-                            table_xml.extend_from_slice(b"=\"");
-                            table_xml.extend_from_slice(&attr.value);
-                            table_xml.push(b'"');
-                        }
-                        table_xml.push(b'>');
-                    }
-                },
-                Ok(Event::End(e)) if in_table => {
-                    table_xml.extend_from_slice(b"</");
-                    table_xml.extend_from_slice(e.name().as_ref());
-                    table_xml.push(b'>');
-
-                    depth -= 1;
-                    if depth == 0 && e.local_name().as_ref() == b"tbl" {
-                        return Ok(Table::new(table_xml));
-                    }
-                },
-                Ok(Event::Text(e)) if in_table => {
-                    table_xml.extend_from_slice(e.as_ref());
-                },
-                Ok(Event::Empty(e)) if in_table => {
-                    table_xml.push(b'<');
-                    table_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        table_xml.push(b' ');
-                        table_xml.extend_from_slice(attr.key.as_ref());
-                        table_xml.extend_from_slice(b"=\"");
-                        table_xml.extend_from_slice(&attr.value);
-                        table_xml.push(b'"');
-                    }
-                    table_xml.extend_from_slice(b"/>");
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
+        let mut table = None;
+        scan_drawingml_element_ranges(xml_bytes, b"tbl", |start, length| {
+            if table.is_none() {
+                let start = start as usize;
+                table = Some(Table::new(
+                    xml_bytes[start..start + length as usize].to_vec(),
+                ));
             }
-        }
-
-        Err(OoxmlError::PartNotFound(
-            "Table not found in graphic frame".to_string(),
-        ))
+            Ok(())
+        })?;
+        table
+            .ok_or_else(|| OoxmlError::PartNotFound("Table not found in graphic frame".to_string()))
     }
 
     /// Get the number of rows in the table.
     pub fn row_count(&self) -> Result<usize> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
-
         let mut count = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e))
-                    // DrawingML table rows are <a:tr>
-                    if e.local_name().as_ref() == b"tr" => {
-                        count += 1;
-                    },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_drawingml_element_ranges(&self.xml_bytes, b"tr", |_, _| {
+            count += 1;
+            Ok(())
+        })?;
         Ok(count)
     }
 
@@ -141,68 +75,14 @@ impl Table {
 
     /// Get all rows in the table.
     pub fn rows(&self) -> Result<Vec<TableRow>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
-
         let mut rows = Vec::new();
-        let mut current_row_xml = Vec::new();
-        let mut in_row = false;
-        let mut depth = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"tr" && !in_row {
-                        in_row = true;
-                        depth = 1;
-                        current_row_xml.clear();
-                        current_row_xml.extend_from_slice(b"<a:tr>");
-                    } else if in_row {
-                        depth += 1;
-                        current_row_xml.push(b'<');
-                        current_row_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_row_xml.push(b' ');
-                            current_row_xml.extend_from_slice(attr.key.as_ref());
-                            current_row_xml.extend_from_slice(b"=\"");
-                            current_row_xml.extend_from_slice(&attr.value);
-                            current_row_xml.push(b'"');
-                        }
-                        current_row_xml.push(b'>');
-                    }
-                },
-                Ok(Event::End(e)) if in_row => {
-                    current_row_xml.extend_from_slice(b"</");
-                    current_row_xml.extend_from_slice(e.name().as_ref());
-                    current_row_xml.push(b'>');
-
-                    depth -= 1;
-                    if depth == 0 && e.local_name().as_ref() == b"tr" {
-                        rows.push(TableRow::new(current_row_xml.clone()));
-                        in_row = false;
-                    }
-                },
-                Ok(Event::Text(e)) if in_row => {
-                    current_row_xml.extend_from_slice(e.as_ref());
-                },
-                Ok(Event::Empty(e)) if in_row => {
-                    current_row_xml.push(b'<');
-                    current_row_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        current_row_xml.push(b' ');
-                        current_row_xml.extend_from_slice(attr.key.as_ref());
-                        current_row_xml.extend_from_slice(b"=\"");
-                        current_row_xml.extend_from_slice(&attr.value);
-                        current_row_xml.push(b'"');
-                    }
-                    current_row_xml.extend_from_slice(b"/>");
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_drawingml_element_ranges(&self.xml_bytes, b"tr", |start, length| {
+            let start = start as usize;
+            rows.push(TableRow::new(
+                self.xml_bytes[start..start + length as usize].to_vec(),
+            ));
+            Ok(())
+        })?;
         Ok(rows)
     }
 
@@ -235,91 +115,24 @@ impl TableRow {
 
     /// Get the number of cells in this row.
     pub fn cell_count(&self) -> Result<usize> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
-
         let mut count = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e))
-                    // DrawingML table cells are <a:tc>
-                    if e.local_name().as_ref() == b"tc" => {
-                        count += 1;
-                    },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_drawingml_element_ranges(&self.xml_bytes, b"tc", |_, _| {
+            count += 1;
+            Ok(())
+        })?;
         Ok(count)
     }
 
     /// Get all cells in this row.
     pub fn cells(&self) -> Result<Vec<TableCell>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
-
         let mut cells = Vec::new();
-        let mut current_cell_xml = Vec::new();
-        let mut in_cell = false;
-        let mut depth = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"tc" && !in_cell {
-                        in_cell = true;
-                        depth = 1;
-                        current_cell_xml.clear();
-                        current_cell_xml.extend_from_slice(b"<a:tc>");
-                    } else if in_cell {
-                        depth += 1;
-                        current_cell_xml.push(b'<');
-                        current_cell_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_cell_xml.push(b' ');
-                            current_cell_xml.extend_from_slice(attr.key.as_ref());
-                            current_cell_xml.extend_from_slice(b"=\"");
-                            current_cell_xml.extend_from_slice(&attr.value);
-                            current_cell_xml.push(b'"');
-                        }
-                        current_cell_xml.push(b'>');
-                    }
-                },
-                Ok(Event::End(e)) if in_cell => {
-                    current_cell_xml.extend_from_slice(b"</");
-                    current_cell_xml.extend_from_slice(e.name().as_ref());
-                    current_cell_xml.push(b'>');
-
-                    depth -= 1;
-                    if depth == 0 && e.local_name().as_ref() == b"tc" {
-                        cells.push(TableCell::new(current_cell_xml.clone()));
-                        in_cell = false;
-                    }
-                },
-                Ok(Event::Text(e)) if in_cell => {
-                    current_cell_xml.extend_from_slice(e.as_ref());
-                },
-                Ok(Event::Empty(e)) if in_cell => {
-                    current_cell_xml.push(b'<');
-                    current_cell_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        current_cell_xml.push(b' ');
-                        current_cell_xml.extend_from_slice(attr.key.as_ref());
-                        current_cell_xml.extend_from_slice(b"=\"");
-                        current_cell_xml.extend_from_slice(&attr.value);
-                        current_cell_xml.push(b'"');
-                    }
-                    current_cell_xml.extend_from_slice(b"/>");
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_drawingml_element_ranges(&self.xml_bytes, b"tc", |start, length| {
+            let start = start as usize;
+            cells.push(TableCell::new(
+                self.xml_bytes[start..start + length as usize].to_vec(),
+            ));
+            Ok(())
+        })?;
         Ok(cells)
     }
 }
@@ -356,5 +169,30 @@ mod tests {
                 .to_vec(),
         );
         assert_eq!(cell.text().unwrap(), "A & B < C D");
+    }
+
+    #[test]
+    fn table_ranges_preserve_aliases_and_ignore_foreign_lookalikes() {
+        let xml = br#"<p:graphicFrame xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:d="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:false="urn:not-drawingml">
+            <false:tbl><false:tr><false:tc/></false:tr></false:tbl>
+            <d:tbl data-id="kept">
+                <false:tr><false:tc/></false:tr>
+                <d:tr h="20"><false:tc/><d:tc><d:txBody><d:p><d:r><d:t><![CDATA[A < B]]></d:t></d:r></d:p></d:txBody></d:tc></d:tr>
+            </d:tbl>
+        </p:graphicFrame>"#;
+        let table = Table::from_graphic_frame_xml(xml).unwrap();
+        assert_eq!(table.row_count().unwrap(), 1);
+        let rows = table.rows().unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].cell_count().unwrap(), 1);
+        let cells = rows[0].cells().unwrap();
+        assert_eq!(cells.len(), 1);
+        assert_eq!(cells[0].text().unwrap(), "A < B");
+    }
+
+    #[test]
+    fn table_ranges_reject_unterminated_selected_elements() {
+        let xml = br#"<a:graphicFrame xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:tbl><a:tr/>"#;
+        assert!(Table::from_graphic_frame_xml(xml).is_err());
     }
 }
