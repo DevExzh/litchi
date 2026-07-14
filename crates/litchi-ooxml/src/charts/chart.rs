@@ -8,6 +8,162 @@ use crate::charts::models::{Layout, TitleText};
 use crate::charts::plot_area::PlotArea;
 use crate::charts::series::{DataLabel, Marker};
 use crate::charts::types::DisplayBlanks;
+use crate::common::xml::is_drawingml_chart_name;
+use crate::error::{OoxmlError, Result};
+use quick_xml::events::Event;
+use quick_xml::name::ResolveResult;
+use quick_xml::reader::NsReader;
+
+fn validate_chart_xml_fragment(xml: &[u8], expected_root: &[u8], description: &str) -> Result<()> {
+    let mut reader = NsReader::from_reader(xml);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut saw_root = false;
+    let mut closed_root = false;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        match event {
+            Event::Start(ref element) | Event::Empty(ref element) => {
+                if matches!(namespace, ResolveResult::Unknown(_)) {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "{description} contains an undeclared element prefix"
+                    )));
+                }
+                let has_expected_root =
+                    is_drawingml_chart_name(&namespace, element.name(), expected_root);
+                drop(namespace);
+                for attribute in element.attributes() {
+                    let attribute =
+                        attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    if matches!(
+                        reader.resolver().resolve_attribute(attribute.key).0,
+                        ResolveResult::Unknown(_)
+                    ) {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "{description} contains an undeclared attribute prefix"
+                        )));
+                    }
+                }
+                if depth == 0 {
+                    if saw_root || !has_expected_root {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "{description} must have one DrawingML chart root"
+                        )));
+                    }
+                    saw_root = true;
+                }
+                if matches!(event, Event::Start(_)) {
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat(format!("{description} XML nesting is too deep"))
+                    })?;
+                } else if depth == 0 {
+                    closed_root = true;
+                }
+            },
+            Event::End(ref element) => {
+                if matches!(namespace, ResolveResult::Unknown(_)) {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "{description} contains an undeclared closing-element prefix"
+                    )));
+                }
+                let has_expected_root =
+                    is_drawingml_chart_name(&namespace, element.name(), expected_root);
+                drop(namespace);
+                if depth == 0 {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "{description} has an unmatched closing element"
+                    )));
+                }
+                depth -= 1;
+                if depth == 0 {
+                    if !has_expected_root {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "{description} has an invalid root closing element"
+                        )));
+                    }
+                    closed_root = true;
+                }
+            },
+            Event::Text(ref text)
+                if depth == 0
+                    && !text
+                        .decode()
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                        .trim()
+                        .is_empty() =>
+            {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "{description} contains text outside its root"
+                )));
+            },
+            Event::CData(_) | Event::GeneralRef(_) if depth == 0 => {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "{description} contains data outside its root"
+                )));
+            },
+            Event::Decl(_) | Event::DocType(_) => {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "{description} cannot contain an XML declaration or document type"
+                )));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    if !saw_root || !closed_root || depth != 0 {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "{description} has no complete root"
+        )));
+    }
+    Ok(())
+}
+
+macro_rules! chart_xml_fragment {
+    ($(#[$meta:meta])* $name:ident, $root:literal, $description:literal) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, PartialEq, Eq)]
+        pub struct $name {
+            xml: Vec<u8>,
+        }
+
+        impl $name {
+            /// Validate and retain one complete XML fragment.
+            pub fn from_xml(xml: Vec<u8>) -> Result<Self> {
+                validate_chart_xml_fragment(&xml, $root, $description)?;
+                Ok(Self { xml })
+            }
+
+            /// Return the complete XML fragment.
+            pub fn as_xml(&self) -> &[u8] {
+                &self.xml
+            }
+        }
+    };
+}
+
+chart_xml_fragment!(
+    /// Complete chart-space shape properties, including arbitrary DrawingML children.
+    ChartShapeProperties,
+    b"spPr",
+    "chart shape properties"
+);
+
+chart_xml_fragment!(
+    /// Complete chart-space text properties, including arbitrary DrawingML children.
+    ChartTextProperties,
+    b"txPr",
+    "chart text properties"
+);
+
+chart_xml_fragment!(
+    /// Complete chart-space extension list, including extension namespace content.
+    ChartExtensionList,
+    b"extLst",
+    "chart extension list"
+);
 
 /// Printed chart header and footer strings and selection flags.
 #[derive(Debug, Clone)]
@@ -526,8 +682,14 @@ pub struct Chart {
     pub external_data: Option<ChartExternalData>,
     /// Optional chart user-shapes drawing relationship metadata
     pub user_shapes: Option<ChartUserShapes>,
+    /// Optional chart-space DrawingML shape properties
+    pub shape_properties: Option<ChartShapeProperties>,
+    /// Optional chart-space DrawingML text properties
+    pub text_properties: Option<ChartTextProperties>,
     /// Optional chart printing configuration
     pub print_settings: Option<ChartPrintSettings>,
+    /// Optional chart-space extension list
+    pub extension_list: Option<ChartExtensionList>,
 }
 
 impl Chart {
@@ -558,7 +720,10 @@ impl Chart {
             rounded_corners: false,
             external_data: None,
             user_shapes: None,
+            shape_properties: None,
+            text_properties: None,
             print_settings: None,
+            extension_list: None,
         }
     }
 

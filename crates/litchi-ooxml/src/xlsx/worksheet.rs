@@ -25,8 +25,9 @@ use super::table::{Table, parse_table_xml};
 use super::views::SheetView;
 use super::writer::sheet::Image;
 use super::{
-    ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart,
-    ChartUserShapesRelationship, ChartUserShapesRelationshipTarget, WorksheetChart,
+    ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship, ChartRelationshipTarget,
+    ChartUserShapesPart, ChartUserShapesRelationship, ChartUserShapesRelationshipTarget,
+    WorksheetChart,
     chart::{
         chart_external_data_content_type, is_chart_external_data_relationship_type,
         is_chart_user_shapes_relationship_type, parse_chart_from_xml,
@@ -482,6 +483,16 @@ impl<'a> Worksheet<'a> {
                 .into());
             }
             let mut worksheet_chart = parse_chart_from_xml(chart_part.blob(), chart.anchor)?;
+            for relationship_id in
+                crate::xlsx::chart::chart_fragment_relationship_ids(&worksheet_chart.chart)?
+            {
+                if relationship_id.is_empty() || chart_part.rels().get(&relationship_id).is_none() {
+                    return Err(format!(
+                        "Chart fragment references missing relationship '{relationship_id}'"
+                    )
+                    .into());
+                }
+            }
             if let Some(external_data) = worksheet_chart.chart.external_data.as_ref() {
                 let relationship_id =
                     external_data.relationship_id.as_deref().ok_or_else(|| {
@@ -603,6 +614,49 @@ impl<'a> Worksheet<'a> {
                     xml: user_shapes_part.blob().to_vec(),
                     relationships,
                 });
+            }
+            let external_data_relationship_id = worksheet_chart
+                .chart
+                .external_data
+                .as_ref()
+                .and_then(|metadata| metadata.relationship_id.as_deref());
+            let user_shapes_relationship_id = worksheet_chart
+                .chart
+                .user_shapes
+                .as_ref()
+                .and_then(|metadata| metadata.relationship_id.as_deref());
+            for related in chart_part.rels().iter() {
+                if Some(related.r_id()) == external_data_relationship_id
+                    || Some(related.r_id()) == user_shapes_relationship_id
+                {
+                    continue;
+                }
+                let target = if related.is_external() {
+                    ChartRelationshipTarget::External {
+                        target: related.target_ref().to_string(),
+                    }
+                } else {
+                    let target_uri = related.target_partname()?;
+                    let target_part = self.workbook.package().get_part(&target_uri)?;
+                    if target_part.rels().iter().next().is_some() {
+                        return Err(format!(
+                            "Chart related resource '{target_uri}' has nested relationships"
+                        )
+                        .into());
+                    }
+                    ChartRelationshipTarget::Embedded {
+                        data: target_part.blob().to_vec(),
+                        content_type: target_part.content_type().to_string(),
+                        extension: target_uri.ext().to_string(),
+                    }
+                };
+                worksheet_chart
+                    .additional_relationships
+                    .push(ChartRelationship {
+                        relationship_id: related.r_id().to_string(),
+                        relationship_type: related.reltype().to_string(),
+                        target,
+                    });
             }
             charts.push(worksheet_chart);
         }

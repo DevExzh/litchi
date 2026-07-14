@@ -80,9 +80,10 @@ pub mod writer;
 
 pub use axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
 pub use chart::{
-    Chart, ChartExternalData, ChartHeaderFooter, ChartPageMargins, ChartPageOrientation,
-    ChartPageSetup, ChartPrintSettings, ChartProtection, ChartUserShapes, ColorMapOverride,
-    ColorMapping, ColorSchemeIndex, PivotFormat, PivotSource, View3D, WallFloor,
+    Chart, ChartExtensionList, ChartExternalData, ChartHeaderFooter, ChartPageMargins,
+    ChartPageOrientation, ChartPageSetup, ChartPrintSettings, ChartProtection,
+    ChartShapeProperties, ChartTextProperties, ChartUserShapes, ColorMapOverride, ColorMapping,
+    ColorSchemeIndex, PivotFormat, PivotSource, View3D, WallFloor,
 };
 pub use legend::Legend;
 pub use models::{

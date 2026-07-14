@@ -53,9 +53,9 @@ pub struct ChartExternalDataPart {
     pub target: ChartExternalDataTarget,
 }
 
-/// Target of a relationship owned by a chart user-shapes drawing.
+/// Target of a relationship owned by a chart or chart user-shapes part.
 #[derive(Debug, Clone)]
-pub enum ChartUserShapesRelationshipTarget {
+pub enum ChartRelationshipTarget {
     /// A directly related part embedded in the containing package
     Embedded {
         /// Complete target-part bytes
@@ -72,16 +72,22 @@ pub enum ChartUserShapesRelationshipTarget {
     },
 }
 
-/// One relationship owned by a chart user-shapes drawing part.
+/// One relationship owned by a chart or chart user-shapes part.
 #[derive(Debug, Clone)]
-pub struct ChartUserShapesRelationship {
-    /// Relationship identifier referenced by the drawing XML
+pub struct ChartRelationship {
+    /// Relationship identifier referenced by the owning part's XML
     pub relationship_id: String,
     /// Relationship type URI
     pub relationship_type: String,
     /// Internal payload or external target
-    pub target: ChartUserShapesRelationshipTarget,
+    pub target: ChartRelationshipTarget,
 }
+
+/// Backwards-compatible name for a chart user-shapes relationship target.
+pub type ChartUserShapesRelationshipTarget = ChartRelationshipTarget;
+
+/// Backwards-compatible name for a chart user-shapes relationship.
+pub type ChartUserShapesRelationship = ChartRelationship;
 
 /// Lossless chart user-shapes XML and its direct relationship targets.
 #[derive(Debug, Clone)]
@@ -89,7 +95,7 @@ pub struct ChartUserShapesPart {
     /// Complete chart user-shapes XML document
     pub xml: Vec<u8>,
     /// Relationships owned by the chart user-shapes part
-    pub relationships: Vec<ChartUserShapesRelationship>,
+    pub relationships: Vec<ChartRelationship>,
 }
 
 impl ChartUserShapesPart {
@@ -248,6 +254,8 @@ pub struct WorksheetChart {
     pub external_data_part: Option<ChartExternalDataPart>,
     /// Optional chart user-shapes drawing and its direct related resources
     pub user_shapes_part: Option<ChartUserShapesPart>,
+    /// Other direct relationships owned by the chart part
+    pub additional_relationships: Vec<ChartRelationship>,
 }
 
 impl WorksheetChart {
@@ -258,6 +266,7 @@ impl WorksheetChart {
             anchor,
             external_data_part: None,
             user_shapes_part: None,
+            additional_relationships: Vec::new(),
         }
     }
 
@@ -285,6 +294,12 @@ impl WorksheetChart {
     pub fn with_user_shapes_part(mut self, part: ChartUserShapesPart) -> Self {
         self.chart.user_shapes = Some(crate::charts::ChartUserShapes::pending());
         self.user_shapes_part = Some(part);
+        self
+    }
+
+    /// Add a direct chart-part relationship retained with the worksheet chart.
+    pub fn with_additional_relationship(mut self, relationship: ChartRelationship) -> Self {
+        self.additional_relationships.push(relationship);
         self
     }
 
@@ -786,6 +801,68 @@ pub(crate) fn chart_user_shapes_relationship_ids(xml: &[u8]) -> Result<HashSet<S
         return Err(OoxmlError::InvalidFormat(
             "chart user-shapes XML has no complete root".into(),
         ));
+    }
+    Ok(relationship_ids)
+}
+
+pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<HashSet<String>> {
+    const RELATIONSHIPS_NAMESPACE: &[u8] =
+        b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const STRICT_RELATIONSHIPS_NAMESPACE: &[u8] =
+        b"http://purl.oclc.org/ooxml/officeDocument/relationships";
+
+    let mut relationship_ids = HashSet::new();
+    let fragments = [
+        chart
+            .shape_properties
+            .as_ref()
+            .map(crate::charts::ChartShapeProperties::as_xml),
+        chart
+            .text_properties
+            .as_ref()
+            .map(crate::charts::ChartTextProperties::as_xml),
+        chart
+            .extension_list
+            .as_ref()
+            .map(crate::charts::ChartExtensionList::as_xml),
+    ];
+    for xml in fragments.into_iter().flatten() {
+        let mut reader = NsReader::from_reader(xml);
+        let mut buffer = Vec::new();
+        loop {
+            let (_, event) = reader
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            match event {
+                Event::Start(ref element) | Event::Empty(ref element) => {
+                    for attribute in element.attributes() {
+                        let attribute =
+                            attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                        let (attribute_namespace, _) =
+                            reader.resolver().resolve_attribute(attribute.key);
+                        if matches!(
+                            attribute_namespace,
+                            ResolveResult::Bound(Namespace(value))
+                                if value == RELATIONSHIPS_NAMESPACE
+                                    || value == STRICT_RELATIONSHIPS_NAMESPACE
+                        ) {
+                            relationship_ids.insert(
+                                attribute
+                                    .decoded_and_normalized_value(
+                                        XmlVersion::Explicit1_0,
+                                        reader.decoder(),
+                                    )
+                                    .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                                    .into_owned(),
+                            );
+                        }
+                    }
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+            buffer.clear();
+        }
     }
     Ok(relationship_ids)
 }

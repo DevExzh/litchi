@@ -1290,6 +1290,72 @@ impl Workbook {
 
                     let mut chart_part =
                         BlobPart::new(chart_uri.clone(), ct::DML_CHART.to_string(), Vec::new());
+                    let mut chart_related_resources = Vec::new();
+                    let mut additional_relationship_ids = std::collections::HashSet::new();
+                    for (relationship_index, relationship) in
+                        chart.additional_relationships.iter().enumerate()
+                    {
+                        if relationship.relationship_id.is_empty()
+                            || relationship.relationship_type.is_empty()
+                            || !additional_relationship_ids
+                                .insert(relationship.relationship_id.as_str())
+                        {
+                            return Err(format!(
+                                "Worksheet chart {} has invalid additional relationship metadata",
+                                idx + 1
+                            )
+                            .into());
+                        }
+                        let (target, external) = match &relationship.target {
+                            crate::xlsx::ChartRelationshipTarget::Embedded {
+                                data,
+                                content_type,
+                                extension,
+                            } => {
+                                if content_type.is_empty()
+                                    || extension.is_empty()
+                                    || !extension.bytes().all(|byte| byte.is_ascii_alphanumeric())
+                                {
+                                    return Err(format!(
+                                        "Worksheet chart {} has invalid embedded related resource",
+                                        idx + 1
+                                    )
+                                    .into());
+                                }
+                                let resource_name = format!(
+                                    "chartResource{}_{}_{}.{}",
+                                    ws.sheet_id(),
+                                    idx + 1,
+                                    relationship_index + 1,
+                                    extension.to_ascii_lowercase()
+                                );
+                                let resource_uri =
+                                    PackURI::new(format!("/xl/chartResources/{resource_name}"))?;
+                                chart_related_resources.push(BlobPart::new(
+                                    resource_uri,
+                                    content_type.clone(),
+                                    data.clone(),
+                                ));
+                                (format!("../chartResources/{resource_name}"), false)
+                            },
+                            crate::xlsx::ChartRelationshipTarget::External { target } => {
+                                if target.is_empty() {
+                                    return Err(format!(
+                                        "Worksheet chart {} has an empty external related target",
+                                        idx + 1
+                                    )
+                                    .into());
+                                }
+                                (target.clone(), true)
+                            },
+                        };
+                        chart_part.rels_mut().add_relationship(
+                            relationship.relationship_type.clone(),
+                            target,
+                            relationship.relationship_id.clone(),
+                            external,
+                        );
+                    }
                     let mut embedded_external_part = None;
                     let external_data_relationship_id = if let Some(external_data) =
                         chart.external_data_part.as_ref()
@@ -1304,7 +1370,7 @@ impl Workbook {
                                 )
                                 .into());
                         }
-                        let relationship_id = match &external_data.target {
+                        let (target, external) = match &external_data.target {
                             crate::xlsx::ChartExternalDataTarget::Embedded {
                                 data,
                                 content_type,
@@ -1339,10 +1405,7 @@ impl Workbook {
                                     content_type.clone(),
                                     data.clone(),
                                 ));
-                                chart_part.relate_to(
-                                    &format!("../embeddings/{external_name}"),
-                                    &external_data.relationship_type,
-                                )
+                                (format!("../embeddings/{external_name}"), false)
                             },
                             crate::xlsx::ChartExternalDataTarget::Linked { target } => {
                                 if target.is_empty() {
@@ -1352,8 +1415,35 @@ impl Workbook {
                                         )
                                         .into());
                                 }
-                                chart_part.relate_to_ext(target, &external_data.relationship_type)
+                                (target.clone(), true)
                             },
+                        };
+                        let relationship_id = if let Some(relationship_id) = chart
+                            .chart
+                            .external_data
+                            .as_ref()
+                            .and_then(|metadata| metadata.relationship_id.as_deref())
+                        {
+                            if relationship_id.is_empty()
+                                || chart_part.rels().get(relationship_id).is_some()
+                            {
+                                return Err(format!(
+                                    "Worksheet chart {} has a conflicting external-data relationship ID",
+                                    idx + 1
+                                )
+                                .into());
+                            }
+                            chart_part.rels_mut().add_relationship(
+                                external_data.relationship_type.clone(),
+                                target,
+                                relationship_id.to_string(),
+                                external,
+                            );
+                            relationship_id.to_string()
+                        } else if external {
+                            chart_part.relate_to_ext(&target, &external_data.relationship_type)
+                        } else {
+                            chart_part.relate_to(&target, &external_data.relationship_type)
                         };
                         Some(relationship_id)
                     } else {
@@ -1462,15 +1552,51 @@ impl Workbook {
                                 external,
                             );
                         }
-                        let relationship_id = chart_part.relate_to(
-                            &format!("../drawings/{user_shapes_name}"),
-                            rt::CHART_USER_SHAPES,
-                        );
+                        let target = format!("../drawings/{user_shapes_name}");
+                        let relationship_id = if let Some(relationship_id) = chart
+                            .chart
+                            .user_shapes
+                            .as_ref()
+                            .and_then(|metadata| metadata.relationship_id.as_deref())
+                        {
+                            if relationship_id.is_empty()
+                                || chart_part.rels().get(relationship_id).is_some()
+                            {
+                                return Err(format!(
+                                    "Worksheet chart {} has a conflicting user-shapes relationship ID",
+                                    idx + 1
+                                )
+                                .into());
+                            }
+                            chart_part.rels_mut().add_relationship(
+                                rt::CHART_USER_SHAPES.to_string(),
+                                target,
+                                relationship_id.to_string(),
+                                false,
+                            );
+                            relationship_id.to_string()
+                        } else {
+                            chart_part.relate_to(&target, rt::CHART_USER_SHAPES)
+                        };
                         user_shapes_part_to_add = Some(part);
                         Some(relationship_id)
                     } else {
                         None
                     };
+
+                    for relationship_id in
+                        crate::xlsx::chart::chart_fragment_relationship_ids(&chart.chart)?
+                    {
+                        if relationship_id.is_empty()
+                            || chart_part.rels().get(&relationship_id).is_none()
+                        {
+                            return Err(format!(
+                                "Worksheet chart {} fragment references missing relationship '{relationship_id}'",
+                                idx + 1
+                            )
+                            .into());
+                        }
+                    }
 
                     let chart_xml = crate::xlsx::chart::generate_chart_xml_with_external_data_id(
                         &chart.chart,
@@ -1481,6 +1607,9 @@ impl Workbook {
                     chart_part.set_blob(chart_xml);
                     if let Some(external_part) = embedded_external_part {
                         self.package.add_part(Box::new(external_part));
+                    }
+                    for resource in chart_related_resources {
+                        self.package.add_part(Box::new(resource));
                     }
                     for resource in user_shape_resources {
                         self.package.add_part(Box::new(resource));
@@ -2160,15 +2289,16 @@ fn validate_threaded_comment_people<'a>(
 #[cfg(test)]
 mod tests {
     use super::{Workbook, validate_threaded_comment_people};
-    use crate::charts::plot_area::TypeGroup;
+    use crate::charts::{ChartExtensionList, ChartShapeProperties, plot_area::TypeGroup};
     use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
     use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 
     use crate::xlsx::{
-        ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart,
-        ChartUserShapesRelationship, ChartUserShapesRelationshipTarget, Mention, Person,
-        PersonList, Table, TableColumn, ThreadedComment, WorksheetChart,
+        ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship,
+        ChartRelationshipTarget, ChartUserShapesPart, ChartUserShapesRelationship,
+        ChartUserShapesRelationshipTarget, Mention, Person, PersonList, Table, TableColumn,
+        ThreadedComment, WorksheetChart,
     };
 
     const WORKBOOK_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -2205,14 +2335,43 @@ mod tests {
                 Some("Logo"),
             )
             .unwrap();
-        worksheet.add_chart(
-            WorksheetChart::bar_chart(
-                "Revenue",
-                "Sheet1!$A$2:$A$4",
-                "Sheet1!$B$2:$B$4",
-                ChartAnchor::new(3, 1, 9, 14),
+        let mut worksheet_chart = WorksheetChart::bar_chart(
+            "Revenue",
+            "Sheet1!$A$2:$A$4",
+            "Sheet1!$B$2:$B$4",
+            ChartAnchor::new(3, 1, 9, 14),
+        )
+        .unwrap();
+        worksheet_chart.chart.shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId9"/></a:blipFill></c:spPr>"#.to_vec(),
             )
-            .unwrap()
+            .unwrap(),
+        );
+        worksheet_chart.chart.extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="shared"><x:reference r:id="rId1" r:link="rId10"/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        worksheet.add_chart(
+            worksheet_chart
+            .with_additional_relationship(ChartRelationship {
+                relationship_id: "rId9".to_string(),
+                relationship_type: rt::IMAGE.to_string(),
+                target: ChartRelationshipTarget::Embedded {
+                    data: b"chart background".to_vec(),
+                    content_type: ct::PNG.to_string(),
+                    extension: "png".to_string(),
+                },
+            })
+            .with_additional_relationship(ChartRelationship {
+                relationship_id: "rId10".to_string(),
+                relationship_type: rt::HYPERLINK.to_string(),
+                target: ChartRelationshipTarget::External {
+                    target: "https://example.test/chart".to_string(),
+                },
+            })
             .with_external_data_part(
                 ChartExternalDataPart::embedded_workbook(b"PK chart workbook".to_vec()),
                 Some(false),
@@ -2270,6 +2429,20 @@ mod tests {
             b"PK chart workbook"
         );
         let chart_xml = std::str::from_utf8(chart_part.blob()).unwrap();
+        assert!(chart_xml.contains(r#"r:embed="rId9""#));
+        let background_relationship = chart_part.rels().get("rId9").unwrap();
+        assert_eq!(background_relationship.reltype(), rt::IMAGE);
+        assert_eq!(
+            package
+                .get_part(&background_relationship.target_partname().unwrap())
+                .unwrap()
+                .blob(),
+            b"chart background"
+        );
+        let link_relationship = chart_part.rels().get("rId10").unwrap();
+        assert_eq!(link_relationship.reltype(), rt::HYPERLINK);
+        assert!(link_relationship.is_external());
+        assert_eq!(link_relationship.target_ref(), "https://example.test/chart");
         assert!(chart_xml.contains(r#"<c:externalData r:id="rId1">"#));
         assert!(chart_xml.contains(r#"<c:autoUpdate val="0"/>"#));
         let user_shapes_relationship = chart_part.rels().get("rId2").unwrap();
@@ -2337,6 +2510,25 @@ mod tests {
             panic!("expected embedded chart user-shape resource");
         };
         assert_eq!(data, b"shape image");
+        assert_eq!(worksheet.charts()[0].additional_relationships.len(), 2);
+        let background = worksheet.charts()[0]
+            .additional_relationships
+            .iter()
+            .find(|relationship| relationship.relationship_id == "rId9")
+            .unwrap();
+        let ChartRelationshipTarget::Embedded { data, .. } = &background.target else {
+            panic!("expected embedded chart relationship resource");
+        };
+        assert_eq!(data, b"chart background");
+        let link = worksheet.charts()[0]
+            .additional_relationships
+            .iter()
+            .find(|relationship| relationship.relationship_id == "rId10")
+            .unwrap();
+        let ChartRelationshipTarget::External { target } = &link.target else {
+            panic!("expected external chart relationship target");
+        };
+        assert_eq!(target, "https://example.test/chart");
         let TypeGroup::Bar(group) = &worksheet.charts()[0].chart.plot_area.type_groups[0] else {
             panic!("expected reopened bar chart");
         };
@@ -2363,6 +2555,50 @@ mod tests {
                 .formula,
             "Sheet1!$B$2:$B$4"
         );
+
+        let loaded_chart = worksheet.charts()[0].clone();
+        let second_path = directory.path().join("tables-roundtrip.xlsx");
+        let mut second_workbook = Workbook::create().unwrap();
+        second_workbook
+            .worksheet_mut(0)
+            .unwrap()
+            .add_chart(loaded_chart);
+        second_workbook.save(&second_path).unwrap();
+        let second_reopen = Workbook::open(&second_path).unwrap();
+        assert_eq!(
+            second_reopen.get_worksheet(0).unwrap().charts()[0]
+                .chart
+                .external_data
+                .as_ref()
+                .unwrap()
+                .relationship_id
+                .as_deref(),
+            Some("rId1")
+        );
+    }
+
+    #[test]
+    fn rejects_dangling_chart_fragment_relationships() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("dangling-chart-relationship.xlsx");
+        let mut workbook = Workbook::create().unwrap();
+        let mut chart = WorksheetChart::bar_chart(
+            "Revenue",
+            "Sheet1!$A$2:$A$4",
+            "Sheet1!$B$2:$B$4",
+            ChartAnchor::new(3, 1, 9, 14),
+        )
+        .unwrap();
+        chart.chart.extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="dangling"><x:reference r:id="rId404"/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        workbook.worksheet_mut(0).unwrap().add_chart(chart);
+
+        let error = workbook.save(&path).unwrap_err().to_string();
+        assert!(error.contains("fragment references missing relationship 'rId404'"));
     }
 
     #[test]

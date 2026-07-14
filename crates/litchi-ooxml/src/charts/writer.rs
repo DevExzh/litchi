@@ -203,6 +203,13 @@ pub(crate) fn write_chart_with_relationship_ids<W: Write>(
 
     write!(writer, "</c:chart>")?;
 
+    if let Some(shape_properties) = chart.shape_properties.as_ref() {
+        writer.write_all(shape_properties.as_xml())?;
+    }
+    if let Some(text_properties) = chart.text_properties.as_ref() {
+        writer.write_all(text_properties.as_xml())?;
+    }
+
     if let Some(external_data) = chart.external_data.as_ref() {
         write_external_data(writer, external_data, external_data_relationship_id)?;
     } else if external_data_relationship_id.is_some() {
@@ -220,6 +227,9 @@ pub(crate) fn write_chart_with_relationship_ids<W: Write>(
         return Err(invalid_chart_input(
             "chart package supplied user shapes without chart metadata",
         ));
+    }
+    if let Some(extension_list) = chart.extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
     }
 
     write!(writer, "</c:chartSpace>")?;

@@ -8,9 +8,10 @@ use crate::charts::axis::{
     DateAxis, DisplayUnits, SeriesAxis, TimeUnit, ValueAxis,
 };
 use crate::charts::chart::{
-    Chart, ChartExternalData, ChartHeaderFooter, ChartPageMargins, ChartPageOrientation,
-    ChartPageSetup, ChartPrintSettings, ChartProtection, ChartUserShapes, ColorMapOverride,
-    ColorMapping, ColorSchemeIndex, PivotFormat, PivotSource, View3D, WallFloor,
+    Chart, ChartExtensionList, ChartExternalData, ChartHeaderFooter, ChartPageMargins,
+    ChartPageOrientation, ChartPageSetup, ChartPrintSettings, ChartProtection,
+    ChartShapeProperties, ChartTextProperties, ChartUserShapes, ColorMapOverride, ColorMapping,
+    ColorSchemeIndex, PivotFormat, PivotSource, View3D, WallFloor,
 };
 use crate::charts::legend::{Legend, LegendEntry};
 use crate::charts::models::{
@@ -38,6 +39,7 @@ use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::{Config, NsReader};
+use quick_xml::writer::Writer;
 use std::io::BufRead;
 
 const IGNORED_NAMESPACE_ELEMENT: &str = "ignoredNamespaceElement";
@@ -56,6 +58,7 @@ struct ChartXmlReader<R: BufRead> {
     skipped_depth: usize,
     saw_root: bool,
     closed_root: bool,
+    root_namespace_attributes: Vec<(Vec<u8>, Vec<u8>)>,
 }
 
 impl<R: BufRead> ChartXmlReader<R> {
@@ -66,6 +69,7 @@ impl<R: BufRead> ChartXmlReader<R> {
             skipped_depth: 0,
             saw_root: false,
             closed_root: false,
+            root_namespace_attributes: Vec::new(),
         }
     }
 
@@ -118,6 +122,82 @@ impl<R: BufRead> ChartXmlReader<R> {
         Ok(value)
     }
 
+    fn make_fragment_root_self_contained(&self, element: &BytesStart<'_>) -> BytesStart<'static> {
+        let mut root = element.to_owned();
+        let existing_names: Vec<Vec<u8>> = root
+            .attributes()
+            .filter_map(std::result::Result::ok)
+            .map(|attribute| attribute.key.as_ref().to_vec())
+            .collect();
+        for (name, value) in &self.root_namespace_attributes {
+            if !existing_names.iter().any(|existing| existing == name) {
+                root.push_attribute((name.as_slice(), value.as_slice()));
+            }
+        }
+        root
+    }
+
+    fn capture_empty_fragment(&self, element: &BytesStart<'_>) -> Result<Vec<u8>> {
+        let mut writer = Writer::new(Vec::new());
+        writer
+            .write_event(Event::Empty(
+                self.make_fragment_root_self_contained(element),
+            ))
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        Ok(writer.into_inner())
+    }
+
+    fn capture_fragment(&mut self, element: &BytesStart<'_>, description: &str) -> Result<Vec<u8>> {
+        let mut writer = Writer::new(Vec::new());
+        writer
+            .write_event(Event::Start(
+                self.make_fragment_root_self_contained(element),
+            ))
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        let fragment_depth = self.depth;
+        let mut buffer = Vec::new();
+        loop {
+            let (_, event) = self
+                .inner
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            match event {
+                Event::Start(_) => {
+                    self.depth = self.depth.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat(format!("{description} XML nesting is too deep"))
+                    })?;
+                },
+                Event::End(_) => {
+                    self.depth = self.depth.checked_sub(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat(format!(
+                            "{description} has an unmatched closing element"
+                        ))
+                    })?;
+                },
+                Event::Eof => {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "unterminated {description}"
+                    )));
+                },
+                Event::DocType(_) => {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "{description} cannot contain a document type"
+                    )));
+                },
+                _ => {},
+            }
+            let finished = matches!(event, Event::End(_)) && self.depth < fragment_depth;
+            writer
+                .write_event(event.into_owned())
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            buffer.clear();
+            if finished {
+                break;
+            }
+        }
+        Ok(writer.into_inner())
+    }
+
     fn read_event_into<'buffer>(&mut self, buffer: &'buffer mut Vec<u8>) -> Result<Event<'buffer>> {
         let (namespace, event) = self
             .inner
@@ -138,6 +218,40 @@ impl<R: BufRead> ChartXmlReader<R> {
                         ));
                     }
                     self.saw_root = true;
+                    self.root_namespace_attributes.clear();
+                    for attribute in element.attributes() {
+                        let attribute =
+                            attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                        let name = attribute.key.as_ref();
+                        if name == b"xmlns" || name.starts_with(b"xmlns:") {
+                            self.root_namespace_attributes
+                                .push((name.to_vec(), attribute.value.into_owned()));
+                        }
+                    }
+                    for (name, value) in [
+                        (
+                            b"xmlns:c".as_slice(),
+                            b"http://schemas.openxmlformats.org/drawingml/2006/chart".as_slice(),
+                        ),
+                        (
+                            b"xmlns:a".as_slice(),
+                            b"http://schemas.openxmlformats.org/drawingml/2006/main".as_slice(),
+                        ),
+                        (
+                            b"xmlns:r".as_slice(),
+                            b"http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                                .as_slice(),
+                        ),
+                    ] {
+                        if !self
+                            .root_namespace_attributes
+                            .iter()
+                            .any(|(existing, _)| existing == name)
+                        {
+                            self.root_namespace_attributes
+                                .push((name.to_vec(), value.to_vec()));
+                        }
+                    }
                 }
                 self.depth = self.depth.checked_add(1).ok_or_else(|| {
                     OoxmlError::InvalidFormat("chart XML nesting is too deep".to_string())
@@ -395,6 +509,46 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
                     e,
                 )?));
             },
+            Ok(Event::Start(ref e)) if closed_chart && e.local_name().as_ref() == b"spPr" => {
+                if chart.shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate chart-space shape properties".into(),
+                    ));
+                }
+                chart.shape_properties = Some(ChartShapeProperties::from_xml(
+                    xml_reader.capture_fragment(e, "chart-space shape properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref e)) if closed_chart && e.local_name().as_ref() == b"spPr" => {
+                if chart.shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate chart-space shape properties".into(),
+                    ));
+                }
+                chart.shape_properties = Some(ChartShapeProperties::from_xml(
+                    xml_reader.capture_empty_fragment(e)?,
+                )?);
+            },
+            Ok(Event::Start(ref e)) if closed_chart && e.local_name().as_ref() == b"txPr" => {
+                if chart.text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate chart-space text properties".into(),
+                    ));
+                }
+                chart.text_properties = Some(ChartTextProperties::from_xml(
+                    xml_reader.capture_fragment(e, "chart-space text properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref e)) if closed_chart && e.local_name().as_ref() == b"txPr" => {
+                if chart.text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate chart-space text properties".into(),
+                    ));
+                }
+                chart.text_properties = Some(ChartTextProperties::from_xml(
+                    xml_reader.capture_empty_fragment(e)?,
+                )?);
+            },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"userShapes" => {
                 if chart.user_shapes.is_some() {
                     return Err(OoxmlError::InvalidFormat(
@@ -421,6 +575,26 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
                     &xml_reader,
                     e,
                 )?));
+            },
+            Ok(Event::Start(ref e)) if closed_chart && e.local_name().as_ref() == b"extLst" => {
+                if chart.extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate chart-space extension lists".into(),
+                    ));
+                }
+                chart.extension_list = Some(ChartExtensionList::from_xml(
+                    xml_reader.capture_fragment(e, "chart-space extension list")?,
+                )?);
+            },
+            Ok(Event::Empty(ref e)) if closed_chart && e.local_name().as_ref() == b"extLst" => {
+                if chart.extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate chart-space extension lists".into(),
+                    ));
+                }
+                chart.extension_list = Some(ChartExtensionList::from_xml(
+                    xml_reader.capture_empty_fragment(e)?,
+                )?);
             },
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
@@ -5017,6 +5191,54 @@ mod tests {
             document.extend_from_slice(b"</c:chartSpace>");
             assert!(parse_chart(document.as_slice()).is_err());
         }
+    }
+
+    #[test]
+    fn preserves_chart_space_drawing_and_extension_fragments() {
+        let xml = br#"<c:chartSpace
+                xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+                xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                xmlns:x="urn:example:chart-extension">
+            <c:chart><c:plotArea/></c:chart>
+            <c:spPr><a:solidFill><a:srgbClr val="123456"/></a:solidFill></c:spPr>
+            <c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Label</a:t></a:r></a:p></c:txPr>
+            <c:extLst><c:ext uri="example"><x:payload enabled="1"/></c:ext></c:extLst>
+        </c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let shape_properties = chart.shape_properties.as_ref().unwrap();
+        assert!(
+            std::str::from_utf8(shape_properties.as_xml())
+                .unwrap()
+                .contains("123456")
+        );
+        let extension_list = chart.extension_list.as_ref().unwrap();
+        assert!(
+            std::str::from_utf8(extension_list.as_xml())
+                .unwrap()
+                .contains(r#"xmlns:x="urn:example:chart-extension""#)
+        );
+
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        let reparsed = parse_chart(output.as_slice()).unwrap();
+        assert_eq!(reparsed.shape_properties, chart.shape_properties);
+        assert_eq!(reparsed.text_properties, chart.text_properties);
+        assert_eq!(reparsed.extension_list, chart.extension_list);
+
+        assert!(
+            ChartShapeProperties::from_xml(
+                br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#
+                    .to_vec()
+            )
+            .is_err()
+        );
+        assert!(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/><c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#
+                    .to_vec()
+            )
+            .is_err()
+        );
     }
 
     #[test]
