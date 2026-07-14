@@ -680,9 +680,9 @@ fn write_picture_options<W: Write>(
         write!(writer, r#"<c:pictureFormat val="{}"/>"#, format.xml_value())?;
     }
     if let Some(unit) = options.picture_stack_unit {
-        if !unit.is_finite() {
+        if !unit.is_finite() || unit <= 0.0 {
             return Err(invalid_chart_input(
-                "chart picture stack unit must be finite",
+                "chart picture stack unit must be finite and positive",
             ));
         }
         write!(writer, r#"<c:pictureStackUnit val="{}"/>"#, unit)?;

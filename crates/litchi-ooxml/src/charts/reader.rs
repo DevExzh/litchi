@@ -1871,8 +1871,10 @@ fn parse_picture_option_child(
                     "chart picture options contain duplicate stack units".into(),
                 ));
             }
-            options.picture_stack_unit =
-                Some(required_f64_attr(element, "chart picture stack unit")?);
+            options.picture_stack_unit = Some(required_positive_f64_attr(
+                element,
+                "chart picture stack unit",
+            )?);
             None
         },
         _ => unreachable!("picture option child was checked by caller"),
@@ -7025,7 +7027,7 @@ mod tests {
                     <c:spPr><a:solidFill><a:srgbClr val="112233"/></a:solidFill></c:spPr>
                     <c:invertIfNegative val="1"/>
                     <c:pictureOptions><c:applyToFront val="0"/>
-                        <c:pictureFormat val="stack"/><c:pictureStackUnit val="-2"/>
+                        <c:pictureFormat val="stack"/><c:pictureStackUnit val="2"/>
                     </c:pictureOptions>
                     <c:dPt><c:idx val="2"/>
                         <c:spPr><a:solidFill><a:srgbClr val="AABBCC"/></a:solidFill></c:spPr>
@@ -7053,7 +7055,7 @@ mod tests {
         );
         assert_eq!(
             series.picture_options.as_ref().unwrap().picture_stack_unit,
-            Some(-2.0)
+            Some(2.0)
         );
         assert_eq!(series.bar_shape, Some(BarShape::Cylinder));
         assert!(
@@ -7122,6 +7124,24 @@ mod tests {
                 .extend_from_slice(b"</c:ser></c:barChart></c:plotArea></c:chart></c:chartSpace>");
             assert!(parse_chart(document.as_slice()).is_err());
         }
+
+        for invalid_unit in ["0", "-1"] {
+            let document = format!(
+                r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:barChart><c:ser><c:idx val="0"/><c:order val="0"/><c:pictureOptions><c:pictureStackUnit val="{invalid_unit}"/></c:pictureOptions></c:ser></c:barChart></c:plotArea></c:chart></c:chartSpace>"#
+            );
+            assert!(parse_chart(document.as_bytes()).is_err());
+        }
+
+        let mut invalid = Chart::new();
+        let mut bar = BarTypeGroup::new(BarDirection::Column, BarGrouping::Clustered);
+        let mut series = Series::new(0);
+        series.picture_options = Some(PictureOptions {
+            picture_stack_unit: Some(0.0),
+            ..PictureOptions::default()
+        });
+        bar.common.series.push(series);
+        invalid.plot_area.type_groups.push(TypeGroup::Bar(bar));
+        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &invalid).is_err());
 
         for supported in [
             br#"<c:areaChart><c:grouping val="standard"/><c:ser><c:idx val="0"/><c:order val="0"/><c:pictureOptions/></c:ser></c:areaChart>"#.as_slice(),
