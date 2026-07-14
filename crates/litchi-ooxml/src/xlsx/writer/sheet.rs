@@ -171,6 +171,15 @@ pub struct Image {
     pub description: Option<String>,
 }
 
+#[derive(Default)]
+pub(crate) struct WorksheetPartRelationships<'a> {
+    pub(crate) hyperlinks: Option<&'a HashMap<String, String>>,
+    pub(crate) vml_drawing: Option<&'a str>,
+    pub(crate) pivot_tables: Option<&'a [String]>,
+    pub(crate) tables: Option<&'a [String]>,
+    pub(crate) drawing: Option<&'a str>,
+}
+
 /// Rich text run for a cell.
 #[derive(Debug, Clone)]
 pub struct RichTextRun {
@@ -1261,7 +1270,7 @@ impl MutableWorksheet {
     /// let mut ws = wb.worksheet_mut(0)?;
     ///
     /// let image_data = fs::read("logo.png")?;
-    /// ws.add_image(image_data, "png", 1, 1, 5, 5, Some("Company Logo"));
+    /// ws.add_image(image_data, "png", 1, 1, 5, 5, Some("Company Logo"))?;
     ///
     /// wb.save("output.xlsx")?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
@@ -1276,15 +1285,35 @@ impl MutableWorksheet {
         to_row: u32,
         to_col: u32,
         description: Option<&str>,
-    ) {
+    ) -> SheetResult<()> {
+        if image_data.is_empty() {
+            return Err("image data cannot be empty".into());
+        }
+        if from_row == 0 || from_col == 0 || to_row == 0 || to_col == 0 {
+            return Err("image anchor coordinates must be one-based and positive".into());
+        }
+        if to_row < from_row || to_col < from_col {
+            return Err("image anchor cannot be descending".into());
+        }
+        if to_row > 1_048_576 || to_col > 16_384 {
+            return Err("image anchor exceeds worksheet bounds".into());
+        }
+        let format = format.to_ascii_lowercase();
+        if !matches!(
+            format.as_str(),
+            "png" | "jpg" | "jpeg" | "gif" | "bmp" | "svg"
+        ) {
+            return Err(format!("unsupported worksheet image format '{format}'").into());
+        }
         // Convert from 1-based (API) to 0-based (internal storage)
         self.images.push(Image {
             data: image_data,
-            format: format.to_string(),
+            format,
             position: (from_row - 1, from_col - 1, to_row - 1, to_col - 1),
             description: description.map(|s| s.to_string()),
         });
         self.modified = true;
+        Ok(())
     }
 
     /// Get all images in the worksheet.
@@ -1298,6 +1327,26 @@ impl MutableWorksheet {
     pub fn generate_drawing_xml(&self) -> SheetResult<Option<String>> {
         if self.images.is_empty() && self.charts.is_empty() {
             return Ok(None);
+        }
+        for chart in &self.charts {
+            let anchor = &chart.anchor;
+            if anchor.to_row < anchor.from_row || anchor.to_col < anchor.from_col {
+                return Err("chart anchor cannot be descending".into());
+            }
+            if anchor.to_row >= 1_048_576 || anchor.to_col >= 16_384 {
+                return Err("chart anchor exceeds worksheet bounds".into());
+            }
+            if [
+                anchor.from_col_offset,
+                anchor.from_row_offset,
+                anchor.to_col_offset,
+                anchor.to_row_offset,
+            ]
+            .iter()
+            .any(|offset| *offset < 0)
+            {
+                return Err("chart anchor offsets cannot be negative".into());
+            }
         }
 
         let mut xml = String::with_capacity(4096);
@@ -1332,11 +1381,17 @@ impl MutableWorksheet {
             // Picture element
             write!(
                 xml,
-                r#"<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="{}" name="Picture {}">"#,
+                r#"<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="{}" name="Picture {}""#,
                 idx + 1,
                 idx + 1
             )
             .map_err(|e| format!("XML write error: {}", e))?;
+
+            if let Some(description) = &image.description {
+                write!(xml, r#" descr="{}""#, escape_xml(description))
+                    .map_err(|e| format!("XML write error: {}", e))?;
+            }
+            xml.push('>');
 
             if image.description.is_some() {
                 let creation_id = generate_guid_braced();
@@ -2081,11 +2136,23 @@ impl MutableWorksheet {
         self.to_xml_internal(
             shared_strings,
             style_indices,
-            Some(hyperlink_rel_ids),
-            vml_rel_id,
-            pivot_table_rel_ids,
-            table_rel_ids,
+            WorksheetPartRelationships {
+                hyperlinks: Some(hyperlink_rel_ids),
+                vml_drawing: vml_rel_id,
+                pivot_tables: pivot_table_rel_ids,
+                tables: table_rel_ids,
+                drawing: None,
+            },
         )
+    }
+
+    pub(crate) fn to_xml_with_part_rels(
+        &self,
+        shared_strings: &mut MutableSharedStrings,
+        style_indices: &HashMap<(u32, u32), usize>,
+        relationships: WorksheetPartRelationships<'_>,
+    ) -> SheetResult<String> {
+        self.to_xml_internal(shared_strings, style_indices, relationships)
     }
 
     /// Serialize the worksheet to XML.
@@ -2098,7 +2165,11 @@ impl MutableWorksheet {
         shared_strings: &mut MutableSharedStrings,
         style_indices: &HashMap<(u32, u32), usize>,
     ) -> SheetResult<String> {
-        self.to_xml_internal(shared_strings, style_indices, None, None, None, None)
+        self.to_xml_internal(
+            shared_strings,
+            style_indices,
+            WorksheetPartRelationships::default(),
+        )
     }
 
     /// Internal method for XML serialization with optional hyperlink relationship IDs.
@@ -2106,10 +2177,7 @@ impl MutableWorksheet {
         &self,
         shared_strings: &mut MutableSharedStrings,
         style_indices: &HashMap<(u32, u32), usize>,
-        hyperlink_rel_ids: Option<&HashMap<String, String>>,
-        vml_rel_id: Option<&str>,
-        pivot_table_rel_ids: Option<&[String]>,
-        table_rel_ids: Option<&[String]>,
+        relationships: WorksheetPartRelationships<'_>,
     ) -> SheetResult<String> {
         let mut xml = String::with_capacity(4096);
         xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
@@ -2238,7 +2306,8 @@ impl MutableWorksheet {
         xml.push_str("<sheetFormatPr defaultRowHeight=\"15\"/>");
 
         // Write column information (widths and hidden columns)
-        let has_pivots = pivot_table_rel_ids
+        let has_pivots = relationships
+            .pivot_tables
             .map(|ids| !ids.is_empty())
             .unwrap_or(false);
         self.write_cols(&mut xml, has_pivots)?;
@@ -2293,7 +2362,7 @@ impl MutableWorksheet {
 
         // Write hyperlinks
         if !self.hyperlinks.is_empty() {
-            self.write_hyperlinks(&mut xml, hyperlink_rel_ids)?;
+            self.write_hyperlinks(&mut xml, relationships.hyperlinks)?;
         }
 
         // Write page margins (required by Excel)
@@ -2316,17 +2385,22 @@ impl MutableWorksheet {
 
         // Write drawing reference for charts and images
         if !self.charts.is_empty() || !self.images.is_empty() {
-            xml.push_str(r#"<drawing r:id="rId1"/>"#);
+            write!(
+                xml,
+                r#"<drawing r:id="{}"/>"#,
+                relationships.drawing.unwrap_or("rId1")
+            )
+            .map_err(|e| format!("XML write error: {}", e))?;
         }
 
         // Write legacyDrawing reference for comments (VML)
-        if let Some(vml_rel_id) = vml_rel_id {
+        if let Some(vml_rel_id) = relationships.vml_drawing {
             write!(xml, r#"<legacyDrawing r:id="{}"/>"#, vml_rel_id)
                 .map_err(|e| format!("XML write error: {}", e))?;
         }
 
         // Write tableParts if tables are present
-        if let Some(table_rels) = table_rel_ids.filter(|rels| !rels.is_empty()) {
+        if let Some(table_rels) = relationships.tables.filter(|rels| !rels.is_empty()) {
             write!(xml, r#"<tableParts count="{}">"#, table_rels.len())
                 .map_err(|e| format!("XML write error: {}", e))?;
             for rel_id in table_rels {
@@ -3690,6 +3764,25 @@ mod tests {
         );
         assert_eq!(sort.conditions[0].ref_range, "B2:B5");
         assert_eq!(sort.conditions[0].descending, Some(true));
+    }
+
+    #[test]
+    fn rejects_invalid_drawing_anchors_and_image_formats() {
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+        assert!(ws.add_image(vec![1], "png", 0, 1, 2, 2, None).is_err());
+        assert!(ws.add_image(vec![1], "png", 3, 1, 2, 2, None).is_err());
+        assert!(ws.add_image(vec![1], "webp", 1, 1, 2, 2, None).is_err());
+
+        let mut chart = WorksheetChart::bar_chart(
+            "Revenue",
+            "Sheet1!$A$1:$A$2",
+            "Sheet1!$B$1:$B$2",
+            ChartAnchor::new(4, 4, 2, 2),
+        )
+        .unwrap();
+        chart.anchor.from_col_offset = -1;
+        ws.add_chart(chart);
+        assert!(ws.generate_drawing_xml().is_err());
     }
 
     #[test]

@@ -15,6 +15,7 @@ use crate::charts::series::Series;
 use crate::charts::types::{
     AxisPosition, BarDirection, BarGrouping, DisplayBlanks, LegendPosition, ScatterStyle,
 };
+use crate::common::xml::decode_xml_reference;
 use crate::error::{OoxmlError, Result};
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
@@ -23,62 +24,71 @@ use std::io::BufRead;
 /// Parse a chart XML document.
 pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
     let mut xml_reader = Reader::from_reader(reader);
-    xml_reader.config_mut().trim_text(true);
+    xml_reader.config_mut().trim_text(false);
 
     let mut chart = Chart::new();
     let mut buf = Vec::new();
+    let mut saw_chart = false;
+    let mut closed_chart = false;
 
     loop {
         match xml_reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
-                    b"c:chart" => {
-                        parse_chart_element(&mut xml_reader, &mut chart)?;
-                    },
-                    b"c:title" => {
+                    b"chart" => saw_chart = true,
+                    b"chartSpace" => {},
+                    b"title" => {
                         chart.title = Some(parse_title(&mut xml_reader)?);
                     },
-                    b"c:autoTitleDeleted" => {
+                    b"autoTitleDeleted" => {
                         chart.auto_title_deleted = parse_bool_attr(e)?;
                     },
-                    b"c:view3D" => {
+                    b"view3D" => {
                         chart.view_3d = Some(parse_view_3d(&mut xml_reader)?);
                     },
-                    b"c:floor" => {
+                    b"floor" => {
                         chart.floor = Some(parse_wall_floor(&mut xml_reader)?);
                     },
-                    b"c:backWall" => {
+                    b"backWall" => {
                         chart.back_wall = Some(parse_wall_floor(&mut xml_reader)?);
                     },
-                    b"c:sideWall" => {
+                    b"sideWall" => {
                         chart.side_wall = Some(parse_wall_floor(&mut xml_reader)?);
                     },
-                    b"c:plotArea" => {
+                    b"plotArea" => {
                         chart.plot_area = parse_plot_area(&mut xml_reader)?;
                     },
-                    b"c:legend" => {
+                    b"legend" => {
                         chart.legend = Some(parse_legend(&mut xml_reader)?);
                     },
-                    b"c:plotVisOnly" => {
+                    b"plotVisOnly" => {
                         chart.plot_visible_only = parse_bool_attr(e)?;
                     },
-                    b"c:dispBlanksAs" => {
+                    b"dispBlanksAs" => {
                         chart.display_blanks_as = parse_display_blanks(e)?;
                     },
-                    b"c:date1904" => {
+                    b"date1904" => {
                         chart.date_1904 = parse_bool_attr(e)?;
                     },
-                    b"c:roundedCorners" => {
+                    b"roundedCorners" => {
                         chart.rounded_corners = parse_bool_attr(e)?;
                     },
-                    b"c:style" => {
+                    b"style" => {
                         chart.style = parse_u32_attr(e, b"val");
                     },
                     _ => {},
                 }
             },
-            Ok(Event::Eof) => break,
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"chart" => {
+                closed_chart = true;
+            },
+            Ok(Event::Eof) if saw_chart && closed_chart => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart XML has no complete chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -88,20 +98,6 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
     Ok(chart)
 }
 
-fn parse_chart_element<R: BufRead>(reader: &mut Reader<R>, _chart: &mut Chart) -> Result<()> {
-    let mut buf = Vec::new();
-    loop {
-        match reader.read_event_into(&mut buf) {
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:chart" => break,
-            Ok(Event::Eof) => break,
-            Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-            _ => {},
-        }
-        buf.clear();
-    }
-    Ok(())
-}
-
 fn parse_title<R: BufRead>(reader: &mut Reader<R>) -> Result<TitleText> {
     let mut text = String::new();
     let mut buf = Vec::new();
@@ -109,19 +105,27 @@ fn parse_title<R: BufRead>(reader: &mut Reader<R>) -> Result<TitleText> {
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"a:t" => {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"t" => {
                 in_text = true;
             },
             Ok(Event::Text(e)) if in_text => {
-                text.push_str(
-                    std::str::from_utf8(e.as_ref()).map_err(|e| OoxmlError::Xml(e.to_string()))?,
-                );
+                text.push_str(&e.decode().map_err(|e| OoxmlError::Xml(e.to_string()))?);
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"a:t" => {
+            Ok(Event::CData(e)) if in_text => {
+                text.push_str(&e.decode().map_err(|e| OoxmlError::Xml(e.to_string()))?);
+            },
+            Ok(Event::GeneralRef(reference)) if in_text => {
+                text.push_str(&decode_xml_reference(&reference)?);
+            },
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"t" => {
                 in_text = false;
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:title" => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"title" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -140,17 +144,21 @@ fn parse_view_3d<R: BufRead>(reader: &mut Reader<R>) -> Result<View3D> {
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
-                    b"c:rotX" => view.rot_x = parse_u32_attr(e, b"val"),
-                    b"c:rotY" => view.rot_y = parse_u32_attr(e, b"val"),
-                    b"c:perspective" => view.perspective = parse_u32_attr(e, b"val"),
-                    b"c:hPercent" => view.height_percent = parse_u32_attr(e, b"val"),
-                    b"c:depthPercent" => view.depth_percent = parse_u32_attr(e, b"val"),
-                    b"c:rAngAx" => view.right_angle_axes = parse_bool_attr(e)?,
+                    b"rotX" => view.rot_x = parse_u32_attr(e, b"val"),
+                    b"rotY" => view.rot_y = parse_u32_attr(e, b"val"),
+                    b"perspective" => view.perspective = parse_u32_attr(e, b"val"),
+                    b"hPercent" => view.height_percent = parse_u32_attr(e, b"val"),
+                    b"depthPercent" => view.depth_percent = parse_u32_attr(e, b"val"),
+                    b"rAngAx" => view.right_angle_axes = parse_bool_attr(e)?,
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:view3D" => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"view3D" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -167,20 +175,24 @@ fn parse_wall_floor<R: BufRead>(reader: &mut Reader<R>) -> Result<WallFloor> {
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e))
-                if e.local_name().as_ref() == b"c:thickness" =>
+                if e.local_name().as_ref() == b"thickness" =>
             {
                 wall_floor.thickness = parse_u32_attr(e, b"val");
             },
             Ok(Event::End(ref e)) => {
                 let tag_name = e.local_name();
-                if tag_name.as_ref() == b"c:floor"
-                    || tag_name.as_ref() == b"c:backWall"
-                    || tag_name.as_ref() == b"c:sideWall"
+                if tag_name.as_ref() == b"floor"
+                    || tag_name.as_ref() == b"backWall"
+                    || tag_name.as_ref() == b"sideWall"
                 {
                     break;
                 }
             },
-            Ok(Event::Eof) => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -199,52 +211,52 @@ fn parse_plot_area<R: BufRead>(reader: &mut Reader<R>) -> Result<PlotArea> {
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
-                    b"c:barChart" => {
+                    b"barChart" => {
                         if let Some(group) = parse_bar_chart(reader)? {
                             plot_area.type_groups.push(TypeGroup::Bar(group));
                         }
                     },
-                    b"c:bar3DChart" => {
+                    b"bar3DChart" => {
                         if let Some(group) = parse_bar_3d_chart(reader)? {
                             plot_area.type_groups.push(TypeGroup::Bar3D(group));
                         }
                     },
-                    b"c:lineChart" => {
+                    b"lineChart" => {
                         if let Some(group) = parse_line_chart(reader)? {
                             plot_area.type_groups.push(TypeGroup::Line(group));
                         }
                     },
-                    b"c:pieChart" => {
+                    b"pieChart" => {
                         if let Some(group) = parse_pie_chart(reader)? {
                             plot_area.type_groups.push(TypeGroup::Pie(group));
                         }
                     },
-                    b"c:areaChart" => {
+                    b"areaChart" => {
                         if let Some(group) = parse_area_chart(reader)? {
                             plot_area.type_groups.push(TypeGroup::Area(group));
                         }
                     },
-                    b"c:scatterChart" => {
+                    b"scatterChart" => {
                         if let Some(group) = parse_scatter_chart(reader)? {
                             plot_area.type_groups.push(TypeGroup::Scatter(group));
                         }
                     },
-                    b"c:catAx" => {
+                    b"catAx" => {
                         if let Some(axis) = parse_category_axis(reader)? {
                             plot_area.axes.push(Axis::Category(axis));
                         }
                     },
-                    b"c:valAx" => {
+                    b"valAx" => {
                         if let Some(axis) = parse_value_axis(reader)? {
                             plot_area.axes.push(Axis::Value(axis));
                         }
                     },
-                    b"c:dateAx" => {
+                    b"dateAx" => {
                         if let Some(axis) = parse_date_axis(reader)? {
                             plot_area.axes.push(Axis::Date(axis));
                         }
                     },
-                    b"c:serAx" => {
+                    b"serAx" => {
                         if let Some(axis) = parse_series_axis(reader)? {
                             plot_area.axes.push(Axis::Series(axis));
                         }
@@ -252,8 +264,12 @@ fn parse_plot_area<R: BufRead>(reader: &mut Reader<R>) -> Result<PlotArea> {
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:plotArea" => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"plotArea" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -274,7 +290,7 @@ fn parse_bar_chart<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<BarTypeG
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
-                    b"c:barDir" => {
+                    b"barDir" => {
                         if let Some(val) = get_attr(e, b"val") {
                             direction = if val.as_slice() == b"bar" {
                                 BarDirection::Bar
@@ -283,13 +299,13 @@ fn parse_bar_chart<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<BarTypeG
                             };
                         }
                     },
-                    b"c:grouping" => {
-                        grouping = parse_grouping(e);
+                    b"grouping" => {
+                        grouping = parse_grouping(e)?;
                     },
-                    b"c:varyColors" => {
-                        common.vary_colors = parse_bool_attr(e).unwrap_or(false);
+                    b"varyColors" => {
+                        common.vary_colors = parse_bool_attr(e)?;
                     },
-                    b"c:ser" => {
+                    b"ser" => {
                         if let Some(series) = parse_series(reader)? {
                             common.series.push(series);
                         }
@@ -297,8 +313,12 @@ fn parse_bar_chart<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<BarTypeG
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:barChart" => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"barChart" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -321,7 +341,7 @@ fn parse_bar_3d_chart<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<Bar3D
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
-                    b"c:barDir" => {
+                    b"barDir" => {
                         if let Some(val) = get_attr(e, b"val") {
                             direction = if val.as_slice() == b"bar" {
                                 BarDirection::Bar
@@ -330,13 +350,13 @@ fn parse_bar_3d_chart<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<Bar3D
                             };
                         }
                     },
-                    b"c:grouping" => {
-                        grouping = parse_grouping(e);
+                    b"grouping" => {
+                        grouping = parse_grouping(e)?;
                     },
-                    b"c:varyColors" => {
-                        common.vary_colors = parse_bool_attr(e).unwrap_or(false);
+                    b"varyColors" => {
+                        common.vary_colors = parse_bool_attr(e)?;
                     },
-                    b"c:ser" => {
+                    b"ser" => {
                         if let Some(series) = parse_series(reader)? {
                             common.series.push(series);
                         }
@@ -344,8 +364,12 @@ fn parse_bar_3d_chart<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<Bar3D
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:bar3DChart" => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"bar3DChart" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -367,13 +391,13 @@ fn parse_line_chart<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<LineTyp
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
-                    b"c:grouping" => {
-                        grouping = parse_grouping(e);
+                    b"grouping" => {
+                        grouping = parse_grouping(e)?;
                     },
-                    b"c:varyColors" => {
-                        common.vary_colors = parse_bool_attr(e).unwrap_or(false);
+                    b"varyColors" => {
+                        common.vary_colors = parse_bool_attr(e)?;
                     },
-                    b"c:ser" => {
+                    b"ser" => {
                         if let Some(series) = parse_series(reader)? {
                             common.series.push(series);
                         }
@@ -381,8 +405,12 @@ fn parse_line_chart<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<LineTyp
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:lineChart" => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"lineChart" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -403,10 +431,10 @@ fn parse_pie_chart<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<PieTypeG
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
-                    b"c:varyColors" => {
-                        common.vary_colors = parse_bool_attr(e).unwrap_or(true);
+                    b"varyColors" => {
+                        common.vary_colors = parse_bool_attr(e)?;
                     },
-                    b"c:ser" => {
+                    b"ser" => {
                         if let Some(series) = parse_series(reader)? {
                             common.series.push(series);
                         }
@@ -414,8 +442,12 @@ fn parse_pie_chart<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<PieTypeG
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:pieChart" => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"pieChart" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -437,13 +469,13 @@ fn parse_area_chart<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<AreaTyp
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
-                    b"c:grouping" => {
-                        grouping = parse_grouping(e);
+                    b"grouping" => {
+                        grouping = parse_grouping(e)?;
                     },
-                    b"c:varyColors" => {
-                        common.vary_colors = parse_bool_attr(e).unwrap_or(false);
+                    b"varyColors" => {
+                        common.vary_colors = parse_bool_attr(e)?;
                     },
-                    b"c:ser" => {
+                    b"ser" => {
                         if let Some(series) = parse_series(reader)? {
                             common.series.push(series);
                         }
@@ -451,8 +483,12 @@ fn parse_area_chart<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<AreaTyp
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:areaChart" => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"areaChart" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -474,7 +510,7 @@ fn parse_scatter_chart<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<Scat
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
-                    b"c:scatterStyle" => {
+                    b"scatterStyle" => {
                         if let Some(val) = get_attr(e, b"val") {
                             style = match val.as_slice() {
                                 b"line" => ScatterStyle::Line,
@@ -486,10 +522,10 @@ fn parse_scatter_chart<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<Scat
                             };
                         }
                     },
-                    b"c:varyColors" => {
-                        common.vary_colors = parse_bool_attr(e).unwrap_or(false);
+                    b"varyColors" => {
+                        common.vary_colors = parse_bool_attr(e)?;
                     },
-                    b"c:ser" => {
+                    b"ser" => {
                         if let Some(series) = parse_series(reader)? {
                             common.series.push(series);
                         }
@@ -497,8 +533,12 @@ fn parse_scatter_chart<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<Scat
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:scatterChart" => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"scatterChart" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -519,29 +559,33 @@ fn parse_series<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<Series>> {
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
-                    b"c:idx" => {
+                    b"idx" => {
                         series.index = parse_u32_attr(e, b"val").unwrap_or(0);
                     },
-                    b"c:order" => {
+                    b"order" => {
                         series.order = parse_u32_attr(e, b"val").unwrap_or(0);
                     },
-                    b"c:cat" => {
+                    b"cat" => {
                         series.categories = parse_string_data(reader)?;
                     },
-                    b"c:val" => {
+                    b"val" => {
                         series.values = parse_numeric_data(reader)?;
                     },
-                    b"c:xVal" => {
+                    b"xVal" => {
                         series.x_values = parse_numeric_data(reader)?;
                     },
-                    b"c:yVal" => {
+                    b"yVal" => {
                         series.y_values = parse_numeric_data(reader)?;
                     },
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:ser" => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"ser" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -557,13 +601,17 @@ fn parse_string_data<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<String
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"c:pt" => {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"pt" => {
                 if let Some(text) = parse_point_text(reader)? {
                     data.values.push(text);
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:cat" => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"cat" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -579,17 +627,21 @@ fn parse_numeric_data<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<Numer
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"c:pt" => {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"pt" => {
                 if let Some(val) = parse_point_value(reader)? {
                     data.values.push(val);
                 }
             },
             Ok(Event::End(ref e))
-                if matches!(e.local_name().as_ref(), b"c:val" | b"c:xVal" | b"c:yVal") =>
+                if matches!(e.local_name().as_ref(), b"val" | b"xVal" | b"yVal") =>
             {
                 break;
             },
-            Ok(Event::Eof) => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -606,16 +658,27 @@ fn parse_point_text<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<String>
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"c:v" => {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"v" => {
                 in_v = true;
             },
             Ok(Event::Text(e)) if in_v => {
-                text = std::str::from_utf8(e.as_ref())
-                    .map_err(|e| OoxmlError::Xml(e.to_string()))?
-                    .to_string();
+                text.push_str(&e.decode().map_err(|e| OoxmlError::Xml(e.to_string()))?);
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:pt" => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::CData(e)) if in_v => {
+                text.push_str(&e.decode().map_err(|e| OoxmlError::Xml(e.to_string()))?);
+            },
+            Ok(Event::GeneralRef(reference)) if in_v => {
+                text.push_str(&decode_xml_reference(&reference)?);
+            },
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"v" => {
+                in_v = false;
+            },
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"pt" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -627,7 +690,9 @@ fn parse_point_text<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<String>
 
 fn parse_point_value<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<f64>> {
     if let Some(text) = parse_point_text(reader)? {
-        Ok(text.parse::<f64>().ok())
+        Ok(Some(text.trim().parse::<f64>().map_err(|_| {
+            OoxmlError::InvalidFormat(format!("invalid chart numeric point '{text}'"))
+        })?))
     } else {
         Ok(None)
     }
@@ -644,20 +709,24 @@ fn parse_category_axis<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<Cate
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
-                    b"c:axId" => {
+                    b"axId" => {
                         axis_id = parse_u32_attr(e, b"val").unwrap_or(0);
                     },
-                    b"c:crossAx" => {
+                    b"crossAx" => {
                         cross_axis_id = parse_u32_attr(e, b"val").unwrap_or(0);
                     },
-                    b"c:axPos" => {
-                        position = parse_axis_position(e);
+                    b"axPos" => {
+                        position = parse_axis_position(e)?;
                     },
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:catAx" => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"catAx" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -678,20 +747,24 @@ fn parse_value_axis<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<ValueAx
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
-                    b"c:axId" => {
+                    b"axId" => {
                         axis_id = parse_u32_attr(e, b"val").unwrap_or(0);
                     },
-                    b"c:crossAx" => {
+                    b"crossAx" => {
                         cross_axis_id = parse_u32_attr(e, b"val").unwrap_or(0);
                     },
-                    b"c:axPos" => {
-                        position = parse_axis_position(e);
+                    b"axPos" => {
+                        position = parse_axis_position(e)?;
                     },
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:valAx" => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"valAx" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -712,20 +785,24 @@ fn parse_date_axis<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<DateAxis
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
-                    b"c:axId" => {
+                    b"axId" => {
                         axis_id = parse_u32_attr(e, b"val").unwrap_or(0);
                     },
-                    b"c:crossAx" => {
+                    b"crossAx" => {
                         cross_axis_id = parse_u32_attr(e, b"val").unwrap_or(0);
                     },
-                    b"c:axPos" => {
-                        position = parse_axis_position(e);
+                    b"axPos" => {
+                        position = parse_axis_position(e)?;
                     },
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:dateAx" => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"dateAx" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -746,20 +823,24 @@ fn parse_series_axis<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<Series
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
-                    b"c:axId" => {
+                    b"axId" => {
                         axis_id = parse_u32_attr(e, b"val").unwrap_or(0);
                     },
-                    b"c:crossAx" => {
+                    b"crossAx" => {
                         cross_axis_id = parse_u32_attr(e, b"val").unwrap_or(0);
                     },
-                    b"c:axPos" => {
-                        position = parse_axis_position(e);
+                    b"axPos" => {
+                        position = parse_axis_position(e)?;
                     },
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:serAx" => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"serAx" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -779,7 +860,7 @@ fn parse_legend<R: BufRead>(reader: &mut Reader<R>) -> Result<Legend> {
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
-                    b"c:legendPos" => {
+                    b"legendPos" => {
                         if let Some(val) = get_attr(e, b"val") {
                             position = match val.as_slice() {
                                 b"b" => LegendPosition::Bottom,
@@ -791,14 +872,18 @@ fn parse_legend<R: BufRead>(reader: &mut Reader<R>) -> Result<Legend> {
                             };
                         }
                     },
-                    b"c:overlay" => {
-                        overlay = parse_bool_attr(e).unwrap_or(false);
+                    b"overlay" => {
+                        overlay = parse_bool_attr(e)?;
                     },
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"c:legend" => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"legend" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(e.to_string())),
             _ => {},
         }
@@ -809,31 +894,32 @@ fn parse_legend<R: BufRead>(reader: &mut Reader<R>) -> Result<Legend> {
 }
 
 #[inline]
-fn parse_grouping(e: &BytesStart) -> BarGrouping {
+fn parse_grouping(e: &BytesStart) -> Result<BarGrouping> {
     if let Some(val) = get_attr(e, b"val") {
-        match val.as_slice() {
+        Ok(match val.as_slice() {
+            b"standard" => BarGrouping::Standard,
             b"clustered" => BarGrouping::Clustered,
             b"stacked" => BarGrouping::Stacked,
             b"percentStacked" => BarGrouping::PercentStacked,
-            _ => BarGrouping::Standard,
-        }
+            _ => return Err(invalid_attribute("chart grouping", &val)),
+        })
     } else {
-        BarGrouping::Standard
+        Ok(BarGrouping::Standard)
     }
 }
 
 #[inline]
-fn parse_axis_position(e: &BytesStart) -> AxisPosition {
+fn parse_axis_position(e: &BytesStart) -> Result<AxisPosition> {
     if let Some(val) = get_attr(e, b"val") {
-        match val.as_slice() {
+        Ok(match val.as_slice() {
             b"b" => AxisPosition::Bottom,
             b"l" => AxisPosition::Left,
             b"r" => AxisPosition::Right,
             b"t" => AxisPosition::Top,
-            _ => AxisPosition::Bottom,
-        }
+            _ => return Err(invalid_attribute("chart axis position", &val)),
+        })
     } else {
-        AxisPosition::Bottom
+        Ok(AxisPosition::Bottom)
     }
 }
 
@@ -844,7 +930,7 @@ fn parse_display_blanks(e: &BytesStart) -> crate::error::Result<DisplayBlanks> {
             b"gap" => DisplayBlanks::Gap,
             b"span" => DisplayBlanks::Span,
             b"zero" => DisplayBlanks::Zero,
-            _ => DisplayBlanks::Gap,
+            _ => return Err(invalid_attribute("chart blank-display mode", &val)),
         })
     } else {
         Ok(DisplayBlanks::Gap)
@@ -854,10 +940,21 @@ fn parse_display_blanks(e: &BytesStart) -> crate::error::Result<DisplayBlanks> {
 #[inline]
 fn parse_bool_attr(e: &BytesStart) -> crate::error::Result<bool> {
     if let Some(val) = get_attr(e, b"val") {
-        Ok(val.as_slice() == b"1" || val.as_slice() == b"true")
+        match val.as_slice() {
+            b"1" | b"true" => Ok(true),
+            b"0" | b"false" => Ok(false),
+            _ => Err(invalid_attribute("chart boolean", &val)),
+        }
     } else {
         Ok(true)
     }
+}
+
+fn invalid_attribute(description: &str, value: &[u8]) -> OoxmlError {
+    OoxmlError::InvalidFormat(format!(
+        "invalid {description} '{}'",
+        String::from_utf8_lossy(value)
+    ))
 }
 
 #[inline]
@@ -871,4 +968,61 @@ fn get_attr(e: &BytesStart, name: &[u8]) -> Option<Vec<u8>> {
         .filter_map(|a| a.ok())
         .find(|a| a.key.as_ref() == name)
         .map(|a| a.value.to_vec())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_prefixed_chart_content() {
+        let xml =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+                xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+            <c:chart><c:title><c:tx><c:rich><a:p><a:r><a:t>Revenue &amp; <![CDATA[Growth]]></a:t></a:r></a:p>
+                </c:rich></c:tx></c:title><c:plotArea><c:barChart>
+                <c:barDir val="bar"/><c:grouping val="stacked"/><c:ser>
+                    <c:idx val="2"/><c:order val="1"/>
+                    <c:cat><c:strRef><c:strCache><c:pt idx="0"><c:v>East</c:v></c:pt>
+                        </c:strCache></c:strRef></c:cat>
+                    <c:val><c:numRef><c:numCache><c:pt idx="0"><c:v>42.5</c:v></c:pt>
+                        </c:numCache></c:numRef></c:val>
+                </c:ser></c:barChart></c:plotArea>
+                <c:legend><c:legendPos val="b"/><c:overlay val="1"/></c:legend>
+            </c:chart></c:chartSpace>"#;
+
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let Some(TitleText::Literal(title)) = chart.title.as_ref() else {
+            panic!("expected a literal chart title");
+        };
+        assert_eq!(title.text, "Revenue & Growth");
+        assert_eq!(chart.plot_area.type_groups.len(), 1);
+        let TypeGroup::Bar(group) = &chart.plot_area.type_groups[0] else {
+            panic!("expected a bar chart");
+        };
+        assert_eq!(group.direction, BarDirection::Bar);
+        assert_eq!(group.grouping, BarGrouping::Stacked);
+        assert_eq!(group.common.series.len(), 1);
+        assert_eq!(group.common.series[0].index, 2);
+        assert_eq!(
+            group.common.series[0].categories.as_ref().unwrap().values,
+            ["East"]
+        );
+        assert_eq!(
+            group.common.series[0].values.as_ref().unwrap().values,
+            [42.5]
+        );
+        assert_eq!(chart.legend.unwrap().position, LegendPosition::Bottom);
+    }
+
+    #[test]
+    fn rejects_truncated_and_invalid_chart_values() {
+        for xml in [
+            br#"<c:chartSpace xmlns:c="urn:test"><c:chart><c:plotArea>"#.as_slice(),
+            br#"<c:chartSpace xmlns:c="urn:test"><c:chart><c:plotVisOnly val="yes"/></c:chart></c:chartSpace>"#.as_slice(),
+            br#"<c:chartSpace xmlns:c="urn:test"><c:chart><c:dispBlanksAs val="empty"/></c:chart></c:chartSpace>"#.as_slice(),
+        ] {
+            assert!(parse_chart(xml).is_err());
+        }
+    }
 }

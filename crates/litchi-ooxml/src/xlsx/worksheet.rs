@@ -16,12 +16,15 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use super::RichTextRun;
 use super::cell::{Cell, CellIterator as XlsxCellIterator, RowIterator as XlsxRowIterator};
 use super::comments::parse_comments_xml;
+use super::drawing::parse_drawing_xml;
 use super::format::{CellBorder, CellFill, CellFont, CellFormat};
 use super::parsers::worksheet_parser;
 use super::sort::SortState;
 use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
 use super::table::{Table, parse_table_xml};
 use super::views::SheetView;
+use super::writer::sheet::Image;
+use super::{WorksheetChart, chart::parse_chart_from_xml};
 
 /// Information about a worksheet
 #[derive(Debug, Clone)]
@@ -219,6 +222,8 @@ pub struct Worksheet<'a> {
     rich_text_cells: HashMap<(u32, u32), Vec<RichTextRun>>,
     sparkline_groups: Vec<SparklineGroup>,
     tables: Vec<Table>,
+    images: Vec<Image>,
+    charts: Vec<WorksheetChart>,
 }
 
 impl<'a> Worksheet<'a> {
@@ -245,6 +250,8 @@ impl<'a> Worksheet<'a> {
             rich_text_cells: HashMap::new(),
             sparkline_groups: Vec::new(),
             tables: Vec::new(),
+            images: Vec::new(),
+            charts: Vec::new(),
         }
     }
 
@@ -262,9 +269,11 @@ impl<'a> Worksheet<'a> {
 
     /// Parse worksheet XML to extract cell data.
     fn parse_worksheet_xml(&mut self, content: &str, relationships: &Relationships) -> Result<()> {
-        let (hyperlinks, table_relationship_ids) = self.parse_sheet_data(content)?;
+        let (hyperlinks, table_relationship_ids, drawing_relationship_id) =
+            self.parse_sheet_data(content)?;
         self.resolve_hyperlinks(hyperlinks, relationships)?;
         self.load_tables(table_relationship_ids, relationships)?;
+        self.load_drawing(drawing_relationship_id.as_deref(), relationships)?;
         self.load_comments(relationships)?;
 
         self.sparkline_groups = parse_sparkline_groups_from_worksheet_xml(content)?;
@@ -311,11 +320,25 @@ impl<'a> Worksheet<'a> {
         &self.tables
     }
 
+    /// Pictures embedded in this worksheet's drawing part.
+    pub fn images(&self) -> &[Image] {
+        &self.images
+    }
+
+    /// Charts embedded in this worksheet's drawing part.
+    pub fn charts(&self) -> &[WorksheetChart] {
+        &self.charts
+    }
+
     /// Parse sheetData content.
     fn parse_sheet_data(
         &mut self,
         sheet_data: &str,
-    ) -> Result<(Vec<worksheet_parser::ParsedHyperlink>, Vec<String>)> {
+    ) -> Result<(
+        Vec<worksheet_parser::ParsedHyperlink>,
+        Vec<String>,
+        Option<String>,
+    )> {
         let parsed = worksheet_parser::parse_worksheet_data(sheet_data)?;
         self.cells = parsed.cells;
         self.cell_styles = parsed.cell_styles;
@@ -331,7 +354,131 @@ impl<'a> Worksheet<'a> {
         self.auto_filter = parsed.auto_filter;
         self.sheet_views = parsed.sheet_views;
         self.dimensions = parsed.dimensions;
-        Ok((parsed.hyperlinks, parsed.table_relationship_ids))
+        Ok((
+            parsed.hyperlinks,
+            parsed.table_relationship_ids,
+            parsed.drawing_relationship_id,
+        ))
+    }
+
+    fn load_drawing(
+        &mut self,
+        relationship_id: Option<&str>,
+        relationships: &Relationships,
+    ) -> Result<()> {
+        let Some(relationship_id) = relationship_id else {
+            self.images.clear();
+            self.charts.clear();
+            return Ok(());
+        };
+        let relationship = relationships.get(relationship_id).ok_or_else(|| {
+            format!("Worksheet drawing references missing relationship '{relationship_id}'")
+        })?;
+        if !matches!(relationship.reltype(), rt::DRAWING | rt::STRICT_DRAWING) {
+            return Err(format!(
+                "Worksheet drawing relationship '{relationship_id}' has invalid type '{}'",
+                relationship.reltype()
+            )
+            .into());
+        }
+        if relationship.is_external() {
+            return Err("Worksheet drawing relationship cannot be external".into());
+        }
+        let drawing_uri = relationship.target_partname()?;
+        let drawing_part = self.workbook.package().get_part(&drawing_uri)?;
+        if drawing_part.content_type() != ct::OFC_DRAWING {
+            return Err(format!(
+                "Worksheet drawing part '{drawing_uri}' has content type '{}', expected '{}'",
+                drawing_part.content_type(),
+                ct::OFC_DRAWING
+            )
+            .into());
+        }
+        let drawing_xml = std::str::from_utf8(drawing_part.blob())?;
+        let drawing = parse_drawing_xml(drawing_xml)?
+            .ok_or_else(|| format!("Drawing part '{drawing_uri}' has no wsDr root"))?;
+
+        let mut images = Vec::with_capacity(drawing.pictures.len());
+        for picture in drawing.pictures {
+            let media_relationship = drawing_part
+                .rels()
+                .get(&picture.relationship_id)
+                .ok_or_else(|| {
+                    format!(
+                        "Drawing picture references missing relationship '{}'",
+                        picture.relationship_id
+                    )
+                })?;
+            if !matches!(media_relationship.reltype(), rt::IMAGE | rt::STRICT_IMAGE) {
+                return Err(format!(
+                    "Drawing picture relationship '{}' has invalid type '{}'",
+                    picture.relationship_id,
+                    media_relationship.reltype()
+                )
+                .into());
+            }
+            if media_relationship.is_external() {
+                return Err("Drawing picture relationship cannot be external".into());
+            }
+            let media_uri = media_relationship.target_partname()?;
+            let media_part = self.workbook.package().get_part(&media_uri)?;
+            let format = image_format(media_part.content_type()).ok_or_else(|| {
+                format!(
+                    "Drawing picture part '{media_uri}' has unsupported content type '{}'",
+                    media_part.content_type()
+                )
+            })?;
+            images.push(Image {
+                data: media_part.blob().to_vec(),
+                format: format.to_string(),
+                position: (
+                    picture.anchor.from_row,
+                    picture.anchor.from_col,
+                    picture.anchor.to_row,
+                    picture.anchor.to_col,
+                ),
+                description: picture.description,
+            });
+        }
+
+        let mut charts = Vec::with_capacity(drawing.charts.len());
+        for chart in drawing.charts {
+            let chart_relationship =
+                drawing_part
+                    .rels()
+                    .get(&chart.relationship_id)
+                    .ok_or_else(|| {
+                        format!(
+                            "Drawing chart references missing relationship '{}'",
+                            chart.relationship_id
+                        )
+                    })?;
+            if !matches!(chart_relationship.reltype(), rt::CHART | rt::STRICT_CHART) {
+                return Err(format!(
+                    "Drawing chart relationship '{}' has invalid type '{}'",
+                    chart.relationship_id,
+                    chart_relationship.reltype()
+                )
+                .into());
+            }
+            if chart_relationship.is_external() {
+                return Err("Drawing chart relationship cannot be external".into());
+            }
+            let chart_uri = chart_relationship.target_partname()?;
+            let chart_part = self.workbook.package().get_part(&chart_uri)?;
+            if chart_part.content_type() != ct::DML_CHART {
+                return Err(format!(
+                    "Drawing chart part '{chart_uri}' has content type '{}', expected '{}'",
+                    chart_part.content_type(),
+                    ct::DML_CHART
+                )
+                .into());
+            }
+            charts.push(parse_chart_from_xml(chart_part.blob(), chart.anchor)?);
+        }
+        self.images = images;
+        self.charts = charts;
+        Ok(())
     }
 
     fn load_tables(
@@ -1737,6 +1884,20 @@ pub struct WorksheetIterator<'a> {
     worksheets: Vec<WorksheetInfo>,
     workbook: &'a Workbook,
     index: usize,
+}
+
+fn image_format(content_type: &str) -> Option<&'static str> {
+    match content_type {
+        "image/png" => Some("png"),
+        "image/jpeg" => Some("jpeg"),
+        "image/gif" => Some("gif"),
+        "image/bmp" => Some("bmp"),
+        "image/svg+xml" => Some("svg"),
+        "image/tiff" => Some("tiff"),
+        "image/x-emf" => Some("emf"),
+        "image/x-wmf" => Some("wmf"),
+        _ => None,
+    }
 }
 
 impl<'a> WorksheetIterator<'a> {

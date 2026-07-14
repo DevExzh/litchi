@@ -9,11 +9,11 @@ pub fn write_a_blip_embed(xml: &mut String, rid: &str, include_xmlns_r: bool) ->
     if include_xmlns_r {
         write!(
             xml,
-            r#"<a:blip xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:embed=\"{}\"/>"#,
+            r#"<a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="{}"/>"#,
             rid
         )
     } else {
-        write!(xml, r#"<a:blip r:embed=\"{}\"/>"#, rid)
+        write!(xml, r#"<a:blip r:embed="{}"/>"#, rid)
     }
 }
 
@@ -25,11 +25,11 @@ pub fn write_a_blip_embed_rid_num(
     if include_xmlns_r {
         write!(
             xml,
-            r#"<a:blip xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:embed=\"rId{}\"/>"#,
+            r#"<a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId{}"/>"#,
             rid_num
         )
     } else {
-        write!(xml, r#"<a:blip r:embed=\"rId{}\"/>"#, rid_num)
+        write!(xml, r#"<a:blip r:embed="rId{}"/>"#, rid_num)
     }
 }
 

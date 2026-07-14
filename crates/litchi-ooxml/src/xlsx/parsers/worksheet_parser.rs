@@ -46,6 +46,7 @@ pub(crate) struct ParsedWorksheetData {
     pub(crate) sheet_views: Vec<SheetView>,
     pub(crate) dimensions: Option<(u32, u32, u32, u32)>,
     pub(crate) table_relationship_ids: Vec<String>,
+    pub(crate) drawing_relationship_id: Option<String>,
 }
 
 pub(crate) struct ParsedHyperlink {
@@ -191,6 +192,7 @@ struct Parser {
     seen_merge_cells: bool,
     expected_merge_count: Option<usize>,
     seen_table_parts: bool,
+    seen_drawing: bool,
     expected_table_part_count: Option<u32>,
     table_relationship_ids: HashSet<String>,
     min_row: u32,
@@ -228,6 +230,7 @@ impl Parser {
             seen_merge_cells: false,
             expected_merge_count: None,
             seen_table_parts: false,
+            seen_drawing: false,
             expected_table_part_count: None,
             table_relationship_ids: HashSet::new(),
             min_row: u32::MAX,
@@ -375,6 +378,12 @@ impl Parser {
             && is_spreadsheetml_name(namespace, element.name(), b"tablePart")
         {
             self.table_part(element, decoder, resolver)?;
+            return Ok(Context::Other);
+        }
+        if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"drawing")
+        {
+            self.drawing(element, decoder, resolver)?;
             return Ok(Context::Other);
         }
         if parent == Context::Worksheet
@@ -574,6 +583,10 @@ impl Parser {
         {
             self.table_part(element, decoder, resolver)?;
         } else if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"drawing")
+        {
+            self.drawing(element, decoder, resolver)?;
+        } else if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"sheetData")
         {
             self.sheet_data()?;
@@ -752,6 +765,25 @@ impl Parser {
                 self.data.table_relationship_ids.len()
             )));
         }
+        Ok(())
+    }
+
+    fn drawing(
+        &mut self,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        resolver: &NamespaceResolver,
+    ) -> Result<()> {
+        if self.seen_drawing {
+            return Err(invalid("duplicate worksheet drawing element"));
+        }
+        self.seen_drawing = true;
+        let relationship_id = relationship_attribute_value(element, b"id", decoder, resolver)?
+            .ok_or_else(|| invalid("worksheet drawing is missing relationship ID"))?;
+        if relationship_id.is_empty() {
+            return Err(invalid("worksheet drawing relationship ID cannot be empty"));
+        }
+        self.data.drawing_relationship_id = Some(relationship_id);
         Ok(())
     }
 
@@ -2987,6 +3019,36 @@ mod tests {
             r#"<tableParts count="2"><tablePart r:id="r1"/></tableParts>"#,
             r#"<tableParts count="2"><tablePart r:id="r1"/><tablePart r:id="r1"/></tableParts>"#,
             r#"<tableParts count="0"/><tableParts count="0"/>"#,
+        ] {
+            let xml = format!(r#"<worksheet xmlns="{S}" xmlns:r="{R}">{body}</worksheet>"#);
+            assert!(parse_worksheet_data(&xml).is_err(), "accepted {xml}");
+        }
+    }
+
+    #[test]
+    fn parses_strict_drawing_relationship() {
+        let xml = format!(
+            r#"<s:worksheet xmlns:s="{STRICT_S}"
+                    xmlns:r="http://purl.oclc.org/ooxml/officeDocument/relationships"
+                    xmlns:f="urn:foreign">
+                <f:drawing r:id="ignored"/>
+                <s:drawing r:id="custom-drawing"/>
+            </s:worksheet>"#
+        );
+        let data = parse_worksheet_data(&xml).unwrap();
+        assert_eq!(
+            data.drawing_relationship_id.as_deref(),
+            Some("custom-drawing")
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_drawing_references() {
+        const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+        for body in [
+            r#"<drawing/>"#,
+            r#"<drawing r:id=""/>"#,
+            r#"<drawing r:id="r1"/><drawing r:id="r2"/>"#,
         ] {
             let xml = format!(r#"<worksheet xmlns="{S}" xmlns:r="{R}">{body}</worksheet>"#);
             assert!(parse_worksheet_data(&xml).is_err(), "accepted {xml}");

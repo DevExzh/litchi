@@ -1218,14 +1218,14 @@ impl Workbook {
             }
 
             // Generate and add drawing XML for images if present
-            if let Some(drawing_xml) = ws.generate_drawing_xml()? {
+            let drawing_rel_id = if let Some(drawing_xml) = ws.generate_drawing_xml()? {
                 let drawing_uri =
                     PackURI::new(format!("/xl/drawings/drawing{}.xml", ws.sheet_id()))?;
 
                 // Create drawing part with relationships for images
                 let mut drawing_part = BlobPart::new(
                     drawing_uri.clone(),
-                    "application/vnd.openxmlformats-officedocument.drawing+xml".to_string(),
+                    ct::OFC_DRAWING.to_string(),
                     drawing_xml.into_bytes(),
                 );
 
@@ -1233,8 +1233,9 @@ impl Workbook {
                 for (idx, image) in ws.images().iter().enumerate() {
                     let image_ext = &image.format;
                     let image_uri = PackURI::new(format!(
-                        "/xl/media/image{}.{}",
-                        ws.sheet_id() * 1000 + idx as u32,
+                        "/xl/media/image{}_{}.{}",
+                        ws.sheet_id(),
+                        idx + 1,
                         image_ext
                     ))?;
 
@@ -1245,7 +1246,13 @@ impl Workbook {
                         "gif" => "image/gif",
                         "bmp" => "image/bmp",
                         "svg" => "image/svg+xml",
-                        _ => "image/png", // Default to PNG
+                        _ => {
+                            return Err(format!(
+                                "Unsupported worksheet image format '{}'",
+                                image.format
+                            )
+                            .into());
+                        },
                     };
 
                     let image_part = BlobPart::new(
@@ -1257,47 +1264,38 @@ impl Workbook {
 
                     // Add relationship from drawing to image
                     drawing_part.relate_to(
-                        &format!(
-                            "../media/image{}.{}",
-                            ws.sheet_id() * 1000 + idx as u32,
-                            image_ext
-                        ),
-                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+                        &format!("../media/image{}_{}.{}", ws.sheet_id(), idx + 1, image_ext),
+                        rt::IMAGE,
                     );
                 }
 
                 // Add chart parts and create relationships
                 for (idx, chart) in ws.charts().iter().enumerate() {
-                    let chart_id = ws.sheet_id() * 1000 + (ws.images().len() + idx) as u32;
-                    let chart_uri = PackURI::new(format!("/xl/charts/chart{}.xml", chart_id))?;
+                    let chart_name = format!("chart{}_{}", ws.sheet_id(), idx + 1);
+                    let chart_uri = PackURI::new(format!("/xl/charts/{chart_name}.xml"))?;
 
                     // Generate chart XML
                     let chart_xml = crate::xlsx::chart::generate_chart_xml(&chart.chart)
                         .map_err(|e| format!("Failed to generate chart XML: {}", e))?;
 
-                    let chart_part = BlobPart::new(
-                        chart_uri.clone(),
-                        "application/vnd.openxmlformats-officedocument.drawingml.chart+xml"
-                            .to_string(),
-                        chart_xml,
-                    );
+                    let chart_part =
+                        BlobPart::new(chart_uri.clone(), ct::DML_CHART.to_string(), chart_xml);
                     self.package.add_part(Box::new(chart_part));
 
                     // Add relationship from drawing to chart
-                    drawing_part.relate_to(
-                        &format!("../charts/chart{}.xml", chart_id),
-                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
-                    );
+                    drawing_part.relate_to(&format!("../charts/{chart_name}.xml"), rt::CHART);
                 }
 
                 self.package.add_part(Box::new(drawing_part));
 
                 // Add relationship from worksheet to drawing
-                ws_part.relate_to(
+                Some(ws_part.relate_to(
                     &format!("../drawings/drawing{}.xml", ws.sheet_id()),
-                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
-                );
-            }
+                    rt::DRAWING,
+                ))
+            } else {
+                None
+            };
 
             let mut pivot_table_rel_ids: Vec<String> = Vec::new();
             if let Some(targets) = pivot_table_targets_per_sheet.get(index) {
@@ -1308,13 +1306,16 @@ impl Workbook {
             }
 
             // Now generate worksheet XML with proper hyperlink relationship IDs and VML reference
-            let ws_xml = ws.to_xml_with_hyperlink_rels(
+            let ws_xml = ws.to_xml_with_part_rels(
                 &mut data.shared_strings,
                 &style_indices,
-                &hyperlink_rel_ids,
-                vml_rel_id.as_deref(),
-                Some(&pivot_table_rel_ids),
-                Some(&table_rel_ids),
+                crate::xlsx::writer::sheet::WorksheetPartRelationships {
+                    hyperlinks: Some(&hyperlink_rel_ids),
+                    vml_drawing: vml_rel_id.as_deref(),
+                    pivot_tables: Some(&pivot_table_rel_ids),
+                    tables: Some(&table_rel_ids),
+                    drawing: drawing_rel_id.as_deref(),
+                },
             )?;
             ws_part.set_blob(ws_xml.into_bytes());
 
@@ -1955,7 +1956,10 @@ mod tests {
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
     use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 
-    use crate::xlsx::{Mention, Person, PersonList, Table, TableColumn, ThreadedComment};
+    use crate::xlsx::{
+        ChartAnchor, Mention, Person, PersonList, Table, TableColumn, ThreadedComment,
+        WorksheetChart,
+    };
 
     const WORKBOOK_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -1968,7 +1972,7 @@ mod tests {
 </workbook>"#;
 
     #[test]
-    fn saves_and_reloads_worksheet_tables() {
+    fn saves_and_reloads_worksheet_tables_and_drawings() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("tables.xlsx");
         let mut workbook = Workbook::create().unwrap();
@@ -1978,9 +1982,55 @@ mod tests {
             TableColumn::new(2, "Revenue"),
         ];
         table.auto_filter_range = Some("A1:B4".to_string());
-        workbook.worksheet_mut(0).unwrap().add_table(table);
+        let worksheet = workbook.worksheet_mut(0).unwrap();
+        worksheet.add_table(table);
+        worksheet
+            .add_image(
+                b"\x89PNG\r\n\x1a\nfixture".to_vec(),
+                "png",
+                1,
+                1,
+                4,
+                2,
+                Some("Logo"),
+            )
+            .unwrap();
+        worksheet.add_chart(
+            WorksheetChart::bar_chart(
+                "Revenue",
+                "Sheet1!$A$2:$A$4",
+                "Sheet1!$B$2:$B$4",
+                ChartAnchor::new(3, 1, 9, 14),
+            )
+            .unwrap(),
+        );
 
         workbook.save(&path).unwrap();
+        let package = OpcPackage::open(&path).unwrap();
+        let sheet_part = package
+            .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
+            .unwrap();
+        let sheet_xml = std::str::from_utf8(sheet_part.blob()).unwrap();
+        assert!(sheet_xml.contains(r#"<drawing r:id="rId2"/>"#));
+        let drawing_relationship = sheet_part.rels().get("rId2").unwrap();
+        assert_eq!(drawing_relationship.reltype(), rt::DRAWING);
+        assert_eq!(
+            drawing_relationship.target_partname().unwrap().as_str(),
+            "/xl/drawings/drawing1.xml"
+        );
+        let drawing_part = package
+            .get_part(&drawing_relationship.target_partname().unwrap())
+            .unwrap();
+        assert_eq!(drawing_part.content_type(), ct::OFC_DRAWING);
+        assert_eq!(
+            drawing_part.rels().get("rId1").unwrap().reltype(),
+            rt::IMAGE
+        );
+        assert_eq!(
+            drawing_part.rels().get("rId2").unwrap().reltype(),
+            rt::CHART
+        );
+
         let reopened = Workbook::open(&path).unwrap();
         let worksheet = reopened.get_worksheet(0).unwrap();
 
@@ -1990,6 +2040,13 @@ mod tests {
         assert_eq!(table.name, "SalesTable");
         assert_eq!(table.ref_range, "A1:B4");
         assert_eq!(table.column_names(), vec!["Region", "Revenue"]);
+        assert_eq!(worksheet.images().len(), 1);
+        assert_eq!(worksheet.images()[0].format, "png");
+        assert_eq!(worksheet.images()[0].position, (0, 0, 3, 1));
+        assert_eq!(worksheet.images()[0].description.as_deref(), Some("Logo"));
+        assert_eq!(worksheet.charts().len(), 1);
+        assert_eq!(worksheet.charts()[0].anchor.from_col, 3);
+        assert_eq!(worksheet.charts()[0].anchor.to_row, 14);
     }
 
     #[test]

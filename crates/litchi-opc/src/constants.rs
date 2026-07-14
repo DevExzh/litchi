@@ -274,6 +274,8 @@ pub mod relationship_type {
     // Images and media
     pub const IMAGE: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+    /// ISO/IEC 29500 Strict image relationship type.
+    pub const STRICT_IMAGE: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/image";
     pub const AUDIO: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio";
     pub const VIDEO: &str =
@@ -284,8 +286,13 @@ pub mod relationship_type {
     // Chart and drawing
     pub const CHART: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart";
+    /// ISO/IEC 29500 Strict chart relationship type.
+    pub const STRICT_CHART: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/chart";
     pub const DRAWING: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing";
+    /// ISO/IEC 29500 Strict drawing relationship type.
+    pub const STRICT_DRAWING: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/drawing";
     pub const VML_DRAWING: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing";
 
