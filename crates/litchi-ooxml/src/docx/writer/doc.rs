@@ -45,6 +45,12 @@ pub struct MutableDocument {
     toc_config: Option<(usize, TableOfContents)>, // (insertion index, config)
     /// Whether the document has been modified
     modified: bool,
+    /// Exact document/root/body opening XML retained from an existing document.
+    preserved_prefix: Option<String>,
+    /// Exact body/document closing XML retained from an existing document.
+    preserved_suffix: Option<String>,
+    /// Whether section properties must be regenerated instead of preserved verbatim.
+    section_dirty: bool,
 }
 
 /// Document protection settings.
@@ -75,6 +81,10 @@ impl CollectGlyphs for MutableDocument {
             let element_glyphs = match element {
                 BodyElement::Paragraph(p) => p.collect_glyphs(),
                 BodyElement::Table(t) => t.collect_glyphs(),
+                BodyElement::PreservedParagraph(_)
+                | BodyElement::PreservedTable(_)
+                | BodyElement::PreservedSectionProperties(_)
+                | BodyElement::PreservedOther(_) => continue,
             };
             for (font, bitmap) in element_glyphs {
                 *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
@@ -163,14 +173,17 @@ impl MutableDocument {
             theme: None,
             watermark: None,
             modified: false,
+            preserved_prefix: None,
+            preserved_suffix: None,
+            section_dirty: false,
         }
     }
 
     /// Create a mutable document from existing XML content.
     pub fn from_xml(xml: &str) -> Result<Self> {
-        let body = DocumentBody::from_xml(xml)?;
+        let parsed = DocumentBody::from_xml(xml)?;
         Ok(Self {
-            body,
+            body: parsed.body,
             toc_config: None,
             header: None,
             footer: None,
@@ -182,12 +195,16 @@ impl MutableDocument {
             theme: None,
             watermark: None,
             modified: false,
+            preserved_prefix: Some(parsed.prefix),
+            preserved_suffix: Some(parsed.suffix),
+            section_dirty: false,
         })
     }
 
     /// Get a mutable reference to the section properties.
     pub fn section_mut(&mut self) -> &mut SectionProperties {
         self.modified = true;
+        self.section_dirty = true;
         &mut self.section
     }
 
@@ -260,6 +277,7 @@ impl MutableDocument {
         if self.header.is_none() {
             self.header = Some(Vec::new());
             self.modified = true;
+            self.section_dirty = true;
         }
         self.header.as_mut().unwrap()
     }
@@ -269,6 +287,7 @@ impl MutableDocument {
         if self.footer.is_none() {
             self.footer = Some(Vec::new());
             self.modified = true;
+            self.section_dirty = true;
         }
         self.footer.as_mut().unwrap()
     }
@@ -311,6 +330,7 @@ impl MutableDocument {
         let note = Note::new(id);
         self.footnotes.push(note);
         self.modified = true;
+        self.section_dirty = true;
         (id, self.footnotes.last_mut().unwrap())
     }
 
@@ -320,6 +340,7 @@ impl MutableDocument {
         let note = Note::new(id);
         self.endnotes.push(note);
         self.modified = true;
+        self.section_dirty = true;
         (id, self.endnotes.last_mut().unwrap())
     }
 
@@ -518,7 +539,7 @@ impl MutableDocument {
         }
 
         // Record the insertion point (after the title if present)
-        let insertion_index = self.body.elements.len();
+        let insertion_index = self.body.content_insertion_index();
 
         // Store the TOC configuration for later generation (at save time)
         self.toc_config = Some((insertion_index, toc));
@@ -939,10 +960,13 @@ impl MutableDocument {
     /// Serialize the document to XML.
     pub fn to_xml(&self) -> Result<String> {
         let mut xml = String::with_capacity(4096);
-        xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
-        xml.push_str(r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">"#);
-        self.body.to_xml(&mut xml)?;
-        xml.push_str("</w:document>");
+        self.write_document_prefix(&mut xml);
+        let preserve_section = !self.section_dirty && self.body.has_preserved_section();
+        self.body.write_contents(&mut xml, preserve_section)?;
+        if !preserve_section {
+            Self::write_default_section_properties(&mut xml);
+        }
+        self.write_document_suffix(&mut xml);
         Ok(xml)
     }
 
@@ -955,19 +979,45 @@ impl MutableDocument {
         rel_mapper: &super::relmap::RelationshipMapper,
     ) -> Result<String> {
         let mut xml = String::with_capacity(4096);
-        xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
-        xml.push_str(r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">"#);
+        self.write_document_prefix(&mut xml);
 
         // Generate body with relationship IDs
-        self.body.to_xml_with_rels(&mut xml, rel_mapper)?;
+        let preserve_section = !self.section_dirty && self.body.has_preserved_section();
+        self.body
+            .write_contents_with_rels(&mut xml, rel_mapper, preserve_section)?;
 
-        // Add section properties at the end of the body (before </w:body>)
-        // The sectPr must be the last element in the body
-        self.generate_section_properties(&mut xml, rel_mapper)?;
+        if !preserve_section {
+            // The sectPr must be the last element in the body.
+            self.generate_section_properties(&mut xml, rel_mapper)?;
+        }
 
-        xml.push_str("</w:body>");
-        xml.push_str("</w:document>");
+        self.write_document_suffix(&mut xml);
         Ok(xml)
+    }
+
+    fn write_document_prefix(&self, xml: &mut String) {
+        if let Some(prefix) = &self.preserved_prefix {
+            xml.push_str(prefix);
+        } else {
+            xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
+            xml.push_str(r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><w:body>"#);
+        }
+    }
+
+    fn write_document_suffix(&self, xml: &mut String) {
+        if let Some(suffix) = &self.preserved_suffix {
+            xml.push_str(suffix);
+        } else {
+            xml.push_str("</w:body></w:document>");
+        }
+    }
+
+    fn write_default_section_properties(xml: &mut String) {
+        xml.push_str("<w:sectPr><w:pgSz w:w=\"12240\" w:h=\"15840\"/>");
+        xml.push_str(
+            "<w:pgMar w:top=\"1440\" w:right=\"1440\" w:bottom=\"1440\" w:left=\"1440\"/>",
+        );
+        xml.push_str("</w:sectPr>");
     }
 
     /// Generate section properties XML including header/footer/footnote/endnote references.
@@ -1058,6 +1108,20 @@ pub(crate) struct DocumentBody {
     pub(crate) elements: Vec<BodyElement>,
 }
 
+struct ParsedDocumentBody {
+    body: DocumentBody,
+    prefix: String,
+    suffix: String,
+}
+
+#[derive(Clone, Copy)]
+enum PreservedBodyKind {
+    Paragraph,
+    Table,
+    SectionProperties,
+    Other,
+}
+
 impl DocumentBody {
     fn new() -> Self {
         Self {
@@ -1065,185 +1129,271 @@ impl DocumentBody {
         }
     }
 
-    fn from_xml(xml: &str) -> Result<Self> {
-        use quick_xml::Reader;
+    fn from_xml(xml: &str) -> Result<ParsedDocumentBody> {
+        use crate::docx::namespace::is_wordprocessing_namespace;
         use quick_xml::events::Event;
+        use quick_xml::reader::NsReader;
 
-        let mut reader = Reader::from_str(xml);
-        reader.config_mut().trim_text(true);
+        enum ScanEvent {
+            StartBody,
+            StartChild(PreservedBodyKind),
+            NestedStart,
+            EmptyChild(PreservedBodyKind),
+            EndCaptured,
+            EndBody,
+            StartOther,
+            EndOther,
+            Eof,
+            Other,
+        }
 
+        let bytes = xml.as_bytes();
+        let mut reader = NsReader::from_reader(bytes);
         let mut body = Self::new();
-        let mut current_para_xml = Vec::new();
-        let mut current_table_xml = Vec::new();
-        let mut in_paragraph = false;
-        let mut in_table = false;
-        let mut depth = 0;
+        let mut depth = 0usize;
+        let mut body_depth = None;
+        let mut prefix_end = None;
+        let mut suffix_start = None;
+        let mut last_content_end = 0usize;
+        let mut capture: Option<(PreservedBodyKind, usize, usize)> = None;
 
         loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    let tag = e.local_name();
-                    if tag.as_ref() == b"p" && !in_paragraph && !in_table {
-                        in_paragraph = true;
-                        depth = 1;
-                        current_para_xml.clear();
-                        current_para_xml.extend_from_slice(b"<w:p");
-                        for attr in e.attributes().flatten() {
-                            current_para_xml.push(b' ');
-                            current_para_xml.extend_from_slice(attr.key.as_ref());
-                            current_para_xml.extend_from_slice(b"=\"");
-                            current_para_xml.extend_from_slice(&attr.value);
-                            current_para_xml.push(b'"');
-                        }
-                        current_para_xml.push(b'>');
-                    } else if tag.as_ref() == b"tbl" && !in_table && !in_paragraph {
-                        in_table = true;
-                        depth = 1;
-                        current_table_xml.clear();
-                        current_table_xml.extend_from_slice(b"<w:tbl");
-                        for attr in e.attributes().flatten() {
-                            current_table_xml.push(b' ');
-                            current_table_xml.extend_from_slice(attr.key.as_ref());
-                            current_table_xml.extend_from_slice(b"=\"");
-                            current_table_xml.extend_from_slice(&attr.value);
-                            current_table_xml.push(b'"');
-                        }
-                        current_table_xml.push(b'>');
-                    } else if in_paragraph {
-                        depth += 1;
-                        current_para_xml.push(b'<');
-                        current_para_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_para_xml.push(b' ');
-                            current_para_xml.extend_from_slice(attr.key.as_ref());
-                            current_para_xml.extend_from_slice(b"=\"");
-                            current_para_xml.extend_from_slice(&attr.value);
-                            current_para_xml.push(b'"');
-                        }
-                        current_para_xml.push(b'>');
-                    } else if in_table {
-                        depth += 1;
-                        current_table_xml.push(b'<');
-                        current_table_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_table_xml.push(b' ');
-                            current_table_xml.extend_from_slice(attr.key.as_ref());
-                            current_table_xml.extend_from_slice(b"=\"");
-                            current_table_xml.extend_from_slice(&attr.value);
-                            current_table_xml.push(b'"');
-                        }
-                        current_table_xml.push(b'>');
+            let event_start = usize::try_from(reader.buffer_position()).map_err(|_| {
+                OoxmlError::InvalidFormat("Word document offset does not fit usize".to_string())
+            })?;
+            let event = {
+                let (namespace, event) = reader
+                    .read_resolved_event()
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                match event {
+                    Event::Start(_) if capture.is_some() => ScanEvent::NestedStart,
+                    Event::Start(element)
+                        if is_wordprocessing_namespace(&namespace)
+                            && element.local_name().as_ref() == b"body" =>
+                    {
+                        ScanEvent::StartBody
+                    },
+                    Event::Start(element) if body_depth == Some(depth) => ScanEvent::StartChild(
+                        preserved_body_kind(&namespace, element.local_name().as_ref()),
+                    ),
+                    Event::Start(_) => ScanEvent::StartOther,
+                    Event::Empty(element) if capture.is_none() && body_depth == Some(depth) => {
+                        ScanEvent::EmptyChild(preserved_body_kind(
+                            &namespace,
+                            element.local_name().as_ref(),
+                        ))
+                    },
+                    Event::End(_) if capture.is_some() => ScanEvent::EndCaptured,
+                    Event::End(element)
+                        if is_wordprocessing_namespace(&namespace)
+                            && element.local_name().as_ref() == b"body"
+                            && body_depth == Some(depth) =>
+                    {
+                        ScanEvent::EndBody
+                    },
+                    Event::End(_) => ScanEvent::EndOther,
+                    Event::Eof => ScanEvent::Eof,
+                    _ => ScanEvent::Other,
+                }
+            };
+            let event_end = usize::try_from(reader.buffer_position()).map_err(|_| {
+                OoxmlError::InvalidFormat("Word document offset does not fit usize".to_string())
+            })?;
+
+            match event {
+                ScanEvent::StartBody => {
+                    if body_depth.is_some() || prefix_end.is_some() {
+                        return Err(OoxmlError::InvalidFormat(
+                            "document contains multiple Word body elements".to_string(),
+                        ));
+                    }
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("Word XML nesting is too deep".to_string())
+                    })?;
+                    body_depth = Some(depth);
+                    prefix_end = Some(event_end);
+                    last_content_end = event_end;
+                },
+                ScanEvent::StartChild(kind) => {
+                    capture = Some((kind, event_start, 1));
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("Word XML nesting is too deep".to_string())
+                    })?;
+                },
+                ScanEvent::NestedStart => {
+                    let Some((_, _, capture_depth)) = capture.as_mut() else {
+                        return Err(OoxmlError::InvalidFormat(
+                            "missing preserved body element".to_string(),
+                        ));
+                    };
+                    *capture_depth = capture_depth.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("Word XML nesting is too deep".to_string())
+                    })?;
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("Word XML nesting is too deep".to_string())
+                    })?;
+                },
+                ScanEvent::EmptyChild(kind) => {
+                    push_preserved_body_range(
+                        &mut body,
+                        xml,
+                        &mut last_content_end,
+                        kind,
+                        event_start,
+                        event_end,
+                    )?;
+                },
+                ScanEvent::EndCaptured => {
+                    let Some((_, _, capture_depth)) = capture.as_mut() else {
+                        return Err(OoxmlError::InvalidFormat(
+                            "missing preserved body element".to_string(),
+                        ));
+                    };
+                    *capture_depth = capture_depth.checked_sub(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("invalid Word XML nesting".to_string())
+                    })?;
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("invalid Word XML nesting".to_string())
+                    })?;
+                    if *capture_depth == 0 {
+                        let Some((kind, start, _)) = capture.take() else {
+                            return Err(OoxmlError::InvalidFormat(
+                                "missing preserved body element range".to_string(),
+                            ));
+                        };
+                        push_preserved_body_range(
+                            &mut body,
+                            xml,
+                            &mut last_content_end,
+                            kind,
+                            start,
+                            event_end,
+                        )?;
                     }
                 },
-                Ok(Event::End(e)) => {
-                    let tag = e.local_name();
-                    if in_paragraph {
-                        current_para_xml.extend_from_slice(b"</");
-                        current_para_xml.extend_from_slice(e.name().as_ref());
-                        current_para_xml.push(b'>');
-                        depth -= 1;
-                        if depth == 0 && tag.as_ref() == b"p" {
-                            // Parse paragraph from XML
-                            let xml_str = String::from_utf8_lossy(&current_para_xml).into_owned();
-                            body.elements
-                                .push(BodyElement::Paragraph(MutableParagraph::from_xml(
-                                    &xml_str,
-                                )?));
-                            in_paragraph = false;
-                        }
-                    } else if in_table {
-                        current_table_xml.extend_from_slice(b"</");
-                        current_table_xml.extend_from_slice(e.name().as_ref());
-                        current_table_xml.push(b'>');
-                        depth -= 1;
-                        if depth == 0 && tag.as_ref() == b"tbl" {
-                            // Parse table from XML
-                            let xml_str = String::from_utf8_lossy(&current_table_xml).into_owned();
-                            body.elements
-                                .push(BodyElement::Table(MutableTable::from_xml(&xml_str)?));
-                            in_table = false;
-                        }
+                ScanEvent::EndBody => {
+                    if event_start > last_content_end {
+                        push_raw_body_xml(
+                            &mut body,
+                            PreservedBodyKind::Other,
+                            xml,
+                            last_content_end,
+                            event_start,
+                        )?;
                     }
+                    suffix_start = Some(event_start);
+                    body_depth = None;
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("invalid Word XML nesting".to_string())
+                    })?;
                 },
-                Ok(Event::Text(e)) if in_paragraph => {
-                    current_para_xml.extend_from_slice(e.as_ref());
+                ScanEvent::StartOther => {
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("Word XML nesting is too deep".to_string())
+                    })?;
                 },
-                Ok(Event::Text(e)) if in_table => {
-                    current_table_xml.extend_from_slice(e.as_ref());
+                ScanEvent::EndOther => {
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("invalid Word XML nesting".to_string())
+                    })?;
                 },
-                Ok(Event::Empty(e)) if in_paragraph => {
-                    current_para_xml.push(b'<');
-                    current_para_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        current_para_xml.push(b' ');
-                        current_para_xml.extend_from_slice(attr.key.as_ref());
-                        current_para_xml.extend_from_slice(b"=\"");
-                        current_para_xml.extend_from_slice(&attr.value);
-                        current_para_xml.push(b'"');
-                    }
-                    current_para_xml.extend_from_slice(b"/>");
+                ScanEvent::Eof if depth != 0 || capture.is_some() || body_depth.is_some() => {
+                    return Err(OoxmlError::InvalidFormat(
+                        "unterminated Word document XML".to_string(),
+                    ));
                 },
-                Ok(Event::Empty(e)) if in_table => {
-                    current_table_xml.push(b'<');
-                    current_table_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        current_table_xml.push(b' ');
-                        current_table_xml.extend_from_slice(attr.key.as_ref());
-                        current_table_xml.extend_from_slice(b"=\"");
-                        current_table_xml.extend_from_slice(&attr.value);
-                        current_table_xml.push(b'"');
-                    }
-                    current_table_xml.extend_from_slice(b"/>");
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
+                ScanEvent::Eof => break,
+                ScanEvent::Other => {},
             }
         }
 
-        Ok(body)
+        let prefix_end = prefix_end.ok_or_else(|| {
+            OoxmlError::InvalidFormat("Word document has no body element".to_string())
+        })?;
+        let suffix_start = suffix_start.ok_or_else(|| {
+            OoxmlError::InvalidFormat("Word document body is not closed".to_string())
+        })?;
+        Ok(ParsedDocumentBody {
+            body,
+            prefix: ensure_writer_namespace_declarations(xml.get(..prefix_end).ok_or_else(
+                || OoxmlError::InvalidFormat("invalid Word document prefix range".to_string()),
+            )?)?,
+            suffix: xml
+                .get(suffix_start..)
+                .ok_or_else(|| {
+                    OoxmlError::InvalidFormat("invalid Word document suffix range".to_string())
+                })?
+                .to_string(),
+        })
     }
-
     fn add_paragraph(&mut self) -> &mut MutableParagraph {
+        let index = self.content_insertion_index();
         self.elements
-            .push(BodyElement::Paragraph(MutableParagraph::new()));
-        match self.elements.last_mut() {
+            .insert(index, BodyElement::Paragraph(MutableParagraph::new()));
+        match self.elements.get_mut(index) {
             Some(BodyElement::Paragraph(p)) => p,
             _ => unreachable!(),
         }
     }
 
     fn add_table(&mut self, rows: usize, cols: usize) -> &mut MutableTable {
+        let index = self.content_insertion_index();
         self.elements
-            .push(BodyElement::Table(MutableTable::new(rows, cols)));
-        match self.elements.last_mut() {
+            .insert(index, BodyElement::Table(MutableTable::new(rows, cols)));
+        match self.elements.get_mut(index) {
             Some(BodyElement::Table(t)) => t,
             _ => unreachable!(),
         }
     }
 
+    fn content_insertion_index(&self) -> usize {
+        self.elements
+            .iter()
+            .position(|element| matches!(element, BodyElement::PreservedSectionProperties(_)))
+            .unwrap_or(self.elements.len())
+    }
+
     fn paragraph_count(&self) -> usize {
         self.elements
             .iter()
-            .filter(|e| matches!(e, BodyElement::Paragraph(_)))
+            .filter(|element| {
+                matches!(
+                    element,
+                    BodyElement::Paragraph(_) | BodyElement::PreservedParagraph(_)
+                )
+            })
             .count()
     }
 
     fn table_count(&self) -> usize {
         self.elements
             .iter()
-            .filter(|e| matches!(e, BodyElement::Table(_)))
+            .filter(|element| {
+                matches!(
+                    element,
+                    BodyElement::Table(_) | BodyElement::PreservedTable(_)
+                )
+            })
             .count()
     }
 
     fn paragraph(&mut self, index: usize) -> Option<&mut MutableParagraph> {
         let mut count = 0;
         for elem in &mut self.elements {
-            if let BodyElement::Paragraph(p) = elem {
-                if count == index {
-                    return Some(p);
-                }
-                count += 1;
+            match elem {
+                BodyElement::Paragraph(paragraph) => {
+                    if count == index {
+                        return Some(paragraph);
+                    }
+                    count += 1;
+                },
+                BodyElement::PreservedParagraph(_) => {
+                    if count == index {
+                        return None;
+                    }
+                    count += 1;
+                },
+                _ => {},
             }
         }
         None
@@ -1252,47 +1402,55 @@ impl DocumentBody {
     fn table(&mut self, index: usize) -> Option<&mut MutableTable> {
         let mut count = 0;
         for elem in &mut self.elements {
-            if let BodyElement::Table(t) = elem {
-                if count == index {
-                    return Some(t);
-                }
-                count += 1;
+            match elem {
+                BodyElement::Table(table) => {
+                    if count == index {
+                        return Some(table);
+                    }
+                    count += 1;
+                },
+                BodyElement::PreservedTable(_) => {
+                    if count == index {
+                        return None;
+                    }
+                    count += 1;
+                },
+                _ => {},
             }
         }
         None
     }
 
-    fn to_xml(&self, xml: &mut String) -> Result<()> {
-        xml.push_str("<w:body>");
-
+    fn write_contents(&self, xml: &mut String, preserve_section: bool) -> Result<()> {
         for element in &self.elements {
             match element {
                 BodyElement::Paragraph(p) => p.to_xml(xml)?,
                 BodyElement::Table(t) => t.to_xml(xml)?,
+                BodyElement::PreservedParagraph(raw)
+                | BodyElement::PreservedTable(raw)
+                | BodyElement::PreservedOther(raw) => xml.push_str(raw),
+                BodyElement::PreservedSectionProperties(raw) if preserve_section => {
+                    xml.push_str(raw);
+                },
+                BodyElement::PreservedSectionProperties(_) => {},
             }
         }
-
-        // Add default section properties
-        xml.push_str("<w:sectPr><w:pgSz w:w=\"12240\" w:h=\"15840\"/>");
-        xml.push_str(
-            "<w:pgMar w:top=\"1440\" w:right=\"1440\" w:bottom=\"1440\" w:left=\"1440\"/>",
-        );
-        xml.push_str("</w:sectPr>");
-
-        xml.push_str("</w:body>");
-
         Ok(())
     }
 
+    fn has_preserved_section(&self) -> bool {
+        self.elements
+            .iter()
+            .any(|element| matches!(element, BodyElement::PreservedSectionProperties(_)))
+    }
+
     /// Generate XML with actual relationship IDs from the mapper.
-    /// Note: Does not close </w:body> tag - caller must add sectPr and close it.
-    fn to_xml_with_rels(
+    fn write_contents_with_rels(
         &self,
         xml: &mut String,
         rel_mapper: &crate::docx::writer::relmap::RelationshipMapper,
+        preserve_section: bool,
     ) -> Result<()> {
-        xml.push_str("<w:body>");
-
         // Global counters for hyperlinks and images across all paragraphs
         let mut hyperlink_counter = 0;
         let mut image_counter = 0;
@@ -1308,19 +1466,138 @@ impl DocumentBody {
                     )?;
                 },
                 BodyElement::Table(t) => t.to_xml(xml)?, // Tables don't need rel mapping for now
+                BodyElement::PreservedParagraph(raw)
+                | BodyElement::PreservedTable(raw)
+                | BodyElement::PreservedOther(raw) => xml.push_str(raw),
+                BodyElement::PreservedSectionProperties(raw) if preserve_section => {
+                    xml.push_str(raw);
+                },
+                BodyElement::PreservedSectionProperties(_) => {},
             }
         }
-
-        // Note: Don't close </w:body> here - it will be closed after sectPr is added
         Ok(())
     }
 }
 
-/// A body element (paragraph or table).
+fn preserved_body_kind(
+    namespace: &quick_xml::name::ResolveResult<'_>,
+    local_name: &[u8],
+) -> PreservedBodyKind {
+    if crate::docx::namespace::is_wordprocessing_namespace(namespace) {
+        return match local_name {
+            b"p" => PreservedBodyKind::Paragraph,
+            b"tbl" => PreservedBodyKind::Table,
+            b"sectPr" => PreservedBodyKind::SectionProperties,
+            _ => PreservedBodyKind::Other,
+        };
+    }
+    PreservedBodyKind::Other
+}
+
+fn ensure_writer_namespace_declarations(prefix: &str) -> Result<String> {
+    const REQUIRED: [(&str, &str); 4] = [
+        (
+            "w",
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+        ),
+        (
+            "r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        ),
+        (
+            "wp",
+            "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+        ),
+        ("a", "http://schemas.openxmlformats.org/drawingml/2006/main"),
+    ];
+
+    let declarations = REQUIRED
+        .iter()
+        .filter(|(namespace_prefix, _)| !has_namespace_declaration(prefix, namespace_prefix))
+        .map(|(namespace_prefix, namespace)| format!(r#" xmlns:{namespace_prefix}="{namespace}""#))
+        .collect::<String>();
+    if declarations.is_empty() {
+        return Ok(prefix.to_string());
+    }
+    let insertion = prefix.rfind('>').ok_or_else(|| {
+        OoxmlError::InvalidFormat("Word body opening tag is incomplete".to_string())
+    })?;
+    let mut augmented = String::with_capacity(prefix.len() + declarations.len());
+    augmented.push_str(&prefix[..insertion]);
+    augmented.push_str(&declarations);
+    augmented.push_str(&prefix[insertion..]);
+    Ok(augmented)
+}
+
+fn has_namespace_declaration(xml: &str, namespace_prefix: &str) -> bool {
+    let needle = format!("xmlns:{namespace_prefix}");
+    xml.match_indices(&needle).any(|(start, _)| {
+        let before_is_boundary = start == 0
+            || xml.as_bytes()[start - 1].is_ascii_whitespace()
+            || xml.as_bytes()[start - 1] == b'<';
+        let mut after = start + needle.len();
+        while xml
+            .as_bytes()
+            .get(after)
+            .is_some_and(u8::is_ascii_whitespace)
+        {
+            after += 1;
+        }
+        before_is_boundary && xml.as_bytes().get(after) == Some(&b'=')
+    })
+}
+
+fn push_preserved_body_range(
+    body: &mut DocumentBody,
+    xml: &str,
+    last_content_end: &mut usize,
+    kind: PreservedBodyKind,
+    start: usize,
+    end: usize,
+) -> Result<()> {
+    if start > *last_content_end {
+        push_raw_body_xml(
+            body,
+            PreservedBodyKind::Other,
+            xml,
+            *last_content_end,
+            start,
+        )?;
+    }
+    push_raw_body_xml(body, kind, xml, start, end)?;
+    *last_content_end = end;
+    Ok(())
+}
+
+fn push_raw_body_xml(
+    body: &mut DocumentBody,
+    kind: PreservedBodyKind,
+    xml: &str,
+    start: usize,
+    end: usize,
+) -> Result<()> {
+    let raw_xml = xml
+        .get(start..end)
+        .ok_or_else(|| OoxmlError::InvalidFormat("invalid Word body element range".to_string()))?
+        .to_string();
+    body.elements.push(match kind {
+        PreservedBodyKind::Paragraph => BodyElement::PreservedParagraph(raw_xml),
+        PreservedBodyKind::Table => BodyElement::PreservedTable(raw_xml),
+        PreservedBodyKind::SectionProperties => BodyElement::PreservedSectionProperties(raw_xml),
+        PreservedBodyKind::Other => BodyElement::PreservedOther(raw_xml),
+    });
+    Ok(())
+}
+
+/// A body element (paragraph, table, or exact preserved XML).
 #[derive(Debug)]
 pub(crate) enum BodyElement {
     Paragraph(MutableParagraph),
     Table(MutableTable),
+    PreservedParagraph(String),
+    PreservedTable(String),
+    PreservedSectionProperties(String),
+    PreservedOther(String),
 }
 
 #[cfg(test)]
@@ -1372,5 +1649,49 @@ mod tests {
         let xml = doc.to_xml().unwrap();
         assert!(xml.contains("<w:b/>"));
         assert!(xml.contains("<w:i/>"));
+    }
+
+    #[test]
+    fn appending_preserves_existing_body_xml_exactly() {
+        let input = r#"<?xml version="1.0"?><q:document xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:extension"><q:body>
+  <!--keep--><q:p q:rsidR="00AB"><q:r><q:t><![CDATA[A < B]]></q:t></q:r><x:payload data="1 &amp; 2"/></q:p>
+  <q:tbl><q:tr><q:tc><q:p><q:r><q:t>cell</q:t></q:r></q:p></q:tc></q:tr></q:tbl>
+  <x:custom><![CDATA[opaque <xml>]]></x:custom>
+  <q:sectPr><q:pgSz q:w="20000" q:h="10000"/></q:sectPr>
+</q:body></q:document>"#;
+        let mut document = MutableDocument::from_xml(input).unwrap();
+        assert_eq!(document.paragraph_count(), 1);
+        assert_eq!(document.table_count(), 1);
+
+        document.add_paragraph_with_text("appended");
+        let output = document.to_xml().unwrap();
+        assert!(output.starts_with(
+            r#"<?xml version="1.0"?><q:document xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:extension"><q:body"#
+        ));
+        assert!(
+            output.contains(
+                r#"xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main""#
+            )
+        );
+        assert!(output.contains(
+            r#"<q:p q:rsidR="00AB"><q:r><q:t><![CDATA[A < B]]></q:t></q:r><x:payload data="1 &amp; 2"/></q:p>"#
+        ));
+        assert!(output.contains(
+            r#"<q:tbl><q:tr><q:tc><q:p><q:r><q:t>cell</q:t></q:r></q:p></q:tc></q:tr></q:tbl>"#
+        ));
+        assert!(output.contains(r#"<x:custom><![CDATA[opaque <xml>]]></x:custom>"#));
+        assert!(output.contains(r#"<q:sectPr><q:pgSz q:w="20000" q:h="10000"/></q:sectPr>"#));
+        assert!(output.contains("appended"));
+        assert_eq!(output.matches("sectPr").count(), 2);
+        assert!(output.ends_with("</q:body></q:document>"));
+    }
+
+    #[test]
+    fn existing_document_parser_rejects_missing_or_truncated_body() {
+        assert!(MutableDocument::from_xml("<w:document/>").is_err());
+        assert!(MutableDocument::from_xml(
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>"#
+        )
+        .is_err());
     }
 }

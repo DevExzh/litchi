@@ -1296,7 +1296,7 @@ mod tests {
             .add_paragraph_with_text("round-trip text");
         package.save(file.path()).unwrap();
 
-        let reopened = Package::open(file.path()).unwrap();
+        let mut reopened = Package::open(file.path()).unwrap();
         assert!(
             reopened
                 .document()
@@ -1305,5 +1305,15 @@ mod tests {
                 .unwrap()
                 .contains("round-trip text")
         );
+
+        reopened
+            .document_mut()
+            .unwrap()
+            .add_paragraph_with_text("appended after reopen");
+        reopened.save(file.path()).unwrap();
+        let reopened_again = Package::open(file.path()).unwrap();
+        let text = reopened_again.document().unwrap().text().unwrap();
+        assert!(text.contains("round-trip text"));
+        assert!(text.contains("appended after reopen"));
     }
 }

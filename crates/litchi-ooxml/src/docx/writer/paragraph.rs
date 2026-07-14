@@ -46,16 +46,6 @@ impl MutableParagraph {
         }
     }
 
-    /// Create a MutableParagraph from existing XML.
-    ///
-    /// For now, this stores the raw XML to preserve formatting when re-writing.
-    /// Full parsing could be added later for more sophisticated editing.
-    pub(crate) fn from_xml(_xml: &str) -> Result<Self> {
-        // For initial implementation, create an empty paragraph
-        // Future enhancement: parse XML to extract runs, hyperlinks, and properties
-        Ok(Self::new())
-    }
-
     /// Add a new run to the paragraph.
     pub fn add_run(&mut self) -> &mut MutableRun {
         self.elements.push(ParagraphElement::Run(MutableRun::new()));
