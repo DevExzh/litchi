@@ -445,7 +445,68 @@ fn write_pivot_table_style(xml: &mut String, style: &PivotTableStyle) -> SheetRe
     Ok(())
 }
 
+fn write_bool_attribute(xml: &mut String, name: &str, value: bool) -> SheetResult<()> {
+    write!(xml, r#" {name}="{}""#, if value { "1" } else { "0" })?;
+    Ok(())
+}
+
+fn validate_pivot_cache_definition(cache_def: &PivotCacheDefinition) -> SheetResult<()> {
+    if cache_def.id.as_deref() == Some("") {
+        return Err("pivot cache records relationship ID cannot be empty".into());
+    }
+    if cache_def.source_relationship_id.as_deref() == Some("") {
+        return Err("pivot cache source relationship ID cannot be empty".into());
+    }
+    if !matches!(
+        cache_def.source_type.as_str(),
+        "worksheet" | "external" | "consolidation" | "scenario"
+    ) {
+        return Err(format!(
+            "invalid pivot cache source type '{}'",
+            cache_def.source_type
+        )
+        .into());
+    }
+    let has_worksheet_source = cache_def.source_worksheet.is_some()
+        || cache_def.source_ref.is_some()
+        || cache_def.source_name.is_some()
+        || cache_def.source_relationship_id.is_some();
+    if cache_def.source_type == "worksheet" && !has_worksheet_source {
+        return Err("worksheet pivot cache is missing worksheetSource metadata".into());
+    }
+    if cache_def.source_type != "worksheet" && has_worksheet_source {
+        return Err("worksheetSource metadata requires a worksheet pivot-cache source".into());
+    }
+    if cache_def.cache_fields.is_empty() {
+        return Err("pivot cache must contain at least one cache field".into());
+    }
+    if cache_def
+        .refreshed_date
+        .is_some_and(|value| !value.is_finite())
+    {
+        return Err("pivot cache refreshedDate must be finite".into());
+    }
+    for field in &cache_def.cache_fields {
+        if field.name.is_empty() {
+            return Err("pivot cache field name cannot be empty".into());
+        }
+        for item in &field.shared_items {
+            match item {
+                SharedItem::Index(_) => {
+                    return Err("shared-item indexes are only valid in pivot cache records".into());
+                },
+                SharedItem::Number(value) if !value.is_finite() => {
+                    return Err("pivot cache shared number must be finite".into());
+                },
+                _ => {},
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn write_pivot_cache_definition(cache_def: &PivotCacheDefinition) -> SheetResult<String> {
+    validate_pivot_cache_definition(cache_def)?;
     let mut xml = String::with_capacity(4096);
 
     xml.push_str(XML_HEADER);
@@ -469,18 +530,56 @@ pub fn write_pivot_cache_definition(cache_def: &PivotCacheDefinition) -> SheetRe
     if cache_def.refresh_on_load {
         xml.push_str(r#" refreshOnLoad="1""#);
     }
-    if !cache_def.background_query {
-        xml.push_str(r#" backgroundQuery="0""#);
+    if let Some(value) = cache_def.optimize_memory {
+        write_bool_attribute(&mut xml, "optimizeMemory", value)?;
+    }
+    if !cache_def.enable_refresh {
+        xml.push_str(r#" enableRefresh="0""#);
+    }
+    if let Some(value) = &cache_def.refreshed_by {
+        write!(xml, r#" refreshedBy="{}""#, escape_xml(value))?;
+    }
+    if let Some(value) = cache_def.refreshed_date {
+        write!(xml, r#" refreshedDate="{}""#, value)?;
+    }
+    if let Some(value) = &cache_def.refreshed_date_iso {
+        write!(xml, r#" refreshedDateIso="{}""#, escape_xml(value))?;
+    }
+    if cache_def.background_query {
+        xml.push_str(r#" backgroundQuery="1""#);
+    }
+    if let Some(value) = cache_def.missing_items_limit {
+        write!(xml, r#" missingItemsLimit="{}""#, value)?;
     }
 
     write!(
         xml,
-        r#" createdVersion="{}" refreshedVersion="{}" minRefreshableVersion="{}">"#,
+        r#" createdVersion="{}" refreshedVersion="{}" minRefreshableVersion="{}""#,
         cache_def.created_version, cache_def.refreshed_version, cache_def.min_refreshable_version
     )?;
+    if let Some(value) = cache_def.record_count {
+        write!(xml, r#" recordCount="{}""#, value)?;
+    }
+    if let Some(value) = cache_def.upgrade_on_refresh {
+        write_bool_attribute(&mut xml, "upgradeOnRefresh", value)?;
+    }
+    if let Some(value) = cache_def.tuples_cache {
+        write_bool_attribute(&mut xml, "tupleCache", value)?;
+    }
+    if let Some(value) = cache_def.supports_subquery {
+        write_bool_attribute(&mut xml, "supportSubquery", value)?;
+    }
+    if let Some(value) = cache_def.supports_advanced_drill {
+        write_bool_attribute(&mut xml, "supportAdvancedDrill", value)?;
+    }
+    xml.push('>');
 
-    if cache_def.source_worksheet.is_some() || cache_def.source_ref.is_some() {
-        xml.push_str("<cacheSource type=\"worksheet\">");
+    write!(xml, r#"<cacheSource type="{}""#, cache_def.source_type)?;
+    if let Some(connection_id) = cache_def.source_connection_id {
+        write!(xml, r#" connectionId="{}""#, connection_id)?;
+    }
+    if cache_def.source_type == "worksheet" {
+        xml.push('>');
         xml.push_str("<worksheetSource");
 
         if let Some(sheet) = &cache_def.source_worksheet {
@@ -492,14 +591,17 @@ pub fn write_pivot_cache_definition(cache_def: &PivotCacheDefinition) -> SheetRe
         if let Some(name) = &cache_def.source_name {
             write!(xml, r#" name="{}""#, escape_xml(name))?;
         }
+        if let Some(relationship_id) = &cache_def.source_relationship_id {
+            write!(xml, r#" r:id="{}""#, escape_xml(relationship_id))?;
+        }
 
         xml.push_str("/>");
         xml.push_str("</cacheSource>");
+    } else {
+        xml.push_str("/>");
     }
 
-    if !cache_def.cache_fields.is_empty() {
-        write_cache_fields(&mut xml, &cache_def.cache_fields)?;
-    }
+    write_cache_fields(&mut xml, &cache_def.cache_fields)?;
 
     xml.push_str("</pivotCacheDefinition>");
 
@@ -521,6 +623,33 @@ fn write_cache_fields(xml: &mut String, fields: &[PivotCacheField]) -> SheetResu
         if let Some(caption) = &field.caption {
             write!(xml, r#" caption="{}""#, escape_xml(caption))?;
         }
+        if let Some(property_name) = &field.property_name {
+            write!(xml, r#" propertyName="{}""#, escape_xml(property_name))?;
+        }
+        if let Some(server_field) = field.server_field {
+            write_bool_attribute(xml, "serverField", server_field)?;
+        }
+        if !field.unique_list {
+            xml.push_str(r#" uniqueList="0""#);
+        }
+        if let Some(formula) = &field.formula {
+            write!(xml, r#" formula="{}""#, escape_xml(formula))?;
+        }
+        if let Some(sql_type) = field.sql_type {
+            write!(xml, r#" sqlType="{}""#, sql_type)?;
+        }
+        if let Some(hierarchy) = field.hierarchy {
+            write!(xml, r#" hierarchy="{}""#, hierarchy)?;
+        }
+        if let Some(level) = field.level {
+            write!(xml, r#" level="{}""#, level)?;
+        }
+        if let Some(mapping_count) = field.mapping_count {
+            write!(xml, r#" mappingCount="{}""#, mapping_count)?;
+        }
+        if let Some(member_property_field) = field.member_property_field {
+            write_bool_attribute(xml, "memberPropertyField", member_property_field)?;
+        }
 
         if field.shared_items.is_empty() {
             xml.push_str("/>");
@@ -541,6 +670,9 @@ fn write_shared_items(xml: &mut String, items: &[SharedItem]) -> SheetResult<()>
     for item in items {
         match item {
             SharedItem::Missing => xml.push_str("<m/>"),
+            SharedItem::Index(_) => {
+                return Err("shared-item indexes are only valid in pivot cache records".into());
+            },
             SharedItem::Number(n) => write!(xml, r#"<n v="{}"/>"#, n)?,
             SharedItem::Boolean(b) => write!(xml, r#"<b v="{}"/>"#, if *b { "1" } else { "0" })?,
             SharedItem::Error(e) => write!(xml, r#"<e v="{}"/>"#, escape_xml(e))?,
@@ -554,6 +686,15 @@ fn write_shared_items(xml: &mut String, items: &[SharedItem]) -> SheetResult<()>
 }
 
 pub fn write_pivot_cache_records(records: &PivotCacheRecords) -> SheetResult<String> {
+    for record in &records.records {
+        if record
+            .values
+            .iter()
+            .any(|value| matches!(value, SharedItem::Number(number) if !number.is_finite()))
+        {
+            return Err("pivot cache record number must be finite".into());
+        }
+    }
     let mut xml = String::with_capacity(4096);
 
     xml.push_str(XML_HEADER);
@@ -570,6 +711,7 @@ pub fn write_pivot_cache_records(records: &PivotCacheRecords) -> SheetResult<Str
         for value in &record.values {
             match value {
                 SharedItem::Missing => xml.push_str("<m/>"),
+                SharedItem::Index(index) => write!(xml, r#"<x v="{}"/>"#, index)?,
                 SharedItem::Number(n) => write!(xml, r#"<n v="{}"/>"#, n)?,
                 SharedItem::Boolean(b) => {
                     write!(xml, r#"<b v="{}"/>"#, if *b { "1" } else { "0" })?
@@ -585,4 +727,112 @@ pub fn write_pivot_cache_records(records: &PivotCacheRecords) -> SheetResult<Str
     xml.push_str("</pivotCacheRecords>");
 
     Ok(xml)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::xlsx::pivot::cache::CacheRecord;
+    use crate::xlsx::pivot::reader::{read_pivot_cache_definition, read_pivot_cache_records};
+
+    use super::*;
+
+    #[test]
+    fn writes_complete_pivot_cache_definition_round_trip() {
+        let mut definition = PivotCacheDefinition {
+            id: Some("records & data".to_string()),
+            optimize_memory: Some(true),
+            enable_refresh: false,
+            refreshed_by: Some("A & B".to_string()),
+            refreshed_date: Some(42.5),
+            refreshed_date_iso: Some("2026-07-14T00:00:00Z".to_string()),
+            missing_items_limit: Some(12),
+            record_count: Some(2),
+            upgrade_on_refresh: Some(true),
+            tuples_cache: Some(false),
+            supports_subquery: Some(true),
+            supports_advanced_drill: Some(false),
+            source_connection_id: Some(8),
+            source_worksheet: Some("Data & More".to_string()),
+            source_ref: Some("$A$1:$B$3".to_string()),
+            source_relationship_id: Some("source-sheet".to_string()),
+            ..Default::default()
+        };
+        definition.cache_fields.push(PivotCacheField {
+            name: "Region & Area".to_string(),
+            num_fmt_id: Some(4),
+            database_field: false,
+            caption: Some("Area".to_string()),
+            property_name: Some("Property".to_string()),
+            server_field: Some(false),
+            unique_list: false,
+            level: Some(3),
+            formula: Some("a < b".to_string()),
+            sql_type: Some(-1),
+            hierarchy: Some(2),
+            mapping_count: Some(1),
+            member_property_field: Some(true),
+            shared_items: vec![
+                SharedItem::String("North & West".to_string()),
+                SharedItem::Number(2.5),
+            ],
+        });
+
+        let xml = write_pivot_cache_definition(&definition).unwrap();
+        let parsed = read_pivot_cache_definition(&xml).unwrap().unwrap();
+
+        assert_eq!(parsed.id.as_deref(), Some("records & data"));
+        assert_eq!(
+            parsed.source_relationship_id.as_deref(),
+            Some("source-sheet")
+        );
+        assert_eq!(parsed.refreshed_by.as_deref(), Some("A & B"));
+        assert_eq!(parsed.cache_fields[0].formula.as_deref(), Some("a < b"));
+        assert_eq!(parsed.cache_fields[0].mapping_count, Some(1));
+        assert_eq!(parsed.cache_fields[0].member_property_field, Some(true));
+    }
+
+    #[test]
+    fn writes_pivot_cache_record_indexes_round_trip() {
+        let records = PivotCacheRecords {
+            records: vec![CacheRecord {
+                values: vec![
+                    SharedItem::Index(3),
+                    SharedItem::Missing,
+                    SharedItem::String("A & B".to_string()),
+                ],
+            }],
+        };
+
+        let xml = write_pivot_cache_records(&records).unwrap();
+        let parsed = read_pivot_cache_records(&xml).unwrap().unwrap();
+
+        assert!(matches!(parsed.records[0].values[0], SharedItem::Index(3)));
+        assert!(matches!(
+            &parsed.records[0].values[2],
+            SharedItem::String(value) if value == "A & B"
+        ));
+    }
+
+    #[test]
+    fn rejects_invalid_pivot_cache_output() {
+        assert!(write_pivot_cache_definition(&PivotCacheDefinition::default()).is_err());
+
+        let mut definition = PivotCacheDefinition {
+            source_ref: Some("A1".to_string()),
+            ..Default::default()
+        };
+        definition.cache_fields.push(PivotCacheField {
+            name: "One".to_string(),
+            shared_items: vec![SharedItem::Index(0)],
+            ..Default::default()
+        });
+        assert!(write_pivot_cache_definition(&definition).is_err());
+
+        let records = PivotCacheRecords {
+            records: vec![CacheRecord {
+                values: vec![SharedItem::Number(f64::NAN)],
+            }],
+        };
+        assert!(write_pivot_cache_records(&records).is_err());
+    }
 }

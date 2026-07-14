@@ -75,8 +75,8 @@ pub use pivot::{
     AxisType, DataField, FieldItem, ItemType, Location, PageField, PivotArea, PivotCacheDefinition,
     PivotCacheField, PivotCacheRecords, PivotField, PivotFilter, PivotTableDefinition,
     PivotTableStyle, Reference, RowColField, RowColItem, SharedItem, SortType, Subtotal,
-    read_pivot_cache_definition, read_pivot_table_definition, read_pivot_tables,
-    write_pivot_cache_definition, write_pivot_cache_records, write_pivot_table,
+    read_pivot_cache_definition, read_pivot_cache_records, read_pivot_table_definition,
+    read_pivot_tables, write_pivot_cache_definition, write_pivot_cache_records, write_pivot_table,
 };
 // Re-export writer types
 pub use writer::{

@@ -1,6 +1,7 @@
 #[derive(Debug, Clone)]
 pub enum SharedItem {
     Missing,
+    Index(u32),
     Number(f64),
     Boolean(bool),
     Error(String),
@@ -12,6 +13,7 @@ impl SharedItem {
     pub fn as_string(&self) -> String {
         match self {
             Self::Missing => String::new(),
+            Self::Index(index) => index.to_string(),
             Self::Number(n) => n.to_string(),
             Self::Boolean(b) => (if *b { "TRUE" } else { "FALSE" }).to_string(),
             Self::Error(e) => e.clone(),

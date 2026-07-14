@@ -8,7 +8,10 @@ pub mod writer;
 pub use cache::{PivotCacheDefinition, PivotCacheField, PivotCacheRecords, SharedItem};
 pub use fields::{DataField, FieldItem, PageField, PivotField, RowColField, RowColItem, Subtotal};
 pub use filters::{PivotArea, PivotFilter, Reference};
-pub use reader::{read_pivot_cache_definition, read_pivot_table_definition, read_pivot_tables};
+pub use reader::{
+    read_pivot_cache_definition, read_pivot_cache_records, read_pivot_table_definition,
+    read_pivot_tables,
+};
 pub use styles::{Location, PivotTableStyle};
 pub use writer::{
     PivotTableDefinition, write_pivot_cache_definition, write_pivot_cache_records,

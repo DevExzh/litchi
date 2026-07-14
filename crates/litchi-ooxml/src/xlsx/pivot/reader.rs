@@ -10,7 +10,9 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use super::cache::{PivotCacheDefinition, PivotCacheField, SharedItem};
+use super::cache::{
+    CacheRecord, PivotCacheDefinition, PivotCacheField, PivotCacheRecords, SharedItem,
+};
 use crate::common::xml::unqualified_attribute_value;
 use crate::xlsx::Cell;
 use crate::xlsx::namespace::{is_spreadsheetml_name, relationship_attribute_value};
@@ -237,6 +239,12 @@ fn validate_pivot_cache_relationships(
             &records_uri,
             records_part.content_type(),
             ct::SML_PIVOT_CACHE_RECORDS,
+        )?;
+        let records_xml = std::str::from_utf8(records_part.blob())?;
+        validate_pivot_cache_records(
+            records_xml,
+            &definition.cache_fields,
+            definition.record_count,
         )?;
     }
 
@@ -1080,6 +1088,260 @@ pub fn read_pivot_cache_definition(xml: &str) -> SheetResult<Option<PivotCacheDe
     PivotCacheParser::parse(xml)
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CacheRecordsContext {
+    Root,
+    Record,
+    Item,
+    Other,
+}
+
+struct PivotCacheRecordsParser {
+    records: PivotCacheRecords,
+    pending_record: Option<CacheRecord>,
+    expected_records: u32,
+    actual_records: usize,
+    pending_value_count: usize,
+    expected_field_count: Option<usize>,
+    shared_item_counts: Vec<usize>,
+    retain_records: bool,
+}
+
+impl PivotCacheRecordsParser {
+    fn from_root(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        cache_fields: Option<&[PivotCacheField]>,
+        definition_record_count: Option<u32>,
+        retain_records: bool,
+    ) -> SheetResult<Self> {
+        let expected_records =
+            required_u32(element, b"count", decoder, "pivot cache records count")?;
+        if let Some(definition_record_count) = definition_record_count
+            && definition_record_count != expected_records
+        {
+            return Err(format!(
+                "pivot cache definition declares {definition_record_count} records, but the records part declares {expected_records}"
+            )
+            .into());
+        }
+        Ok(Self {
+            records: PivotCacheRecords::default(),
+            pending_record: None,
+            expected_records,
+            actual_records: 0,
+            pending_value_count: 0,
+            expected_field_count: cache_fields.map(<[PivotCacheField]>::len),
+            shared_item_counts: cache_fields
+                .map(|fields| {
+                    fields
+                        .iter()
+                        .map(|field| field.shared_items.len())
+                        .collect()
+                })
+                .unwrap_or_default(),
+            retain_records,
+        })
+    }
+
+    fn parse(
+        xml: &str,
+        cache_fields: Option<&[PivotCacheField]>,
+        definition_record_count: Option<u32>,
+        retain_records: bool,
+    ) -> SheetResult<Option<PivotCacheRecords>> {
+        let mut reader = NsReader::from_reader(xml.as_bytes());
+        let mut parser: Option<Self> = None;
+        let mut stack = Vec::new();
+        let mut closed_root = false;
+
+        loop {
+            let decoder = reader.decoder();
+            let event = reader.read_event()?.into_owned();
+            let resolver = reader.resolver().clone();
+            let (namespace, event) = resolver.resolve_event(event);
+            match event {
+                Event::Start(element) if stack.is_empty() => {
+                    if closed_root {
+                        return Err("pivot cache records contain multiple root elements".into());
+                    }
+                    if !is_spreadsheetml_name(&namespace, element.name(), b"pivotCacheRecords") {
+                        return Ok(None);
+                    }
+                    parser = Some(Self::from_root(
+                        &element,
+                        decoder,
+                        cache_fields,
+                        definition_record_count,
+                        retain_records,
+                    )?);
+                    stack.push(CacheRecordsContext::Root);
+                },
+                Event::Empty(element) if stack.is_empty() => {
+                    if !is_spreadsheetml_name(&namespace, element.name(), b"pivotCacheRecords") {
+                        return Ok(None);
+                    }
+                    let parser = Self::from_root(
+                        &element,
+                        decoder,
+                        cache_fields,
+                        definition_record_count,
+                        retain_records,
+                    )?;
+                    parser.validate_count()?;
+                    return Ok(Some(parser.records));
+                },
+                Event::Start(element) => {
+                    let parent = *stack
+                        .last()
+                        .ok_or("pivot cache records are missing their root")?;
+                    let context = parser
+                        .as_mut()
+                        .ok_or("pivot cache records parser is not initialized")?
+                        .start(parent, &namespace, &element, decoder)?;
+                    stack.push(context);
+                },
+                Event::Empty(element) => {
+                    let parent = *stack
+                        .last()
+                        .ok_or("pivot cache records are missing their root")?;
+                    let parser = parser
+                        .as_mut()
+                        .ok_or("pivot cache records parser is not initialized")?;
+                    let context = parser.start(parent, &namespace, &element, decoder)?;
+                    parser.finish(context)?;
+                },
+                Event::End(element) => {
+                    let context = stack
+                        .pop()
+                        .ok_or("pivot cache records have a closing element outside their root")?;
+                    parser
+                        .as_mut()
+                        .ok_or("pivot cache records parser is not initialized")?
+                        .finish(context)?;
+                    if context == CacheRecordsContext::Root {
+                        if !is_spreadsheetml_name(&namespace, element.name(), b"pivotCacheRecords")
+                        {
+                            return Err(
+                                "pivot cache records have an invalid root closing element".into()
+                            );
+                        }
+                        closed_root = true;
+                    }
+                },
+                Event::Eof if parser.is_none() => return Ok(None),
+                Event::Eof if !closed_root || !stack.is_empty() => {
+                    return Err("pivot cache records have a missing or unterminated root".into());
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+        }
+        Ok(parser.map(|parser| parser.records))
+    }
+
+    fn start(
+        &mut self,
+        parent: CacheRecordsContext,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+    ) -> SheetResult<CacheRecordsContext> {
+        if parent == CacheRecordsContext::Root
+            && is_spreadsheetml_name(namespace, element.name(), b"r")
+        {
+            if self.pending_record.is_some() {
+                return Err("nested pivot cache record".into());
+            }
+            self.pending_record = Some(CacheRecord::default());
+            self.pending_value_count = 0;
+            return Ok(CacheRecordsContext::Record);
+        }
+        if parent == CacheRecordsContext::Record
+            && let Some(value) = parse_record_value(namespace, element, decoder)?
+        {
+            if let Some(expected) = self.expected_field_count
+                && self.pending_value_count >= expected
+            {
+                return Err(
+                    format!("pivot cache record has more than {expected} field values").into(),
+                );
+            }
+            if let SharedItem::Index(index) = &value
+                && self.expected_field_count.is_some()
+            {
+                let shared_item_count = self.shared_item_counts[self.pending_value_count];
+                if usize::try_from(*index).map_or(true, |index| index >= shared_item_count) {
+                    return Err(format!(
+                        "pivot cache shared-item index {index} exceeds the {shared_item_count} items for field {}",
+                        self.pending_value_count
+                    )
+                    .into());
+                }
+            }
+            self.pending_value_count += 1;
+            if self.retain_records {
+                self.pending_record
+                    .as_mut()
+                    .ok_or("pivot cache value outside a record")?
+                    .values
+                    .push(value);
+            }
+            return Ok(CacheRecordsContext::Item);
+        }
+        Ok(CacheRecordsContext::Other)
+    }
+
+    fn finish(&mut self, context: CacheRecordsContext) -> SheetResult<()> {
+        match context {
+            CacheRecordsContext::Record => {
+                if let Some(expected) = self.expected_field_count
+                    && self.pending_value_count != expected
+                {
+                    return Err(format!(
+                        "pivot cache record has {} values, expected {expected}",
+                        self.pending_value_count
+                    )
+                    .into());
+                }
+                let record = self
+                    .pending_record
+                    .take()
+                    .ok_or("missing pending pivot cache record")?;
+                self.actual_records += 1;
+                if self.retain_records {
+                    self.records.records.push(record);
+                }
+                Ok(())
+            },
+            CacheRecordsContext::Root => self.validate_count(),
+            _ => Ok(()),
+        }
+    }
+
+    fn validate_count(&self) -> SheetResult<()> {
+        validate_count(
+            Some(self.expected_records),
+            self.actual_records,
+            "pivot cache records",
+        )
+    }
+}
+
+pub fn read_pivot_cache_records(xml: &str) -> SheetResult<Option<PivotCacheRecords>> {
+    PivotCacheRecordsParser::parse(xml, None, None, true)
+}
+
+fn validate_pivot_cache_records(
+    xml: &str,
+    cache_fields: &[PivotCacheField],
+    definition_record_count: Option<u32>,
+) -> SheetResult<()> {
+    PivotCacheRecordsParser::parse(xml, Some(cache_fields), definition_record_count, false)?
+        .ok_or("pivot-cache records part has no pivotCacheRecords root")?;
+    Ok(())
+}
+
 fn parse_cache_field_element(
     element: &BytesStart<'_>,
     decoder: Decoder,
@@ -1167,6 +1429,22 @@ fn parse_shared_item(
         )?)));
     }
     Ok(None)
+}
+
+fn parse_record_value(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+) -> SheetResult<Option<SharedItem>> {
+    if is_spreadsheetml_name(namespace, element.name(), b"x") {
+        return Ok(Some(SharedItem::Index(required_u32(
+            element,
+            b"v",
+            decoder,
+            "pivot cache shared-item index",
+        )?)));
+    }
+    parse_shared_item(namespace, element, decoder)
 }
 
 fn build_roles(
@@ -1440,7 +1718,10 @@ mod tests {
         package.add_part(Box::new(BlobPart::new(
             records_uri,
             ct::SML_PIVOT_CACHE_RECORDS.to_string(),
-            Vec::new(),
+            br#"<pivotCacheRecords xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main" count="2">
+                    <r><s v="North"/></r><r><s v="South"/></r>
+                </pivotCacheRecords>"#
+                .to_vec(),
         )));
         package.add_part(Box::new(table_part));
         (package, worksheet_uri)
@@ -1527,9 +1808,20 @@ mod tests {
 
         let (mut package, _) = package_with_pivot_table();
         package.add_part(Box::new(BlobPart::new(
-            records_uri,
+            records_uri.clone(),
             ct::SML_WORKSHEET.to_string(),
             Vec::new(),
+        )));
+        assert!(read_pivot_tables(&package).is_err());
+
+        let (mut package, _) = package_with_pivot_table();
+        package.add_part(Box::new(BlobPart::new(
+            records_uri,
+            ct::SML_PIVOT_CACHE_RECORDS.to_string(),
+            br#"<pivotCacheRecords xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main" count="2">
+                    <r><x v="0"/></r><r><s v="South"/></r>
+                </pivotCacheRecords>"#
+                .to_vec(),
         )));
         assert!(read_pivot_tables(&package).is_err());
 
@@ -1735,6 +2027,52 @@ mod tests {
         }
         assert!(
             read_pivot_cache_definition(r#"<pivotCacheDefinition xmlns="urn:foreign"/>"#)
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn parses_prefixed_pivot_cache_records() {
+        let xml = r##"<p:pivotCacheRecords
+                xmlns:p="http://purl.oclc.org/ooxml/spreadsheetml/main"
+                xmlns:f="urn:foreign" count="2">
+                <f:r><p:n v="99"/></f:r>
+                <p:r><p:x v="3"/><p:m/><p:n v="2.5"/><p:b v="false"/>
+                    <p:e v="#N/A"/><p:s v="North &amp; West"/><p:d v="2026-07-14T00:00:00Z"/></p:r>
+                <p:r/>
+            </p:pivotCacheRecords>"##;
+        let records = read_pivot_cache_records(xml).unwrap().unwrap();
+
+        assert_eq!(records.records.len(), 2);
+        let values = &records.records[0].values;
+        assert_eq!(values.len(), 7);
+        assert!(matches!(values[0], SharedItem::Index(3)));
+        assert!(matches!(values[1], SharedItem::Missing));
+        assert!(matches!(values[2], SharedItem::Number(2.5)));
+        assert!(matches!(values[3], SharedItem::Boolean(false)));
+        assert!(matches!(&values[5], SharedItem::String(value) if value == "North & West"));
+        assert!(records.records[1].values.is_empty());
+    }
+
+    #[test]
+    fn rejects_malformed_pivot_cache_records() {
+        const S: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+        for xml in [
+            format!(r#"<pivotCacheRecords xmlns="{S}"/>"#),
+            format!(r#"<pivotCacheRecords xmlns="{S}" count="2"><r/></pivotCacheRecords>"#),
+            format!(r#"<pivotCacheRecords xmlns="{S}" count="1"><r><x/></r></pivotCacheRecords>"#),
+            format!(
+                r#"<pivotCacheRecords xmlns="{S}" count="1"><r><b v="yes"/></r></pivotCacheRecords>"#
+            ),
+            format!(
+                r#"<pivotCacheRecords xmlns="{S}" count="1"><r><n v="NaN"/></r></pivotCacheRecords>"#
+            ),
+        ] {
+            assert!(read_pivot_cache_records(&xml).is_err(), "accepted {xml}");
+        }
+        assert!(
+            read_pivot_cache_records(r#"<pivotCacheRecords xmlns="urn:foreign" count="0"/>"#)
                 .unwrap()
                 .is_none()
         );
