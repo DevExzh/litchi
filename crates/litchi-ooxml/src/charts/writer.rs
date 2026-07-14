@@ -3,7 +3,7 @@
 //! This module provides functionality to generate chart XML for OOXML packages.
 
 use crate::charts::axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
-use crate::charts::chart::{Chart, View3D, WallFloor};
+use crate::charts::chart::{Chart, PivotFormat, View3D, WallFloor};
 use crate::charts::legend::Legend;
 use crate::charts::models::{Layout, NumericData, StringData, TitleText};
 use crate::charts::plot_area::{
@@ -13,8 +13,8 @@ use crate::charts::plot_area::{
     SurfaceTypeGroup, TypeGroup, TypeGroupCommon, UpDownBars,
 };
 use crate::charts::series::{
-    DataLabels, DataPoint, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType, Series,
-    Trendline, TrendlineType,
+    DataLabel, DataLabels, DataPoint, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType,
+    Marker, Series, Trendline, TrendlineType,
 };
 use litchi_core::xml::escape_xml;
 use std::io::Write;
@@ -129,6 +129,10 @@ pub fn write_chart<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<(
         if chart.auto_title_deleted { "1" } else { "0" }
     )?;
 
+    if let Some(formats) = chart.pivot_formats.as_deref() {
+        write_pivot_formats(writer, formats)?;
+    }
+
     if let Some(ref view) = chart.view_3d {
         write_view_3d(writer, view)?;
     }
@@ -209,6 +213,50 @@ fn write_title<W: Write>(
     )?;
     write!(writer, "</c:title>")?;
 
+    Ok(())
+}
+
+fn write_pivot_formats<W: Write>(writer: &mut W, formats: &[PivotFormat]) -> std::io::Result<()> {
+    let mut indexes = std::collections::HashSet::with_capacity(formats.len());
+    write!(writer, "<c:pivotFmts>")?;
+    for format in formats {
+        if !indexes.insert(format.index) {
+            return Err(invalid_chart_input(format!(
+                "chart contains duplicate pivot-format index {}",
+                format.index
+            )));
+        }
+        write!(writer, r#"<c:pivotFmt><c:idx val="{}"/>"#, format.index)?;
+        if let Some(marker) = format.marker.as_ref() {
+            write_marker(writer, marker, "chart pivot-format")?;
+        }
+        if let Some(label) = format.data_label.as_ref() {
+            write_data_label(writer, label)?;
+        }
+        write!(writer, "</c:pivotFmt>")?;
+    }
+    write!(writer, "</c:pivotFmts>")?;
+    Ok(())
+}
+
+fn write_marker<W: Write>(
+    writer: &mut W,
+    marker: &Marker,
+    description: &str,
+) -> std::io::Result<()> {
+    if marker.size.is_some_and(|size| !(2..=72).contains(&size)) {
+        return Err(invalid_chart_input(format!(
+            "{description} marker size must be 2-72"
+        )));
+    }
+    write!(writer, "<c:marker>")?;
+    if let Some(symbol) = marker.symbol {
+        write!(writer, r#"<c:symbol val="{}"/>"#, symbol.xml_value())?;
+    }
+    if let Some(size) = marker.size {
+        write!(writer, r#"<c:size val="{size}"/>"#)?;
+    }
+    write!(writer, "</c:marker>")?;
     Ok(())
 }
 
@@ -1115,54 +1163,7 @@ fn write_data_labels<W: Write>(writer: &mut W, labels: &DataLabels) -> std::io::
                 label.index
             )));
         }
-        write!(writer, r#"<c:dLbl><c:idx val="{}"/>"#, label.index)?;
-        if label.deleted {
-            write!(writer, r#"<c:delete val="1"/></c:dLbl>"#)?;
-            continue;
-        }
-        if let Some(layout) = label.layout.as_ref() {
-            write_layout(writer, Some(layout))?;
-        }
-        if let Some(text) = label.text.as_ref() {
-            write_title_text(writer, text)?;
-        }
-        if let Some(number_format) = label.number_format.as_ref() {
-            write!(
-                writer,
-                r#"<c:numFmt formatCode="{}" sourceLinked="{}"/>"#,
-                escape_xml(&number_format.format_code),
-                if number_format.source_linked {
-                    "1"
-                } else {
-                    "0"
-                }
-            )?;
-        }
-        if let Some(position) = label.position {
-            write!(writer, r#"<c:dLblPos val="{}"/>"#, position.xml_value())?;
-        }
-        for (name, value) in [
-            ("showLegendKey", label.show_legend_key),
-            ("showVal", label.show_value),
-            ("showCatName", label.show_category_name),
-            ("showSerName", label.show_series_name),
-            ("showPercent", label.show_percent),
-            ("showBubbleSize", label.show_bubble_size),
-        ] {
-            write!(
-                writer,
-                r#"<c:{name} val="{}"/>"#,
-                if value { "1" } else { "0" }
-            )?;
-        }
-        if let Some(separator) = label.separator.as_ref() {
-            write!(
-                writer,
-                "<c:separator>{}</c:separator>",
-                escape_xml(separator)
-            )?;
-        }
-        write!(writer, "</c:dLbl>")?;
+        write_data_label(writer, label)?;
     }
     if labels.deleted {
         write!(writer, r#"<c:delete val="1"/>"#)?;
@@ -1209,6 +1210,58 @@ fn write_data_labels<W: Write>(writer: &mut W, labels: &DataLabels) -> std::io::
         write!(writer, r#"<c:showLeaderLines val="1"/>"#)?;
     }
     write!(writer, "</c:dLbls>")?;
+    Ok(())
+}
+
+fn write_data_label<W: Write>(writer: &mut W, label: &DataLabel) -> std::io::Result<()> {
+    write!(writer, r#"<c:dLbl><c:idx val="{}"/>"#, label.index)?;
+    if label.deleted {
+        write!(writer, r#"<c:delete val="1"/></c:dLbl>"#)?;
+        return Ok(());
+    }
+    if let Some(layout) = label.layout.as_ref() {
+        write_layout(writer, Some(layout))?;
+    }
+    if let Some(text) = label.text.as_ref() {
+        write_title_text(writer, text)?;
+    }
+    if let Some(number_format) = label.number_format.as_ref() {
+        write!(
+            writer,
+            r#"<c:numFmt formatCode="{}" sourceLinked="{}"/>"#,
+            escape_xml(&number_format.format_code),
+            if number_format.source_linked {
+                "1"
+            } else {
+                "0"
+            }
+        )?;
+    }
+    if let Some(position) = label.position {
+        write!(writer, r#"<c:dLblPos val="{}"/>"#, position.xml_value())?;
+    }
+    for (name, value) in [
+        ("showLegendKey", label.show_legend_key),
+        ("showVal", label.show_value),
+        ("showCatName", label.show_category_name),
+        ("showSerName", label.show_series_name),
+        ("showPercent", label.show_percent),
+        ("showBubbleSize", label.show_bubble_size),
+    ] {
+        write!(
+            writer,
+            r#"<c:{name} val="{}"/>"#,
+            if value { "1" } else { "0" }
+        )?;
+    }
+    if let Some(separator) = label.separator.as_ref() {
+        write!(
+            writer,
+            "<c:separator>{}</c:separator>",
+            escape_xml(separator)
+        )?;
+    }
+    write!(writer, "</c:dLbl>")?;
     Ok(())
 }
 

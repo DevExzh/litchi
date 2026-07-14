@@ -6,7 +6,31 @@
 use crate::charts::legend::Legend;
 use crate::charts::models::{Layout, TitleText};
 use crate::charts::plot_area::PlotArea;
+use crate::charts::series::{DataLabel, Marker};
 use crate::charts::types::DisplayBlanks;
+
+/// Formatting override for one pivot-chart data point.
+#[derive(Debug, Clone)]
+pub struct PivotFormat {
+    /// Zero-based data-point index
+    pub index: u32,
+    /// Optional marker override
+    pub marker: Option<Marker>,
+    /// Optional data-label override
+    pub data_label: Option<DataLabel>,
+}
+
+impl PivotFormat {
+    /// Create a pivot-format entry for one data point.
+    #[inline]
+    pub fn new(index: u32) -> Self {
+        Self {
+            index,
+            marker: None,
+            data_label: None,
+        }
+    }
+}
 
 /// View 3D settings for 3D charts.
 #[derive(Debug, Clone)]
@@ -102,6 +126,8 @@ pub struct Chart {
     pub title_overlay: bool,
     /// Whether auto-generated title has been deleted
     pub auto_title_deleted: bool,
+    /// Optional pivot-chart formatting collection; `Some` preserves an empty wrapper
+    pub pivot_formats: Option<Vec<PivotFormat>>,
     /// Plot area with series and axes
     pub plot_area: PlotArea,
     /// Chart legend
@@ -137,6 +163,7 @@ impl Chart {
             title_layout: None,
             title_overlay: false,
             auto_title_deleted: false,
+            pivot_formats: None,
             plot_area: PlotArea::new(),
             legend: None,
             view_3d: None,

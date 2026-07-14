@@ -7,7 +7,7 @@ use crate::charts::axis::{
     Axis, AxisCommon, AxisCrossBetween, AxisCrossMode, AxisLabelAlign, BuiltInUnit, CategoryAxis,
     DateAxis, DisplayUnits, SeriesAxis, TimeUnit, ValueAxis,
 };
-use crate::charts::chart::{Chart, View3D, WallFloor};
+use crate::charts::chart::{Chart, PivotFormat, View3D, WallFloor};
 use crate::charts::legend::{Legend, LegendEntry};
 use crate::charts::models::{
     DataSourceRef, Layout, NumberFormat, NumericData, RichText, StringData, TitleText,
@@ -20,7 +20,7 @@ use crate::charts::plot_area::{
 };
 use crate::charts::series::{
     DataLabel, DataLabels, DataPoint, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType,
-    Series, Trendline, TrendlineType,
+    Marker, Series, Trendline, TrendlineType,
 };
 use crate::charts::types::{
     AxisOrientation, AxisPosition, BarDirection, BarGrouping, DataLabelPosition, DisplayBlanks,
@@ -204,6 +204,25 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
 
     loop {
         match xml_reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"pivotFmts" => {
+                if chart.pivot_formats.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate pivot-format collections".into(),
+                    ));
+                }
+                chart.pivot_formats = Some(parse_pivot_formats(&mut xml_reader)?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"pivotFmts" => {
+                if chart.pivot_formats.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate pivot-format collections".into(),
+                    ));
+                }
+                chart.pivot_formats = Some(Vec::new());
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"plotArea" => {
+                chart.plot_area = PlotArea::new();
+            },
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
@@ -278,6 +297,109 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
     }
 
     Ok(chart)
+}
+
+fn parse_pivot_formats<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Vec<PivotFormat>> {
+    let mut formats = Vec::new();
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"pivotFmt" => {
+                let format = parse_pivot_format(reader)?;
+                if formats
+                    .iter()
+                    .any(|existing: &PivotFormat| existing.index == format.index)
+                {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "chart contains duplicate pivot-format index {}",
+                        format.index
+                    )));
+                }
+                formats.push(format);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"pivotFmt" => {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart pivot format is missing its index".into(),
+                ));
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"pivotFmts" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart pivot formats".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok(formats)
+}
+
+fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PivotFormat> {
+    let mut index = None;
+    let mut marker = None;
+    let mut data_label = None;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"marker" => {
+                if marker.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart pivot format contains duplicate markers".into(),
+                    ));
+                }
+                let (symbol, size) = parse_series_marker(reader)?;
+                marker = Some(Marker { symbol, size });
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"marker" => {
+                if marker.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart pivot format contains duplicate markers".into(),
+                    ));
+                }
+                marker = Some(Marker::new());
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"dLbl" => {
+                if data_label.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart pivot format contains duplicate data labels".into(),
+                    ));
+                }
+                data_label = Some(parse_data_label(reader)?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"dLbl" => {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart pivot-format data label is missing its index".into(),
+                ));
+            },
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+                if element.local_name().as_ref() == b"idx" =>
+            {
+                if index.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart pivot format contains duplicate indexes".into(),
+                    ));
+                }
+                index = Some(required_u32_attr(element, "chart pivot-format index")?);
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"pivotFmt" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart pivot format".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+
+    let mut format =
+        PivotFormat::new(index.ok_or_else(|| missing_attribute("chart pivot-format index"))?);
+    format.marker = marker;
+    format.data_label = data_label;
+    Ok(format)
 }
 
 struct ParsedTitle {
@@ -3845,6 +3967,63 @@ fn get_attr(e: &BytesStart, name: &[u8]) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn round_trips_and_validates_pivot_chart_formats() {
+        let xml =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:pivotFmts>
+                <c:pivotFmt><c:idx val="2"/><c:spPr/><c:marker>
+                    <c:symbol val="diamond"/><c:size val="8"/>
+                </c:marker><c:dLbl><c:idx val="2"/><c:showVal val="1"/></c:dLbl></c:pivotFmt>
+                <c:pivotFmt><c:idx val="7"/><c:marker/></c:pivotFmt>
+            </c:pivotFmts><c:plotArea/></c:chart></c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let formats = chart.pivot_formats.as_ref().unwrap();
+        assert_eq!(formats.len(), 2);
+        assert_eq!(formats[0].index, 2);
+        let marker = formats[0].marker.as_ref().unwrap();
+        assert_eq!(marker.symbol, Some(MarkerStyle::Diamond));
+        assert_eq!(marker.size, Some(8));
+        assert!(formats[0].data_label.as_ref().unwrap().show_value);
+        assert!(formats[1].marker.is_some());
+
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        let reparsed = parse_chart(output.as_slice()).unwrap();
+        assert_eq!(reparsed.pivot_formats.as_ref().unwrap().len(), 2);
+
+        let empty =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:pivotFmts/><c:plotArea/></c:chart></c:chartSpace>"#;
+        assert!(
+            parse_chart(empty.as_slice())
+                .unwrap()
+                .pivot_formats
+                .unwrap()
+                .is_empty()
+        );
+
+        let duplicate =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:pivotFmts><c:pivotFmt><c:idx val="1"/></c:pivotFmt>
+                <c:pivotFmt><c:idx val="1"/></c:pivotFmt></c:pivotFmts>
+                <c:plotArea/></c:chart></c:chartSpace>"#;
+        assert!(parse_chart(duplicate.as_slice()).is_err());
+
+        let mut invalid = Chart::new();
+        invalid.pivot_formats = Some(vec![PivotFormat::new(3), PivotFormat::new(3)]);
+        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &invalid).is_err());
+
+        let mut invalid = Chart::new();
+        let mut format = PivotFormat::new(3);
+        format.marker = Some(Marker {
+            symbol: None,
+            size: Some(73),
+        });
+        invalid.pivot_formats = Some(vec![format]);
+        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &invalid).is_err());
+    }
 
     #[test]
     fn parses_prefixed_chart_content() {

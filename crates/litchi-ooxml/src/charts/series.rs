@@ -6,6 +6,31 @@
 use crate::charts::models::{Layout, NumberFormat, NumericData, StringData, TitleText};
 use crate::charts::types::{DataLabelPosition, MarkerStyle};
 
+/// Marker formatting shared by chart elements that support point symbols.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Marker {
+    /// Marker symbol
+    pub symbol: Option<MarkerStyle>,
+    /// Marker size in points (2-72)
+    pub size: Option<u32>,
+}
+
+impl Marker {
+    /// Create an empty marker override.
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set marker symbol and size.
+    #[inline]
+    pub fn with_symbol_and_size(mut self, symbol: MarkerStyle, size: u32) -> Self {
+        self.symbol = Some(symbol);
+        self.size = Some(size);
+        self
+    }
+}
+
 /// A single data point with optional formatting.
 #[derive(Debug, Clone)]
 pub struct DataPoint {
