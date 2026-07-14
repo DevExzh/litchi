@@ -241,8 +241,8 @@ pub const SPRM_C_IBST_RMARK_DEL: u16 = 0x4863;
 /// sprmCDttmRMarkDel - Revision mark deletion date/time (operation 0x64)
 pub const SPRM_C_DTTM_RMARK_DEL: u16 = 0x6864;
 
-/// sprmCBrc - Border (operation 0x65)
-pub const SPRM_C_BRC: u16 = 0x6865;
+/// sprmCBrc80 - Palette-based border (operation 0x65)
+pub const SPRM_C_BRC80: u16 = 0x6865;
 
 /// sprmCShd80 - Shading (Word 97-2000) (operation 0x66)
 pub const SPRM_C_SHD80: u16 = 0x4866;
@@ -271,8 +271,8 @@ pub const SPRM_C_CV: u16 = 0x6870;
 /// sprmCShd - Shading (Word 2002+) (operation 0x71)
 pub const SPRM_C_SHD: u16 = 0xCA71;
 
-/// sprmCBrc80 - Border (Word 97-2000) (operation 0x72)
-pub const SPRM_C_BRC80: u16 = 0xCA72;
+/// sprmCBrc - RGB border (operation 0x72)
+pub const SPRM_C_BRC: u16 = 0xCA72;
 
 /// sprmCRgLid0_80 - Language ID v80 (operation 0x73)
 pub const SPRM_C_RG_LID0_80: u16 = 0x4873;
@@ -282,6 +282,12 @@ pub const SPRM_C_RG_LID1_80: u16 = 0x4874;
 
 /// sprmCFNoProof - No proofing (operation 0x75)
 pub const SPRM_C_F_NO_PROOF: u16 = 0x0875;
+
+/// sprmCCvUl - Underline color (operation 0x77)
+pub const SPRM_C_CV_UL: u16 = 0x6877;
+
+/// sprmCFComplexScripts - Force complex-script formatting (operation 0x82)
+pub const SPRM_C_F_COMPLEX_SCRIPTS: u16 = 0x0882;
 
 // PAP (Paragraph Properties) SPRM opcodes
 // Based on Apache POI's ParagraphProperties and ParagraphSprmUncompressor

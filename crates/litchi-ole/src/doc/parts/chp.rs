@@ -38,6 +38,12 @@ pub struct CharacterProperties {
     pub font_index_other: Option<u16>,
     /// Text color (RGB)
     pub color: Option<(u8, u8, u8)>,
+    /// Color of the text underline.
+    pub underline_color: Option<CharacterColor>,
+    /// Border drawn on all four sides of this character run.
+    pub border: Option<CharacterBorder>,
+    /// Background shading for this character run.
+    pub shading: Option<CharacterShading>,
     /// Highlight color
     pub highlight: Option<HighlightColor>,
     /// Superscript/subscript
@@ -96,6 +102,8 @@ pub struct CharacterProperties {
     pub script_hint: Option<CharacterScriptHint>,
     /// Whether spelling and grammar proofing excludes this run.
     pub is_no_proof: Option<bool>,
+    /// Whether complex-script formatting is forced for this run.
+    pub is_complex_scripts: Option<bool>,
     /// Style index (istd)
     pub style_index: Option<u16>,
     /// Vanish (hidden)
@@ -161,6 +169,266 @@ pub enum CharacterScriptHint {
     ComplexScript,
     /// A reserved value retained for forward compatibility.
     Reserved(u8),
+}
+
+/// A color stored in a legacy Word character property.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CharacterColor {
+    /// The application chooses a context-appropriate color.
+    Automatic,
+    /// An explicit red, green, and blue color.
+    Rgb(u8, u8, u8),
+    /// An invalid or future palette index retained without interpretation.
+    ReservedPaletteIndex(u8),
+}
+
+impl CharacterColor {
+    fn from_colorref(data: &[u8]) -> Option<Self> {
+        let [red, green, blue, automatic, ..] = data else {
+            return None;
+        };
+        if *automatic == 0xFF {
+            Some(Self::Automatic)
+        } else {
+            Some(Self::Rgb(*red, *green, *blue))
+        }
+    }
+
+    fn from_palette_index(index: u8) -> Self {
+        match index {
+            0 => Self::Automatic,
+            1 => Self::Rgb(0, 0, 0),
+            2 => Self::Rgb(0, 0, 255),
+            3 => Self::Rgb(0, 255, 255),
+            4 => Self::Rgb(0, 255, 0),
+            5 => Self::Rgb(255, 0, 255),
+            6 => Self::Rgb(255, 0, 0),
+            7 => Self::Rgb(255, 255, 0),
+            8 => Self::Rgb(255, 255, 255),
+            9 => Self::Rgb(0, 0, 128),
+            10 => Self::Rgb(0, 128, 128),
+            11 => Self::Rgb(0, 128, 0),
+            12 => Self::Rgb(128, 0, 128),
+            13 => Self::Rgb(128, 0, 0),
+            14 => Self::Rgb(128, 128, 0),
+            15 => Self::Rgb(128, 128, 128),
+            16 => Self::Rgb(192, 192, 192),
+            value => Self::ReservedPaletteIndex(value),
+        }
+    }
+}
+
+/// Border formatting applied around a character run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CharacterBorder {
+    /// Border color, including the context-dependent automatic color.
+    pub color: CharacterColor,
+    /// Border width in eighths of a point for ordinary character borders.
+    pub width: u8,
+    /// Border line style.
+    pub style: CharacterBorderStyle,
+    /// Distance between the border and text, in points.
+    pub spacing: u8,
+    /// Whether Word adds a shadow to the border.
+    pub has_shadow: bool,
+    /// Whether Word reverses the border to create a frame effect.
+    pub has_frame: bool,
+}
+
+/// Line styles supported by MS-DOC character borders.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CharacterBorderStyle {
+    Single,
+    Double,
+    Thin,
+    Dotted,
+    Dashed,
+    DotDash,
+    DotDotDash,
+    Triple,
+    ThinThickSmallGap,
+    ThickThinSmallGap,
+    ThinThickThinSmallGap,
+    ThinThickMediumGap,
+    ThickThinMediumGap,
+    ThinThickThinMediumGap,
+    ThinThickLargeGap,
+    ThickThinLargeGap,
+    ThinThickThinLargeGap,
+    Wave,
+    DoubleWave,
+    DashSmallGap,
+    DashDotStroked,
+    ThreeDEmboss,
+    ThreeDEngrave,
+    Outset,
+    Inset,
+    /// An invalid or future style retained without coercion.
+    Reserved(u8),
+}
+
+impl From<u8> for CharacterBorderStyle {
+    fn from(value: u8) -> Self {
+        match value {
+            0x01 => Self::Single,
+            0x03 => Self::Double,
+            0x05 => Self::Thin,
+            0x06 => Self::Dotted,
+            0x07 => Self::Dashed,
+            0x08 => Self::DotDash,
+            0x09 => Self::DotDotDash,
+            0x0A => Self::Triple,
+            0x0B => Self::ThinThickSmallGap,
+            0x0C => Self::ThickThinSmallGap,
+            0x0D => Self::ThinThickThinSmallGap,
+            0x0E => Self::ThinThickMediumGap,
+            0x0F => Self::ThickThinMediumGap,
+            0x10 => Self::ThinThickThinMediumGap,
+            0x11 => Self::ThinThickLargeGap,
+            0x12 => Self::ThickThinLargeGap,
+            0x13 => Self::ThinThickThinLargeGap,
+            0x14 => Self::Wave,
+            0x15 => Self::DoubleWave,
+            0x16 => Self::DashSmallGap,
+            0x17 => Self::DashDotStroked,
+            0x18 => Self::ThreeDEmboss,
+            0x19 => Self::ThreeDEngrave,
+            0x1A => Self::Outset,
+            0x1B => Self::Inset,
+            value => Self::Reserved(value),
+        }
+    }
+}
+
+/// Shading applied behind a character run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CharacterShading {
+    pub foreground_color: CharacterColor,
+    pub background_color: CharacterColor,
+    pub pattern: CharacterShadingPattern,
+}
+
+/// Shading patterns defined by the MS-DOC `Ipat` enumeration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CharacterShadingPattern {
+    Clear,
+    Solid,
+    Percent5,
+    Percent10,
+    Percent20,
+    Percent25,
+    Percent30,
+    Percent40,
+    Percent50,
+    Percent60,
+    Percent70,
+    Percent75,
+    Percent80,
+    Percent90,
+    DarkHorizontal,
+    DarkVertical,
+    DarkForwardDiagonal,
+    DarkBackwardDiagonal,
+    DarkCross,
+    DarkDiagonalCross,
+    Horizontal,
+    Vertical,
+    ForwardDiagonal,
+    BackwardDiagonal,
+    Cross,
+    DiagonalCross,
+    Percent2_5,
+    Percent7_5,
+    Percent12_5,
+    Percent15,
+    Percent17_5,
+    Percent22_5,
+    Percent27_5,
+    Percent32_5,
+    Percent35,
+    Percent37_5,
+    Percent42_5,
+    Percent45,
+    Percent47_5,
+    Percent52_5,
+    Percent55,
+    Percent57_5,
+    Percent62_5,
+    Percent65,
+    Percent67_5,
+    Percent72_5,
+    Percent77_5,
+    Percent82_5,
+    Percent85,
+    Percent87_5,
+    Percent92_5,
+    Percent95,
+    Percent97_5,
+    Nil,
+    /// An invalid or future pattern retained without coercion.
+    Reserved(u16),
+}
+
+impl From<u16> for CharacterShadingPattern {
+    fn from(value: u16) -> Self {
+        match value {
+            0x0000 => Self::Clear,
+            0x0001 => Self::Solid,
+            0x0002 => Self::Percent5,
+            0x0003 => Self::Percent10,
+            0x0004 => Self::Percent20,
+            0x0005 => Self::Percent25,
+            0x0006 => Self::Percent30,
+            0x0007 => Self::Percent40,
+            0x0008 => Self::Percent50,
+            0x0009 => Self::Percent60,
+            0x000A => Self::Percent70,
+            0x000B => Self::Percent75,
+            0x000C => Self::Percent80,
+            0x000D => Self::Percent90,
+            0x000E => Self::DarkHorizontal,
+            0x000F => Self::DarkVertical,
+            0x0010 => Self::DarkForwardDiagonal,
+            0x0011 => Self::DarkBackwardDiagonal,
+            0x0012 => Self::DarkCross,
+            0x0013 => Self::DarkDiagonalCross,
+            0x0014 => Self::Horizontal,
+            0x0015 => Self::Vertical,
+            0x0016 => Self::ForwardDiagonal,
+            0x0017 => Self::BackwardDiagonal,
+            0x0018 => Self::Cross,
+            0x0019 => Self::DiagonalCross,
+            0x0023 => Self::Percent2_5,
+            0x0024 => Self::Percent7_5,
+            0x0025 => Self::Percent12_5,
+            0x0026 => Self::Percent15,
+            0x0027 => Self::Percent17_5,
+            0x0028 => Self::Percent22_5,
+            0x0029 => Self::Percent27_5,
+            0x002A => Self::Percent32_5,
+            0x002B => Self::Percent35,
+            0x002C => Self::Percent37_5,
+            0x002D => Self::Percent42_5,
+            0x002E => Self::Percent45,
+            0x002F => Self::Percent47_5,
+            0x0030 => Self::Percent52_5,
+            0x0031 => Self::Percent55,
+            0x0032 => Self::Percent57_5,
+            0x0033 => Self::Percent62_5,
+            0x0034 => Self::Percent65,
+            0x0035 => Self::Percent67_5,
+            0x0036 => Self::Percent72_5,
+            0x0037 => Self::Percent77_5,
+            0x0038 => Self::Percent82_5,
+            0x0039 => Self::Percent85,
+            0x003A => Self::Percent87_5,
+            0x003B => Self::Percent92_5,
+            0x003C => Self::Percent95,
+            0x003D => Self::Percent97_5,
+            0xFFFF => Self::Nil,
+            value => Self::Reserved(value),
+        }
+    }
 }
 
 impl From<u8> for CharacterScriptHint {
@@ -653,6 +921,10 @@ impl CharacterProperties {
             0x60 => chp.color_index_bidi = sprm.operand_word(),
             // Operation 0x61: sprmCHpsBi - Complex-script size.
             0x61 => chp.font_size_bidi = sprm.operand_word(),
+            // Operation 0x65: sprmCBrc80 - palette-based character border.
+            0x65 => chp.border = Self::parse_border(sprm.operand_bytes(), true),
+            // Operation 0x66: sprmCShd80 - palette-based character shading.
+            0x66 => chp.shading = Self::parse_shading80(sprm.operand_bytes()),
             // Operations 0x6D and 0x73: legacy and current default language.
             0x6D | 0x73 => chp.language_id = sprm.operand_word(),
             // Operations 0x6E and 0x74: legacy and current Far East language.
@@ -669,14 +941,27 @@ impl CharacterProperties {
                     chp.color = Some((r, g, b));
                 }
             },
+            // Operation 0x71: sprmCShd - RGB character shading.
+            0x71 => chp.shading = Self::parse_shading(sprm.operand_bytes()),
+            // Operation 0x72: sprmCBrc - RGB character border.
+            0x72 => chp.border = Self::parse_border(sprm.operand_bytes(), false),
             // Operation 0x75: sprmCFNoProof - Exclude from proofing.
             0x75 => {
                 if let Some(value) = sprm.operand_byte() {
                     chp.is_no_proof = Some(Self::get_toggle_value(value, chp.is_no_proof));
                 }
             },
+            // Operation 0x77: sprmCCvUl - Underline COLORREF.
+            0x77 => chp.underline_color = CharacterColor::from_colorref(sprm.operand_bytes()),
+            // Operation 0x82: sprmCFComplexScripts - Force complex-script formatting.
+            0x82 => {
+                if let Some(value) = sprm.operand_byte() {
+                    chp.is_complex_scripts =
+                        Some(Self::get_toggle_value(value, chp.is_complex_scripts));
+                }
+            },
             // Remaining border, shading, and revision SPRMs.
-            0x5B | 0x62..=0x6C | 0x71 | 0x72 => {
+            0x5B | 0x62..=0x64 | 0x67..=0x6C => {
                 // Retained for future structured border/revision metadata.
             },
             // Default: Unknown or unsupported SPRM
@@ -684,6 +969,95 @@ impl CharacterProperties {
                 // Silently ignore unknown SPRMs
             },
         }
+    }
+
+    fn parse_border(data: &[u8], palette_color: bool) -> Option<CharacterBorder> {
+        let (color, width, style, flags) = if palette_color {
+            let [width, style, color, flags, ..] = data else {
+                return None;
+            };
+            (
+                CharacterColor::from_palette_index(*color),
+                *width,
+                *style,
+                u16::from(*flags),
+            )
+        } else {
+            let [color @ .., width, style, flags_low, flags_high] = data else {
+                return None;
+            };
+            if color.len() != 4 {
+                return None;
+            }
+            (
+                CharacterColor::from_colorref(color)?,
+                *width,
+                *style,
+                u16::from_le_bytes([*flags_low, *flags_high]),
+            )
+        };
+
+        if style == 0 || style == 0xFF {
+            return None;
+        }
+
+        Some(CharacterBorder {
+            color,
+            width,
+            style: CharacterBorderStyle::from(style),
+            spacing: (flags & 0x1F) as u8,
+            has_shadow: flags & 0x20 != 0,
+            has_frame: flags & 0x40 != 0,
+        })
+    }
+
+    fn parse_shading(data: &[u8]) -> Option<CharacterShading> {
+        let [colors @ .., pattern_low, pattern_high] = data else {
+            return None;
+        };
+        if colors.len() != 8 {
+            return None;
+        }
+
+        let foreground_color = CharacterColor::from_colorref(&colors[..4])?;
+        let background_color = CharacterColor::from_colorref(&colors[4..])?;
+        let pattern =
+            CharacterShadingPattern::from(u16::from_le_bytes([*pattern_low, *pattern_high]));
+        if matches!(pattern, CharacterShadingPattern::Nil)
+            || (matches!(pattern, CharacterShadingPattern::Clear)
+                && foreground_color == CharacterColor::Automatic
+                && background_color == CharacterColor::Automatic)
+        {
+            return None;
+        }
+
+        Some(CharacterShading {
+            foreground_color,
+            background_color,
+            pattern,
+        })
+    }
+
+    fn parse_shading80(data: &[u8]) -> Option<CharacterShading> {
+        let [low, high] = data else {
+            return None;
+        };
+        let value = u16::from_le_bytes([*low, *high]);
+        let foreground_index = (value & 0x1F) as u8;
+        let background_index = ((value >> 5) & 0x1F) as u8;
+        let pattern_value = (value >> 10) & 0x3F;
+
+        if (foreground_index == 0x1F && background_index == 0x1F && pattern_value == 0x3F)
+            || (foreground_index == 0 && background_index == 0 && pattern_value == 0)
+        {
+            return None;
+        }
+
+        Some(CharacterShading {
+            foreground_color: CharacterColor::from_palette_index(foreground_index),
+            background_color: CharacterColor::from_palette_index(background_index),
+            pattern: CharacterShadingPattern::from(pattern_value),
+        })
     }
 
     /// Get toggle value from SPRM operand.
@@ -720,6 +1094,9 @@ impl CharacterProperties {
             || self.is_strikethrough.is_some()
             || self.font_size.is_some()
             || self.color.is_some()
+            || self.underline_color.is_some()
+            || self.border.is_some()
+            || self.shading.is_some()
             || self.highlight.is_some()
             || self.vertical_position != VerticalPosition::Normal
             || self.is_bidi.is_some()
@@ -732,6 +1109,7 @@ impl CharacterProperties {
             || self.language_id_fe.is_some()
             || self.script_hint.is_some()
             || self.is_no_proof.is_some()
+            || self.is_complex_scripts.is_some()
     }
 }
 
@@ -832,6 +1210,101 @@ mod tests {
         assert_eq!(
             properties.script_hint,
             Some(CharacterScriptHint::Reserved(0xFF))
+        );
+    }
+
+    #[test]
+    fn parses_palette_character_border_and_shading() {
+        let properties = CharacterProperties::from_sprm(&[
+            0x65, 0x68, // sprmCBrc80
+            0x10, 0x14, 0x06, 0x65, // 2pt wave, red, 5pt, shadow and frame
+            0x66, 0x48, // sprmCShd80
+            0xE6, 0x04, // solid red foreground on yellow
+        ])
+        .unwrap();
+
+        assert_eq!(
+            properties.border,
+            Some(CharacterBorder {
+                color: CharacterColor::Rgb(255, 0, 0),
+                width: 0x10,
+                style: CharacterBorderStyle::Wave,
+                spacing: 5,
+                has_shadow: true,
+                has_frame: true,
+            })
+        );
+        assert_eq!(
+            properties.shading,
+            Some(CharacterShading {
+                foreground_color: CharacterColor::Rgb(255, 0, 0),
+                background_color: CharacterColor::Rgb(255, 255, 0),
+                pattern: CharacterShadingPattern::Solid,
+            })
+        );
+    }
+
+    #[test]
+    fn parses_rgb_character_border_shading_and_underline() {
+        let properties = CharacterProperties::from_sprm(&[
+            0x71, 0xCA, // sprmCShd
+            0x0A, // SHDOperand byte count
+            0x12, 0x34, 0x56, 0x00, // foreground COLORREF
+            0x00, 0x00, 0x00, 0xFF, // automatic background COLORREF
+            0x25, 0x00, // 12.5 percent pattern
+            0x72, 0xCA, // sprmCBrc
+            0x08, // BrcOperand byte count
+            0xAA, 0xBB, 0xCC, 0x00, // border COLORREF
+            0x10, 0x18, 0x43, 0x00, // width, emboss, 3pt, frame
+            0x77, 0x68, // sprmCCvUl
+            0x01, 0x02, 0x03, 0x00, // underline COLORREF
+            0x82, 0x08, 0x01, // sprmCFComplexScripts
+        ])
+        .unwrap();
+
+        assert_eq!(
+            properties.shading,
+            Some(CharacterShading {
+                foreground_color: CharacterColor::Rgb(0x12, 0x34, 0x56),
+                background_color: CharacterColor::Automatic,
+                pattern: CharacterShadingPattern::Percent12_5,
+            })
+        );
+        assert_eq!(
+            properties.border,
+            Some(CharacterBorder {
+                color: CharacterColor::Rgb(0xAA, 0xBB, 0xCC),
+                width: 0x10,
+                style: CharacterBorderStyle::ThreeDEmboss,
+                spacing: 3,
+                has_shadow: false,
+                has_frame: true,
+            })
+        );
+        assert_eq!(
+            properties.underline_color,
+            Some(CharacterColor::Rgb(1, 2, 3))
+        );
+        assert_eq!(properties.is_complex_scripts, Some(true));
+        assert!(properties.has_formatting());
+    }
+
+    #[test]
+    fn preserves_reserved_character_format_values() {
+        let properties = CharacterProperties::from_sprm(&[
+            0x65, 0x68, // sprmCBrc80
+            0x02, 0x02, 0x11, 0x00, // reserved style and palette index
+            0x71, 0xCA, // sprmCShd
+            0x0A, 0x01, 0x02, 0x03, 0x00, 0x04, 0x05, 0x06, 0x00, 0x1A, 0x00,
+        ])
+        .unwrap();
+
+        let border = properties.border.unwrap();
+        assert_eq!(border.style, CharacterBorderStyle::Reserved(0x02));
+        assert_eq!(border.color, CharacterColor::ReservedPaletteIndex(0x11));
+        assert_eq!(
+            properties.shading.unwrap().pattern,
+            CharacterShadingPattern::Reserved(0x001A)
         );
     }
 }
