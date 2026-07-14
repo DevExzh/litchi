@@ -2623,6 +2623,15 @@ mod tests {
             )
             .unwrap(),
         );
+        chart.chart.plot_area.data_table = Some(crate::charts::DataTable {
+            shape_properties: Some(
+                ChartShapeProperties::from_xml(
+                    br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId408"/></a:blipFill></c:spPr>"#.to_vec(),
+                )
+                .unwrap(),
+            ),
+            ..crate::charts::DataTable::default()
+        });
         let fragment_ids = crate::xlsx::chart::chart_fragment_relationship_ids(&chart.chart)
             .expect("relationship-bearing fragments should be valid XML");
         assert_eq!(
@@ -2633,6 +2642,7 @@ mod tests {
                 "rId405".to_string(),
                 "rId406".to_string(),
                 "rId407".to_string(),
+                "rId408".to_string(),
             ]
             .into()
         );

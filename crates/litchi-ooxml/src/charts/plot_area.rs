@@ -4,7 +4,7 @@
 //! and chart type groups.
 
 use crate::charts::axis::Axis;
-use crate::charts::chart::{ChartExtensionList, ChartShapeProperties};
+use crate::charts::chart::{ChartExtensionList, ChartShapeProperties, ChartTextProperties};
 use crate::charts::models::Layout;
 use crate::charts::series::{DataLabels, Series};
 use crate::charts::types::{
@@ -68,6 +68,12 @@ pub struct DataTable {
     pub show_outline: bool,
     /// Show legend keys beside series rows
     pub show_legend_keys: bool,
+    /// DrawingML shape properties
+    pub shape_properties: Option<ChartShapeProperties>,
+    /// DrawingML text properties
+    pub text_properties: Option<ChartTextProperties>,
+    /// Data-table extension list
+    pub extension_list: Option<ChartExtensionList>,
 }
 
 impl Default for PlotArea {

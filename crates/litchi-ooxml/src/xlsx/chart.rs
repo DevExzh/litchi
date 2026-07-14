@@ -842,6 +842,24 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                 .as_ref()
                 .map(crate::charts::ChartExtensionList::as_xml),
             chart
+                .plot_area
+                .data_table
+                .as_ref()
+                .and_then(|table| table.shape_properties.as_ref())
+                .map(crate::charts::ChartShapeProperties::as_xml),
+            chart
+                .plot_area
+                .data_table
+                .as_ref()
+                .and_then(|table| table.text_properties.as_ref())
+                .map(crate::charts::ChartTextProperties::as_xml),
+            chart
+                .plot_area
+                .data_table
+                .as_ref()
+                .and_then(|table| table.extension_list.as_ref())
+                .map(crate::charts::ChartExtensionList::as_xml),
+            chart
                 .floor
                 .as_ref()
                 .and_then(|surface| surface.shape_properties.as_ref())

@@ -676,6 +676,15 @@ fn write_data_table<W: Write>(writer: &mut W, data_table: &DataTable) -> std::io
             write!(writer, r#"<c:{name} val="1"/>"#)?;
         }
     }
+    if let Some(shape_properties) = data_table.shape_properties.as_ref() {
+        writer.write_all(shape_properties.as_xml())?;
+    }
+    if let Some(text_properties) = data_table.text_properties.as_ref() {
+        writer.write_all(text_properties.as_xml())?;
+    }
+    if let Some(extension_list) = data_table.extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
+    }
     write!(writer, "</c:dTable>")?;
     Ok(())
 }

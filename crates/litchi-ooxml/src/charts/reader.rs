@@ -1983,6 +1983,66 @@ fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataTa
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if data_table.shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data table contains duplicate shape properties".into(),
+                    ));
+                }
+                data_table.shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_fragment(element, "chart data-table shape properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if data_table.shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data table contains duplicate shape properties".into(),
+                    ));
+                }
+                data_table.shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"txPr" => {
+                if data_table.text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data table contains duplicate text properties".into(),
+                    ));
+                }
+                data_table.text_properties = Some(ChartTextProperties::from_xml(
+                    reader.capture_fragment(element, "chart data-table text properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"txPr" => {
+                if data_table.text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data table contains duplicate text properties".into(),
+                    ));
+                }
+                data_table.text_properties = Some(ChartTextProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if data_table.extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data table contains duplicate extension lists".into(),
+                    ));
+                }
+                data_table.extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_fragment(element, "chart data-table extension list")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if data_table.extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data table contains duplicate extension lists".into(),
+                    ));
+                }
+                data_table.extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
                 let field = match element.local_name().as_ref() {
                     b"showHorzBorder" => Some((0, &mut data_table.show_horizontal_border)),
@@ -6179,10 +6239,15 @@ mod tests {
     #[test]
     fn parses_and_validates_chart_data_tables() {
         let xml =
-            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+                xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                xmlns:x="urn:example:data-table">
             <c:chart><c:plotArea><c:lineChart></c:lineChart>
                 <c:dTable><c:showHorzBorder/><c:showVertBorder val="0"/>
                     <c:showOutline val="true"/><c:showKeys val="false"/>
+                    <c:spPr><a:solidFill><a:srgbClr val="F0E0D0"/></a:solidFill></c:spPr>
+                    <c:txPr><a:bodyPr/><a:lstStyle/><a:p/></c:txPr>
+                    <c:extLst><c:ext uri="table"><x:payload/></c:ext></c:extLst>
                 </c:dTable>
             </c:plotArea></c:chart>
         </c:chartSpace>"#;
@@ -6192,6 +6257,25 @@ mod tests {
         assert!(!table.show_vertical_border);
         assert!(table.show_outline);
         assert!(!table.show_legend_keys);
+        assert!(
+            std::str::from_utf8(table.shape_properties.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("F0E0D0")
+        );
+        assert!(table.text_properties.is_some());
+        assert!(
+            std::str::from_utf8(table.extension_list.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("urn:example:data-table")
+        );
+
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        let reparsed = parse_chart(output.as_slice()).unwrap();
+        let reparsed = reparsed.plot_area.data_table.unwrap();
+        assert_eq!(reparsed.shape_properties, table.shape_properties);
+        assert_eq!(reparsed.text_properties, table.text_properties);
+        assert_eq!(reparsed.extension_list, table.extension_list);
 
         let duplicate =
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
@@ -6721,6 +6805,7 @@ mod tests {
             show_vertical_border: false,
             show_outline: true,
             show_legend_keys: true,
+            ..DataTable::default()
         });
         chart.plot_area.type_groups = vec![
             TypeGroup::Area(AreaTypeGroup::new(BarGrouping::Standard)),
