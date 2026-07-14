@@ -8,6 +8,8 @@ use quick_xml::reader::NsReader;
 
 const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
+const OMML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/officeDocument/2006/math";
+const STRICT_OMML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/math";
 
 fn is_drawingml_name(
     namespace: &ResolveResult<'_>,
@@ -265,6 +267,100 @@ fn emit_drawingml_range(
     )
 }
 
+fn is_omml_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: &[u8]) -> bool {
+    if name.local_name().as_ref() != local_name {
+        return false;
+    }
+    match namespace {
+        ResolveResult::Bound(Namespace(value)) => {
+            *value == OMML_NAMESPACE || *value == STRICT_OMML_NAMESPACE
+        },
+        // TextFrame and Paragraph are often slices whose namespace declarations live on
+        // an ancestor. The conventional OMML prefix is safe to accept when it is unresolved;
+        // an explicitly foreign binding is still rejected by the Bound branch above.
+        ResolveResult::Unknown(prefix) => prefix.as_slice() == b"m",
+        ResolveResult::Unbound => false,
+    }
+}
+
+fn scan_omml_formula_ranges(
+    xml_bytes: &[u8],
+    mut emit: impl FnMut(usize, usize) -> Result<()>,
+) -> Result<()> {
+    enum ScanEvent {
+        Start,
+        NestedStart,
+        Empty,
+        End,
+        Eof,
+        Other,
+    }
+
+    let mut reader = NsReader::from_reader(xml_bytes);
+    let mut capture: Option<(usize, usize)> = None;
+
+    loop {
+        let event_start = usize::try_from(reader.buffer_position())
+            .map_err(|_| OoxmlError::InvalidFormat("OMML offset does not fit usize".to_string()))?;
+        let event = {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            match event {
+                Event::Start(_) if capture.is_some() => ScanEvent::NestedStart,
+                Event::Start(element) if is_omml_name(&namespace, element.name(), b"oMath") => {
+                    ScanEvent::Start
+                },
+                Event::Empty(element)
+                    if capture.is_none() && is_omml_name(&namespace, element.name(), b"oMath") =>
+                {
+                    ScanEvent::Empty
+                },
+                Event::End(_) if capture.is_some() => ScanEvent::End,
+                Event::Eof => ScanEvent::Eof,
+                _ => ScanEvent::Other,
+            }
+        };
+        let event_end = usize::try_from(reader.buffer_position())
+            .map_err(|_| OoxmlError::InvalidFormat("OMML offset does not fit usize".to_string()))?;
+
+        match event {
+            ScanEvent::NestedStart => {
+                let Some((_, depth)) = capture.as_mut() else {
+                    unreachable!("capture was checked above");
+                };
+                *depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("OMML nesting is too deep".to_string())
+                })?;
+            },
+            ScanEvent::Start => capture = Some((event_start, 1)),
+            ScanEvent::Empty => emit(event_start, event_end)?,
+            ScanEvent::End => {
+                let Some((_, depth)) = capture.as_mut() else {
+                    unreachable!("capture was checked above");
+                };
+                *depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| OoxmlError::InvalidFormat("invalid OMML nesting".to_string()))?;
+                if *depth == 0 {
+                    let Some((start, _)) = capture.take() else {
+                        unreachable!("capture was checked above");
+                    };
+                    emit(start, event_end)?;
+                }
+            },
+            ScanEvent::Eof if capture.is_some() => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated OMML formula".to_string(),
+                ));
+            },
+            ScanEvent::Eof => break,
+            ScanEvent::Other => {},
+        }
+    }
+    Ok(())
+}
+
 /// A text frame containing text content.
 ///
 /// Text frames are found in shape objects and provide access to the
@@ -323,22 +419,22 @@ impl TextFrame {
 
     /// Extract all OMML formulas from this text frame.
     ///
-    /// Returns a vector of OMML formula strings found in any paragraph within this text frame.
+    /// Returns the exact XML of each OMML `<oMath>` element in document order.
     pub fn omml_formulas(&self) -> Result<Vec<String>> {
         let mut formulas = Vec::new();
-        for para in self.paragraphs()? {
-            // For PPTX, we need to check if the paragraph contains OMML formulas
-            // This is a simplified approach - in a full implementation, we would
-            // need to parse the paragraph XML for OMML content similar to how
-            // we do it for DOCX runs
-            if let Ok(text) = para.text() {
-                // Look for OMML-like patterns in the text (simplified heuristic)
-                if text.contains("oMath") || text.contains("m:oMath") {
-                    // In a full implementation, we would extract the actual OMML XML
-                    formulas.push(text);
-                }
-            }
-        }
+        scan_omml_formula_ranges(&self.xml_bytes, |start, end| {
+            let formula = self.xml_bytes.get(start..end).ok_or_else(|| {
+                OoxmlError::InvalidFormat("invalid OMML formula range".to_string())
+            })?;
+            formulas.push(
+                std::str::from_utf8(formula)
+                    .map_err(|_| {
+                        OoxmlError::InvalidFormat("OMML formula is not UTF-8".to_string())
+                    })?
+                    .to_owned(),
+            );
+            Ok(())
+        })?;
         Ok(formulas)
     }
 }
@@ -402,5 +498,55 @@ mod tests {
                 .to_vec(),
         );
         assert!(truncated.text().is_err());
+    }
+
+    #[test]
+    fn omml_formulas_preserve_exact_namespaced_elements() {
+        let xml = br#"<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+            xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+            xmlns:math="http://schemas.openxmlformats.org/officeDocument/2006/math"
+            xmlns:false="urn:not-omml">
+            <a:txBody><a:p><a:r><a:t>ordinary m:oMath text</a:t></a:r>
+                <m:oMath data-id="1"><m:r><m:t><![CDATA[x < y]]></m:t></m:r></m:oMath>
+                <false:oMath>ignored</false:oMath>
+                <math:oMath math:id="2"/>
+            </a:p></a:txBody>
+        </p:sp>"#;
+        let frame = TextFrame::from_xml(xml).unwrap();
+        assert_eq!(
+            frame.omml_formulas().unwrap(),
+            vec![
+                r#"<m:oMath data-id="1"><m:r><m:t><![CDATA[x < y]]></m:t></m:r></m:oMath>"#,
+                r#"<math:oMath math:id="2"/>"#,
+            ]
+        );
+    }
+
+    #[test]
+    fn omml_formulas_accept_strict_and_inherited_conventional_prefixes() {
+        let strict = br#"<root xmlns:s="http://purl.oclc.org/ooxml/officeDocument/math"><s:oMath><s:r/></s:oMath></root>"#;
+        assert_eq!(
+            TextFrame::from_xml(strict)
+                .unwrap()
+                .omml_formulas()
+                .unwrap(),
+            vec!["<s:oMath><s:r/></s:oMath>"]
+        );
+
+        let inherited = TextFrame::from_xml(br#"<a:p><m:oMath><m:r/></m:oMath></a:p>"#).unwrap();
+        assert_eq!(
+            inherited.omml_formulas().unwrap(),
+            vec!["<m:oMath><m:r/></m:oMath>"]
+        );
+    }
+
+    #[test]
+    fn omml_formulas_reject_malformed_xml() {
+        let frame = TextFrame::from_xml(
+            br#"<a:p xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:r/></a:p>"#,
+        )
+        .unwrap();
+        assert!(frame.omml_formulas().is_err());
     }
 }
