@@ -5,6 +5,13 @@ use crate::protobuf::tsp::{ComponentInfo, ObjectUuidMapEntry, PackageMetadata, R
 use crate::protobuf::tswp::StorageArchive;
 use crate::shapes::{DrawablePoint, DrawableSize};
 
+const TEST_SLIDE_MESSAGE_TYPE: u32 = 5;
+const TEST_PLACEHOLDER_MESSAGE_TYPE: u32 = 7;
+const TEST_SLIDE_NUMBER_PLACEHOLDER_FIELD: u32 = 20;
+const TEST_SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
+const TEST_SLIDE_DRAWABLES_Z_ORDER_FIELD: u32 = 42;
+const TEST_SLIDE_NUMBER_PLACEHOLDER_ID: u64 = 70;
+
 #[test]
 fn edits_title_and_body_by_slide_index() {
     let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
@@ -2250,6 +2257,132 @@ fn show_settings_and_skip_state_are_transactional() {
 }
 
 #[test]
+fn slide_number_visibility_matches_native_ownership_and_round_trips_exactly() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_slide_number()).unwrap();
+    assert_eq!(
+        editor.slides().unwrap()[0].is_slide_number_visible,
+        Some(false)
+    );
+    let document_before = editor
+        .package()
+        .archive("Index/Document.iwa")
+        .unwrap()
+        .to_bytes()
+        .unwrap();
+    let slide_before = editor
+        .package()
+        .archive("Index/Slide-4.iwa")
+        .unwrap()
+        .to_bytes()
+        .unwrap();
+    let raw_placeholder_before = {
+        let archive = editor.package().archive("Index/Slide-4.iwa").unwrap();
+        let slide = &archive.object(4).unwrap().messages[0].data;
+        repeated_length_delimited_payloads(slide, TEST_SLIDE_NUMBER_PLACEHOLDER_FIELD).unwrap()[0]
+            .to_vec()
+    };
+
+    editor.set_slide_number_visible(0, true).unwrap();
+    assert_eq!(
+        editor.slides().unwrap()[0].is_slide_number_visible,
+        Some(true)
+    );
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let slide: kn::SlideArchive = graph
+        .decode_type(4, TEST_SLIDE_MESSAGE_TYPE, "KN.SlideArchive")
+        .unwrap();
+    assert_eq!(
+        slide
+            .owned_drawables
+            .iter()
+            .filter(|reference| reference.identifier == TEST_SLIDE_NUMBER_PLACEHOLDER_ID)
+            .count(),
+        1
+    );
+    assert_eq!(
+        slide
+            .drawables_z_order
+            .iter()
+            .filter(|reference| reference.identifier == TEST_SLIDE_NUMBER_PLACEHOLDER_ID)
+            .count(),
+        1
+    );
+    let archive = editor.package().archive("Index/Slide-4.iwa").unwrap();
+    let data = &archive.object(4).unwrap().messages[0].data;
+    assert_eq!(
+        repeated_length_delimited_payloads(data, TEST_SLIDE_OWNED_DRAWABLES_FIELD)
+            .unwrap()
+            .last()
+            .copied(),
+        Some(raw_placeholder_before.as_slice())
+    );
+    assert_eq!(
+        repeated_length_delimited_payloads(data, TEST_SLIDE_DRAWABLES_Z_ORDER_FIELD)
+            .unwrap()
+            .last()
+            .copied(),
+        Some(raw_placeholder_before.as_slice())
+    );
+
+    let visible = editor.to_bytes().unwrap();
+    editor.set_slide_number_visible(0, true).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), visible);
+    editor.set_slide_number_visible(0, false).unwrap();
+    assert_eq!(
+        editor
+            .package()
+            .archive("Index/Document.iwa")
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        document_before
+    );
+    assert_eq!(
+        editor
+            .package()
+            .archive("Index/Slide-4.iwa")
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        slide_before
+    );
+
+    let before_invalid = editor.to_bytes().unwrap();
+    assert!(editor.set_slide_number_visible(1, true).is_err());
+    assert!(editor.set_slide_number_visible(2, true).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before_invalid);
+}
+
+#[test]
+fn slide_number_visibility_rejects_inconsistent_native_state_transactionally() {
+    let mut package = test_package_with_slide_number();
+    package
+        .update_archive("Index/Slide-4.iwa", |archive| {
+            let slide = archive.object_mut(4).unwrap();
+            let message = slide.messages[0].clone();
+            let mut data = message.data;
+            data = append_repeated_length_delimited_field(
+                &data,
+                TEST_SLIDE_OWNED_DRAWABLES_FIELD,
+                &reference(TEST_SLIDE_NUMBER_PLACEHOLDER_ID).encode_to_vec(),
+            )?;
+            slide.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.set_slide_number_visible(0, true).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn transition_custom_parameter_crud_is_lossless_and_transactional() {
     let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
     let mut settings = editor.slides().unwrap()[0].transition.clone().unwrap();
@@ -3565,6 +3698,57 @@ fn test_package_with_theme() -> IWorkPackage {
                 ],
             },
         )
+        .unwrap();
+    package
+}
+
+fn test_package_with_slide_number() -> IWorkPackage {
+    let mut package = test_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let node = archive.object_mut(3).unwrap();
+            let message = node.messages[0].clone();
+            let mut decoded = kn::SlideNodeArchive::decode(message.data.as_slice())?;
+            decoded.is_slide_number_visible = Some(false);
+            node.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    package
+        .update_archive("Index/Slide-4.iwa", |archive| {
+            let slide = archive.object_mut(4).unwrap();
+            let message = slide.messages[0].clone();
+            let mut decoded = kn::SlideArchive::decode(message.data.as_slice())?;
+            decoded.slide_number_placeholder = Some(reference(TEST_SLIDE_NUMBER_PLACEHOLDER_ID));
+            let data = transform_length_delimited_fields_at_path(
+                &decoded.encode_to_vec(),
+                &[TEST_SLIDE_NUMBER_PLACEHOLDER_FIELD],
+                |reference| {
+                    let mut reference = reference.to_vec();
+                    append_unknown_varint(&mut reference, 98, 980);
+                    Ok(reference)
+                },
+            )?;
+            slide.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+            )?;
+            archive.insert_object(object(
+                TEST_SLIDE_NUMBER_PLACEHOLDER_ID,
+                TEST_PLACEHOLDER_MESSAGE_TYPE,
+                kn::PlaceholderArchive::default(),
+            ))?;
+            Ok(())
+        })
         .unwrap();
     package
 }

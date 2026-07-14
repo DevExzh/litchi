@@ -42,6 +42,8 @@ println!("{}", structured.summary());
   body/header/footer/text-box text, and Keynote slides/placeholders/text boxes/speaker notes
 - Typed Keynote theme-layout discovery and fresh empty-slide creation with native
   component registration, speaker notes, slide numbers, and transactional insertion
+- Wire-preserving Keynote per-slide number visibility with native placeholder
+  ownership and z-order invariants
 - Native Keynote build-in/build-out object CRUD with typed On Click / After Transition /
   With Previous / After Previous timing, typed Rotate / Scale / Opacity / Move actions,
   editable Bézier motion paths, typed Blink / Bounce / Flip / Jiggle / Pop / Pulse
@@ -243,6 +245,7 @@ if let Some(text_box) = keynote
 }
 keynote.set_slide_name(0, Some("Opening"))?;
 keynote.set_slide_skipped(0, false)?;
+keynote.set_slide_number_visible(0, true)?;
 let layout = keynote.default_slide_layout()?;
 let fresh = keynote.add_slide(layout)?;
 keynote.set_slide_title(fresh.index, "New from theme")?;

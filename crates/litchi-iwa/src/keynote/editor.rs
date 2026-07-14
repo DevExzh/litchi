@@ -3135,6 +3135,7 @@ impl KeynoteEditor {
 mod builds;
 mod slide_create;
 mod slide_graph;
+mod slide_number;
 
 use builds::*;
 use slide_graph::*;
