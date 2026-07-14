@@ -18,7 +18,7 @@ use super::format::{CellBorder, CellFill, CellFont, CellFormat};
 use super::parsers::worksheet_parser;
 use super::sort::SortState;
 use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
-use super::views::{SheetView, SheetViewType};
+use super::views::SheetView;
 
 /// Information about a worksheet
 #[derive(Debug, Clone)]
@@ -201,8 +201,8 @@ pub struct Worksheet<'a> {
     page_setup: PageSetup,
     /// Auto-filter
     auto_filter: Option<AutoFilter>,
-    /// Sheet view settings
-    sheet_view: Option<SheetView>,
+    /// Sheet view settings for each workbook window.
+    sheet_views: Vec<SheetView>,
     /// Manual row page breaks
     row_breaks: Vec<PageBreak>,
     /// Manual column page breaks
@@ -229,7 +229,7 @@ impl<'a> Worksheet<'a> {
             conditional_formats: Vec::new(),
             page_setup: PageSetup::default(),
             auto_filter: None,
-            sheet_view: None,
+            sheet_views: Vec::new(),
             row_breaks: Vec::new(),
             col_breaks: Vec::new(),
             rich_text_cells: HashMap::new(),
@@ -253,14 +253,6 @@ impl<'a> Worksheet<'a> {
     fn parse_worksheet_xml(&mut self, content: &str, relationships: &Relationships) -> Result<()> {
         let hyperlinks = self.parse_sheet_data(content)?;
         self.resolve_hyperlinks(hyperlinks, relationships)?;
-
-        // Parse sheet views
-        if let Some(views_start) = content.find("<sheetViews")
-            && let Some(views_end) = content[views_start..].find("</sheetViews>")
-        {
-            let views_content = &content[views_start..views_start + views_end + 13];
-            self.parse_sheet_views(views_content)?;
-        }
 
         self.sparkline_groups = parse_sparkline_groups_from_worksheet_xml(content)?;
 
@@ -289,6 +281,7 @@ impl<'a> Worksheet<'a> {
         self.row_breaks = parsed.row_breaks;
         self.col_breaks = parsed.col_breaks;
         self.auto_filter = parsed.auto_filter;
+        self.sheet_views = parsed.sheet_views;
         self.dimensions = parsed.dimensions;
         Ok(parsed.hyperlinks)
     }
@@ -766,51 +759,6 @@ impl<'a> Worksheet<'a> {
         Ok(())
     }
 
-    /// Parse sheet views from XML.
-    fn parse_sheet_views(&mut self, content: &str) -> Result<()> {
-        if let Some(view_start) = content.find("<sheetView ")
-            && let Some(view_end) = content[view_start..].find('>')
-        {
-            let view_tag = &content[view_start..view_start + view_end + 1];
-            self.sheet_view = Some(Self::parse_sheet_view_tag(view_tag));
-        }
-        Ok(())
-    }
-
-    /// Parse the <sheetView> tag into a SheetView struct.
-    fn parse_sheet_view_tag(tag: &str) -> SheetView {
-        let show_formulas = Self::extract_attribute(tag, "showFormulas")
-            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"));
-        let show_grid_lines = Self::extract_attribute(tag, "showGridLines")
-            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"));
-        let show_row_col_headers = Self::extract_attribute(tag, "showRowColHeaders")
-            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"));
-        let show_zeros = Self::extract_attribute(tag, "showZeros")
-            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"));
-        let right_to_left = Self::extract_attribute(tag, "rightToLeft")
-            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"));
-        let view_type = Self::extract_attribute(tag, "view")
-            .as_deref()
-            .and_then(SheetViewType::parse);
-        let top_left_cell = Self::extract_attribute(tag, "topLeftCell");
-        let zoom_scale =
-            Self::extract_attribute(tag, "zoomScale").and_then(|v| v.parse::<u16>().ok());
-        let zoom_scale_normal =
-            Self::extract_attribute(tag, "zoomScaleNormal").and_then(|v| v.parse::<u16>().ok());
-
-        SheetView {
-            show_formulas,
-            show_grid_lines,
-            show_row_col_headers,
-            show_zeros,
-            right_to_left,
-            view_type,
-            top_left_cell,
-            zoom_scale,
-            zoom_scale_normal,
-        }
-    }
-
     /// Helper method to extract attribute value from XML tag.
     fn extract_attribute(tag: &str, attr: &str) -> Option<String> {
         let search_str = format!("{}=\"", attr);
@@ -989,7 +937,12 @@ impl<'a> Worksheet<'a> {
 
     /// Get worksheet view settings, if present.
     pub fn sheet_view(&self) -> Option<&SheetView> {
-        self.sheet_view.as_ref()
+        self.sheet_views.last()
+    }
+
+    /// Get all worksheet views, one for each workbook window.
+    pub fn sheet_views(&self) -> &[SheetView] {
+        &self.sheet_views
     }
 
     /// Find cells containing specific text.

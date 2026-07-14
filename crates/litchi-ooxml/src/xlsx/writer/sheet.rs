@@ -1,6 +1,7 @@
 use crate::drawings::blip::write_a_blip_embed_rid_num;
 use crate::drawings::ext::write_a16_creation_id_extlst;
 use crate::drawings::fill::write_a_stretch_fill_rect;
+use crate::xlsx::cell::Cell;
 use crate::xlsx::sort::{SortCondition, SortState};
 use crate::xlsx::sparkline::{SparklineGroup, write_sparkline_groups_ext};
 use crate::xlsx::table::Table;
@@ -2147,9 +2148,25 @@ impl MutableWorksheet {
         }
 
         // Write sheet views (including freeze panes if set)
-        xml.push_str("<sheetViews><sheetView workbookViewId=\"0\"");
+        xml.push_str("<sheetViews><sheetView");
+        let workbook_view_id = self
+            .sheet_view
+            .as_ref()
+            .and_then(|view| view.workbook_view_id)
+            .unwrap_or(0);
+        write!(xml, r#" workbookViewId="{}""#, workbook_view_id)
+            .map_err(|e| format!("XML write error: {}", e))?;
         if self.is_active() {
             xml.push_str(" tabSelected=\"1\"");
+        } else if let Some(tab_selected) =
+            self.sheet_view.as_ref().and_then(|view| view.tab_selected)
+        {
+            write!(
+                xml,
+                r#" tabSelected="{}""#,
+                if tab_selected { 1 } else { 0 }
+            )
+            .map_err(|e| format!("XML write error: {}", e))?;
         }
         if let Some(ref view) = self.sheet_view {
             self.write_sheet_view_attributes(&mut xml, view)?;
@@ -3245,6 +3262,10 @@ impl MutableWorksheet {
     }
 
     fn write_sheet_view_attributes(&self, xml: &mut String, view: &SheetView) -> SheetResult<()> {
+        if let Some(v) = view.window_protection {
+            write!(xml, r#" windowProtection="{}""#, if v { 1 } else { 0 })
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
         if let Some(v) = view.show_formulas {
             write!(xml, r#" showFormulas="{}""#, if v { 1 } else { 0 })
                 .map_err(|e| format!("XML write error: {}", e))?;
@@ -3265,21 +3286,51 @@ impl MutableWorksheet {
             write!(xml, r#" rightToLeft="{}""#, if v { 1 } else { 0 })
                 .map_err(|e| format!("XML write error: {}", e))?;
         }
+        if let Some(v) = view.show_ruler {
+            write!(xml, r#" showRuler="{}""#, if v { 1 } else { 0 })
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(v) = view.show_outline_symbols {
+            write!(xml, r#" showOutlineSymbols="{}""#, if v { 1 } else { 0 })
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(v) = view.default_grid_color {
+            write!(xml, r#" defaultGridColor="{}""#, if v { 1 } else { 0 })
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(v) = view.show_white_space {
+            write!(xml, r#" showWhiteSpace="{}""#, if v { 1 } else { 0 })
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
         if let Some(view_type) = view.view_type {
             write!(xml, r#" view="{}""#, view_type.as_str())
                 .map_err(|e| format!("XML write error: {}", e))?;
         }
         if let Some(ref cell) = view.top_left_cell {
+            Cell::reference_to_coords(cell)?;
             write!(xml, r#" topLeftCell="{}""#, escape_xml(cell))
                 .map_err(|e| format!("XML write error: {}", e))?;
         }
-        if let Some(scale) = view.zoom_scale {
-            write!(xml, r#" zoomScale="{}""#, scale)
+        if let Some(color_id) = view.color_id {
+            write!(xml, r#" colorId="{}""#, color_id)
                 .map_err(|e| format!("XML write error: {}", e))?;
         }
-        if let Some(scale) = view.zoom_scale_normal {
-            write!(xml, r#" zoomScaleNormal="{}""#, scale)
-                .map_err(|e| format!("XML write error: {}", e))?;
+        for (name, scale) in [
+            ("zoomScale", view.zoom_scale),
+            ("zoomScaleNormal", view.zoom_scale_normal),
+            (
+                "zoomScaleSheetLayoutView",
+                view.zoom_scale_sheet_layout_view,
+            ),
+            ("zoomScalePageLayoutView", view.zoom_scale_page_layout_view),
+        ] {
+            if let Some(scale) = scale {
+                if !(10..=400).contains(&scale) {
+                    return Err(format!("Sheet-view {name} must be between 10 and 400").into());
+                }
+                write!(xml, r#" {name}="{scale}""#)
+                    .map_err(|e| format!("XML write error: {}", e))?;
+            }
         }
         Ok(())
     }
@@ -3499,5 +3550,65 @@ mod tests {
         let filter = xml.find("<autoFilter").unwrap();
         let phonetic = xml.find("<phoneticPr").unwrap();
         assert!(filter < phonetic);
+    }
+
+    #[test]
+    fn sheet_view_attributes_round_trip() {
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+        ws.set_sheet_view(SheetView {
+            workbook_view_id: Some(3),
+            window_protection: Some(true),
+            show_formulas: Some(true),
+            show_grid_lines: Some(false),
+            show_row_col_headers: Some(false),
+            show_zeros: Some(false),
+            right_to_left: Some(true),
+            tab_selected: Some(false),
+            show_ruler: Some(false),
+            show_outline_symbols: Some(false),
+            default_grid_color: Some(false),
+            show_white_space: Some(false),
+            view_type: Some(crate::xlsx::SheetViewType::PageLayout),
+            top_left_cell: Some("C4".to_string()),
+            color_id: Some(12),
+            zoom_scale: Some(120),
+            zoom_scale_normal: Some(100),
+            zoom_scale_sheet_layout_view: Some(60),
+            zoom_scale_page_layout_view: Some(80),
+        });
+
+        let mut shared_strings = MutableSharedStrings::new();
+        let styles = HashMap::new();
+        let xml = ws.to_xml(&mut shared_strings, &styles).unwrap();
+        let parsed = crate::xlsx::parsers::worksheet_parser::parse_worksheet_data(&xml).unwrap();
+        let view = &parsed.sheet_views[0];
+
+        assert_eq!(view.workbook_view_id, Some(3));
+        assert_eq!(view.tab_selected, Some(false));
+        assert_eq!(view.window_protection, Some(true));
+        assert_eq!(view.view_type, Some(crate::xlsx::SheetViewType::PageLayout));
+        assert_eq!(view.top_left_cell.as_deref(), Some("C4"));
+        assert_eq!(view.color_id, Some(12));
+        assert_eq!(view.zoom_scale_sheet_layout_view, Some(60));
+        assert_eq!(view.zoom_scale_page_layout_view, Some(80));
+    }
+
+    #[test]
+    fn rejects_invalid_sheet_view_output() {
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+        let mut shared_strings = MutableSharedStrings::new();
+        let styles = HashMap::new();
+
+        ws.set_sheet_view(SheetView {
+            zoom_scale: Some(9),
+            ..Default::default()
+        });
+        assert!(ws.to_xml(&mut shared_strings, &styles).is_err());
+
+        ws.set_sheet_view(SheetView {
+            top_left_cell: Some("A0".to_string()),
+            ..Default::default()
+        });
+        assert!(ws.to_xml(&mut shared_strings, &styles).is_err());
     }
 }

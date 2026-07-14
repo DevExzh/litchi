@@ -1862,6 +1862,11 @@ mod tests {
     const WORKSHEET_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheetViews>
+    <sheetView workbookViewId="0" showGridLines="1"/>
+    <sheetView workbookViewId="2" view="pageBreakPreview" topLeftCell="B2"
+               zoomScale="90" zoomScaleNormal="110" showOutlineSymbols="0"/>
+  </sheetViews>
   <cols><col min="2" max="3" width="12.5" hidden="1" customWidth="1"/></cols>
   <sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>
   <autoFilter ref="A1:E10">
@@ -1995,6 +2000,17 @@ mod tests {
         assert_eq!(sort.sort_method, Some(crate::xlsx::SortMethod::Stroke));
         assert_eq!(sort.conditions.len(), 1);
         assert_eq!(sort.conditions[0].descending, Some(true));
+        assert_eq!(worksheet.sheet_views().len(), 2);
+        let view = worksheet.sheet_view().unwrap();
+        assert_eq!(view.workbook_view_id, Some(2));
+        assert_eq!(
+            view.view_type,
+            Some(crate::xlsx::SheetViewType::PageBreakPreview)
+        );
+        assert_eq!(view.top_left_cell.as_deref(), Some("B2"));
+        assert_eq!(view.zoom_scale, Some(90));
+        assert_eq!(view.zoom_scale_normal, Some(110));
+        assert_eq!(view.show_outline_symbols, Some(false));
     }
 
     #[test]

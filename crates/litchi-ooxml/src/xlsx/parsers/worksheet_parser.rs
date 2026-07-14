@@ -17,6 +17,7 @@ use crate::xlsx::namespace::{
 };
 use crate::xlsx::shared_strings::decode_spreadsheet_text;
 use crate::xlsx::sort::{SortBy, SortCondition, SortMethod, SortState};
+use crate::xlsx::views::{SheetView, SheetViewType};
 use crate::xlsx::worksheet::{
     AutoFilter, ColumnInfo, ConditionalFormatRule, DataValidationRule, PageBreak, PageSetup,
     RowInfo,
@@ -40,6 +41,7 @@ pub(crate) struct ParsedWorksheetData {
     pub(crate) row_breaks: Vec<PageBreak>,
     pub(crate) col_breaks: Vec<PageBreak>,
     pub(crate) auto_filter: Option<AutoFilter>,
+    pub(crate) sheet_views: Vec<SheetView>,
     pub(crate) dimensions: Option<(u32, u32, u32, u32)>,
 }
 
@@ -54,6 +56,8 @@ pub(crate) struct ParsedHyperlink {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Context {
     Worksheet,
+    SheetViews,
+    SheetView,
     Columns,
     Hyperlinks,
     DataValidations,
@@ -168,6 +172,7 @@ struct Parser {
     merged_regions: HashSet<(u32, u32, u32, u32)>,
     hyperlink_refs: HashSet<String>,
     seen_sheet_data: bool,
+    seen_sheet_views: bool,
     seen_columns: bool,
     seen_hyperlinks: bool,
     seen_data_validations: bool,
@@ -201,6 +206,7 @@ impl Parser {
             merged_regions: HashSet::new(),
             hyperlink_refs: HashSet::new(),
             seen_sheet_data: false,
+            seen_sheet_views: false,
             seen_columns: false,
             seen_hyperlinks: false,
             seen_data_validations: false,
@@ -326,6 +332,18 @@ impl Parser {
         decoder: Decoder,
         resolver: &NamespaceResolver,
     ) -> Result<Context> {
+        if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"sheetViews")
+        {
+            self.start_sheet_views()?;
+            return Ok(Context::SheetViews);
+        }
+        if parent == Context::SheetViews
+            && is_spreadsheetml_name(namespace, element.name(), b"sheetView")
+        {
+            self.sheet_view(element, decoder)?;
+            return Ok(Context::SheetView);
+        }
         if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"sheetData")
         {
@@ -497,6 +515,15 @@ impl Parser {
         resolver: &NamespaceResolver,
     ) -> Result<()> {
         if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"sheetViews")
+        {
+            self.start_sheet_views()?;
+            self.finish_sheet_views()?;
+        } else if parent == Context::SheetViews
+            && is_spreadsheetml_name(namespace, element.name(), b"sheetView")
+        {
+            self.sheet_view(element, decoder)?;
+        } else if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"sheetData")
         {
             self.sheet_data()?;
@@ -1124,6 +1151,133 @@ impl Parser {
         Ok(())
     }
 
+    fn start_sheet_views(&mut self) -> Result<()> {
+        if self.seen_sheet_views {
+            return Err(invalid("duplicate worksheet sheetViews element"));
+        }
+        self.seen_sheet_views = true;
+        Ok(())
+    }
+
+    fn sheet_view(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+        let top_left_cell = unqualified_attribute_value(element, b"topLeftCell", decoder)?;
+        if let Some(reference) = top_left_cell.as_deref() {
+            Cell::reference_to_coords(reference).map_err(|error| invalid(error.to_string()))?;
+        }
+        let view_type = enum_attribute(
+            element,
+            b"view",
+            decoder,
+            "worksheet sheet-view type",
+            &["normal", "pageBreakPreview", "pageLayout"],
+        )?
+        .as_deref()
+        .and_then(SheetViewType::parse);
+
+        self.data.sheet_views.push(SheetView {
+            workbook_view_id: Some(required_u32(
+                element,
+                b"workbookViewId",
+                decoder,
+                "worksheet sheet-view workbook-view ID",
+            )?),
+            window_protection: optional_bool(
+                element,
+                b"windowProtection",
+                decoder,
+                "worksheet sheet-view windowProtection",
+            )?,
+            show_formulas: optional_bool(
+                element,
+                b"showFormulas",
+                decoder,
+                "worksheet sheet-view showFormulas",
+            )?,
+            show_grid_lines: optional_bool(
+                element,
+                b"showGridLines",
+                decoder,
+                "worksheet sheet-view showGridLines",
+            )?,
+            show_row_col_headers: optional_bool(
+                element,
+                b"showRowColHeaders",
+                decoder,
+                "worksheet sheet-view showRowColHeaders",
+            )?,
+            show_zeros: optional_bool(
+                element,
+                b"showZeros",
+                decoder,
+                "worksheet sheet-view showZeros",
+            )?,
+            right_to_left: optional_bool(
+                element,
+                b"rightToLeft",
+                decoder,
+                "worksheet sheet-view rightToLeft",
+            )?,
+            tab_selected: optional_bool(
+                element,
+                b"tabSelected",
+                decoder,
+                "worksheet sheet-view tabSelected",
+            )?,
+            show_ruler: optional_bool(
+                element,
+                b"showRuler",
+                decoder,
+                "worksheet sheet-view showRuler",
+            )?,
+            show_outline_symbols: optional_bool(
+                element,
+                b"showOutlineSymbols",
+                decoder,
+                "worksheet sheet-view showOutlineSymbols",
+            )?,
+            default_grid_color: optional_bool(
+                element,
+                b"defaultGridColor",
+                decoder,
+                "worksheet sheet-view defaultGridColor",
+            )?,
+            show_white_space: optional_bool(
+                element,
+                b"showWhiteSpace",
+                decoder,
+                "worksheet sheet-view showWhiteSpace",
+            )?,
+            view_type,
+            top_left_cell,
+            color_id: optional_u32(
+                element,
+                b"colorId",
+                decoder,
+                "worksheet sheet-view color ID",
+            )?,
+            zoom_scale: optional_zoom(element, b"zoomScale", decoder)?,
+            zoom_scale_normal: optional_zoom(element, b"zoomScaleNormal", decoder)?,
+            zoom_scale_sheet_layout_view: optional_zoom(
+                element,
+                b"zoomScaleSheetLayoutView",
+                decoder,
+            )?,
+            zoom_scale_page_layout_view: optional_zoom(
+                element,
+                b"zoomScalePageLayoutView",
+                decoder,
+            )?,
+        });
+        Ok(())
+    }
+
+    fn finish_sheet_views(&self) -> Result<()> {
+        if self.data.sheet_views.is_empty() {
+            return Err(invalid("worksheet sheetViews contains no sheetView"));
+        }
+        Ok(())
+    }
+
     fn start_auto_filter(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
         if self.seen_auto_filter {
             return Err(invalid("duplicate worksheet autoFilter element"));
@@ -1631,6 +1785,7 @@ impl Parser {
 
     fn finish(&mut self, ended: Context) -> Result<()> {
         match ended {
+            Context::SheetViews => self.finish_sheet_views(),
             Context::RichRun => self.finish_run(),
             Context::Cell => self.finish_cell(),
             Context::Row => self.finish_row(),
@@ -1952,6 +2107,21 @@ fn optional_u32(
             value
                 .parse::<u32>()
                 .map_err(|_| invalid(format!("invalid {description} value '{value}'")))
+        })
+        .transpose()
+}
+
+fn optional_zoom(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<Option<u16>> {
+    let value = optional_u32(element, name, decoder, "worksheet sheet-view zoom")?;
+    value
+        .map(|value| {
+            if (10..=400).contains(&value) {
+                Ok(value as u16)
+            } else {
+                Err(invalid(format!(
+                    "worksheet sheet-view zoom {value} is outside 10..=400"
+                )))
+            }
         })
         .transpose()
 }
@@ -2338,6 +2508,52 @@ mod tests {
     }
 
     #[test]
+    fn parses_all_sheet_views() {
+        let xml = format!(
+            r#"<x:worksheet xmlns:x="{STRICT_S}" xmlns:f="urn:foreign">
+                <f:sheetViews><x:sheetView workbookViewId="99"/></f:sheetViews>
+                <x:sheetViews>
+                    <x:sheetView workbookViewId="0" showGridLines="0"/>
+                    <x:sheetView workbookViewId="2" windowProtection="1"
+                        showFormulas="true" showGridLines="false"
+                        showRowColHeaders="0" showZeros="1" rightToLeft="true"
+                        tabSelected="false" showRuler="0" showOutlineSymbols="1"
+                        defaultGridColor="false" showWhiteSpace="true"
+                        view="pageLayout" topLeftCell="XFD1048576" colorId="64"
+                        zoomScale="125" zoomScaleNormal="100"
+                        zoomScaleSheetLayoutView="60" zoomScalePageLayoutView="80">
+                        <f:sheetView workbookViewId="88"/>
+                    </x:sheetView>
+                </x:sheetViews>
+            </x:worksheet>"#
+        );
+        let data = parse_worksheet_data(&xml).unwrap();
+
+        assert_eq!(data.sheet_views.len(), 2);
+        assert_eq!(data.sheet_views[0].workbook_view_id, Some(0));
+        assert_eq!(data.sheet_views[0].show_grid_lines, Some(false));
+        let view = &data.sheet_views[1];
+        assert_eq!(view.workbook_view_id, Some(2));
+        assert_eq!(view.window_protection, Some(true));
+        assert_eq!(view.show_formulas, Some(true));
+        assert_eq!(view.show_row_col_headers, Some(false));
+        assert_eq!(view.show_zeros, Some(true));
+        assert_eq!(view.right_to_left, Some(true));
+        assert_eq!(view.tab_selected, Some(false));
+        assert_eq!(view.show_ruler, Some(false));
+        assert_eq!(view.show_outline_symbols, Some(true));
+        assert_eq!(view.default_grid_color, Some(false));
+        assert_eq!(view.show_white_space, Some(true));
+        assert_eq!(view.view_type, Some(SheetViewType::PageLayout));
+        assert_eq!(view.top_left_cell.as_deref(), Some("XFD1048576"));
+        assert_eq!(view.color_id, Some(64));
+        assert_eq!(view.zoom_scale, Some(125));
+        assert_eq!(view.zoom_scale_normal, Some(100));
+        assert_eq!(view.zoom_scale_sheet_layout_view, Some(60));
+        assert_eq!(view.zoom_scale_page_layout_view, Some(80));
+    }
+
+    #[test]
     fn rejects_invalid_columns_and_merged_regions() {
         let invalid_documents = [
             "<cols><col min=\"0\" max=\"1\"/></cols>",
@@ -2357,12 +2573,6 @@ mod tests {
                 "accepted invalid worksheet fragment: {fragment}"
             );
         }
-
-        let conditions = "<sortCondition ref=\"A1:A2\"/>".repeat(MAX_SORT_CONDITIONS + 1);
-        let xml = wrap(&format!(
-            "<autoFilter><sortState ref=\"A1:A2\">{conditions}</sortState></autoFilter>"
-        ));
-        assert!(parse_worksheet_data(&xml).is_err());
     }
 
     #[test]
@@ -2373,6 +2583,29 @@ mod tests {
             "<hyperlinks><hyperlink ref=\"B2:A1\" location=\"Sheet2!A1\"/></hyperlinks>",
             "<hyperlinks><hyperlink ref=\"A1\" location=\"Sheet2!A1\"/><hyperlink ref=\"A1\" location=\"Sheet3!A1\"/></hyperlinks>",
             "<hyperlinks/><hyperlinks/>",
+        ];
+
+        for fragment in invalid_documents {
+            let xml = wrap(fragment);
+            assert!(
+                parse_worksheet_data(&xml).is_err(),
+                "accepted invalid worksheet fragment: {fragment}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_sheet_views() {
+        let invalid_documents = [
+            "<sheetViews/>",
+            "<sheetViews><sheetView/></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"x\"/></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"0\" showGridLines=\"yes\"/></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"0\" view=\"print\"/></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"0\" topLeftCell=\"A0\"/></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"0\" zoomScale=\"9\"/></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"0\" zoomScaleNormal=\"401\"/></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"0\"/></sheetViews><sheetViews><sheetView workbookViewId=\"1\"/></sheetViews>",
         ];
 
         for fragment in invalid_documents {
@@ -2461,6 +2694,12 @@ mod tests {
                 "accepted invalid worksheet fragment: {fragment}"
             );
         }
+
+        let conditions = "<sortCondition ref=\"A1:A2\"/>".repeat(MAX_SORT_CONDITIONS + 1);
+        let xml = wrap(&format!(
+            "<autoFilter><sortState ref=\"A1:A2\">{conditions}</sortState></autoFilter>"
+        ));
+        assert!(parse_worksheet_data(&xml).is_err());
     }
 
     #[test]
