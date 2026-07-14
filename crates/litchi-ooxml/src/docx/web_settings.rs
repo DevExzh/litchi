@@ -4,11 +4,13 @@ use crate::docx::namespace::{
     is_wordprocessing_namespace, normalize_xml_integer, word_attribute_value,
 };
 use crate::error::{OoxmlError, Result};
+use litchi_core::xml::escape_xml;
 use litchi_opc::part::Part;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::fmt::Write as _;
 
 /// Scalar settings from a Word `webSettings.xml` part.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -544,6 +546,62 @@ impl WebSettings {
         self.save_smart_tags_as_xml
     }
 
+    /// Serialize these web-output settings as canonical transitional WordprocessingML.
+    ///
+    /// The typed model is validated while parsing. Serialization additionally
+    /// bounds recursive framesets and HTML divisions to the same safety limit
+    /// used by the reader.
+    pub fn to_xml(&self) -> Result<String> {
+        let mut xml = String::with_capacity(1024);
+        xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
+        xml.push_str(
+            r#"<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">"#,
+        );
+
+        if let Some(frameset) = &self.frameset {
+            write_frameset(&mut xml, frameset, 1)?;
+        }
+        if let Some(divs) = &self.divs {
+            xml.push_str("<w:divs>");
+            for div in divs {
+                write_html_div(&mut xml, div, 1)?;
+            }
+            xml.push_str("</w:divs>");
+        }
+        if let Some(value) = &self.encoding {
+            write_value_element(&mut xml, "encoding", value)?;
+        }
+        write_optional_on_off(&mut xml, "optimizeForBrowser", self.optimize_for_browser);
+        write_optional_on_off(&mut xml, "relyOnVML", self.rely_on_vml);
+        write_optional_on_off(&mut xml, "allowPNG", self.allow_png);
+        write_optional_on_off(&mut xml, "doNotRelyOnCSS", self.do_not_rely_on_css);
+        write_optional_on_off(
+            &mut xml,
+            "doNotSaveAsSingleFile",
+            self.do_not_save_as_single_file,
+        );
+        write_optional_on_off(
+            &mut xml,
+            "doNotOrganizeInFolder",
+            self.do_not_organize_in_folder,
+        );
+        write_optional_on_off(
+            &mut xml,
+            "doNotUseLongFileNames",
+            self.do_not_use_long_file_names,
+        );
+        if let Some(value) = &self.pixels_per_inch {
+            write_value_element(&mut xml, "pixelsPerInch", value)?;
+        }
+        if let Some(value) = self.target_screen_size {
+            write_value_element(&mut xml, "targetScreenSz", value.as_str())?;
+        }
+        write_optional_on_off(&mut xml, "saveSmartTagsAsXml", self.save_smart_tags_as_xml);
+
+        xml.push_str("</w:webSettings>");
+        Ok(xml)
+    }
+
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Self> {
         let settings = Self::extract_from_xml(part.blob())?;
         validate_frame_relationships(part, &settings)?;
@@ -641,6 +699,219 @@ impl WebSettings {
         }
         Ok(settings)
     }
+}
+
+fn write_value_element(xml: &mut String, name: &str, value: &str) -> Result<()> {
+    write!(xml, "<w:{name} w:val=\"{}\"/>", escape_xml(value))
+        .map_err(|error| OoxmlError::Xml(error.to_string()))
+}
+
+fn write_optional_on_off(xml: &mut String, name: &str, value: Option<bool>) {
+    match value {
+        Some(true) => {
+            write!(xml, "<w:{name}/>").expect("writing to a String cannot fail");
+        },
+        Some(false) => {
+            write!(xml, "<w:{name} w:val=\"false\"/>").expect("writing to a String cannot fail");
+        },
+        None => {},
+    }
+}
+
+fn write_frameset(xml: &mut String, frameset: &Frameset, nesting: usize) -> Result<()> {
+    if nesting > MAX_FRAMESET_NESTING {
+        return Err(OoxmlError::InvalidFormat(
+            "Word web frameset nesting exceeds the supported safety limit".into(),
+        ));
+    }
+    xml.push_str("<w:frameset>");
+    if let Some(value) = &frameset.size {
+        write_value_element(xml, "sz", value)?;
+    }
+    if let Some(split_bar) = &frameset.split_bar {
+        write_frameset_split_bar(xml, split_bar)?;
+    }
+    if let Some(layout) = frameset.layout {
+        write_value_element(xml, "frameLayout", layout.as_str())?;
+    }
+    for child in &frameset.children {
+        match child {
+            FramesetChild::Frameset(nested) => write_frameset(xml, nested, nesting + 1)?,
+            FramesetChild::Frame(frame) => write_frame(xml, frame)?,
+        }
+    }
+    xml.push_str("</w:frameset>");
+    Ok(())
+}
+
+fn write_frame(xml: &mut String, frame: &Frame) -> Result<()> {
+    xml.push_str("<w:frame>");
+    if let Some(value) = &frame.size {
+        write_value_element(xml, "sz", value)?;
+    }
+    if let Some(value) = &frame.name {
+        write_value_element(xml, "name", value)?;
+    }
+    if let Some(value) = &frame.source_file_relationship_id {
+        write!(xml, "<w:sourceFileName r:id=\"{}\"/>", escape_xml(value))
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    if let Some(value) = frame.margin_width {
+        write_value_element(xml, "marW", &value.to_string())?;
+    }
+    if let Some(value) = frame.margin_height {
+        write_value_element(xml, "marH", &value.to_string())?;
+    }
+    if let Some(value) = frame.scrollbar {
+        write_value_element(xml, "scrollbar", value.as_str())?;
+    }
+    write_optional_on_off(xml, "noResizeAllowed", frame.no_resize_allowed);
+    write_optional_on_off(xml, "linkedToFile", frame.linked_to_file);
+    xml.push_str("</w:frame>");
+    Ok(())
+}
+
+fn write_frameset_split_bar(xml: &mut String, split_bar: &FramesetSplitBar) -> Result<()> {
+    xml.push_str("<w:framesetSplitbar>");
+    if let Some(value) = split_bar.width_twips {
+        write_value_element(xml, "w", &value.to_string())?;
+    }
+    if let Some(color) = &split_bar.color {
+        xml.push_str("<w:color");
+        write_color_attributes(
+            xml,
+            &color.value,
+            color.theme_color,
+            color.theme_tint,
+            color.theme_shade,
+        )?;
+        xml.push_str("/>");
+    }
+    write_optional_on_off(xml, "noBorder", split_bar.no_border);
+    write_optional_on_off(xml, "flatBorders", split_bar.flat_borders);
+    xml.push_str("</w:framesetSplitbar>");
+    Ok(())
+}
+
+fn write_html_div(xml: &mut String, div: &HtmlDiv, nesting: usize) -> Result<()> {
+    if nesting > MAX_FRAMESET_NESTING {
+        return Err(OoxmlError::InvalidFormat(
+            "Word HTML division nesting exceeds the supported safety limit".into(),
+        ));
+    }
+    write!(xml, "<w:div w:id=\"{}\">", escape_xml(&div.id))
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    write_optional_on_off(xml, "blockQuote", div.block_quote);
+    write_optional_on_off(xml, "bodyDiv", div.body_div);
+    for (name, value) in [
+        ("marLeft", &div.margin_left_twips),
+        ("marRight", &div.margin_right_twips),
+        ("marTop", &div.margin_top_twips),
+        ("marBottom", &div.margin_bottom_twips),
+    ] {
+        if let Some(value) = value {
+            write_value_element(xml, name, value)?;
+        }
+    }
+    if let Some(borders) = &div.borders {
+        write_html_div_borders(xml, borders)?;
+    }
+    if !div.children.is_empty() {
+        xml.push_str("<w:divsChild>");
+        for child in &div.children {
+            write_html_div(xml, child, nesting + 1)?;
+        }
+        xml.push_str("</w:divsChild>");
+    }
+    xml.push_str("</w:div>");
+    Ok(())
+}
+
+fn write_html_div_borders(xml: &mut String, borders: &HtmlDivBorders) -> Result<()> {
+    xml.push_str("<w:divBdr>");
+    for (name, border) in [
+        ("top", &borders.top),
+        ("left", &borders.left),
+        ("bottom", &borders.bottom),
+        ("right", &borders.right),
+    ] {
+        let Some(border) = border else {
+            continue;
+        };
+        write!(xml, "<w:{name} w:val=\"{}\"", escape_xml(&border.style))
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        if let Some(color) = &border.color {
+            write!(xml, " w:color=\"{}\"", escape_xml(color))
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        }
+        write_theme_attributes(
+            xml,
+            border.theme_color,
+            border.theme_tint,
+            border.theme_shade,
+        )?;
+        if let Some(value) = border.size_eighth_points {
+            write!(xml, " w:sz=\"{value}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        }
+        if let Some(value) = border.space_points {
+            write!(xml, " w:space=\"{value}\"")
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        }
+        write_optional_on_off_attribute(xml, "shadow", border.shadow)?;
+        write_optional_on_off_attribute(xml, "frame", border.frame)?;
+        xml.push_str("/>");
+    }
+    xml.push_str("</w:divBdr>");
+    Ok(())
+}
+
+fn write_color_attributes(
+    xml: &mut String,
+    value: &str,
+    theme_color: Option<ThemeColor>,
+    theme_tint: Option<u8>,
+    theme_shade: Option<u8>,
+) -> Result<()> {
+    write!(xml, " w:val=\"{}\"", escape_xml(value))
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    write_theme_attributes(xml, theme_color, theme_tint, theme_shade)
+}
+
+fn write_theme_attributes(
+    xml: &mut String,
+    theme_color: Option<ThemeColor>,
+    theme_tint: Option<u8>,
+    theme_shade: Option<u8>,
+) -> Result<()> {
+    if let Some(value) = theme_color {
+        write!(xml, " w:themeColor=\"{}\"", value.as_str())
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    if let Some(value) = theme_tint {
+        write!(xml, " w:themeTint=\"{value:02X}\"")
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    if let Some(value) = theme_shade {
+        write!(xml, " w:themeShade=\"{value:02X}\"")
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    Ok(())
+}
+
+fn write_optional_on_off_attribute(
+    xml: &mut String,
+    name: &str,
+    value: Option<bool>,
+) -> Result<()> {
+    if let Some(value) = value {
+        write!(
+            xml,
+            " w:{name}=\"{}\"",
+            if value { "true" } else { "false" }
+        )
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    Ok(())
 }
 
 fn validate_frame_relationships(part: &dyn Part, settings: &WebSettings) -> Result<()> {
@@ -1865,5 +2136,113 @@ mod tests {
             r#"<w:webSettings xmlns:w="{W}"><w:divs><w:div w:id="1"><w:divsChild/><w:divsChild/></w:div></w:divs></w:webSettings>"#
         );
         assert!(WebSettings::extract_from_xml(duplicate_child_container.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn serializes_every_modeled_web_setting_for_round_trip() {
+        let xml = br#"<w:webSettings
+          xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+          <w:frameset>
+            <w:sz w:val="2* &amp; 1*"/>
+            <w:framesetSplitbar>
+              <w:w w:val="18446744073709551615"/>
+              <w:color w:val="A0b1C2" w:themeColor="accent4" w:themeTint="0a" w:themeShade="FF"/>
+              <w:noBorder/>
+              <w:flatBorders w:val="false"/>
+            </w:framesetSplitbar>
+            <w:frameLayout w:val="cols"/>
+            <w:frame>
+              <w:sz w:val="50%"/>
+              <w:name w:val="main &amp; detail"/>
+              <w:sourceFileName r:id="rId7"/>
+              <w:marW w:val="42"/>
+              <w:marH w:val="24"/>
+              <w:scrollbar w:val="auto"/>
+              <w:noResizeAllowed w:val="off"/>
+              <w:linkedToFile/>
+            </w:frame>
+            <w:frameset><w:frameLayout w:val="none"/></w:frameset>
+          </w:frameset>
+          <w:divs>
+            <w:div w:id="root&amp;division">
+              <w:blockQuote/>
+              <w:bodyDiv w:val="0"/>
+              <w:marLeft w:val="-123456789012345678901234567890"/>
+              <w:marRight w:val="+42"/>
+              <w:marTop w:val="0"/>
+              <w:marBottom w:val="700"/>
+              <w:divBdr>
+                <w:top w:val="single" w:color="auto" w:themeColor="text2" w:themeTint="10" w:themeShade="ff" w:sz="18446744073709551615" w:space="6" w:shadow="on" w:frame="0"/>
+                <w:left w:val="zigZagStitch"/>
+              </w:divBdr>
+              <w:divsChild><w:div w:id="child"><w:bodyDiv/></w:div></w:divsChild>
+            </w:div>
+          </w:divs>
+          <w:encoding w:val="utf&amp;8"/>
+          <w:optimizeForBrowser/>
+          <w:relyOnVML w:val="false"/>
+          <w:allowPNG/>
+          <w:doNotRelyOnCSS w:val="off"/>
+          <w:doNotSaveAsSingleFile/>
+          <w:doNotOrganizeInFolder w:val="0"/>
+          <w:doNotUseLongFileNames/>
+          <w:pixelsPerInch w:val="+123456789012345678901234567890"/>
+          <w:targetScreenSz w:val="1920x1200"/>
+          <w:saveSmartTagsAsXml w:val="false"/>
+        </w:webSettings>"#;
+
+        let settings = WebSettings::extract_from_xml(xml).unwrap();
+        let serialized = settings.to_xml().unwrap();
+        let reparsed = WebSettings::extract_from_xml(serialized.as_bytes()).unwrap();
+
+        assert_eq!(reparsed, settings);
+        assert!(serialized.contains("main &amp; detail"));
+        assert!(serialized.contains("w:themeTint=\"0A\""));
+        assert!(serialized.contains("w:themeShade=\"FF\""));
+    }
+
+    #[test]
+    fn serialization_preserves_present_empty_top_level_containers() {
+        let xml = br#"<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:frameset/><w:divs/></w:webSettings>"#;
+        let settings = WebSettings::extract_from_xml(xml).unwrap();
+        let reparsed =
+            WebSettings::extract_from_xml(settings.to_xml().unwrap().as_bytes()).unwrap();
+        assert_eq!(reparsed, settings);
+        assert!(reparsed.frameset().is_some());
+        assert_eq!(reparsed.divs(), Some([].as_slice()));
+    }
+
+    #[test]
+    fn serialization_rejects_excessive_recursive_nesting() {
+        let mut frameset = Frameset::default();
+        for _ in 0..=MAX_FRAMESET_NESTING {
+            frameset = Frameset {
+                children: vec![FramesetChild::Frameset(frameset)],
+                ..Frameset::default()
+            };
+        }
+        let settings = WebSettings {
+            frameset: Some(frameset),
+            ..WebSettings::default()
+        };
+        assert!(settings.to_xml().is_err());
+
+        let mut div = HtmlDiv {
+            id: "leaf".into(),
+            ..HtmlDiv::default()
+        };
+        for id in 0..=MAX_FRAMESET_NESTING {
+            div = HtmlDiv {
+                id: id.to_string(),
+                children: vec![div],
+                ..HtmlDiv::default()
+            };
+        }
+        let settings = WebSettings {
+            divs: Some(vec![div]),
+            ..WebSettings::default()
+        };
+        assert!(settings.to_xml().is_err());
     }
 }
