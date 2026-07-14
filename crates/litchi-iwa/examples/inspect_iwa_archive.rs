@@ -13,6 +13,7 @@ use litchi_iwa::protobuf::tsd::CommentStorageArchive;
 use litchi_iwa::protobuf::tsd::GuideStorageArchive;
 use litchi_iwa::protobuf::tsk::{AnnotationAuthorArchive, AnnotationAuthorStorageArchive};
 use litchi_iwa::protobuf::tsp::PackageMetadata;
+use litchi_iwa::protobuf::tss::StylesheetArchive;
 use litchi_iwa::protobuf::tst::TableDataList;
 use litchi_iwa::protobuf::tswp::{ShapeInfoArchive, StorageArchive};
 use prost::Message;
@@ -140,6 +141,16 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                 && let Ok(slide) = kn::SlideArchive::decode(message.data.as_slice())
             {
                 println!("  keynote_slide={slide:#?}");
+            }
+            if message.type_ == 9
+                && let Ok(style) = kn::SlideStyleArchive::decode(message.data.as_slice())
+            {
+                println!("  keynote_slide_style={style:#?}");
+            }
+            if message.type_ == 401
+                && let Ok(stylesheet) = StylesheetArchive::decode(message.data.as_slice())
+            {
+                println!("  stylesheet={stylesheet:#?}");
             }
             if message.type_ == 2_011
                 && let Ok(shape) = ShapeInfoArchive::decode(message.data.as_slice())

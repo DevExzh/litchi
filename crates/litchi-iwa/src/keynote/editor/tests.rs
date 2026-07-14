@@ -14,6 +14,171 @@ const TEST_SLIDE_DRAWABLES_Z_ORDER_FIELD: u32 = 42;
 const TEST_SLIDE_NUMBER_PLACEHOLDER_ID: u64 = 70;
 
 #[test]
+fn slide_background_crud_inherits_and_culls_native_variations() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_slide_background()).unwrap();
+    let white = KeynoteSlideBackground::Solid(KeynoteRgbaColor {
+        red: 1.0,
+        green: 1.0,
+        blue: 1.0,
+        alpha: 1.0,
+        color_space: KeynoteRgbColorSpace::Srgb,
+    });
+    assert_eq!(editor.slide_background(0).unwrap(), white);
+    assert_eq!(editor.slide_background(1).unwrap(), white);
+
+    let red = KeynoteSlideBackground::Solid(KeynoteRgbaColor {
+        red: 0.9,
+        green: 0.2,
+        blue: 0.1,
+        alpha: 0.75,
+        color_space: KeynoteRgbColorSpace::DisplayP3,
+    });
+    editor.set_slide_background(0, red.clone()).unwrap();
+    assert_eq!(editor.slide_background(0).unwrap(), red);
+    assert_eq!(editor.slide_background(1).unwrap(), white);
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let slide: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
+    let first_variation = slide.style.identifier;
+    let style: kn::SlideStyleArchive = graph
+        .decode_type(first_variation, 9, "KN.SlideStyleArchive")
+        .unwrap();
+    assert_eq!(style.super_.parent.unwrap().identifier, 40);
+    assert_eq!(style.super_.is_variation, Some(true));
+    assert_eq!(style.override_count, Some(1));
+
+    let no_op = editor.to_bytes().unwrap();
+    editor.set_slide_background(0, red).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), no_op);
+
+    let green = KeynoteSlideBackground::Solid(KeynoteRgbaColor {
+        red: 0.1,
+        green: 0.8,
+        blue: 0.3,
+        alpha: 1.0,
+        color_space: KeynoteRgbColorSpace::Srgb,
+    });
+    editor.set_slide_background(0, green.clone()).unwrap();
+    assert_eq!(editor.slide_background(0).unwrap(), green);
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    assert!(!graph.objects.contains_key(&first_variation));
+    let slide: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
+    let second_variation = slide.style.identifier;
+    let stylesheet: tss::StylesheetArchive =
+        graph.decode_type(41, 401, "TSS.StylesheetArchive").unwrap();
+    assert_eq!(
+        stylesheet
+            .styles
+            .iter()
+            .map(|reference| reference.identifier)
+            .collect::<Vec<_>>(),
+        vec![40, second_variation]
+    );
+    assert_eq!(
+        stylesheet.parent_to_children_style_map[0]
+            .children
+            .iter()
+            .map(|reference| reference.identifier)
+            .collect::<Vec<_>>(),
+        vec![second_variation]
+    );
+
+    editor
+        .set_slide_background(0, KeynoteSlideBackground::None)
+        .unwrap();
+    assert_eq!(
+        editor.slide_background(0).unwrap(),
+        KeynoteSlideBackground::None
+    );
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    assert!(!graph.objects.contains_key(&second_variation));
+    let slide: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
+    let raw = graph
+        .message_data_type(slide.style.identifier, 9, "KN.SlideStyleArchive")
+        .unwrap();
+    let properties = required_length_delimited_payload(raw, 11, "slide style").unwrap();
+    assert_eq!(
+        required_length_delimited_payload(properties, 1, "slide fill").unwrap(),
+        []
+    );
+}
+
+#[test]
+fn slide_background_preserves_opaque_fills_and_unknown_solid_fields() {
+    let mut future_fill = Vec::new();
+    append_unknown_varint(&mut future_fill, 100, 73);
+    assert_eq!(
+        slide_background::background_from_fill(&future_fill).unwrap(),
+        KeynoteSlideBackground::Opaque(future_fill)
+    );
+
+    let mut editor = KeynoteEditor::from_package(test_package_with_slide_background()).unwrap();
+    let opaque = tsd::FillArchive {
+        gradient: Some(tsd::GradientArchive::default()),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    let background = KeynoteSlideBackground::Opaque(opaque.clone());
+    editor.set_slide_background(0, background.clone()).unwrap();
+    assert_eq!(editor.slide_background(0).unwrap(), background);
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let slide: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
+    let raw = graph
+        .message_data_type(slide.style.identifier, 9, "KN.SlideStyleArchive")
+        .unwrap();
+    let properties = required_length_delimited_payload(raw, 11, "slide style").unwrap();
+    assert_eq!(
+        required_length_delimited_payload(properties, 1, "slide fill").unwrap(),
+        opaque
+    );
+
+    let mut editor = KeynoteEditor::from_package(test_package_with_slide_background()).unwrap();
+    let blue = KeynoteSlideBackground::Solid(KeynoteRgbaColor {
+        red: 0.2,
+        green: 0.4,
+        blue: 0.8,
+        alpha: 1.0,
+        color_space: KeynoteRgbColorSpace::Srgb,
+    });
+    editor.set_slide_background(0, blue).unwrap();
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let slide: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
+    let raw = graph
+        .message_data_type(slide.style.identifier, 9, "KN.SlideStyleArchive")
+        .unwrap();
+    let properties = required_length_delimited_payload(raw, 11, "slide style").unwrap();
+    let fill = required_length_delimited_payload(properties, 1, "slide fill").unwrap();
+    assert!(fill.windows(3).any(|bytes| bytes == [0xa0, 0x06, 73]));
+}
+
+#[test]
+fn slide_background_rejects_invalid_inputs_transactionally() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_slide_background()).unwrap();
+    let before = editor.to_bytes().unwrap();
+    let invalid = KeynoteSlideBackground::Solid(KeynoteRgbaColor {
+        red: f32::NAN,
+        green: 0.0,
+        blue: 0.0,
+        alpha: 1.0,
+        color_space: KeynoteRgbColorSpace::Srgb,
+    });
+    assert!(editor.set_slide_background(0, invalid).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+    assert!(
+        editor
+            .set_slide_background(0, KeynoteSlideBackground::Opaque(vec![0x0a, 0xff]))
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+    assert!(
+        editor
+            .set_slide_background(0, KeynoteSlideBackground::Opaque(Vec::new()))
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+    assert!(editor.slide_background(2).is_err());
+}
+
+#[test]
 fn edits_title_and_body_by_slide_index() {
     let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
     let slides = editor.slides().unwrap();
@@ -3765,6 +3930,100 @@ fn test_package() -> IWorkPackage {
                         },
                     ),
                 ],
+            },
+        )
+        .unwrap();
+    package
+}
+
+fn test_package_with_slide_background() -> IWorkPackage {
+    let mut package = test_package();
+    for archive_name in ["Index/Slide-4.iwa", "Index/Slide-10.iwa"] {
+        package
+            .update_archive(archive_name, |archive| {
+                let slide = archive
+                    .objects
+                    .iter_mut()
+                    .find(|object| object.messages[0].type_ == TEST_SLIDE_MESSAGE_TYPE)
+                    .unwrap();
+                let mut native = kn::SlideArchive::decode(slide.messages[0].data.as_slice())?;
+                native.style = reference(40);
+                slide.replace_message(
+                    0,
+                    RawMessage {
+                        type_: TEST_SLIDE_MESSAGE_TYPE,
+                        data: native.encode_to_vec(),
+                    },
+                )?;
+                slide.archive_info.message_infos[0]
+                    .object_references
+                    .push(40);
+                Ok(())
+            })
+            .unwrap();
+    }
+    let mut fill_payload = tsd::FillArchive {
+        color: Some(tsp::Color {
+            model: tsp::color::ColorModel::Rgb as i32,
+            r: Some(1.0),
+            g: Some(1.0),
+            b: Some(1.0),
+            rgbspace: Some(tsp::color::RgbColorSpace::Srgb as i32),
+            a: Some(1.0),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    append_unknown_varint(&mut fill_payload, 100, 73);
+    let style = kn::SlideStyleArchive {
+        super_: tss::StyleArchive {
+            name: Some("template slide style".to_owned()),
+            style_identifier: Some("slide-0-slidestyle".to_owned()),
+            stylesheet: Some(reference(41)),
+            ..Default::default()
+        },
+        override_count: Some(1),
+        slide_properties: Some(kn::SlideStylePropertiesArchive {
+            fill: Some(tsd::FillArchive::default()),
+            ..Default::default()
+        }),
+    };
+    let style_data = patch_nested_length_delimited_field(
+        &style.encode_to_vec(),
+        &[11, 1],
+        true,
+        Some(&fill_payload),
+    )
+    .unwrap();
+    let mut style_object = ArchiveObject::new(
+        40,
+        vec![RawMessage {
+            type_: 9,
+            data: style_data,
+        }],
+    )
+    .unwrap();
+    style_object.archive_info.message_infos[0]
+        .object_references
+        .push(41);
+    let mut stylesheet_object = object(
+        41,
+        401,
+        tss::StylesheetArchive {
+            styles: vec![reference(40)],
+            can_cull_styles: Some(true),
+            ..Default::default()
+        },
+    );
+    stylesheet_object.archive_info.message_infos[0]
+        .object_references
+        .push(40);
+    package
+        .replace_archive(
+            "Index/DocumentStylesheet.iwa",
+            &Archive {
+                objects: vec![style_object, stylesheet_object],
             },
         )
         .unwrap();

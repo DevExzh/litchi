@@ -15,10 +15,11 @@ use crate::package_metadata::{
     add_component_external_reference, add_component_link, add_component_object_uuids,
     clone_component_registration, component_identifier_for_entry,
     component_identifier_for_object_uuid, component_uuid_identifiers, next_object_identifier,
-    release_package_identifier_suffix, remove_component_object_uuids,
-    remove_component_registration, set_package_last_object_identifier,
+    release_package_identifier_suffix, remove_component_external_references_to_object,
+    remove_component_object_uuids, remove_component_registration,
+    set_package_last_object_identifier,
 };
-use crate::protobuf::{kn, tsd, tsp, tswp};
+use crate::protobuf::{kn, tsd, tsp, tss, tswp};
 use crate::shapes::{
     DrawableGeometry, DrawableProperties, set_shape_geometry, set_shape_properties, shape_geometry,
     shape_properties,
@@ -3178,11 +3179,14 @@ impl KeynoteEditor {
 mod builds;
 mod placeholder_ownership;
 mod placeholder_visibility;
+mod slide_background;
+mod slide_background_wire;
 mod slide_create;
 mod slide_graph;
 mod slide_number;
 
 use builds::*;
+pub use slide_background::{KeynoteRgbColorSpace, KeynoteRgbaColor, KeynoteSlideBackground};
 use slide_graph::*;
 #[cfg(test)]
 mod tests;
