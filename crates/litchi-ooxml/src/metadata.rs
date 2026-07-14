@@ -1,3 +1,4 @@
+use crate::common::xml::decode_xml_reference;
 use crate::error::{OoxmlError, Result};
 use chrono::{DateTime, Utc};
 /// OOXML core properties/metadata extraction.
@@ -11,8 +12,33 @@ use chrono::{DateTime, Utc};
 use litchi_core::Metadata;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcPackage, PackURI};
-use quick_xml::Reader;
+use quick_xml::XmlVersion;
 use quick_xml::events::Event;
+use quick_xml::name::{Namespace, QName, ResolveResult};
+use quick_xml::reader::NsReader;
+
+const CORE_PROPERTIES_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/package/2006/metadata/core-properties";
+const STRICT_CORE_PROPERTIES_NAMESPACE: &[u8] =
+    b"http://purl.oclc.org/ooxml/package/metadata/core-properties";
+const DUBLIN_CORE_NAMESPACE: &[u8] = b"http://purl.org/dc/elements/1.1/";
+const DUBLIN_CORE_TERMS_NAMESPACE: &[u8] = b"http://purl.org/dc/terms/";
+
+#[derive(Clone, Copy)]
+enum CoreProperty {
+    Title,
+    Subject,
+    Author,
+    Keywords,
+    Description,
+    LastModifiedBy,
+    Revision,
+    Category,
+    ContentStatus,
+    Created,
+    Modified,
+    LastPrinted,
+}
 
 /// Extract metadata from an OOXML package.
 ///
@@ -69,92 +95,56 @@ fn find_core_properties_part(package: &OpcPackage) -> Result<&dyn litchi_opc::pa
 /// The core properties XML follows the Dublin Core metadata standard
 /// and OPC-specific extensions.
 fn parse_core_properties_xml(xml: &str) -> Result<Metadata> {
-    let mut reader = Reader::from_reader(xml.as_bytes());
-    reader.config_mut().trim_text(true);
+    let mut reader = NsReader::from_reader(xml.as_bytes());
 
     let mut metadata = Metadata::default();
 
     loop {
-        match reader.read_event() {
-            Ok(Event::Start(ref e)) => {
-                match e.name().as_ref() {
-                    b"dc:title" | b"cp:title" => {
-                        if let Some(text) = read_text_element(&mut reader)? {
-                            metadata.title = Some(text);
-                        }
-                    },
-                    b"dc:subject" | b"cp:subject" => {
-                        if let Some(text) = read_text_element(&mut reader)? {
-                            metadata.subject = Some(text);
-                        }
-                    },
-                    b"dc:creator" | b"cp:creator" | b"dc:author" | b"cp:author" => {
-                        if let Some(text) = read_text_element(&mut reader)? {
-                            metadata.author = Some(text);
-                        }
-                    },
-                    b"cp:keywords" => {
-                        if let Some(text) = read_text_element(&mut reader)? {
-                            metadata.keywords = Some(text);
-                        }
-                    },
-                    b"dc:description" | b"cp:description" | b"cp:comment" => {
-                        if let Some(text) = read_text_element(&mut reader)? {
-                            metadata.description = Some(text);
-                        }
-                    },
-                    b"cp:lastModifiedBy" => {
-                        if let Some(text) = read_text_element(&mut reader)? {
-                            metadata.last_modified_by = Some(text);
-                        }
-                    },
-                    b"cp:revision" => {
-                        if let Some(text) = read_text_element(&mut reader)?
-                            && let Ok(rev) = text.parse::<u32>()
-                        {
-                            metadata.revision = Some(rev.to_string());
-                        }
-                    },
-                    b"cp:category" => {
-                        if let Some(text) = read_text_element(&mut reader)? {
-                            metadata.category = Some(text);
-                        }
-                    },
-                    b"cp:contentStatus" => {
-                        if let Some(text) = read_text_element(&mut reader)? {
-                            metadata.content_status = Some(text);
-                        }
-                    },
-                    b"dcterms:created" | b"cp:created" => {
-                        if let Some(text) = read_text_element(&mut reader)?
-                            && let Ok(dt) = parse_datetime(&text)
-                        {
-                            metadata.created = Some(dt);
-                        }
-                    },
-                    b"dcterms:modified" | b"cp:modified" => {
-                        if let Some(text) = read_text_element(&mut reader)?
-                            && let Ok(dt) = parse_datetime(&text)
-                        {
-                            metadata.modified = Some(dt);
-                        }
-                    },
-                    b"cp:lastPrinted" => {
-                        if let Some(text) = read_text_element(&mut reader)?
-                            && let Ok(dt) = parse_datetime(&text)
-                        {
-                            metadata.last_printed_time = Some(dt);
-                        }
-                    },
-                    _ => {
-                        // Skip unknown elements
-                    },
+        let property = {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| OoxmlError::Xml(format!("XML parsing error: {error}")))?;
+            match event {
+                Event::Start(element) => core_property(&namespace, element.name()),
+                Event::Eof => break,
+                _ => None,
+            }
+        };
+        let Some(property) = property else {
+            continue;
+        };
+        let Some(text) = read_text_element(&mut reader)? else {
+            continue;
+        };
+
+        match property {
+            CoreProperty::Title => metadata.title = Some(text),
+            CoreProperty::Subject => metadata.subject = Some(text),
+            CoreProperty::Author => metadata.author = Some(text),
+            CoreProperty::Keywords => metadata.keywords = Some(text),
+            CoreProperty::Description => metadata.description = Some(text),
+            CoreProperty::LastModifiedBy => metadata.last_modified_by = Some(text),
+            CoreProperty::Revision => {
+                if let Ok(revision) = text.parse::<u32>() {
+                    metadata.revision = Some(revision.to_string());
                 }
             },
-            Ok(Event::Eof) => break,
-            Err(e) => return Err(OoxmlError::Xml(format!("XML parsing error: {}", e))),
-            _ => {
-                // Skip other events
+            CoreProperty::Category => metadata.category = Some(text),
+            CoreProperty::ContentStatus => metadata.content_status = Some(text),
+            CoreProperty::Created => {
+                if let Ok(created) = parse_datetime(&text) {
+                    metadata.created = Some(created);
+                }
+            },
+            CoreProperty::Modified => {
+                if let Ok(modified) = parse_datetime(&text) {
+                    metadata.modified = Some(modified);
+                }
+            },
+            CoreProperty::LastPrinted => {
+                if let Ok(last_printed) = parse_datetime(&text) {
+                    metadata.last_printed_time = Some(last_printed);
+                }
             },
         }
     }
@@ -162,25 +152,96 @@ fn parse_core_properties_xml(xml: &str) -> Result<Metadata> {
     Ok(metadata)
 }
 
+fn core_property(namespace: &ResolveResult<'_>, name: QName<'_>) -> Option<CoreProperty> {
+    let ResolveResult::Bound(Namespace(namespace)) = namespace else {
+        return None;
+    };
+    let local_name = name.local_name();
+    let local_name = local_name.as_ref();
+
+    if *namespace == DUBLIN_CORE_NAMESPACE {
+        return match local_name {
+            b"title" => Some(CoreProperty::Title),
+            b"subject" => Some(CoreProperty::Subject),
+            b"creator" | b"author" => Some(CoreProperty::Author),
+            b"description" => Some(CoreProperty::Description),
+            _ => None,
+        };
+    }
+    if *namespace == DUBLIN_CORE_TERMS_NAMESPACE {
+        return match local_name {
+            b"created" => Some(CoreProperty::Created),
+            b"modified" => Some(CoreProperty::Modified),
+            _ => None,
+        };
+    }
+    if *namespace != CORE_PROPERTIES_NAMESPACE && *namespace != STRICT_CORE_PROPERTIES_NAMESPACE {
+        return None;
+    }
+    match local_name {
+        // Some producers use the core-properties namespace for fields that the standard
+        // places in Dublin Core. Retain that compatibility without depending on prefixes.
+        b"title" => Some(CoreProperty::Title),
+        b"subject" => Some(CoreProperty::Subject),
+        b"creator" | b"author" => Some(CoreProperty::Author),
+        b"keywords" => Some(CoreProperty::Keywords),
+        b"description" | b"comment" => Some(CoreProperty::Description),
+        b"lastModifiedBy" => Some(CoreProperty::LastModifiedBy),
+        b"revision" => Some(CoreProperty::Revision),
+        b"category" => Some(CoreProperty::Category),
+        b"contentStatus" => Some(CoreProperty::ContentStatus),
+        b"created" => Some(CoreProperty::Created),
+        b"modified" => Some(CoreProperty::Modified),
+        b"lastPrinted" => Some(CoreProperty::LastPrinted),
+        _ => None,
+    }
+}
+
 /// Read the text content of an XML element.
-fn read_text_element(reader: &mut Reader<&[u8]>) -> Result<Option<String>> {
+fn read_text_element(reader: &mut NsReader<&[u8]>) -> Result<Option<String>> {
     let mut text = String::new();
+    let mut depth = 1usize;
 
     loop {
         match reader.read_event() {
-            Ok(Event::Text(e)) => {
-                // Convert bytes to string (XML should be UTF-8)
-                let text_content = std::str::from_utf8(e.as_ref()).map_err(|e| {
-                    OoxmlError::Xml(format!("Invalid UTF-8 in text content: {}", e))
+            Ok(Event::Start(_)) => {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("core properties nesting is too deep".to_string())
                 })?;
-                text.push_str(text_content);
             },
-            Ok(Event::End(_)) => break,
-            Ok(Event::Eof) => break,
+            Ok(Event::Text(e)) => {
+                let decoded = e
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                text.push_str(
+                    &quick_xml::escape::unescape(&decoded)
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                );
+            },
+            Ok(Event::CData(e)) => {
+                text.push_str(
+                    &e.xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                );
+            },
+            Ok(Event::GeneralRef(reference)) => {
+                text.push_str(&decode_xml_reference(&reference)?);
+            },
+            Ok(Event::End(_)) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("invalid core properties nesting".to_string())
+                })?;
+                if depth == 0 {
+                    break;
+                }
+            },
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated core property element".to_string(),
+                ));
+            },
             Err(e) => return Err(OoxmlError::Xml(format!("XML parsing error: {}", e))),
-            _ => {
-                // Skip other events
-            },
+            _ => {},
         }
     }
 
@@ -228,12 +289,47 @@ mod tests {
     use chrono::Datelike;
 
     #[test]
-    #[ignore] // Requires test file
-    fn test_extract_metadata() {
-        // This would require a test .docx file with core properties
-        // let package = OpcPackage::open("test.docx").unwrap();
-        // let metadata = extract_metadata(&package).unwrap();
-        // assert!(metadata.title.is_some() || metadata.author.is_some());
+    fn extracts_aliased_core_properties_and_decodes_xml_text() {
+        use litchi_opc::part::BlobPart;
+
+        let xml = br#"<props xmlns:core="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+            xmlns:d="http://purl.org/dc/elements/1.1/"
+            xmlns:terms="http://purl.org/dc/terms/"
+            xmlns:false="urn:not-core-properties">
+            <d:title>R&amp;D <![CDATA[<notes>]]></d:title>
+            <d:creator>Alice</d:creator>
+            <core:revision>7</core:revision>
+            <terms:created>2023-10-10T14:30:00Z</terms:created>
+            <false:title>ignored</false:title>
+        </props>"#;
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/unusual/core-properties.xml").unwrap(),
+            ct::OPC_CORE_PROPERTIES.to_string(),
+            xml.to_vec(),
+        )));
+
+        let metadata = extract_metadata(&package).unwrap();
+        assert_eq!(metadata.title.as_deref(), Some("R&D <notes>"));
+        assert_eq!(metadata.author.as_deref(), Some("Alice"));
+        assert_eq!(metadata.revision.as_deref(), Some("7"));
+        assert_eq!(metadata.created.unwrap().year(), 2023);
+    }
+
+    #[test]
+    fn extracts_strict_core_properties_and_rejects_truncation() {
+        let strict = r#"<s:coreProperties xmlns:s="http://purl.oclc.org/ooxml/package/metadata/core-properties"><s:category>Strict</s:category></s:coreProperties>"#;
+        assert_eq!(
+            parse_core_properties_xml(strict)
+                .unwrap()
+                .category
+                .as_deref(),
+            Some("Strict")
+        );
+        assert!(parse_core_properties_xml(
+            r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"><cp:keywords>broken"#
+        )
+        .is_err());
     }
 
     #[test]
