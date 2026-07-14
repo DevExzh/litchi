@@ -90,6 +90,105 @@ pub(super) fn generate_text_paragraphs(text: &str, style_name: Option<&str>) -> 
     output
 }
 
+fn push_optional_attribute(output: &mut String, name: &str, value: Option<&str>) {
+    if let Some(value) = value {
+        output.push(' ');
+        output.push_str(name);
+        output.push_str("=\"");
+        output.push_str(&escape_xml(value));
+        output.push('"');
+    }
+}
+
+pub(super) fn slide_style_name(slide: &Slide, index: usize) -> String {
+    if slide
+        .transition
+        .as_ref()
+        .is_some_and(|value| !value.is_empty())
+    {
+        format!("dpTransition{}", index + 1)
+    } else {
+        "dp1".to_string()
+    }
+}
+
+pub(super) fn generate_transition_styles(slides: &[Slide]) -> String {
+    let mut output = String::from(
+        r#"<style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties/></style:style>"#,
+    );
+    for (index, slide) in slides.iter().enumerate() {
+        let Some(transition) = slide.transition.as_ref().filter(|value| !value.is_empty()) else {
+            continue;
+        };
+        output.push_str(r#"<style:style style:name=""#);
+        output.push_str(&slide_style_name(slide, index));
+        output.push_str(r#"" style:family="drawing-page"><style:drawing-page-properties"#);
+        push_optional_attribute(
+            &mut output,
+            "presentation:transition-type",
+            transition.transition_type.map(|value| value.as_str()),
+        );
+        push_optional_attribute(
+            &mut output,
+            "presentation:transition-style",
+            transition.style.as_ref().map(|value| value.as_str()),
+        );
+        push_optional_attribute(
+            &mut output,
+            "presentation:transition-speed",
+            transition.speed.map(|value| value.as_str()),
+        );
+        push_optional_attribute(&mut output, "smil:type", transition.smil_type.as_deref());
+        push_optional_attribute(
+            &mut output,
+            "smil:subtype",
+            transition.smil_subtype.as_deref(),
+        );
+        push_optional_attribute(
+            &mut output,
+            "smil:direction",
+            transition.direction.map(|value| value.as_str()),
+        );
+        push_optional_attribute(
+            &mut output,
+            "smil:fadeColor",
+            transition.fade_color.as_deref(),
+        );
+        push_optional_attribute(
+            &mut output,
+            "presentation:duration",
+            transition.duration.as_deref(),
+        );
+        if let Some(sound) = transition.sound.as_ref() {
+            output.push('>');
+            output.push_str(r#"<presentation:sound xlink:type="simple" xlink:href=""#);
+            output.push_str(&escape_xml(&sound.href));
+            output.push('"');
+            if sound.actuate_on_request {
+                output.push_str(r#" xlink:actuate="onRequest""#);
+            }
+            push_optional_attribute(
+                &mut output,
+                "xlink:show",
+                sound.show.map(|value| value.as_str()),
+            );
+            push_optional_attribute(&mut output, "xml:id", sound.xml_id.as_deref());
+            push_optional_attribute(
+                &mut output,
+                "presentation:play-full",
+                sound
+                    .play_full
+                    .map(|value| if value { "true" } else { "false" }),
+            );
+            output.push_str("/></style:drawing-page-properties>");
+        } else {
+            output.push_str("/>");
+        }
+        output.push_str("</style:style>");
+    }
+    output
+}
+
 impl Default for PresentationBuilder {
     fn default() -> Self {
         Self::new()
@@ -146,6 +245,7 @@ impl PresentationBuilder {
             text: text.to_string(),
             index: self.slides.len(),
             notes: None,
+            transition: None,
             shapes: Vec::new(),
         };
         self.slides.push(slide);
@@ -175,6 +275,7 @@ impl PresentationBuilder {
             text: text.to_string(),
             index: self.slides.len(),
             notes: None,
+            transition: None,
             shapes: Vec::new(),
         };
         self.slides.push(slide);
@@ -199,6 +300,7 @@ impl PresentationBuilder {
     ///     text: "Custom content".to_string(),
     ///     index: 0,
     ///     notes: Some("Speaker notes".to_string()),
+    ///     transition: None,
     ///     shapes: vec![],
     /// };
     /// builder.add_slide_element(slide)?;
@@ -377,9 +479,11 @@ impl PresentationBuilder {
         let mut body = String::with_capacity(estimated);
 
         for (i, slide) in self.slides.iter().enumerate() {
+            let slide_style = slide_style_name(slide, i);
             body.push_str(&format!(
-                r#"<draw:page draw:name="page{}" draw:style-name="dp1" draw:master-page-name="Default">"#,
-                i + 1
+                r#"<draw:page draw:name="page{}" draw:style-name="{}" draw:master-page-name="Default">"#,
+                i + 1,
+                slide_style
             ));
 
             // Add title frame if title exists
@@ -420,10 +524,11 @@ impl PresentationBuilder {
     /// Generate the complete content.xml for presentation
     fn generate_content_xml(&self) -> Result<String> {
         let body = self.generate_content_body()?;
+        let transition_styles = generate_transition_styles(&self.slides);
 
         Ok(format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:math="http://www.w3.org/1998/Math/MathML" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:ooo="http://openoffice.org/2004/office" office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles/><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
-            body
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:math="http://www.w3.org/1998/Math/MathML" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:ooo="http://openoffice.org/2004/office" office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles>{}</office:automatic-styles><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
+            transition_styles, body
         ))
     }
 
@@ -515,7 +620,10 @@ impl PresentationBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::odp::Shape;
+    use crate::odp::{
+        Presentation, Shape, TransitionDirection, TransitionSound, TransitionSoundShow,
+        TransitionSpeed, TransitionStyle, TransitionType,
+    };
     use litchi_core::ShapeType;
 
     #[test]
@@ -553,5 +661,48 @@ mod tests {
             generate_text_paragraphs(" leading  text\ttab\nnext ", Some("P&1")),
             r#"<text:p text:style-name="P&amp;1"><text:s/>leading<text:s text:c="2"/>text<text:tab/>tab</text:p><text:p text:style-name="P&amp;1">next<text:s/></text:p>"#
         );
+    }
+
+    #[test]
+    fn transition_configuration_round_trips_through_a_package() {
+        let mut builder = PresentationBuilder::new();
+        builder.add_slide("Transition slide").unwrap();
+        let transition = builder.slides[0].transition_mut();
+        transition
+            .set_transition_type(Some(TransitionType::Automatic))
+            .set_style(Some(TransitionStyle::new("fade-from-left").unwrap()))
+            .set_speed(Some(TransitionSpeed::Fast))
+            .set_smil_type(Some("fade & dissolve"))
+            .set_smil_subtype(Some("crossfade"))
+            .set_direction(Some(TransitionDirection::Reverse));
+        transition.set_fade_color(Some("#102030")).unwrap();
+        transition.set_duration(Some("PT6.5S")).unwrap();
+        let mut sound = TransitionSound::new("Sounds/a&b.ogg");
+        sound.play_full = Some(true);
+        sound.actuate_on_request = true;
+        sound.show = Some(TransitionSoundShow::Replace);
+        sound.xml_id = Some("transitionSound1".to_string());
+        transition.set_sound(Some(sound));
+
+        let presentation = Presentation::from_bytes(builder.build().unwrap()).unwrap();
+        let slide = presentation.slides().unwrap().remove(0);
+        let transition = slide.transition().unwrap();
+        assert_eq!(
+            transition.transition_type(),
+            Some(TransitionType::Automatic)
+        );
+        assert_eq!(transition.style().unwrap().as_str(), "fade-from-left");
+        assert_eq!(transition.speed(), Some(TransitionSpeed::Fast));
+        assert_eq!(transition.smil_type(), Some("fade & dissolve"));
+        assert_eq!(transition.smil_subtype(), Some("crossfade"));
+        assert_eq!(transition.direction(), Some(TransitionDirection::Reverse));
+        assert_eq!(transition.fade_color(), Some("#102030"));
+        assert_eq!(transition.duration(), Some("PT6.5S"));
+        let sound = transition.sound().unwrap();
+        assert_eq!(sound.href, "Sounds/a&b.ogg");
+        assert_eq!(sound.play_full, Some(true));
+        assert!(sound.actuate_on_request);
+        assert_eq!(sound.show, Some(TransitionSoundShow::Replace));
+        assert_eq!(sound.xml_id.as_deref(), Some("transitionSound1"));
     }
 }

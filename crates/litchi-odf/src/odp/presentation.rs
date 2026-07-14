@@ -152,7 +152,10 @@ impl Presentation {
         let content_bytes = package.get_file("content.xml")?;
         let content = Content::from_bytes(&content_bytes)?;
 
-        OdpParser::parse_slides(content.xml_content())
+        OdpParser::parse_slides_with_styles(
+            content.xml_content(),
+            self.styles.as_ref().map(Styles::xml_content),
+        )
     }
 
     /// Get a slide by index.

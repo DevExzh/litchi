@@ -1,5 +1,6 @@
 //! Slide and shape structures for ODP presentations.
 
+use super::SlideTransition;
 use litchi_core::Result;
 
 /// A slide in an ODP presentation.
@@ -15,6 +16,8 @@ pub struct Slide {
     pub index: usize,
     /// Optional notes for the slide
     pub notes: Option<String>,
+    /// Optional slide transition and automatic-advance properties.
+    pub transition: Option<SlideTransition>,
     /// Shapes on the slide
     pub shapes: Vec<Shape>,
 }
@@ -74,6 +77,21 @@ impl Slide {
     /// Returns speaker notes for this slide if present, None otherwise.
     pub fn notes(&self) -> Result<Option<&str>> {
         Ok(self.notes.as_deref())
+    }
+
+    /// Get the slide transition configuration.
+    pub fn transition(&self) -> Option<&SlideTransition> {
+        self.transition.as_ref()
+    }
+
+    /// Get or create the slide transition configuration.
+    pub fn transition_mut(&mut self) -> &mut SlideTransition {
+        self.transition.get_or_insert_with(SlideTransition::new)
+    }
+
+    /// Remove the slide transition configuration.
+    pub fn clear_transition(&mut self) {
+        self.transition = None;
     }
 }
 
@@ -178,6 +196,7 @@ mod tests {
             text: String::new(),
             index: 0,
             notes: None,
+            transition: None,
             shapes: vec![],
         };
         assert!(slide.title.is_none());
@@ -191,6 +210,7 @@ mod tests {
             text: "Slide content".to_string(),
             index: 5,
             notes: Some("Speaker notes".to_string()),
+            transition: None,
             shapes: vec![],
         };
         assert_eq!(slide.title().unwrap(), Some("Test Slide"));
@@ -206,6 +226,7 @@ mod tests {
             text: String::new(),
             index: 0,
             notes: None,
+            transition: None,
             shapes: vec![],
         };
         assert_eq!(slide.title().unwrap(), Some("Title"));
@@ -218,6 +239,7 @@ mod tests {
             text: String::new(),
             index: 0,
             notes: None,
+            transition: None,
             shapes: vec![],
         };
         assert_eq!(slide.title().unwrap(), None);
@@ -230,6 +252,7 @@ mod tests {
             text: "Hello World".to_string(),
             index: 0,
             notes: None,
+            transition: None,
             shapes: vec![],
         };
         assert_eq!(slide.text().unwrap(), "Hello World");
@@ -253,6 +276,7 @@ mod tests {
             text: String::new(),
             index: 0,
             notes: None,
+            transition: None,
             shapes,
         };
         assert_eq!(slide.shapes().unwrap().len(), 1);
@@ -265,6 +289,7 @@ mod tests {
             text: String::new(),
             index: 42,
             notes: None,
+            transition: None,
             shapes: vec![],
         };
         assert_eq!(slide.index(), 42);
@@ -277,6 +302,7 @@ mod tests {
             text: String::new(),
             index: 0,
             notes: Some("Notes".to_string()),
+            transition: None,
             shapes: vec![],
         };
         assert_eq!(slide.notes().unwrap(), Some("Notes"));
@@ -289,6 +315,7 @@ mod tests {
             text: String::new(),
             index: 0,
             notes: None,
+            transition: None,
             shapes: vec![],
         };
         assert_eq!(slide.notes().unwrap(), None);
@@ -301,6 +328,7 @@ mod tests {
             text: "Content".to_string(),
             index: 1,
             notes: Some("Notes".to_string()),
+            transition: None,
             shapes: vec![],
         };
         let cloned = slide.clone();

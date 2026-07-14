@@ -146,6 +146,7 @@ impl MutablePresentation {
             text: text.to_string(),
             index: self.slides.len(),
             notes: None,
+            transition: None,
             shapes: Vec::new(),
         };
         self.slides.push(slide);
@@ -180,6 +181,7 @@ impl MutablePresentation {
                 text: text.to_string(),
                 index,
                 notes: None,
+                transition: None,
                 shapes: Vec::new(),
             };
             self.slides.insert(index, slide);
@@ -412,9 +414,11 @@ impl MutablePresentation {
 
         for (i, slide) in self.slides.iter().enumerate() {
             let page_num = i + 1;
+            let slide_style = super::builder::slide_style_name(slide, i);
             body.push_str(&xml_minifier::minified_xml_format!(
-                r#"<draw:page draw:name="page{}" draw:style-name="dp1" draw:master-page-name="Default">"#,
-                page_num
+                r#"<draw:page draw:name="page{}" draw:style-name="{}" draw:master-page-name="Default">"#,
+                page_num,
+                slide_style
             ));
 
             // Add title frame if title exists
@@ -456,8 +460,10 @@ impl MutablePresentation {
             body.push_str("</draw:page>");
         }
 
+        let transition_styles = super::builder::generate_transition_styles(&self.slides);
         Ok(xml_minifier::minified_xml_format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles/><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles>{}</office:automatic-styles><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
+            transition_styles,
             body
         ))
     }

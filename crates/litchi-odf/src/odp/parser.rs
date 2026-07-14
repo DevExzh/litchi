@@ -1,18 +1,37 @@
 //! ODP-specific parsing utilities.
 
-use super::{Shape, Slide};
+use super::{
+    Shape, Slide, SlideTransition, TransitionDirection, TransitionSound, TransitionSoundShow,
+    TransitionSpeed, TransitionStyle, TransitionType,
+};
 use litchi_core::{Error, Result, ShapeType};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::collections::{HashMap, HashSet};
 
 const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+const SMIL_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0";
 const SVG_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
 const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
+const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
+
+#[derive(Clone, Default)]
+struct TransitionStyleDefinition {
+    parent: Option<String>,
+    transition: SlideTransition,
+}
+
+#[derive(Default)]
+struct TransitionStyles {
+    named: HashMap<String, TransitionStyleDefinition>,
+    default: SlideTransition,
+}
 
 #[derive(Clone, Copy)]
 enum ShapeElement {
@@ -330,8 +349,267 @@ impl OdpParser {
         Ok(())
     }
 
+    fn parse_optional_bool(value: Option<String>, attribute: &str) -> Result<Option<bool>> {
+        value
+            .map(|value| match value.as_str() {
+                "true" | "1" => Ok(true),
+                "false" | "0" => Ok(false),
+                _ => Err(Error::InvalidFormat(format!(
+                    "invalid {attribute} value '{value}'"
+                ))),
+            })
+            .transpose()
+    }
+
+    fn parse_transition_properties(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+        transition: &mut SlideTransition,
+    ) -> Result<()> {
+        transition.transition_type =
+            Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"transition-type")?
+                .map(|value| TransitionType::parse(&value))
+                .transpose()?;
+        transition.style =
+            Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"transition-style")?
+                .map(TransitionStyle::new)
+                .transpose()?;
+        transition.speed =
+            Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"transition-speed")?
+                .map(|value| TransitionSpeed::parse(&value))
+                .transpose()?;
+        transition.smil_type = Self::get_attr(reader, element, SMIL_NAMESPACE, b"type")?;
+        transition.smil_subtype = Self::get_attr(reader, element, SMIL_NAMESPACE, b"subtype")?;
+        transition.direction = Self::get_attr(reader, element, SMIL_NAMESPACE, b"direction")?
+            .map(|value| TransitionDirection::parse(&value))
+            .transpose()?;
+        transition.set_fade_color(Self::get_attr(
+            reader,
+            element,
+            SMIL_NAMESPACE,
+            b"fadeColor",
+        )?)?;
+        transition.set_duration(Self::get_attr(
+            reader,
+            element,
+            PRESENTATION_NAMESPACE,
+            b"duration",
+        )?)?;
+        Ok(())
+    }
+
+    fn parse_transition_sound(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+    ) -> Result<TransitionSound> {
+        let href = Self::get_attr(reader, element, XLINK_NAMESPACE, b"href")?.ok_or_else(|| {
+            Error::InvalidFormat("presentation:sound is missing xlink:href".to_string())
+        })?;
+        if let Some(link_type) = Self::get_attr(reader, element, XLINK_NAMESPACE, b"type")?
+            && link_type != "simple"
+        {
+            return Err(Error::InvalidFormat(format!(
+                "invalid presentation:sound xlink:type '{link_type}'"
+            )));
+        }
+        let actuate = Self::get_attr(reader, element, XLINK_NAMESPACE, b"actuate")?;
+        if actuate.as_deref().is_some_and(|value| value != "onRequest") {
+            return Err(Error::InvalidFormat(format!(
+                "invalid presentation:sound xlink:actuate '{}'",
+                actuate.as_deref().expect("actuate checked above")
+            )));
+        }
+        let show = Self::get_attr(reader, element, XLINK_NAMESPACE, b"show")?
+            .map(|value| TransitionSoundShow::parse(&value))
+            .transpose()?;
+        let play_full = Self::parse_optional_bool(
+            Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"play-full")?,
+            "presentation:play-full",
+        )?;
+        Ok(TransitionSound {
+            href,
+            play_full,
+            actuate_on_request: actuate.is_some(),
+            show,
+            xml_id: Self::get_attr(reader, element, XML_NAMESPACE, b"id")?,
+        })
+    }
+
+    fn parse_transition_style_definitions(xml: &str) -> Result<TransitionStyles> {
+        let mut reader = NsReader::from_str(xml);
+        let mut buf = Vec::new();
+        let mut result = TransitionStyles::default();
+        let mut current: Option<(Option<String>, bool, TransitionStyleDefinition)> = None;
+        let mut in_properties = false;
+
+        loop {
+            let (namespace, event) = reader
+                .read_resolved_event_into(&mut buf)
+                .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+            match event {
+                Event::Start(ref element)
+                    if Self::is_namespace(&namespace, STYLE_NAMESPACE)
+                        && matches!(element.local_name().as_ref(), b"style" | b"default-style") =>
+                {
+                    let family = Self::get_attr(&reader, element, STYLE_NAMESPACE, b"family")?;
+                    let is_drawing_page = family.as_deref() == Some("drawing-page");
+                    let name = Self::get_attr(&reader, element, STYLE_NAMESPACE, b"name")?;
+                    let parent =
+                        Self::get_attr(&reader, element, STYLE_NAMESPACE, b"parent-style-name")?;
+                    current = Some((
+                        name,
+                        is_drawing_page,
+                        TransitionStyleDefinition {
+                            parent,
+                            transition: SlideTransition::new(),
+                        },
+                    ));
+                },
+                Event::Empty(ref element)
+                    if Self::is_namespace(&namespace, STYLE_NAMESPACE)
+                        && matches!(element.local_name().as_ref(), b"style" | b"default-style") =>
+                {
+                    let family = Self::get_attr(&reader, element, STYLE_NAMESPACE, b"family")?;
+                    if family.as_deref() == Some("drawing-page") {
+                        let name = Self::get_attr(&reader, element, STYLE_NAMESPACE, b"name")?;
+                        let definition = TransitionStyleDefinition {
+                            parent: Self::get_attr(
+                                &reader,
+                                element,
+                                STYLE_NAMESPACE,
+                                b"parent-style-name",
+                            )?,
+                            transition: SlideTransition::new(),
+                        };
+                        if let Some(name) = name {
+                            result.named.insert(name, definition);
+                        } else {
+                            result.default = definition.transition;
+                        }
+                    }
+                },
+                Event::Start(ref element) | Event::Empty(ref element)
+                    if current.as_ref().is_some_and(|(_, family, _)| *family)
+                        && Self::is_namespace(&namespace, STYLE_NAMESPACE)
+                        && element.local_name().as_ref() == b"drawing-page-properties" =>
+                {
+                    let (_, _, definition) = current.as_mut().expect("style checked above");
+                    Self::parse_transition_properties(
+                        &reader,
+                        element,
+                        &mut definition.transition,
+                    )?;
+                    in_properties = matches!(event, Event::Start(_));
+                },
+                Event::Start(ref element) | Event::Empty(ref element)
+                    if in_properties
+                        && Self::is_namespace(&namespace, PRESENTATION_NAMESPACE)
+                        && element.local_name().as_ref() == b"sound" =>
+                {
+                    let (_, _, definition) = current.as_mut().expect("properties require style");
+                    definition.transition.sound =
+                        Some(Self::parse_transition_sound(&reader, element)?);
+                },
+                Event::End(ref element)
+                    if Self::is_namespace(&namespace, STYLE_NAMESPACE)
+                        && element.local_name().as_ref() == b"drawing-page-properties" =>
+                {
+                    in_properties = false;
+                },
+                Event::End(ref element)
+                    if Self::is_namespace(&namespace, STYLE_NAMESPACE)
+                        && matches!(element.local_name().as_ref(), b"style" | b"default-style") =>
+                {
+                    if let Some((name, is_drawing_page, definition)) = current.take()
+                        && is_drawing_page
+                    {
+                        if let Some(name) = name {
+                            result.named.insert(name, definition);
+                        } else {
+                            result.default = definition.transition;
+                        }
+                    }
+                    in_properties = false;
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+            buf.clear();
+        }
+        Ok(result)
+    }
+
+    fn resolved_transition_styles(
+        content: &str,
+        styles: Option<&str>,
+    ) -> Result<(HashMap<String, SlideTransition>, SlideTransition)> {
+        let mut definitions = TransitionStyles::default();
+        if let Some(styles) = styles {
+            definitions = Self::parse_transition_style_definitions(styles)?;
+        }
+        let content_definitions = Self::parse_transition_style_definitions(content)?;
+        definitions.named.extend(content_definitions.named);
+        if !content_definitions.default.is_empty() {
+            definitions.default = content_definitions.default;
+        }
+
+        fn resolve(
+            name: &str,
+            definitions: &HashMap<String, TransitionStyleDefinition>,
+            default: &SlideTransition,
+            cache: &mut HashMap<String, SlideTransition>,
+            visiting: &mut HashSet<String>,
+            depth: usize,
+        ) -> Result<SlideTransition> {
+            if let Some(value) = cache.get(name) {
+                return Ok(value.clone());
+            }
+            if depth > 128 || !visiting.insert(name.to_string()) {
+                return Err(Error::InvalidFormat(format!(
+                    "cyclic or excessively deep drawing-page style inheritance at '{name}'"
+                )));
+            }
+            let definition = definitions.get(name).cloned().unwrap_or_default();
+            let mut value = definition.transition;
+            let parent = if let Some(parent) = definition.parent {
+                resolve(&parent, definitions, default, cache, visiting, depth + 1)?
+            } else {
+                default.clone()
+            };
+            value.inherit_from(&parent);
+            visiting.remove(name);
+            cache.insert(name.to_string(), value.clone());
+            Ok(value)
+        }
+
+        let mut resolved = HashMap::with_capacity(definitions.named.len());
+        let names: Vec<String> = definitions.named.keys().cloned().collect();
+        for name in names {
+            resolve(
+                &name,
+                &definitions.named,
+                &definitions.default,
+                &mut resolved,
+                &mut HashSet::new(),
+                0,
+            )?;
+        }
+        Ok((resolved, definitions.default))
+    }
+
     /// Parse all slides from ODP content.xml
+    #[cfg(test)]
     pub fn parse_slides(xml_content: &str) -> Result<Vec<Slide>> {
+        Self::parse_slides_with_styles(xml_content, None)
+    }
+
+    /// Parse slides and resolve drawing-page transition styles.
+    pub fn parse_slides_with_styles(
+        xml_content: &str,
+        styles_xml: Option<&str>,
+    ) -> Result<Vec<Slide>> {
+        let (transition_styles, default_transition) =
+            Self::resolved_transition_styles(xml_content, styles_xml)?;
         let mut reader = NsReader::from_str(xml_content);
         let mut buf = Vec::new();
         let mut slides = Vec::new();
@@ -346,6 +624,7 @@ impl OdpParser {
         let mut current_notes_has_paragraph = false;
         let mut in_notes = false;
         let mut current_slide_has_segment = false;
+        let mut current_transition: Option<SlideTransition> = None;
 
         // Shape parsing state
         let mut current_shape: Option<ShapeBuilder> = None;
@@ -368,6 +647,7 @@ impl OdpParser {
                                     index: slide_index,
                                     notes: (!current_notes_text.is_empty())
                                         .then(|| std::mem::take(&mut current_notes_text)),
+                                    transition: current_transition.take(),
                                     shapes: std::mem::take(&mut current_shapes),
                                 });
                                 slide_index += 1;
@@ -375,6 +655,14 @@ impl OdpParser {
                             current_slide_title = None;
                             current_slide_has_segment = false;
                             current_notes_has_paragraph = false;
+                            let style_name =
+                                Self::get_attr(&reader, element, DRAW_NAMESPACE, b"style-name")?;
+                            let transition = style_name
+                                .as_deref()
+                                .and_then(|name| transition_styles.get(name))
+                                .unwrap_or(&default_transition)
+                                .clone();
+                            current_transition = (!transition.is_empty()).then_some(transition);
                             in_slide = true;
                         },
                         OdpElement::Notes if in_slide => in_notes = true,
@@ -453,6 +741,24 @@ impl OdpParser {
                 Event::Empty(ref element) => {
                     let element_type = Self::classify(&namespace, element.local_name().as_ref());
                     match element_type {
+                        OdpElement::Page if !in_slide => {
+                            let style_name =
+                                Self::get_attr(&reader, element, DRAW_NAMESPACE, b"style-name")?;
+                            let transition = style_name
+                                .as_deref()
+                                .and_then(|name| transition_styles.get(name))
+                                .unwrap_or(&default_transition)
+                                .clone();
+                            slides.push(Slide {
+                                title: None,
+                                text: String::new(),
+                                index: slide_index,
+                                notes: None,
+                                transition: (!transition.is_empty()).then_some(transition),
+                                shapes: Vec::new(),
+                            });
+                            slide_index += 1;
+                        },
                         OdpElement::TextParagraph if in_slide => {
                             Self::push_parsed_paragraph(
                                 "",
@@ -543,6 +849,7 @@ impl OdpParser {
                                     index: slide_index,
                                     notes: (!current_notes_text.is_empty())
                                         .then(|| std::mem::take(&mut current_notes_text)),
+                                    transition: current_transition.take(),
                                     shapes: std::mem::take(&mut current_shapes),
                                 });
                                 slide_index += 1;
@@ -718,6 +1025,7 @@ mod tests {
             text: "Content".to_string(),
             index: 0,
             notes: None,
+            transition: None,
             shapes: vec![],
         };
         let debug_str = format!("{:?}", slide);
@@ -732,6 +1040,7 @@ mod tests {
             text: "Content".to_string(),
             index: 0,
             notes: None,
+            transition: None,
             shapes: vec![],
         };
         let cloned = slide.clone();
@@ -922,5 +1231,37 @@ mod tests {
         assert_eq!(connector.position(), (Some("1cm"), Some("2cm")));
         assert_eq!(connector.dimensions(), (Some("3cm"), Some("4cm")));
         assert_eq!(slides[0].shapes[2].shape_type, ShapeType::Table);
+    }
+
+    #[test]
+    fn resolves_transition_styles_across_package_parts_and_inheritance() {
+        let styles = r##"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:m="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:l="http://www.w3.org/1999/xlink"><o:styles><s:default-style s:family="drawing-page"><s:drawing-page-properties p:transition-speed="slow"/></s:default-style><s:style s:name="Base" s:family="drawing-page"><s:drawing-page-properties p:transition-type="automatic" p:duration="PT8S"><p:sound l:type="simple" l:href="Sounds/a&amp;b.ogg" l:actuate="onRequest" l:show="replace" p:play-full="true"/></s:drawing-page-properties></s:style></o:styles></o:document-styles>"##;
+        let content = r##"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:m="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0"><o:automatic-styles><s:style s:name="Child" s:family="drawing-page" s:parent-style-name="Base"><s:drawing-page-properties p:transition-style="fade-from-left" p:transition-speed="fast" m:type="fade" m:subtype="crossfade" m:direction="reverse" m:fadeColor="#aB09fF"/></s:style></o:automatic-styles><o:body><o:presentation><d:page d:style-name="Child"/></o:presentation></o:body></o:document-content>"##;
+
+        let slides = OdpParser::parse_slides_with_styles(content, Some(styles)).unwrap();
+        let transition = slides[0].transition().unwrap();
+        assert_eq!(
+            transition.transition_type(),
+            Some(TransitionType::Automatic)
+        );
+        assert_eq!(transition.style().unwrap().as_str(), "fade-from-left");
+        assert_eq!(transition.speed(), Some(TransitionSpeed::Fast));
+        assert_eq!(transition.smil_type(), Some("fade"));
+        assert_eq!(transition.smil_subtype(), Some("crossfade"));
+        assert_eq!(transition.direction(), Some(TransitionDirection::Reverse));
+        assert_eq!(transition.fade_color(), Some("#aB09fF"));
+        assert_eq!(transition.duration(), Some("PT8S"));
+        let sound = transition.sound().unwrap();
+        assert_eq!(sound.href, "Sounds/a&b.ogg");
+        assert_eq!(sound.play_full, Some(true));
+        assert!(sound.actuate_on_request);
+        assert_eq!(sound.show, Some(TransitionSoundShow::Replace));
+    }
+
+    #[test]
+    fn rejects_cyclic_transition_style_inheritance() {
+        let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><o:automatic-styles><s:style s:name="A" s:family="drawing-page" s:parent-style-name="B"/><s:style s:name="B" s:family="drawing-page" s:parent-style-name="A"/></o:automatic-styles><o:body><o:presentation><d:page d:style-name="A"/></o:presentation></o:body></o:document-content>"#;
+        let error = OdpParser::parse_slides_with_styles(content, None).unwrap_err();
+        assert!(error.to_string().contains("cyclic"));
     }
 }

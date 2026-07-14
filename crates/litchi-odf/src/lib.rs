@@ -111,7 +111,6 @@
 //! - ⚠️ Chart creation and parsing
 //! - ⚠️ Conditional formatting
 //! - ⚠️ Pivot tables
-//! - ⚠️ Cell-style protection resolution
 //! - ⚠️ Filter and sort criteria
 //!
 //! ## ✅ ODP - Presentations (COMPLETE for reading/writing)
@@ -124,6 +123,8 @@
 //! - ✅ Master page parsing
 //! - ✅ Text extraction from slides
 //! - ✅ Metadata extraction
+//! - ✅ Speaker notes extraction
+//! - ✅ Slide transition and automatic-timing style resolution
 //!
 //! ### Writing (`odp/builder.rs`, `odp/mutable.rs`)
 //! - ✅ PresentationBuilder for creating new ODP files
@@ -132,16 +133,15 @@
 //! - ✅ Set slide layouts
 //! - ✅ MutablePresentation for modifying existing presentations
 //! - ✅ Set metadata
+//! - ✅ Speaker notes
+//! - ✅ Slide transitions, timings, and transition sounds
 //! - ✅ Save to file or bytes
 //!
 //! ### TODO - Advanced Features
-//! - ⚠️ Slide transitions
 //! - ⚠️ Animations
-//! - ⚠️ Speaker notes
 //! - ⚠️ Multimedia embedding (audio, video)
 //! - ⚠️ Custom slide layouts
 //! - ⚠️ Advanced shape properties
-//! - ⚠️ Connector lines
 //! - ⚠️ Slide master manipulation
 //!
 //! ## 🚧 Additional ODF Formats (NOT IMPLEMENTED)
@@ -232,7 +232,10 @@ pub use litchi_core::RGBColor as Color;
 pub use litchi_core::unit::{Length, LengthUnit};
 
 // Re-export main types for convenience
-pub use odp::{MutablePresentation, Presentation, PresentationBuilder};
+pub use odp::{
+    MutablePresentation, Presentation, PresentationBuilder, SlideTransition, TransitionDirection,
+    TransitionSound, TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
+};
 pub use ods::{
     AnnotationElement, AnnotationNode, Cell as SCell, CellAnnotation, CellMatrixSpan, CellMerge,
     CellStyleProtection, CellValue, Column as SColumn, ContentValidation, FormulaNamespace,

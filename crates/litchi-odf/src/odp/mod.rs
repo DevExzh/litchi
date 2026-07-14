@@ -18,6 +18,8 @@
 //! - ✅ Master page parsing
 //! - ✅ Metadata extraction
 //! - ✅ Style parsing
+//! - ✅ Speaker notes
+//! - ✅ Slide transition and automatic-timing style resolution
 //!
 //! ## ✅ Writing (`builder.rs`, `mutable.rs`) - COMPLETE
 //! - ✅ `PresentationBuilder::new()` - Create new presentations
@@ -27,18 +29,15 @@
 //! - ✅ `set_title()` / `set_author()` - Set metadata
 //! - ✅ `save()` / `to_bytes()` - Write to file or bytes
 //! - ✅ `MutablePresentation` - Modify existing presentations
+//! - ✅ Slide transitions, timings, and transition sounds
 //!
 //! ## 🚧 TODO - Advanced Features
-//! - ⚠️ Slide transitions (fade, wipe, push, etc.)
 //! - ⚠️ Animations (entrance, emphasis, exit, motion paths)
-//! - ⚠️ Speaker notes (notes pages)
 //! - ⚠️ Multimedia embedding (audio, video)
 //! - ⚠️ Custom slide layouts
 //! - ⚠️ Advanced shape properties (gradients, shadows, 3D effects)
-//! - ⚠️ Connector lines (arrows between shapes)
 //! - ⚠️ Slide master editing
 //! - ⚠️ SmartArt/diagrams
-//! - ⚠️ Slide timings
 //! - ⚠️ Action buttons and hyperlinks
 //! - ⚠️ Embedded charts
 //! - ⚠️ Presentation protection
@@ -53,8 +52,13 @@ mod mutable;
 mod parser;
 mod presentation;
 mod slide;
+mod transition;
 
 pub use builder::PresentationBuilder;
 pub use mutable::MutablePresentation;
 pub use presentation::Presentation;
 pub use slide::{Shape, Slide};
+pub use transition::{
+    SlideTransition, TransitionDirection, TransitionSound, TransitionSoundShow, TransitionSpeed,
+    TransitionStyle, TransitionType,
+};
