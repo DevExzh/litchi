@@ -186,6 +186,15 @@ pub fn write_chart<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<(
 fn write_title<W: Write>(writer: &mut W, title: &TitleText) -> std::io::Result<()> {
     write!(writer, "<c:title>")?;
 
+    write_title_text(writer, title)?;
+
+    write!(writer, r#"<c:overlay val="0"/>"#)?;
+    write!(writer, "</c:title>")?;
+
+    Ok(())
+}
+
+fn write_title_text<W: Write>(writer: &mut W, title: &TitleText) -> std::io::Result<()> {
     match title {
         TitleText::Literal(rich_text) => {
             write!(writer, "<c:tx><c:rich>")?;
@@ -204,10 +213,6 @@ fn write_title<W: Write>(writer: &mut W, title: &TitleText) -> std::io::Result<(
             write!(writer, "</c:strRef></c:tx>")?;
         },
     }
-
-    write!(writer, r#"<c:overlay val="0"/>"#)?;
-    write!(writer, "</c:title>")?;
-
     Ok(())
 }
 
@@ -1451,12 +1456,35 @@ fn write_value_axis<W: Write>(writer: &mut W, axis: &ValueAxis) -> std::io::Resu
         write!(writer, r#"<c:minorUnit val="{}"/>"#, minor_unit)?;
     }
     if let Some(display_units) = &axis.display_units {
+        if display_units.built_in_unit.is_some() == display_units.custom_unit.is_some() {
+            return Err(invalid_chart_input(
+                "chart display units require exactly one built-in or custom unit",
+            ));
+        }
         write!(writer, "<c:dispUnits>")?;
         if let Some(unit) = display_units.built_in_unit {
             write!(writer, r#"<c:builtInUnit val="{}"/>"#, unit.xml_value())?;
         }
         if let Some(unit) = display_units.custom_unit {
+            if !unit.is_finite() || unit <= 0.0 {
+                return Err(invalid_chart_input(
+                    "chart custom display unit must be finite and positive",
+                ));
+            }
             write!(writer, r#"<c:custUnit val="{}"/>"#, unit)?;
+        }
+        if display_units.show_label
+            || display_units.label.is_some()
+            || display_units.layout.is_some()
+        {
+            write!(writer, "<c:dispUnitsLbl>")?;
+            if let Some(layout) = display_units.layout.as_ref() {
+                write_layout(writer, Some(layout))?;
+            }
+            if let Some(label) = display_units.label.as_ref() {
+                write_title_text(writer, label)?;
+            }
+            write!(writer, "</c:dispUnitsLbl>")?;
         }
         write!(writer, "</c:dispUnits>")?;
     }
@@ -1512,6 +1540,26 @@ fn write_legend<W: Write>(writer: &mut W, legend: &Legend) -> std::io::Result<()
         r#"<c:legendPos val="{}"/>"#,
         legend.position.xml_value()
     )?;
+    let mut entry_indexes = std::collections::HashSet::with_capacity(legend.entries.len());
+    for entry in &legend.entries {
+        if !entry_indexes.insert(entry.index) {
+            return Err(invalid_chart_input(format!(
+                "chart legend contains duplicate entry index {}",
+                entry.index
+            )));
+        }
+        write!(writer, "<c:legendEntry>")?;
+        write!(writer, r#"<c:idx val="{}"/>"#, entry.index)?;
+        write!(
+            writer,
+            r#"<c:delete val="{}"/>"#,
+            if entry.deleted { "1" } else { "0" }
+        )?;
+        write!(writer, "</c:legendEntry>")?;
+    }
+    if let Some(layout) = legend.layout.as_ref() {
+        write_layout(writer, Some(layout))?;
+    }
     write!(
         writer,
         r#"<c:overlay val="{}"/>"#,

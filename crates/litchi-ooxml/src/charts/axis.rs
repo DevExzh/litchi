@@ -120,6 +120,8 @@ pub struct DisplayUnits {
     pub built_in_unit: Option<BuiltInUnit>,
     /// Custom unit scale
     pub custom_unit: Option<f64>,
+    /// Whether to display the units label, including an automatically generated label
+    pub show_label: bool,
     /// Display units label
     pub label: Option<TitleText>,
     /// Layout for the label
@@ -133,6 +135,7 @@ impl DisplayUnits {
         Self {
             built_in_unit: Some(unit),
             custom_unit: None,
+            show_label: false,
             label: None,
             layout: None,
         }
@@ -144,6 +147,7 @@ impl DisplayUnits {
         Self {
             built_in_unit: None,
             custom_unit: Some(scale),
+            show_label: false,
             label: None,
             layout: None,
         }

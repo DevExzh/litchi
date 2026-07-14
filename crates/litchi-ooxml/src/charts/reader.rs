@@ -8,7 +8,7 @@ use crate::charts::axis::{
     DateAxis, DisplayUnits, SeriesAxis, TimeUnit, ValueAxis,
 };
 use crate::charts::chart::{Chart, View3D, WallFloor};
-use crate::charts::legend::Legend;
+use crate::charts::legend::{Legend, LegendEntry};
 use crate::charts::models::{
     DataSourceRef, Layout, NumberFormat, NumericData, RichText, StringData, TitleText,
 };
@@ -277,6 +277,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<TitleText> 
     let mut formula = None;
     let mut buf = Vec::new();
     let mut in_text = false;
+    let mut saw_text = false;
 
     loop {
         match reader.read_event_into(&mut buf) {
@@ -289,6 +290,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<TitleText> 
                 formula = Some(parse_text_element(reader, b"f")?);
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"t" => {
+                saw_text = true;
                 in_text = true;
             },
             Ok(Event::Text(e)) if in_text => {
@@ -316,7 +318,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<TitleText> 
     }
 
     if let Some(formula) = formula {
-        if !text.is_empty() {
+        if saw_text {
             return Err(OoxmlError::InvalidFormat(
                 "chart title mixes a formula reference with literal text".to_string(),
             ));
@@ -1920,8 +1922,7 @@ fn parse_value_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
     let mut major_unit = None;
     let mut minor_unit = None;
     let mut log_base = None;
-    let mut built_in_unit = None;
-    let mut custom_unit = None;
+    let mut display_units = None;
     let mut cross_between = AxisCrossBetween::Between;
     let mut buf = Vec::new();
 
@@ -1929,6 +1930,19 @@ fn parse_value_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"title" => {
                 common.title = Some(parse_title(reader)?);
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"dispUnits" => {
+                if display_units.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart value axis contains duplicate display units".into(),
+                    ));
+                }
+                display_units = Some(parse_display_units(reader)?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"dispUnits" => {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart display units are missing their unit".into(),
+                ));
             },
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
                 if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
@@ -1957,13 +1971,6 @@ fn parse_value_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
                         }
                         log_base = Some(value);
                     },
-                    b"builtInUnit" => built_in_unit = Some(parse_built_in_unit(element)?),
-                    b"custUnit" => {
-                        custom_unit = Some(required_positive_f64_attr(
-                            element,
-                            "chart custom display unit",
-                        )?);
-                    },
                     b"crossBetween" => cross_between = parse_axis_cross_between(element)?,
                     _ => {},
                 }
@@ -1981,11 +1988,6 @@ fn parse_value_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
             "chart axis minimum exceeds maximum".into(),
         ));
     }
-    if built_in_unit.is_some() && custom_unit.is_some() {
-        return Err(OoxmlError::InvalidFormat(
-            "chart axis cannot have both built-in and custom display units".into(),
-        ));
-    }
     let common = common.finish()?;
     let mut axis = ValueAxis::new(common.axis_id, common.position, common.cross_axis_id);
     axis.common = common;
@@ -1995,17 +1997,176 @@ fn parse_value_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
     axis.minor_unit = minor_unit;
     axis.log_base = log_base;
     axis.cross_between = cross_between;
-    axis.display_units = if built_in_unit.is_some() || custom_unit.is_some() {
-        Some(DisplayUnits {
-            built_in_unit,
-            custom_unit,
-            label: None,
-            layout: None,
-        })
+    axis.display_units = display_units;
+    Ok(Some(axis))
+}
+
+fn parse_display_units<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DisplayUnits> {
+    let mut built_in_unit = None;
+    let mut custom_unit = None;
+    let mut label = None;
+    let mut layout = None;
+    let mut saw_label = false;
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"dispUnitsLbl" => {
+                if saw_label {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart display units contain duplicate labels".into(),
+                    ));
+                }
+                saw_label = true;
+                (label, layout) = parse_display_units_label(reader)?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"dispUnitsLbl" => {
+                if saw_label {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart display units contain duplicate labels".into(),
+                    ));
+                }
+                saw_label = true;
+            },
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+                match element.local_name().as_ref() {
+                    b"builtInUnit" => {
+                        if built_in_unit.is_some() {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart display units contain duplicate built-in units".into(),
+                            ));
+                        }
+                        built_in_unit = Some(parse_built_in_unit(element)?);
+                    },
+                    b"custUnit" => {
+                        if custom_unit.is_some() {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart display units contain duplicate custom units".into(),
+                            ));
+                        }
+                        custom_unit = Some(required_positive_f64_attr(
+                            element,
+                            "chart custom display unit",
+                        )?);
+                    },
+                    _ => {},
+                }
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"dispUnits" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart display units".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+
+    if built_in_unit.is_some() == custom_unit.is_some() {
+        return Err(OoxmlError::InvalidFormat(
+            "chart display units require exactly one built-in or custom unit".into(),
+        ));
+    }
+    Ok(DisplayUnits {
+        built_in_unit,
+        custom_unit,
+        show_label: saw_label,
+        label,
+        layout,
+    })
+}
+
+fn parse_display_units_label<R: BufRead>(
+    reader: &mut ChartXmlReader<R>,
+) -> Result<(Option<TitleText>, Option<Layout>)> {
+    let mut text = String::new();
+    let mut formula = None;
+    let mut layout = None;
+    let mut in_text = false;
+    let mut saw_text = false;
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"layout" => {
+                if layout.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart display-units label contains duplicate layouts".into(),
+                    ));
+                }
+                layout = Some(parse_layout(reader)?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"layout" => {
+                layout = Some(match layout {
+                    None => Layout::new(),
+                    Some(_) => {
+                        return Err(OoxmlError::InvalidFormat(
+                            "chart display-units label contains duplicate layouts".into(),
+                        ));
+                    },
+                });
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"f" => {
+                if formula.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart display-units label contains duplicate formula references".into(),
+                    ));
+                }
+                formula = Some(parse_text_element(reader, b"f")?);
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"t" => {
+                saw_text = true;
+                in_text = true;
+            },
+            Ok(Event::Text(value)) if in_text => {
+                text.push_str(
+                    &value
+                        .decode()
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                );
+            },
+            Ok(Event::CData(value)) if in_text => {
+                text.push_str(
+                    &value
+                        .decode()
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                );
+            },
+            Ok(Event::GeneralRef(reference)) if in_text => {
+                text.push_str(&decode_xml_reference(&reference)?);
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"t" => {
+                in_text = false;
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"dispUnitsLbl" => {
+                break;
+            },
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart display-units label".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+
+    let label = if let Some(formula) = formula {
+        if saw_text {
+            return Err(OoxmlError::InvalidFormat(
+                "chart display-units label mixes a formula reference with literal text".into(),
+            ));
+        }
+        Some(TitleText::Reference(DataSourceRef::new(formula)))
+    } else if saw_text {
+        Some(TitleText::Literal(RichText::new(text)))
     } else {
         None
     };
-    Ok(Some(axis))
+    Ok((label, layout))
 }
 
 fn parse_date_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<DateAxis>> {
@@ -2130,10 +2291,48 @@ fn unterminated_axis(kind: &str) -> OoxmlError {
 fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
     let mut position = LegendPosition::Right;
     let mut overlay = false;
+    let mut layout = None;
+    let mut entries = Vec::new();
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"legendEntry" => {
+                let entry = parse_legend_entry(reader)?;
+                if entries
+                    .iter()
+                    .any(|existing: &LegendEntry| existing.index == entry.index)
+                {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "chart legend contains duplicate entry index {}",
+                        entry.index
+                    )));
+                }
+                entries.push(entry);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"legendEntry" => {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart legend entry is missing its index".into(),
+                ));
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"layout" => {
+                if layout.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart legend contains duplicate layouts".into(),
+                    ));
+                }
+                layout = Some(parse_layout(reader)?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"layout" => {
+                layout = Some(match layout {
+                    None => Layout::new(),
+                    Some(_) => {
+                        return Err(OoxmlError::InvalidFormat(
+                            "chart legend contains duplicate layouts".into(),
+                        ));
+                    },
+                });
+            },
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
@@ -2167,7 +2366,58 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
         buf.clear();
     }
 
-    Ok(Legend::new(position).with_overlay(overlay))
+    let mut legend = Legend::new(position).with_overlay(overlay);
+    legend.layout = layout;
+    legend.entries = entries;
+    Ok(legend)
+}
+
+fn parse_legend_entry<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<LegendEntry> {
+    let mut index = None;
+    let mut deleted = false;
+    let mut saw_delete = false;
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+                match element.local_name().as_ref() {
+                    b"idx" => {
+                        if index.is_some() {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart legend entry contains duplicate indexes".into(),
+                            ));
+                        }
+                        index = Some(required_u32_attr(element, "chart legend entry index")?);
+                    },
+                    b"delete" => {
+                        if saw_delete {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart legend entry contains duplicate delete flags".into(),
+                            ));
+                        }
+                        deleted = parse_bool_attr(element)?;
+                        saw_delete = true;
+                    },
+                    _ => {},
+                }
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"legendEntry" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart legend entry".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+
+    let index = index.ok_or_else(|| missing_attribute("chart legend entry index"))?;
+    let mut entry = LegendEntry::new(index);
+    entry.deleted = deleted;
+    Ok(entry)
 }
 
 #[inline]
@@ -2593,6 +2843,61 @@ mod tests {
     }
 
     #[test]
+    fn preserves_automatic_display_units_labels() {
+        let xml =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea><c:valAx><c:axId val="1"/><c:scaling/>
+                <c:axPos val="l"/><c:crossAx val="2"/><c:dispUnits>
+                    <c:builtInUnit val="thousands"/><c:dispUnitsLbl/>
+                </c:dispUnits>
+            </c:valAx></c:plotArea></c:chart>
+        </c:chartSpace>"#;
+
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let Axis::Value(axis) = &chart.plot_area.axes[0] else {
+            panic!("expected value axis");
+        };
+        let display_units = axis.display_units.as_ref().unwrap();
+        assert_eq!(display_units.built_in_unit, Some(BuiltInUnit::Thousands));
+        assert!(display_units.show_label);
+        assert!(display_units.label.is_none());
+        assert!(display_units.layout.is_none());
+
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        assert!(
+            std::str::from_utf8(&output)
+                .unwrap()
+                .contains("<c:dispUnitsLbl>")
+        );
+    }
+
+    #[test]
+    fn writer_rejects_invalid_display_units_and_duplicate_legend_entries() {
+        let mut chart = Chart::new();
+        let mut axis = ValueAxis::new(1, AxisPosition::Left, 2);
+        let mut units = DisplayUnits::custom(1_000.0);
+        units.built_in_unit = Some(BuiltInUnit::Thousands);
+        axis.display_units = Some(units);
+        chart.plot_area.axes.push(Axis::Value(axis));
+        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
+
+        let mut chart = Chart::new();
+        let mut axis = ValueAxis::new(1, AxisPosition::Left, 2);
+        axis.display_units = Some(DisplayUnits::custom(f64::NAN));
+        chart.plot_area.axes.push(Axis::Value(axis));
+        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
+
+        let mut chart = Chart::new();
+        let legend = Legend {
+            entries: vec![LegendEntry::new(4), LegendEntry::new(4)],
+            ..Legend::default()
+        };
+        chart.legend = Some(legend);
+        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
+    }
+
+    #[test]
     fn rejects_truncated_and_invalid_chart_values() {
         for xml in [
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea>"#.as_slice(),
@@ -2836,7 +3141,11 @@ mod tests {
         value.minor_unit = Some(2.0);
         value.log_base = Some(10.0);
         value.cross_between = AxisCrossBetween::MidCategory;
-        value.display_units = Some(DisplayUnits::built_in(BuiltInUnit::Millions));
+        let mut display_units = DisplayUnits::built_in(BuiltInUnit::Millions);
+        display_units.show_label = true;
+        display_units.label = Some(TitleText::from_string("Millions sold"));
+        display_units.layout = Some(Layout::new().with_position(0.15, 0.25));
+        value.display_units = Some(display_units);
 
         let mut date = DateAxis::new(30, AxisPosition::Top, 40);
         date.min = Some(45_000.0);
@@ -2859,6 +3168,12 @@ mod tests {
         layout.x_mode = Some(LayoutMode::Factor);
         layout.y_mode = Some(LayoutMode::Edge);
         chart.plot_area.layout = Some(layout);
+        let mut legend = Legend::new(LegendPosition::Top).with_overlay(true);
+        legend.layout = Some(Layout::new().with_size(0.4, 0.2));
+        let mut deleted_entry = LegendEntry::new(2);
+        deleted_entry.deleted = true;
+        legend.entries = vec![deleted_entry, LegendEntry::new(3)];
+        chart.legend = Some(legend);
         chart.plot_area.axes = vec![
             Axis::Category(category),
             Axis::Value(value),
@@ -2923,6 +3238,25 @@ mod tests {
             value.display_units.as_ref().unwrap().built_in_unit,
             Some(BuiltInUnit::Millions)
         );
+        let display_units = value.display_units.as_ref().unwrap();
+        assert!(display_units.show_label);
+        let Some(TitleText::Literal(label)) = display_units.label.as_ref() else {
+            panic!("expected literal display-units label");
+        };
+        assert_eq!(label.text, "Millions sold");
+        assert_eq!(display_units.layout.as_ref().unwrap().x, Some(0.15));
+        assert_eq!(display_units.layout.as_ref().unwrap().y, Some(0.25));
+
+        let legend = parsed.legend.as_ref().unwrap();
+        assert_eq!(legend.position, LegendPosition::Top);
+        assert!(legend.overlay);
+        assert_eq!(legend.layout.as_ref().unwrap().width, Some(0.4));
+        assert_eq!(legend.layout.as_ref().unwrap().height, Some(0.2));
+        assert_eq!(legend.entries.len(), 2);
+        assert_eq!(legend.entries[0].index, 2);
+        assert!(legend.entries[0].deleted);
+        assert_eq!(legend.entries[1].index, 3);
+        assert!(!legend.entries[1].deleted);
 
         let Axis::Date(date) = &parsed.plot_area.axes[2] else {
             unreachable!();
