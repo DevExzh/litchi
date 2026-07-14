@@ -1865,7 +1865,10 @@ mod tests {
   <sheetViews>
     <sheetView workbookViewId="0" showGridLines="1"/>
     <sheetView workbookViewId="2" view="pageBreakPreview" topLeftCell="B2"
-               zoomScale="90" zoomScaleNormal="110" showOutlineSymbols="0"/>
+               zoomScale="90" zoomScaleNormal="110" showOutlineSymbols="0">
+      <pane xSplit="1" ySplit="2" topLeftCell="B3" activePane="bottomRight" state="frozen"/>
+      <selection pane="bottomRight" activeCell="B3" sqref="B3:C4"/>
+    </sheetView>
   </sheetViews>
   <cols><col min="2" max="3" width="12.5" hidden="1" customWidth="1"/></cols>
   <sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>
@@ -2011,6 +2014,12 @@ mod tests {
         assert_eq!(view.zoom_scale, Some(90));
         assert_eq!(view.zoom_scale_normal, Some(110));
         assert_eq!(view.show_outline_symbols, Some(false));
+        assert_eq!(view.pane.as_ref().unwrap().x_split, Some(1.0));
+        assert_eq!(
+            view.pane.as_ref().unwrap().state,
+            Some(crate::xlsx::SheetPaneState::Frozen)
+        );
+        assert_eq!(view.selections[0].sqref.as_deref(), Some("B3:C4"));
     }
 
     #[test]

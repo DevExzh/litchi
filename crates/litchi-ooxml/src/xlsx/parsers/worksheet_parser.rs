@@ -17,7 +17,9 @@ use crate::xlsx::namespace::{
 };
 use crate::xlsx::shared_strings::decode_spreadsheet_text;
 use crate::xlsx::sort::{SortBy, SortCondition, SortMethod, SortState};
-use crate::xlsx::views::{SheetView, SheetViewType};
+use crate::xlsx::views::{
+    SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
+};
 use crate::xlsx::worksheet::{
     AutoFilter, ColumnInfo, ConditionalFormatRule, DataValidationRule, PageBreak, PageSetup,
     RowInfo,
@@ -344,6 +346,17 @@ impl Parser {
             self.sheet_view(element, decoder)?;
             return Ok(Context::SheetView);
         }
+        if parent == Context::SheetView && is_spreadsheetml_name(namespace, element.name(), b"pane")
+        {
+            self.sheet_pane(element, decoder)?;
+            return Ok(Context::Other);
+        }
+        if parent == Context::SheetView
+            && is_spreadsheetml_name(namespace, element.name(), b"selection")
+        {
+            self.sheet_selection(element, decoder)?;
+            return Ok(Context::Other);
+        }
         if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"sheetData")
         {
@@ -523,6 +536,14 @@ impl Parser {
             && is_spreadsheetml_name(namespace, element.name(), b"sheetView")
         {
             self.sheet_view(element, decoder)?;
+        } else if parent == Context::SheetView
+            && is_spreadsheetml_name(namespace, element.name(), b"pane")
+        {
+            self.sheet_pane(element, decoder)?;
+        } else if parent == Context::SheetView
+            && is_spreadsheetml_name(namespace, element.name(), b"selection")
+        {
+            self.sheet_selection(element, decoder)?;
         } else if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"sheetData")
         {
@@ -1267,6 +1288,94 @@ impl Parser {
                 b"zoomScalePageLayoutView",
                 decoder,
             )?,
+            pane: None,
+            selections: Vec::new(),
+        });
+        Ok(())
+    }
+
+    fn sheet_pane(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+        let view = self
+            .data
+            .sheet_views
+            .last_mut()
+            .ok_or_else(|| invalid("worksheet pane outside a sheet view"))?;
+        if view.pane.is_some() {
+            return Err(invalid("duplicate worksheet sheet-view pane"));
+        }
+        if !view.selections.is_empty() {
+            return Err(invalid(
+                "worksheet sheet-view pane appears after a selection",
+            ));
+        }
+        let x_split = optional_f64(
+            element,
+            b"xSplit",
+            decoder,
+            "worksheet sheet-view horizontal split",
+        )?;
+        let y_split = optional_f64(
+            element,
+            b"ySplit",
+            decoder,
+            "worksheet sheet-view vertical split",
+        )?;
+        if x_split.is_some_and(|value| !value.is_finite())
+            || y_split.is_some_and(|value| !value.is_finite())
+        {
+            return Err(invalid("worksheet sheet-view split must be finite"));
+        }
+        let top_left_cell = unqualified_attribute_value(element, b"topLeftCell", decoder)?;
+        if let Some(reference) = top_left_cell.as_deref() {
+            Cell::reference_to_coords(reference).map_err(|error| invalid(error.to_string()))?;
+        }
+        let active_pane = pane_position_attribute(element, b"activePane", decoder)?;
+        let state = enum_attribute(
+            element,
+            b"state",
+            decoder,
+            "worksheet sheet-view pane state",
+            &["split", "frozen", "frozenSplit"],
+        )?
+        .as_deref()
+        .and_then(SheetPaneState::parse);
+        view.pane = Some(SheetPane {
+            x_split,
+            y_split,
+            top_left_cell,
+            active_pane,
+            state,
+        });
+        Ok(())
+    }
+
+    fn sheet_selection(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+        let view = self
+            .data
+            .sheet_views
+            .last_mut()
+            .ok_or_else(|| invalid("worksheet selection outside a sheet view"))?;
+        if view.selections.len() >= 4 {
+            return Err(invalid("worksheet sheet view exceeds four selections"));
+        }
+        let active_cell = unqualified_attribute_value(element, b"activeCell", decoder)?;
+        if let Some(reference) = active_cell.as_deref() {
+            Cell::reference_to_coords(reference).map_err(|error| invalid(error.to_string()))?;
+        }
+        let sqref = unqualified_attribute_value(element, b"sqref", decoder)?;
+        if let Some(references) = sqref.as_deref() {
+            validate_sqref(references, "worksheet sheet-view selection sqref")?;
+        }
+        view.selections.push(SheetSelection {
+            pane: pane_position_attribute(element, b"pane", decoder)?,
+            active_cell,
+            active_cell_id: optional_u32(
+                element,
+                b"activeCellId",
+                decoder,
+                "worksheet sheet-view active-cell ID",
+            )?,
+            sqref,
         });
         Ok(())
     }
@@ -2152,6 +2261,21 @@ fn enum_attribute(
     Ok(value)
 }
 
+fn pane_position_attribute(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+) -> Result<Option<SheetPanePosition>> {
+    enum_attribute(
+        element,
+        name,
+        decoder,
+        "worksheet sheet-view pane position",
+        &["bottomRight", "topRight", "bottomLeft", "topLeft"],
+    )
+    .map(|value| value.as_deref().and_then(SheetPanePosition::parse))
+}
+
 fn validate_sqref(value: &str, description: &str) -> Result<()> {
     let mut references = value.split_whitespace().peekable();
     if references.peek().is_none() {
@@ -2522,6 +2646,10 @@ mod tests {
                         view="pageLayout" topLeftCell="XFD1048576" colorId="64"
                         zoomScale="125" zoomScaleNormal="100"
                         zoomScaleSheetLayoutView="60" zoomScalePageLayoutView="80">
+                        <x:pane xSplit="2" ySplit="3.5" topLeftCell="C4"
+                            activePane="bottomRight" state="frozenSplit"/>
+                        <x:selection pane="bottomRight" activeCell="D5"
+                            activeCellId="1" sqref="C4:D5 F7"/>
                         <f:sheetView workbookViewId="88"/>
                     </x:sheetView>
                 </x:sheetViews>
@@ -2551,6 +2679,20 @@ mod tests {
         assert_eq!(view.zoom_scale_normal, Some(100));
         assert_eq!(view.zoom_scale_sheet_layout_view, Some(60));
         assert_eq!(view.zoom_scale_page_layout_view, Some(80));
+        let pane = view.pane.as_ref().unwrap();
+        assert_eq!(pane.x_split, Some(2.0));
+        assert_eq!(pane.y_split, Some(3.5));
+        assert_eq!(pane.top_left_cell.as_deref(), Some("C4"));
+        assert_eq!(pane.active_pane, Some(SheetPanePosition::BottomRight));
+        assert_eq!(pane.state, Some(SheetPaneState::FrozenSplit));
+        assert_eq!(view.selections.len(), 1);
+        assert_eq!(
+            view.selections[0].pane,
+            Some(SheetPanePosition::BottomRight)
+        );
+        assert_eq!(view.selections[0].active_cell.as_deref(), Some("D5"));
+        assert_eq!(view.selections[0].active_cell_id, Some(1));
+        assert_eq!(view.selections[0].sqref.as_deref(), Some("C4:D5 F7"));
     }
 
     #[test]
@@ -2605,6 +2747,17 @@ mod tests {
             "<sheetViews><sheetView workbookViewId=\"0\" topLeftCell=\"A0\"/></sheetViews>",
             "<sheetViews><sheetView workbookViewId=\"0\" zoomScale=\"9\"/></sheetViews>",
             "<sheetViews><sheetView workbookViewId=\"0\" zoomScaleNormal=\"401\"/></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"0\"><pane activePane=\"center\"/></sheetView></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"0\"><pane state=\"fixed\"/></sheetView></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"0\"><pane xSplit=\"NaN\"/></sheetView></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"0\"><pane topLeftCell=\"A0\"/></sheetView></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"0\"><pane/><pane/></sheetView></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"0\"><selection/><pane/></sheetView></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"0\"><selection pane=\"center\"/></sheetView></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"0\"><selection activeCell=\"A0\"/></sheetView></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"0\"><selection activeCellId=\"x\"/></sheetView></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"0\"><selection sqref=\"B2:A1\"/></sheetView></sheetViews>",
+            "<sheetViews><sheetView workbookViewId=\"0\"><selection/><selection/><selection/><selection/><selection/></sheetView></sheetViews>",
             "<sheetViews><sheetView workbookViewId=\"0\"/></sheetViews><sheetViews><sheetView workbookViewId=\"1\"/></sheetViews>",
         ];
 

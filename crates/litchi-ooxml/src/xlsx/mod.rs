@@ -61,7 +61,9 @@ pub use sparkline::{
 };
 pub use styles::{Alignment, Border, BorderStyle, CellStyle, Fill, Font, NumberFormat, Styles};
 pub use table::{Table, TableColumn, TableFormula, TableStyleInfo, TableType, TotalsRowFunction};
-pub use views::{SheetView, SheetViewType};
+pub use views::{
+    SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
+};
 pub use workbook::Workbook;
 pub use worksheet::{
     AutoFilter, ColumnInfo, Comment, ConditionalFormatRule, DataValidationRule, Hyperlink,

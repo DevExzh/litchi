@@ -5,7 +5,7 @@ use crate::xlsx::cell::Cell;
 use crate::xlsx::sort::{SortCondition, SortState};
 use crate::xlsx::sparkline::{SparklineGroup, write_sparkline_groups_ext};
 use crate::xlsx::table::Table;
-use crate::xlsx::views::SheetView;
+use crate::xlsx::views::{SheetPane, SheetSelection, SheetView};
 /// Writer module for creating and modifying Excel worksheets.
 use litchi_core::sheet::{CellValue, Result as SheetResult};
 use litchi_core::{id::generate_guid_braced, xml::escape::escape_xml};
@@ -2174,6 +2174,16 @@ impl MutableWorksheet {
 
         // Add freeze panes if configured
         if let Some(ref freeze) = self.freeze_panes {
+            if self
+                .sheet_view
+                .as_ref()
+                .is_some_and(|view| view.pane.is_some() || !view.selections.is_empty())
+            {
+                return Err(
+                    "Freeze panes and explicit sheet-view pane selections cannot both be set"
+                        .into(),
+                );
+            }
             xml.push('>');
 
             let y_split = freeze.freeze_rows;
@@ -2205,6 +2215,20 @@ impl MutableWorksheet {
                 .map_err(|e| format!("XML write error: {}", e))?;
             }
 
+            xml.push_str("</sheetView>");
+        } else if let Some(view) = self.sheet_view.as_ref()
+            && (view.pane.is_some() || !view.selections.is_empty())
+        {
+            xml.push('>');
+            if let Some(pane) = view.pane.as_ref() {
+                self.write_sheet_pane(&mut xml, pane)?;
+            }
+            if view.selections.len() > 4 {
+                return Err("A sheet view cannot contain more than four selections".into());
+            }
+            for selection in &view.selections {
+                self.write_sheet_selection(&mut xml, selection)?;
+            }
             xml.push_str("</sheetView>");
         } else {
             xml.push_str("/>");
@@ -3335,6 +3359,86 @@ impl MutableWorksheet {
         Ok(())
     }
 
+    fn write_sheet_pane(&self, xml: &mut String, pane: &SheetPane) -> SheetResult<()> {
+        xml.push_str("<pane");
+        for (name, split) in [("xSplit", pane.x_split), ("ySplit", pane.y_split)] {
+            if let Some(split) = split {
+                if !split.is_finite() {
+                    return Err(format!("Sheet-view {name} must be finite").into());
+                }
+                write!(xml, r#" {name}="{split}""#)
+                    .map_err(|e| format!("XML write error: {}", e))?;
+            }
+        }
+        if let Some(cell) = pane.top_left_cell.as_deref() {
+            Cell::reference_to_coords(cell)?;
+            write!(xml, r#" topLeftCell="{}""#, escape_xml(cell))
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(active_pane) = pane.active_pane {
+            write!(xml, r#" activePane="{}""#, active_pane.as_str())
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(state) = pane.state {
+            write!(xml, r#" state="{}""#, state.as_str())
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        xml.push_str("/>");
+        Ok(())
+    }
+
+    fn write_sheet_selection(
+        &self,
+        xml: &mut String,
+        selection: &SheetSelection,
+    ) -> SheetResult<()> {
+        xml.push_str("<selection");
+        if let Some(pane) = selection.pane {
+            write!(xml, r#" pane="{}""#, pane.as_str())
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(cell) = selection.active_cell.as_deref() {
+            Cell::reference_to_coords(cell)?;
+            write!(xml, r#" activeCell="{}""#, escape_xml(cell))
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(active_cell_id) = selection.active_cell_id {
+            write!(xml, r#" activeCellId="{}""#, active_cell_id)
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        if let Some(sqref) = selection.sqref.as_deref() {
+            Self::validate_sheet_sqref(sqref)?;
+            write!(xml, r#" sqref="{}""#, escape_xml(sqref))
+                .map_err(|e| format!("XML write error: {}", e))?;
+        }
+        xml.push_str("/>");
+        Ok(())
+    }
+
+    fn validate_sheet_sqref(sqref: &str) -> SheetResult<()> {
+        let mut references = sqref.split_whitespace().peekable();
+        if references.peek().is_none() {
+            return Err("Sheet-view selection sqref cannot be empty".into());
+        }
+        for reference in references {
+            let mut cells = reference.split(':');
+            let start = cells
+                .next()
+                .ok_or("Sheet-view selection contains an empty reference")?;
+            let (start_column, start_row) = Cell::reference_to_coords(start)?;
+            if let Some(end) = cells.next() {
+                let (end_column, end_row) = Cell::reference_to_coords(end)?;
+                if start_column > end_column || start_row > end_row {
+                    return Err(format!("Invalid sheet-view selection range '{reference}'").into());
+                }
+            }
+            if cells.next().is_some() {
+                return Err(format!("Invalid sheet-view selection range '{reference}'").into());
+            }
+        }
+        Ok(())
+    }
+
     fn write_page_breaks(&self, xml: &mut String) -> SheetResult<()> {
         if !self.row_breaks.is_empty() {
             self.write_break_list(xml, "rowBreaks", &self.row_breaks)?;
@@ -3575,6 +3679,19 @@ mod tests {
             zoom_scale_normal: Some(100),
             zoom_scale_sheet_layout_view: Some(60),
             zoom_scale_page_layout_view: Some(80),
+            pane: Some(SheetPane {
+                x_split: Some(2.0),
+                y_split: Some(3.5),
+                top_left_cell: Some("C4".to_string()),
+                active_pane: Some(crate::xlsx::SheetPanePosition::BottomRight),
+                state: Some(crate::xlsx::SheetPaneState::FrozenSplit),
+            }),
+            selections: vec![SheetSelection {
+                pane: Some(crate::xlsx::SheetPanePosition::BottomRight),
+                active_cell: Some("D5".to_string()),
+                active_cell_id: Some(1),
+                sqref: Some("C4:D5 F7".to_string()),
+            }],
         });
 
         let mut shared_strings = MutableSharedStrings::new();
@@ -3591,6 +3708,9 @@ mod tests {
         assert_eq!(view.color_id, Some(12));
         assert_eq!(view.zoom_scale_sheet_layout_view, Some(60));
         assert_eq!(view.zoom_scale_page_layout_view, Some(80));
+        assert_eq!(view.pane.as_ref().unwrap().y_split, Some(3.5));
+        assert_eq!(view.selections.len(), 1);
+        assert_eq!(view.selections[0].active_cell.as_deref(), Some("D5"));
     }
 
     #[test]
@@ -3610,5 +3730,54 @@ mod tests {
             ..Default::default()
         });
         assert!(ws.to_xml(&mut shared_strings, &styles).is_err());
+
+        ws.set_sheet_view(SheetView {
+            pane: Some(SheetPane {
+                x_split: Some(f64::NAN),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+        assert!(ws.to_xml(&mut shared_strings, &styles).is_err());
+
+        ws.set_sheet_view(SheetView {
+            selections: vec![SheetSelection {
+                sqref: Some("B2:A1".to_string()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        assert!(ws.to_xml(&mut shared_strings, &styles).is_err());
+
+        ws.set_sheet_view(SheetView {
+            pane: Some(SheetPane::default()),
+            ..Default::default()
+        });
+        ws.freeze_panes(2, 1);
+        assert!(ws.to_xml(&mut shared_strings, &styles).is_err());
+    }
+
+    #[test]
+    fn generated_freeze_panes_round_trip() {
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+        ws.freeze_panes(2, 1);
+
+        let mut shared_strings = MutableSharedStrings::new();
+        let styles = HashMap::new();
+        let xml = ws.to_xml(&mut shared_strings, &styles).unwrap();
+        let parsed = crate::xlsx::parsers::worksheet_parser::parse_worksheet_data(&xml).unwrap();
+        let view = &parsed.sheet_views[0];
+        let pane = view.pane.as_ref().unwrap();
+
+        assert_eq!(pane.x_split, Some(1.0));
+        assert_eq!(pane.y_split, Some(2.0));
+        assert_eq!(pane.top_left_cell.as_deref(), Some("B3"));
+        assert_eq!(
+            pane.active_pane,
+            Some(crate::xlsx::SheetPanePosition::BottomRight)
+        );
+        assert_eq!(pane.state, Some(crate::xlsx::SheetPaneState::Frozen));
+        assert_eq!(view.selections[0].active_cell.as_deref(), Some("B3"));
+        assert_eq!(view.selections[0].sqref.as_deref(), Some("B3"));
     }
 }

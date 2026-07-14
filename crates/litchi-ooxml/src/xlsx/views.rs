@@ -33,6 +33,98 @@ impl SheetViewType {
     }
 }
 
+/// Pane position within a split or frozen worksheet view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SheetPanePosition {
+    /// Lower-right pane.
+    BottomRight,
+    /// Upper-right pane.
+    TopRight,
+    /// Lower-left pane.
+    BottomLeft,
+    /// Upper-left pane.
+    TopLeft,
+}
+
+impl SheetPanePosition {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::BottomRight => "bottomRight",
+            Self::TopRight => "topRight",
+            Self::BottomLeft => "bottomLeft",
+            Self::TopLeft => "topLeft",
+        }
+    }
+
+    pub(crate) fn parse(value: &str) -> Option<Self> {
+        match value {
+            "bottomRight" => Some(Self::BottomRight),
+            "topRight" => Some(Self::TopRight),
+            "bottomLeft" => Some(Self::BottomLeft),
+            "topLeft" => Some(Self::TopLeft),
+            _ => None,
+        }
+    }
+}
+
+/// Split/freeze state for a worksheet pane.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SheetPaneState {
+    /// A movable split pane.
+    Split,
+    /// Frozen rows and/or columns.
+    Frozen,
+    /// A frozen pane that also contains a split.
+    FrozenSplit,
+}
+
+impl SheetPaneState {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Split => "split",
+            Self::Frozen => "frozen",
+            Self::FrozenSplit => "frozenSplit",
+        }
+    }
+
+    pub(crate) fn parse(value: &str) -> Option<Self> {
+        match value {
+            "split" => Some(Self::Split),
+            "frozen" => Some(Self::Frozen),
+            "frozenSplit" => Some(Self::FrozenSplit),
+            _ => None,
+        }
+    }
+}
+
+/// Pane configuration within a worksheet view.
+#[derive(Debug, Clone, Default)]
+pub struct SheetPane {
+    /// Horizontal split position.
+    pub x_split: Option<f64>,
+    /// Vertical split position.
+    pub y_split: Option<f64>,
+    /// First visible cell in the lower-right pane.
+    pub top_left_cell: Option<String>,
+    /// Pane that currently has focus.
+    pub active_pane: Option<SheetPanePosition>,
+    /// Split/freeze state.
+    pub state: Option<SheetPaneState>,
+}
+
+/// Cell selection within a worksheet pane.
+#[derive(Debug, Clone, Default)]
+pub struct SheetSelection {
+    /// Pane containing the selection.
+    pub pane: Option<SheetPanePosition>,
+    /// Active cell reference.
+    pub active_cell: Option<String>,
+    /// Index of the active cell within `sqref`.
+    pub active_cell_id: Option<u32>,
+    /// Selected cell references.
+    pub sqref: Option<String>,
+}
+
 /// Worksheet view configuration.
 #[derive(Debug, Clone, Default)]
 pub struct SheetView {
@@ -74,4 +166,8 @@ pub struct SheetView {
     pub zoom_scale_sheet_layout_view: Option<u16>,
     /// Zoom scale for page-layout view.
     pub zoom_scale_page_layout_view: Option<u16>,
+    /// Optional split or frozen pane.
+    pub pane: Option<SheetPane>,
+    /// Selections associated with this view's panes.
+    pub selections: Vec<SheetSelection>,
 }
