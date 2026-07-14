@@ -213,23 +213,22 @@ fn analyze_table_spans(table: &Table, use_parallel: bool) -> Result<Vec<Vec<Cell
                             // Count how many rows below continue this merge
                             let mut rowspan = 1;
                             for next_row_idx in (row_idx + 1)..cell_data.len() {
-                                if let Some(next_cell) = cell_data[next_row_idx].get(grid_col) {
-                                    if matches!(next_cell.v_merge, Some(VMergeState::Continue)) {
-                                        rowspan += 1;
-                                        // Mark this cell as skipped
-                                        spans[next_row_idx][grid_col] = CellSpan::skipped();
-                                        // Also mark colspan cells as skipped
-                                        for offset in 1..colspan {
-                                            if grid_col + offset < max_grid_cols {
-                                                spans[next_row_idx][grid_col + offset] =
-                                                    CellSpan::skipped();
-                                            }
-                                        }
-                                    } else {
-                                        break;
-                                    }
-                                } else {
+                                let Some(next_cell) = cell_data[next_row_idx].get(grid_col) else {
                                     break;
+                                };
+                                if !matches!(next_cell.v_merge, Some(VMergeState::Continue)) {
+                                    break;
+                                }
+
+                                rowspan += 1;
+                                // Mark this cell as skipped
+                                spans[next_row_idx][grid_col] = CellSpan::skipped();
+                                // Also mark colspan cells as skipped
+                                for offset in 1..colspan {
+                                    if grid_col + offset < max_grid_cols {
+                                        spans[next_row_idx][grid_col + offset] =
+                                            CellSpan::skipped();
+                                    }
                                 }
                             }
                             spans[row_idx][grid_col].rowspan = rowspan;
@@ -1252,7 +1251,7 @@ impl MarkdownWriter {
 
         while pos < bytes.len() {
             // Find the next character that needs escaping
-            let next_special = [b'&', b'<', b'>', b'\n']
+            let next_special = b"&<>\n"
                 .iter()
                 .filter_map(|&ch| memchr(ch, &bytes[pos..]).map(|p| pos + p))
                 .min();

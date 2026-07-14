@@ -2,32 +2,32 @@ repos:
   - repo: local
     hooks:
       - id: rustfmt
-        name: Run rustfmt
-        entry: rustfmt -v --config-path . --edition 2024
+        name: Check Rust formatting
+        entry: cargo fmt --all -- --check
         language: system
-        types: [rust]
-        pass_filenames: true
-      - id: cargo-sort
-        name: Run cargo sort
-        entry: cargo sort
-        language: system
-        files: ^Cargo\.toml$
+        files: '^(.*\.rs|rustfmt\.toml)$'
         pass_filenames: false
-      - id: cargo-clippy
-        name: Run cargo clippy
-        entry: cargo clippy --all-features -- -D warnings
+      - id: cargo-sort
+        name: Check Cargo.toml sorting
+        entry: cargo sort --check
         language: system
-        types: [rust]
+        files: '(^|/)Cargo\.toml$'
+        pass_filenames: false
+      - id: cargo-lint
+        name: Enforce Rust lint policy
+        entry: cargo lint
+        language: system
+        files: '^(.*\.rs|Cargo\.toml|Cargo\.lock|clippy\.toml|\.cargo/config\.toml)$'
         pass_filenames: false
       - id: cargo-test-lib
         name: Run cargo test (lib and tests)
-        entry: cargo test --all-features --lib --tests
+        entry: cargo test --workspace --all-features --lib --tests
         language: system
-        types: [rust]
+        files: '^(.*\.rs|Cargo\.toml|Cargo\.lock)$'
         pass_filenames: false
       - id: cargo-test-doc
         name: Run cargo test (doc tests)
-        entry: cargo test --all-features --doc
+        entry: cargo test --workspace --all-features --doc
         language: system
-        types: [rust]
+        files: '^(.*\.rs|Cargo\.toml|Cargo\.lock)$'
         pass_filenames: false

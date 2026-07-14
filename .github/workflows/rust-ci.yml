@@ -6,6 +6,10 @@ on:
       - '**/*.rs'
       - '**/Cargo.toml'
       - 'Cargo.lock'
+      - '.cargo/config.toml'
+      - 'clippy.toml'
+      - '.pre-commit-config.yaml'
+      - 'rustfmt.toml'
       - '.github/workflows/rust-ci.yml'
     branches:
       - main
@@ -14,6 +18,10 @@ on:
       - '**/*.rs'
       - '**/Cargo.toml'
       - 'Cargo.lock'
+      - '.cargo/config.toml'
+      - 'clippy.toml'
+      - '.pre-commit-config.yaml'
+      - 'rustfmt.toml'
       - '.github/workflows/rust-ci.yml'
     branches:
       - main
@@ -60,10 +68,10 @@ jobs:
         run: cargo sort --check
 
       - name: Check if code is compilable
-        run: cargo check
+        run: cargo check --workspace --all-features
 
-      - name: Check if code adheres to best practices
-        run: cargo clippy --all-features -- -D warnings
+      - name: Enforce Rust lint policy
+        run: cargo lint
 
   test:
     name: cargo test
@@ -87,7 +95,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run unit and integration tests
-        run: cargo test --all-features --lib --tests
+        run: cargo test --workspace --all-features --lib --tests
 
       - name: Run doc tests
-        run: cargo test --all-features --doc
+        run: cargo test --workspace --all-features --doc

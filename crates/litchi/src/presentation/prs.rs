@@ -135,19 +135,15 @@ impl Presentation {
                     Box::new(ole::ppt::Package::from_ole_file(ole_file).map_err(Error::from)?);
 
                 // Extract metadata from OLE property streams
-                let cached_metadata =
-                    package
-                        .ole_file()
-                        .get_metadata()
-                        .ok()
-                        .and_then(|ole_metadata| {
-                            let metadata: litchi_core::Metadata = ole_metadata.into();
-                            if metadata.has_data() {
-                                Some(metadata)
-                            } else {
-                                None
-                            }
-                        });
+                let cached_metadata = package
+                    .ole_file()
+                    .get_metadata()
+                    .ok()
+                    .map(|ole_metadata| {
+                        let metadata: litchi_core::Metadata = ole_metadata.into();
+                        metadata
+                    })
+                    .filter(|metadata| metadata.has_data());
 
                 let pres = package.presentation().map_err(Error::from)?;
 
@@ -169,13 +165,7 @@ impl Presentation {
                 let cached_metadata =
                     crate::ooxml::metadata::extract_metadata(package.opc_package())
                         .ok()
-                        .and_then(|metadata| {
-                            if metadata.has_data() {
-                                Some(metadata)
-                            } else {
-                                None
-                            }
-                        });
+                        .filter(|metadata| metadata.has_data());
 
                 // SAFETY: Same lifetime extension as in `open()`
                 let pres_ref = unsafe {
@@ -200,13 +190,11 @@ impl Presentation {
                 })?;
 
                 // Extract Keynote metadata from bundle properties
-                let cached_metadata = doc.metadata().ok().flatten().and_then(|metadata| {
-                    if metadata.has_data() {
-                        Some(metadata)
-                    } else {
-                        None
-                    }
-                });
+                let cached_metadata = doc
+                    .metadata()
+                    .ok()
+                    .flatten()
+                    .filter(|metadata| metadata.has_data());
 
                 Ok(Self {
                     inner: PresentationImpl::Keynote(doc),

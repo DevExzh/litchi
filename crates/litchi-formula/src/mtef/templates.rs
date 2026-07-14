@@ -6,7 +6,7 @@
 //!
 //! Based on rtf2latex2e Profile_TEMPLATES_5 template system.
 
-use crate::ast::{Fence, LargeOperator, MathNode, Operator};
+use crate::ast::{Fence, LargeOperator, MathNode, Operator, Symbol};
 use smallvec::SmallVec;
 
 /// Template argument list type - a small vector of node vectors
@@ -592,13 +592,7 @@ impl TemplateParser {
                             match node {
                                 MathNode::Text(text) => arg_text.push_str(text),
                                 MathNode::Number(num) => arg_text.push_str(num),
-                                MathNode::Symbol(sym) => {
-                                    if let Some(unicode) = sym.unicode {
-                                        arg_text.push(unicode);
-                                    } else {
-                                        arg_text.push_str(&sym.name);
-                                    }
-                                },
+                                MathNode::Symbol(sym) => append_symbol_text(&mut arg_text, sym),
                                 _ => arg_text.push('?'), // Placeholder for complex nodes
                             }
                         }
@@ -1034,5 +1028,12 @@ impl TemplateParser {
             5 => Some(Fence::DoublePipe), // TMPL_DBAR: double vertical bars
             _ => None,
         }
+    }
+}
+
+fn append_symbol_text(output: &mut String, symbol: &Symbol<'_>) {
+    match symbol.unicode {
+        Some(unicode) => output.push(unicode),
+        None => output.push_str(&symbol.name),
     }
 }

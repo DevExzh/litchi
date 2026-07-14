@@ -50,7 +50,13 @@ See [Project][] for more info.
 
 ## Submitting a pull request
 
-* run `cargo fmt` and `cargo test` locally to format and test your changes
+* install the local guard once with `pre-commit install`
+* run `cargo fmt`, `cargo lint`, and `cargo test --workspace --all-features` locally
+  before opening a pull request
+* `cargo lint` is the repository's strict lint policy. It checks all workspace
+  libraries and tests, denies warnings, and includes limits for control-flow
+  complexity, nesting, function length, argument count, type complexity, and
+  other risky implementation patterns
 * non-trivial changes are often best discussed in an issue first, to prevent
   you from doing unnecessary work
 * for ambitious tasks, you should try to get your work in front of the

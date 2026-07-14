@@ -1,0 +1,14 @@
+# Quality limits for `cargo lint` (the workspace Clippy alias in
+# `.cargo/config.toml`). They are hard ceilings for the existing parsers and
+# format converters; lower them as those modules are decomposed.
+
+# Reject exceptionally long functions.
+too-many-lines-threshold = 2_000
+
+# Require complicated control flow to be decomposed before it becomes opaque.
+cognitive-complexity-threshold = 100
+excessive-nesting-threshold = 10
+
+# Prefer parameter objects and type aliases once APIs become unwieldy.
+too-many-arguments-threshold = 12
+type-complexity-threshold = 500
