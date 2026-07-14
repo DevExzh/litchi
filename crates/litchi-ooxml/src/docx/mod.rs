@@ -96,7 +96,7 @@ pub use package::Package;
 pub use paragraph::{Paragraph, Run, RunBreak, RunBreakClear, RunBreakType, RunProperties};
 pub use revision::{Revision, RevisionType};
 pub use section::{Emu, Margins, PageSize, Section, Sections};
-pub use settings::{DocumentSettings, ProtectionType};
+pub use settings::{DocumentSettings, ProtectionType, SmartTagType};
 pub use smart_tag::{SmartTag, SmartTagAttribute};
 pub use statistics::DocumentStatistics;
 pub use styles::{Style, Styles};
