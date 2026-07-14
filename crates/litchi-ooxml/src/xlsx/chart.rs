@@ -964,6 +964,28 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
             );
         }
     }
+    if let Some(formats) = chart.pivot_formats.as_ref() {
+        for format in formats {
+            fragments.extend(
+                [
+                    format
+                        .shape_properties
+                        .as_ref()
+                        .map(crate::charts::ChartShapeProperties::as_xml),
+                    format
+                        .text_properties
+                        .as_ref()
+                        .map(crate::charts::ChartTextProperties::as_xml),
+                    format
+                        .extension_list
+                        .as_ref()
+                        .map(crate::charts::ChartExtensionList::as_xml),
+                ]
+                .into_iter()
+                .flatten(),
+            );
+        }
+    }
     for axis in &chart.plot_area.axes {
         let common = axis.common();
         fragments.extend(

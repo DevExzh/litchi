@@ -417,11 +417,20 @@ fn write_pivot_formats<W: Write>(writer: &mut W, formats: &[PivotFormat]) -> std
             )));
         }
         write!(writer, r#"<c:pivotFmt><c:idx val="{}"/>"#, format.index)?;
+        if let Some(shape_properties) = format.shape_properties.as_ref() {
+            writer.write_all(shape_properties.as_xml())?;
+        }
+        if let Some(text_properties) = format.text_properties.as_ref() {
+            writer.write_all(text_properties.as_xml())?;
+        }
         if let Some(marker) = format.marker.as_ref() {
             write_marker(writer, marker, "chart pivot-format")?;
         }
         if let Some(label) = format.data_label.as_ref() {
             write_data_label(writer, label)?;
+        }
+        if let Some(extension_list) = format.extension_list.as_ref() {
+            writer.write_all(extension_list.as_xml())?;
         }
         write!(writer, "</c:pivotFmt>")?;
     }

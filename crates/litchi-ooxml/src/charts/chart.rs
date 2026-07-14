@@ -339,10 +339,16 @@ impl ChartPrintSettings {
 pub struct PivotFormat {
     /// Zero-based data-point index
     pub index: u32,
+    /// Shape properties for the pivot-format point
+    pub shape_properties: Option<ChartShapeProperties>,
+    /// Text properties for the pivot-format point
+    pub text_properties: Option<ChartTextProperties>,
     /// Optional marker override
     pub marker: Option<Marker>,
     /// Optional data-label override
     pub data_label: Option<DataLabel>,
+    /// Pivot-format extension list
+    pub extension_list: Option<ChartExtensionList>,
 }
 
 /// Pivot-table source metadata for a pivot chart.
@@ -544,8 +550,11 @@ impl PivotFormat {
     pub fn new(index: u32) -> Self {
         Self {
             index,
+            shape_properties: None,
+            text_properties: None,
             marker: None,
             data_label: None,
+            extension_list: None,
         }
     }
 }

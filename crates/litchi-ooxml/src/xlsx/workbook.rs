@@ -2736,6 +2736,26 @@ mod tests {
             .unwrap(),
         );
         value_axis.display_units = Some(Box::new(display_units));
+        let mut pivot_format = crate::charts::PivotFormat::new(0);
+        pivot_format.shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId421"/></a:blipFill></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        pivot_format.text_properties = Some(
+            crate::charts::ChartTextProperties::from_xml(
+                br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr><a:hlinkClick r:id="rId422"/></a:defRPr></a:pPr></a:p></c:txPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        pivot_format.extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="pivot"><x:reference r:id="rId423"/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        chart.chart.pivot_formats = Some(vec![pivot_format]);
         let fragment_ids = crate::xlsx::chart::chart_fragment_relationship_ids(&chart.chart)
             .expect("relationship-bearing fragments should be valid XML");
         assert_eq!(
@@ -2759,6 +2779,9 @@ mod tests {
                 "rId418".to_string(),
                 "rId419".to_string(),
                 "rId420".to_string(),
+                "rId421".to_string(),
+                "rId422".to_string(),
+                "rId423".to_string(),
             ]
             .into()
         );
@@ -2770,7 +2793,7 @@ mod tests {
             [
                 "rId403", "rId404", "rId405", "rId406", "rId407", "rId408", "rId409", "rId410",
                 "rId411", "rId412", "rId413", "rId414", "rId415", "rId416", "rId417", "rId418",
-                "rId419", "rId420",
+                "rId419", "rId420", "rId421", "rId422", "rId423",
             ]
             .iter()
             .any(|relationship_id| error.contains(relationship_id))
