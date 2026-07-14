@@ -30,6 +30,7 @@ struct SeriesFeatures {
     trendlines: bool,
     explosion: bool,
     invert_if_negative: bool,
+    picture_options: bool,
     marker: bool,
     smooth: bool,
 }
@@ -41,6 +42,7 @@ impl SeriesFeatures {
         trendlines: true,
         explosion: false,
         invert_if_negative: false,
+        picture_options: false,
         marker: false,
         smooth: false,
     };
@@ -50,6 +52,7 @@ impl SeriesFeatures {
     };
     const BAR: Self = Self {
         invert_if_negative: true,
+        picture_options: true,
         ..Self::BASIC
     };
     const LINE: Self = Self {
@@ -1292,6 +1295,10 @@ fn write_series<W: Write>(
         write!(writer, "</c:tx>")?;
     }
 
+    if let Some(shape_properties) = series.shape_properties.as_ref() {
+        writer.write_all(shape_properties.as_xml())?;
+    }
+
     write_series_presentation(writer, series, features)?;
 
     if let Some(ref categories) = series.categories {
@@ -1308,6 +1315,10 @@ fn write_series<W: Write>(
             r#"<c:smooth val="{}"/>"#,
             if series.smooth { "1" } else { "0" }
         )?;
+    }
+
+    if let Some(extension_list) = series.extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
     }
 
     write!(writer, "</c:ser>")?;
@@ -1333,6 +1344,11 @@ fn write_series_presentation<W: Write>(
     if !features.invert_if_negative && series.invert_if_negative {
         return Err(invalid_chart_input(
             "chart type does not support negative-value inversion",
+        ));
+    }
+    if !features.picture_options && series.picture_options.is_some() {
+        return Err(invalid_chart_input(
+            "chart type does not support series picture options",
         ));
     }
     if !features.explosion && series.explosion.is_some() {
@@ -1376,6 +1392,11 @@ fn write_series_presentation<W: Write>(
 
     if features.invert_if_negative && series.invert_if_negative {
         write!(writer, r#"<c:invertIfNegative val="1"/>"#)?;
+    }
+    if features.picture_options
+        && let Some(options) = series.picture_options.as_ref()
+    {
+        write_picture_options(writer, options)?;
     }
     if features.explosion
         && let Some(explosion) = series.explosion
@@ -1438,6 +1459,15 @@ fn write_data_point<W: Write>(writer: &mut W, point: &DataPoint) -> std::io::Res
     }
     if let Some(explosion) = point.explosion {
         write!(writer, r#"<c:explosion val="{}"/>"#, explosion)?;
+    }
+    if let Some(shape_properties) = point.shape_properties.as_ref() {
+        writer.write_all(shape_properties.as_xml())?;
+    }
+    if let Some(options) = point.picture_options.as_ref() {
+        write_picture_options(writer, options)?;
+    }
+    if let Some(extension_list) = point.extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
     }
     write!(writer, "</c:dPt>")?;
     Ok(())
@@ -1784,6 +1814,10 @@ fn write_scatter_series<W: Write>(writer: &mut W, series: &Series) -> std::io::R
         write!(writer, "</c:tx>")?;
     }
 
+    if let Some(shape_properties) = series.shape_properties.as_ref() {
+        writer.write_all(shape_properties.as_xml())?;
+    }
+
     write_series_presentation(writer, series, SeriesFeatures::LINE)?;
 
     if let Some(ref x_values) = series.x_values {
@@ -1799,6 +1833,10 @@ fn write_scatter_series<W: Write>(writer: &mut W, series: &Series) -> std::io::R
         r#"<c:smooth val="{}"/>"#,
         if series.smooth { "1" } else { "0" }
     )?;
+
+    if let Some(extension_list) = series.extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
+    }
 
     write!(writer, "</c:ser>")?;
 
@@ -1825,6 +1863,10 @@ fn write_bubble_series<W: Write>(writer: &mut W, series: &Series) -> std::io::Re
         write!(writer, "</c:tx>")?;
     }
 
+    if let Some(shape_properties) = series.shape_properties.as_ref() {
+        writer.write_all(shape_properties.as_xml())?;
+    }
+
     write_series_presentation(writer, series, SeriesFeatures::BASIC)?;
 
     if let Some(ref x_values) = series.x_values {
@@ -1844,6 +1886,10 @@ fn write_bubble_series<W: Write>(writer: &mut W, series: &Series) -> std::io::Re
         r#"<c:bubble3D val="{}"/>"#,
         if series.bubble_3d { "1" } else { "0" }
     )?;
+
+    if let Some(extension_list) = series.extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
+    }
 
     write!(writer, "</c:ser>")?;
 

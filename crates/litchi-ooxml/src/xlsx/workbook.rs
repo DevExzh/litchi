@@ -2585,16 +2585,34 @@ mod tests {
             ChartAnchor::new(3, 1, 9, 14),
         )
         .unwrap();
-        chart.chart.extension_list = Some(
+        let TypeGroup::Bar(group) = &mut chart.chart.plot_area.type_groups[0] else {
+            panic!("expected a bar chart");
+        };
+        let series = &mut group.common.series[0];
+        series.shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId403"/></a:blipFill></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        let mut point = crate::charts::DataPoint::new(0);
+        point.extension_list = Some(
             ChartExtensionList::from_xml(
                 br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="dangling"><x:reference r:id="rId404"/></c:ext></c:extLst>"#.to_vec(),
             )
             .unwrap(),
         );
+        series.data_points.push(point);
+        let fragment_ids = crate::xlsx::chart::chart_fragment_relationship_ids(&chart.chart)
+            .expect("relationship-bearing fragments should be valid XML");
+        assert_eq!(
+            fragment_ids,
+            ["rId403".to_string(), "rId404".to_string()].into()
+        );
         workbook.worksheet_mut(0).unwrap().add_chart(chart);
 
         let error = workbook.save(&path).unwrap_err().to_string();
-        assert!(error.contains("fragment references missing relationship 'rId404'"));
+        assert!(error.contains("fragment references missing relationship 'rId40"));
     }
 
     #[test]

@@ -107,6 +107,30 @@ pub enum TypeGroup {
     Surface3D(Surface3DTypeGroup),
 }
 
+impl TypeGroup {
+    /// Return the properties shared by every classic chart-type group.
+    pub fn common(&self) -> &TypeGroupCommon {
+        match self {
+            Self::Area(group) => &group.common,
+            Self::Area3D(group) => &group.common,
+            Self::Bar(group) => &group.common,
+            Self::Bar3D(group) => &group.common,
+            Self::Bubble(group) => &group.common,
+            Self::Doughnut(group) => &group.common,
+            Self::Line(group) => &group.common,
+            Self::Line3D(group) => &group.common,
+            Self::OfPie(group) => &group.common,
+            Self::Pie(group) => &group.common,
+            Self::Pie3D(group) => &group.common,
+            Self::Radar(group) => &group.common,
+            Self::Scatter(group) => &group.common,
+            Self::Stock(group) => &group.common,
+            Self::Surface(group) => &group.common,
+            Self::Surface3D(group) => &group.common,
+        }
+    }
+}
+
 /// Common properties for type groups.
 #[derive(Debug, Clone)]
 pub struct TypeGroupCommon {

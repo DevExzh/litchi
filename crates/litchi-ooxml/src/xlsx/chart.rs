@@ -812,51 +812,90 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
         b"http://purl.oclc.org/ooxml/officeDocument/relationships";
 
     let mut relationship_ids = HashSet::new();
-    let fragments = [
-        chart
-            .shape_properties
-            .as_ref()
-            .map(crate::charts::ChartShapeProperties::as_xml),
-        chart
-            .text_properties
-            .as_ref()
-            .map(crate::charts::ChartTextProperties::as_xml),
-        chart
-            .extension_list
-            .as_ref()
-            .map(crate::charts::ChartExtensionList::as_xml),
-        chart
-            .floor
-            .as_ref()
-            .and_then(|surface| surface.shape_properties.as_ref())
-            .map(crate::charts::ChartShapeProperties::as_xml),
-        chart
-            .back_wall
-            .as_ref()
-            .and_then(|surface| surface.shape_properties.as_ref())
-            .map(crate::charts::ChartShapeProperties::as_xml),
-        chart
-            .side_wall
-            .as_ref()
-            .and_then(|surface| surface.shape_properties.as_ref())
-            .map(crate::charts::ChartShapeProperties::as_xml),
-        chart
-            .floor
-            .as_ref()
-            .and_then(|surface| surface.extension_list.as_ref())
-            .map(crate::charts::ChartExtensionList::as_xml),
-        chart
-            .back_wall
-            .as_ref()
-            .and_then(|surface| surface.extension_list.as_ref())
-            .map(crate::charts::ChartExtensionList::as_xml),
-        chart
-            .side_wall
-            .as_ref()
-            .and_then(|surface| surface.extension_list.as_ref())
-            .map(crate::charts::ChartExtensionList::as_xml),
-    ];
-    for xml in fragments.into_iter().flatten() {
+    let mut fragments = Vec::new();
+    fragments.extend(
+        [
+            chart
+                .shape_properties
+                .as_ref()
+                .map(crate::charts::ChartShapeProperties::as_xml),
+            chart
+                .text_properties
+                .as_ref()
+                .map(crate::charts::ChartTextProperties::as_xml),
+            chart
+                .extension_list
+                .as_ref()
+                .map(crate::charts::ChartExtensionList::as_xml),
+            chart
+                .floor
+                .as_ref()
+                .and_then(|surface| surface.shape_properties.as_ref())
+                .map(crate::charts::ChartShapeProperties::as_xml),
+            chart
+                .back_wall
+                .as_ref()
+                .and_then(|surface| surface.shape_properties.as_ref())
+                .map(crate::charts::ChartShapeProperties::as_xml),
+            chart
+                .side_wall
+                .as_ref()
+                .and_then(|surface| surface.shape_properties.as_ref())
+                .map(crate::charts::ChartShapeProperties::as_xml),
+            chart
+                .floor
+                .as_ref()
+                .and_then(|surface| surface.extension_list.as_ref())
+                .map(crate::charts::ChartExtensionList::as_xml),
+            chart
+                .back_wall
+                .as_ref()
+                .and_then(|surface| surface.extension_list.as_ref())
+                .map(crate::charts::ChartExtensionList::as_xml),
+            chart
+                .side_wall
+                .as_ref()
+                .and_then(|surface| surface.extension_list.as_ref())
+                .map(crate::charts::ChartExtensionList::as_xml),
+        ]
+        .into_iter()
+        .flatten(),
+    );
+    for group in &chart.plot_area.type_groups {
+        for series in &group.common().series {
+            fragments.extend(
+                [
+                    series
+                        .shape_properties
+                        .as_ref()
+                        .map(crate::charts::ChartShapeProperties::as_xml),
+                    series
+                        .extension_list
+                        .as_ref()
+                        .map(crate::charts::ChartExtensionList::as_xml),
+                ]
+                .into_iter()
+                .flatten(),
+            );
+            for point in &series.data_points {
+                fragments.extend(
+                    [
+                        point
+                            .shape_properties
+                            .as_ref()
+                            .map(crate::charts::ChartShapeProperties::as_xml),
+                        point
+                            .extension_list
+                            .as_ref()
+                            .map(crate::charts::ChartExtensionList::as_xml),
+                    ]
+                    .into_iter()
+                    .flatten(),
+                );
+            }
+        }
+    }
+    for xml in fragments {
         let mut reader = NsReader::from_reader(xml);
         let mut buffer = Vec::new();
         loop {

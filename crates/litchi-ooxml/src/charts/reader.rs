@@ -3106,6 +3106,62 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"spPr" => {
+                if series.shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart series contains duplicate shape properties".into(),
+                    ));
+                }
+                series.shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_fragment(e, "chart series shape properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"spPr" => {
+                if series.shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart series contains duplicate shape properties".into(),
+                    ));
+                }
+                series.shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_empty_fragment(e)?,
+                )?);
+            },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"pictureOptions" => {
+                if series.picture_options.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart series contains duplicate picture options".into(),
+                    ));
+                }
+                series.picture_options = Some(parse_picture_options(reader)?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"pictureOptions" => {
+                if series.picture_options.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart series contains duplicate picture options".into(),
+                    ));
+                }
+                series.picture_options = Some(PictureOptions::default());
+            },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"extLst" => {
+                if series.extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart series contains duplicate extension lists".into(),
+                    ));
+                }
+                series.extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_fragment(e, "chart series extension list")?,
+                )?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"extLst" => {
+                if series.extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart series contains duplicate extension lists".into(),
+                    ));
+                }
+                series.extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_empty_fragment(e)?,
+                )?);
+            },
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
@@ -3276,11 +3332,70 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
     let mut marker_symbol = None;
     let mut invert_if_negative = false;
     let mut bubble_3d = None;
+    let mut shape_properties = None;
+    let mut picture_options = None;
+    let mut extension_list = None;
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"marker" => {
                 (marker_symbol, marker_size) = parse_series_marker(reader)?;
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data point contains duplicate shape properties".into(),
+                    ));
+                }
+                shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_fragment(element, "chart data-point shape properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data point contains duplicate shape properties".into(),
+                    ));
+                }
+                shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"pictureOptions" => {
+                if picture_options.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data point contains duplicate picture options".into(),
+                    ));
+                }
+                picture_options = Some(parse_picture_options(reader)?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"pictureOptions" => {
+                if picture_options.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data point contains duplicate picture options".into(),
+                    ));
+                }
+                picture_options = Some(PictureOptions::default());
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data point contains duplicate extension lists".into(),
+                    ));
+                }
+                extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_fragment(element, "chart data-point extension list")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data point contains duplicate extension lists".into(),
+                    ));
+                }
+                extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
             },
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
                 match element.local_name().as_ref() {
@@ -3313,6 +3428,9 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
     point.marker_symbol = marker_symbol;
     point.invert_if_negative = invert_if_negative;
     point.bubble_3d = bubble_3d;
+    point.shape_properties = shape_properties;
+    point.picture_options = picture_options;
+    point.extension_list = extension_list;
     Ok(point)
 }
 
@@ -5496,6 +5614,95 @@ mod tests {
         assert!(empty_chart.floor.is_some());
         assert!(empty_chart.back_wall.is_some());
         assert!(empty_chart.side_wall.is_some());
+    }
+
+    #[test]
+    fn round_trips_series_and_data_point_formatting_fragments() {
+        let xml = br#"<c:chartSpace
+                xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+                xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                xmlns:x="urn:example:series">
+            <c:chart><c:plotArea><c:barChart>
+                <c:barDir val="col"/><c:grouping val="clustered"/><c:ser>
+                    <c:idx val="0"/><c:order val="0"/>
+                    <c:spPr><a:solidFill><a:srgbClr val="112233"/></a:solidFill></c:spPr>
+                    <c:invertIfNegative val="1"/>
+                    <c:pictureOptions><c:applyToFront val="0"/>
+                        <c:pictureFormat val="stack"/><c:pictureStackUnit val="-2"/>
+                    </c:pictureOptions>
+                    <c:dPt><c:idx val="2"/>
+                        <c:spPr><a:solidFill><a:srgbClr val="AABBCC"/></a:solidFill></c:spPr>
+                        <c:pictureOptions><c:applyToSides/></c:pictureOptions>
+                        <c:extLst><c:ext uri="point"><x:pointPayload/></c:ext></c:extLst>
+                    </c:dPt>
+                    <c:extLst><c:ext uri="series"><x:seriesPayload/></c:ext></c:extLst>
+                </c:ser><c:axId val="1"/><c:axId val="2"/>
+            </c:barChart></c:plotArea></c:chart>
+        </c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let TypeGroup::Bar(group) = &chart.plot_area.type_groups[0] else {
+            panic!("expected a bar chart");
+        };
+        let series = &group.common.series[0];
+        assert!(
+            std::str::from_utf8(series.shape_properties.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("112233")
+        );
+        assert_eq!(
+            series.picture_options.as_ref().unwrap().picture_format,
+            Some(PictureFormat::Stack)
+        );
+        assert_eq!(
+            series.picture_options.as_ref().unwrap().picture_stack_unit,
+            Some(-2.0)
+        );
+        assert!(
+            std::str::from_utf8(series.extension_list.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("seriesPayload")
+        );
+        let point = &series.data_points[0];
+        assert_eq!(
+            point.picture_options.as_ref().unwrap().apply_to_sides,
+            Some(true)
+        );
+        assert!(
+            std::str::from_utf8(point.extension_list.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("pointPayload")
+        );
+
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        let reparsed = parse_chart(output.as_slice()).unwrap();
+        let TypeGroup::Bar(reparsed_group) = &reparsed.plot_area.type_groups[0] else {
+            panic!("expected a bar chart");
+        };
+        let reparsed_series = &reparsed_group.common.series[0];
+        assert_eq!(reparsed_series.shape_properties, series.shape_properties);
+        assert_eq!(reparsed_series.picture_options, series.picture_options);
+        assert_eq!(reparsed_series.extension_list, series.extension_list);
+        assert_eq!(
+            reparsed_series.data_points[0].shape_properties,
+            point.shape_properties
+        );
+        assert_eq!(
+            reparsed_series.data_points[0].picture_options,
+            point.picture_options
+        );
+        assert_eq!(
+            reparsed_series.data_points[0].extension_list,
+            point.extension_list
+        );
+
+        let unsupported =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea><c:lineChart><c:ser><c:idx val="0"/><c:order val="0"/>
+                <c:pictureOptions/></c:ser></c:lineChart></c:plotArea></c:chart>
+            </c:chartSpace>"#;
+        let unsupported = parse_chart(unsupported.as_slice()).unwrap();
+        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &unsupported).is_err());
     }
 
     #[test]

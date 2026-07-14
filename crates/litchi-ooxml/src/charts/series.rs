@@ -3,6 +3,7 @@
 //! This module contains structures for representing chart series,
 //! data points, and their associated properties.
 
+use crate::charts::chart::{ChartExtensionList, ChartShapeProperties, PictureOptions};
 use crate::charts::models::{Layout, NumberFormat, NumericData, StringData, TitleText};
 use crate::charts::types::{DataLabelPosition, MarkerStyle};
 
@@ -46,6 +47,12 @@ pub struct DataPoint {
     pub invert_if_negative: bool,
     /// Show bubble in 3D
     pub bubble_3d: Option<bool>,
+    /// DrawingML shape properties
+    pub shape_properties: Option<ChartShapeProperties>,
+    /// Picture-fill placement options
+    pub picture_options: Option<PictureOptions>,
+    /// Data-point extension list
+    pub extension_list: Option<ChartExtensionList>,
 }
 
 impl DataPoint {
@@ -59,6 +66,9 @@ impl DataPoint {
             marker_symbol: None,
             invert_if_negative: false,
             bubble_3d: None,
+            shape_properties: None,
+            picture_options: None,
+            extension_list: None,
         }
     }
 
@@ -365,6 +375,12 @@ pub struct Series {
     pub error_bars: Vec<ErrorBar>,
     /// Trendlines
     pub trendlines: Vec<Trendline>,
+    /// DrawingML shape properties
+    pub shape_properties: Option<ChartShapeProperties>,
+    /// Bar-series picture-fill placement options
+    pub picture_options: Option<PictureOptions>,
+    /// Series extension list
+    pub extension_list: Option<ChartExtensionList>,
 }
 
 impl Series {
@@ -390,6 +406,9 @@ impl Series {
             bubble_3d: false,
             error_bars: Vec::new(),
             trendlines: Vec::new(),
+            shape_properties: None,
+            picture_options: None,
+            extension_list: None,
         }
     }
 
