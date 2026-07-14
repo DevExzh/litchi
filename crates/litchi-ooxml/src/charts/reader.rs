@@ -469,6 +469,9 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"layout" => {
                 plot_area.layout = Some(parse_layout(reader)?);
             },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"layout" => {
+                plot_area.layout = Some(Layout::new());
+            },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"dTable" => {
                 if saw_data_table {
                     return Err(OoxmlError::InvalidFormat(
@@ -487,7 +490,19 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
                 saw_data_table = true;
                 plot_area.data_table = Some(DataTable::default());
             },
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+            Ok(Event::Empty(ref e))
+                if is_chart_type_group_name(e.local_name().as_ref())
+                    || matches!(
+                        e.local_name().as_ref(),
+                        b"catAx" | b"valAx" | b"dateAx" | b"serAx"
+                    ) =>
+            {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "chart plot-area element {} cannot be empty",
+                    String::from_utf8_lossy(e.local_name().as_ref())
+                )));
+            },
+            Ok(Event::Start(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
                     b"barChart" => {
@@ -606,6 +621,28 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
     }
 
     Ok(plot_area)
+}
+
+fn is_chart_type_group_name(name: &[u8]) -> bool {
+    matches!(
+        name,
+        b"areaChart"
+            | b"area3DChart"
+            | b"barChart"
+            | b"bar3DChart"
+            | b"bubbleChart"
+            | b"doughnutChart"
+            | b"lineChart"
+            | b"line3DChart"
+            | b"ofPieChart"
+            | b"pieChart"
+            | b"pie3DChart"
+            | b"radarChart"
+            | b"scatterChart"
+            | b"stockChart"
+            | b"surfaceChart"
+            | b"surface3DChart"
+    )
 }
 
 fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataTable> {
@@ -3968,6 +4005,30 @@ mod tests {
         ] {
             assert!(parse_chart(xml).is_err());
         }
+    }
+
+    #[test]
+    fn rejects_empty_plot_containers_without_consuming_following_content() {
+        for xml in [
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+                <c:chart><c:plotArea><c:lineChart/><c:dTable/></c:plotArea></c:chart>
+            </c:chartSpace>"#
+                .as_slice(),
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+                <c:chart><c:plotArea><c:catAx/><c:dTable/></c:plotArea></c:chart>
+            </c:chartSpace>"#
+                .as_slice(),
+        ] {
+            assert!(parse_chart(xml).is_err());
+        }
+
+        let empty_layout =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+                <c:chart><c:plotArea><c:layout/><c:lineChart></c:lineChart>
+                </c:plotArea></c:chart>
+            </c:chartSpace>"#;
+        let chart = parse_chart(empty_layout.as_slice()).unwrap();
+        assert!(chart.plot_area.layout.is_some());
     }
 
     #[test]
