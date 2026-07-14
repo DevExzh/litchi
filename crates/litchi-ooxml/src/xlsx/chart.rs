@@ -908,6 +908,9 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                 );
             }
         }
+        if let Some(extension_list) = group.common().extension_list.as_ref() {
+            fragments.push(extension_list.as_xml());
+        }
     }
     for xml in fragments {
         let mut reader = NsReader::from_reader(xml);

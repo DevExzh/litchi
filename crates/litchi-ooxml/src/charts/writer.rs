@@ -767,6 +767,7 @@ fn write_area_chart<W: Write>(writer: &mut W, group: &AreaTypeGroup) -> std::io:
         write!(writer, "<c:dropLines/>")?;
     }
     write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "area chart")?;
+    write_type_group_extension(writer, &group.common)?;
     write!(writer, "</c:areaChart>")?;
 
     Ok(())
@@ -798,6 +799,7 @@ fn write_area_3d_chart<W: Write>(writer: &mut W, group: &Area3DTypeGroup) -> std
         write!(writer, r#"<c:gapDepth val="{gap_depth}"/>"#)?;
     }
     write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 3, "3D area chart")?;
+    write_type_group_extension(writer, &group.common)?;
     write!(writer, "</c:area3DChart>")?;
 
     Ok(())
@@ -850,6 +852,7 @@ fn write_bar_chart<W: Write>(writer: &mut W, group: &BarTypeGroup) -> std::io::R
     }
 
     write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "bar chart")?;
+    write_type_group_extension(writer, &group.common)?;
     write!(writer, "</c:barChart>")?;
 
     Ok(())
@@ -894,6 +897,7 @@ fn write_bar_3d_chart<W: Write>(writer: &mut W, group: &Bar3DTypeGroup) -> std::
     }
 
     write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 3, "3D bar chart")?;
+    write_type_group_extension(writer, &group.common)?;
     write!(writer, "</c:bar3DChart>")?;
 
     Ok(())
@@ -945,6 +949,7 @@ fn write_bubble_chart<W: Write>(writer: &mut W, group: &BubbleTypeGroup) -> std:
     )?;
 
     write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "bubble chart")?;
+    write_type_group_extension(writer, &group.common)?;
     write!(writer, "</c:bubbleChart>")?;
 
     Ok(())
@@ -982,6 +987,7 @@ fn write_doughnut_chart<W: Write>(
         group.first_slice_angle
     )?;
     write!(writer, r#"<c:holeSize val="{}"/>"#, group.hole_size)?;
+    write_type_group_extension(writer, &group.common)?;
     write!(writer, "</c:doughnutChart>")?;
 
     Ok(())
@@ -1025,6 +1031,7 @@ fn write_line_chart<W: Write>(writer: &mut W, group: &LineTypeGroup) -> std::io:
         if group.smooth { "1" } else { "0" }
     )?;
     write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "line chart")?;
+    write_type_group_extension(writer, &group.common)?;
     write!(writer, "</c:lineChart>")?;
 
     Ok(())
@@ -1056,6 +1063,7 @@ fn write_line_3d_chart<W: Write>(writer: &mut W, group: &Line3DTypeGroup) -> std
         write!(writer, r#"<c:gapDepth val="{gap_depth}"/>"#)?;
     }
     write_type_group_axis_ids(writer, &group.common, &[1, 2, 3], 3, 3, "3D line chart")?;
+    write_type_group_extension(writer, &group.common)?;
     write!(writer, "</c:line3DChart>")?;
 
     Ok(())
@@ -1084,6 +1092,7 @@ fn write_pie_chart<W: Write>(writer: &mut W, group: &PieTypeGroup) -> std::io::R
         r#"<c:firstSliceAng val="{}"/>"#,
         group.first_slice_angle
     )?;
+    write_type_group_extension(writer, &group.common)?;
     write!(writer, "</c:pieChart>")?;
 
     Ok(())
@@ -1146,6 +1155,7 @@ fn write_of_pie_chart<W: Write>(writer: &mut W, group: &OfPieTypeGroup) -> std::
     for _ in &group.series_lines {
         write!(writer, "<c:serLines/>")?;
     }
+    write_type_group_extension(writer, &group.common)?;
     write!(writer, "</c:ofPieChart>")?;
     Ok(())
 }
@@ -1163,6 +1173,7 @@ fn write_pie_3d_chart<W: Write>(writer: &mut W, group: &Pie3DTypeGroup) -> std::
     }
 
     write_group_data_labels(writer, &group.common)?;
+    write_type_group_extension(writer, &group.common)?;
     write!(writer, "</c:pie3DChart>")?;
 
     Ok(())
@@ -1187,6 +1198,7 @@ fn write_radar_chart<W: Write>(writer: &mut W, group: &RadarTypeGroup) -> std::i
 
     write_group_data_labels(writer, &group.common)?;
     write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "radar chart")?;
+    write_type_group_extension(writer, &group.common)?;
     write!(writer, "</c:radarChart>")?;
 
     Ok(())
@@ -1211,6 +1223,7 @@ fn write_scatter_chart<W: Write>(writer: &mut W, group: &ScatterTypeGroup) -> st
 
     write_group_data_labels(writer, &group.common)?;
     write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "scatter chart")?;
+    write_type_group_extension(writer, &group.common)?;
     write!(writer, "</c:scatterChart>")?;
 
     Ok(())
@@ -1234,6 +1247,7 @@ fn write_stock_chart<W: Write>(writer: &mut W, group: &StockTypeGroup) -> std::i
         write_up_down_bars(writer, up_down_bars)?;
     }
     write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "stock chart")?;
+    write_type_group_extension(writer, &group.common)?;
     write!(writer, "</c:stockChart>")?;
 
     Ok(())
@@ -1255,6 +1269,7 @@ fn write_surface_chart<W: Write>(writer: &mut W, group: &SurfaceTypeGroup) -> st
     }
 
     write_type_group_axis_ids(writer, &group.common, &[1, 2, 3], 3, 3, "surface chart")?;
+    write_type_group_extension(writer, &group.common)?;
     write!(writer, "</c:surfaceChart>")?;
 
     Ok(())
@@ -1279,6 +1294,7 @@ fn write_surface_3d_chart<W: Write>(
     }
 
     write_type_group_axis_ids(writer, &group.common, &[1, 2, 3], 3, 3, "3D surface chart")?;
+    write_type_group_extension(writer, &group.common)?;
     write!(writer, "</c:surface3DChart>")?;
 
     Ok(())
@@ -2035,6 +2051,16 @@ fn write_up_down_bars<W: Write>(writer: &mut W, bars: &UpDownBars) -> std::io::R
         write!(writer, "<c:downBars/>")?;
     }
     write!(writer, "</c:upDownBars>")?;
+    Ok(())
+}
+
+fn write_type_group_extension<W: Write>(
+    writer: &mut W,
+    common: &TypeGroupCommon,
+) -> std::io::Result<()> {
+    if let Some(extension_list) = common.extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
+    }
     Ok(())
 }
 

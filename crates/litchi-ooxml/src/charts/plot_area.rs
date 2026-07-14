@@ -136,6 +136,28 @@ impl TypeGroup {
             Self::Surface3D(group) => &group.common,
         }
     }
+
+    /// Return mutable properties shared by every classic chart-type group.
+    pub fn common_mut(&mut self) -> &mut TypeGroupCommon {
+        match self {
+            Self::Area(group) => &mut group.common,
+            Self::Area3D(group) => &mut group.common,
+            Self::Bar(group) => &mut group.common,
+            Self::Bar3D(group) => &mut group.common,
+            Self::Bubble(group) => &mut group.common,
+            Self::Doughnut(group) => &mut group.common,
+            Self::Line(group) => &mut group.common,
+            Self::Line3D(group) => &mut group.common,
+            Self::OfPie(group) => &mut group.common,
+            Self::Pie(group) => &mut group.common,
+            Self::Pie3D(group) => &mut group.common,
+            Self::Radar(group) => &mut group.common,
+            Self::Scatter(group) => &mut group.common,
+            Self::Stock(group) => &mut group.common,
+            Self::Surface(group) => &mut group.common,
+            Self::Surface3D(group) => &mut group.common,
+        }
+    }
 }
 
 /// Common properties for type groups.
@@ -149,6 +171,8 @@ pub struct TypeGroupCommon {
     pub data_labels: Option<DataLabels>,
     /// Identifiers of the axes used by this chart group
     pub axis_ids: Vec<u32>,
+    /// Chart-type extension list
+    pub extension_list: Option<ChartExtensionList>,
 }
 
 impl TypeGroupCommon {
@@ -160,6 +184,7 @@ impl TypeGroupCommon {
             series: Vec::new(),
             data_labels: None,
             axis_ids: Vec::new(),
+            extension_list: None,
         }
     }
 

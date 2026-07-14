@@ -2615,6 +2615,14 @@ mod tests {
             )
             .unwrap(),
         );
+        chart.chart.plot_area.type_groups[0]
+            .common_mut()
+            .extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="group"><x:reference r:id="rId407"/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
         let fragment_ids = crate::xlsx::chart::chart_fragment_relationship_ids(&chart.chart)
             .expect("relationship-bearing fragments should be valid XML");
         assert_eq!(
@@ -2624,6 +2632,7 @@ mod tests {
                 "rId404".to_string(),
                 "rId405".to_string(),
                 "rId406".to_string(),
+                "rId407".to_string(),
             ]
             .into()
         );

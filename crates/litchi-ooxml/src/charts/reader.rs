@@ -2080,6 +2080,12 @@ fn parse_common_type_group<R: BufRead>(
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, false)?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, true)?;
+            },
             Ok(Event::Start(ref element))
                 if supports_data_labels && element.local_name().as_ref() == b"dLbls" =>
             {
@@ -2118,6 +2124,26 @@ fn parse_common_type_group<R: BufRead>(
         buf.clear();
     }
     Ok(common)
+}
+
+fn parse_type_group_extension<R: BufRead>(
+    reader: &mut ChartXmlReader<R>,
+    common: &mut TypeGroupCommon,
+    element: &BytesStart<'_>,
+    empty: bool,
+) -> Result<()> {
+    if common.extension_list.is_some() {
+        return Err(OoxmlError::InvalidFormat(
+            "chart type group contains duplicate extension lists".into(),
+        ));
+    }
+    let xml = if empty {
+        reader.capture_empty_fragment(element)?
+    } else {
+        reader.capture_fragment(element, "chart type-group extension list")?
+    };
+    common.extension_list = Some(ChartExtensionList::from_xml(xml)?);
+    Ok(())
 }
 
 fn begin_group_data_labels(seen: &mut bool) -> Result<()> {
@@ -2292,6 +2318,12 @@ fn parse_of_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<OfPi
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut group.common, element, false)?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut group.common, element, true)?;
+            },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"dLbls" => {
                 begin_group_data_labels(&mut saw_data_labels)?;
                 group.common.data_labels = Some(parse_data_labels(reader)?);
@@ -2519,6 +2551,12 @@ fn parse_stock_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Stock
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, false)?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, true)?;
+            },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"upDownBars" => {
                 if up_down_bars.is_some() {
                     return Err(OoxmlError::InvalidFormat(
@@ -2603,6 +2641,12 @@ fn parse_surface_type_group<R: BufRead>(
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, false)?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, true)?;
+            },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"bandFmts" => {
                 if band_formats.is_some() {
                     return Err(OoxmlError::InvalidFormat(
@@ -2734,6 +2778,12 @@ fn parse_bar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, false)?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, true)?;
+            },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"dLbls" => {
                 begin_group_data_labels(&mut saw_data_labels)?;
                 common.data_labels = Some(parse_data_labels(reader)?);
@@ -2820,6 +2870,12 @@ fn parse_bar_3d_chart<R: BufRead>(
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, false)?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, true)?;
+            },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"dLbls" => {
                 begin_group_data_labels(&mut saw_data_labels)?;
                 common.data_labels = Some(parse_data_labels(reader)?);
@@ -2916,6 +2972,12 @@ fn parse_line_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, false)?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, true)?;
+            },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"upDownBars" => {
                 if up_down_bars.is_some() {
                     return Err(OoxmlError::InvalidFormat(
@@ -2991,6 +3053,12 @@ fn parse_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, false)?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, true)?;
+            },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"dLbls" => {
                 begin_group_data_labels(&mut saw_data_labels)?;
                 common.data_labels = Some(parse_data_labels(reader)?);
@@ -3046,6 +3114,12 @@ fn parse_area_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, false)?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, true)?;
+            },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"dLbls" => {
                 begin_group_data_labels(&mut saw_data_labels)?;
                 common.data_labels = Some(parse_data_labels(reader)?);
@@ -3103,6 +3177,12 @@ fn parse_scatter_chart<R: BufRead>(
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, false)?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_type_group_extension(reader, &mut common, element, true)?;
+            },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"dLbls" => {
                 begin_group_data_labels(&mut saw_data_labels)?;
                 common.data_labels = Some(parse_data_labels(reader)?);
@@ -6663,12 +6743,30 @@ mod tests {
             TypeGroup::Surface(surface),
             TypeGroup::Surface3D(surface_3d),
         ];
+        for (index, group) in chart.plot_area.type_groups.iter_mut().enumerate() {
+            group.common_mut().extension_list = Some(
+                ChartExtensionList::from_xml(
+                    format!(
+                        r#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:x="urn:example:group"><c:ext uri="group-{index}"><x:payload/></c:ext></c:extLst>"#
+                    )
+                    .into_bytes(),
+                )
+                .unwrap(),
+            );
+        }
 
         let mut xml = Vec::new();
         crate::charts::writer::write_chart(&mut xml, &chart).unwrap();
         let parsed = parse_chart(xml.as_slice()).unwrap();
 
         assert_eq!(parsed.plot_area.type_groups.len(), 16);
+        for (index, group) in parsed.plot_area.type_groups.iter().enumerate() {
+            assert!(
+                std::str::from_utf8(group.common().extension_list.as_ref().unwrap().as_xml())
+                    .unwrap()
+                    .contains(&format!(r#"uri="group-{index}""#))
+            );
+        }
         let data_table = parsed.plot_area.data_table.as_ref().unwrap();
         assert!(data_table.show_horizontal_border);
         assert!(!data_table.show_vertical_border);
