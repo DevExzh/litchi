@@ -18,10 +18,10 @@ use crate::charts::plot_area::{
     RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup, SurfaceTypeGroup,
     TypeGroup, TypeGroupCommon,
 };
-use crate::charts::series::Series;
+use crate::charts::series::{DataLabels, DataPoint, Series};
 use crate::charts::types::{
-    AxisOrientation, AxisPosition, BarDirection, BarGrouping, DisplayBlanks, LegendPosition,
-    RadarStyle, ScatterStyle, TickLabelPosition, TickMark,
+    AxisOrientation, AxisPosition, BarDirection, BarGrouping, DataLabelPosition, DisplayBlanks,
+    LegendPosition, MarkerStyle, RadarStyle, ScatterStyle, TickLabelPosition, TickMark,
 };
 use crate::common::xml::decode_xml_reference;
 use crate::error::{OoxmlError, Result};
@@ -899,6 +899,10 @@ fn parse_scatter_chart<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<Scat
 
 fn parse_series<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<Series>> {
     let mut series = Series::new(0);
+    let mut saw_index = false;
+    let mut saw_order = false;
+    let mut saw_marker = false;
+    let mut saw_data_labels = false;
     let mut buf = Vec::new();
 
     loop {
@@ -907,13 +911,60 @@ fn parse_series<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<Series>> {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
                     b"idx" => {
-                        series.index = parse_u32_attr(e, b"val").unwrap_or(0);
+                        if saw_index {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart series has duplicate index".to_string(),
+                            ));
+                        }
+                        saw_index = true;
+                        series.index = required_u32_attr(e, "chart series index")?;
                     },
                     b"order" => {
-                        series.order = parse_u32_attr(e, b"val").unwrap_or(0);
+                        if saw_order {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart series has duplicate order".to_string(),
+                            ));
+                        }
+                        saw_order = true;
+                        series.order = required_u32_attr(e, "chart series order")?;
                     },
                     b"tx" => {
                         series.title = parse_series_title(reader)?;
+                    },
+                    b"marker" => {
+                        if saw_marker {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart series has duplicate marker".to_string(),
+                            ));
+                        }
+                        saw_marker = true;
+                        (series.marker_symbol, series.marker_size) = parse_series_marker(reader)?;
+                    },
+                    b"invertIfNegative" => {
+                        series.invert_if_negative = parse_bool_attr(e)?;
+                    },
+                    b"dPt" => {
+                        let point = parse_data_point(reader)?;
+                        if series
+                            .data_points
+                            .iter()
+                            .any(|existing| existing.index == point.index)
+                        {
+                            return Err(OoxmlError::InvalidFormat(format!(
+                                "chart series has duplicate data-point index {}",
+                                point.index
+                            )));
+                        }
+                        series.data_points.push(point);
+                    },
+                    b"dLbls" => {
+                        if saw_data_labels {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart series has duplicate data-label settings".to_string(),
+                            ));
+                        }
+                        saw_data_labels = true;
+                        series.data_labels = Some(parse_data_labels(reader)?);
                     },
                     b"cat" => {
                         series.categories = parse_string_data(reader)?;
@@ -936,6 +987,9 @@ fn parse_series<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<Series>> {
                     b"bubble3D" => {
                         series.bubble_3d = parse_bool_attr(e)?;
                     },
+                    b"smooth" => {
+                        series.smooth = parse_bool_attr(e)?;
+                    },
                     _ => {},
                 }
             },
@@ -951,7 +1005,137 @@ fn parse_series<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<Series>> {
         buf.clear();
     }
 
+    if !saw_index || !saw_order {
+        return Err(OoxmlError::InvalidFormat(
+            "chart series requires both index and order".to_string(),
+        ));
+    }
     Ok(Some(series))
+}
+
+fn parse_series_marker<R: BufRead>(
+    reader: &mut Reader<R>,
+) -> Result<(Option<MarkerStyle>, Option<u32>)> {
+    let mut symbol = None;
+    let mut size = None;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+                match element.local_name().as_ref() {
+                    b"symbol" => {
+                        if symbol.is_some() {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart marker has duplicate symbol".to_string(),
+                            ));
+                        }
+                        symbol = Some(parse_marker_style(element)?);
+                    },
+                    b"size" => {
+                        if size.is_some() {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart marker has duplicate size".to_string(),
+                            ));
+                        }
+                        size = Some(bounded_u32_attr(element, "chart marker size", 2, 72)?);
+                    },
+                    _ => {},
+                }
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"marker" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart series marker".to_string(),
+                ));
+            },
+            Err(error) => return Err(OoxmlError::Xml(error.to_string())),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok((symbol, size))
+}
+
+fn parse_data_point<R: BufRead>(reader: &mut Reader<R>) -> Result<DataPoint> {
+    let mut index = None;
+    let mut explosion = None;
+    let mut marker_size = None;
+    let mut marker_symbol = None;
+    let mut invert_if_negative = false;
+    let mut bubble_3d = None;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"marker" => {
+                (marker_symbol, marker_size) = parse_series_marker(reader)?;
+            },
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+                match element.local_name().as_ref() {
+                    b"idx" => {
+                        index = Some(required_u32_attr(element, "chart data-point index")?);
+                    },
+                    b"explosion" => {
+                        explosion = Some(required_u32_attr(element, "chart data-point explosion")?);
+                    },
+                    b"invertIfNegative" => invert_if_negative = parse_bool_attr(element)?,
+                    b"bubble3D" => bubble_3d = Some(parse_bool_attr(element)?),
+                    _ => {},
+                }
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"dPt" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart data point".to_string(),
+                ));
+            },
+            Err(error) => return Err(OoxmlError::Xml(error.to_string())),
+            _ => {},
+        }
+        buf.clear();
+    }
+    let mut point =
+        DataPoint::new(index.ok_or_else(|| missing_attribute("chart data-point index"))?);
+    point.explosion = explosion;
+    point.marker_size = marker_size;
+    point.marker_symbol = marker_symbol;
+    point.invert_if_negative = invert_if_negative;
+    point.bubble_3d = bubble_3d;
+    Ok(point)
+}
+
+fn parse_data_labels<R: BufRead>(reader: &mut Reader<R>) -> Result<DataLabels> {
+    let mut labels = DataLabels::new();
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"separator" => {
+                labels.separator = Some(parse_text_element(reader, b"separator")?);
+            },
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+                match element.local_name().as_ref() {
+                    b"delete" => labels.deleted = parse_bool_attr(element)?,
+                    b"dLblPos" => labels.position = Some(parse_data_label_position(element)?),
+                    b"showLegendKey" => labels.show_legend_key = parse_bool_attr(element)?,
+                    b"showVal" => labels.show_value = parse_bool_attr(element)?,
+                    b"showCatName" => labels.show_category_name = parse_bool_attr(element)?,
+                    b"showSerName" => labels.show_series_name = parse_bool_attr(element)?,
+                    b"showPercent" => labels.show_percent = parse_bool_attr(element)?,
+                    b"showBubbleSize" => labels.show_bubble_size = parse_bool_attr(element)?,
+                    _ => {},
+                }
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"dLbls" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart data labels".to_string(),
+                ));
+            },
+            Err(error) => return Err(OoxmlError::Xml(error.to_string())),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok(labels)
 }
 
 fn parse_string_data<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<StringData>> {
@@ -1685,6 +1869,42 @@ fn parse_built_in_unit(element: &BytesStart<'_>) -> Result<BuiltInUnit> {
     }
 }
 
+fn parse_marker_style(element: &BytesStart<'_>) -> Result<MarkerStyle> {
+    let value = get_attr(element, b"val").ok_or_else(|| missing_attribute("chart marker style"))?;
+    match value.as_slice() {
+        b"circle" => Ok(MarkerStyle::Circle),
+        b"dash" => Ok(MarkerStyle::Dash),
+        b"diamond" => Ok(MarkerStyle::Diamond),
+        b"dot" => Ok(MarkerStyle::Dot),
+        b"none" => Ok(MarkerStyle::None),
+        b"picture" => Ok(MarkerStyle::Picture),
+        b"plus" => Ok(MarkerStyle::Plus),
+        b"square" => Ok(MarkerStyle::Square),
+        b"star" => Ok(MarkerStyle::Star),
+        b"triangle" => Ok(MarkerStyle::Triangle),
+        b"x" => Ok(MarkerStyle::X),
+        b"auto" => Ok(MarkerStyle::Auto),
+        _ => Err(invalid_attribute("chart marker style", &value)),
+    }
+}
+
+fn parse_data_label_position(element: &BytesStart<'_>) -> Result<DataLabelPosition> {
+    let value =
+        get_attr(element, b"val").ok_or_else(|| missing_attribute("chart data-label position"))?;
+    match value.as_slice() {
+        b"bestFit" => Ok(DataLabelPosition::BestFit),
+        b"ctr" => Ok(DataLabelPosition::Center),
+        b"inBase" => Ok(DataLabelPosition::InsideBase),
+        b"inEnd" => Ok(DataLabelPosition::InsideEnd),
+        b"l" => Ok(DataLabelPosition::Left),
+        b"outEnd" => Ok(DataLabelPosition::OutsideEnd),
+        b"r" => Ok(DataLabelPosition::Right),
+        b"t" => Ok(DataLabelPosition::Top),
+        b"b" => Ok(DataLabelPosition::Bottom),
+        _ => Err(invalid_attribute("chart data-label position", &value)),
+    }
+}
+
 fn parse_axis_number_format(element: &BytesStart<'_>, decoder: Decoder) -> Result<NumberFormat> {
     let format_code = element
         .try_get_attribute(b"formatCode")
@@ -1736,11 +1956,6 @@ fn invalid_attribute(description: &str, value: &[u8]) -> OoxmlError {
         "invalid {description} '{}'",
         String::from_utf8_lossy(value)
     ))
-}
-
-#[inline]
-fn parse_u32_attr(e: &BytesStart, attr_name: &[u8]) -> Option<u32> {
-    get_attr(e, attr_name).and_then(|v| std::str::from_utf8(&v).ok()?.parse().ok())
 }
 
 fn required_u32_attr(element: &BytesStart<'_>, description: &str) -> Result<u32> {
@@ -1912,6 +2127,23 @@ mod tests {
         bubble_series.bubble_sizes = Some(NumericData::from_values(vec![3.0]));
         bubble_series.bubble_3d = true;
         bubble.common.series.push(bubble_series);
+        let mut scatter = ScatterTypeGroup::new(ScatterStyle::SmoothMarker);
+        let mut scatter_series = Series::new(4);
+        scatter_series.marker_symbol = Some(MarkerStyle::Star);
+        scatter_series.marker_size = Some(9);
+        scatter_series.smooth = true;
+        let mut point = DataPoint::new(2).with_marker(7, MarkerStyle::Diamond);
+        point.invert_if_negative = true;
+        point.bubble_3d = Some(false);
+        point.explosion = Some(15);
+        scatter_series.data_points.push(point);
+        let mut labels = DataLabels::new()
+            .with_position(DataLabelPosition::Top)
+            .with_show_value(true);
+        labels.show_series_name = true;
+        labels.separator = Some(" & ".to_string());
+        scatter_series.data_labels = Some(labels);
+        scatter.common.series.push(scatter_series);
 
         let mut chart = Chart::new();
         chart.plot_area.type_groups = vec![
@@ -1929,7 +2161,7 @@ mod tests {
             TypeGroup::Pie(PieTypeGroup::new()),
             TypeGroup::Pie3D(Pie3DTypeGroup::new()),
             TypeGroup::Radar(RadarTypeGroup::new(RadarStyle::Filled)),
-            TypeGroup::Scatter(ScatterTypeGroup::new(ScatterStyle::Smooth)),
+            TypeGroup::Scatter(scatter),
             TypeGroup::Stock(StockTypeGroup::new()),
             TypeGroup::Surface(surface),
             TypeGroup::Surface3D(surface_3d),
@@ -2005,6 +2237,28 @@ mod tests {
             [3.0]
         );
         assert!(group.common.series[0].bubble_3d);
+        let TypeGroup::Scatter(group) = &parsed.plot_area.type_groups[11] else {
+            unreachable!();
+        };
+        let series = &group.common.series[0];
+        assert_eq!(series.marker_symbol, Some(MarkerStyle::Star));
+        assert_eq!(series.marker_size, Some(9));
+        assert!(series.smooth);
+        assert_eq!(series.data_points.len(), 1);
+        assert_eq!(series.data_points[0].index, 2);
+        assert_eq!(series.data_points[0].marker_size, Some(7));
+        assert_eq!(
+            series.data_points[0].marker_symbol,
+            Some(MarkerStyle::Diamond)
+        );
+        assert!(series.data_points[0].invert_if_negative);
+        assert_eq!(series.data_points[0].bubble_3d, Some(false));
+        assert_eq!(series.data_points[0].explosion, Some(15));
+        let labels = series.data_labels.as_ref().unwrap();
+        assert_eq!(labels.position, Some(DataLabelPosition::Top));
+        assert!(labels.show_value);
+        assert!(labels.show_series_name);
+        assert_eq!(labels.separator.as_deref(), Some(" & "));
     }
 
     #[test]

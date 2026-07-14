@@ -12,9 +12,57 @@ use crate::charts::plot_area::{
     RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup, SurfaceTypeGroup,
     TypeGroup,
 };
-use crate::charts::series::Series;
+use crate::charts::series::{DataLabels, DataPoint, Series};
 use litchi_core::xml::escape_xml;
 use std::io::Write;
+
+#[derive(Clone, Copy)]
+struct SeriesFeatures {
+    point_and_label_overrides: bool,
+    explosion: bool,
+    invert_if_negative: bool,
+    marker: bool,
+    smooth: bool,
+}
+
+impl SeriesFeatures {
+    const BASIC: Self = Self {
+        point_and_label_overrides: true,
+        explosion: false,
+        invert_if_negative: false,
+        marker: false,
+        smooth: false,
+    };
+    const AREA: Self = Self {
+        invert_if_negative: true,
+        ..Self::BASIC
+    };
+    const BAR: Self = Self {
+        invert_if_negative: true,
+        ..Self::BASIC
+    };
+    const LINE: Self = Self {
+        marker: true,
+        smooth: true,
+        ..Self::BASIC
+    };
+    const LINE_3D: Self = Self {
+        marker: true,
+        ..Self::BASIC
+    };
+    const PIE: Self = Self {
+        explosion: true,
+        ..Self::BASIC
+    };
+    const RADAR: Self = Self {
+        marker: true,
+        ..Self::BASIC
+    };
+    const SURFACE: Self = Self {
+        point_and_label_overrides: false,
+        ..Self::BASIC
+    };
+}
 
 /// Write a chart to XML.
 pub fn write_chart<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<()> {
@@ -239,7 +287,7 @@ fn write_area_chart<W: Write>(writer: &mut W, group: &AreaTypeGroup) -> std::io:
     )?;
 
     for series in &group.common.series {
-        write_series(writer, series, false)?;
+        write_series(writer, series, SeriesFeatures::AREA)?;
     }
 
     write_data_labels_default(writer)?;
@@ -263,7 +311,7 @@ fn write_area_3d_chart<W: Write>(writer: &mut W, group: &Area3DTypeGroup) -> std
     )?;
 
     for series in &group.common.series {
-        write_series(writer, series, false)?;
+        write_series(writer, series, SeriesFeatures::BASIC)?;
     }
 
     write_data_labels_default(writer)?;
@@ -292,7 +340,7 @@ fn write_bar_chart<W: Write>(writer: &mut W, group: &BarTypeGroup) -> std::io::R
     )?;
 
     for series in &group.common.series {
-        write_series(writer, series, false)?;
+        write_series(writer, series, SeriesFeatures::BAR)?;
     }
 
     write_data_labels_default(writer)?;
@@ -332,7 +380,7 @@ fn write_bar_3d_chart<W: Write>(writer: &mut W, group: &Bar3DTypeGroup) -> std::
     )?;
 
     for series in &group.common.series {
-        write_series(writer, series, false)?;
+        write_series(writer, series, SeriesFeatures::BAR)?;
     }
 
     write_data_labels_default(writer)?;
@@ -412,7 +460,7 @@ fn write_doughnut_chart<W: Write>(
     )?;
 
     for series in &group.common.series {
-        write_series(writer, series, true)?;
+        write_series(writer, series, SeriesFeatures::PIE)?;
     }
 
     write_data_labels_default(writer)?;
@@ -441,7 +489,7 @@ fn write_line_chart<W: Write>(writer: &mut W, group: &LineTypeGroup) -> std::io:
     )?;
 
     for series in &group.common.series {
-        write_series(writer, series, false)?;
+        write_series(writer, series, SeriesFeatures::LINE)?;
     }
 
     write_data_labels_default(writer)?;
@@ -470,7 +518,7 @@ fn write_line_3d_chart<W: Write>(writer: &mut W, group: &Line3DTypeGroup) -> std
     )?;
 
     for series in &group.common.series {
-        write_series(writer, series, false)?;
+        write_series(writer, series, SeriesFeatures::LINE_3D)?;
     }
 
     write_data_labels_default(writer)?;
@@ -489,7 +537,7 @@ fn write_pie_chart<W: Write>(writer: &mut W, group: &PieTypeGroup) -> std::io::R
     )?;
 
     for series in &group.common.series {
-        write_series(writer, series, true)?;
+        write_series(writer, series, SeriesFeatures::PIE)?;
     }
 
     write_data_labels_default(writer)?;
@@ -512,7 +560,7 @@ fn write_pie_3d_chart<W: Write>(writer: &mut W, group: &Pie3DTypeGroup) -> std::
     )?;
 
     for series in &group.common.series {
-        write_series(writer, series, true)?;
+        write_series(writer, series, SeriesFeatures::PIE)?;
     }
 
     write_data_labels_default(writer)?;
@@ -535,7 +583,7 @@ fn write_radar_chart<W: Write>(writer: &mut W, group: &RadarTypeGroup) -> std::i
     )?;
 
     for series in &group.common.series {
-        write_series(writer, series, false)?;
+        write_series(writer, series, SeriesFeatures::RADAR)?;
     }
 
     write_data_labels_default(writer)?;
@@ -573,7 +621,7 @@ fn write_stock_chart<W: Write>(writer: &mut W, group: &StockTypeGroup) -> std::i
     write!(writer, "<c:stockChart>")?;
 
     for series in &group.common.series {
-        write_series(writer, series, false)?;
+        write_series(writer, series, SeriesFeatures::LINE)?;
     }
 
     write_data_labels_default(writer)?;
@@ -592,7 +640,7 @@ fn write_surface_chart<W: Write>(writer: &mut W, group: &SurfaceTypeGroup) -> st
     )?;
 
     for series in &group.common.series {
-        write_series(writer, series, false)?;
+        write_series(writer, series, SeriesFeatures::SURFACE)?;
     }
 
     write!(
@@ -616,7 +664,7 @@ fn write_surface_3d_chart<W: Write>(
     )?;
 
     for series in &group.common.series {
-        write_series(writer, series, false)?;
+        write_series(writer, series, SeriesFeatures::SURFACE)?;
     }
 
     write!(
@@ -628,7 +676,11 @@ fn write_surface_3d_chart<W: Write>(
     Ok(())
 }
 
-fn write_series<W: Write>(writer: &mut W, series: &Series, is_pie: bool) -> std::io::Result<()> {
+fn write_series<W: Write>(
+    writer: &mut W,
+    series: &Series,
+    features: SeriesFeatures,
+) -> std::io::Result<()> {
     write!(writer, "<c:ser>")?;
     write!(writer, r#"<c:idx val="{}"/>"#, series.index)?;
     write!(writer, r#"<c:order val="{}"/>"#, series.order)?;
@@ -648,6 +700,8 @@ fn write_series<W: Write>(writer: &mut W, series: &Series, is_pie: bool) -> std:
         write!(writer, "</c:tx>")?;
     }
 
+    write_series_presentation(writer, series, features)?;
+
     if let Some(ref categories) = series.categories {
         write_string_data_ref(writer, "c:cat", categories)?;
     }
@@ -656,12 +710,165 @@ fn write_series<W: Write>(writer: &mut W, series: &Series, is_pie: bool) -> std:
         write_numeric_data_ref(writer, "c:val", values)?;
     }
 
-    if is_pie && let Some(explosion) = series.explosion {
-        write!(writer, r#"<c:explosion val="{}"/>"#, explosion)?;
+    if features.smooth {
+        write!(
+            writer,
+            r#"<c:smooth val="{}"/>"#,
+            if series.smooth { "1" } else { "0" }
+        )?;
     }
 
     write!(writer, "</c:ser>")?;
 
+    Ok(())
+}
+
+fn write_series_presentation<W: Write>(
+    writer: &mut W,
+    series: &Series,
+    features: SeriesFeatures,
+) -> std::io::Result<()> {
+    if !features.marker && (series.marker_symbol.is_some() || series.marker_size.is_some()) {
+        return Err(invalid_chart_input(
+            "chart type does not support series markers",
+        ));
+    }
+    if !features.smooth && series.smooth {
+        return Err(invalid_chart_input(
+            "chart type does not support smoothed series",
+        ));
+    }
+    if !features.invert_if_negative && series.invert_if_negative {
+        return Err(invalid_chart_input(
+            "chart type does not support negative-value inversion",
+        ));
+    }
+    if !features.explosion && series.explosion.is_some() {
+        return Err(invalid_chart_input(
+            "chart type does not support series explosion",
+        ));
+    }
+    if !features.point_and_label_overrides
+        && (!series.data_points.is_empty() || series.data_labels.is_some())
+    {
+        return Err(invalid_chart_input(
+            "chart type does not support point or data-label overrides",
+        ));
+    }
+    if series
+        .marker_size
+        .is_some_and(|size| !(2..=72).contains(&size))
+    {
+        return Err(invalid_chart_input("chart series marker size must be 2-72"));
+    }
+    if features.marker && (series.marker_symbol.is_some() || series.marker_size.is_some()) {
+        write!(writer, "<c:marker>")?;
+        if let Some(symbol) = series.marker_symbol {
+            write!(writer, r#"<c:symbol val="{}"/>"#, symbol.xml_value())?;
+        }
+        if let Some(size) = series.marker_size {
+            write!(writer, r#"<c:size val="{}"/>"#, size)?;
+        }
+        write!(writer, "</c:marker>")?;
+    }
+
+    if features.invert_if_negative && series.invert_if_negative {
+        write!(writer, r#"<c:invertIfNegative val="1"/>"#)?;
+    }
+    if features.explosion
+        && let Some(explosion) = series.explosion
+    {
+        write!(writer, r#"<c:explosion val="{}"/>"#, explosion)?;
+    }
+    for (position, point) in series.data_points.iter().enumerate() {
+        if series.data_points[..position]
+            .iter()
+            .any(|existing| existing.index == point.index)
+        {
+            return Err(invalid_chart_input(format!(
+                "duplicate chart data-point index {}",
+                point.index
+            )));
+        }
+        write_data_point(writer, point)?;
+    }
+    if let Some(labels) = &series.data_labels {
+        write_data_labels(writer, labels)?;
+    }
+    Ok(())
+}
+
+fn write_data_point<W: Write>(writer: &mut W, point: &DataPoint) -> std::io::Result<()> {
+    if point
+        .marker_size
+        .is_some_and(|size| !(2..=72).contains(&size))
+    {
+        return Err(invalid_chart_input(
+            "chart data-point marker size must be 2-72",
+        ));
+    }
+    write!(writer, r#"<c:dPt><c:idx val="{}"/>"#, point.index)?;
+    if point.invert_if_negative {
+        write!(writer, r#"<c:invertIfNegative val="1"/>"#)?;
+    }
+    if point.marker_symbol.is_some() || point.marker_size.is_some() {
+        write!(writer, "<c:marker>")?;
+        if let Some(symbol) = point.marker_symbol {
+            write!(writer, r#"<c:symbol val="{}"/>"#, symbol.xml_value())?;
+        }
+        if let Some(size) = point.marker_size {
+            write!(writer, r#"<c:size val="{}"/>"#, size)?;
+        }
+        write!(writer, "</c:marker>")?;
+    }
+    if let Some(bubble_3d) = point.bubble_3d {
+        write!(
+            writer,
+            r#"<c:bubble3D val="{}"/>"#,
+            if bubble_3d { "1" } else { "0" }
+        )?;
+    }
+    if let Some(explosion) = point.explosion {
+        write!(writer, r#"<c:explosion val="{}"/>"#, explosion)?;
+    }
+    write!(writer, "</c:dPt>")?;
+    Ok(())
+}
+
+fn invalid_chart_input(message: impl Into<String>) -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::InvalidInput, message.into())
+}
+
+fn write_data_labels<W: Write>(writer: &mut W, labels: &DataLabels) -> std::io::Result<()> {
+    write!(writer, "<c:dLbls>")?;
+    if labels.deleted {
+        write!(writer, r#"<c:delete val="1"/>"#)?;
+    }
+    if let Some(position) = labels.position {
+        write!(writer, r#"<c:dLblPos val="{}"/>"#, position.xml_value())?;
+    }
+    for (name, value) in [
+        ("showLegendKey", labels.show_legend_key),
+        ("showVal", labels.show_value),
+        ("showCatName", labels.show_category_name),
+        ("showSerName", labels.show_series_name),
+        ("showPercent", labels.show_percent),
+        ("showBubbleSize", labels.show_bubble_size),
+    ] {
+        write!(
+            writer,
+            r#"<c:{name} val="{}"/>"#,
+            if value { "1" } else { "0" }
+        )?;
+    }
+    if let Some(separator) = &labels.separator {
+        write!(
+            writer,
+            "<c:separator>{}</c:separator>",
+            escape_xml(separator)
+        )?;
+    }
+    write!(writer, "</c:dLbls>")?;
     Ok(())
 }
 
@@ -685,6 +892,8 @@ fn write_scatter_series<W: Write>(writer: &mut W, series: &Series) -> std::io::R
         write!(writer, "</c:tx>")?;
     }
 
+    write_series_presentation(writer, series, SeriesFeatures::LINE)?;
+
     if let Some(ref x_values) = series.x_values {
         write_numeric_data_ref(writer, "c:xVal", x_values)?;
     }
@@ -692,6 +901,12 @@ fn write_scatter_series<W: Write>(writer: &mut W, series: &Series) -> std::io::R
     if let Some(ref y_values) = series.y_values {
         write_numeric_data_ref(writer, "c:yVal", y_values)?;
     }
+
+    write!(
+        writer,
+        r#"<c:smooth val="{}"/>"#,
+        if series.smooth { "1" } else { "0" }
+    )?;
 
     if let Some(ref bubble_sizes) = series.bubble_sizes {
         write_numeric_data_ref(writer, "c:bubbleSize", bubble_sizes)?;
@@ -721,6 +936,8 @@ fn write_bubble_series<W: Write>(writer: &mut W, series: &Series) -> std::io::Re
         }
         write!(writer, "</c:tx>")?;
     }
+
+    write_series_presentation(writer, series, SeriesFeatures::BASIC)?;
 
     if let Some(ref x_values) = series.x_values {
         write_numeric_data_ref(writer, "c:xVal", x_values)?;
