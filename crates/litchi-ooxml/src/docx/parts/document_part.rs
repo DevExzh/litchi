@@ -1,10 +1,13 @@
-/// DocumentPart - the main document.xml part of a Word document.
+//! DocumentPart - the main document.xml part of a Word document.
+
+use crate::docx::namespace::is_wordprocessing_namespace;
 use crate::docx::paragraph::{Paragraph, extract_word_text};
 use crate::docx::table::Table;
 use crate::error::{OoxmlError, Result};
 use litchi_opc::part::Part;
-use quick_xml::Reader;
-use quick_xml::events::Event;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::ResolveResult;
+use quick_xml::reader::NsReader;
 use smallvec::SmallVec;
 use std::sync::Arc;
 
@@ -16,6 +19,135 @@ use std::sync::Arc;
 pub struct DocumentPart<'a> {
     /// Reference to the underlying part
     part: &'a dyn Part,
+}
+
+#[derive(Clone, Copy)]
+enum ElementKind {
+    Paragraph,
+    Table,
+}
+
+#[derive(Clone, Copy)]
+struct ElementSelection {
+    paragraphs: bool,
+    tables: bool,
+}
+
+fn selected_element(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    selection: ElementSelection,
+) -> Option<ElementKind> {
+    if !is_wordprocessing_namespace(namespace) {
+        return None;
+    }
+    match element.local_name().as_ref() {
+        b"p" if selection.paragraphs => Some(ElementKind::Paragraph),
+        b"tbl" if selection.tables => Some(ElementKind::Table),
+        _ => None,
+    }
+}
+
+fn scan_element_ranges(
+    xml_bytes: &[u8],
+    selection: ElementSelection,
+    mut emit: impl FnMut(ElementKind, u32, u32) -> Result<()>,
+) -> Result<()> {
+    enum ScanEvent {
+        Start(ElementKind),
+        NestedStart,
+        Empty(ElementKind),
+        End,
+        Eof,
+        Other,
+    }
+
+    let mut reader = NsReader::from_reader(xml_bytes);
+    let mut capture: Option<(ElementKind, usize, usize)> = None;
+
+    loop {
+        let event_start = usize::try_from(reader.buffer_position()).map_err(|_| {
+            OoxmlError::InvalidFormat("Word document offset does not fit usize".to_string())
+        })?;
+        let event = {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            match event {
+                Event::Start(_) if capture.is_some() => ScanEvent::NestedStart,
+                Event::Start(element) => selected_element(&namespace, &element, selection)
+                    .map_or(ScanEvent::Other, ScanEvent::Start),
+                Event::Empty(element) if capture.is_none() => {
+                    selected_element(&namespace, &element, selection)
+                        .map_or(ScanEvent::Other, ScanEvent::Empty)
+                },
+                Event::End(_) if capture.is_some() => ScanEvent::End,
+                Event::Eof => ScanEvent::Eof,
+                _ => ScanEvent::Other,
+            }
+        };
+        let event_end = usize::try_from(reader.buffer_position()).map_err(|_| {
+            OoxmlError::InvalidFormat("Word document offset does not fit usize".to_string())
+        })?;
+
+        match event {
+            ScanEvent::Start(kind) => capture = Some((kind, event_start, 1)),
+            ScanEvent::NestedStart => {
+                let Some((_, _, depth)) = capture.as_mut() else {
+                    return Err(OoxmlError::InvalidFormat(
+                        "missing captured Word element".to_string(),
+                    ));
+                };
+                *depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("Word element nesting is too deep".to_string())
+                })?;
+            },
+            ScanEvent::Empty(kind) => emit_element_range(kind, event_start, event_end, &mut emit)?,
+            ScanEvent::End => {
+                let Some((_, _, depth)) = capture.as_mut() else {
+                    return Err(OoxmlError::InvalidFormat(
+                        "missing captured Word element".to_string(),
+                    ));
+                };
+                *depth = depth.checked_sub(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("invalid Word element nesting".to_string())
+                })?;
+                if *depth == 0 {
+                    let Some((kind, start, _)) = capture.take() else {
+                        return Err(OoxmlError::InvalidFormat(
+                            "missing captured Word element range".to_string(),
+                        ));
+                    };
+                    emit_element_range(kind, start, event_end, &mut emit)?;
+                }
+            },
+            ScanEvent::Eof if capture.is_some() => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated Word document element".to_string(),
+                ));
+            },
+            ScanEvent::Eof => break,
+            ScanEvent::Other => {},
+        }
+    }
+
+    Ok(())
+}
+
+fn emit_element_range(
+    kind: ElementKind,
+    start: usize,
+    end: usize,
+    emit: &mut impl FnMut(ElementKind, u32, u32) -> Result<()>,
+) -> Result<()> {
+    let length = end
+        .checked_sub(start)
+        .ok_or_else(|| OoxmlError::InvalidFormat("invalid Word element byte range".to_string()))?;
+    let start = u32::try_from(start)
+        .map_err(|_| OoxmlError::InvalidFormat("Word element offset exceeds u32".to_string()))?;
+    let length = u32::try_from(length)
+        .map_err(|_| OoxmlError::InvalidFormat("Word element length exceeds u32".to_string()))?;
+    emit(kind, start, length)
 }
 
 impl<'a> DocumentPart<'a> {
@@ -57,22 +189,18 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Counts `<w:p>` elements in the document body.
     pub fn paragraph_count(&self) -> Result<usize> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
-
         let mut count = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"p" => {
-                    count += 1;
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_element_ranges(
+            self.xml_bytes(),
+            ElementSelection {
+                paragraphs: true,
+                tables: false,
+            },
+            |_, _, _| {
+                count += 1;
+                Ok(())
+            },
+        )?;
         Ok(count)
     }
 
@@ -80,22 +208,18 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Counts `<w:tbl>` elements in the document body.
     pub fn table_count(&self) -> Result<usize> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
-
         let mut count = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) if e.local_name().as_ref() == b"tbl" => {
-                    count += 1;
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_element_ranges(
+            self.xml_bytes(),
+            ElementSelection {
+                paragraphs: false,
+                tables: true,
+            },
+            |_, _, _| {
+                count += 1;
+                Ok(())
+            },
+        )?;
         Ok(count)
     }
 
@@ -105,58 +229,25 @@ impl<'a> DocumentPart<'a> {
     ///
     /// # Performance
     ///
-    /// Uses streaming XML parsing with pre-allocated SmallVec for efficient
-    /// storage of typically small paragraph collections. Optimized to minimize
-    /// allocations via pre-sized reserves.
+    /// Uses namespace-aware streaming XML parsing and shared byte ranges.
     pub fn paragraphs(&self) -> Result<SmallVec<[Paragraph; 32]>> {
-        let xml_bytes = self.xml_bytes();
-        let mut reader = Reader::from_reader(xml_bytes);
-        reader.config_mut().trim_text(true);
-
-        // Estimate paragraph count
-        let estimated = (xml_bytes.len() / 400).max(8);
-        let mut paragraphs = SmallVec::with_capacity(estimated);
-        let mut current_para_xml = Vec::with_capacity(4096);
-        let mut in_para = false;
-        let mut depth = 0u32;
-
-        // Use read_event() for zero-copy parsing from slice
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"p" && !in_para {
-                        in_para = true;
-                        depth = 1;
-                        current_para_xml.clear();
-                        write_start_tag(&mut current_para_xml, &e);
-                    } else if in_para {
-                        depth += 1;
-                        write_start_tag_dynamic(&mut current_para_xml, &e);
-                    }
-                },
-                Ok(Event::End(e)) if in_para => {
-                    write_end_tag(&mut current_para_xml, e.name().as_ref());
-                    depth -= 1;
-                    if depth == 0 && e.local_name().as_ref() == b"p" {
-                        // Clone bytes and clear buffer (preserves capacity for next element)
-                        let para_xml = current_para_xml.clone();
-                        current_para_xml.clear();
-                        paragraphs.push(Paragraph::new(para_xml));
-                        in_para = false;
-                    }
-                },
-                Ok(Event::Text(e)) if in_para => {
-                    current_para_xml.extend_from_slice(e.as_ref());
-                },
-                Ok(Event::Empty(e)) if in_para => {
-                    write_empty_tag(&mut current_para_xml, &e);
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        let source = self.get_xml_arc();
+        let mut paragraphs = SmallVec::new();
+        scan_element_ranges(
+            source.as_slice(),
+            ElementSelection {
+                paragraphs: true,
+                tables: false,
+            },
+            |_, start, length| {
+                paragraphs.push(Paragraph::from_arc_range(
+                    Arc::clone(&source),
+                    start,
+                    length,
+                ));
+                Ok(())
+            },
+        )?;
         Ok(paragraphs)
     }
 
@@ -166,55 +257,21 @@ impl<'a> DocumentPart<'a> {
     ///
     /// # Performance
     ///
-    /// Uses SmallVec for efficient storage of typically small table collections.
-    /// Optimized to minimize allocations via pre-sized reserves.
+    /// Uses namespace-aware streaming XML parsing and shared byte ranges.
     pub fn tables(&self) -> Result<SmallVec<[Table; 8]>> {
-        let xml_bytes = self.xml_bytes();
-        let mut reader = Reader::from_reader(xml_bytes);
-        reader.config_mut().trim_text(true);
-
+        let source = self.get_xml_arc();
         let mut tables = SmallVec::new();
-        let mut current_table_xml = Vec::with_capacity(8192);
-        let mut in_table = false;
-        let mut depth = 0u32;
-
-        // Use read_event() for zero-copy parsing from slice
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"tbl" && !in_table {
-                        in_table = true;
-                        depth = 1;
-                        current_table_xml.clear();
-                        write_start_tag(&mut current_table_xml, &e);
-                    } else if in_table {
-                        depth += 1;
-                        write_start_tag_dynamic(&mut current_table_xml, &e);
-                    }
-                },
-                Ok(Event::End(e)) if in_table => {
-                    write_end_tag(&mut current_table_xml, e.name().as_ref());
-                    depth -= 1;
-                    if depth == 0 && e.local_name().as_ref() == b"tbl" {
-                        // Clone bytes and clear buffer (preserves capacity for next element)
-                        let table_xml = current_table_xml.clone();
-                        current_table_xml.clear();
-                        tables.push(Table::new(table_xml));
-                        in_table = false;
-                    }
-                },
-                Ok(Event::Text(e)) if in_table => {
-                    current_table_xml.extend_from_slice(e.as_ref());
-                },
-                Ok(Event::Empty(e)) if in_table => {
-                    write_empty_tag(&mut current_table_xml, &e);
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_element_ranges(
+            source.as_slice(),
+            ElementSelection {
+                paragraphs: false,
+                tables: true,
+            },
+            |_, start, length| {
+                tables.push(Table::from_arc_range(Arc::clone(&source), start, length));
+                Ok(())
+            },
+        )?;
         Ok(tables)
     }
 
@@ -232,323 +289,104 @@ impl<'a> DocumentPart<'a> {
     ///
     /// # Performance
     ///
-    /// Uses TRUE zero-copy parsing with NO Vec::push calls.
-    /// All allocations happen upfront via pre-counting.
+    /// Uses one-pass, namespace-aware zero-copy parsing.
     pub fn elements(&self) -> Result<Vec<crate::docx::DocxElement>> {
         use crate::docx::DocxElement;
 
-        // Get cached Arc (created once, shared across calls)
-        let source_arc = self.get_xml_arc();
-        let len = source_arc.len();
-
-        // PASS 1: Count elements (no allocations)
-        let count = count_elements(&source_arc);
-        if count == 0 {
-            return Ok(Vec::new());
-        }
-
-        // Single allocation: result vector with exact capacity
-        let mut elements: Vec<DocxElement> = Vec::with_capacity(count);
-
-        // OPTIMIZATION: Pre-increment Arc refcount to avoid per-element atomic operations.
-        // Convert Arc to raw pointer - this "forgets" the Arc without decrementing refcount.
-        let arc_ptr = Arc::into_raw(source_arc);
-        // Reborrow from the raw pointer for reading (valid for the Arc's lifetime)
-        let xml_bytes: &[u8] = unsafe { &*arc_ptr };
-        // Pre-increment refcount by (count - 1) since into_raw gave us one ownership.
-        // SAFETY: arc_ptr came from Arc::into_raw, so it's valid.
-        unsafe {
-            for _ in 0..(count - 1) {
-                Arc::increment_strong_count(arc_ptr);
-            }
-        }
-
-        // PASS 2: Fill elements directly using unsafe set_len to avoid push
-        let mut write_idx = 0usize;
-        let mut i = 0usize;
-
-        // Get raw pointer for direct writes
-        let elements_ptr = elements.as_mut_ptr();
-
-        while i < len && write_idx < count {
-            let Some(tag_start) = memchr::memchr(b'<', &xml_bytes[i..]) else {
-                break;
-            };
-            let tag_start = i + tag_start;
-
-            // Check for <w:p
-            if tag_start + 5 < len && &xml_bytes[tag_start..tag_start + 4] == b"<w:p" {
-                let next_char = xml_bytes[tag_start + 4];
-                if (next_char == b'>' || next_char == b' ' || next_char == b'/')
-                    && let Some(end) = find_paragraph_end(&xml_bytes[tag_start..])
-                {
-                    let end_pos = tag_start + end;
-                    let elem_len = (end_pos - tag_start) as u32;
-
-                    // SAFETY: arc_ptr is valid; each from_raw consumes one refcount we pre-incremented
-                    let arc_clone = unsafe { Arc::from_raw(arc_ptr) };
-
-                    // Write directly to pre-allocated slot (no push)
-                    unsafe {
-                        std::ptr::write(
-                            elements_ptr.add(write_idx),
-                            DocxElement::Paragraph(Box::new(Paragraph::from_arc_range(
-                                arc_clone,
-                                tag_start as u32,
-                                elem_len,
-                            ))),
-                        );
-                    }
-                    write_idx += 1;
-                    i = end_pos;
-                    continue;
-                }
-            }
-            // Check for <w:tbl
-            else if tag_start + 7 < len && &xml_bytes[tag_start..tag_start + 6] == b"<w:tbl" {
-                let next_char = xml_bytes[tag_start + 6];
-                if (next_char == b'>' || next_char == b' ')
-                    && let Some(end) = find_table_end(&xml_bytes[tag_start..])
-                {
-                    let end_pos = tag_start + end;
-                    let elem_len = (end_pos - tag_start) as u32;
-
-                    // SAFETY: arc_ptr is valid; each from_raw consumes one refcount we pre-incremented
-                    let arc_clone = unsafe { Arc::from_raw(arc_ptr) };
-
-                    // Write directly to pre-allocated slot (no push)
-                    unsafe {
-                        std::ptr::write(
-                            elements_ptr.add(write_idx),
-                            DocxElement::Table(Box::new(Table::from_arc_range(
-                                arc_clone,
-                                tag_start as u32,
-                                elem_len,
-                            ))),
-                        );
-                    }
-                    write_idx += 1;
-                    i = end_pos;
-                    continue;
-                }
-            }
-
-            i = tag_start + 1;
-        }
-
-        // Handle refcount mismatch: if we found fewer elements than counted,
-        // we need to decrement the unused pre-incremented refcounts.
-        // SAFETY: arc_ptr is valid, and we're decrementing refs we incremented but didn't use.
-        if write_idx < count {
-            unsafe {
-                for _ in 0..(count - write_idx) {
-                    Arc::decrement_strong_count(arc_ptr);
-                }
-            }
-        }
-
-        // Set final length (elements were written directly)
-        unsafe {
-            elements.set_len(write_idx);
-        }
-
+        let source = self.get_xml_arc();
+        let mut elements = Vec::new();
+        scan_element_ranges(
+            source.as_slice(),
+            ElementSelection {
+                paragraphs: true,
+                tables: true,
+            },
+            |kind, start, length| {
+                let source = Arc::clone(&source);
+                elements.push(match kind {
+                    ElementKind::Paragraph => DocxElement::Paragraph(Box::new(
+                        Paragraph::from_arc_range(source, start, length),
+                    )),
+                    ElementKind::Table => {
+                        DocxElement::Table(Box::new(Table::from_arc_range(source, start, length)))
+                    },
+                });
+                Ok(())
+            },
+        )?;
         Ok(elements)
     }
 }
 
-/// Write a start tag with raw bytes from BytesStart, ending with ">".
-/// Optimized to minimize capacity checks by calculating total size upfront.
-#[inline(always)]
-fn write_start_tag(out: &mut Vec<u8>, e: &quick_xml::events::BytesStart<'_>) {
-    let raw: &[u8] = e.as_ref();
-    let needed = raw.len() + 2; // '<' + raw + '>'
-    out.reserve(needed);
-    // SAFETY: We just reserved enough space, so these writes won't reallocate.
-    // Using extend_from_slice in a single batch is faster than push + extend + push.
-    let old_len = out.len();
-    // Write all bytes at once to avoid multiple capacity checks
-    unsafe {
-        let ptr = out.as_mut_ptr().add(old_len);
-        *ptr = b'<';
-        std::ptr::copy_nonoverlapping(raw.as_ptr(), ptr.add(1), raw.len());
-        *ptr.add(1 + raw.len()) = b'>';
-        out.set_len(old_len + needed);
-    }
-}
-
-/// Write a start tag - alias for write_start_tag (they were identical).
-#[inline(always)]
-fn write_start_tag_dynamic(out: &mut Vec<u8>, e: &quick_xml::events::BytesStart<'_>) {
-    write_start_tag(out, e);
-}
-
-/// Write an empty tag "<name attrs/>".
-/// Optimized to minimize capacity checks by calculating total size upfront.
-#[inline(always)]
-fn write_empty_tag(out: &mut Vec<u8>, e: &quick_xml::events::BytesStart<'_>) {
-    let raw: &[u8] = e.as_ref();
-    let needed = raw.len() + 3; // '<' + raw + '/>'
-    out.reserve(needed);
-    let old_len = out.len();
-    // Write all bytes at once to avoid multiple capacity checks
-    unsafe {
-        let ptr = out.as_mut_ptr().add(old_len);
-        *ptr = b'<';
-        std::ptr::copy_nonoverlapping(raw.as_ptr(), ptr.add(1), raw.len());
-        *ptr.add(1 + raw.len()) = b'/';
-        *ptr.add(2 + raw.len()) = b'>';
-        out.set_len(old_len + needed);
-    }
-}
-
-/// Write a closing tag "</name>" efficiently.
-#[inline(always)]
-fn write_end_tag(out: &mut Vec<u8>, name: &[u8]) {
-    let needed = name.len() + 3; // '</' + name + '>'
-    out.reserve(needed);
-    let old_len = out.len();
-    unsafe {
-        let ptr = out.as_mut_ptr().add(old_len);
-        *ptr = b'<';
-        *ptr.add(1) = b'/';
-        std::ptr::copy_nonoverlapping(name.as_ptr(), ptr.add(2), name.len());
-        *ptr.add(2 + name.len()) = b'>';
-        out.set_len(old_len + needed);
-    }
-}
-
-/// Count the number of top-level paragraphs and tables in the XML.
-/// This is a fast pre-scan to determine exact allocation size.
-#[inline]
-fn count_elements(xml_bytes: &[u8]) -> usize {
-    let mut count = 0usize;
-    let mut i = 0usize;
-    let len = xml_bytes.len();
-
-    while i < len {
-        let Some(tag_start) = memchr::memchr(b'<', &xml_bytes[i..]) else {
-            break;
-        };
-        let tag_start = i + tag_start;
-
-        // Check for <w:p
-        if tag_start + 5 < len && &xml_bytes[tag_start..tag_start + 4] == b"<w:p" {
-            let next_char = xml_bytes[tag_start + 4];
-            if (next_char == b'>' || next_char == b' ' || next_char == b'/')
-                && let Some(end) = find_paragraph_end(&xml_bytes[tag_start..])
-            {
-                count += 1;
-                i = tag_start + end;
-                continue;
-            }
-        }
-        // Check for <w:tbl
-        else if tag_start + 7 < len && &xml_bytes[tag_start..tag_start + 6] == b"<w:tbl" {
-            let next_char = xml_bytes[tag_start + 6];
-            if (next_char == b'>' || next_char == b' ')
-                && let Some(end) = find_table_end(&xml_bytes[tag_start..])
-            {
-                count += 1;
-                i = tag_start + end;
-                continue;
-            }
-        }
-
-        i = tag_start + 1;
-    }
-
-    count
-}
-
-/// Find the end of a `<w:p>` element. Handles nested paragraphs (though rare).
-/// Returns byte offset AFTER the closing `</w:p>`.
-#[inline]
-fn find_paragraph_end(xml: &[u8]) -> Option<usize> {
-    // Check for self-closing tag first: <w:p.../>
-    let first_gt = memchr::memchr(b'>', xml)?;
-    if first_gt > 0 && xml[first_gt - 1] == b'/' {
-        return Some(first_gt + 1);
-    }
-
-    let mut depth = 1i32;
-    let mut pos = first_gt + 1;
-
-    while pos < xml.len() && depth > 0 {
-        let Some(next_lt) = memchr::memchr(b'<', &xml[pos..]) else {
-            break;
-        };
-        pos += next_lt;
-
-        // Check for </w:p>
-        if pos + 6 <= xml.len() && &xml[pos..pos + 5] == b"</w:p" {
-            let c = xml[pos + 5];
-            if c == b'>' {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(pos + 6);
-                }
-            }
-        }
-        // Check for <w:p> or <w:p ...> (nested paragraph - rare but possible)
-        else if pos + 5 <= xml.len() && &xml[pos..pos + 4] == b"<w:p" {
-            let c = xml[pos + 4];
-            if c == b'>' || c == b' ' {
-                let gt = memchr::memchr(b'>', &xml[pos..])?;
-                if gt > 0 && xml[pos + gt - 1] != b'/' {
-                    depth += 1;
-                }
-            }
-        }
-        pos += 1;
-    }
-    None
-}
-
-/// Find the end of a `<w:tbl>` element. Handles nested tables.
-/// Returns byte offset AFTER the closing `</w:tbl>`.
-#[inline]
-fn find_table_end(xml: &[u8]) -> Option<usize> {
-    // Check for self-closing tag first: <w:tbl.../>
-    let first_gt = memchr::memchr(b'>', xml)?;
-    if first_gt > 0 && xml[first_gt - 1] == b'/' {
-        return Some(first_gt + 1);
-    }
-
-    let mut depth = 1i32;
-    let mut pos = first_gt + 1;
-
-    while pos < xml.len() && depth > 0 {
-        let Some(next_lt) = memchr::memchr(b'<', &xml[pos..]) else {
-            break;
-        };
-        pos += next_lt;
-
-        // Check for </w:tbl>
-        if pos + 8 <= xml.len() && &xml[pos..pos + 7] == b"</w:tbl" {
-            let c = xml[pos + 7];
-            if c == b'>' {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(pos + 8);
-                }
-            }
-        }
-        // Check for <w:tbl> or <w:tbl ...> (nested table)
-        else if pos + 7 <= xml.len() && &xml[pos..pos + 6] == b"<w:tbl" {
-            let c = xml[pos + 6];
-            if c == b'>' || c == b' ' {
-                let gt = memchr::memchr(b'>', &xml[pos..])?;
-                if gt > 0 && xml[pos + gt - 1] != b'/' {
-                    depth += 1;
-                }
-            }
-        }
-        pos += 1;
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
-    // Tests will be added as we have a way to construct test XmlParts
+    use super::*;
+    use crate::docx::DocxElement;
+    use litchi_opc::packuri::PackURI;
+    use litchi_opc::part::BlobPart;
+
+    fn document_part(xml: &[u8]) -> BlobPart {
+        BlobPart::new(
+            PackURI::new("/word/document.xml").unwrap(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+                .to_string(),
+            xml.to_vec(),
+        )
+    }
+
+    #[test]
+    fn extracts_aliased_word_elements_in_document_order_without_copying_text() {
+        let xml = br#"<wp:document xmlns:wp="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:false="urn:not-wordprocessingml">
+            <wp:body>
+                <false:p><false:r><false:t>ignored</false:t></false:r></false:p>
+                <wp:p><wp:r><wp:t><![CDATA[A < B]]></wp:t></wp:r></wp:p>
+                <wp:tbl><wp:tr><wp:tc><wp:p><wp:r><wp:t>cell</wp:t></wp:r></wp:p></wp:tc></wp:tr></wp:tbl>
+                <wp:p><wp:r><wp:t>tail</wp:t></wp:r></wp:p>
+                <wp:p/>
+                <false:tbl/>
+            </wp:body>
+        </wp:document>"#;
+        let part = document_part(xml);
+        let document = DocumentPart::from_part(&part).unwrap();
+
+        assert_eq!(document.paragraph_count().unwrap(), 4);
+        assert_eq!(document.table_count().unwrap(), 1);
+        assert_eq!(document.tables().unwrap().len(), 1);
+
+        let paragraphs = document.paragraphs().unwrap();
+        assert_eq!(paragraphs.len(), 4);
+        assert_eq!(paragraphs[0].text().unwrap(), "A < B");
+        assert_eq!(paragraphs[0].runs().unwrap()[0].text().unwrap(), "A < B");
+        assert_eq!(paragraphs[1].text().unwrap(), "cell");
+        assert_eq!(paragraphs[2].text().unwrap(), "tail");
+        assert_eq!(paragraphs[3].text().unwrap(), "");
+
+        let elements = document.elements().unwrap();
+        assert_eq!(elements.len(), 4);
+        assert!(matches!(elements[0], DocxElement::Paragraph(_)));
+        assert!(matches!(elements[1], DocxElement::Table(_)));
+        assert!(matches!(elements[2], DocxElement::Paragraph(_)));
+        assert!(matches!(elements[3], DocxElement::Paragraph(_)));
+    }
+
+    #[test]
+    fn accepts_strict_wordprocessingml_and_self_closing_blocks() {
+        let xml = br#"<s:document xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:body><s:p/><s:tbl/></s:body></s:document>"#;
+        let part = document_part(xml);
+        let document = DocumentPart::from_part(&part).unwrap();
+
+        assert_eq!(document.paragraph_count().unwrap(), 1);
+        assert_eq!(document.table_count().unwrap(), 1);
+        assert_eq!(document.elements().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn rejects_unterminated_selected_elements() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r/>"#;
+        let part = document_part(xml);
+        let document = DocumentPart::from_part(&part).unwrap();
+
+        assert!(document.paragraphs().is_err());
+        assert!(document.elements().is_err());
+    }
 }

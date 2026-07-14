@@ -62,6 +62,7 @@ pub mod format;
 pub mod header_footer;
 pub mod hyperlink;
 pub mod image;
+mod namespace;
 pub mod numbering;
 pub mod package;
 pub mod paragraph;

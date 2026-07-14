@@ -2,6 +2,7 @@ use crate::common::xml::decode_xml_reference;
 use crate::docx::drawing::{DrawingObject, parse_drawing_objects};
 use crate::docx::hyperlink::Hyperlink;
 use crate::docx::image::{InlineImage, parse_inline_images};
+use crate::docx::namespace::is_wordprocessing_namespace;
 use crate::docx::revision::{Revision, parse_revisions};
 use crate::error::{OoxmlError, Result};
 /// Paragraph and Run structures for Word documents.
@@ -9,25 +10,35 @@ use litchi_core::VerticalPosition;
 use litchi_core::XmlSlice;
 use litchi_opc::rel::Relationships;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 use quick_xml::{Reader, XmlVersion};
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::sync::Arc;
 
-const WORDPROCESSINGML_NAMESPACE: &[u8] =
-    b"http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-const STRICT_WORDPROCESSINGML_NAMESPACE: &[u8] =
-    b"http://purl.oclc.org/ooxml/wordprocessingml/main";
-
-fn is_wordprocessing_namespace(namespace: &ResolveResult<'_>) -> bool {
-    matches!(
-        namespace,
-        ResolveResult::Bound(Namespace(value))
-            if *value == WORDPROCESSINGML_NAMESPACE
-                || *value == STRICT_WORDPROCESSINGML_NAMESPACE
-    )
+fn is_fragment_word_name(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    local_name: &[u8],
+    fragment_prefix: &Option<Option<Vec<u8>>>,
+) -> bool {
+    if element.local_name().as_ref() != local_name {
+        return false;
+    }
+    if is_wordprocessing_namespace(namespace) {
+        return true;
+    }
+    match namespace {
+        ResolveResult::Unknown(prefix) => {
+            fragment_prefix
+                .as_ref()
+                .and_then(|prefix| prefix.as_deref())
+                == Some(prefix.as_slice())
+        },
+        ResolveResult::Unbound => fragment_prefix == &Some(None),
+        ResolveResult::Bound(_) => false,
+    }
 }
 
 pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
@@ -201,6 +212,7 @@ impl Paragraph {
         let mut runs = SmallVec::new();
         let mut run_start = None;
         let mut run_depth = 0usize;
+        let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
 
         loop {
             let event_start = usize::try_from(reader.buffer_position()).map_err(|_| {
@@ -210,13 +222,35 @@ impl Paragraph {
                 let (namespace, event) = reader
                     .read_resolved_event()
                     .map_err(|error| OoxmlError::Xml(error.to_string()))?;
-                let is_run = |element: &BytesStart<'_>| {
-                    is_wordprocessing_namespace(&namespace) && element.local_name().as_ref() == b"r"
-                };
                 match event {
+                    Event::Start(ref element)
+                        if fragment_prefix.is_none()
+                            && element.local_name().as_ref() == b"p"
+                            && !matches!(namespace, ResolveResult::Bound(_)) =>
+                    {
+                        fragment_prefix = Some(
+                            element
+                                .name()
+                                .prefix()
+                                .map(|prefix| prefix.into_inner().to_vec()),
+                        );
+                        RunEvent::Other
+                    },
                     Event::Start(_) if run_start.is_some() => RunEvent::NestedStart,
-                    Event::Start(element) if is_run(&element) => RunEvent::Start,
-                    Event::Empty(element) if run_start.is_none() && is_run(&element) => {
+                    Event::Start(element)
+                        if is_fragment_word_name(&namespace, &element, b"r", &fragment_prefix) =>
+                    {
+                        RunEvent::Start
+                    },
+                    Event::Empty(element)
+                        if run_start.is_none()
+                            && is_fragment_word_name(
+                                &namespace,
+                                &element,
+                                b"r",
+                                &fragment_prefix,
+                            ) =>
+                    {
                         RunEvent::Empty
                     },
                     Event::End(_) if run_start.is_some() => RunEvent::End,
@@ -1509,6 +1543,15 @@ mod tests {
         let runs = Paragraph::new(xml.to_vec()).runs().unwrap();
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].text().unwrap(), "strict");
+    }
+
+    #[test]
+    fn runs_accept_fragments_with_an_inherited_namespace_binding() {
+        let xml = br#"<wp:p><wp:r><wp:t>inherited</wp:t></wp:r></wp:p>"#;
+
+        let runs = Paragraph::new(xml.to_vec()).runs().unwrap();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].text().unwrap(), "inherited");
     }
 
     #[test]
