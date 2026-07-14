@@ -1,9 +1,10 @@
 //! Main Spreadsheet structure and implementation.
 
 use super::{
-    ContentValidation, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Sheet,
-    SheetProtection, SpreadsheetProtection,
+    ContentValidation, DatabaseRange, NamedDefinition, NamedDefinitionScope, NamedExpression,
+    NamedRange, Sheet, SheetProtection, SpreadsheetProtection,
     data_validation::parse_content_validations,
+    database_range::parse_database_ranges,
     parser::OdsParser,
     protection::parse_protection,
     style_protection::{CellStyleProtection, CellStyleRegistry},
@@ -48,6 +49,7 @@ pub struct Spreadsheet {
     meta: Option<Meta>,
     named_definitions: Vec<NamedDefinition>,
     content_validations: Vec<ContentValidation>,
+    database_ranges: Vec<DatabaseRange>,
     protection: SpreadsheetProtection,
     sheet_protections: Vec<SheetProtection>,
     cell_styles: CellStyleRegistry,
@@ -130,6 +132,7 @@ impl Spreadsheet {
         let content = Content::from_bytes(&content_bytes)?;
         let named_definitions = OdsParser::parse_named_definitions(content.xml_content())?;
         let content_validations = parse_content_validations(content.xml_content())?;
+        let database_ranges = parse_database_ranges(content.xml_content())?;
         let (protection, sheet_protections) = parse_protection(content.xml_content())?;
 
         let styles = if package.has_file("styles.xml") {
@@ -157,6 +160,7 @@ impl Spreadsheet {
             meta,
             named_definitions,
             content_validations,
+            database_ranges,
             protection,
             sheet_protections,
             cell_styles,
@@ -220,6 +224,13 @@ impl Spreadsheet {
     /// Return document-level spreadsheet content validations in document order.
     pub fn content_validations(&self) -> &[ContentValidation] {
         &self.content_validations
+    }
+
+    /// Return spreadsheet database ranges, filters, sort keys, and subtotal rules.
+    ///
+    /// External database sources are inert metadata and are never executed.
+    pub fn database_ranges(&self) -> &[DatabaseRange] {
+        &self.database_ranges
     }
 
     /// Find a content-validation definition by name.

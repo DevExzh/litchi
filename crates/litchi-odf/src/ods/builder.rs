@@ -4,12 +4,13 @@
 
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
-    Cell, CellAnnotation, CellValue, Column, ContentValidation, NamedDefinition,
+    Cell, CellAnnotation, CellValue, Column, ContentValidation, DatabaseRange, NamedDefinition,
     NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings,
     SheetScenario, SheetStyle, SheetTableSource, SpreadsheetProtection, TableStructure,
     TableVisibility,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
+    database_range::write_database_ranges,
     named_expression::{ensure_unique, write_named_definitions},
     protection::{
         has_extensions as has_protection_extensions, write_sheet_attributes, write_sheet_options,
@@ -50,6 +51,7 @@ pub struct SpreadsheetBuilder {
     metadata: Metadata,
     named_definitions: Vec<NamedDefinition>,
     content_validations: Vec<ContentValidation>,
+    database_ranges: Vec<DatabaseRange>,
     protection: SpreadsheetProtection,
 }
 
@@ -75,6 +77,7 @@ impl SpreadsheetBuilder {
             metadata: Metadata::default(),
             named_definitions: Vec::new(),
             content_validations: Vec::new(),
+            database_ranges: Vec::new(),
             protection: SpreadsheetProtection::default(),
         }
     }
@@ -96,6 +99,29 @@ impl SpreadsheetBuilder {
     /// Return document-level cell validation definitions.
     pub fn content_validations(&self) -> &[ContentValidation] {
         &self.content_validations
+    }
+
+    /// Return database ranges added to this spreadsheet.
+    pub fn database_ranges(&self) -> &[DatabaseRange] {
+        &self.database_ranges
+    }
+
+    /// Add a database range with optional filter, sort, source, and subtotal metadata.
+    pub fn add_database_range(&mut self, range: DatabaseRange) -> Result<&mut Self> {
+        range.validate()?;
+        self.database_ranges.push(range);
+        Ok(self)
+    }
+
+    /// Remove a database range by index.
+    pub fn remove_database_range(&mut self, index: usize) -> Option<DatabaseRange> {
+        (index < self.database_ranges.len()).then(|| self.database_ranges.remove(index))
+    }
+
+    fn validate_database_ranges(&self) -> Result<()> {
+        self.database_ranges
+            .iter()
+            .try_for_each(DatabaseRange::validate)
     }
 
     /// Return document-structure protection metadata.
@@ -1363,6 +1389,8 @@ impl SpreadsheetBuilder {
                 .filter(|definition| definition.scope() == &NamedDefinitionScope::Global),
         );
 
+        write_database_ranges(&mut body, &self.database_ranges)?;
+
         Ok(body)
     }
 
@@ -1451,6 +1479,7 @@ impl SpreadsheetBuilder {
         self.validate_named_definitions()?;
         self.validate_annotations()?;
         self.validate_content_validations()?;
+        self.validate_database_ranges()?;
         let mut writer = PackageWriter::new();
 
         // Set MIME type

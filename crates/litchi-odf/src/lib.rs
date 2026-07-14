@@ -92,6 +92,8 @@
 //! - ✅ Merged cell handling
 //! - ✅ Global and sheet-local named ranges and expressions
 //! - ✅ Cell annotations with metadata, rich text/lists, extensions, and drawing geometry
+//! - ✅ Database ranges, recursive filters, sort keys, and subtotal rules
+//! - ✅ Inert database query/table/SQL source metadata
 //!
 //! ### Writing (`ods/builder.rs`, `ods/mutable.rs`)
 //! - ✅ SpreadsheetBuilder for creating new ODS files
@@ -105,13 +107,13 @@
 //! - ✅ Create, replace, edit, remove, and round-trip cell annotations
 //! - ✅ Content-validation definitions, prompts, cell bindings, and inert event metadata
 //! - ✅ Document/sheet keys, direct cell protection flags, and LibreOffice permissions
+//! - ✅ Database ranges, filters, sorting, subtotals, and inert source metadata
 //! - ✅ Save to file or bytes
 //!
 //! ### TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing
 //! - ⚠️ Conditional formatting
 //! - ⚠️ Pivot tables
-//! - ⚠️ Filter and sort criteria
 //!
 //! ## ✅ ODP - Presentations (COMPLETE for reading/writing)
 //!
@@ -238,15 +240,18 @@ pub use odp::{
 };
 pub use ods::{
     AnnotationElement, AnnotationNode, Cell as SCell, CellAnnotation, CellMatrixSpan, CellMerge,
-    CellStyleProtection, CellValue, Column as SColumn, ContentValidation, FormulaNamespace,
-    MutableSpreadsheet, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
-    NamedRangeUsage, ProtectionKey, Row as SRow, Sheet, SheetPrintSettings, SheetProtection,
-    SheetProtectionOptions, SheetScenario, SheetStyle, SheetStyleUsage, SheetTableSource,
-    Spreadsheet, SpreadsheetBuilder, SpreadsheetProtection, TableGroup, TableRange,
-    TableSourceMode, TableStructure, TableVisibility, ValidationDisplayList, ValidationErrorMacro,
-    ValidationErrorMessage, ValidationEventListener, ValidationMessage, ValidationMessageType,
-    ValidationPresentationEventListener, ValidationPresentationSound,
-    ValidationScriptEventListener,
+    CellStyleProtection, CellValue, Column as SColumn, ContentValidation, DatabaseFilter,
+    DatabaseOrientation, DatabaseRange, DatabaseSort, DatabaseSortKey, DatabaseSource,
+    EmbeddedNumberBehavior, FilterCondition, FilterConditionSource, FilterDataType,
+    FilterExpression, FormulaNamespace, MutableSpreadsheet, NamedDefinition, NamedDefinitionScope,
+    NamedExpression, NamedRange, NamedRangeUsage, ProtectionKey, Row as SRow, Sheet,
+    SheetPrintSettings, SheetProtection, SheetProtectionOptions, SheetScenario, SheetStyle,
+    SheetStyleUsage, SheetTableSource, SortOrder, Spreadsheet, SpreadsheetBuilder,
+    SpreadsheetProtection, SubtotalField, SubtotalRule, SubtotalRules, SubtotalSortGroups,
+    TableGroup, TableRange, TableSourceMode, TableStructure, TableVisibility,
+    ValidationDisplayList, ValidationErrorMacro, ValidationErrorMessage, ValidationEventListener,
+    ValidationMessage, ValidationMessageType, ValidationPresentationEventListener,
+    ValidationPresentationSound, ValidationScriptEventListener,
 };
 pub use odt::{Document, DocumentBuilder, MutableDocument};
 

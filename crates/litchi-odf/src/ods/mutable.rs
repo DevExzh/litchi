@@ -5,12 +5,13 @@
 
 use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
 use crate::ods::{
-    Cell, CellAnnotation, CellValue, Column, ContentValidation, NamedDefinition,
+    Cell, CellAnnotation, CellValue, Column, ContentValidation, DatabaseRange, NamedDefinition,
     NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings,
     SheetScenario, SheetStyle, SheetTableSource, Spreadsheet, SpreadsheetProtection,
     TableStructure, TableVisibility,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
+    database_range::write_database_ranges,
     named_expression::{ensure_unique, write_named_definitions},
     protection::{
         has_extensions as has_protection_extensions, write_sheet_attributes, write_sheet_options,
@@ -61,6 +62,7 @@ pub struct MutableSpreadsheet {
     /// Global and sheet-local named ranges and expressions.
     named_definitions: Vec<NamedDefinition>,
     content_validations: Vec<ContentValidation>,
+    database_ranges: Vec<DatabaseRange>,
     protection: SpreadsheetProtection,
     /// Original package retained for copying auxiliary package parts.
     source_package: Option<OwnedPackage>,
@@ -143,6 +145,7 @@ impl MutableSpreadsheet {
         let metadata = spreadsheet.metadata()?;
         let named_definitions = spreadsheet.named_definitions().to_vec();
         let content_validations = spreadsheet.content_validations().to_vec();
+        let database_ranges = spreadsheet.database_ranges().to_vec();
         let protection = spreadsheet.protection().clone();
         let mimetype = "application/vnd.oasis.opendocument.spreadsheet".to_string();
         let source_package = Some(spreadsheet.into_package());
@@ -156,6 +159,7 @@ impl MutableSpreadsheet {
             font_face_decls,
             named_definitions,
             content_validations,
+            database_ranges,
             protection,
             source_package,
         })
@@ -172,6 +176,7 @@ impl MutableSpreadsheet {
             font_face_decls: None,
             named_definitions: Vec::new(),
             content_validations: Vec::new(),
+            database_ranges: Vec::new(),
             protection: SpreadsheetProtection::default(),
             source_package: None,
         }
@@ -205,6 +210,28 @@ impl MutableSpreadsheet {
     /// Return document-level content validation definitions.
     pub fn content_validations(&self) -> &[ContentValidation] {
         &self.content_validations
+    }
+
+    /// Return database ranges and their filter/sort metadata.
+    pub fn database_ranges(&self) -> &[DatabaseRange] {
+        &self.database_ranges
+    }
+
+    /// Mutably access database ranges.
+    pub fn database_ranges_mut(&mut self) -> &mut Vec<DatabaseRange> {
+        &mut self.database_ranges
+    }
+
+    /// Add a validated database range.
+    pub fn add_database_range(&mut self, range: DatabaseRange) -> Result<()> {
+        range.validate()?;
+        self.database_ranges.push(range);
+        Ok(())
+    }
+
+    /// Remove a database range by index.
+    pub fn remove_database_range(&mut self, index: usize) -> Option<DatabaseRange> {
+        (index < self.database_ranges.len()).then(|| self.database_ranges.remove(index))
     }
 
     /// Return document-structure protection metadata.
@@ -365,6 +392,12 @@ impl MutableSpreadsheet {
             }
         }
         Ok(())
+    }
+
+    fn validate_database_ranges(&self) -> Result<()> {
+        self.database_ranges
+            .iter()
+            .try_for_each(DatabaseRange::validate)
     }
 
     fn has_validation_event_listeners(&self) -> bool {
@@ -1183,6 +1216,8 @@ impl MutableSpreadsheet {
                 .filter(|definition| definition.scope() == &NamedDefinitionScope::Global),
         );
 
+        write_database_ranges(&mut body, &self.database_ranges)?;
+
         let of_ns = if self.has_formulas() {
             " xmlns:of=\"urn:oasis:names:tc:opendocument:xmlns:of:1.2\""
         } else {
@@ -1277,6 +1312,7 @@ impl MutableSpreadsheet {
         self.validate_named_definitions()?;
         self.validate_annotations()?;
         self.validate_content_validations()?;
+        self.validate_database_ranges()?;
         let mut writer = PackageWriter::new();
 
         writer.set_mimetype(&self.mimetype)?;

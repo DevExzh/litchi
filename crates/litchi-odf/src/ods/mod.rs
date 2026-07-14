@@ -21,6 +21,8 @@
 //! - ✅ Metadata extraction
 //! - ✅ Global and sheet-local named ranges and named expressions
 //! - ✅ Cell annotations with metadata, rich text/lists, extensions, and drawing geometry
+//! - ✅ Database ranges, recursive filters, sort keys, and subtotal rules
+//! - ✅ Inert database query/table/SQL source metadata
 //!
 //! ## ✅ Formula Support (`formula.rs`) - PARTIAL
 //! - ✅ Formula string representation
@@ -41,13 +43,12 @@
 //! - ✅ Create, replace, edit, remove, and round-trip cell annotations
 //! - ✅ Content-validation definitions, prompts, cell bindings, and inert event metadata
 //! - ✅ Document/sheet keys, direct cell protection flags, and LibreOffice permissions
+//! - ✅ Database ranges, filters, sorting, subtotals, and inert source metadata
 //!
 //! ## 🚧 TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing (embedded charts)
 //! - ⚠️ Conditional formatting
 //! - ⚠️ Pivot tables
-//! - ⚠️ Cell-style protection resolution
-//! - ⚠️ Filter and sort criteria
 //! - ⚠️ Sparklines
 //! - ⚠️ Data tables and scenarios
 //! - ⚠️ External data connections
@@ -62,6 +63,7 @@ mod annotation;
 mod builder;
 mod cell;
 mod data_validation;
+mod database_range;
 /// OpenFormula parsing and support
 pub mod formula;
 mod mutable;
@@ -84,6 +86,11 @@ pub use data_validation::{
     ValidationEventListener, ValidationMessage, ValidationMessageType,
     ValidationPresentationEventListener, ValidationPresentationSound,
     ValidationScriptEventListener,
+};
+pub use database_range::{
+    DatabaseFilter, DatabaseOrientation, DatabaseRange, DatabaseSort, DatabaseSortKey,
+    DatabaseSource, EmbeddedNumberBehavior, FilterCondition, FilterConditionSource, FilterDataType,
+    FilterExpression, SortOrder, SubtotalField, SubtotalRule, SubtotalRules, SubtotalSortGroups,
 };
 pub use mutable::MutableSpreadsheet;
 pub use named_expression::{
