@@ -4,12 +4,12 @@
 /// in Word documents. Headers and footers can be different for first page,
 /// even/odd pages, and sections.
 use crate::docx::enums::WdHeaderFooter;
+use crate::docx::namespace::scan_word_element_ranges;
 use crate::docx::paragraph::{Paragraph, extract_word_text};
 use crate::docx::table::Table;
-use crate::error::{OoxmlError, Result};
+use crate::error::Result;
 use litchi_opc::part::Part;
-use quick_xml::Reader;
-use quick_xml::events::Event;
+use std::sync::Arc;
 
 /// A header or footer part in a Word document.
 ///
@@ -40,7 +40,7 @@ use quick_xml::events::Event;
 #[derive(Debug, Clone)]
 pub struct HeaderFooter {
     /// The raw XML bytes for this header/footer
-    xml_bytes: Vec<u8>,
+    xml_bytes: Arc<Vec<u8>>,
     /// The type of header/footer (default, first, even)
     hdr_ftr_type: WdHeaderFooter,
 }
@@ -54,7 +54,7 @@ impl HeaderFooter {
     /// * `hdr_ftr_type` - The type of header/footer
     pub fn from_part(part: &dyn Part, hdr_ftr_type: WdHeaderFooter) -> Result<Self> {
         Ok(Self {
-            xml_bytes: part.blob().to_vec(),
+            xml_bytes: part.blob_arc(),
             hdr_ftr_type,
         })
     }
@@ -68,7 +68,7 @@ impl HeaderFooter {
     #[inline]
     pub fn from_xml_bytes(xml_bytes: Vec<u8>, hdr_ftr_type: WdHeaderFooter) -> Self {
         Self {
-            xml_bytes,
+            xml_bytes: Arc::new(xml_bytes),
             hdr_ftr_type,
         }
     }
@@ -105,7 +105,7 @@ impl HeaderFooter {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn text(&self) -> Result<String> {
-        extract_word_text(&self.xml_bytes)
+        extract_word_text(self.xml_bytes.as_slice())
     }
 
     /// Get all paragraphs in this header/footer.
@@ -130,83 +130,19 @@ impl HeaderFooter {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
-
         let mut paragraphs = Vec::new();
-        let mut current_para_xml = Vec::with_capacity(4096);
-        let mut in_para = false;
-        let mut depth = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"p" && !in_para {
-                        in_para = true;
-                        depth = 1;
-                        current_para_xml.clear();
-                        current_para_xml.extend_from_slice(b"<w:p");
-                        // Copy attributes
-                        for attr in e.attributes().flatten() {
-                            current_para_xml.extend_from_slice(b" ");
-                            current_para_xml.extend_from_slice(attr.key.as_ref());
-                            current_para_xml.extend_from_slice(b"=\"");
-                            current_para_xml.extend_from_slice(&attr.value);
-                            current_para_xml.extend_from_slice(b"\"");
-                        }
-                        current_para_xml.extend_from_slice(b">");
-                    } else if in_para {
-                        depth += 1;
-                        current_para_xml.extend_from_slice(b"<");
-                        current_para_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_para_xml.extend_from_slice(b" ");
-                            current_para_xml.extend_from_slice(attr.key.as_ref());
-                            current_para_xml.extend_from_slice(b"=\"");
-                            current_para_xml.extend_from_slice(&attr.value);
-                            current_para_xml.extend_from_slice(b"\"");
-                        }
-                        current_para_xml.extend_from_slice(b">");
-                    }
-                },
-                Ok(Event::End(e)) if in_para => {
-                    current_para_xml.extend_from_slice(b"</");
-                    current_para_xml.extend_from_slice(e.name().as_ref());
-                    current_para_xml.extend_from_slice(b">");
-
-                    if e.local_name().as_ref() == b"p" && depth == 1 {
-                        paragraphs.push(Paragraph::new(current_para_xml.clone()));
-                        in_para = false;
-                    } else {
-                        depth -= 1;
-                    }
-                },
-                Ok(Event::Empty(e)) if in_para => {
-                    current_para_xml.extend_from_slice(b"<");
-                    current_para_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        current_para_xml.extend_from_slice(b" ");
-                        current_para_xml.extend_from_slice(attr.key.as_ref());
-                        current_para_xml.extend_from_slice(b"=\"");
-                        current_para_xml.extend_from_slice(&attr.value);
-                        current_para_xml.extend_from_slice(b"\"");
-                    }
-                    current_para_xml.extend_from_slice(b"/>");
-                },
-                Ok(Event::Text(e)) if in_para => {
-                    current_para_xml.extend_from_slice(e.as_ref());
-                },
-                Ok(Event::CData(e)) if in_para => {
-                    current_para_xml.extend_from_slice(b"<![CDATA[");
-                    current_para_xml.extend_from_slice(e.as_ref());
-                    current_para_xml.extend_from_slice(b"]]>");
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_word_element_ranges(
+            self.xml_bytes.as_slice(),
+            &[b"p".as_slice()],
+            |_, start, length| {
+                paragraphs.push(Paragraph::from_arc_range(
+                    Arc::clone(&self.xml_bytes),
+                    start,
+                    length,
+                ));
+                Ok(())
+            },
+        )?;
         Ok(paragraphs)
     }
 
@@ -232,124 +168,43 @@ impl HeaderFooter {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn tables(&self) -> Result<Vec<Table>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
-
         let mut tables = Vec::new();
-        let mut current_table_xml = Vec::with_capacity(8192);
-        let mut in_table = false;
-        let mut depth = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"tbl" && !in_table {
-                        in_table = true;
-                        depth = 1;
-                        current_table_xml.clear();
-                        current_table_xml.extend_from_slice(b"<w:tbl");
-                        for attr in e.attributes().flatten() {
-                            current_table_xml.extend_from_slice(b" ");
-                            current_table_xml.extend_from_slice(attr.key.as_ref());
-                            current_table_xml.extend_from_slice(b"=\"");
-                            current_table_xml.extend_from_slice(&attr.value);
-                            current_table_xml.extend_from_slice(b"\"");
-                        }
-                        current_table_xml.extend_from_slice(b">");
-                    } else if in_table {
-                        depth += 1;
-                        current_table_xml.extend_from_slice(b"<");
-                        current_table_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_table_xml.extend_from_slice(b" ");
-                            current_table_xml.extend_from_slice(attr.key.as_ref());
-                            current_table_xml.extend_from_slice(b"=\"");
-                            current_table_xml.extend_from_slice(&attr.value);
-                            current_table_xml.extend_from_slice(b"\"");
-                        }
-                        current_table_xml.extend_from_slice(b">");
-                    }
-                },
-                Ok(Event::End(e)) if in_table => {
-                    current_table_xml.extend_from_slice(b"</");
-                    current_table_xml.extend_from_slice(e.name().as_ref());
-                    current_table_xml.extend_from_slice(b">");
-
-                    if e.local_name().as_ref() == b"tbl" && depth == 1 {
-                        tables.push(Table::new(current_table_xml.clone()));
-                        in_table = false;
-                    } else {
-                        depth -= 1;
-                    }
-                },
-                Ok(Event::Empty(e)) if in_table => {
-                    current_table_xml.extend_from_slice(b"<");
-                    current_table_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        current_table_xml.extend_from_slice(b" ");
-                        current_table_xml.extend_from_slice(attr.key.as_ref());
-                        current_table_xml.extend_from_slice(b"=\"");
-                        current_table_xml.extend_from_slice(&attr.value);
-                        current_table_xml.extend_from_slice(b"\"");
-                    }
-                    current_table_xml.extend_from_slice(b"/>");
-                },
-                Ok(Event::Text(e)) if in_table => {
-                    current_table_xml.extend_from_slice(e.as_ref());
-                },
-                Ok(Event::CData(e)) if in_table => {
-                    current_table_xml.extend_from_slice(b"<![CDATA[");
-                    current_table_xml.extend_from_slice(e.as_ref());
-                    current_table_xml.extend_from_slice(b"]]>");
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_word_element_ranges(
+            self.xml_bytes.as_slice(),
+            &[b"tbl".as_slice()],
+            |_, start, length| {
+                tables.push(Table::from_arc_range(
+                    Arc::clone(&self.xml_bytes),
+                    start,
+                    length,
+                ));
+                Ok(())
+            },
+        )?;
         Ok(tables)
     }
 
     /// Get the number of paragraphs in this header/footer.
     pub fn paragraph_count(&self) -> Result<usize> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
-
         let mut count = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"p" => {
-                    count += 1;
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_word_element_ranges(self.xml_bytes.as_slice(), &[b"p".as_slice()], |_, _, _| {
+            count += 1;
+            Ok(())
+        })?;
         Ok(count)
     }
 
     /// Get the number of tables in this header/footer.
     pub fn table_count(&self) -> Result<usize> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
-
         let mut count = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) if e.local_name().as_ref() == b"tbl" => {
-                    count += 1;
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_word_element_ranges(
+            self.xml_bytes.as_slice(),
+            &[b"tbl".as_slice()],
+            |_, _, _| {
+                count += 1;
+                Ok(())
+            },
+        )?;
         Ok(count)
     }
 }
@@ -498,6 +353,36 @@ mod tests {
 
         let tables = header.tables().unwrap();
         assert_eq!(tables.len(), 1);
+    }
+
+    #[test]
+    fn header_blocks_preserve_aliases_cdata_and_namespace_semantics() {
+        let xml = br#"<h:hdr xmlns:h="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:false="urn:not-wordprocessingml">
+            <false:p><false:r><false:t>ignored</false:t></false:r></false:p>
+            <h:p><h:r><h:t><![CDATA[A < B]]></h:t></h:r></h:p>
+            <h:tbl><h:tr><h:tc><h:p><h:r><h:t>cell</h:t></h:r></h:p></h:tc></h:tr></h:tbl>
+            <h:p/>
+            <false:tbl/>
+        </h:hdr>"#;
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+
+        assert_eq!(header.text().unwrap(), "A < Bcell");
+        assert_eq!(header.paragraph_count().unwrap(), 3);
+        assert_eq!(header.table_count().unwrap(), 1);
+        let paragraphs = header.paragraphs().unwrap();
+        assert_eq!(paragraphs.len(), 3);
+        assert_eq!(paragraphs[0].text().unwrap(), "A < B");
+        assert_eq!(paragraphs[0].runs().unwrap()[0].text().unwrap(), "A < B");
+        assert_eq!(header.tables().unwrap()[0].row_count().unwrap(), 1);
+    }
+
+    #[test]
+    fn header_blocks_reject_unterminated_selected_elements() {
+        let xml = br#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r/>"#;
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+
+        assert!(header.text().is_err());
+        assert!(header.paragraphs().is_err());
     }
 
     #[test]
