@@ -276,6 +276,12 @@ impl AxisCommon {
 pub struct CategoryAxis {
     /// Common axis properties
     pub common: AxisCommon,
+    /// Minimum category value
+    pub min: Option<f64>,
+    /// Maximum category value
+    pub max: Option<f64>,
+    /// Logarithmic scale base
+    pub log_base: Option<f64>,
     /// Automatically determine text/date type
     pub auto: bool,
     /// Label alignment
@@ -319,6 +325,9 @@ impl CategoryAxis {
     pub fn new(axis_id: u32, position: AxisPosition, cross_axis_id: u32) -> Self {
         Self {
             common: AxisCommon::new(axis_id, position, cross_axis_id),
+            min: None,
+            max: None,
+            log_base: None,
             auto: true,
             label_align: None,
             label_offset: None,
@@ -398,6 +407,8 @@ pub struct DateAxis {
     pub min: Option<f64>,
     /// Maximum date value
     pub max: Option<f64>,
+    /// Logarithmic scale base
+    pub log_base: Option<f64>,
     /// Major unit
     pub major_unit: Option<f64>,
     /// Minor unit
@@ -420,6 +431,7 @@ impl DateAxis {
             common: AxisCommon::new(axis_id, position, cross_axis_id),
             min: None,
             max: None,
+            log_base: None,
             major_unit: None,
             minor_unit: None,
             major_time_unit: None,
@@ -435,6 +447,12 @@ impl DateAxis {
 pub struct SeriesAxis {
     /// Common axis properties
     pub common: AxisCommon,
+    /// Minimum series value
+    pub min: Option<f64>,
+    /// Maximum series value
+    pub max: Option<f64>,
+    /// Logarithmic scale base
+    pub log_base: Option<f64>,
     /// Skip N tick labels
     pub tick_label_skip: Option<u32>,
     /// Skip N tick marks
@@ -447,6 +465,9 @@ impl SeriesAxis {
     pub fn new(axis_id: u32, position: AxisPosition, cross_axis_id: u32) -> Self {
         Self {
             common: AxisCommon::new(axis_id, position, cross_axis_id),
+            min: None,
+            max: None,
+            log_base: None,
             tick_label_skip: None,
             tick_mark_skip: None,
         }

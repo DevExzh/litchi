@@ -4647,6 +4647,46 @@ fn parse_point_value<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Optio
     }
 }
 
+#[derive(Default)]
+struct ParsedAxisScaling {
+    min: Option<f64>,
+    max: Option<f64>,
+    log_base: Option<f64>,
+}
+
+impl ParsedAxisScaling {
+    fn parse_element(&mut self, element: &BytesStart<'_>) -> Result<bool> {
+        let (slot, description) = match element.local_name().as_ref() {
+            b"min" => (&mut self.min, "chart axis minimum"),
+            b"max" => (&mut self.max, "chart axis maximum"),
+            b"logBase" => (&mut self.log_base, "chart logarithmic base"),
+            _ => return Ok(false),
+        };
+        if slot.is_some() {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "{description} is specified more than once"
+            )));
+        }
+        let value = required_f64_attr(element, description)?;
+        if element.local_name().as_ref() == b"logBase" && !(2.0..=1000.0).contains(&value) {
+            return Err(OoxmlError::InvalidFormat(
+                "chart logarithmic base must be between 2 and 1000".into(),
+            ));
+        }
+        *slot = Some(value);
+        Ok(true)
+    }
+
+    fn validate(&self) -> Result<()> {
+        if self.min.zip(self.max).is_some_and(|(min, max)| min > max) {
+            return Err(OoxmlError::InvalidFormat(
+                "chart axis minimum exceeds maximum".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 struct ParsedAxisCommon {
     axis_id: Option<u32>,
     cross_axis_id: Option<u32>,
@@ -4897,6 +4937,7 @@ fn parse_axis_extension<R: BufRead>(
 
 fn parse_category_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<CategoryAxis>> {
     let mut common = ParsedAxisCommon::new();
+    let mut scaling = ParsedAxisScaling::default();
     let mut auto = true;
     let mut label_align = None;
     let mut label_offset = None;
@@ -4929,6 +4970,10 @@ fn parse_category_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Opt
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
                 if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
             {
+                if in_scaling && scaling.parse_element(element)? {
+                    buf.clear();
+                    continue;
+                }
                 match element.local_name().as_ref() {
                     b"auto" => auto = parse_bool_attr(element)?,
                     b"lblAlgn" => label_align = Some(parse_axis_label_align(element)?),
@@ -4965,9 +5010,13 @@ fn parse_category_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Opt
         buf.clear();
     }
 
+    scaling.validate()?;
     let common = common.finish()?;
     let mut axis = CategoryAxis::new(common.axis_id, common.position, common.cross_axis_id);
     axis.common = common;
+    axis.min = scaling.min;
+    axis.max = scaling.max;
+    axis.log_base = scaling.log_base;
     axis.auto = auto;
     axis.label_align = label_align;
     axis.label_offset = label_offset;
@@ -4979,11 +5028,9 @@ fn parse_category_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Opt
 
 fn parse_value_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<ValueAxis>> {
     let mut common = ParsedAxisCommon::new();
-    let mut min = None;
-    let mut max = None;
+    let mut scaling = ParsedAxisScaling::default();
     let mut major_unit = None;
     let mut minor_unit = None;
-    let mut log_base = None;
     let mut display_units = None;
     let mut cross_between = AxisCrossBetween::Between;
     let mut in_scaling = false;
@@ -5025,9 +5072,11 @@ fn parse_value_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
                 if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
             {
+                if in_scaling && scaling.parse_element(element)? {
+                    buf.clear();
+                    continue;
+                }
                 match element.local_name().as_ref() {
-                    b"min" => min = Some(required_f64_attr(element, "chart axis minimum")?),
-                    b"max" => max = Some(required_f64_attr(element, "chart axis maximum")?),
                     b"majorUnit" => {
                         major_unit = Some(required_positive_f64_attr(
                             element,
@@ -5039,15 +5088,6 @@ fn parse_value_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
                             element,
                             "chart axis minor unit",
                         )?);
-                    },
-                    b"logBase" => {
-                        let value = required_f64_attr(element, "chart logarithmic base")?;
-                        if !(2.0..=1000.0).contains(&value) {
-                            return Err(OoxmlError::InvalidFormat(
-                                "chart logarithmic base must be between 2 and 1000".into(),
-                            ));
-                        }
-                        log_base = Some(value);
                     },
                     b"crossBetween" => cross_between = parse_axis_cross_between(element)?,
                     _ => {},
@@ -5064,19 +5104,15 @@ fn parse_value_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
         buf.clear();
     }
 
-    if min.zip(max).is_some_and(|(min, max)| min > max) {
-        return Err(OoxmlError::InvalidFormat(
-            "chart axis minimum exceeds maximum".into(),
-        ));
-    }
+    scaling.validate()?;
     let common = common.finish()?;
     let mut axis = ValueAxis::new(common.axis_id, common.position, common.cross_axis_id);
     axis.common = common;
-    axis.min = min;
-    axis.max = max;
+    axis.min = scaling.min;
+    axis.max = scaling.max;
     axis.major_unit = major_unit;
     axis.minor_unit = minor_unit;
-    axis.log_base = log_base;
+    axis.log_base = scaling.log_base;
     axis.cross_between = cross_between;
     axis.display_units = display_units.map(Box::new);
     Ok(Some(axis))
@@ -5332,8 +5368,7 @@ fn parse_display_units_label<R: BufRead>(
 
 fn parse_date_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<DateAxis>> {
     let mut common = ParsedAxisCommon::new();
-    let mut min = None;
-    let mut max = None;
+    let mut scaling = ParsedAxisScaling::default();
     let mut major_unit = None;
     let mut minor_unit = None;
     let mut major_time_unit = None;
@@ -5366,9 +5401,11 @@ fn parse_date_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
                 if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
             {
+                if in_scaling && scaling.parse_element(element)? {
+                    buf.clear();
+                    continue;
+                }
                 match element.local_name().as_ref() {
-                    b"min" => min = Some(required_f64_attr(element, "chart date minimum")?),
-                    b"max" => max = Some(required_f64_attr(element, "chart date maximum")?),
                     b"majorUnit" => {
                         major_unit = Some(required_positive_f64_attr(
                             element,
@@ -5399,16 +5436,13 @@ fn parse_date_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
         buf.clear();
     }
 
-    if min.zip(max).is_some_and(|(min, max)| min > max) {
-        return Err(OoxmlError::InvalidFormat(
-            "chart date-axis minimum exceeds maximum".into(),
-        ));
-    }
+    scaling.validate()?;
     let common = common.finish()?;
     let mut axis = DateAxis::new(common.axis_id, common.position, common.cross_axis_id);
     axis.common = common;
-    axis.min = min;
-    axis.max = max;
+    axis.min = scaling.min;
+    axis.max = scaling.max;
+    axis.log_base = scaling.log_base;
     axis.major_unit = major_unit;
     axis.minor_unit = minor_unit;
     axis.major_time_unit = major_time_unit;
@@ -5420,6 +5454,7 @@ fn parse_date_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
 
 fn parse_series_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<SeriesAxis>> {
     let mut common = ParsedAxisCommon::new();
+    let mut scaling = ParsedAxisScaling::default();
     let mut tick_label_skip = None;
     let mut tick_mark_skip = None;
     let mut in_scaling = false;
@@ -5448,6 +5483,10 @@ fn parse_series_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Optio
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
                 if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
             {
+                if in_scaling && scaling.parse_element(element)? {
+                    buf.clear();
+                    continue;
+                }
                 match element.local_name().as_ref() {
                     b"tickLblSkip" => {
                         tick_label_skip = Some(required_positive_u32_attr(
@@ -5475,9 +5514,13 @@ fn parse_series_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Optio
         buf.clear();
     }
 
+    scaling.validate()?;
     let common = common.finish()?;
     let mut axis = SeriesAxis::new(common.axis_id, common.position, common.cross_axis_id);
     axis.common = common;
+    axis.min = scaling.min;
+    axis.max = scaling.max;
+    axis.log_base = scaling.log_base;
     axis.tick_label_skip = tick_label_skip;
     axis.tick_mark_skip = tick_mark_skip;
     Ok(Some(axis))
@@ -7437,13 +7480,20 @@ mod tests {
     }
 
     #[test]
-    fn writer_rejects_invalid_display_units_and_duplicate_legend_entries() {
+    fn writer_rejects_invalid_axes_and_duplicate_legend_entries() {
         let mut chart = Chart::new();
         let mut axis = ValueAxis::new(1, AxisPosition::Left, 2);
         let mut units = DisplayUnits::custom(1_000.0);
         units.built_in_unit = Some(BuiltInUnit::Thousands);
         axis.display_units = Some(Box::new(units));
         chart.plot_area.axes.push(Axis::Value(axis));
+        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
+
+        let mut chart = Chart::new();
+        let mut axis = CategoryAxis::new(1, AxisPosition::Bottom, 2);
+        axis.min = Some(2.0);
+        axis.max = Some(1.0);
+        chart.plot_area.axes.push(Axis::Category(axis));
         assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
 
         let mut chart = Chart::new();
@@ -8059,6 +8109,9 @@ mod tests {
         category.common.deleted = true;
         category.common.cross_mode = AxisCrossMode::Max;
         category.common.show_major_gridlines = true;
+        category.min = Some(1.0);
+        category.max = Some(12.0);
+        category.log_base = Some(2.0);
         category.auto = false;
         category.label_align = Some(AxisLabelAlign::Right);
         category.label_offset = Some(250);
@@ -8084,6 +8137,7 @@ mod tests {
         let mut date = DateAxis::new(30, AxisPosition::Top, 40);
         date.min = Some(45_000.0);
         date.max = Some(46_000.0);
+        date.log_base = Some(10.0);
         date.major_unit = Some(2.0);
         date.minor_unit = Some(1.0);
         date.major_time_unit = Some(TimeUnit::Months);
@@ -8092,6 +8146,9 @@ mod tests {
         date.auto = false;
 
         let mut series = SeriesAxis::new(40, AxisPosition::Right, 30);
+        series.min = Some(1.0);
+        series.max = Some(8.0);
+        series.log_base = Some(2.0);
         series.tick_label_skip = Some(4);
         series.tick_mark_skip = Some(5);
 
@@ -8143,6 +8200,9 @@ mod tests {
             unreachable!();
         };
         assert_eq!(category.common.orientation, AxisOrientation::MaxMin);
+        assert_eq!(category.min, Some(1.0));
+        assert_eq!(category.max, Some(12.0));
+        assert_eq!(category.log_base, Some(2.0));
         assert!(category.common.deleted);
         assert_eq!(category.common.major_tick_mark, TickMark::Cross);
         assert_eq!(category.common.minor_tick_mark, TickMark::In);
@@ -8205,6 +8265,7 @@ mod tests {
         };
         assert_eq!(date.min, Some(45_000.0));
         assert_eq!(date.max, Some(46_000.0));
+        assert_eq!(date.log_base, Some(10.0));
         assert_eq!(date.major_time_unit, Some(TimeUnit::Months));
         assert_eq!(date.minor_time_unit, Some(TimeUnit::Days));
         assert_eq!(date.base_time_unit, Some(TimeUnit::Years));
@@ -8215,5 +8276,23 @@ mod tests {
         };
         assert_eq!(series.tick_label_skip, Some(4));
         assert_eq!(series.tick_mark_skip, Some(5));
+        assert_eq!(series.min, Some(1.0));
+        assert_eq!(series.max, Some(8.0));
+        assert_eq!(series.log_base, Some(2.0));
+    }
+
+    #[test]
+    fn rejects_invalid_scaling_on_every_axis_kind() {
+        for axis in [
+            r#"<c:catAx><c:axId val="1"/><c:scaling><c:min val="1"/><c:min val="2"/></c:scaling><c:axPos val="b"/><c:crossAx val="2"/></c:catAx>"#,
+            r#"<c:valAx><c:axId val="1"/><c:scaling><c:max val="1"/><c:min val="2"/></c:scaling><c:axPos val="l"/><c:crossAx val="2"/></c:valAx>"#,
+            r#"<c:dateAx><c:axId val="1"/><c:scaling><c:logBase val="1"/></c:scaling><c:axPos val="b"/><c:crossAx val="2"/></c:dateAx>"#,
+            r#"<c:serAx><c:axId val="1"/><c:scaling><c:logBase val="1001"/></c:scaling><c:axPos val="b"/><c:crossAx val="2"/></c:serAx>"#,
+        ] {
+            let xml = format!(
+                r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea>{axis}</c:plotArea></c:chart></c:chartSpace>"#
+            );
+            assert!(parse_chart(xml.as_bytes()).is_err());
+        }
     }
 }

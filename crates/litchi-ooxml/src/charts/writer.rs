@@ -2190,6 +2190,19 @@ fn write_axis_common<W: Write>(
     max: Option<f64>,
     log_base: Option<f64>,
 ) -> std::io::Result<()> {
+    if min.is_some_and(|value| !value.is_finite()) || max.is_some_and(|value| !value.is_finite()) {
+        return Err(invalid_chart_input("chart axis bounds must be finite"));
+    }
+    if min.zip(max).is_some_and(|(min, max)| min > max) {
+        return Err(invalid_chart_input(
+            "chart axis minimum cannot exceed its maximum",
+        ));
+    }
+    if log_base.is_some_and(|base| !base.is_finite() || !(2.0..=1000.0).contains(&base)) {
+        return Err(invalid_chart_input(
+            "chart logarithmic base must be between 2 and 1000",
+        ));
+    }
     write!(writer, r#"<c:axId val="{}"/>"#, common.axis_id)?;
 
     write!(writer, "<c:scaling>")?;
@@ -2301,7 +2314,7 @@ fn write_axis_common<W: Write>(
 
 fn write_category_axis<W: Write>(writer: &mut W, axis: &CategoryAxis) -> std::io::Result<()> {
     write!(writer, "<c:catAx>")?;
-    write_axis_common(writer, &axis.common, None, None, None)?;
+    write_axis_common(writer, &axis.common, axis.min, axis.max, axis.log_base)?;
     write!(
         writer,
         r#"<c:auto val="{}"/>"#,
@@ -2401,7 +2414,7 @@ fn write_value_axis<W: Write>(writer: &mut W, axis: &ValueAxis) -> std::io::Resu
 
 fn write_date_axis<W: Write>(writer: &mut W, axis: &DateAxis) -> std::io::Result<()> {
     write!(writer, "<c:dateAx>")?;
-    write_axis_common(writer, &axis.common, axis.min, axis.max, None)?;
+    write_axis_common(writer, &axis.common, axis.min, axis.max, axis.log_base)?;
     write!(
         writer,
         r#"<c:auto val="{}"/>"#,
@@ -2429,7 +2442,7 @@ fn write_date_axis<W: Write>(writer: &mut W, axis: &DateAxis) -> std::io::Result
 
 fn write_series_axis<W: Write>(writer: &mut W, axis: &SeriesAxis) -> std::io::Result<()> {
     write!(writer, "<c:serAx>")?;
-    write_axis_common(writer, &axis.common, None, None, None)?;
+    write_axis_common(writer, &axis.common, axis.min, axis.max, axis.log_base)?;
     if let Some(skip) = axis.tick_label_skip {
         write!(writer, r#"<c:tickLblSkip val="{}"/>"#, skip)?;
     }
