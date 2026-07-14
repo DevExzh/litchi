@@ -7,7 +7,7 @@ use crate::error::{OoxmlError, Result};
 use litchi_core::VerticalPosition;
 use litchi_core::XmlSlice;
 use litchi_opc::rel::Relationships;
-use quick_xml::events::{BytesRef, Event};
+use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 use smallvec::SmallVec;
 use std::borrow::Cow;
@@ -616,6 +616,42 @@ pub struct RunProperties {
     pub vertical_position: Option<VerticalPosition>,
 }
 
+fn update_run_properties(props: &mut RunProperties, element: &BytesStart<'_>) -> Result<()> {
+    let property = element.local_name();
+    if !matches!(property.as_ref(), b"b" | b"i" | b"strike" | b"vertAlign") {
+        return Ok(());
+    }
+
+    let mut value = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        if attribute.key.local_name().as_ref() == b"val" {
+            value = Some(attribute.value);
+            break;
+        }
+    }
+
+    match property.as_ref() {
+        b"b" => props.bold = Some(value.as_deref().is_none_or(is_on)),
+        b"i" => props.italic = Some(value.as_deref().is_none_or(is_on)),
+        b"strike" => props.strikethrough = Some(value.as_deref().is_none_or(is_on)),
+        b"vertAlign" => {
+            props.vertical_position = match value.as_deref() {
+                Some(b"superscript") => Some(VerticalPosition::Superscript),
+                Some(b"subscript") => Some(VerticalPosition::Subscript),
+                _ => None,
+            };
+        },
+        _ => {},
+    }
+    Ok(())
+}
+
+#[inline]
+fn is_on(value: &[u8]) -> bool {
+    matches!(value, b"true" | b"1" | b"on")
+}
+
 /// Internal storage for run XML data (same pattern as Paragraph).
 #[derive(Debug, Clone)]
 enum RunXmlData {
@@ -872,7 +908,7 @@ impl Run {
     /// ```
     pub fn get_text_and_properties(&self) -> Result<(String, RunProperties)> {
         let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
+        reader.config_mut().trim_text(false);
 
         let mut props = RunProperties::default();
         let mut text = String::with_capacity(self.xml_bytes().len() / 8);
@@ -881,84 +917,55 @@ impl Run {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                Ok(Event::Start(e)) => {
                     let name = e.local_name();
 
-                    // Handle text elements
                     if name.as_ref() == b"t" {
                         in_text_element = true;
-                    } else if name.as_ref() == b"tab" {
-                        text.push('\t');
-                    } else if name.as_ref() == b"br" {
-                        text.push('\n');
                     } else if name.as_ref() == b"rPr" {
                         in_r_pr = true;
-                    } else if in_r_pr {
-                        // Extract all properties in one pass
+                    } else {
                         match name.as_ref() {
-                            b"b" => {
-                                let mut found_val = false;
-                                for attr in e.attributes().flatten() {
-                                    if attr.key.as_ref() == b"val" {
-                                        found_val = true;
-                                        let value = attr.value.as_ref();
-                                        props.bold = Some(value == b"true" || value == b"1");
-                                        break;
-                                    }
-                                }
-                                if !found_val {
-                                    props.bold = Some(true);
-                                }
-                            },
-                            b"i" => {
-                                let mut found_val = false;
-                                for attr in e.attributes().flatten() {
-                                    if attr.key.as_ref() == b"val" {
-                                        found_val = true;
-                                        let value = attr.value.as_ref();
-                                        props.italic = Some(value == b"true" || value == b"1");
-                                        break;
-                                    }
-                                }
-                                if !found_val {
-                                    props.italic = Some(true);
-                                }
-                            },
-                            b"strike" => {
-                                let mut found_val = false;
-                                for attr in e.attributes().flatten() {
-                                    if attr.key.as_ref() == b"val" {
-                                        found_val = true;
-                                        let value = attr.value.as_ref();
-                                        props.strikethrough =
-                                            Some(value == b"true" || value == b"1");
-                                        break;
-                                    }
-                                }
-                                if !found_val {
-                                    props.strikethrough = Some(true);
-                                }
-                            },
-                            b"vertAlign" => {
-                                for attr in e.attributes().flatten() {
-                                    if attr.key.as_ref() == b"val" {
-                                        let value = attr.value.as_ref();
-                                        props.vertical_position = match value {
-                                            b"superscript" => Some(VerticalPosition::Superscript),
-                                            b"subscript" => Some(VerticalPosition::Subscript),
-                                            _ => None,
-                                        };
-                                        break;
-                                    }
-                                }
-                            },
+                            b"tab" => text.push('\t'),
+                            b"br" | b"cr" => text.push('\n'),
+                            b"noBreakHyphen" => text.push('\u{2011}'),
+                            b"softHyphen" => text.push('\u{00ad}'),
                             _ => {},
+                        }
+                        if in_r_pr {
+                            update_run_properties(&mut props, &e)?;
                         }
                     }
                 },
-                Ok(Event::Text(e)) if in_text_element => {
-                    let text_str = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
-                    text.push_str(text_str);
+                Ok(Event::Empty(e)) => {
+                    let name = e.local_name();
+                    match name.as_ref() {
+                        b"tab" => text.push('\t'),
+                        b"br" | b"cr" => text.push('\n'),
+                        b"noBreakHyphen" => text.push('\u{2011}'),
+                        b"softHyphen" => text.push('\u{00ad}'),
+                        _ => {},
+                    }
+                    if in_r_pr {
+                        update_run_properties(&mut props, &e)?;
+                    }
+                },
+                Ok(Event::Text(content)) if in_text_element => {
+                    let decoded = content
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    let unescaped = quick_xml::escape::unescape(&decoded)
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    text.push_str(&unescaped);
+                },
+                Ok(Event::CData(content)) if in_text_element => {
+                    let decoded = content
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    text.push_str(&decoded);
+                },
+                Ok(Event::GeneralRef(reference)) if in_text_element => {
+                    text.push_str(&decode_xml_reference(&reference)?);
                 },
                 Ok(Event::End(e)) => {
                     let name = e.local_name();
@@ -1011,74 +1018,16 @@ impl Run {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                Ok(Event::Start(e)) => {
                     let name = e.local_name();
                     if name.as_ref() == b"rPr" {
                         in_r_pr = true;
                     } else if in_r_pr {
-                        // Extract all properties in one pass
-                        match name.as_ref() {
-                            b"b" => {
-                                // Check for w:val attribute
-                                let mut found_val = false;
-                                for attr in e.attributes().flatten() {
-                                    if attr.key.as_ref() == b"val" {
-                                        found_val = true;
-                                        let value = attr.value.as_ref();
-                                        props.bold = Some(value == b"true" || value == b"1");
-                                        break;
-                                    }
-                                }
-                                // Element present without val attribute means true
-                                if !found_val {
-                                    props.bold = Some(true);
-                                }
-                            },
-                            b"i" => {
-                                let mut found_val = false;
-                                for attr in e.attributes().flatten() {
-                                    if attr.key.as_ref() == b"val" {
-                                        found_val = true;
-                                        let value = attr.value.as_ref();
-                                        props.italic = Some(value == b"true" || value == b"1");
-                                        break;
-                                    }
-                                }
-                                if !found_val {
-                                    props.italic = Some(true);
-                                }
-                            },
-                            b"strike" => {
-                                let mut found_val = false;
-                                for attr in e.attributes().flatten() {
-                                    if attr.key.as_ref() == b"val" {
-                                        found_val = true;
-                                        let value = attr.value.as_ref();
-                                        props.strikethrough =
-                                            Some(value == b"true" || value == b"1");
-                                        break;
-                                    }
-                                }
-                                if !found_val {
-                                    props.strikethrough = Some(true);
-                                }
-                            },
-                            b"vertAlign" => {
-                                for attr in e.attributes().flatten() {
-                                    if attr.key.as_ref() == b"val" {
-                                        let value = attr.value.as_ref();
-                                        props.vertical_position = match value {
-                                            b"superscript" => Some(VerticalPosition::Superscript),
-                                            b"subscript" => Some(VerticalPosition::Subscript),
-                                            _ => None,
-                                        };
-                                        break;
-                                    }
-                                }
-                            },
-                            _ => {},
-                        }
+                        update_run_properties(&mut props, &e)?;
                     }
+                },
+                Ok(Event::Empty(e)) if in_r_pr && e.local_name().as_ref() != b"rPr" => {
+                    update_run_properties(&mut props, &e)?;
                 },
                 Ok(Event::End(e)) if e.local_name().as_ref() == b"rPr" => {
                     // Exit early once we've finished parsing rPr
@@ -1110,7 +1059,7 @@ impl Run {
                         in_r_pr = true;
                     } else if in_r_pr && name.as_ref() == b"vertAlign" {
                         for attr in e.attributes().flatten() {
-                            if attr.key.as_ref() == b"val" {
+                            if attr.key.local_name().as_ref() == b"val" {
                                 let value = attr.value.as_ref();
                                 match value {
                                     b"superscript" => {
@@ -1152,7 +1101,7 @@ impl Run {
                         in_r_pr = true;
                     } else if in_r_pr && name.as_ref() == b"rFonts" {
                         for attr in e.attributes().flatten() {
-                            if attr.key.as_ref() == b"ascii" {
+                            if attr.key.local_name().as_ref() == b"ascii" {
                                 let value = attr
                                     .decoded_and_normalized_value(
                                         XmlVersion::Implicit1_0,
@@ -1194,7 +1143,7 @@ impl Run {
                         in_r_pr = true;
                     } else if in_r_pr && name.as_ref() == b"sz" {
                         for attr in e.attributes().flatten() {
-                            if attr.key.as_ref() == b"val"
+                            if attr.key.local_name().as_ref() == b"val"
                                 && let Ok(value) = std::str::from_utf8(&attr.value)
                                 && let Ok(size) = value.parse::<u32>()
                             {
@@ -1456,9 +1405,9 @@ impl Run {
                     } else if in_r_pr && name.as_ref() == property_name {
                         // Check for w:val attribute
                         for attr in e.attributes().flatten() {
-                            if attr.key.as_ref() == b"val" {
+                            if attr.key.local_name().as_ref() == b"val" {
                                 let value = attr.value.as_ref();
-                                return Ok(Some(value == b"true" || value == b"1"));
+                                return Ok(Some(is_on(value)));
                             }
                         }
                         // Element present without val attribute means true
@@ -1580,12 +1529,52 @@ mod tests {
     }
 
     #[test]
+    fn optimized_run_extraction_matches_text_and_reads_qualified_properties() {
+        let run = Run::new(
+            br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                <w:rPr><w:b w:val="0"/><w:i w:val="on"/><w:strike/><w:vertAlign w:val="superscript"/></w:rPr>
+                <w:t xml:space="preserve"> A &amp; <![CDATA[B < C]]> &#x1F600; </w:t><w:t/>
+                <w:tab/><w:br/><w:cr/><w:noBreakHyphen/><w:softHyphen/><w:t>tail</w:t>
+            </w:r>"#
+                .to_vec(),
+        );
+
+        let expected_text = " A & B < C 😀 \t\n\n‑\u{00ad}tail";
+        let (text, properties) = run.get_text_and_properties().unwrap();
+        assert_eq!(text, expected_text);
+        assert_eq!(text, run.text().unwrap());
+        assert_eq!(properties.bold, Some(false));
+        assert_eq!(properties.italic, Some(true));
+        assert_eq!(properties.strikethrough, Some(true));
+        assert_eq!(
+            properties.vertical_position,
+            Some(VerticalPosition::Superscript)
+        );
+
+        let properties_only = run.get_properties().unwrap();
+        assert_eq!(properties_only.bold, properties.bold);
+        assert_eq!(properties_only.italic, properties.italic);
+        assert_eq!(properties_only.strikethrough, properties.strikethrough);
+        assert_eq!(
+            properties_only.vertical_position,
+            properties.vertical_position
+        );
+        assert_eq!(run.bold().unwrap(), Some(false));
+        assert_eq!(run.italic().unwrap(), Some(true));
+        assert_eq!(
+            run.vertical_position().unwrap(),
+            properties.vertical_position
+        );
+    }
+
+    #[test]
     fn rejects_unknown_entities_in_word_text() {
         let run = Run::new(
             br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:t>&unknown;</w:t></w:r>"#
                 .to_vec(),
         );
         assert!(run.text().is_err());
+        assert!(run.get_text_and_properties().is_err());
     }
 
     #[test]
