@@ -1284,11 +1284,26 @@ impl Package {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::NamedTempFile;
 
     #[test]
-    #[ignore] // Requires test file
-    fn test_open_package() {
-        let result = Package::open("test.docx");
-        assert!(result.is_ok());
+    fn saves_and_reopens_package() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        package
+            .document_mut()
+            .unwrap()
+            .add_paragraph_with_text("round-trip text");
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        assert!(
+            reopened
+                .document()
+                .unwrap()
+                .text()
+                .unwrap()
+                .contains("round-trip text")
+        );
     }
 }

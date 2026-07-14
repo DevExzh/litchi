@@ -1326,11 +1326,16 @@ impl Package {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::NamedTempFile;
 
     #[test]
-    #[ignore] // Requires test file
-    fn test_open_package() {
-        let result = Package::open("test.pptx");
-        assert!(result.is_ok());
+    fn saves_and_reopens_package() {
+        let file = NamedTempFile::with_suffix(".pptx").unwrap();
+        let mut package = Package::new().unwrap();
+        package.presentation_mut().unwrap().add_slide().unwrap();
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        assert_eq!(reopened.presentation().unwrap().slide_count().unwrap(), 1);
     }
 }
