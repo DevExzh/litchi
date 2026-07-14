@@ -4,7 +4,10 @@ use crate::common::xml::{
 use crate::docx::drawing::{DrawingObject, parse_drawing_objects};
 use crate::docx::hyperlink::Hyperlink;
 use crate::docx::image::{InlineImage, parse_inline_images};
-use crate::docx::namespace::{is_wordprocessing_namespace, scan_word_element_ranges};
+use crate::docx::namespace::{
+    direct_word_property_value, is_wordprocessing_namespace, normalize_xml_integer,
+    scan_word_element_ranges,
+};
 use crate::docx::revision::{Revision, parse_revisions};
 use crate::docx::smart_tag::SmartTag;
 use crate::error::{OoxmlError, Result};
@@ -249,6 +252,13 @@ impl Paragraph {
     /// Uses streaming XML parsing with pre-allocated buffer to extract text efficiently.
     pub fn text(&self) -> Result<String> {
         extract_word_text(self.xml_bytes())
+    }
+
+    /// Return the HTML division ID referenced by this paragraph, if present.
+    pub fn division_id(&self) -> Result<Option<String>> {
+        direct_word_property_value(self.xml_bytes(), b"p", b"pPr", b"divId")?
+            .map(|value| normalize_xml_integer(value, "Word paragraph division ID"))
+            .transpose()
     }
 
     /// Get an iterator over the runs in this paragraph.
@@ -1649,5 +1659,27 @@ mod tests {
                 .to_vec(),
         );
         assert!(invalid_clear.breaks().is_err());
+    }
+
+    #[test]
+    fn reads_direct_paragraph_division_ids_namespace_aware() {
+        let paragraph = Paragraph::new(
+            br#"<q:p xmlns:q="http://purl.oclc.org/ooxml/wordprocessingml/main" xmlns:false="urn:not-wordprocessingml"><q:pPr><false:divId false:val="9"/><q:divId q:val=" +123456789012345678901234567890 "/></q:pPr><q:r><q:t>text</q:t></q:r></q:p>"#
+                .to_vec(),
+        );
+        assert_eq!(
+            paragraph.division_id().unwrap().as_deref(),
+            Some("+123456789012345678901234567890")
+        );
+
+        let inherited =
+            Paragraph::new(br#"<q:p><q:pPr><q:divId q:val="-7"/></q:pPr></q:p>"#.to_vec());
+        assert_eq!(inherited.division_id().unwrap().as_deref(), Some("-7"));
+
+        let invalid = Paragraph::new(
+            br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:divId w:val="1.5"/></w:pPr></w:p>"#
+                .to_vec(),
+        );
+        assert!(invalid.division_id().is_err());
     }
 }

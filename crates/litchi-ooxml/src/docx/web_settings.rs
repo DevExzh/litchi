@@ -1,6 +1,8 @@
 //! WordprocessingML web-settings support.
 
-use crate::docx::namespace::{is_wordprocessing_namespace, word_attribute_value};
+use crate::docx::namespace::{
+    is_wordprocessing_namespace, normalize_xml_integer, word_attribute_value,
+};
 use crate::error::{OoxmlError, Result};
 use litchi_opc::part::Part;
 use quick_xml::encoding::Decoder;
@@ -770,17 +772,8 @@ fn parse_setting(
         ),
         b"pixelsPerInch" => {
             let value = required_value(element, decoder, resolver, "pixels per inch")?;
-            let value = value.trim();
-            if !is_xml_integer(value) {
-                return Err(OoxmlError::InvalidFormat(format!(
-                    "invalid pixels-per-inch value '{value}'"
-                )));
-            }
-            set_once(
-                &mut settings.pixels_per_inch,
-                value.to_owned(),
-                "pixelsPerInch",
-            )
+            let value = normalize_xml_integer(value, "pixels-per-inch")?;
+            set_once(&mut settings.pixels_per_inch, value, "pixelsPerInch")
         },
         b"targetScreenSz" => {
             let value = required_value(element, decoder, resolver, "target screen size")?;
@@ -1103,13 +1096,8 @@ fn set_signed_twips(
     description: &str,
 ) -> Result<()> {
     let value = required_value(element, decoder, resolver, description)?;
-    let value = value.trim();
-    if !is_xml_integer(value) {
-        return Err(OoxmlError::InvalidFormat(format!(
-            "invalid {description} value '{value}'"
-        )));
-    }
-    set_once(slot, value.to_owned(), description)
+    let value = normalize_xml_integer(value, description)?;
+    set_once(slot, value, description)
 }
 
 fn parse_html_div_borders(reader: &mut NsReader<&[u8]>) -> Result<HtmlDivBorders> {
@@ -1597,14 +1585,6 @@ fn skip_element(reader: &mut NsReader<&[u8]>) -> Result<()> {
             _ => {},
         }
     }
-}
-
-fn is_xml_integer(value: &str) -> bool {
-    let digits = value
-        .strip_prefix('+')
-        .or_else(|| value.strip_prefix('-'))
-        .unwrap_or(value);
-    !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit())
 }
 
 fn required_value(

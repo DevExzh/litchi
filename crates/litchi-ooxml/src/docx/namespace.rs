@@ -186,6 +186,201 @@ pub(crate) fn scan_word_element_ranges(
     Ok(())
 }
 
+pub(crate) fn direct_word_property_value(
+    xml_bytes: &[u8],
+    root_name: &[u8],
+    properties_name: &[u8],
+    property_name: &[u8],
+) -> Result<Option<String>> {
+    let mut reader = NsReader::from_reader(xml_bytes);
+    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut depth = 0usize;
+    let mut properties_depth = None;
+    let mut saw_properties = false;
+    let mut value = None;
+    let mut saw_root = false;
+
+    loop {
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+
+        if fragment_prefix.is_none()
+            && depth == 0
+            && let Event::Start(element) | Event::Empty(element) = &event
+            && !matches!(namespace, ResolveResult::Bound(_))
+        {
+            fragment_prefix = Some(
+                element
+                    .name()
+                    .prefix()
+                    .map(|prefix| prefix.into_inner().to_vec()),
+            );
+        }
+
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("Word property XML nesting is too deep".into())
+                })?;
+                let is_word = is_fragment_word_namespace(&namespace, &fragment_prefix);
+                if depth == 1 {
+                    if saw_root || !is_word || element.local_name().as_ref() != root_name {
+                        return Err(OoxmlError::InvalidFormat(
+                            "Word property XML has an invalid root".into(),
+                        ));
+                    }
+                    saw_root = true;
+                } else if depth == 2 && is_word && element.local_name().as_ref() == properties_name
+                {
+                    if saw_properties {
+                        return Err(OoxmlError::InvalidFormat(
+                            "duplicate Word property container".into(),
+                        ));
+                    }
+                    saw_properties = true;
+                    properties_depth = Some(depth);
+                } else if depth == 3
+                    && properties_depth == Some(2)
+                    && is_word
+                    && element.local_name().as_ref() == property_name
+                {
+                    set_direct_property_value(
+                        &mut value,
+                        &element,
+                        decoder,
+                        &resolver,
+                        &fragment_prefix,
+                        property_name,
+                    )?;
+                }
+            },
+            Event::Empty(element) => {
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("Word property XML nesting is too deep".into())
+                })?;
+                let is_word = is_fragment_word_namespace(&namespace, &fragment_prefix);
+                if child_depth == 1 {
+                    if saw_root || !is_word || element.local_name().as_ref() != root_name {
+                        return Err(OoxmlError::InvalidFormat(
+                            "Word property XML has an invalid root".into(),
+                        ));
+                    }
+                    saw_root = true;
+                } else if child_depth == 2
+                    && is_word
+                    && element.local_name().as_ref() == properties_name
+                {
+                    if saw_properties {
+                        return Err(OoxmlError::InvalidFormat(
+                            "duplicate Word property container".into(),
+                        ));
+                    }
+                    saw_properties = true;
+                } else if child_depth == 3
+                    && properties_depth == Some(2)
+                    && is_word
+                    && element.local_name().as_ref() == property_name
+                {
+                    set_direct_property_value(
+                        &mut value,
+                        &element,
+                        decoder,
+                        &resolver,
+                        &fragment_prefix,
+                        property_name,
+                    )?;
+                }
+            },
+            Event::End(_) => {
+                if properties_depth == Some(depth) {
+                    properties_depth = None;
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("invalid Word property XML nesting".into())
+                })?;
+            },
+            Event::Eof if depth != 0 => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated Word property XML".into(),
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+
+    if !saw_root {
+        return Err(OoxmlError::InvalidFormat(
+            "Word property XML has no root".into(),
+        ));
+    }
+    Ok(value)
+}
+
+fn set_direct_property_value(
+    slot: &mut Option<String>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    fragment_prefix: &Option<Option<Vec<u8>>>,
+    property_name: &[u8],
+) -> Result<()> {
+    if slot.is_some() {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "duplicate Word property '{}'",
+            String::from_utf8_lossy(property_name)
+        )));
+    }
+    let mut value = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        if attribute.key.local_name().as_ref() != b"val" {
+            continue;
+        }
+        let (namespace, _) = resolver.resolve_attribute(attribute.key);
+        if !is_fragment_word_namespace(&namespace, fragment_prefix) {
+            continue;
+        }
+        if value.is_some() {
+            return Err(OoxmlError::InvalidFormat(
+                "duplicate Word property value attribute".into(),
+            ));
+        }
+        value = Some(
+            attribute
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                .into_owned(),
+        );
+    }
+    *slot = Some(value.ok_or_else(|| {
+        OoxmlError::InvalidFormat(format!(
+            "Word property '{}' requires a value",
+            String::from_utf8_lossy(property_name)
+        ))
+    })?);
+    Ok(())
+}
+
+pub(crate) fn normalize_xml_integer(value: String, description: &str) -> Result<String> {
+    let value = value.trim();
+    let digits = value
+        .strip_prefix('+')
+        .or_else(|| value.strip_prefix('-'))
+        .unwrap_or(value);
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "invalid {description} value '{value}'"
+        )));
+    }
+    Ok(value.to_owned())
+}
+
 fn emit_word_element_range(
     target: usize,
     start: usize,

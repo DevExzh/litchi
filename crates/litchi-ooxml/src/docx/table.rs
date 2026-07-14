@@ -1,5 +1,7 @@
 /// Table, Row, and Cell structures for Word documents.
-use crate::docx::namespace::scan_word_element_ranges;
+use crate::docx::namespace::{
+    direct_word_property_value, normalize_xml_integer, scan_word_element_ranges,
+};
 use crate::docx::paragraph::{Paragraph, extract_word_text};
 use crate::error::{OoxmlError, Result};
 use litchi_core::XmlSlice;
@@ -294,6 +296,13 @@ impl Row {
     #[inline]
     fn xml_bytes(&self) -> &[u8] {
         self.xml_data.as_bytes()
+    }
+
+    /// Return the HTML division ID referenced by this row, if present.
+    pub fn division_id(&self) -> Result<Option<String>> {
+        direct_word_property_value(self.xml_bytes(), b"tr", b"trPr", b"divId")?
+            .map(|value| normalize_xml_integer(value, "Word table-row division ID"))
+            .transpose()
     }
 
     /// Get the number of cells in this row.
@@ -597,5 +606,23 @@ mod tests {
                 .to_vec(),
         );
         assert!(invalid_merge.v_merge().is_err());
+    }
+
+    #[test]
+    fn row_division_ids_are_direct_and_namespace_aware() {
+        let row = Row::new(
+            br#"<s:tr xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:trPr><s:divId s:val="-123456789012345678901234567890"/></s:trPr><s:tc><s:p><s:pPr><s:divId s:val="99"/></s:pPr></s:p></s:tc></s:tr>"#
+                .to_vec(),
+        );
+        assert_eq!(
+            row.division_id().unwrap().as_deref(),
+            Some("-123456789012345678901234567890")
+        );
+
+        let nested_only = Row::new(
+            br#"<w:tr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tc><w:p><w:pPr><w:divId w:val="99"/></w:pPr></w:p></w:tc></w:tr>"#
+                .to_vec(),
+        );
+        assert_eq!(nested_only.division_id().unwrap(), None);
     }
 }
