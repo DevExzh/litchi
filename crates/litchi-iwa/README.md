@@ -124,6 +124,8 @@ assert!(pivot_categories.iter().all(|category| category.label.is_some()));
 numbers.resize_table(table.object_id, 30, 10)?;
 numbers.rename_table(table.object_id, "Inventory")?;
 let original_sheet_id = numbers.sheets()?[0].object_id;
+let copied_sheet = numbers.duplicate_sheet(original_sheet_id)?;
+numbers.remove_sheet(copied_sheet.object_id)?;
 let new_sheet = numbers.add_empty_sheet("Archive")?;
 let new_table = numbers.add_empty_table(new_sheet.object_id, "Log", 100, 6)?;
 numbers.move_table(table.object_id, new_sheet.object_id)?;
@@ -393,6 +395,12 @@ identity, cell stores, formulas, comments, styles, or geometry. The operation
 transfers the original raw drawable reference, rewrites the optional table
 parent, and updates both sheets' IWA reference metadata atomically. See
 `move_numbers_table`.
+
+Populated sheets can be duplicated adjacent to their source with preserved
+sheet settings, drawable order, table names and positions, local formula
+dependency graphs, and independently writable table and text-box storage.
+Unsupported drawable graphs and cross-table dependency edges fail before the
+editor is modified. See `duplicate_numbers_sheet`.
 
 Populated tables can be duplicated with independent storage and CalculationEngine
 owner families. Formula hosts, table UUID references, dependency tiles, package

@@ -238,6 +238,181 @@ fn ordinary_text_box_duplicate_delete_is_independent_and_exact() {
 }
 
 #[test]
+fn populated_sheet_duplicate_is_ordered_and_independent() {
+    const SOURCE_SHEET_ID: u64 = 2;
+    const SOURCE_TABLE_ID: u64 = 10;
+    const SOURCE_TEXT_BOX_ID: u64 = 50;
+    const SOURCE_CELL_ROW: usize = 0;
+    const SOURCE_CELL_COLUMN: usize = 1;
+
+    let mut editor = NumbersEditor::from_package(test_package_with_text_box()).unwrap();
+    let created = editor.duplicate_sheet(SOURCE_SHEET_ID).unwrap();
+    assert_ne!(created.object_id, SOURCE_SHEET_ID);
+    assert_eq!(created.index, 1);
+    assert_eq!(created.name, "Sheet 1-1");
+    assert_eq!(
+        editor
+            .sheets()
+            .unwrap()
+            .into_iter()
+            .map(|sheet| sheet.name)
+            .collect::<Vec<_>>(),
+        vec!["Sheet 1", "Sheet 1-1"]
+    );
+
+    let (_, _, source_sheet) = numbers_sheet(editor.package(), SOURCE_SHEET_ID).unwrap();
+    let (_, _, copied_sheet) = numbers_sheet(editor.package(), created.object_id).unwrap();
+    assert_eq!(source_sheet.drawable_infos.len(), 2);
+    assert_eq!(copied_sheet.drawable_infos.len(), 2);
+    assert_ne!(
+        source_sheet.drawable_infos[0].identifier,
+        copied_sheet.drawable_infos[0].identifier
+    );
+    assert_ne!(
+        source_sheet.drawable_infos[1].identifier,
+        copied_sheet.drawable_infos[1].identifier
+    );
+
+    let copied_table_id = editor
+        .tables()
+        .unwrap()
+        .into_iter()
+        .find(|table| table.object_id != SOURCE_TABLE_ID)
+        .unwrap()
+        .object_id;
+    assert_eq!(
+        find_table_owner(editor.package(), copied_table_id)
+            .unwrap()
+            .sheet_id,
+        created.object_id
+    );
+    let copied_text_box = editor
+        .sheet_text_boxes(created.object_id)
+        .unwrap()
+        .remove(0);
+    assert_ne!(copied_text_box.drawable_object_id, SOURCE_TEXT_BOX_ID);
+    assert_eq!(copied_text_box.storage.text, "Source");
+
+    editor
+        .set_cell(
+            copied_table_id,
+            SOURCE_CELL_ROW,
+            SOURCE_CELL_COLUMN,
+            CellValue::Text("Copied cell".to_owned()),
+        )
+        .unwrap();
+    editor
+        .set_sheet_text_box_text(
+            created.object_id,
+            copied_text_box.drawable_object_id,
+            "Copied box",
+        )
+        .unwrap();
+    assert_eq!(
+        editor.sheet_text_boxes(SOURCE_SHEET_ID).unwrap()[0]
+            .storage
+            .text,
+        "Source"
+    );
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let sheets = document.sheets().unwrap();
+    assert_eq!(
+        sheets[0].tables[0].get_cell(SOURCE_CELL_ROW, SOURCE_CELL_COLUMN),
+        Some(&CellValue::Text("Original".to_owned()))
+    );
+    assert_eq!(
+        sheets[1].tables[0].get_cell(SOURCE_CELL_ROW, SOURCE_CELL_COLUMN),
+        Some(&CellValue::Text("Copied cell".to_owned()))
+    );
+}
+
+#[test]
+fn unsupported_sheet_drawable_duplicate_fails_transactionally() {
+    const SOURCE_SHEET_ID: u64 = 2;
+    const UNSUPPORTED_DRAWABLE_ID: u64 = 90;
+    const SHEET_ARCHIVE_MESSAGE_TYPE: u32 = 2;
+
+    let mut package = test_package_with_text_box();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let sheet = archive.object_mut(SOURCE_SHEET_ID).unwrap();
+            let mut decoded = tn::SheetArchive::decode(sheet.messages[0].data.as_slice())?;
+            decoded.drawable_infos.push(Reference {
+                identifier: UNSUPPORTED_DRAWABLE_ID,
+                ..Default::default()
+            });
+            sheet.replace_message(
+                0,
+                RawMessage {
+                    type_: SHEET_ARCHIVE_MESSAGE_TYPE,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+            archive.insert_object(ArchiveObject::new(
+                UNSUPPORTED_DRAWABLE_ID,
+                vec![RawMessage {
+                    type_: SHAPE_INFO_MESSAGE_TYPE,
+                    data: tswp::ShapeInfoArchive {
+                        is_text_box: Some(false),
+                        ..Default::default()
+                    }
+                    .encode_to_vec(),
+                }],
+            )?)?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.duplicate_sheet(SOURCE_SHEET_ID).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn cross_table_dependency_sheet_duplicate_fails_transactionally() {
+    const SOURCE_SHEET_ID: u64 = 2;
+    const FORMULA_OWNER_OBJECT_ID: u64 = 101;
+    const EXTERNAL_OWNER_ID: u32 = 777;
+    const FORMULA_OWNER_MESSAGE_TYPE: u32 = 4_008;
+
+    let mut package = test_package_with_calculation_engine();
+    package
+        .update_archive("Index/CalculationEngine.iwa", |archive| {
+            let object = archive.object_mut(FORMULA_OWNER_OBJECT_ID).unwrap();
+            let mut owner =
+                tsce::FormulaOwnerDependenciesArchive::decode(object.messages[0].data.as_slice())?;
+            owner
+                .cell_dependencies
+                .get_or_insert_default()
+                .cell_record
+                .push(tsce::CellRecordExpandedArchive {
+                    column: 0,
+                    row: 0,
+                    expanded_edges: Some(tsce::ExpandedEdgesArchive {
+                        edge_with_owner_rows: vec![0],
+                        edge_with_owner_columns: vec![0],
+                        internal_owner_id_for_edge: vec![EXTERNAL_OWNER_ID],
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                });
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: FORMULA_OWNER_MESSAGE_TYPE,
+                    data: owner.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.duplicate_sheet(SOURCE_SHEET_ID).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn malformed_text_box_ownership_and_external_references_fail_transactionally() {
     let mut duplicate_owner = test_package_with_text_box();
     duplicate_owner

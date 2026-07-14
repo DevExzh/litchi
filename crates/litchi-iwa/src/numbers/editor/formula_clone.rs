@@ -298,6 +298,55 @@ pub(super) fn formula_graph_owner_uuids(
     Ok(Some((source_owner_uuid, new_owner_uuid)))
 }
 
+/// Return whether every explicit dependency edge for a table stays inside its owner family.
+///
+/// A standalone table duplicate intentionally keeps cross-table references pointed at the
+/// original targets. Sheet duplication needs a later sheet-wide remap for those edges, so it
+/// rejects them until that operation can preserve their native semantics exactly.
+pub(super) fn table_formula_graph_is_self_contained(
+    package: &IWorkPackage,
+    table_info_id: u64,
+) -> Result<bool> {
+    if !package.contains_entry(CALCULATION_ENGINE_ENTRY) {
+        return Ok(true);
+    }
+    let archive = package.archive(CALCULATION_ENGINE_ENTRY)?;
+    let (owners, _) = formula_owner_family(&archive, table_info_id)?;
+    let family = owners
+        .iter()
+        .map(|source| source.owner.internal_formula_owner_id)
+        .collect::<HashSet<_>>();
+    let inline_is_self_contained = owners.iter().all(|source| {
+        source
+            .owner
+            .cell_dependencies
+            .as_ref()
+            .is_none_or(|dependencies| {
+                dependency_records_are_self_contained(&dependencies.cell_record, &family)
+            })
+    });
+    if !inline_is_self_contained {
+        return Ok(false);
+    }
+    Ok(cell_record_tiles(&archive, &owners)?
+        .iter()
+        .all(|source| dependency_records_are_self_contained(&source.tile.cell_records, &family)))
+}
+
+fn dependency_records_are_self_contained(
+    records: &[tsce::CellRecordExpandedArchive],
+    family: &HashSet<u32>,
+) -> bool {
+    records.iter().all(|record| {
+        record.expanded_edges.as_ref().is_none_or(|edges| {
+            edges
+                .internal_owner_id_for_edge
+                .iter()
+                .all(|identifier| family.contains(identifier))
+        })
+    })
+}
+
 /// Remap formula host and explicit self-table references in cloned formula lists.
 fn formula_owner_family(
     archive: &Archive,
