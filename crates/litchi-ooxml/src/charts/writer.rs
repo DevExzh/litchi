@@ -1937,6 +1937,12 @@ fn write_error_bar<W: Write>(writer: &mut W, error_bar: &ErrorBar) -> std::io::R
     if let Some(value) = error_bar.value {
         write!(writer, r#"<c:val val="{}"/>"#, value)?;
     }
+    if let Some(shape_properties) = error_bar.shape_properties.as_ref() {
+        writer.write_all(shape_properties.as_xml())?;
+    }
+    if let Some(extension_list) = error_bar.extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
+    }
     write!(writer, "</c:errBars>")?;
     Ok(())
 }

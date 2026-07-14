@@ -1166,6 +1166,14 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                 .flatten(),
             );
             append_data_label_fragments(&mut fragments, series.data_labels.as_ref());
+            for error_bar in &series.error_bars {
+                if let Some(shape_properties) = error_bar.shape_properties.as_ref() {
+                    fragments.push(shape_properties.as_xml());
+                }
+                if let Some(extension_list) = error_bar.extension_list.as_ref() {
+                    fragments.push(extension_list.as_xml());
+                }
+            }
             for point in &series.data_points {
                 fragments.extend(
                     [

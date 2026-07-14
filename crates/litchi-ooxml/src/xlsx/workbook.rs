@@ -2729,6 +2729,27 @@ mod tests {
         );
         line_labels.labels.push(line_label);
         line_series.data_labels = Some(line_labels);
+        line_series.error_bars.push(crate::charts::series::ErrorBar {
+            direction: crate::charts::series::ErrorBarDirection::Y,
+            error_type: crate::charts::series::ErrorBarType::Both,
+            value_type: crate::charts::series::ErrorBarValueType::Fixed,
+            value: Some(1.0),
+            plus_values: None,
+            minus_values: None,
+            no_end_cap: false,
+            shape_properties: Some(
+                ChartShapeProperties::from_xml(
+                    br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId437"/></a:blipFill></c:spPr>"#.to_vec(),
+                )
+                .unwrap(),
+            ),
+            extension_list: Some(
+                ChartExtensionList::from_xml(
+                    br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="error-bars"><x:reference r:id="rId438"/></c:ext></c:extLst>"#.to_vec(),
+                )
+                .unwrap(),
+            ),
+        });
         line.common.series.push(line_series);
         chart
             .chart
@@ -2886,6 +2907,8 @@ mod tests {
                 "rId434".to_string(),
                 "rId435".to_string(),
                 "rId436".to_string(),
+                "rId437".to_string(),
+                "rId438".to_string(),
             ]
             .into()
         );
@@ -2899,7 +2922,7 @@ mod tests {
                 "rId411", "rId412", "rId413", "rId414", "rId415", "rId416", "rId417", "rId418",
                 "rId419", "rId420", "rId421", "rId422", "rId423", "rId424", "rId425", "rId426",
                 "rId427", "rId428", "rId429", "rId430", "rId431", "rId432", "rId433", "rId434",
-                "rId435", "rId436",
+                "rId435", "rId436", "rId437", "rId438",
             ]
             .iter()
             .any(|relationship_id| error.contains(relationship_id))

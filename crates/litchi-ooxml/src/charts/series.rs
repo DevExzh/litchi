@@ -265,6 +265,10 @@ pub struct ErrorBar {
     pub minus_values: Option<NumericData>,
     /// No end cap on error bars
     pub no_end_cap: bool,
+    /// DrawingML shape properties for the error bars
+    pub shape_properties: Option<ChartShapeProperties>,
+    /// Error-bar extension list
+    pub extension_list: Option<ChartExtensionList>,
 }
 
 /// Error bar direction.

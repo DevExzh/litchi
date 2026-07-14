@@ -4636,9 +4636,51 @@ fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ErrorBa
     let mut plus_values = None;
     let mut minus_values = None;
     let mut no_end_cap = false;
+    let mut shape_properties = None;
+    let mut extension_list = None;
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"spPr" => {
+                if shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart error bars contain duplicate shape properties".into(),
+                    ));
+                }
+                shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_fragment(e, "chart error-bar shape properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"spPr" => {
+                if shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart error bars contain duplicate shape properties".into(),
+                    ));
+                }
+                shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_empty_fragment(e)?,
+                )?);
+            },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"extLst" => {
+                if extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart error bars contain duplicate extension lists".into(),
+                    ));
+                }
+                extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_fragment(e, "chart error-bar extension list")?,
+                )?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"extLst" => {
+                if extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart error bars contain duplicate extension lists".into(),
+                    ));
+                }
+                extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_empty_fragment(e)?,
+                )?);
+            },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"plus" => {
                 plus_values = parse_numeric_data(reader)?
             },
@@ -4708,6 +4750,8 @@ fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ErrorBa
         plus_values,
         minus_values,
         no_end_cap,
+        shape_properties,
+        extension_list,
     };
     match error_bar.value_type {
         ErrorBarValueType::Fixed | ErrorBarValueType::Percentage | ErrorBarValueType::StdDev
@@ -8252,6 +8296,18 @@ mod tests {
             plus_values: None,
             minus_values: None,
             no_end_cap: true,
+            shape_properties: Some(
+                ChartShapeProperties::from_xml(
+                    br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:ln w="50800"/></c:spPr>"#.to_vec(),
+                )
+                .unwrap(),
+            ),
+            extension_list: Some(
+                ChartExtensionList::from_xml(
+                    br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:x="urn:example:error-bars"><c:ext uri="error-bars"><x:payload/></c:ext></c:extLst>"#.to_vec(),
+                )
+                .unwrap(),
+            ),
         });
         scatter_series.error_bars.push(ErrorBar {
             direction: ErrorBarDirection::X,
@@ -8261,6 +8317,8 @@ mod tests {
             plus_values: Some(NumericData::from_ref("Sheet1!$D$2:$D$4")),
             minus_values: None,
             no_end_cap: false,
+            shape_properties: None,
+            extension_list: None,
         });
         scatter.common.series.push(scatter_series);
         let mut of_pie = OfPieTypeGroup::new(OfPieType::Bar);
@@ -8555,6 +8613,18 @@ mod tests {
         assert_eq!(series.error_bars[0].direction, ErrorBarDirection::Y);
         assert_eq!(series.error_bars[0].value, Some(1.5));
         assert!(series.error_bars[0].no_end_cap);
+        assert!(
+            std::str::from_utf8(
+                series.error_bars[0]
+                    .shape_properties
+                    .as_ref()
+                    .unwrap()
+                    .as_xml()
+            )
+            .unwrap()
+            .contains("50800")
+        );
+        assert!(series.error_bars[0].extension_list.is_some());
         assert_eq!(series.error_bars[1].value_type, ErrorBarValueType::Custom);
         assert_eq!(
             series.error_bars[1]
