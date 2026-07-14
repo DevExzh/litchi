@@ -71,6 +71,8 @@ pub struct PageBreak {
     pub max: u32,
     /// Whether the break is manual.
     pub manual: bool,
+    /// Whether the break was created for a pivot-table report.
+    pub pivot: bool,
 }
 
 /// Hyperlink information
@@ -252,14 +254,6 @@ impl<'a> Worksheet<'a> {
         let hyperlinks = self.parse_sheet_data(content)?;
         self.resolve_hyperlinks(hyperlinks, relationships)?;
 
-        // Parse page setup
-        if let Some(ps_start) = content.find("<pageSetup ")
-            && let Some(ps_end) = content[ps_start..].find("/>")
-        {
-            let ps_content = &content[ps_start..ps_start + ps_end + 2];
-            self.parse_page_setup(ps_content)?;
-        }
-
         // Parse auto-filter
         if let Some(af_start) = content.find("<autoFilter ") {
             if let Some(af_end) = content[af_start..].find("</autoFilter>") {
@@ -277,20 +271,6 @@ impl<'a> Worksheet<'a> {
         {
             let views_content = &content[views_start..views_start + views_end + 13];
             self.parse_sheet_views(views_content)?;
-        }
-
-        // Parse manual page breaks
-        if let Some(rb_start) = content.find("<rowBreaks")
-            && let Some(rb_end) = content[rb_start..].find("</rowBreaks>")
-        {
-            let rb_content = &content[rb_start..rb_start + rb_end + 12];
-            self.parse_row_breaks(rb_content)?;
-        }
-        if let Some(cb_start) = content.find("<colBreaks")
-            && let Some(cb_end) = content[cb_start..].find("</colBreaks>")
-        {
-            let cb_content = &content[cb_start..cb_start + cb_end + 12];
-            self.parse_col_breaks(cb_content)?;
         }
 
         self.sparkline_groups = parse_sparkline_groups_from_worksheet_xml(content)?;
@@ -316,6 +296,9 @@ impl<'a> Worksheet<'a> {
         self.columns = parsed.columns;
         self.data_validations = parsed.data_validations;
         self.conditional_formats = parsed.conditional_formats;
+        self.page_setup = parsed.page_setup.unwrap_or_default();
+        self.row_breaks = parsed.row_breaks;
+        self.col_breaks = parsed.col_breaks;
         self.dimensions = parsed.dimensions;
         Ok(parsed.hyperlinks)
     }
@@ -793,28 +776,6 @@ impl<'a> Worksheet<'a> {
         Ok(())
     }
 
-    /// Parse page setup from XML.
-    fn parse_page_setup(&mut self, content: &str) -> Result<()> {
-        let paper_size =
-            Self::extract_attribute(content, "paperSize").and_then(|s| s.parse::<u32>().ok());
-        let landscape = content.contains("orientation=\"landscape\"");
-        let scale = Self::extract_attribute(content, "scale").and_then(|s| s.parse::<u32>().ok());
-        let fit_to_width =
-            Self::extract_attribute(content, "fitToWidth").and_then(|s| s.parse::<u32>().ok());
-        let fit_to_height =
-            Self::extract_attribute(content, "fitToHeight").and_then(|s| s.parse::<u32>().ok());
-
-        self.page_setup = PageSetup {
-            paper_size,
-            landscape,
-            scale,
-            fit_to_width,
-            fit_to_height,
-        };
-
-        Ok(())
-    }
-
     /// Parse auto-filter from XML.
     fn parse_auto_filter(&mut self, content: &str) -> Result<()> {
         let range = Self::extract_attribute(content, "ref");
@@ -942,52 +903,6 @@ impl<'a> Worksheet<'a> {
             zoom_scale,
             zoom_scale_normal,
         }
-    }
-
-    /// Parse row page breaks from XML.
-    fn parse_row_breaks(&mut self, content: &str) -> Result<()> {
-        self.row_breaks = Self::parse_breaks(content);
-        Ok(())
-    }
-
-    /// Parse column page breaks from XML.
-    fn parse_col_breaks(&mut self, content: &str) -> Result<()> {
-        self.col_breaks = Self::parse_breaks(content);
-        Ok(())
-    }
-
-    /// Parse <brk> entries from a rowBreaks/colBreaks XML fragment.
-    fn parse_breaks(content: &str) -> Vec<PageBreak> {
-        let mut breaks = Vec::new();
-        let mut pos = 0;
-        while let Some(brk_start) = content[pos..].find("<brk ") {
-            let brk_start_pos = pos + brk_start;
-            if let Some(brk_end) = content[brk_start_pos..].find("/>") {
-                let brk_tag = &content[brk_start_pos..brk_start_pos + brk_end + 2];
-                let id = Self::extract_attribute(brk_tag, "id").and_then(|s| s.parse().ok());
-                if let Some(id) = id {
-                    let min = Self::extract_attribute(brk_tag, "min")
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(0);
-                    let max = Self::extract_attribute(brk_tag, "max")
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(16383);
-                    let manual = Self::extract_attribute(brk_tag, "man")
-                        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-                        .unwrap_or(true);
-                    breaks.push(PageBreak {
-                        id,
-                        min,
-                        max,
-                        manual,
-                    });
-                }
-                pos = brk_start_pos + brk_end + 2;
-            } else {
-                break;
-            }
-        }
-        breaks
     }
 
     /// Helper method to extract attribute value from XML tag.

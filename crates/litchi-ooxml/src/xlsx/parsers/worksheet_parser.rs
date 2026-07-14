@@ -16,7 +16,9 @@ use crate::xlsx::namespace::{
     SPREADSHEETML_NAMESPACE, is_spreadsheetml_name, relationship_attribute_value,
 };
 use crate::xlsx::shared_strings::decode_spreadsheet_text;
-use crate::xlsx::worksheet::{ColumnInfo, ConditionalFormatRule, DataValidationRule, RowInfo};
+use crate::xlsx::worksheet::{
+    ColumnInfo, ConditionalFormatRule, DataValidationRule, PageBreak, PageSetup, RowInfo,
+};
 
 const MAX_EXCEL_COLUMN: u32 = 16_384;
 
@@ -31,6 +33,9 @@ pub(crate) struct ParsedWorksheetData {
     pub(crate) hyperlinks: Vec<ParsedHyperlink>,
     pub(crate) data_validations: Vec<DataValidationRule>,
     pub(crate) conditional_formats: Vec<ConditionalFormatRule>,
+    pub(crate) page_setup: Option<PageSetup>,
+    pub(crate) row_breaks: Vec<PageBreak>,
+    pub(crate) col_breaks: Vec<PageBreak>,
     pub(crate) dimensions: Option<(u32, u32, u32, u32)>,
 }
 
@@ -50,6 +55,8 @@ enum Context {
     DataValidations,
     DataValidation,
     ConditionalFormatting,
+    RowBreaks,
+    ColBreaks,
     MergeCells,
     SheetData,
     Row,
@@ -111,6 +118,19 @@ struct PendingValidation {
     saw_formula2: bool,
 }
 
+#[derive(Clone, Copy)]
+enum BreakKind {
+    Row,
+    Column,
+}
+
+struct PendingBreaks {
+    kind: BreakKind,
+    expected_count: Option<usize>,
+    expected_manual_count: Option<usize>,
+    start_count: usize,
+}
+
 impl PendingRun {
     fn new() -> Self {
         Self {
@@ -147,6 +167,10 @@ struct Parser {
     expected_validation_count: Option<usize>,
     conditional_range: Option<String>,
     conditional_start_count: usize,
+    breaks: Option<PendingBreaks>,
+    seen_page_setup: bool,
+    seen_row_breaks: bool,
+    seen_col_breaks: bool,
     seen_merge_cells: bool,
     expected_merge_count: Option<usize>,
     min_row: u32,
@@ -174,6 +198,10 @@ impl Parser {
             expected_validation_count: None,
             conditional_range: None,
             conditional_start_count: 0,
+            breaks: None,
+            seen_page_setup: false,
+            seen_row_breaks: false,
+            seen_col_breaks: false,
             seen_merge_cells: false,
             expected_merge_count: None,
             min_row: u32::MAX,
@@ -363,6 +391,30 @@ impl Parser {
             self.conditional_rule(element, decoder)?;
             return Ok(Context::Other);
         }
+        if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"pageSetup")
+        {
+            self.page_setup(element, decoder)?;
+            return Ok(Context::Other);
+        }
+        if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"rowBreaks")
+        {
+            self.start_breaks(BreakKind::Row, element, decoder)?;
+            return Ok(Context::RowBreaks);
+        }
+        if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"colBreaks")
+        {
+            self.start_breaks(BreakKind::Column, element, decoder)?;
+            return Ok(Context::ColBreaks);
+        }
+        if matches!(parent, Context::RowBreaks | Context::ColBreaks)
+            && is_spreadsheetml_name(namespace, element.name(), b"brk")
+        {
+            self.page_break(element, decoder)?;
+            return Ok(Context::Other);
+        }
         if parent == Context::SheetData && is_spreadsheetml_name(namespace, element.name(), b"row")
         {
             self.start_row(element, decoder)?;
@@ -472,6 +524,24 @@ impl Parser {
             && is_spreadsheetml_name(namespace, element.name(), b"cfRule")
         {
             self.conditional_rule(element, decoder)?;
+        } else if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"pageSetup")
+        {
+            self.page_setup(element, decoder)?;
+        } else if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"rowBreaks")
+        {
+            self.start_breaks(BreakKind::Row, element, decoder)?;
+            self.finish_breaks()?;
+        } else if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"colBreaks")
+        {
+            self.start_breaks(BreakKind::Column, element, decoder)?;
+            self.finish_breaks()?;
+        } else if matches!(parent, Context::RowBreaks | Context::ColBreaks)
+            && is_spreadsheetml_name(namespace, element.name(), b"brk")
+        {
+            self.page_break(element, decoder)?;
         } else if parent == Context::SheetData
             && is_spreadsheetml_name(namespace, element.name(), b"row")
         {
@@ -867,6 +937,152 @@ impl Parser {
         Ok(())
     }
 
+    fn page_setup(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+        if self.seen_page_setup {
+            return Err(invalid("duplicate worksheet pageSetup element"));
+        }
+        self.seen_page_setup = true;
+        let orientation = enum_attribute(
+            element,
+            b"orientation",
+            decoder,
+            "worksheet page orientation",
+            &["default", "portrait", "landscape"],
+        )?;
+        let scale = optional_u32(element, b"scale", decoder, "worksheet page scale")?;
+        if let Some(scale) = scale
+            && !(10..=400).contains(&scale)
+        {
+            return Err(invalid(format!("invalid worksheet page scale '{scale}'")));
+        }
+        self.data.page_setup = Some(PageSetup {
+            paper_size: optional_u32(element, b"paperSize", decoder, "worksheet paper size")?,
+            landscape: orientation.as_deref() == Some("landscape"),
+            scale,
+            fit_to_width: optional_u32(
+                element,
+                b"fitToWidth",
+                decoder,
+                "worksheet fit-to-page width",
+            )?,
+            fit_to_height: optional_u32(
+                element,
+                b"fitToHeight",
+                decoder,
+                "worksheet fit-to-page height",
+            )?,
+        });
+        Ok(())
+    }
+
+    fn start_breaks(
+        &mut self,
+        kind: BreakKind,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+    ) -> Result<()> {
+        if self.breaks.is_some() {
+            return Err(invalid("nested worksheet page-break collection"));
+        }
+        let seen = match kind {
+            BreakKind::Row => &mut self.seen_row_breaks,
+            BreakKind::Column => &mut self.seen_col_breaks,
+        };
+        if *seen {
+            return Err(invalid("duplicate worksheet page-break collection"));
+        }
+        *seen = true;
+        let start_count = match kind {
+            BreakKind::Row => self.data.row_breaks.len(),
+            BreakKind::Column => self.data.col_breaks.len(),
+        };
+        self.breaks = Some(PendingBreaks {
+            kind,
+            expected_count: optional_u32(element, b"count", decoder, "worksheet page-break count")?
+                .map(|count| count as usize),
+            expected_manual_count: optional_u32(
+                element,
+                b"manualBreakCount",
+                decoder,
+                "worksheet manual page-break count",
+            )?
+            .map(|count| count as usize),
+            start_count,
+        });
+        Ok(())
+    }
+
+    fn page_break(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+        let pending = self
+            .breaks
+            .as_ref()
+            .ok_or_else(|| invalid("worksheet page break outside its collection"))?;
+        let id = required_u32(element, b"id", decoder, "worksheet page-break ID")?;
+        let (maximum_id, maximum_span) = match pending.kind {
+            BreakKind::Row => (1_048_576, MAX_EXCEL_COLUMN - 1),
+            BreakKind::Column => (MAX_EXCEL_COLUMN, 1_048_575),
+        };
+        if id > maximum_id {
+            return Err(invalid(format!(
+                "worksheet page-break ID '{id}' exceeds Excel limits"
+            )));
+        }
+        let min =
+            optional_u32(element, b"min", decoder, "worksheet page-break minimum")?.unwrap_or(0);
+        let max = optional_u32(element, b"max", decoder, "worksheet page-break maximum")?
+            .unwrap_or(maximum_span);
+        if min > max || max > maximum_span {
+            return Err(invalid(format!(
+                "invalid worksheet page-break span '{min}:{max}'"
+            )));
+        }
+        let value = PageBreak {
+            id,
+            min,
+            max,
+            manual: optional_bool(element, b"man", decoder, "worksheet page-break manual flag")?
+                .unwrap_or(false),
+            pivot: optional_bool(element, b"pt", decoder, "worksheet page-break pivot flag")?
+                .unwrap_or(false),
+        };
+        match pending.kind {
+            BreakKind::Row => self.data.row_breaks.push(value),
+            BreakKind::Column => self.data.col_breaks.push(value),
+        }
+        Ok(())
+    }
+
+    fn finish_breaks(&mut self) -> Result<()> {
+        let pending = self
+            .breaks
+            .take()
+            .ok_or_else(|| invalid("missing worksheet page-break collection"))?;
+        let values = match pending.kind {
+            BreakKind::Row => &self.data.row_breaks,
+            BreakKind::Column => &self.data.col_breaks,
+        };
+        let actual_count = values.len() - pending.start_count;
+        if let Some(expected) = pending.expected_count
+            && expected != actual_count
+        {
+            return Err(invalid(format!(
+                "worksheet page-break count is {expected}, but {actual_count} brk elements were found"
+            )));
+        }
+        let manual_count = values[pending.start_count..]
+            .iter()
+            .filter(|value| value.manual)
+            .count();
+        if let Some(expected) = pending.expected_manual_count
+            && expected != manual_count
+        {
+            return Err(invalid(format!(
+                "worksheet manual page-break count is {expected}, but {manual_count} manual breaks were found"
+            )));
+        }
+        Ok(())
+    }
+
     fn start_merge_cells(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
         if self.seen_merge_cells {
             return Err(invalid("duplicate worksheet mergeCells element"));
@@ -1258,6 +1474,7 @@ impl Parser {
             Context::DataValidation => self.finish_data_validation(),
             Context::DataValidations => self.finish_data_validations(),
             Context::ConditionalFormatting => self.finish_conditional_formatting(),
+            Context::RowBreaks | Context::ColBreaks => self.finish_breaks(),
             _ => Ok(()),
         }
     }
@@ -1881,6 +2098,41 @@ mod tests {
     }
 
     #[test]
+    fn parses_page_setup_and_page_breaks() {
+        let xml = format!(
+            r#"<x:worksheet xmlns:x="{STRICT_S}" xmlns:f="urn:foreign">
+                <f:pageSetup paperSize="1" orientation="portrait"/>
+                <x:pageSetup paperSize="9" orientation="landscape" scale="125"
+                    fitToWidth="2" fitToHeight="3"/>
+                <f:rowBreaks><x:brk id="99"/></f:rowBreaks>
+                <x:rowBreaks count="2" manualBreakCount="1">
+                    <x:brk id="20" min="0" max="16383" man="true" pt="1"/>
+                    <x:brk id="40"></x:brk>
+                </x:rowBreaks>
+                <x:colBreaks count="1" manualBreakCount="0">
+                    <x:brk id="4"/>
+                </x:colBreaks>
+            </x:worksheet>"#
+        );
+        let data = parse_worksheet_data(&xml).unwrap();
+
+        let setup = data.page_setup.unwrap();
+        assert_eq!(setup.paper_size, Some(9));
+        assert!(setup.landscape);
+        assert_eq!(setup.scale, Some(125));
+        assert_eq!(setup.fit_to_width, Some(2));
+        assert_eq!(setup.fit_to_height, Some(3));
+        assert_eq!(data.row_breaks.len(), 2);
+        assert!(data.row_breaks[0].manual);
+        assert!(data.row_breaks[0].pivot);
+        assert!(!data.row_breaks[1].manual);
+        assert_eq!(data.row_breaks[1].max, 16_383);
+        assert_eq!(data.col_breaks.len(), 1);
+        assert_eq!(data.col_breaks[0].max, 1_048_575);
+        assert!(!data.col_breaks[0].manual);
+    }
+
+    #[test]
     fn rejects_invalid_columns_and_merged_regions() {
         let invalid_documents = [
             "<cols><col min=\"0\" max=\"1\"/></cols>",
@@ -1939,6 +2191,33 @@ mod tests {
             "<conditionalFormatting sqref=\"A1\"><cfRule type=\"top10\"/></conditionalFormatting>",
             "<conditionalFormatting sqref=\"A1\" pivot=\"yes\"/>",
             "<conditionalFormatting sqref=\"A1\"/>",
+        ];
+
+        for fragment in invalid_documents {
+            let xml = wrap(fragment);
+            assert!(
+                parse_worksheet_data(&xml).is_err(),
+                "accepted invalid worksheet fragment: {fragment}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_page_setup_and_page_breaks() {
+        let invalid_documents = [
+            "<pageSetup scale=\"9\"/>",
+            "<pageSetup scale=\"401\"/>",
+            "<pageSetup orientation=\"sideways\"/>",
+            "<pageSetup/><pageSetup/>",
+            "<rowBreaks count=\"2\"><brk id=\"1\"/></rowBreaks>",
+            "<rowBreaks manualBreakCount=\"1\"><brk id=\"1\"/></rowBreaks>",
+            "<rowBreaks><brk id=\"1048577\"/></rowBreaks>",
+            "<colBreaks><brk id=\"16385\"/></colBreaks>",
+            "<rowBreaks><brk id=\"1\" min=\"2\" max=\"1\"/></rowBreaks>",
+            "<rowBreaks><brk id=\"1\" max=\"16384\"/></rowBreaks>",
+            "<colBreaks><brk id=\"1\" max=\"1048576\"/></colBreaks>",
+            "<rowBreaks><brk id=\"1\" man=\"yes\"/></rowBreaks>",
+            "<rowBreaks/><rowBreaks/>",
         ];
 
         for fragment in invalid_documents {

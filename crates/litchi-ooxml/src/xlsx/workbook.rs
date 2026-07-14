@@ -1879,6 +1879,12 @@ mod tests {
   <conditionalFormatting sqref="E1:E2">
     <cfRule type="expression" priority="1"><formula>E1&gt;0</formula></cfRule>
   </conditionalFormatting>
+  <pageSetup paperSize="9" orientation="landscape" scale="110"
+             fitToWidth="1" fitToHeight="2"/>
+  <rowBreaks count="1" manualBreakCount="1">
+    <brk id="20" min="0" max="16383" man="1" pt="true"/>
+  </rowBreaks>
+  <colBreaks count="1" manualBreakCount="0"><brk id="3"/></colBreaks>
 </worksheet>"#;
 
     fn package_with_worksheet_relationship(reltype: &str, external: bool) -> OpcPackage {
@@ -1968,6 +1974,14 @@ mod tests {
             worksheet.get_conditional_formatting()[0].rule_type,
             "expression"
         );
+        assert_eq!(worksheet.get_page_setup().paper_size, Some(9));
+        assert!(worksheet.get_page_setup().landscape);
+        assert_eq!(worksheet.get_page_setup().scale, Some(110));
+        assert_eq!(worksheet.row_breaks().len(), 1);
+        assert!(worksheet.row_breaks()[0].manual);
+        assert!(worksheet.row_breaks()[0].pivot);
+        assert_eq!(worksheet.col_breaks()[0].max, 1_048_575);
+        assert!(!worksheet.col_breaks()[0].manual);
     }
 
     #[test]
