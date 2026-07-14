@@ -1,709 +1,1140 @@
-//! XML parser for styles.xml file.
-//!
-//! This module contains the core parsing logic for Excel styles.xml files.
-//! It uses quick-xml for efficient streaming XML parsing.
+//! Namespace-aware streaming parser for `xl/styles.xml`.
 
 use std::collections::HashMap;
 
-use quick_xml::events::Event;
-use quick_xml::{Reader, XmlVersion};
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, QName, ResolveResult};
+use quick_xml::reader::NsReader;
 
 use super::{Alignment, Border, BorderStyle, CellStyle, Fill, Font, NumberFormat, Styles};
+use crate::common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
 
-/// Parse styles from xl/styles.xml XML content.
-///
-/// This is the main entry point for parsing Excel styles. It processes
-/// the XML and extracts all formatting information.
+const SPREADSHEETML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const STRICT_SPREADSHEETML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
+
+type XmlReader<'a> = NsReader<&'a [u8]>;
+
+fn is_spreadsheetml_name(spreadsheet_namespace: bool, name: QName<'_>, local_name: &[u8]) -> bool {
+    spreadsheet_namespace && name.local_name().as_ref() == local_name
+}
+
+/// Parse styles from `xl/styles.xml` XML content.
 pub fn parse_styles(content: &str) -> Result<Styles> {
-    let mut reader = Reader::from_str(content);
-    reader.config_mut().trim_text(true);
-
+    let mut reader = NsReader::from_reader(content.as_bytes());
     let mut styles = Styles::new();
+    let mut seen_root = false;
+    let mut closed_root = false;
+    let mut depth = 0usize;
+    let mut sections = 0u8;
 
     loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => match e.local_name().as_ref() {
-                b"numFmts" => {
-                    parse_number_formats(&mut reader, &mut styles.number_formats)?;
-                },
-                b"fonts" => {
-                    parse_fonts(&mut reader, &mut styles.fonts)?;
-                },
-                b"fills" => {
-                    parse_fills(&mut reader, &mut styles.fills)?;
-                },
-                b"borders" => {
-                    parse_borders(&mut reader, &mut styles.borders)?;
-                },
-                b"cellStyleXfs" => {
-                    parse_cell_xfs(&mut reader, &mut styles.cell_styles)?;
-                },
-                b"cellXfs" => {
-                    parse_cell_xfs(&mut reader, &mut styles.cell_xfs)?;
-                },
-                _ => {},
-            },
-            Ok(Event::Eof) => break,
-            Err(e) => {
-                return Err(OoxmlError::Xml(format!("XML parsing error: {}", e)));
-            },
-            _ => {},
-        }
-    }
-
-    Ok(styles)
-}
-
-/// Parse number formats section.
-fn parse_number_formats(
-    reader: &mut Reader<&[u8]>,
-    number_formats: &mut HashMap<u32, NumberFormat>,
-) -> Result<()> {
-    loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"numFmt" => {
-                let mut id = None;
-                let mut code = None;
-
-                for attr in e.attributes().flatten() {
-                    match attr.key.local_name().as_ref() {
-                        b"numFmtId" => {
-                            if let Ok(value) = attr.decoded_and_normalized_value(
-                                XmlVersion::Implicit1_0,
-                                reader.decoder(),
-                            ) {
-                                id = value.parse::<u32>().ok();
-                            }
-                        },
-                        b"formatCode" => {
-                            if let Ok(value) = attr.decoded_and_normalized_value(
-                                XmlVersion::Implicit1_0,
-                                reader.decoder(),
-                            ) {
-                                code = Some(value.to_string());
-                            }
-                        },
-                        _ => {},
-                    }
+        let decoder = reader.decoder();
+        let (namespace, event) = resolved_event(&mut reader, "styles")?;
+        match event {
+            Event::Start(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"styleSheet") =>
+            {
+                if seen_root || depth != 0 {
+                    return Err(invalid("duplicate SpreadsheetML styleSheet element"));
                 }
-
-                if let (Some(id), Some(code)) = (id, code) {
-                    number_formats.insert(id, NumberFormat::new(id, code));
+                seen_root = true;
+                depth = 1;
+            },
+            Event::Start(element) if seen_root && !closed_root && depth == 1 => {
+                match element.local_name().as_ref() {
+                    b"numFmts" if is_spreadsheetml_name(namespace, element.name(), b"numFmts") => {
+                        mark_section(&mut sections, 1, "numFmts")?;
+                        let expected =
+                            optional_u32(&element, b"count", decoder, "number-format count")?;
+                        parse_number_formats(&mut reader, &mut styles.number_formats, expected)?;
+                    },
+                    b"fonts" if is_spreadsheetml_name(namespace, element.name(), b"fonts") => {
+                        mark_section(&mut sections, 2, "fonts")?;
+                        let expected = optional_u32(&element, b"count", decoder, "font count")?;
+                        parse_fonts(&mut reader, &mut styles.fonts, expected)?;
+                    },
+                    b"fills" if is_spreadsheetml_name(namespace, element.name(), b"fills") => {
+                        mark_section(&mut sections, 4, "fills")?;
+                        let expected = optional_u32(&element, b"count", decoder, "fill count")?;
+                        parse_fills(&mut reader, &mut styles.fills, expected)?;
+                    },
+                    b"borders" if is_spreadsheetml_name(namespace, element.name(), b"borders") => {
+                        mark_section(&mut sections, 8, "borders")?;
+                        let expected = optional_u32(&element, b"count", decoder, "border count")?;
+                        parse_borders(&mut reader, &mut styles.borders, expected)?;
+                    },
+                    b"cellStyleXfs"
+                        if is_spreadsheetml_name(namespace, element.name(), b"cellStyleXfs") =>
+                    {
+                        mark_section(&mut sections, 16, "cellStyleXfs")?;
+                        let expected =
+                            optional_u32(&element, b"count", decoder, "cell-style XF count")?;
+                        parse_cell_xfs(
+                            &mut reader,
+                            &mut styles.cell_styles,
+                            b"cellStyleXfs",
+                            expected,
+                        )?;
+                    },
+                    b"cellXfs" if is_spreadsheetml_name(namespace, element.name(), b"cellXfs") => {
+                        mark_section(&mut sections, 32, "cellXfs")?;
+                        let expected = optional_u32(&element, b"count", decoder, "cell XF count")?;
+                        parse_cell_xfs(&mut reader, &mut styles.cell_xfs, b"cellXfs", expected)?;
+                    },
+                    _ => {
+                        depth = depth
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("SpreadsheetML style nesting is too deep"))?;
+                    },
                 }
             },
-            Ok(Event::End(e)) if e.local_name().as_ref() == b"numFmts" => break,
-            Ok(Event::Eof) => break,
-            Err(e) => return Err(OoxmlError::Xml(format!("XML error in numFmts: {}", e))),
-            _ => {},
-        }
-    }
-
-    Ok(())
-}
-
-/// Parse fonts section.
-fn parse_fonts(reader: &mut Reader<&[u8]>, fonts: &mut Vec<Font>) -> Result<()> {
-    loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) if e.local_name().as_ref() == b"font" => {
-                let font = parse_font(reader)?;
-                fonts.push(font);
+            Event::Start(_) if seen_root && !closed_root => {
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("SpreadsheetML style nesting is too deep"))?;
             },
-            Ok(Event::End(e)) if e.local_name().as_ref() == b"fonts" => break,
-            Ok(Event::Eof) => break,
-            Err(e) => return Err(OoxmlError::Xml(format!("XML error in fonts: {}", e))),
-            _ => {},
-        }
-    }
-
-    Ok(())
-}
-
-/// Parse a single font element.
-fn parse_font(reader: &mut Reader<&[u8]>) -> Result<Font> {
-    let mut font = Font::new();
-
-    loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                match e.local_name().as_ref() {
-                    b"name" => {
-                        for attr in e.attributes().flatten() {
-                            if attr.key.local_name().as_ref() == b"val"
-                                && let Ok(value) = attr.decoded_and_normalized_value(
-                                    XmlVersion::Implicit1_0,
-                                    reader.decoder(),
-                                )
-                            {
-                                font.name = Some(value.to_string());
-                            }
-                        }
+            Event::Empty(element) if seen_root && !closed_root && depth == 1 => {
+                match element.local_name().as_ref() {
+                    b"numFmts" if is_spreadsheetml_name(namespace, element.name(), b"numFmts") => {
+                        mark_section(&mut sections, 1, "numFmts")?;
+                        validate_count(&element, decoder, 0, "number-format")?;
                     },
-                    b"sz" => {
-                        for attr in e.attributes().flatten() {
-                            if attr.key.local_name().as_ref() == b"val"
-                                && let Ok(value) = attr.decoded_and_normalized_value(
-                                    XmlVersion::Implicit1_0,
-                                    reader.decoder(),
-                                )
-                            {
-                                font.size = value.parse::<f64>().ok();
-                            }
-                        }
+                    b"fonts" if is_spreadsheetml_name(namespace, element.name(), b"fonts") => {
+                        mark_section(&mut sections, 2, "fonts")?;
+                        validate_count(&element, decoder, 0, "font")?;
                     },
-                    b"b" => font.bold = true,
-                    b"i" => font.italic = true,
-                    b"strike" => font.strike = true,
-                    b"u" => {
-                        // Underline can have a val attribute, default is "single"
-                        let mut underline_type = "single".to_string();
-                        for attr in e.attributes().flatten() {
-                            if attr.key.local_name().as_ref() == b"val"
-                                && let Ok(value) = attr.decoded_and_normalized_value(
-                                    XmlVersion::Implicit1_0,
-                                    reader.decoder(),
-                                )
-                            {
-                                underline_type = value.to_string();
-                            }
-                        }
-                        font.underline = Some(underline_type);
+                    b"fills" if is_spreadsheetml_name(namespace, element.name(), b"fills") => {
+                        mark_section(&mut sections, 4, "fills")?;
+                        validate_count(&element, decoder, 0, "fill")?;
                     },
-                    b"color" => {
-                        font.color = parse_color(reader, &e)?;
+                    b"borders" if is_spreadsheetml_name(namespace, element.name(), b"borders") => {
+                        mark_section(&mut sections, 8, "borders")?;
+                        validate_count(&element, decoder, 0, "border")?;
                     },
-                    b"charset" => {
-                        for attr in e.attributes().flatten() {
-                            if attr.key.local_name().as_ref() == b"val"
-                                && let Ok(value) = attr.decoded_and_normalized_value(
-                                    XmlVersion::Implicit1_0,
-                                    reader.decoder(),
-                                )
-                            {
-                                font.charset = value.parse::<u32>().ok();
-                            }
-                        }
+                    b"cellStyleXfs"
+                        if is_spreadsheetml_name(namespace, element.name(), b"cellStyleXfs") =>
+                    {
+                        mark_section(&mut sections, 16, "cellStyleXfs")?;
+                        validate_count(&element, decoder, 0, "cell-style XF")?;
                     },
-                    b"family" => {
-                        for attr in e.attributes().flatten() {
-                            if attr.key.local_name().as_ref() == b"val"
-                                && let Ok(value) = attr.decoded_and_normalized_value(
-                                    XmlVersion::Implicit1_0,
-                                    reader.decoder(),
-                                )
-                            {
-                                font.family = value.parse::<u32>().ok();
-                            }
-                        }
-                    },
-                    b"scheme" => {
-                        for attr in e.attributes().flatten() {
-                            if attr.key.local_name().as_ref() == b"val"
-                                && let Ok(value) = attr.decoded_and_normalized_value(
-                                    XmlVersion::Implicit1_0,
-                                    reader.decoder(),
-                                )
-                            {
-                                font.scheme = Some(value.to_string());
-                            }
-                        }
+                    b"cellXfs" if is_spreadsheetml_name(namespace, element.name(), b"cellXfs") => {
+                        mark_section(&mut sections, 32, "cellXfs")?;
+                        validate_count(&element, decoder, 0, "cell XF")?;
                     },
                     _ => {},
                 }
             },
-            Ok(Event::End(e)) if e.local_name().as_ref() == b"font" => break,
-            Ok(Event::Eof) => break,
-            Err(e) => return Err(OoxmlError::Xml(format!("XML error in font: {}", e))),
+            Event::End(element)
+                if depth == 1
+                    && is_spreadsheetml_name(namespace, element.name(), b"styleSheet") =>
+            {
+                depth = 0;
+                closed_root = true;
+            },
+            Event::End(_) if seen_root && !closed_root => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("invalid SpreadsheetML style nesting"))?;
+            },
+            Event::Start(_) | Event::Empty(_) if !seen_root || closed_root => {
+                return Err(invalid(
+                    "styles XML must contain exactly one SpreadsheetML styleSheet root",
+                ));
+            },
+            Event::Eof if !seen_root || !closed_root || depth != 0 => {
+                return Err(invalid(
+                    "styles XML has a missing or unterminated SpreadsheetML styleSheet root",
+                ));
+            },
+            Event::Eof => break,
             _ => {},
         }
     }
-
-    Ok(font)
+    Ok(styles)
 }
 
-/// Parse fills section.
-fn parse_fills(reader: &mut Reader<&[u8]>, fills: &mut Vec<Fill>) -> Result<()> {
+fn parse_number_formats(
+    reader: &mut XmlReader<'_>,
+    formats: &mut HashMap<u32, NumberFormat>,
+    expected: Option<u32>,
+) -> Result<()> {
     loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) if e.local_name().as_ref() == b"fill" => {
-                let fill = parse_fill(reader)?;
-                fills.push(fill);
+        let decoder = reader.decoder();
+        let (namespace, event) = resolved_event(reader, "numFmts")?;
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"numFmt") =>
+            {
+                let id = required_u32(&element, b"numFmtId", decoder, "number-format ID")?;
+                let code = required_string(&element, b"formatCode", decoder, "format code")?;
+                if formats.insert(id, NumberFormat::new(id, code)).is_some() {
+                    return Err(invalid(format!("duplicate number-format ID {id}")));
+                }
             },
-            Ok(Event::End(e)) if e.local_name().as_ref() == b"fills" => break,
-            Ok(Event::Eof) => break,
-            Err(e) => return Err(OoxmlError::Xml(format!("XML error in fills: {}", e))),
+            Event::End(element) if is_spreadsheetml_name(namespace, element.name(), b"numFmts") => {
+                check_count(expected, formats.len(), "number-format")?;
+                return Ok(());
+            },
+            Event::Eof => return Err(unterminated("numFmts")),
             _ => {},
         }
     }
-
-    Ok(())
 }
 
-/// Parse a single fill element.
-fn parse_fill(reader: &mut Reader<&[u8]>) -> Result<Fill> {
-    let mut fill = Fill::None;
-
+fn parse_fonts(
+    reader: &mut XmlReader<'_>,
+    fonts: &mut Vec<Font>,
+    expected: Option<u32>,
+) -> Result<()> {
     loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) if e.local_name().as_ref() == b"patternFill" => {
-                fill = parse_pattern_fill(reader, &e)?;
+        let (namespace, event) = resolved_event(reader, "fonts")?;
+        match event {
+            Event::Start(element) if is_spreadsheetml_name(namespace, element.name(), b"font") => {
+                fonts.push(parse_font(reader)?);
             },
-            Ok(Event::Start(e)) if e.local_name().as_ref() == b"gradientFill" => {
-                fill = parse_gradient_fill(reader, &e)?;
+            Event::Empty(element) if is_spreadsheetml_name(namespace, element.name(), b"font") => {
+                fonts.push(Font::new());
             },
-            Ok(Event::End(e)) if e.local_name().as_ref() == b"fill" => break,
-            Ok(Event::Eof) => break,
-            Err(e) => return Err(OoxmlError::Xml(format!("XML error in fill: {}", e))),
+            Event::End(element) if is_spreadsheetml_name(namespace, element.name(), b"fonts") => {
+                check_count(expected, fonts.len(), "font")?;
+                return Ok(());
+            },
+            Event::Eof => return Err(unterminated("fonts")),
             _ => {},
         }
     }
-
-    Ok(fill)
 }
 
-/// Parse a pattern fill.
-fn parse_pattern_fill(
-    reader: &mut Reader<&[u8]>,
-    start: &quick_xml::events::BytesStart,
-) -> Result<Fill> {
-    let mut pattern_type = String::from("none");
-    let mut fg_color = None;
-    let mut bg_color = None;
-
-    // Get pattern type from attributes
-    for attr in start.attributes().flatten() {
-        if attr.key.local_name().as_ref() == b"patternType"
-            && let Ok(value) =
-                attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-        {
-            pattern_type = value.to_string();
-        }
-    }
-
+fn parse_font(reader: &mut XmlReader<'_>) -> Result<Font> {
+    let mut font = Font::new();
+    let mut seen = 0u16;
     loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => match e.local_name().as_ref() {
-                b"fgColor" => {
-                    fg_color = parse_color(reader, &e)?;
-                },
-                b"bgColor" => {
-                    bg_color = parse_color(reader, &e)?;
-                },
-                _ => {},
+        let decoder = reader.decoder();
+        let (namespace, event) = resolved_event(reader, "font")?;
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"name") =>
+            {
+                mark_property(&mut seen, 1, "font name")?;
+                font.name = Some(required_string(&element, b"val", decoder, "font name")?);
             },
-            Ok(Event::End(e)) if e.local_name().as_ref() == b"patternFill" => break,
-            Ok(Event::Eof) => break,
-            Err(e) => return Err(OoxmlError::Xml(format!("XML error in patternFill: {}", e))),
+            Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"sz") =>
+            {
+                mark_property(&mut seen, 2, "font size")?;
+                let size = required_f64(&element, b"val", decoder, "font size")?;
+                if !size.is_finite() || size <= 0.0 {
+                    return Err(invalid(format!("invalid font size '{size}'")));
+                }
+                font.size = Some(size);
+            },
+            Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"b") =>
+            {
+                mark_property(&mut seen, 4, "bold property")?;
+                font.bold = boolean_property(&element, decoder, "bold")?;
+            },
+            Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"i") =>
+            {
+                mark_property(&mut seen, 8, "italic property")?;
+                font.italic = boolean_property(&element, decoder, "italic")?;
+            },
+            Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"strike") =>
+            {
+                mark_property(&mut seen, 16, "strike property")?;
+                font.strike = boolean_property(&element, decoder, "strike")?;
+            },
+            Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"u") =>
+            {
+                mark_property(&mut seen, 32, "underline property")?;
+                let value =
+                    optional_string(&element, b"val", decoder)?.unwrap_or_else(|| "single".into());
+                if !matches!(
+                    value.as_str(),
+                    "single" | "double" | "singleAccounting" | "doubleAccounting" | "none"
+                ) {
+                    return Err(invalid(format!("invalid underline style '{value}'")));
+                }
+                font.underline = (value != "none").then_some(value);
+            },
+            Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"color") =>
+            {
+                mark_property(&mut seen, 64, "font color")?;
+                font.color = parse_color(&element, decoder)?;
+            },
+            Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"charset") =>
+            {
+                mark_property(&mut seen, 128, "font charset")?;
+                font.charset = Some(required_u32(&element, b"val", decoder, "font charset")?);
+            },
+            Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"family") =>
+            {
+                mark_property(&mut seen, 256, "font family")?;
+                font.family = Some(required_u32(&element, b"val", decoder, "font family")?);
+            },
+            Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"scheme") =>
+            {
+                mark_property(&mut seen, 512, "font scheme")?;
+                let value = required_string(&element, b"val", decoder, "font scheme")?;
+                if !matches!(value.as_str(), "major" | "minor" | "none") {
+                    return Err(invalid(format!("invalid font scheme '{value}'")));
+                }
+                font.scheme = Some(value);
+            },
+            Event::End(element) if is_spreadsheetml_name(namespace, element.name(), b"font") => {
+                return Ok(font);
+            },
+            Event::Eof => return Err(unterminated("font")),
             _ => {},
         }
     }
+}
 
-    if pattern_type == "none" {
+fn parse_fills(
+    reader: &mut XmlReader<'_>,
+    fills: &mut Vec<Fill>,
+    expected: Option<u32>,
+) -> Result<()> {
+    loop {
+        let (namespace, event) = resolved_event(reader, "fills")?;
+        match event {
+            Event::Start(element) if is_spreadsheetml_name(namespace, element.name(), b"fill") => {
+                fills.push(parse_fill(reader)?);
+            },
+            Event::Empty(element) if is_spreadsheetml_name(namespace, element.name(), b"fill") => {
+                fills.push(Fill::None);
+            },
+            Event::End(element) if is_spreadsheetml_name(namespace, element.name(), b"fills") => {
+                check_count(expected, fills.len(), "fill")?;
+                return Ok(());
+            },
+            Event::Eof => return Err(unterminated("fills")),
+            _ => {},
+        }
+    }
+}
+
+fn parse_fill(reader: &mut XmlReader<'_>) -> Result<Fill> {
+    let mut fill = None;
+    loop {
+        let decoder = reader.decoder();
+        let (namespace, event) = resolved_event(reader, "fill")?;
+        match event {
+            Event::Start(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"patternFill") =>
+            {
+                set_once(
+                    &mut fill,
+                    parse_pattern_fill(reader, &element, decoder)?,
+                    "fill definition",
+                )?;
+            },
+            Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"patternFill") =>
+            {
+                set_once(
+                    &mut fill,
+                    empty_pattern_fill(&element, decoder)?,
+                    "fill definition",
+                )?;
+            },
+            Event::Start(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"gradientFill") =>
+            {
+                set_once(
+                    &mut fill,
+                    parse_gradient_fill(reader, &element, decoder)?,
+                    "fill definition",
+                )?;
+            },
+            Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"gradientFill") =>
+            {
+                set_once(
+                    &mut fill,
+                    empty_gradient_fill(&element, decoder)?,
+                    "fill definition",
+                )?;
+            },
+            Event::End(element) if is_spreadsheetml_name(namespace, element.name(), b"fill") => {
+                return Ok(fill.unwrap_or(Fill::None));
+            },
+            Event::Eof => return Err(unterminated("fill")),
+            _ => {},
+        }
+    }
+}
+
+fn empty_pattern_fill(element: &BytesStart<'_>, decoder: Decoder) -> Result<Fill> {
+    let pattern =
+        optional_string(element, b"patternType", decoder)?.unwrap_or_else(|| "none".into());
+    validate_pattern(&pattern)?;
+    if pattern == "none" {
         Ok(Fill::None)
     } else {
         Ok(Fill::Pattern {
-            pattern_type,
-            fg_color,
-            bg_color,
+            pattern_type: pattern,
+            fg_color: None,
+            bg_color: None,
         })
     }
 }
 
-/// Parse a gradient fill.
-fn parse_gradient_fill(
-    reader: &mut Reader<&[u8]>,
-    start: &quick_xml::events::BytesStart,
+fn parse_pattern_fill(
+    reader: &mut XmlReader<'_>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
 ) -> Result<Fill> {
-    let mut gradient_type = None;
-    let stops = Vec::new();
-
-    // Get gradient type from attributes
-    for attr in start.attributes().flatten() {
-        if attr.key.local_name().as_ref() == b"type"
-            && let Ok(value) =
-                attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-        {
-            gradient_type = Some(value.to_string());
-        }
-    }
-
-    // Skip to end of gradientFill (full gradient parsing can be added later)
-    let mut depth = 1;
+    let pattern =
+        optional_string(element, b"patternType", decoder)?.unwrap_or_else(|| "none".into());
+    validate_pattern(&pattern)?;
+    let mut foreground = None;
+    let mut background = None;
     loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) if e.local_name().as_ref() == b"gradientFill" => depth += 1,
-            Ok(Event::End(e)) if e.local_name().as_ref() == b"gradientFill" => {
-                depth -= 1;
-                if depth == 0 {
-                    break;
-                }
+        let decoder = reader.decoder();
+        let (namespace, event) = resolved_event(reader, "patternFill")?;
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"fgColor") =>
+            {
+                let color = parse_color(&element, decoder)?;
+                set_once(&mut foreground, color, "foreground color")?;
             },
-            Ok(Event::Eof) => break,
-            Err(e) => return Err(OoxmlError::Xml(format!("XML error in gradientFill: {}", e))),
+            Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"bgColor") =>
+            {
+                let color = parse_color(&element, decoder)?;
+                set_once(&mut background, color, "background color")?;
+            },
+            Event::End(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"patternFill") =>
+            {
+                return if pattern == "none" {
+                    Ok(Fill::None)
+                } else {
+                    Ok(Fill::Pattern {
+                        pattern_type: pattern,
+                        fg_color: foreground.flatten(),
+                        bg_color: background.flatten(),
+                    })
+                };
+            },
+            Event::Eof => return Err(unterminated("patternFill")),
             _ => {},
         }
     }
+}
 
+fn empty_gradient_fill(element: &BytesStart<'_>, decoder: Decoder) -> Result<Fill> {
     Ok(Fill::Gradient {
-        gradient_type,
-        stops,
+        gradient_type: parse_gradient_type(element, decoder)?,
+        stops: Vec::new(),
     })
 }
 
-/// Parse borders section.
-fn parse_borders(reader: &mut Reader<&[u8]>, borders: &mut Vec<Border>) -> Result<()> {
+fn parse_gradient_fill(
+    reader: &mut XmlReader<'_>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+) -> Result<Fill> {
+    let gradient_type = parse_gradient_type(element, decoder)?;
+    let mut stops = Vec::new();
     loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) if e.local_name().as_ref() == b"border" => {
-                let border = parse_border(reader, &e)?;
-                borders.push(border);
+        let decoder = reader.decoder();
+        let (namespace, event) = resolved_event(reader, "gradientFill")?;
+        match event {
+            Event::Start(element) if is_spreadsheetml_name(namespace, element.name(), b"stop") => {
+                stops.push(parse_gradient_stop(reader, &element, decoder)?);
             },
-            Ok(Event::End(e)) if e.local_name().as_ref() == b"borders" => break,
-            Ok(Event::Eof) => break,
-            Err(e) => return Err(OoxmlError::Xml(format!("XML error in borders: {}", e))),
+            Event::Empty(element) if is_spreadsheetml_name(namespace, element.name(), b"stop") => {
+                return Err(invalid("gradient stop is missing its color"));
+            },
+            Event::End(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"gradientFill") =>
+            {
+                return Ok(Fill::Gradient {
+                    gradient_type,
+                    stops,
+                });
+            },
+            Event::Eof => return Err(unterminated("gradientFill")),
             _ => {},
         }
     }
-
-    Ok(())
 }
 
-/// Parse a single border element.
-fn parse_border(
-    reader: &mut Reader<&[u8]>,
-    start: &quick_xml::events::BytesStart,
-) -> Result<Border> {
-    let mut border = Border::new();
-
-    // Check for diagonal attributes
-    for attr in start.attributes().flatten() {
-        match attr.key.local_name().as_ref() {
-            b"diagonalUp" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                    && (value == "1" || value == "true")
-                {
-                    border.diagonal_direction = Some(border.diagonal_direction.unwrap_or(0) | 1);
-                }
-            },
-            b"diagonalDown" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                    && (value == "1" || value == "true")
-                {
-                    border.diagonal_direction = Some(border.diagonal_direction.unwrap_or(0) | 2);
-                }
-            },
-            _ => {},
-        }
+fn parse_gradient_stop(
+    reader: &mut XmlReader<'_>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+) -> Result<(f64, String)> {
+    let position = required_f64(element, b"position", decoder, "gradient-stop position")?;
+    if !position.is_finite() || !(0.0..=1.0).contains(&position) {
+        return Err(invalid(format!(
+            "invalid gradient-stop position '{position}'"
+        )));
     }
-
+    let mut color = None;
     loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) if e.local_name().as_ref() == b"left" => {
-                border.left = parse_border_side(reader, &e)?;
+        let decoder = reader.decoder();
+        let (namespace, event) = resolved_event(reader, "gradient stop")?;
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"color") =>
+            {
+                let parsed = parse_color(&element, decoder)?
+                    .ok_or_else(|| invalid("gradient-stop color is empty"))?;
+                set_once(&mut color, parsed, "gradient-stop color")?;
             },
-            Ok(Event::Start(e)) if e.local_name().as_ref() == b"right" => {
-                border.right = parse_border_side(reader, &e)?;
+            Event::End(element) if is_spreadsheetml_name(namespace, element.name(), b"stop") => {
+                return Ok((
+                    position,
+                    color.ok_or_else(|| invalid("gradient stop is missing its color"))?,
+                ));
             },
-            Ok(Event::Start(e)) if e.local_name().as_ref() == b"top" => {
-                border.top = parse_border_side(reader, &e)?;
-            },
-            Ok(Event::Start(e)) if e.local_name().as_ref() == b"bottom" => {
-                border.bottom = parse_border_side(reader, &e)?;
-            },
-            Ok(Event::Start(e)) if e.local_name().as_ref() == b"diagonal" => {
-                border.diagonal = parse_border_side(reader, &e)?;
-            },
-            Ok(Event::End(e)) if e.local_name().as_ref() == b"border" => break,
-            Ok(Event::Eof) => break,
-            Err(e) => return Err(OoxmlError::Xml(format!("XML error in border: {}", e))),
+            Event::Eof => return Err(unterminated("gradient stop")),
             _ => {},
         }
     }
+}
 
+fn parse_gradient_type(element: &BytesStart<'_>, decoder: Decoder) -> Result<Option<String>> {
+    let value = optional_string(element, b"type", decoder)?;
+    if let Some(value) = &value
+        && !matches!(value.as_str(), "linear" | "path")
+    {
+        return Err(invalid(format!("invalid gradient type '{value}'")));
+    }
+    Ok(value)
+}
+
+fn parse_borders(
+    reader: &mut XmlReader<'_>,
+    borders: &mut Vec<Border>,
+    expected: Option<u32>,
+) -> Result<()> {
+    loop {
+        let decoder = reader.decoder();
+        let (namespace, event) = resolved_event(reader, "borders")?;
+        match event {
+            Event::Start(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"border") =>
+            {
+                borders.push(parse_border(reader, &element, decoder)?);
+            },
+            Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"border") =>
+            {
+                borders.push(parse_empty_border(&element, decoder)?);
+            },
+            Event::End(element) if is_spreadsheetml_name(namespace, element.name(), b"borders") => {
+                check_count(expected, borders.len(), "border")?;
+                return Ok(());
+            },
+            Event::Eof => return Err(unterminated("borders")),
+            _ => {},
+        }
+    }
+}
+
+fn parse_empty_border(element: &BytesStart<'_>, decoder: Decoder) -> Result<Border> {
+    let mut border = Border::new();
+    set_diagonal_direction(&mut border, element, decoder)?;
     Ok(border)
 }
 
-/// Parse a single border side (left, right, top, bottom, diagonal).
-fn parse_border_side(
-    reader: &mut Reader<&[u8]>,
-    start: &quick_xml::events::BytesStart,
-) -> Result<Option<BorderStyle>> {
-    let mut style = String::from("none");
-    let mut color = None;
-
-    // Get style from attributes
-    for attr in start.attributes().flatten() {
-        if attr.key.local_name().as_ref() == b"style"
-            && let Ok(value) =
-                attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-        {
-            style = value.to_string();
-        }
-    }
-
-    // Parse color
-    let side_name = start.local_name();
+fn parse_border(
+    reader: &mut XmlReader<'_>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+) -> Result<Border> {
+    let mut border = Border::new();
+    set_diagonal_direction(&mut border, element, decoder)?;
+    let mut seen = 0u8;
     loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"color" => {
-                color = parse_color(reader, &e)?;
+        let decoder = reader.decoder();
+        let (namespace, event) = resolved_event(reader, "border")?;
+        match event {
+            Event::Start(element) if namespace => {
+                parse_border_child(reader, &element, decoder, false, &mut seen, &mut border)?;
             },
-            Ok(Event::End(e)) if e.local_name() == side_name => break,
-            Ok(Event::Eof) => break,
-            Err(e) => return Err(OoxmlError::Xml(format!("XML error in border side: {}", e))),
+            Event::Empty(element) if namespace => {
+                parse_border_child(reader, &element, decoder, true, &mut seen, &mut border)?;
+            },
+            Event::End(element) if is_spreadsheetml_name(namespace, element.name(), b"border") => {
+                return Ok(border);
+            },
+            Event::Eof => return Err(unterminated("border")),
             _ => {},
         }
-    }
-
-    if style == "none" {
-        Ok(None)
-    } else {
-        Ok(Some(BorderStyle::new(style, color)))
     }
 }
 
-/// Parse cell XFs (cell format records).
-fn parse_cell_xfs(reader: &mut Reader<&[u8]>, cell_xfs: &mut Vec<CellStyle>) -> Result<()> {
-    loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) if e.local_name().as_ref() == b"xf" => {
-                let style = parse_xf(reader, &e)?;
-                cell_xfs.push(style);
-            },
-            Ok(Event::End(e))
-                if e.local_name().as_ref() == b"cellXfs"
-                    || e.local_name().as_ref() == b"cellStyleXfs" =>
-            {
-                break;
-            },
-            Ok(Event::Eof) => break,
-            Err(e) => return Err(OoxmlError::Xml(format!("XML error in cellXfs: {}", e))),
-            _ => {},
-        }
+fn parse_border_child(
+    reader: &mut XmlReader<'_>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    empty: bool,
+    seen: &mut u8,
+    border: &mut Border,
+) -> Result<()> {
+    match element.local_name().as_ref() {
+        b"left" => {
+            mark_property(seen, 1, "left border")?;
+            border.left = parse_border_side_event(reader, element, decoder, empty)?;
+        },
+        b"right" => {
+            mark_property(seen, 2, "right border")?;
+            border.right = parse_border_side_event(reader, element, decoder, empty)?;
+        },
+        b"top" => {
+            mark_property(seen, 4, "top border")?;
+            border.top = parse_border_side_event(reader, element, decoder, empty)?;
+        },
+        b"bottom" => {
+            mark_property(seen, 8, "bottom border")?;
+            border.bottom = parse_border_side_event(reader, element, decoder, empty)?;
+        },
+        b"diagonal" => {
+            mark_property(seen, 16, "diagonal border")?;
+            border.diagonal = parse_border_side_event(reader, element, decoder, empty)?;
+        },
+        _ => {},
     }
-
     Ok(())
 }
 
-/// Parse a single xf (format) element.
-fn parse_xf(
-    reader: &mut Reader<&[u8]>,
-    start: &quick_xml::events::BytesStart,
-) -> Result<CellStyle> {
-    let mut style = CellStyle::new();
-
-    // Parse attributes
-    for attr in start.attributes().flatten() {
-        match attr.key.local_name().as_ref() {
-            b"numFmtId" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    style.num_fmt_id = value.parse::<u32>().ok();
-                }
-            },
-            b"fontId" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    style.font_id = value.parse::<u32>().ok();
-                }
-            },
-            b"fillId" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    style.fill_id = value.parse::<u32>().ok();
-                }
-            },
-            b"borderId" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    style.border_id = value.parse::<u32>().ok();
-                }
-            },
-            b"xfId" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    style.xf_id = value.parse::<u32>().ok();
-                }
-            },
-            b"applyNumberFormat" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    style.apply_number_format = value == "1" || value == "true";
-                }
-            },
-            b"applyFont" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    style.apply_font = value == "1" || value == "true";
-                }
-            },
-            b"applyFill" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    style.apply_fill = value == "1" || value == "true";
-                }
-            },
-            b"applyBorder" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    style.apply_border = value == "1" || value == "true";
-                }
-            },
-            b"applyAlignment" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    style.apply_alignment = value == "1" || value == "true";
-                }
-            },
-            b"quotePrefix" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    style.quote_prefix = value == "1" || value == "true";
-                }
-            },
-            _ => {},
-        }
+fn parse_border_side_event(
+    reader: &mut XmlReader<'_>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    empty: bool,
+) -> Result<Option<BorderStyle>> {
+    let style = optional_string(element, b"style", decoder)?.unwrap_or_else(|| "none".into());
+    validate_border_style(&style)?;
+    if empty {
+        return Ok((style != "none").then(|| BorderStyle::new(style, None)));
     }
-
-    // Parse child elements
+    let side = element.local_name().as_ref().to_vec();
+    let mut color = None;
     loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) | Ok(Event::Empty(e))
-                if e.local_name().as_ref() == b"alignment" =>
+        let decoder = reader.decoder();
+        let (namespace, event) = resolved_event(reader, "border side")?;
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"color") =>
             {
-                style.alignment = Some(parse_alignment(reader, &e)?);
+                let parsed = parse_color(&element, decoder)?;
+                set_once(&mut color, parsed, "border color")?;
             },
-            Ok(Event::End(e)) if e.local_name().as_ref() == b"xf" => break,
-            Ok(Event::Eof) => break,
-            Err(e) => return Err(OoxmlError::Xml(format!("XML error in xf: {}", e))),
+            Event::End(element) if is_spreadsheetml_name(namespace, element.name(), &side) => {
+                return Ok((style != "none").then(|| BorderStyle::new(style, color.flatten())));
+            },
+            Event::Eof => return Err(unterminated("border side")),
             _ => {},
         }
     }
-
-    Ok(style)
 }
 
-/// Parse alignment element.
-fn parse_alignment(
-    reader: &mut Reader<&[u8]>,
-    start: &quick_xml::events::BytesStart,
-) -> Result<Alignment> {
-    let mut alignment = Alignment::new();
+fn set_diagonal_direction(
+    border: &mut Border,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+) -> Result<()> {
+    let up = optional_bool(element, b"diagonalUp", decoder, "diagonalUp")?.unwrap_or(false);
+    let down = optional_bool(element, b"diagonalDown", decoder, "diagonalDown")?.unwrap_or(false);
+    let direction = u32::from(up) | (u32::from(down) << 1);
+    border.diagonal_direction = (direction != 0).then_some(direction);
+    Ok(())
+}
 
-    for attr in start.attributes().flatten() {
-        match attr.key.local_name().as_ref() {
-            b"horizontal" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    alignment.horizontal = Some(value.to_string());
-                }
+fn parse_cell_xfs(
+    reader: &mut XmlReader<'_>,
+    styles: &mut Vec<CellStyle>,
+    section: &[u8],
+    expected: Option<u32>,
+) -> Result<()> {
+    loop {
+        let decoder = reader.decoder();
+        let (namespace, event) = resolved_event(reader, "cell XFs")?;
+        match event {
+            Event::Start(element) if is_spreadsheetml_name(namespace, element.name(), b"xf") => {
+                styles.push(parse_xf(reader, &element, decoder)?);
             },
-            b"vertical" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    alignment.vertical = Some(value.to_string());
-                }
+            Event::Empty(element) if is_spreadsheetml_name(namespace, element.name(), b"xf") => {
+                styles.push(parse_xf_attributes(&element, decoder)?);
             },
-            b"textRotation" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    alignment.text_rotation = value.parse::<u32>().ok();
-                }
+            Event::End(element) if is_spreadsheetml_name(namespace, element.name(), section) => {
+                check_count(expected, styles.len(), "cell XF")?;
+                return Ok(());
             },
-            b"wrapText" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    alignment.wrap_text = value == "1" || value == "true";
-                }
-            },
-            b"indent" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    alignment.indent = value.parse::<u32>().ok();
-                }
-            },
-            b"shrinkToFit" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    alignment.shrink_to_fit = value == "1" || value == "true";
-                }
-            },
-            b"readingOrder" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    alignment.reading_order = value.parse::<u32>().ok();
-                }
-            },
+            Event::Eof => return Err(unterminated("cell XFs")),
             _ => {},
         }
     }
-
-    Ok(alignment)
 }
 
-/// Parse color from a color element.
-///
-/// Colors can be specified as:
-/// - RGB hex value (rgb attribute)
-/// - Theme color (theme attribute with optional tint)
-/// - Indexed color (indexed attribute)
-/// - Auto color
-fn parse_color(
-    reader: &mut Reader<&[u8]>,
-    start: &quick_xml::events::BytesStart,
+fn parse_xf(
+    reader: &mut XmlReader<'_>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+) -> Result<CellStyle> {
+    let mut style = parse_xf_attributes(element, decoder)?;
+    loop {
+        let decoder = reader.decoder();
+        let (namespace, event) = resolved_event(reader, "xf")?;
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_name(namespace, element.name(), b"alignment") =>
+            {
+                if style.alignment.is_some() {
+                    return Err(invalid("duplicate cell alignment"));
+                }
+                style.alignment = Some(parse_alignment(&element, decoder)?);
+            },
+            Event::End(element) if is_spreadsheetml_name(namespace, element.name(), b"xf") => {
+                return Ok(style);
+            },
+            Event::Eof => return Err(unterminated("xf")),
+            _ => {},
+        }
+    }
+}
+
+fn parse_xf_attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<CellStyle> {
+    Ok(CellStyle {
+        num_fmt_id: optional_u32(element, b"numFmtId", decoder, "number-format ID")?,
+        font_id: optional_u32(element, b"fontId", decoder, "font ID")?,
+        fill_id: optional_u32(element, b"fillId", decoder, "fill ID")?,
+        border_id: optional_u32(element, b"borderId", decoder, "border ID")?,
+        xf_id: optional_u32(element, b"xfId", decoder, "XF ID")?,
+        alignment: None,
+        apply_number_format: optional_bool(
+            element,
+            b"applyNumberFormat",
+            decoder,
+            "applyNumberFormat",
+        )?
+        .unwrap_or(false),
+        apply_font: optional_bool(element, b"applyFont", decoder, "applyFont")?.unwrap_or(false),
+        apply_fill: optional_bool(element, b"applyFill", decoder, "applyFill")?.unwrap_or(false),
+        apply_border: optional_bool(element, b"applyBorder", decoder, "applyBorder")?
+            .unwrap_or(false),
+        apply_alignment: optional_bool(element, b"applyAlignment", decoder, "applyAlignment")?
+            .unwrap_or(false),
+        quote_prefix: optional_bool(element, b"quotePrefix", decoder, "quotePrefix")?
+            .unwrap_or(false),
+    })
+}
+
+fn parse_alignment(element: &BytesStart<'_>, decoder: Decoder) -> Result<Alignment> {
+    let horizontal = optional_string(element, b"horizontal", decoder)?;
+    if let Some(value) = &horizontal
+        && !matches!(
+            value.as_str(),
+            "general"
+                | "left"
+                | "center"
+                | "right"
+                | "fill"
+                | "justify"
+                | "centerContinuous"
+                | "distributed"
+        )
+    {
+        return Err(invalid(format!("invalid horizontal alignment '{value}'")));
+    }
+    let vertical = optional_string(element, b"vertical", decoder)?;
+    if let Some(value) = &vertical
+        && !matches!(
+            value.as_str(),
+            "top" | "center" | "bottom" | "justify" | "distributed"
+        )
+    {
+        return Err(invalid(format!("invalid vertical alignment '{value}'")));
+    }
+    let text_rotation = optional_u32(element, b"textRotation", decoder, "text rotation")?;
+    if text_rotation.is_some_and(|value| value > 180 && value != 255) {
+        return Err(invalid("text rotation must be 0..=180 or 255"));
+    }
+    let reading_order = optional_u32(element, b"readingOrder", decoder, "reading order")?;
+    if reading_order.is_some_and(|value| value > 2) {
+        return Err(invalid("reading order must be 0, 1, or 2"));
+    }
+    Ok(Alignment {
+        horizontal,
+        vertical,
+        text_rotation,
+        wrap_text: optional_bool(element, b"wrapText", decoder, "wrapText")?.unwrap_or(false),
+        indent: optional_u32(element, b"indent", decoder, "alignment indent")?,
+        shrink_to_fit: optional_bool(element, b"shrinkToFit", decoder, "shrinkToFit")?
+            .unwrap_or(false),
+        reading_order,
+    })
+}
+
+fn parse_color(element: &BytesStart<'_>, decoder: Decoder) -> Result<Option<String>> {
+    let rgb = optional_string(element, b"rgb", decoder)?;
+    let theme = optional_u32(element, b"theme", decoder, "theme color")?;
+    let indexed = optional_u32(element, b"indexed", decoder, "indexed color")?;
+    let auto = optional_bool(element, b"auto", decoder, "automatic color")?;
+    let specified = usize::from(rgb.is_some())
+        + usize::from(theme.is_some())
+        + usize::from(indexed.is_some())
+        + usize::from(auto.is_some());
+    if specified > 1 {
+        return Err(invalid("color has multiple mutually exclusive values"));
+    }
+    if let Some(tint) = optional_f64(element, b"tint", decoder, "color tint")?
+        && (!tint.is_finite() || !(-1.0..=1.0).contains(&tint))
+    {
+        return Err(invalid(format!("invalid color tint '{tint}'")));
+    }
+    if let Some(rgb) = rgb {
+        if !matches!(rgb.len(), 6 | 8) || !rgb.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(invalid(format!("invalid RGB color '{rgb}'")));
+        }
+        Ok(Some(format!("#{rgb}")))
+    } else if let Some(theme) = theme {
+        Ok(Some(format!("theme:{theme}")))
+    } else if let Some(indexed) = indexed {
+        Ok(Some(format!("indexed:{indexed}")))
+    } else if auto == Some(true) {
+        Ok(Some("auto".to_string()))
+    } else {
+        Ok(None)
+    }
+}
+
+fn validate_pattern(value: &str) -> Result<()> {
+    if matches!(
+        value,
+        "none"
+            | "solid"
+            | "mediumGray"
+            | "darkGray"
+            | "lightGray"
+            | "darkHorizontal"
+            | "darkVertical"
+            | "darkDown"
+            | "darkUp"
+            | "darkGrid"
+            | "darkTrellis"
+            | "lightHorizontal"
+            | "lightVertical"
+            | "lightDown"
+            | "lightUp"
+            | "lightGrid"
+            | "lightTrellis"
+            | "gray125"
+            | "gray0625"
+    ) {
+        Ok(())
+    } else {
+        Err(invalid(format!("invalid fill pattern '{value}'")))
+    }
+}
+
+fn validate_border_style(value: &str) -> Result<()> {
+    if matches!(
+        value,
+        "none"
+            | "thin"
+            | "medium"
+            | "dashed"
+            | "dotted"
+            | "thick"
+            | "double"
+            | "hair"
+            | "mediumDashed"
+            | "dashDot"
+            | "mediumDashDot"
+            | "dashDotDot"
+            | "mediumDashDotDot"
+            | "slantDashDot"
+    ) {
+        Ok(())
+    } else {
+        Err(invalid(format!("invalid border style '{value}'")))
+    }
+}
+
+fn boolean_property(element: &BytesStart<'_>, decoder: Decoder, name: &str) -> Result<bool> {
+    optional_bool(element, b"val", decoder, name).map(|value| value.unwrap_or(true))
+}
+
+fn optional_bool(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<Option<bool>> {
+    optional_string(element, name, decoder)?
+        .map(|value| match value.as_str() {
+            "1" | "true" => Ok(true),
+            "0" | "false" => Ok(false),
+            _ => Err(invalid(format!("invalid {description} boolean '{value}'"))),
+        })
+        .transpose()
+}
+
+fn required_string(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<String> {
+    optional_string(element, name, decoder)?
+        .ok_or_else(|| invalid(format!("missing {description} attribute")))
+}
+
+fn optional_string(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
 ) -> Result<Option<String>> {
-    for attr in start.attributes().flatten() {
-        match attr.key.local_name().as_ref() {
-            b"rgb" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    return Ok(Some(format!("#{}", value)));
-                }
-            },
-            b"theme" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    // For now, just store theme reference as-is
-                    // A full implementation would resolve theme colors
-                    return Ok(Some(format!("theme:{}", value)));
-                }
-            },
-            b"indexed" => {
-                if let Ok(value) =
-                    attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                {
-                    return Ok(Some(format!("indexed:{}", value)));
-                }
-            },
-            b"auto" => {
-                return Ok(Some("auto".to_string()));
-            },
-            _ => {},
+    unqualified_attribute_value(element, name, decoder)
+}
+
+fn required_u32(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<u32> {
+    optional_u32(element, name, decoder, description)?
+        .ok_or_else(|| invalid(format!("missing {description} attribute")))
+}
+
+fn optional_u32(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<Option<u32>> {
+    optional_string(element, name, decoder)?
+        .map(|value| {
+            value
+                .parse::<u32>()
+                .map_err(|_| invalid(format!("invalid {description} value '{value}'")))
+        })
+        .transpose()
+}
+
+fn required_f64(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<f64> {
+    optional_f64(element, name, decoder, description)?
+        .ok_or_else(|| invalid(format!("missing {description} attribute")))
+}
+
+fn optional_f64(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<Option<f64>> {
+    optional_string(element, name, decoder)?
+        .map(|value| {
+            value
+                .parse::<f64>()
+                .map_err(|_| invalid(format!("invalid {description} value '{value}'")))
+        })
+        .transpose()
+}
+
+fn resolved_event(reader: &mut XmlReader<'_>, context: &str) -> Result<(bool, Event<'static>)> {
+    let event = reader
+        .read_event()
+        .map_err(|error| xml_error(context, error))?
+        .into_owned();
+    let resolver = reader.resolver().clone();
+    let (namespace, event) = resolver.resolve_event(event);
+    let spreadsheet_namespace = matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(value))
+            if value == SPREADSHEETML_NAMESPACE || value == STRICT_SPREADSHEETML_NAMESPACE
+    );
+    Ok((spreadsheet_namespace, event))
+}
+
+fn validate_count(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    actual: usize,
+    description: &str,
+) -> Result<()> {
+    check_count(
+        optional_u32(element, b"count", decoder, &format!("{description} count"))?,
+        actual,
+        description,
+    )
+}
+
+fn check_count(expected: Option<u32>, actual: usize, description: &str) -> Result<()> {
+    if let Some(expected) = expected {
+        let actual = u32::try_from(actual)
+            .map_err(|_| invalid(format!("{description} count exceeds u32")))?;
+        if expected != actual {
+            return Err(invalid(format!(
+                "{description} count declares {expected}, parsed {actual}"
+            )));
         }
     }
+    Ok(())
+}
 
-    Ok(None)
+fn mark_section(seen: &mut u8, bit: u8, name: &str) -> Result<()> {
+    mark_property(seen, bit, &format!("{name} section"))
+}
+
+fn mark_property<T>(seen: &mut T, bit: T, description: &str) -> Result<()>
+where
+    T: Copy + std::ops::BitAnd<Output = T> + std::ops::BitOrAssign + PartialEq + From<u8>,
+{
+    if (*seen & bit) != T::from(0) {
+        return Err(invalid(format!("duplicate {description}")));
+    }
+    *seen |= bit;
+    Ok(())
+}
+
+fn set_once<T>(target: &mut Option<T>, value: T, description: &str) -> Result<()> {
+    if target.is_some() {
+        return Err(invalid(format!("duplicate {description}")));
+    }
+    *target = Some(value);
+    Ok(())
+}
+
+fn invalid(message: impl Into<String>) -> OoxmlError {
+    OoxmlError::InvalidFormat(message.into())
+}
+
+fn unterminated(element: &str) -> OoxmlError {
+    invalid(format!("unterminated SpreadsheetML {element} element"))
+}
+
+fn xml_error(context: &str, error: quick_xml::Error) -> OoxmlError {
+    OoxmlError::Xml(format!("XML error in {context}: {error}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const S: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+    #[test]
+    fn parses_complete_namespaced_style_sheet() {
+        let xml = format!(
+            r#"<s:styleSheet xmlns:s="{S}" xmlns:f="urn:foreign">
+                <s:numFmts count="1"><s:numFmt numFmtId="164" formatCode="0.00&amp; units"/></s:numFmts>
+                <s:fonts count="1"><s:font><s:name val="A &amp; B"/><s:sz val="11.5"/>
+                    <s:b val="0"/><s:i/><s:u val="double"/><s:color rgb="FF112233"/>
+                    <s:charset val="1"/><s:family val="2"/><s:scheme val="minor"/></s:font></s:fonts>
+                <s:fills count="2"><s:fill><s:patternFill patternType="solid"><s:fgColor theme="2"/>
+                    <s:bgColor indexed="64"/></s:patternFill></s:fill>
+                    <s:fill><s:gradientFill type="linear"><s:stop position="0"><s:color rgb="FF000000"/></s:stop>
+                        <s:stop position="1"><s:color rgb="FFFFFFFF"/></s:stop></s:gradientFill></s:fill></s:fills>
+                <s:borders count="1"><s:border diagonalUp="1"><s:left style="thin"><s:color auto="1"/></s:left>
+                    <s:right/><s:top style="dashed"/><s:bottom style="double"/><s:diagonal style="hair"/></s:border></s:borders>
+                <s:cellStyleXfs count="1"><s:xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></s:cellStyleXfs>
+                <s:cellXfs count="2"><s:xf numFmtId="164" fontId="0" fillId="1" borderId="0"
+                    xfId="0" applyNumberFormat="true" applyFont="0" applyFill="1" applyBorder="1"
+                    applyAlignment="1" quotePrefix="false"><s:alignment horizontal="center" vertical="top"
+                    textRotation="45" wrapText="1" indent="2" shrinkToFit="0" readingOrder="2"/></s:xf><s:xf/></s:cellXfs>
+                <f:fonts><f:font/></f:fonts>
+            </s:styleSheet>"#
+        );
+        let styles = parse_styles(&xml).unwrap();
+        assert_eq!(styles.number_formats[&164].code, "0.00& units");
+        assert_eq!(styles.fonts.len(), 1);
+        assert_eq!(styles.fonts[0].name.as_deref(), Some("A & B"));
+        assert!(!styles.fonts[0].bold);
+        assert!(styles.fonts[0].italic);
+        assert_eq!(styles.fonts[0].underline.as_deref(), Some("double"));
+        assert_eq!(styles.fills.len(), 2);
+        match &styles.fills[1] {
+            Fill::Gradient {
+                gradient_type,
+                stops,
+            } => {
+                assert_eq!(gradient_type.as_deref(), Some("linear"));
+                assert_eq!(
+                    stops,
+                    &[(0.0, "#FF000000".into()), (1.0, "#FFFFFFFF".into())]
+                );
+            },
+            _ => panic!("expected gradient fill"),
+        }
+        assert_eq!(styles.borders[0].diagonal_direction, Some(1));
+        assert_eq!(styles.borders[0].left.as_ref().unwrap().style, "thin");
+        assert_eq!(
+            styles.borders[0].left.as_ref().unwrap().color.as_deref(),
+            Some("auto")
+        );
+        assert_eq!(styles.cell_styles.len(), 1);
+        assert_eq!(styles.cell_xfs.len(), 2);
+        assert!(styles.cell_xfs[0].apply_number_format);
+        assert!(!styles.cell_xfs[0].apply_font);
+        assert_eq!(
+            styles.cell_xfs[0].alignment.as_ref().unwrap().reading_order,
+            Some(2)
+        );
+    }
+
+    #[test]
+    fn supports_strict_aliases_and_empty_sections() {
+        let xml = r#"<x:styleSheet xmlns:x="http://purl.oclc.org/ooxml/spreadsheetml/main">
+            <x:numFmts count="0"/><x:fonts count="1"><x:font/></x:fonts><x:fills count="0"/>
+            <x:borders count="1"><x:border/></x:borders><x:cellStyleXfs count="0"/>
+            <x:cellXfs count="1"><x:xf quotePrefix="1"/></x:cellXfs></x:styleSheet>"#;
+        let styles = parse_styles(xml).unwrap();
+        assert_eq!(styles.fonts.len(), 1);
+        assert_eq!(styles.borders.len(), 1);
+        assert!(styles.cell_xfs[0].quote_prefix);
+    }
+
+    #[test]
+    fn rejects_malformed_styles() {
+        let invalid = [
+            "<styleSheet/>",
+            &format!(r#"<styleSheet xmlns="{S}"><fonts count="2"><font/></fonts></styleSheet>"#),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><numFmts><numFmt numFmtId="x" formatCode="0"/></numFmts></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><fonts><font><b val="maybe"/></font></fonts></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><fills><fill><gradientFill><stop position="2"><color rgb="FF000000"/></stop></gradientFill></fill></fills></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><borders><border><left style="invalid"/></border></borders></styleSheet>"#
+            ),
+            &format!(
+                r#"<styleSheet xmlns="{S}"><cellXfs><xf><alignment textRotation="200"/></xf></cellXfs></styleSheet>"#
+            ),
+            &format!(r#"<styleSheet xmlns="{S}"><fonts><font>"#),
+        ];
+        for xml in invalid {
+            assert!(
+                parse_styles(xml).is_err(),
+                "accepted invalid styles XML: {xml}"
+            );
+        }
+    }
 }
