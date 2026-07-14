@@ -966,23 +966,41 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
     }
     for axis in &chart.plot_area.axes {
         let common = axis.common();
-        let Some(_) = common.title.as_ref() else {
-            continue;
-        };
         fragments.extend(
             [
                 common
-                    .title_shape_properties
+                    .title
+                    .as_ref()
+                    .and(common.title_shape_properties.as_ref())
+                    .map(crate::charts::ChartShapeProperties::as_xml),
+                common
+                    .title
+                    .as_ref()
+                    .and(common.title_text_properties.as_ref())
+                    .map(crate::charts::ChartTextProperties::as_xml),
+                common
+                    .title
+                    .as_ref()
+                    .and(common.title_extension_list.as_ref())
+                    .map(crate::charts::ChartExtensionList::as_xml),
+                common
+                    .major_gridlines
+                    .as_ref()
+                    .and_then(|lines| lines.shape_properties.as_ref())
+                    .map(crate::charts::ChartShapeProperties::as_xml),
+                common
+                    .minor_gridlines
+                    .as_ref()
+                    .and_then(|lines| lines.shape_properties.as_ref())
+                    .map(crate::charts::ChartShapeProperties::as_xml),
+                common
+                    .shape_properties
                     .as_ref()
                     .map(crate::charts::ChartShapeProperties::as_xml),
                 common
-                    .title_text_properties
+                    .text_properties
                     .as_ref()
                     .map(crate::charts::ChartTextProperties::as_xml),
-                common
-                    .title_extension_list
-                    .as_ref()
-                    .map(crate::charts::ChartExtensionList::as_xml),
             ]
             .into_iter()
             .flatten(),

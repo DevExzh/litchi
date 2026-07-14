@@ -2221,11 +2221,15 @@ fn write_axis_common<W: Write>(
         common.position.xml_value()
     )?;
 
-    if common.show_major_gridlines {
+    if let Some(lines) = common.major_gridlines.as_ref() {
+        write_chart_lines(writer, "majorGridlines", lines)?;
+    } else if common.show_major_gridlines {
         write!(writer, "<c:majorGridlines/>")?;
     }
 
-    if common.show_minor_gridlines {
+    if let Some(lines) = common.minor_gridlines.as_ref() {
+        write_chart_lines(writer, "minorGridlines", lines)?;
+    } else if common.show_minor_gridlines {
         write!(writer, "<c:minorGridlines/>")?;
     }
 
@@ -2269,6 +2273,13 @@ fn write_axis_common<W: Write>(
         r#"<c:tickLblPos val="{}"/>"#,
         common.tick_label_position.xml_value()
     )?;
+
+    if let Some(shape_properties) = common.shape_properties.as_ref() {
+        writer.write_all(shape_properties.as_xml())?;
+    }
+    if let Some(text_properties) = common.text_properties.as_ref() {
+        writer.write_all(text_properties.as_xml())?;
+    }
 
     write!(writer, r#"<c:crossAx val="{}"/>"#, common.cross_axis_id)?;
 

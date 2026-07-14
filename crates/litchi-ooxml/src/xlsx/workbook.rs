@@ -2691,6 +2691,14 @@ mod tests {
             )
             .unwrap(),
         );
+        axis_common.major_gridlines = Some(crate::charts::ChartLines {
+            shape_properties: Some(
+                ChartShapeProperties::from_xml(
+                    br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId415"/></a:blipFill></c:spPr>"#.to_vec(),
+                )
+                .unwrap(),
+            ),
+        });
         let fragment_ids = crate::xlsx::chart::chart_fragment_relationship_ids(&chart.chart)
             .expect("relationship-bearing fragments should be valid XML");
         assert_eq!(
@@ -2708,6 +2716,7 @@ mod tests {
                 "rId412".to_string(),
                 "rId413".to_string(),
                 "rId414".to_string(),
+                "rId415".to_string(),
             ]
             .into()
         );
@@ -2718,7 +2727,7 @@ mod tests {
         assert!(
             [
                 "rId403", "rId404", "rId405", "rId406", "rId407", "rId408", "rId409", "rId410",
-                "rId411", "rId412", "rId413", "rId414",
+                "rId411", "rId412", "rId413", "rId414", "rId415",
             ]
             .iter()
             .any(|relationship_id| error.contains(relationship_id))

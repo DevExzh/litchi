@@ -4667,6 +4667,10 @@ struct ParsedAxisCommon {
     crosses_at: Option<f64>,
     show_major_gridlines: bool,
     show_minor_gridlines: bool,
+    major_gridlines: Option<ChartLines>,
+    minor_gridlines: Option<ChartLines>,
+    shape_properties: Option<ChartShapeProperties>,
+    text_properties: Option<ChartTextProperties>,
 }
 
 impl ParsedAxisCommon {
@@ -4691,6 +4695,10 @@ impl ParsedAxisCommon {
             crosses_at: None,
             show_major_gridlines: false,
             show_minor_gridlines: false,
+            major_gridlines: None,
+            minor_gridlines: None,
+            shape_properties: None,
+            text_properties: None,
         }
     }
 
@@ -4721,6 +4729,10 @@ impl ParsedAxisCommon {
         common.crosses_at = self.crosses_at;
         common.show_major_gridlines = self.show_major_gridlines;
         common.show_minor_gridlines = self.show_minor_gridlines;
+        common.major_gridlines = self.major_gridlines;
+        common.minor_gridlines = self.minor_gridlines;
+        common.shape_properties = self.shape_properties;
+        common.text_properties = self.text_properties;
         Ok(common)
     }
 }
@@ -4754,8 +4766,6 @@ fn parse_axis_common_element(
         b"orientation" => common.orientation = parse_axis_orientation(element)?,
         b"delete" => common.deleted = parse_bool_attr(element)?,
         b"axPos" => common.position = Some(parse_axis_position(element)?),
-        b"majorGridlines" => common.show_major_gridlines = true,
-        b"minorGridlines" => common.show_minor_gridlines = true,
         b"numFmt" => {
             common.number_format = Some(parse_number_format(element, decoder, "chart axis")?)
         },
@@ -4774,6 +4784,77 @@ fn parse_axis_common_element(
     Ok(true)
 }
 
+fn is_axis_common_fragment(element: &BytesStart<'_>) -> bool {
+    matches!(
+        element.local_name().as_ref(),
+        b"majorGridlines" | b"minorGridlines" | b"spPr" | b"txPr"
+    )
+}
+
+fn parse_axis_common_fragment<R: BufRead>(
+    reader: &mut ChartXmlReader<R>,
+    common: &mut ParsedAxisCommon,
+    element: &BytesStart<'_>,
+    empty: bool,
+) -> Result<()> {
+    match element.local_name().as_ref() {
+        b"majorGridlines" => {
+            let lines = if empty {
+                ChartLines::new()
+            } else {
+                parse_chart_lines(reader, b"majorGridlines")?
+            };
+            set_chart_lines(
+                &mut common.major_gridlines,
+                lines,
+                "chart axis major gridlines",
+            )?;
+            common.show_major_gridlines = true;
+        },
+        b"minorGridlines" => {
+            let lines = if empty {
+                ChartLines::new()
+            } else {
+                parse_chart_lines(reader, b"minorGridlines")?
+            };
+            set_chart_lines(
+                &mut common.minor_gridlines,
+                lines,
+                "chart axis minor gridlines",
+            )?;
+            common.show_minor_gridlines = true;
+        },
+        b"spPr" => {
+            if common.shape_properties.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart axis contains duplicate shape properties".into(),
+                ));
+            }
+            let xml = if empty {
+                reader.capture_empty_fragment(element)?
+            } else {
+                reader.capture_fragment(element, "chart axis shape properties")?
+            };
+            common.shape_properties = Some(ChartShapeProperties::from_xml(xml)?);
+        },
+        b"txPr" => {
+            if common.text_properties.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart axis contains duplicate text properties".into(),
+                ));
+            }
+            let xml = if empty {
+                reader.capture_empty_fragment(element)?
+            } else {
+                reader.capture_fragment(element, "chart axis text properties")?
+            };
+            common.text_properties = Some(ChartTextProperties::from_xml(xml)?);
+        },
+        _ => {},
+    }
+    Ok(())
+}
+
 fn parse_category_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<CategoryAxis>> {
     let mut common = ParsedAxisCommon::new();
     let mut auto = true;
@@ -4786,6 +4867,12 @@ fn parse_category_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Opt
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if is_axis_common_fragment(element) => {
+                parse_axis_common_fragment(reader, &mut common, element, false)?;
+            },
+            Ok(Event::Empty(ref element)) if is_axis_common_fragment(element) => {
+                parse_axis_common_fragment(reader, &mut common, element, true)?;
+            },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"title" => {
                 parse_axis_title(reader, &mut common)?;
             },
@@ -4850,6 +4937,12 @@ fn parse_value_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if is_axis_common_fragment(element) => {
+                parse_axis_common_fragment(reader, &mut common, element, false)?;
+            },
+            Ok(Event::Empty(ref element)) if is_axis_common_fragment(element) => {
+                parse_axis_common_fragment(reader, &mut common, element, true)?;
+            },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"title" => {
                 parse_axis_title(reader, &mut common)?;
             },
@@ -5105,6 +5198,12 @@ fn parse_date_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if is_axis_common_fragment(element) => {
+                parse_axis_common_fragment(reader, &mut common, element, false)?;
+            },
+            Ok(Event::Empty(ref element)) if is_axis_common_fragment(element) => {
+                parse_axis_common_fragment(reader, &mut common, element, true)?;
+            },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"title" => {
                 parse_axis_title(reader, &mut common)?;
             },
@@ -5168,6 +5267,12 @@ fn parse_series_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Optio
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if is_axis_common_fragment(element) => {
+                parse_axis_common_fragment(reader, &mut common, element, false)?;
+            },
+            Ok(Event::Empty(ref element)) if is_axis_common_fragment(element) => {
+                parse_axis_common_fragment(reader, &mut common, element, true)?;
+            },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"title" => {
                 parse_axis_title(reader, &mut common)?;
             },
@@ -7206,10 +7311,13 @@ mod tests {
                 <c:txPr><a:bodyPr rot="600000"/><a:lstStyle/><a:p/></c:txPr>
                 <c:extLst><c:ext uri="chart-title"><x:chartPayload/></c:ext></c:extLst>
             </c:title><c:plotArea><c:catAx><c:axId val="1"/><c:scaling/>
-                <c:axPos val="b"/><c:title><c:tx><c:rich><a:p><a:r><a:t>Quarter</a:t></a:r></a:p></c:rich></c:tx>
+                <c:axPos val="b"/><c:majorGridlines><c:spPr><a:solidFill><a:srgbClr val="445566"/></a:solidFill></c:spPr></c:majorGridlines>
+                <c:minorGridlines/><c:title><c:tx><c:rich><a:p><a:r><a:t>Quarter</a:t></a:r></a:p></c:rich></c:tx>
                     <c:spPr><a:noFill/></c:spPr><c:txPr><a:bodyPr vert="vert"/><a:lstStyle/><a:p/></c:txPr>
                     <c:extLst><c:ext uri="axis-title"><x:axisPayload/></c:ext></c:extLst>
-                </c:title><c:crossAx val="2"/></c:catAx></c:plotArea></c:chart>
+                </c:title><c:spPr><a:ln w="12700"/></c:spPr>
+                <c:txPr><a:bodyPr rot="-600000"/><a:lstStyle/><a:p/></c:txPr>
+                <c:crossAx val="2"/></c:catAx></c:plotArea></c:chart>
         </c:chartSpace>"#;
         let chart = parse_chart(xml.as_slice()).unwrap();
         assert!(
@@ -7228,6 +7336,33 @@ mod tests {
                 .contains("chartPayload")
         );
         let common = chart.plot_area.axes[0].common();
+        assert!(common.show_major_gridlines);
+        assert!(common.show_minor_gridlines);
+        assert!(
+            std::str::from_utf8(
+                common
+                    .major_gridlines
+                    .as_ref()
+                    .unwrap()
+                    .shape_properties
+                    .as_ref()
+                    .unwrap()
+                    .as_xml()
+            )
+            .unwrap()
+            .contains("445566")
+        );
+        assert!(common.minor_gridlines.is_some());
+        assert!(
+            std::str::from_utf8(common.shape_properties.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("12700")
+        );
+        assert!(
+            std::str::from_utf8(common.text_properties.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("-600000")
+        );
         assert!(common.title_shape_properties.is_some());
         assert!(
             std::str::from_utf8(common.title_text_properties.as_ref().unwrap().as_xml())
@@ -7262,9 +7397,16 @@ mod tests {
             reparsed_common.title_extension_list,
             common.title_extension_list
         );
+        assert_eq!(reparsed_common.major_gridlines, common.major_gridlines);
+        assert_eq!(reparsed_common.minor_gridlines, common.minor_gridlines);
+        assert_eq!(reparsed_common.shape_properties, common.shape_properties);
+        assert_eq!(reparsed_common.text_properties, common.text_properties);
 
         let duplicate = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:title><c:spPr/><c:spPr/></c:title><c:plotArea/></c:chart></c:chartSpace>"#;
         assert!(parse_chart(duplicate.as_slice()).is_err());
+
+        let duplicate_gridlines = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:catAx><c:axId val="1"/><c:scaling/><c:axPos val="b"/><c:majorGridlines/><c:majorGridlines/><c:crossAx val="2"/></c:catAx></c:plotArea></c:chart></c:chartSpace>"#;
+        assert!(parse_chart(duplicate_gridlines.as_slice()).is_err());
     }
 
     #[test]

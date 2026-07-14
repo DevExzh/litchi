@@ -5,6 +5,7 @@
 
 use crate::charts::chart::{ChartExtensionList, ChartShapeProperties, ChartTextProperties};
 use crate::charts::models::{Layout, NumberFormat, TitleText};
+use crate::charts::plot_area::ChartLines;
 use crate::charts::types::{AxisOrientation, AxisPosition, AxisType, TickLabelPosition, TickMark};
 
 /// Axis crossing mode.
@@ -188,6 +189,14 @@ pub struct AxisCommon {
     pub show_major_gridlines: bool,
     /// Show minor gridlines
     pub show_minor_gridlines: bool,
+    /// Optional formatting for major gridlines; also implies they are visible
+    pub major_gridlines: Option<ChartLines>,
+    /// Optional formatting for minor gridlines; also implies they are visible
+    pub minor_gridlines: Option<ChartLines>,
+    /// DrawingML shape properties for the axis
+    pub shape_properties: Option<ChartShapeProperties>,
+    /// DrawingML text properties for axis labels
+    pub text_properties: Option<ChartTextProperties>,
     /// Manual layout for the axis title
     pub layout: Option<Layout>,
     /// DrawingML shape properties for the axis title
@@ -218,6 +227,10 @@ impl AxisCommon {
             crosses_at: None,
             show_major_gridlines: false,
             show_minor_gridlines: false,
+            major_gridlines: None,
+            minor_gridlines: None,
+            shape_properties: None,
+            text_properties: None,
             layout: None,
             title_shape_properties: None,
             title_text_properties: None,
