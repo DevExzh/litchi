@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::pivot::{PivotAxis, PivotDataField, PivotFieldRole, PivotTable, PivotValueFunction};
 use crate::xlsx::parsers::workbook_parser;
 use litchi_core::sheet::Result as SheetResult;
@@ -17,28 +19,24 @@ pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
     let workbook_part = package.main_document_part()?;
     let workbook_xml = std::str::from_utf8(workbook_part.blob())?;
 
-    let (worksheets, _, _) = workbook_parser::parse_workbook_xml(workbook_xml)?;
-
-    if worksheets.is_empty() {
-        return Ok(Vec::new());
-    }
+    let workbook = workbook_parser::parse_workbook_details(workbook_xml)?;
 
     let workbook_rels = workbook_part.rels();
-    let mut tables = Vec::new();
-
-    for ws_info in worksheets {
+    let mut worksheet_uris = HashMap::with_capacity(workbook.sheets.len());
+    let mut worksheet_names_by_uri = HashMap::with_capacity(workbook.sheets.len());
+    for worksheet in &workbook.sheets {
         let rel = workbook_rels
-            .get(ws_info.relationship_id.as_str())
+            .get(&worksheet.relationship_id)
             .ok_or_else(|| {
                 format!(
                     "worksheet '{}' references missing relationship '{}'",
-                    ws_info.name, ws_info.relationship_id
+                    worksheet.name, worksheet.relationship_id
                 )
             })?;
         if !matches!(rel.reltype(), rt::WORKSHEET | rt::STRICT_WORKSHEET) {
             return Err(format!(
                 "worksheet '{}' relationship has invalid type '{}'",
-                ws_info.name,
+                worksheet.name,
                 rel.reltype()
             )
             .into());
@@ -46,14 +44,42 @@ pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
         if rel.is_external() {
             return Err(format!(
                 "worksheet '{}' relationship cannot be external",
-                ws_info.name
+                worksheet.name
             )
             .into());
         }
+        let worksheet_uri = rel.target_partname()?;
+        let worksheet_part = package.get_part(&worksheet_uri)?;
+        require_content_type(
+            &worksheet_uri,
+            worksheet_part.content_type(),
+            ct::SML_WORKSHEET,
+        )?;
+        if worksheet_names_by_uri
+            .insert(worksheet_uri.clone(), worksheet.name.clone())
+            .is_some()
+        {
+            return Err(format!("multiple workbook sheets target part '{worksheet_uri}'").into());
+        }
+        worksheet_uris.insert(worksheet.relationship_id.clone(), worksheet_uri);
+    }
+    let (pivot_caches, pivot_cache_ids_by_uri) = resolve_workbook_pivot_caches(
+        package,
+        workbook_rels,
+        &workbook.pivot_caches,
+        &worksheet_names_by_uri,
+    )?;
+    if workbook.sheets.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut tables = Vec::new();
 
-        let sheet_uri = rel.target_partname()?;
+    for ws_info in workbook.sheets {
+        let sheet_uri = worksheet_uris
+            .get(&ws_info.relationship_id)
+            .ok_or("resolved worksheet URI is missing")?
+            .clone();
         let sheet_part = package.get_part(&sheet_uri)?;
-        require_content_type(&sheet_uri, sheet_part.content_type(), ct::SML_WORKSHEET)?;
         let sheet_rels = sheet_part.rels();
 
         for rel in sheet_rels.iter() {
@@ -71,16 +97,211 @@ pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
             let table_uri = rel.target_partname()?;
             let table_part = package.get_part(&table_uri)?;
             require_content_type(&table_uri, table_part.content_type(), ct::SML_PIVOT_TABLE)?;
+            let cache_uri = resolve_pivot_table_cache_uri(table_part)?;
+            let expected_cache_id = pivot_cache_ids_by_uri.get(&cache_uri).ok_or_else(|| {
+                format!(
+                    "pivot-table part '{table_uri}' references cache definition '{cache_uri}' that is not listed by the workbook"
+                )
+            })?;
+            let cache = pivot_caches
+                .get(expected_cache_id)
+                .ok_or("resolved pivot cache is missing")?;
             let xml = std::str::from_utf8(table_part.blob())?;
 
-            let table = parse_pivot_table_definition(xml, &ws_info.name)?.ok_or_else(|| {
+            let mut table = parse_pivot_table_definition_with_cache(
+                xml,
+                &ws_info.name,
+                Some(&cache.definition.cache_fields),
+            )?
+            .ok_or_else(|| {
                 format!("pivot-table part '{table_uri}' has no pivotTableDefinition root")
             })?;
+            if table.cache_id != *expected_cache_id {
+                return Err(format!(
+                    "pivot-table part '{table_uri}' declares cache ID {}, but its relationship targets workbook cache ID {expected_cache_id}",
+                    table.cache_id
+                )
+                .into());
+            }
+            table.source_sheet = cache.definition.source_worksheet.clone();
+            table.source_ref = cache.definition.source_ref.clone();
             tables.push(table);
         }
     }
 
     Ok(tables)
+}
+
+struct ResolvedPivotCache {
+    definition: PivotCacheDefinition,
+}
+
+fn resolve_workbook_pivot_caches(
+    package: &OpcPackage,
+    workbook_rels: &litchi_opc::Relationships,
+    cache_references: &[workbook_parser::PivotCacheInfo],
+    worksheet_names_by_uri: &HashMap<PackURI, String>,
+) -> SheetResult<(HashMap<u32, ResolvedPivotCache>, HashMap<PackURI, u32>)> {
+    let mut caches = HashMap::with_capacity(cache_references.len());
+    let mut ids_by_uri = HashMap::with_capacity(cache_references.len());
+    for cache_reference in cache_references {
+        let rel = workbook_rels
+            .get(&cache_reference.relationship_id)
+            .ok_or_else(|| {
+                format!(
+                    "workbook pivot cache {} references missing relationship '{}'",
+                    cache_reference.cache_id, cache_reference.relationship_id
+                )
+            })?;
+        if !matches!(
+            rel.reltype(),
+            rt::PIVOT_CACHE_DEFINITION | rt::STRICT_PIVOT_CACHE_DEFINITION
+        ) {
+            return Err(format!(
+                "workbook pivot cache {} relationship has invalid type '{}'",
+                cache_reference.cache_id,
+                rel.reltype()
+            )
+            .into());
+        }
+        if rel.is_external() {
+            return Err(format!(
+                "workbook pivot cache {} relationship cannot be external",
+                cache_reference.cache_id
+            )
+            .into());
+        }
+        let cache_uri = rel.target_partname()?;
+        let cache_part = package.get_part(&cache_uri)?;
+        require_content_type(
+            &cache_uri,
+            cache_part.content_type(),
+            ct::SML_PIVOT_CACHE_DEFINITION,
+        )?;
+        let xml = std::str::from_utf8(cache_part.blob())?;
+        let mut definition = read_pivot_cache_definition(xml)?.ok_or_else(|| {
+            format!("pivot-cache part '{cache_uri}' has no pivotCacheDefinition root")
+        })?;
+        validate_pivot_cache_relationships(
+            package,
+            cache_part,
+            &cache_uri,
+            &mut definition,
+            worksheet_names_by_uri,
+        )?;
+        if ids_by_uri
+            .insert(cache_uri.clone(), cache_reference.cache_id)
+            .is_some()
+        {
+            return Err(
+                format!("multiple workbook pivot cache IDs target part '{cache_uri}'").into(),
+            );
+        }
+        caches.insert(cache_reference.cache_id, ResolvedPivotCache { definition });
+    }
+    Ok((caches, ids_by_uri))
+}
+
+fn validate_pivot_cache_relationships(
+    package: &OpcPackage,
+    cache_part: &dyn litchi_opc::Part,
+    cache_uri: &PackURI,
+    definition: &mut PivotCacheDefinition,
+    worksheet_names_by_uri: &HashMap<PackURI, String>,
+) -> SheetResult<()> {
+    if let Some(relationship_id) = definition.id.as_deref() {
+        let rel = cache_part.rels().get(relationship_id).ok_or_else(|| {
+            format!(
+                "pivot-cache part '{cache_uri}' references missing records relationship '{relationship_id}'"
+            )
+        })?;
+        if !matches!(
+            rel.reltype(),
+            rt::PIVOT_CACHE_RECORDS | rt::STRICT_PIVOT_CACHE_RECORDS
+        ) {
+            return Err(format!(
+                "pivot-cache part '{cache_uri}' records relationship has invalid type '{}'",
+                rel.reltype()
+            )
+            .into());
+        }
+        if rel.is_external() {
+            return Err(format!(
+                "pivot-cache part '{cache_uri}' records relationship cannot be external"
+            )
+            .into());
+        }
+        let records_uri = rel.target_partname()?;
+        let records_part = package.get_part(&records_uri)?;
+        require_content_type(
+            &records_uri,
+            records_part.content_type(),
+            ct::SML_PIVOT_CACHE_RECORDS,
+        )?;
+    }
+
+    if let Some(relationship_id) = definition.source_relationship_id.as_deref() {
+        let rel = cache_part.rels().get(relationship_id).ok_or_else(|| {
+            format!(
+                "pivot-cache part '{cache_uri}' references missing source worksheet relationship '{relationship_id}'"
+            )
+        })?;
+        if !matches!(rel.reltype(), rt::WORKSHEET | rt::STRICT_WORKSHEET) {
+            return Err(format!(
+                "pivot-cache part '{cache_uri}' source worksheet relationship has invalid type '{}'",
+                rel.reltype()
+            )
+            .into());
+        }
+        if rel.is_external() {
+            return Err(format!(
+                "pivot-cache part '{cache_uri}' source worksheet relationship cannot be external"
+            )
+            .into());
+        }
+        let worksheet_uri = rel.target_partname()?;
+        let worksheet_part = package.get_part(&worksheet_uri)?;
+        require_content_type(
+            &worksheet_uri,
+            worksheet_part.content_type(),
+            ct::SML_WORKSHEET,
+        )?;
+        let workbook_name = worksheet_names_by_uri.get(&worksheet_uri).ok_or_else(|| {
+            format!(
+                "pivot-cache part '{cache_uri}' source worksheet '{worksheet_uri}' is not listed by the workbook"
+            )
+        })?;
+        if let Some(source_name) = definition.source_worksheet.as_deref() {
+            if source_name != workbook_name {
+                return Err(format!(
+                    "pivot-cache part '{cache_uri}' names source worksheet '{source_name}', but its relationship targets '{workbook_name}'"
+                )
+                .into());
+            }
+        } else {
+            definition.source_worksheet = Some(workbook_name.clone());
+        }
+    }
+    Ok(())
+}
+
+fn resolve_pivot_table_cache_uri(table_part: &dyn litchi_opc::Part) -> SheetResult<PackURI> {
+    let mut matching = table_part.rels().iter().filter(|rel| {
+        matches!(
+            rel.reltype(),
+            rt::PIVOT_CACHE_DEFINITION | rt::STRICT_PIVOT_CACHE_DEFINITION
+        )
+    });
+    let rel = matching
+        .next()
+        .ok_or("pivot-table part is missing its cache-definition relationship")?;
+    if matching.next().is_some() {
+        return Err("pivot-table part has multiple cache-definition relationships".into());
+    }
+    if rel.is_external() {
+        return Err("pivot-table cache-definition relationship cannot be external".into());
+    }
+    rel.target_partname().map_err(Into::into)
 }
 
 fn require_content_type(uri: &PackURI, actual: &str, expected: &str) -> SheetResult<()> {
@@ -174,7 +395,11 @@ impl PivotTableParser {
         })
     }
 
-    fn parse(xml: &str, sheet_name: &str) -> SheetResult<Option<PivotTable>> {
+    fn parse(
+        xml: &str,
+        sheet_name: &str,
+        cache_fields: Option<&[PivotCacheField]>,
+    ) -> SheetResult<Option<PivotTable>> {
         let mut reader = NsReader::from_reader(xml.as_bytes());
         let mut parser: Option<Self> = None;
         let mut stack = Vec::new();
@@ -251,7 +476,14 @@ impl PivotTableParser {
             }
         }
 
-        parser.map(Self::build).transpose()
+        parser
+            .map(|mut parser| {
+                if let Some(cache_fields) = cache_fields {
+                    parser.apply_cache_fields(cache_fields)?;
+                }
+                parser.build()
+            })
+            .transpose()
     }
 
     fn start(
@@ -377,6 +609,9 @@ impl PivotTableParser {
             TableContext::Root if !self.saw_location => {
                 Err("pivot table is missing its required location".into())
             },
+            TableContext::Root if !self.saw_pivot_fields => {
+                Err("pivot table is missing its required pivotFields".into())
+            },
             TableContext::PivotFields => validate_count(
                 self.expected_pivot_fields,
                 self.field_names.len(),
@@ -402,6 +637,22 @@ impl PivotTableParser {
             ),
             _ => Ok(()),
         }
+    }
+
+    fn apply_cache_fields(&mut self, cache_fields: &[PivotCacheField]) -> SheetResult<()> {
+        if self.field_names.len() != cache_fields.len() {
+            return Err(format!(
+                "pivot table has {} pivot fields, but its cache defines {} fields",
+                self.field_names.len(),
+                cache_fields.len()
+            )
+            .into());
+        }
+        self.field_names = cache_fields
+            .iter()
+            .map(|field| field.name.clone())
+            .collect();
+        Ok(())
     }
 
     fn build(self) -> SheetResult<PivotTable> {
@@ -459,7 +710,15 @@ impl PivotTableParser {
 }
 
 fn parse_pivot_table_definition(xml: &str, sheet_name: &str) -> SheetResult<Option<PivotTable>> {
-    PivotTableParser::parse(xml, sheet_name)
+    parse_pivot_table_definition_with_cache(xml, sheet_name, None)
+}
+
+fn parse_pivot_table_definition_with_cache(
+    xml: &str,
+    sheet_name: &str,
+    cache_fields: Option<&[PivotCacheField]>,
+) -> SheetResult<Option<PivotTable>> {
+    PivotTableParser::parse(xml, sheet_name, cache_fields)
 }
 
 pub fn read_pivot_table_definition(xml: &str) -> SheetResult<Option<PivotTable>> {
@@ -503,6 +762,9 @@ impl PivotCacheParser {
             ..Default::default()
         };
         cache.id = relationship_attribute_value(element, b"id", decoder, resolver)?;
+        if cache.id.as_deref() == Some("") {
+            return Err("pivot cache records relationship ID cannot be empty".into());
+        }
         cache.invalid =
             optional_bool(element, b"invalid", decoder, "pivot cache invalid")?.unwrap_or(false);
         cache.save_data =
@@ -730,6 +992,9 @@ impl PivotCacheParser {
             self.cache.source_name = unqualified_attribute_value(element, b"name", decoder)?;
             self.cache.source_relationship_id =
                 relationship_attribute_value(element, b"id", decoder, resolver)?;
+            if self.cache.source_relationship_id.as_deref() == Some("") {
+                return Err("pivot cache source relationship ID cannot be empty".into());
+            }
             return Ok(CacheContext::WorksheetSource);
         }
         if parent == CacheContext::Root
@@ -1114,37 +1379,70 @@ mod tests {
         let mut package = OpcPackage::new();
         let workbook_uri = PackURI::new("/custom/book.xml").unwrap();
         let worksheet_uri = PackURI::new("/custom/sheets/data.xml").unwrap();
+        let source_uri = PackURI::new("/custom/sheets/source.xml").unwrap();
         let table_uri = PackURI::new("/custom/pivots/table.xml").unwrap();
+        let cache_uri = PackURI::new("/custom/cache/cache.xml").unwrap();
+        let records_uri = PackURI::new("/custom/cache/records.xml").unwrap();
         let mut workbook_part = BlobPart::new(
             workbook_uri,
             ct::SML_SHEET_MAIN.to_string(),
             br#"<workbook xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"
                     xmlns:r="http://purl.oclc.org/ooxml/officeDocument/relationships">
-                    <sheets><sheet name="Pivot" sheetId="1" r:id="rId1"/></sheets>
+                    <sheets><sheet name="Pivot" sheetId="1" r:id="rId1"/>
+                        <sheet name="Source" sheetId="2" r:id="rId2"/></sheets>
+                    <pivotCaches><pivotCache cacheId="7" r:id="rId3"/></pivotCaches>
                 </workbook>"#
                 .to_vec(),
         );
         workbook_part.relate_to("sheets/data.xml", rt::STRICT_WORKSHEET);
+        workbook_part.relate_to("sheets/source.xml", rt::STRICT_WORKSHEET);
+        workbook_part.relate_to("cache/cache.xml", rt::STRICT_PIVOT_CACHE_DEFINITION);
         let mut worksheet_part = BlobPart::new(
             worksheet_uri.clone(),
             ct::SML_WORKSHEET.to_string(),
             Vec::new(),
         );
         worksheet_part.relate_to("../pivots/table.xml", rt::STRICT_PIVOT_TABLE);
-        package.relate_to("custom/book.xml", rt::STRICT_OFFICE_DOCUMENT);
-        package.add_part(Box::new(workbook_part));
-        package.add_part(Box::new(worksheet_part));
-        package.add_part(Box::new(BlobPart::new(
+        let mut cache_part = BlobPart::new(
+            cache_uri,
+            ct::SML_PIVOT_CACHE_DEFINITION.to_string(),
+            br#"<pivotCacheDefinition xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"
+                    xmlns:r="http://purl.oclc.org/ooxml/officeDocument/relationships"
+                    r:id="rId1" recordCount="2">
+                    <cacheSource type="worksheet"><worksheetSource ref="$A$1:$B$3" r:id="rId2"/></cacheSource>
+                    <cacheFields count="1"><cacheField name="Cache Region"/></cacheFields>
+                </pivotCacheDefinition>"#
+                .to_vec(),
+        );
+        cache_part.relate_to("records.xml", rt::STRICT_PIVOT_CACHE_RECORDS);
+        cache_part.relate_to("../sheets/source.xml", rt::STRICT_WORKSHEET);
+        let mut table_part = BlobPart::new(
             table_uri,
             ct::SML_PIVOT_TABLE.to_string(),
             br#"<pivotTableDefinition xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"
                     name="PivotOne" cacheId="7" dataCaption="Values">
                     <location ref="A1:C5" firstHeaderRow="1" firstDataRow="2" firstDataCol="1"/>
-                    <pivotFields count="1"><pivotField name="Region"/></pivotFields>
+                    <pivotFields count="1"><pivotField/></pivotFields>
                     <rowFields count="1"><field x="0"/></rowFields>
                 </pivotTableDefinition>"#
                 .to_vec(),
+        );
+        table_part.relate_to("../cache/cache.xml", rt::STRICT_PIVOT_CACHE_DEFINITION);
+        package.relate_to("custom/book.xml", rt::STRICT_OFFICE_DOCUMENT);
+        package.add_part(Box::new(workbook_part));
+        package.add_part(Box::new(worksheet_part));
+        package.add_part(Box::new(BlobPart::new(
+            source_uri,
+            ct::SML_WORKSHEET.to_string(),
+            Vec::new(),
         )));
+        package.add_part(Box::new(cache_part));
+        package.add_part(Box::new(BlobPart::new(
+            records_uri,
+            ct::SML_PIVOT_CACHE_RECORDS.to_string(),
+            Vec::new(),
+        )));
+        package.add_part(Box::new(table_part));
         (package, worksheet_uri)
     }
 
@@ -1156,7 +1454,10 @@ mod tests {
         assert_eq!(tables.len(), 1);
         assert_eq!(tables[0].name, "PivotOne");
         assert_eq!(tables[0].sheet_name, "Pivot");
-        assert_eq!(tables[0].row_fields[0].field_name, "Region");
+        assert_eq!(tables[0].source_sheet.as_deref(), Some("Source"));
+        assert_eq!(tables[0].source_ref.as_deref(), Some("$A$1:$B$3"));
+        assert_eq!(tables[0].field_names, ["Cache Region"]);
+        assert_eq!(tables[0].row_fields[0].field_name, "Cache Region");
     }
 
     #[test]
@@ -1177,6 +1478,86 @@ mod tests {
         let (mut package, _) = package_with_pivot_table();
         package.add_part(Box::new(BlobPart::new(
             PackURI::new("/custom/pivots/table.xml").unwrap(),
+            ct::SML_WORKSHEET.to_string(),
+            Vec::new(),
+        )));
+        assert!(read_pivot_tables(&package).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_pivot_cache_relationship_graphs() {
+        let workbook_uri = PackURI::new("/custom/book.xml").unwrap();
+        let table_uri = PackURI::new("/custom/pivots/table.xml").unwrap();
+        let cache_uri = PackURI::new("/custom/cache/cache.xml").unwrap();
+        let records_uri = PackURI::new("/custom/cache/records.xml").unwrap();
+
+        let (mut package, _) = package_with_pivot_table();
+        package
+            .get_part_mut(&workbook_uri)
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                rt::STRICT_PIVOT_CACHE_DEFINITION.to_string(),
+                "https://example.com/cache.xml".to_string(),
+                "rId3".to_string(),
+                true,
+            );
+        assert!(read_pivot_tables(&package).is_err());
+
+        let (mut package, _) = package_with_pivot_table();
+        package
+            .get_part_mut(&table_uri)
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                rt::STRICT_PIVOT_CACHE_DEFINITION.to_string(),
+                "../cache/duplicate.xml".to_string(),
+                "duplicate".to_string(),
+                false,
+            );
+        assert!(read_pivot_tables(&package).is_err());
+
+        let (mut package, _) = package_with_pivot_table();
+        let table_part = package.get_part_mut(&table_uri).unwrap();
+        let changed = std::str::from_utf8(table_part.blob())
+            .unwrap()
+            .replace("cacheId=\"7\"", "cacheId=\"8\"");
+        table_part.set_blob(changed.into_bytes());
+        assert!(read_pivot_tables(&package).is_err());
+
+        let (mut package, _) = package_with_pivot_table();
+        package.add_part(Box::new(BlobPart::new(
+            records_uri,
+            ct::SML_WORKSHEET.to_string(),
+            Vec::new(),
+        )));
+        assert!(read_pivot_tables(&package).is_err());
+
+        let (mut package, _) = package_with_pivot_table();
+        package
+            .get_part_mut(&cache_uri)
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                rt::STRICT_WORKSHEET.to_string(),
+                "https://example.com/source.xml".to_string(),
+                "rId2".to_string(),
+                true,
+            );
+        assert!(read_pivot_tables(&package).is_err());
+
+        let (mut package, _) = package_with_pivot_table();
+        let workbook_part = package.get_part_mut(&workbook_uri).unwrap();
+        let changed = std::str::from_utf8(workbook_part.blob()).unwrap().replace(
+            r#"<pivotCaches><pivotCache cacheId="7" r:id="rId3"/></pivotCaches>"#,
+            "",
+        );
+        workbook_part.set_blob(changed.into_bytes());
+        assert!(read_pivot_tables(&package).is_err());
+
+        let (mut package, _) = package_with_pivot_table();
+        package.add_part(Box::new(BlobPart::new(
+            cache_uri,
             ct::SML_WORKSHEET.to_string(),
             Vec::new(),
         )));
@@ -1314,6 +1695,7 @@ mod tests {
     #[test]
     fn rejects_malformed_pivot_cache_definitions() {
         const S: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+        const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
         let valid_source = r#"<cacheSource type="worksheet"><worksheetSource sheet="Data" ref="A1:B2"/></cacheSource>"#;
         let invalid = [
             format!(r#"<pivotCacheDefinition xmlns="{S}"><cacheFields/></pivotCacheDefinition>"#),
@@ -1340,6 +1722,12 @@ mod tests {
             ),
             format!(
                 r#"<pivotCacheDefinition xmlns="{S}">{valid_source}<cacheFields><cacheField name="One"><sharedItems count="1"/></cacheField></cacheFields></pivotCacheDefinition>"#
+            ),
+            format!(
+                r#"<pivotCacheDefinition xmlns="{S}" xmlns:r="{R}" r:id="">{valid_source}<cacheFields/></pivotCacheDefinition>"#
+            ),
+            format!(
+                r#"<pivotCacheDefinition xmlns="{S}" xmlns:r="{R}"><cacheSource type="worksheet"><worksheetSource r:id=""/></cacheSource><cacheFields/></pivotCacheDefinition>"#
             ),
         ];
         for xml in invalid {

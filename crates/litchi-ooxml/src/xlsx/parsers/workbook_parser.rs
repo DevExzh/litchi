@@ -26,6 +26,7 @@ enum WorkbookContext {
     BookViews,
     DefinedNames,
     DefinedName,
+    PivotCaches,
     Other,
 }
 
@@ -36,11 +37,18 @@ pub(crate) struct DefinedName {
     pub(crate) value: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PivotCacheInfo {
+    pub(crate) cache_id: u32,
+    pub(crate) relationship_id: String,
+}
+
 pub(crate) struct WorkbookParseResult {
     pub(crate) sheets: Vec<WorksheetInfo>,
     pub(crate) active_sheet_index: usize,
     pub(crate) uses_1904_date_system: bool,
     pub(crate) defined_names: Vec<DefinedName>,
+    pub(crate) pivot_caches: Vec<PivotCacheInfo>,
 }
 
 struct WorkbookInfo {
@@ -51,12 +59,16 @@ struct WorkbookInfo {
     seen_sheets: bool,
     seen_book_views: bool,
     seen_defined_names: bool,
+    seen_pivot_caches: bool,
     seen_workbook_view: bool,
     sheet_ids: HashSet<u32>,
     relationship_ids: HashSet<String>,
     defined_name_keys: HashSet<(Option<u32>, String)>,
     defined_names: Vec<DefinedName>,
     pending_defined_name: Option<DefinedName>,
+    pivot_cache_ids: HashSet<u32>,
+    pivot_cache_relationship_ids: HashSet<String>,
+    pivot_caches: Vec<PivotCacheInfo>,
 }
 
 impl WorkbookInfo {
@@ -69,12 +81,16 @@ impl WorkbookInfo {
             seen_sheets: false,
             seen_book_views: false,
             seen_defined_names: false,
+            seen_pivot_caches: false,
             seen_workbook_view: false,
             sheet_ids: HashSet::new(),
             relationship_ids: HashSet::new(),
             defined_name_keys: HashSet::new(),
             defined_names: Vec::new(),
             pending_defined_name: None,
+            pivot_cache_ids: HashSet::new(),
+            pivot_cache_relationship_ids: HashSet::new(),
+            pivot_caches: Vec::new(),
         }
     }
 
@@ -256,6 +272,34 @@ impl WorkbookInfo {
                 local_sheet_id,
                 value: String::new(),
             });
+        } else if parent == WorkbookContext::PivotCaches
+            && is_spreadsheetml_name(namespace, element.name(), b"pivotCache")
+        {
+            let cache_id = required_u32(element, b"cacheId", decoder, "pivot cache ID")?;
+            let relationship_id = relationship_attribute_value(element, b"id", decoder, resolver)?
+                .ok_or_else(|| invalid("workbook pivot cache is missing relationship ID"))?;
+            if relationship_id.is_empty() {
+                return Err(invalid(
+                    "workbook pivot cache relationship ID cannot be empty",
+                ));
+            }
+            if !self.pivot_cache_ids.insert(cache_id) {
+                return Err(invalid(format!(
+                    "duplicate workbook pivot cache ID {cache_id}"
+                )));
+            }
+            if !self
+                .pivot_cache_relationship_ids
+                .insert(relationship_id.clone())
+            {
+                return Err(invalid(format!(
+                    "duplicate workbook pivot cache relationship ID '{relationship_id}'"
+                )));
+            }
+            self.pivot_caches.push(PivotCacheInfo {
+                cache_id,
+                relationship_id,
+            });
         }
         Ok(())
     }
@@ -283,6 +327,9 @@ impl WorkbookInfo {
         } else if is_spreadsheetml_name(namespace, element.name(), b"definedNames") {
             mark_once(&mut self.seen_defined_names, "definedNames element")?;
             Ok(WorkbookContext::DefinedNames)
+        } else if is_spreadsheetml_name(namespace, element.name(), b"pivotCaches") {
+            mark_once(&mut self.seen_pivot_caches, "pivotCaches element")?;
+            Ok(WorkbookContext::PivotCaches)
         } else {
             Ok(WorkbookContext::Other)
         }
@@ -306,6 +353,10 @@ impl WorkbookInfo {
             && is_spreadsheetml_name(namespace, element.name(), b"definedNames")
         {
             mark_once(&mut self.seen_defined_names, "definedNames element")?;
+        } else if parent == WorkbookContext::Workbook
+            && is_spreadsheetml_name(namespace, element.name(), b"pivotCaches")
+        {
+            mark_once(&mut self.seen_pivot_caches, "pivotCaches element")?;
         } else if parent == WorkbookContext::DefinedNames
             && is_spreadsheetml_name(namespace, element.name(), b"definedName")
         {
@@ -350,6 +401,7 @@ pub(crate) fn parse_workbook_details(content: &str) -> SheetResult<WorkbookParse
             active_sheet_index: info.active_tab.unwrap_or(0),
             uses_1904_date_system: info.uses_1904_date_system,
             defined_names: info.defined_names,
+            pivot_caches: info.pivot_caches,
         })
         .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)
 }
@@ -552,6 +604,34 @@ mod tests {
     }
 
     #[test]
+    fn parses_strict_workbook_pivot_cache_references() {
+        let xml = format!(
+            r#"<s:workbook xmlns:s="{STRICT_S}" xmlns:r="{STRICT_R}" xmlns:f="urn:foreign">
+                <f:pivotCaches><s:pivotCache cacheId="99" r:id="ignored"/></f:pivotCaches>
+                <s:pivotCaches>
+                    <s:pivotCache cacheId="7" r:id="custom-cache"/>
+                    <s:pivotCache cacheId="11" r:id="second-cache"/>
+                </s:pivotCaches>
+            </s:workbook>"#
+        );
+        let details = parse_workbook_details(&xml).unwrap();
+
+        assert_eq!(
+            details.pivot_caches,
+            vec![
+                PivotCacheInfo {
+                    cache_id: 7,
+                    relationship_id: "custom-cache".to_string(),
+                },
+                PivotCacheInfo {
+                    cache_id: 11,
+                    relationship_id: "second-cache".to_string(),
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn rejects_malformed_defined_names() {
         let sheets = r#"<sheets><sheet name="One" sheetId="1" r:id="r1"/></sheets>"#;
         let invalid = [
@@ -566,6 +646,30 @@ mod tests {
             ),
             format!(
                 r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames/><definedNames/></workbook>"#
+            ),
+        ];
+        for xml in invalid {
+            assert!(parse_workbook_details(&xml).is_err(), "accepted {xml}");
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_workbook_pivot_cache_references() {
+        let invalid = [
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}"><pivotCaches><pivotCache r:id="r1"/></pivotCaches></workbook>"#
+            ),
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}"><pivotCaches><pivotCache cacheId="1"/></pivotCaches></workbook>"#
+            ),
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}"><pivotCaches><pivotCache cacheId="1" r:id="r1"/><pivotCache cacheId="1" r:id="r2"/></pivotCaches></workbook>"#
+            ),
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}"><pivotCaches><pivotCache cacheId="1" r:id="r1"/><pivotCache cacheId="2" r:id="r1"/></pivotCaches></workbook>"#
+            ),
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}"><pivotCaches/><pivotCaches/></workbook>"#
             ),
         ];
         for xml in invalid {
