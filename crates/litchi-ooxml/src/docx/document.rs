@@ -1360,7 +1360,7 @@ impl<'a> Document<'a> {
     // - insert_toc(), update_toc(), remove_toc()
     //
     // TODO: Mail merge fields (MS-DOCX Section 17.16.5.35)
-    // - Requires parsing w:fldSimple and w:fldChar elements with MERGEFIELD
+    // - Field::extract_from_document parses both w:fldSimple and complex w:fldChar fields
     // - execute_mail_merge(), get_merge_fields()
     //
     // ✅ COMPLETED: Typed run breaks (MS-DOCX Section 17.3.3.1)

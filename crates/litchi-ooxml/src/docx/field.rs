@@ -4,7 +4,8 @@
 /// Fields are dynamic content like page numbers, dates, formulas, and cross-references.
 use crate::docx::paragraph::decode_xml_reference;
 use crate::error::{OoxmlError, Result};
-use quick_xml::events::Event;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 
 /// A field in a Word document.
@@ -33,6 +34,8 @@ pub struct Field {
     result: Option<String>,
     /// Whether the field is dirty (needs updating)
     dirty: bool,
+    /// Whether Word should prevent the field result from being recalculated.
+    locked: bool,
 }
 
 impl Field {
@@ -48,6 +51,16 @@ impl Field {
             instruction,
             result,
             dirty,
+            locked: false,
+        }
+    }
+
+    fn with_flags(instruction: String, result: Option<String>, dirty: bool, locked: bool) -> Self {
+        Self {
+            instruction,
+            result,
+            dirty,
+            locked,
         }
     }
 
@@ -75,6 +88,12 @@ impl Field {
     #[inline]
     pub fn is_dirty(&self) -> bool {
         self.dirty
+    }
+
+    /// Check if the field is locked against automatic recalculation.
+    #[inline]
+    pub fn is_locked(&self) -> bool {
+        self.locked
     }
 
     /// Get the field type from the instruction.
@@ -113,18 +132,38 @@ impl Field {
         reader.config_mut().trim_text(false);
 
         let mut fields = Vec::new();
+        let mut next_order = 0usize;
         let mut in_instr_text = false;
         let mut in_field_result = false;
         let mut in_result_text = false;
+        let mut in_simple_result_text = false;
         let mut current_instruction = String::new();
         let mut current_result = String::new();
         let mut current_dirty = false;
+        let mut current_locked = false;
+        let mut current_order = 0usize;
         let mut field_depth: i32 = 0;
+        let mut simple_fields = Vec::new();
 
         loop {
             match reader.read_event() {
                 Ok(Event::Empty(e)) if e.local_name().as_ref() == b"t" => {
                     in_result_text = false;
+                    in_simple_result_text = false;
+                },
+                Ok(Event::Start(e)) if e.local_name().as_ref() == b"fldSimple" => {
+                    simple_fields.push(PendingSimpleField::parse(
+                        &e,
+                        reader.decoder(),
+                        next_order,
+                    )?);
+                    next_order += 1;
+                    in_simple_result_text = false;
+                },
+                Ok(Event::Empty(e)) if e.local_name().as_ref() == b"fldSimple" => {
+                    let field = PendingSimpleField::parse(&e, reader.decoder(), next_order)?;
+                    next_order += 1;
+                    fields.push((field.order, field.finish()));
                 },
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     match e.local_name().as_ref() {
@@ -132,6 +171,7 @@ impl Field {
                             // Field character marks field boundaries
                             let mut fld_char_type = None;
                             let mut dirty = None;
+                            let mut locked = None;
 
                             for attr in e.attributes() {
                                 let attr = attr
@@ -146,7 +186,10 @@ impl Field {
                                     fld_char_type = Some(value.to_string());
                                 }
                                 if attr.key.local_name().as_ref() == b"dirty" {
-                                    dirty = Some(matches!(value.as_ref(), "true" | "1"));
+                                    dirty = Some(is_on(&value));
+                                }
+                                if attr.key.local_name().as_ref() == b"fldLock" {
+                                    locked = Some(is_on(&value));
                                 }
                             }
 
@@ -156,9 +199,12 @@ impl Field {
                                         // Start of field
                                         field_depth += 1;
                                         if field_depth == 1 {
+                                            current_order = next_order;
+                                            next_order += 1;
                                             current_instruction.clear();
                                             current_result.clear();
                                             current_dirty = dirty.unwrap_or(false);
+                                            current_locked = locked.unwrap_or(false);
                                             in_instr_text = false;
                                             in_field_result = false;
                                             in_result_text = false;
@@ -167,6 +213,8 @@ impl Field {
                                     "separate"
                                         // Separator between instruction and result
                                         if field_depth == 1 => {
+                                            current_dirty |= dirty.unwrap_or(false);
+                                            current_locked |= locked.unwrap_or(false);
                                             in_instr_text = false;
                                             in_field_result = true;
                                             in_result_text = false;
@@ -184,11 +232,12 @@ impl Field {
                                                 } else {
                                                     Some(current_result.clone())
                                                 };
-                                                fields.push(Field::new(
+                                                fields.push((current_order, Field::with_flags(
                                                     current_instruction.trim().to_string(),
                                                     result,
                                                     current_dirty,
-                                                ));
+                                                    current_locked,
+                                                )));
                                             }
                                         }
                                         field_depth = field_depth.saturating_sub(1);
@@ -202,7 +251,14 @@ impl Field {
                             if field_depth > 0 => {
                                 in_instr_text = true;
                             },
-                        b"t" if in_field_result => in_result_text = true,
+                        b"t" => {
+                            if in_field_result {
+                                in_result_text = true;
+                            }
+                            if !simple_fields.is_empty() {
+                                in_simple_result_text = true;
+                            }
+                        },
                         b"tab" if in_field_result && field_depth == 1 => {
                             current_result.push('\t');
                         },
@@ -217,49 +273,77 @@ impl Field {
                         },
                         _ => {},
                     }
+
+                    if !simple_fields.is_empty() {
+                        let character = match e.local_name().as_ref() {
+                            b"tab" => Some('\t'),
+                            b"br" | b"cr" => Some('\n'),
+                            b"noBreakHyphen" => Some('\u{2011}'),
+                            b"softHyphen" => Some('\u{00ad}'),
+                            _ => None,
+                        };
+                        if let Some(character) = character {
+                            for field in &mut simple_fields {
+                                field.result.push(character);
+                            }
+                        }
+                    }
                 },
                 Ok(Event::Text(e)) => {
-                    let target = if in_instr_text && field_depth == 1 {
-                        Some(&mut current_instruction)
-                    } else if in_field_result && in_result_text && field_depth == 1 {
-                        Some(&mut current_result)
-                    } else {
-                        None
-                    };
-                    if let Some(target) = target {
+                    let has_complex_target = (in_instr_text && field_depth == 1)
+                        || (in_field_result && in_result_text && field_depth == 1);
+                    if has_complex_target || in_simple_result_text {
                         let decoded = e
                             .xml_content(XmlVersion::Explicit1_0)
                             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
                         let unescaped = quick_xml::escape::unescape(&decoded)
                             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
-                        target.push_str(&unescaped);
+                        if in_instr_text && field_depth == 1 {
+                            current_instruction.push_str(&unescaped);
+                        } else if in_field_result && in_result_text && field_depth == 1 {
+                            current_result.push_str(&unescaped);
+                        }
+                        if in_simple_result_text {
+                            for field in &mut simple_fields {
+                                field.result.push_str(&unescaped);
+                            }
+                        }
                     }
                 },
                 Ok(Event::CData(e)) => {
-                    let target = if in_instr_text && field_depth == 1 {
-                        Some(&mut current_instruction)
-                    } else if in_field_result && in_result_text && field_depth == 1 {
-                        Some(&mut current_result)
-                    } else {
-                        None
-                    };
-                    if let Some(target) = target {
+                    let has_complex_target = (in_instr_text && field_depth == 1)
+                        || (in_field_result && in_result_text && field_depth == 1);
+                    if has_complex_target || in_simple_result_text {
                         let decoded = e
                             .xml_content(XmlVersion::Explicit1_0)
                             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
-                        target.push_str(&decoded);
+                        if in_instr_text && field_depth == 1 {
+                            current_instruction.push_str(&decoded);
+                        } else if in_field_result && in_result_text && field_depth == 1 {
+                            current_result.push_str(&decoded);
+                        }
+                        if in_simple_result_text {
+                            for field in &mut simple_fields {
+                                field.result.push_str(&decoded);
+                            }
+                        }
                     }
                 },
                 Ok(Event::GeneralRef(reference)) => {
-                    let target = if in_instr_text && field_depth == 1 {
-                        Some(&mut current_instruction)
-                    } else if in_field_result && in_result_text && field_depth == 1 {
-                        Some(&mut current_result)
-                    } else {
-                        None
-                    };
-                    if let Some(target) = target {
-                        target.push_str(&decode_xml_reference(&reference)?);
+                    let has_complex_target = (in_instr_text && field_depth == 1)
+                        || (in_field_result && in_result_text && field_depth == 1);
+                    if has_complex_target || in_simple_result_text {
+                        let decoded = decode_xml_reference(&reference)?;
+                        if in_instr_text && field_depth == 1 {
+                            current_instruction.push_str(&decoded);
+                        } else if in_field_result && in_result_text && field_depth == 1 {
+                            current_result.push_str(&decoded);
+                        }
+                        if in_simple_result_text {
+                            for field in &mut simple_fields {
+                                field.result.push_str(&decoded);
+                            }
+                        }
                     }
                 },
                 Ok(Event::End(e)) if e.local_name().as_ref() == b"instrText" => {
@@ -267,6 +351,16 @@ impl Field {
                 },
                 Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
                     in_result_text = false;
+                    in_simple_result_text = false;
+                },
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"fldSimple" => {
+                    in_simple_result_text = false;
+                    let field = simple_fields.pop().ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "DOCX simple field ended without a matching start".to_string(),
+                        )
+                    })?;
+                    fields.push((field.order, field.finish()));
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -274,8 +368,61 @@ impl Field {
             }
         }
 
-        Ok(fields)
+        fields.sort_unstable_by_key(|(order, _)| *order);
+        Ok(fields.into_iter().map(|(_, field)| field).collect())
     }
+}
+
+struct PendingSimpleField {
+    order: usize,
+    instruction: String,
+    result: String,
+    dirty: bool,
+    locked: bool,
+}
+
+impl PendingSimpleField {
+    fn parse(element: &BytesStart<'_>, decoder: Decoder, order: usize) -> Result<Self> {
+        let mut instruction = None;
+        let mut dirty = false;
+        let mut locked = false;
+        for attribute in element.attributes() {
+            let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            let value = attribute
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            match attribute.key.local_name().as_ref() {
+                b"instr" => instruction = Some(value.into_owned()),
+                b"dirty" => dirty = is_on(&value),
+                b"fldLock" => locked = is_on(&value),
+                _ => {},
+            }
+        }
+        let instruction = instruction.ok_or_else(|| {
+            OoxmlError::InvalidFormat("DOCX simple field is missing w:instr".to_string())
+        })?;
+        Ok(Self {
+            order,
+            instruction,
+            result: String::new(),
+            dirty,
+            locked,
+        })
+    }
+
+    fn finish(self) -> Field {
+        let result = (!self.result.is_empty()).then_some(self.result);
+        Field::with_flags(
+            self.instruction.trim().to_string(),
+            result,
+            self.dirty,
+            self.locked,
+        )
+    }
+}
+
+fn is_on(value: &str) -> bool {
+    matches!(value, "true" | "1" | "on")
 }
 
 #[cfg(test)]
@@ -319,5 +466,45 @@ mod tests {
         assert_eq!(fields[0].instruction(), r#"IF "A&B" = "A&B""#);
         assert_eq!(fields[0].result(), Some(" Yes & no \t\n"));
         assert!(fields[0].is_dirty());
+    }
+
+    #[test]
+    fn extracts_simple_fields_in_source_order_with_flags_and_nested_results() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" MERGEFIELD &quot;Full Name&quot; " w:dirty="on" w:fldLock="1">
+                <w:r><w:t xml:space="preserve"> Ada &amp; </w:t></w:r>
+                <w:fldSimple w:instr=" PAGE "><w:r><w:t>7</w:t></w:r></w:fldSimple>
+                <w:r><w:t><![CDATA[ <Lovelace> ]]></w:t><w:tab/><w:br/><w:noBreakHyphen/><w:softHyphen/></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText> DATE </w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>Today</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr=" NUMPAGES "/>
+        </w:p></w:body></w:document>"#;
+
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 4);
+        assert_eq!(fields[0].instruction(), r#"MERGEFIELD "Full Name""#);
+        assert_eq!(
+            fields[0].result(),
+            Some(" Ada & 7 <Lovelace> \t\n‑\u{00ad}")
+        );
+        assert!(fields[0].is_dirty());
+        assert!(fields[0].is_locked());
+        assert_eq!(fields[1].instruction(), "PAGE");
+        assert_eq!(fields[1].result(), Some("7"));
+        assert_eq!(fields[2].instruction(), "DATE");
+        assert_eq!(fields[2].result(), Some("Today"));
+        assert!(fields[2].is_dirty());
+        assert!(fields[2].is_locked());
+        assert_eq!(fields[3].instruction(), "NUMPAGES");
+        assert_eq!(fields[3].result(), None);
+    }
+
+    #[test]
+    fn rejects_simple_fields_without_instructions() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:fldSimple><w:r><w:t>result</w:t></w:r></w:fldSimple></w:p></w:body></w:document>"#;
+        assert!(Field::extract_from_document(xml).is_err());
     }
 }
