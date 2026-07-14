@@ -86,6 +86,11 @@ pub mod content_type {
     pub const SML_SHEET: &str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     pub const SML_SHEET_MAIN: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml";
+    pub const SML_TEMPLATE_MAIN: &str =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml";
+    pub const SML_SHEET_MACRO_MAIN: &str = "application/vnd.ms-excel.sheet.macroEnabled.main+xml";
+    pub const SML_TEMPLATE_MACRO_MAIN: &str =
+        "application/vnd.ms-excel.template.macroEnabled.main+xml";
     pub const SML_WORKSHEET: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml";
     pub const SML_STYLES: &str =
@@ -196,6 +201,9 @@ pub mod relationship_type {
     // Office document
     pub const OFFICE_DOCUMENT: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument";
+    /// ISO/IEC 29500 Strict main-document relationship type.
+    pub const STRICT_OFFICE_DOCUMENT: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/officeDocument";
 
     // Document parts
     pub const COMMENTS: &str =
@@ -221,6 +229,14 @@ pub mod relationship_type {
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings";
     pub const STYLES: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
+    /// ISO/IEC 29500 Strict styles relationship type.
+    pub const STRICT_STYLES: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/styles";
+    pub const SHARED_STRINGS: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings";
+    /// ISO/IEC 29500 Strict shared-strings relationship type.
+    pub const STRICT_SHARED_STRINGS: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/sharedStrings";
     pub const WEB_SETTINGS: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings";
     pub const PIVOT_CACHE_DEFINITION: &str =

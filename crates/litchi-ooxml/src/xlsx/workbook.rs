@@ -25,6 +25,8 @@ use super::worksheet::{Worksheet, WorksheetInfo, WorksheetIterator as XlsxWorksh
 pub struct Workbook {
     /// The underlying OPC package
     package: OpcPackage,
+    /// Actual main-workbook part location resolved from the package relationship.
+    workbook_uri: PackURI,
     /// Cached worksheet information
     worksheets: Vec<WorksheetInfo>,
     /// Cached worksheet names for zero-copy returns
@@ -156,8 +158,26 @@ impl Workbook {
 
     /// Create a new workbook from an OPC package.
     pub fn new(package: OpcPackage) -> SheetResult<Self> {
+        use litchi_opc::constants::content_type as ct;
+
+        let workbook_part = package.main_document_part()?;
+        if !matches!(
+            workbook_part.content_type(),
+            ct::SML_SHEET_MAIN
+                | ct::SML_TEMPLATE_MAIN
+                | ct::SML_SHEET_MACRO_MAIN
+                | ct::SML_TEMPLATE_MACRO_MAIN
+        ) {
+            return Err(format!(
+                "main document part '{}' is not an XML workbook",
+                workbook_part.partname()
+            )
+            .into());
+        }
+        let workbook_uri = workbook_part.partname().clone();
         let mut workbook = Workbook {
             package,
+            workbook_uri,
             worksheets: Vec::new(),
             worksheet_names: Vec::new(),
             active_sheet_index: 0,
@@ -177,8 +197,7 @@ impl Workbook {
 
     /// Load workbook information from workbook.xml
     fn load_workbook_info(&mut self) -> SheetResult<()> {
-        let workbook_uri = PackURI::new("/xl/workbook.xml")?;
-        let workbook_part = self.package.get_part(&workbook_uri)?;
+        let workbook_part = self.package.get_part(&self.workbook_uri)?;
 
         // Parse the workbook XML to extract sheet information
         let content = std::str::from_utf8(workbook_part.blob())?;
@@ -198,22 +217,71 @@ impl Workbook {
 
     /// Load shared strings from xl/sharedStrings.xml
     fn load_shared_strings(&mut self) -> SheetResult<()> {
-        let shared_strings_uri = PackURI::new("/xl/sharedStrings.xml")?;
-        if let Ok(shared_strings_part) = self.package.get_part(&shared_strings_uri) {
-            let content = std::str::from_utf8(shared_strings_part.blob())?;
-            self.shared_strings = SharedStrings::parse(content)?;
-        }
+        use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+
+        let Some(shared_strings_uri) = self.related_workbook_part_uri(
+            &[rt::SHARED_STRINGS, rt::STRICT_SHARED_STRINGS],
+            "shared strings",
+        )?
+        else {
+            return Ok(());
+        };
+        let shared_strings_part = self.package.get_part(&shared_strings_uri)?;
+        Self::require_part_content_type(
+            &shared_strings_uri,
+            shared_strings_part.content_type(),
+            ct::SML_SHARED_STRINGS,
+        )?;
+        let content = std::str::from_utf8(shared_strings_part.blob())?;
+        self.shared_strings = SharedStrings::parse(content)?;
 
         Ok(())
     }
 
     /// Load styles from xl/styles.xml
     fn load_styles(&mut self) -> SheetResult<()> {
-        let styles_uri = PackURI::new("/xl/styles.xml")?;
-        if let Ok(styles_part) = self.package.get_part(&styles_uri) {
-            let content = std::str::from_utf8(styles_part.blob())?;
-            self.styles = Styles::parse(content)
-                .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
+        use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+
+        let Some(styles_uri) =
+            self.related_workbook_part_uri(&[rt::STYLES, rt::STRICT_STYLES], "styles")?
+        else {
+            return Ok(());
+        };
+        let styles_part = self.package.get_part(&styles_uri)?;
+        Self::require_part_content_type(&styles_uri, styles_part.content_type(), ct::SML_STYLES)?;
+        let content = std::str::from_utf8(styles_part.blob())?;
+        self.styles = Styles::parse(content)
+            .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
+        Ok(())
+    }
+
+    fn related_workbook_part_uri(
+        &self,
+        relationship_types: &[&str],
+        description: &str,
+    ) -> SheetResult<Option<PackURI>> {
+        let workbook_part = self.package.get_part(&self.workbook_uri)?;
+        let mut matching = workbook_part
+            .rels()
+            .iter()
+            .filter(|relationship| relationship_types.contains(&relationship.reltype()));
+        let Some(relationship) = matching.next() else {
+            return Ok(None);
+        };
+        if matching.next().is_some() {
+            return Err(format!("workbook has multiple {description} relationships").into());
+        }
+        if relationship.is_external() {
+            return Err(format!("workbook {description} relationship cannot be external").into());
+        }
+        Ok(Some(relationship.target_partname()?))
+    }
+
+    fn require_part_content_type(uri: &PackURI, actual: &str, expected: &str) -> SheetResult<()> {
+        if actual != expected {
+            return Err(
+                format!("part '{uri}' has content type '{actual}', expected '{expected}'").into(),
+            );
         }
         Ok(())
     }
@@ -366,8 +434,7 @@ impl Workbook {
     pub(crate) fn worksheet_part_uri(&self, worksheet: &WorksheetInfo) -> SheetResult<PackURI> {
         use litchi_opc::constants::relationship_type as rt;
 
-        let workbook_uri = PackURI::new("/xl/workbook.xml")?;
-        let workbook_part = self.package.get_part(&workbook_uri)?;
+        let workbook_part = self.package.get_part(&self.workbook_uri)?;
         let relationship = workbook_part
             .rels()
             .get(&worksheet.relationship_id)
@@ -1998,6 +2065,7 @@ mod tests {
             workbook_part.relate_to("custom/sales-data.xml", reltype)
         };
         assert_eq!(relationship_id, "rId1");
+        package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
         package.add_part(Box::new(workbook_part));
 
         if !external {
@@ -2032,6 +2100,58 @@ mod tests {
             )));
         }
 
+        package
+    }
+
+    fn package_with_custom_workbook_parts() -> OpcPackage {
+        let mut package = OpcPackage::new();
+        let workbook_uri = PackURI::new("/custom/book/main.xml").unwrap();
+        let mut workbook_part = BlobPart::new(
+            workbook_uri,
+            ct::SML_SHEET_MAIN.to_string(),
+            br#"<workbook xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"
+                    xmlns:r="http://purl.oclc.org/ooxml/officeDocument/relationships">
+                    <sheets><sheet name="Custom" sheetId="1" r:id="rId1"/></sheets>
+                </workbook>"#
+                .to_vec(),
+        );
+        assert_eq!(
+            workbook_part.relate_to("../sheets/data.xml", rt::STRICT_WORKSHEET),
+            "rId1"
+        );
+        assert_eq!(
+            workbook_part.relate_to("../assets/strings.xml", rt::STRICT_SHARED_STRINGS),
+            "rId2"
+        );
+        assert_eq!(
+            workbook_part.relate_to("../assets/styles.xml", rt::STRICT_STYLES),
+            "rId3"
+        );
+        package.relate_to("custom/book/main.xml", rt::STRICT_OFFICE_DOCUMENT);
+        package.add_part(Box::new(workbook_part));
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/custom/sheets/data.xml").unwrap(),
+            ct::SML_WORKSHEET.to_string(),
+            br#"<worksheet xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main">
+                    <sheetData><row r="1"><c r="A1" t="s" s="0"><v>0</v></c></row></sheetData>
+                </worksheet>"#
+                .to_vec(),
+        )));
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/custom/assets/strings.xml").unwrap(),
+            ct::SML_SHARED_STRINGS.to_string(),
+            br#"<sst xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main" count="1" uniqueCount="1">
+                    <si><t>Relationship resolved</t></si>
+                </sst>"#
+                .to_vec(),
+        )));
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/custom/assets/styles.xml").unwrap(),
+            ct::SML_STYLES.to_string(),
+            crate::xlsx::template::default_styles_xml()
+                .as_bytes()
+                .to_vec(),
+        )));
         package
     }
 
@@ -2134,6 +2254,43 @@ mod tests {
         assert_eq!(comment.text, "Hello world");
         assert_eq!(comment.guid.as_deref(), Some("{comment-guid}"));
         assert_eq!(comment.shape_id, Some(5));
+    }
+
+    #[test]
+    fn resolves_strict_custom_workbook_related_parts() {
+        let workbook = Workbook::new(package_with_custom_workbook_parts()).unwrap();
+        let worksheet = workbook.get_worksheet(0).unwrap();
+
+        assert_eq!(worksheet.name(), "Custom");
+        assert_eq!(
+            worksheet.cell_value(1, 1).unwrap().as_str(),
+            Some("Relationship resolved")
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_workbook_related_parts() {
+        let mut package = package_with_custom_workbook_parts();
+        let workbook_uri = PackURI::new("/custom/book/main.xml").unwrap();
+        package
+            .get_part_mut(&workbook_uri)
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                rt::STRICT_SHARED_STRINGS.to_string(),
+                "../assets/other-strings.xml".to_string(),
+                "rId4".to_string(),
+                false,
+            );
+        assert!(Workbook::new(package).is_err());
+
+        let mut package = package_with_custom_workbook_parts();
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/custom/assets/styles.xml").unwrap(),
+            ct::SML_SHARED_STRINGS.to_string(),
+            Vec::new(),
+        )));
+        assert!(Workbook::new(package).is_err());
     }
 
     #[test]

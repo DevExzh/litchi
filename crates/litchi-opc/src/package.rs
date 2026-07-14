@@ -182,9 +182,25 @@ impl OpcPackage {
     /// For Excel, the workbook.xml part.
     /// For PowerPoint, the presentation.xml part.
     pub fn main_document_part(&self) -> Result<&dyn Part> {
-        let rel = self
-            .rels
-            .part_with_reltype(relationship_type::OFFICE_DOCUMENT)?;
+        let mut matching = self.rels.iter().filter(|relationship| {
+            matches!(
+                relationship.reltype(),
+                relationship_type::OFFICE_DOCUMENT | relationship_type::STRICT_OFFICE_DOCUMENT
+            )
+        });
+        let rel = matching.next().ok_or_else(|| {
+            OpcError::InvalidRelationship("main-document relationship is missing".to_string())
+        })?;
+        if matching.next().is_some() {
+            return Err(OpcError::InvalidRelationship(
+                "package has multiple main-document relationships".to_string(),
+            ));
+        }
+        if rel.is_external() {
+            return Err(OpcError::InvalidRelationship(
+                "main-document relationship cannot be external".to_string(),
+            ));
+        }
         let partname = rel.target_partname()?;
         self.get_part(&partname)
     }
@@ -391,6 +407,7 @@ impl Default for OpcPackage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::part::BlobPart;
     use soapberry_zip::office::StreamingArchiveWriter;
     use std::io::Cursor;
 
@@ -455,5 +472,22 @@ mod tests {
             main_part.content_type(),
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
         );
+    }
+
+    #[test]
+    fn resolves_one_internal_strict_main_document_part() {
+        let mut package = OpcPackage::new();
+        let uri = PackURI::new("/custom/main.xml").unwrap();
+        package.add_part(Box::new(BlobPart::new(
+            uri.clone(),
+            "application/xml".to_string(),
+            Vec::new(),
+        )));
+        package.relate_to("custom/main.xml", relationship_type::STRICT_OFFICE_DOCUMENT);
+
+        assert_eq!(package.main_document_part().unwrap().partname(), &uri);
+
+        package.relate_to("other.xml", relationship_type::OFFICE_DOCUMENT);
+        assert!(package.main_document_part().is_err());
     }
 }
