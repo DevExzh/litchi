@@ -222,28 +222,12 @@ impl<'a> Worksheet<'a> {
     fn parse_worksheet_xml(&mut self, content: &str) -> Result<()> {
         self.parse_sheet_data(content)?;
 
-        // Parse merged cells
-        if let Some(merge_start) = content.find("<mergeCells")
-            && let Some(merge_end) = content[merge_start..].find("</mergeCells>")
-        {
-            let merge_content = &content[merge_start..merge_start + merge_end + 13];
-            self.parse_merged_cells(merge_content)?;
-        }
-
         // Parse hyperlinks
         if let Some(hyperlink_start) = content.find("<hyperlinks>")
             && let Some(hyperlink_end) = content[hyperlink_start..].find("</hyperlinks>")
         {
             let hyperlink_content = &content[hyperlink_start..hyperlink_start + hyperlink_end];
             self.parse_hyperlinks(hyperlink_content)?;
-        }
-
-        // Parse column information
-        if let Some(cols_start) = content.find("<cols>")
-            && let Some(cols_end) = content[cols_start..].find("</cols>")
-        {
-            let cols_content = &content[cols_start..cols_start + cols_end];
-            self.parse_columns(cols_content)?;
         }
 
         // Parse data validations
@@ -319,6 +303,8 @@ impl<'a> Worksheet<'a> {
         self.cell_styles = parsed.cell_styles;
         self.rows = parsed.rows;
         self.rich_text_cells = parsed.rich_text_cells;
+        self.merged_regions = parsed.merged_regions;
+        self.columns = parsed.columns;
         self.dimensions = parsed.dimensions;
         Ok(())
     }
@@ -743,40 +729,6 @@ impl<'a> Worksheet<'a> {
         })
     }
 
-    /// Parse merged cells from XML.
-    fn parse_merged_cells(&mut self, content: &str) -> Result<()> {
-        let mut pos = 0;
-        while let Some(merge_start) = content[pos..].find("<mergeCell ") {
-            let merge_start_pos = pos + merge_start;
-            if let Some(merge_end) = content[merge_start_pos..].find("/>") {
-                let merge_tag = &content[merge_start_pos..merge_start_pos + merge_end + 2];
-
-                // Extract ref attribute (e.g., "A1:B2")
-                if let Some(ref_start) = merge_tag.find("ref=\"")
-                    && let Some(ref_end) = merge_tag[ref_start + 5..].find('"')
-                {
-                    let range_ref = &merge_tag[ref_start + 5..ref_start + 5 + ref_end];
-                    if let Some(colon_pos) = range_ref.find(':') {
-                        let start_ref = &range_ref[..colon_pos];
-                        let end_ref = &range_ref[colon_pos + 1..];
-
-                        if let Ok((start_col, start_row)) = Cell::reference_to_coords(start_ref)
-                            && let Ok((end_col, end_row)) = Cell::reference_to_coords(end_ref)
-                        {
-                            self.merged_regions
-                                .push((start_row, start_col, end_row, end_col));
-                        }
-                    }
-                }
-
-                pos = merge_start_pos + merge_end + 2;
-            } else {
-                break;
-            }
-        }
-        Ok(())
-    }
-
     /// Parse hyperlinks from XML.
     fn parse_hyperlinks(&mut self, content: &str) -> Result<()> {
         let mut pos = 0;
@@ -802,42 +754,6 @@ impl<'a> Worksheet<'a> {
                 }
 
                 pos = hyperlink_start_pos + hyperlink_end + 2;
-            } else {
-                break;
-            }
-        }
-        Ok(())
-    }
-
-    /// Parse column information from XML.
-    fn parse_columns(&mut self, content: &str) -> Result<()> {
-        let mut pos = 0;
-        while let Some(col_start) = content[pos..].find("<col ") {
-            let col_start_pos = pos + col_start;
-            if let Some(col_end) = content[col_start_pos..].find("/>") {
-                let col_tag = &content[col_start_pos..col_start_pos + col_end + 2];
-
-                let min_col =
-                    Self::extract_attribute(col_tag, "min").and_then(|s| s.parse::<u32>().ok());
-                let max_col =
-                    Self::extract_attribute(col_tag, "max").and_then(|s| s.parse::<u32>().ok());
-                let width =
-                    Self::extract_attribute(col_tag, "width").and_then(|s| s.parse::<f64>().ok());
-                let hidden = col_tag.contains("hidden=\"1\"");
-                let custom_width = col_tag.contains("customWidth=\"1\"");
-
-                if let (Some(min), Some(max)) = (min_col, max_col) {
-                    let col_info = ColumnInfo {
-                        width,
-                        hidden,
-                        custom_width,
-                    };
-                    for col_num in min..=max {
-                        self.columns.insert(col_num, col_info.clone());
-                    }
-                }
-
-                pos = col_start_pos + col_end + 2;
             } else {
                 break;
             }

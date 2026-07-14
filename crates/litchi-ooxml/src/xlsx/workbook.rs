@@ -1849,7 +1849,7 @@ impl Workbook {
 #[cfg(test)]
 mod tests {
     use super::Workbook;
-    use litchi_core::sheet::{CellValue, WorkbookTrait};
+    use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
     use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 
@@ -1861,7 +1861,9 @@ mod tests {
 
     const WORKSHEET_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <cols><col min="2" max="3" width="12.5" hidden="1" customWidth="1"/></cols>
   <sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>
+  <mergeCells count="1"><mergeCell ref="B2:C3"/></mergeCells>
 </worksheet>"#;
 
     fn package_with_worksheet_relationship(reltype: &str, external: bool) -> OpcPackage {
@@ -1896,12 +1898,15 @@ mod tests {
     fn loads_worksheet_from_relationship_target() {
         let workbook =
             Workbook::new(package_with_worksheet_relationship(rt::WORKSHEET, false)).unwrap();
-        let worksheet = workbook.worksheet_by_index(0).unwrap();
+        let worksheet = workbook.get_worksheet(0).unwrap();
 
         assert_eq!(
             worksheet.cell_value(1, 1).unwrap().as_ref(),
             &CellValue::Int(7)
         );
+        assert_eq!(worksheet.get_column_width(2), Some(12.5));
+        assert!(worksheet.is_column_hidden(3));
+        assert_eq!(worksheet.get_merged_regions(), &[(2, 2, 3, 3)]);
     }
 
     #[test]

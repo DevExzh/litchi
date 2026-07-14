@@ -14,7 +14,7 @@ use crate::xlsx::RichTextRun;
 use crate::xlsx::cell::Cell;
 use crate::xlsx::namespace::{SPREADSHEETML_NAMESPACE, is_spreadsheetml_name};
 use crate::xlsx::shared_strings::decode_spreadsheet_text;
-use crate::xlsx::worksheet::RowInfo;
+use crate::xlsx::worksheet::{ColumnInfo, RowInfo};
 
 const MAX_EXCEL_COLUMN: u32 = 16_384;
 
@@ -24,12 +24,16 @@ pub(crate) struct ParsedWorksheetData {
     pub(crate) cell_styles: HashMap<u32, HashMap<u32, u32>>,
     pub(crate) rows: HashMap<u32, RowInfo>,
     pub(crate) rich_text_cells: HashMap<(u32, u32), Vec<RichTextRun>>,
+    pub(crate) merged_regions: Vec<(u32, u32, u32, u32)>,
+    pub(crate) columns: HashMap<u32, ColumnInfo>,
     pub(crate) dimensions: Option<(u32, u32, u32, u32)>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Context {
     Worksheet,
+    Columns,
+    MergeCells,
     SheetData,
     Row,
     Cell,
@@ -108,7 +112,11 @@ struct Parser {
     run: Option<PendingRun>,
     previous_row: u32,
     rows: HashSet<u32>,
+    merged_regions: HashSet<(u32, u32, u32, u32)>,
     seen_sheet_data: bool,
+    seen_columns: bool,
+    seen_merge_cells: bool,
+    expected_merge_count: Option<usize>,
     min_row: u32,
     min_column: u32,
     max_row: u32,
@@ -124,7 +132,11 @@ impl Parser {
             run: None,
             previous_row: 0,
             rows: HashSet::new(),
+            merged_regions: HashSet::new(),
             seen_sheet_data: false,
+            seen_columns: false,
+            seen_merge_cells: false,
+            expected_merge_count: None,
             min_row: u32::MAX,
             min_column: u32::MAX,
             max_row: 0,
@@ -242,6 +254,27 @@ impl Parser {
             self.sheet_data()?;
             return Ok(Context::SheetData);
         }
+        if parent == Context::Worksheet && is_spreadsheetml_name(namespace, element.name(), b"cols")
+        {
+            self.start_columns()?;
+            return Ok(Context::Columns);
+        }
+        if parent == Context::Columns && is_spreadsheetml_name(namespace, element.name(), b"col") {
+            self.column(element, decoder)?;
+            return Ok(Context::Other);
+        }
+        if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"mergeCells")
+        {
+            self.start_merge_cells(element, decoder)?;
+            return Ok(Context::MergeCells);
+        }
+        if parent == Context::MergeCells
+            && is_spreadsheetml_name(namespace, element.name(), b"mergeCell")
+        {
+            self.merge_cell(element, decoder)?;
+            return Ok(Context::Other);
+        }
         if parent == Context::SheetData && is_spreadsheetml_name(namespace, element.name(), b"row")
         {
             self.start_row(element, decoder)?;
@@ -298,6 +331,23 @@ impl Parser {
             && is_spreadsheetml_name(namespace, element.name(), b"sheetData")
         {
             self.sheet_data()?;
+        } else if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"cols")
+        {
+            self.start_columns()?;
+        } else if parent == Context::Columns
+            && is_spreadsheetml_name(namespace, element.name(), b"col")
+        {
+            self.column(element, decoder)?;
+        } else if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"mergeCells")
+        {
+            self.start_merge_cells(element, decoder)?;
+            self.finish_merge_cells()?;
+        } else if parent == Context::MergeCells
+            && is_spreadsheetml_name(namespace, element.name(), b"mergeCell")
+        {
+            self.merge_cell(element, decoder)?;
         } else if parent == Context::SheetData
             && is_spreadsheetml_name(namespace, element.name(), b"row")
         {
@@ -342,6 +392,82 @@ impl Parser {
             return Err(invalid("duplicate worksheet sheetData element"));
         }
         self.seen_sheet_data = true;
+        Ok(())
+    }
+
+    fn start_columns(&mut self) -> Result<()> {
+        if self.seen_columns {
+            return Err(invalid("duplicate worksheet cols element"));
+        }
+        self.seen_columns = true;
+        Ok(())
+    }
+
+    fn column(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+        let min = required_u32(element, b"min", decoder, "worksheet column minimum")?;
+        let max = required_u32(element, b"max", decoder, "worksheet column maximum")?;
+        if min == 0 || max > MAX_EXCEL_COLUMN || min > max {
+            return Err(invalid(format!(
+                "invalid worksheet column range '{min}:{max}'"
+            )));
+        }
+        let width = optional_f64(element, b"width", decoder, "worksheet column width")?;
+        if let Some(width) = width
+            && (!width.is_finite() || width < 0.0)
+        {
+            return Err(invalid(format!("invalid worksheet column width '{width}'")));
+        }
+        let info = ColumnInfo {
+            width,
+            hidden: optional_bool(element, b"hidden", decoder, "worksheet column hidden")?
+                .unwrap_or(false),
+            custom_width: optional_bool(
+                element,
+                b"customWidth",
+                decoder,
+                "worksheet column customWidth",
+            )?
+            .unwrap_or(false),
+        };
+        for column in min..=max {
+            self.data.columns.insert(column, info.clone());
+        }
+        Ok(())
+    }
+
+    fn start_merge_cells(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+        if self.seen_merge_cells {
+            return Err(invalid("duplicate worksheet mergeCells element"));
+        }
+        self.seen_merge_cells = true;
+        self.expected_merge_count =
+            optional_u32(element, b"count", decoder, "worksheet merged-cell count")?
+                .map(|count| count as usize);
+        Ok(())
+    }
+
+    fn merge_cell(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+        let reference =
+            required_string(element, b"ref", decoder, "worksheet merged-cell reference")?;
+        let region = parse_range(&reference, "worksheet merged-cell reference")?;
+        if !self.merged_regions.insert(region) {
+            return Err(invalid(format!(
+                "duplicate worksheet merged-cell reference '{reference}'"
+            )));
+        }
+        self.data.merged_regions.push(region);
+        Ok(())
+    }
+
+    fn finish_merge_cells(&mut self) -> Result<()> {
+        if let Some(expected) = self.expected_merge_count
+            && expected != self.data.merged_regions.len()
+        {
+            return Err(invalid(format!(
+                "worksheet mergeCells count is {expected}, but {} mergeCell elements were found",
+                self.data.merged_regions.len()
+            )));
+        }
         Ok(())
     }
 
@@ -677,6 +803,7 @@ impl Parser {
             Context::RichRun => self.finish_run(),
             Context::Cell => self.finish_cell(),
             Context::Row => self.finish_row(),
+            Context::MergeCells => self.finish_merge_cells(),
             _ => Ok(()),
         }
     }
@@ -993,6 +1120,33 @@ fn optional_u32(
         .transpose()
 }
 
+fn required_u32(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<u32> {
+    optional_u32(element, name, decoder, description)?
+        .ok_or_else(|| invalid(format!("missing {description} attribute")))
+}
+
+fn parse_range(range: &str, description: &str) -> Result<(u32, u32, u32, u32)> {
+    let mut references = range.split(':');
+    let start = references
+        .next()
+        .ok_or_else(|| invalid(format!("empty {description}")))?;
+    let (start_column, start_row) =
+        Cell::reference_to_coords(start).map_err(|error| invalid(error.to_string()))?;
+    let (end_column, end_row) = match references.next() {
+        Some(end) => Cell::reference_to_coords(end).map_err(|error| invalid(error.to_string()))?,
+        None => (start_column, start_row),
+    };
+    if references.next().is_some() || start_row > end_row || start_column > end_column {
+        return Err(invalid(format!("invalid {description} '{range}'")));
+    }
+    Ok((start_row, start_column, end_row, end_column))
+}
+
 fn optional_f64(
     element: &BytesStart<'_>,
     name: &[u8],
@@ -1127,6 +1281,56 @@ mod tests {
         let data = parse_worksheet_data(&xml).unwrap();
         assert_eq!(data.cells.len(), 1);
         assert_eq!(data.cells[&4][&2], CellValue::String("strict".to_string()));
+    }
+
+    #[test]
+    fn parses_columns_and_merged_regions_namespace_aware() {
+        let xml = format!(
+            r#"<x:worksheet xmlns:x="{STRICT_S}" xmlns:f="urn:foreign">
+                <f:cols><x:col min="1" max="16384" hidden="1"/></f:cols>
+                <x:cols>
+                    <f:col min="1" max="1" width="99"/>
+                    <x:col min="2" max="3" width="12.5" hidden="true" customWidth="0"/>
+                    <x:col min="3" max="3" hidden="1"></x:col>
+                </x:cols>
+                <f:mergeCells><x:mergeCell ref="A1:XFD1048576"/></f:mergeCells>
+                <x:mergeCells count="2">
+                    <x:mergeCell ref="B2:C3"/>
+                    <x:mergeCell ref="D4"></x:mergeCell>
+                </x:mergeCells>
+            </x:worksheet>"#
+        );
+        let data = parse_worksheet_data(&xml).unwrap();
+
+        assert_eq!(data.columns.len(), 2);
+        assert_eq!(data.columns[&2].width, Some(12.5));
+        assert!(data.columns[&2].hidden);
+        assert!(!data.columns[&2].custom_width);
+        assert_eq!(data.columns[&3].width, None);
+        assert!(data.columns[&3].hidden);
+        assert_eq!(data.merged_regions, vec![(2, 2, 3, 3), (4, 4, 4, 4)]);
+    }
+
+    #[test]
+    fn rejects_invalid_columns_and_merged_regions() {
+        let invalid_documents = [
+            "<cols><col min=\"0\" max=\"1\"/></cols>",
+            "<cols><col min=\"2\" max=\"1\"/></cols>",
+            "<cols><col min=\"1\" max=\"16385\"/></cols>",
+            "<cols><col min=\"1\" max=\"1\" width=\"NaN\"/></cols>",
+            "<cols><col min=\"1\" max=\"1\" hidden=\"TRUE\"/></cols>",
+            "<mergeCells count=\"2\"><mergeCell ref=\"A1:B2\"/></mergeCells>",
+            "<mergeCells><mergeCell ref=\"C3:B2\"/></mergeCells>",
+            "<mergeCells><mergeCell ref=\"A1:B2\"/><mergeCell ref=\"A1:B2\"/></mergeCells>",
+        ];
+
+        for fragment in invalid_documents {
+            let xml = wrap(fragment);
+            assert!(
+                parse_worksheet_data(&xml).is_err(),
+                "accepted invalid worksheet fragment: {fragment}"
+            );
+        }
     }
 
     #[test]
