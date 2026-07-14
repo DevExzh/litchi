@@ -3059,9 +3059,30 @@ fn parse_surface_band_formats<R: BufRead>(
 
 fn parse_surface_band_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<BandFormat> {
     let mut index = None;
+    let mut shape_properties = None;
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "surface chart band format contains duplicate shape properties".into(),
+                    ));
+                }
+                shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_fragment(element, "surface chart band shape properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "surface chart band format contains duplicate shape properties".into(),
+                    ));
+                }
+                shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
                 if element.local_name().as_ref() == b"idx" =>
             {
@@ -3083,9 +3104,10 @@ fn parse_surface_band_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Resu
         }
         buf.clear();
     }
-    Ok(BandFormat::new(index.ok_or_else(|| {
-        missing_attribute("surface chart band index")
-    })?))
+    let mut format =
+        BandFormat::new(index.ok_or_else(|| missing_attribute("surface chart band index"))?);
+    format.shape_properties = shape_properties;
+    Ok(format)
 }
 
 fn parse_bar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<BarTypeGroup>> {
@@ -7806,10 +7828,11 @@ mod tests {
     #[test]
     fn round_trips_and_validates_surface_band_formats() {
         let xml =
-            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+                xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
             <c:chart><c:plotArea>
                 <c:surfaceChart><c:wireframe/><c:bandFmts>
-                    <c:bandFmt><c:idx val="2"/><c:spPr/></c:bandFmt>
+                    <c:bandFmt><c:idx val="2"/><c:spPr><a:solidFill><a:srgbClr val="102030"/></a:solidFill></c:spPr></c:bandFmt>
                     <c:bandFmt><c:idx val="7"/><c:spPr/></c:bandFmt>
                 </c:bandFmts></c:surfaceChart>
                 <c:surface3DChart><c:bandFmts/></c:surface3DChart>
@@ -7830,6 +7853,20 @@ mod tests {
                 .collect::<Vec<_>>(),
             [2, 7]
         );
+        assert!(
+            std::str::from_utf8(
+                surface.band_formats.as_ref().unwrap()[0]
+                    .shape_properties
+                    .as_ref()
+                    .unwrap()
+                    .as_xml()
+            )
+            .unwrap()
+            .contains("102030")
+        );
+        let expected_shape_properties = surface.band_formats.as_ref().unwrap()[0]
+            .shape_properties
+            .clone();
         let TypeGroup::Surface3D(surface) = &chart.plot_area.type_groups[1] else {
             panic!("expected 3D surface chart");
         };
@@ -7842,6 +7879,10 @@ mod tests {
             panic!("expected surface chart");
         };
         assert_eq!(surface.band_formats.as_ref().unwrap().len(), 2);
+        assert_eq!(
+            surface.band_formats.as_ref().unwrap()[0].shape_properties,
+            expected_shape_properties
+        );
 
         let duplicate =
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">

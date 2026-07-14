@@ -2269,11 +2269,11 @@ fn write_surface_band_formats<W: Write>(
                 format.index
             )));
         }
-        write!(
-            writer,
-            r#"<c:bandFmt><c:idx val="{}"/><c:spPr/></c:bandFmt>"#,
-            format.index
-        )?;
+        write!(writer, r#"<c:bandFmt><c:idx val="{}"/>"#, format.index)?;
+        if let Some(shape_properties) = format.shape_properties.as_ref() {
+            writer.write_all(shape_properties.as_xml())?;
+        }
+        write!(writer, "</c:bandFmt>")?;
     }
     write!(writer, "</c:bandFmts>")?;
     Ok(())

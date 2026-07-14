@@ -671,17 +671,22 @@ impl Default for StockTypeGroup {
 }
 
 /// Formatting entry for one indexed surface-chart band.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BandFormat {
     /// Zero-based band index
     pub index: u32,
+    /// DrawingML shape properties for the surface band
+    pub shape_properties: Option<ChartShapeProperties>,
 }
 
 impl BandFormat {
     /// Create a surface band-format entry.
     #[inline]
     pub fn new(index: u32) -> Self {
-        Self { index }
+        Self {
+            index,
+            shape_properties: None,
+        }
     }
 }
 

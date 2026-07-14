@@ -1140,6 +1140,24 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                 append_chart_line_fragment(&mut fragments, group.high_low_lines.as_ref());
                 append_up_down_bar_fragments(&mut fragments, group.up_down_bars.as_ref());
             },
+            crate::charts::TypeGroup::Surface(group) => {
+                if let Some(formats) = group.band_formats.as_ref() {
+                    for format in formats {
+                        if let Some(shape_properties) = format.shape_properties.as_ref() {
+                            fragments.push(shape_properties.as_xml());
+                        }
+                    }
+                }
+            },
+            crate::charts::TypeGroup::Surface3D(group) => {
+                if let Some(formats) = group.band_formats.as_ref() {
+                    for format in formats {
+                        if let Some(shape_properties) = format.shape_properties.as_ref() {
+                            fragments.push(shape_properties.as_xml());
+                        }
+                    }
+                }
+            },
             _ => {},
         }
         for series in &group.common().series {

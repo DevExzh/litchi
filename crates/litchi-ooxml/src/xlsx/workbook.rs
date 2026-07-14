@@ -2789,6 +2789,20 @@ mod tests {
             .plot_area
             .type_groups
             .push(TypeGroup::Line(line));
+        let mut surface = crate::charts::plot_area::SurfaceTypeGroup::new();
+        let mut band = crate::charts::plot_area::BandFormat::new(0);
+        band.shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId444"/></a:blipFill></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        surface.band_formats = Some(vec![band]);
+        chart
+            .chart
+            .plot_area
+            .type_groups
+            .push(TypeGroup::Surface(surface));
         let mut legend = crate::charts::Legend {
             shape_properties: Some(
                 ChartShapeProperties::from_xml(
@@ -2947,6 +2961,7 @@ mod tests {
                 "rId441".to_string(),
                 "rId442".to_string(),
                 "rId443".to_string(),
+                "rId444".to_string(),
             ]
             .into()
         );
@@ -2961,7 +2976,7 @@ mod tests {
                 "rId419", "rId420", "rId421", "rId422", "rId423", "rId424", "rId425", "rId426",
                 "rId427", "rId428", "rId429", "rId430", "rId431", "rId432", "rId433", "rId434",
                 "rId435", "rId436", "rId437", "rId438", "rId439", "rId440", "rId441", "rId442",
-                "rId443",
+                "rId443", "rId444",
             ]
             .iter()
             .any(|relationship_id| error.contains(relationship_id))
