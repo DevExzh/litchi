@@ -828,6 +828,46 @@ fn append_up_down_bar_fragments<'a>(
     }
 }
 
+fn append_point_data_label_fragments<'a>(
+    fragments: &mut Vec<&'a [u8]>,
+    label: Option<&'a crate::charts::DataLabel>,
+) {
+    let Some(label) = label else {
+        return;
+    };
+    if let Some(shape_properties) = label.shape_properties.as_ref() {
+        fragments.push(shape_properties.as_xml());
+    }
+    if let Some(text_properties) = label.text_properties.as_ref() {
+        fragments.push(text_properties.as_xml());
+    }
+    if let Some(extension_list) = label.extension_list.as_ref() {
+        fragments.push(extension_list.as_xml());
+    }
+}
+
+fn append_data_label_fragments<'a>(
+    fragments: &mut Vec<&'a [u8]>,
+    labels: Option<&'a crate::charts::DataLabels>,
+) {
+    let Some(labels) = labels else {
+        return;
+    };
+    if let Some(shape_properties) = labels.shape_properties.as_ref() {
+        fragments.push(shape_properties.as_xml());
+    }
+    if let Some(text_properties) = labels.text_properties.as_ref() {
+        fragments.push(text_properties.as_xml());
+    }
+    append_chart_line_fragment(fragments, labels.leader_lines.as_ref());
+    if let Some(extension_list) = labels.extension_list.as_ref() {
+        fragments.push(extension_list.as_xml());
+    }
+    for label in &labels.labels {
+        append_point_data_label_fragments(fragments, Some(label));
+    }
+}
+
 pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<HashSet<String>> {
     const RELATIONSHIPS_NAMESPACE: &[u8] =
         b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -994,6 +1034,7 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                 .into_iter()
                 .flatten(),
             );
+            append_point_data_label_fragments(&mut fragments, format.data_label.as_ref());
         }
     }
     for axis in &chart.plot_area.axes {
@@ -1124,6 +1165,7 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                 .into_iter()
                 .flatten(),
             );
+            append_data_label_fragments(&mut fragments, series.data_labels.as_ref());
             for point in &series.data_points {
                 fragments.extend(
                     [

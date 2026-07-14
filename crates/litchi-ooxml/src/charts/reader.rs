@@ -4040,6 +4040,86 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
                     "chart point data label is missing its index".into(),
                 ));
             },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if labels.shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data labels contain duplicate shape properties".into(),
+                    ));
+                }
+                labels.shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_fragment(element, "chart data-label shape properties")?,
+                )?);
+                saw_shared_settings = true;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if labels.shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data labels contain duplicate shape properties".into(),
+                    ));
+                }
+                labels.shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+                saw_shared_settings = true;
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"txPr" => {
+                if labels.text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data labels contain duplicate text properties".into(),
+                    ));
+                }
+                labels.text_properties = Some(ChartTextProperties::from_xml(
+                    reader.capture_fragment(element, "chart data-label text properties")?,
+                )?);
+                saw_shared_settings = true;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"txPr" => {
+                if labels.text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data labels contain duplicate text properties".into(),
+                    ));
+                }
+                labels.text_properties = Some(ChartTextProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+                saw_shared_settings = true;
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"leaderLines" => {
+                set_chart_lines(
+                    &mut labels.leader_lines,
+                    parse_chart_lines(reader, b"leaderLines")?,
+                    "chart data-label leader lines",
+                )?;
+                saw_shared_settings = true;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"leaderLines" => {
+                set_chart_lines(
+                    &mut labels.leader_lines,
+                    ChartLines::new(),
+                    "chart data-label leader lines",
+                )?;
+                saw_shared_settings = true;
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if labels.extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data labels contain duplicate extension lists".into(),
+                    ));
+                }
+                labels.extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_fragment(element, "chart data-label extension list")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if labels.extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data labels contain duplicate extension lists".into(),
+                    ));
+                }
+                labels.extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"separator" => {
                 saw_shared_settings = true;
                 labels.separator = Some(parse_text_element(reader, b"separator")?);
@@ -4160,6 +4240,70 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
                 }
                 label.text = parse_label_text(reader)?;
                 saw_settings = true;
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if label.shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart point data label contains duplicate shape properties".into(),
+                    ));
+                }
+                label.shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_fragment(element, "chart point data-label shape properties")?,
+                )?);
+                saw_settings = true;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if label.shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart point data label contains duplicate shape properties".into(),
+                    ));
+                }
+                label.shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+                saw_settings = true;
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"txPr" => {
+                if label.text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart point data label contains duplicate text properties".into(),
+                    ));
+                }
+                label.text_properties = Some(ChartTextProperties::from_xml(
+                    reader.capture_fragment(element, "chart point data-label text properties")?,
+                )?);
+                saw_settings = true;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"txPr" => {
+                if label.text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart point data label contains duplicate text properties".into(),
+                    ));
+                }
+                label.text_properties = Some(ChartTextProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+                saw_settings = true;
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if label.extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart point data label contains duplicate extension lists".into(),
+                    ));
+                }
+                label.extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_fragment(element, "chart point data-label extension list")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if label.extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart point data label contains duplicate extension lists".into(),
+                    ));
+                }
+                label.extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"separator" => {
                 label.separator = Some(parse_text_element(reader, b"separator")?);
@@ -8035,6 +8179,32 @@ mod tests {
         labels.number_format = Some(NumberFormat::new("0.0%").with_source_linked(false));
         labels.show_series_name = true;
         labels.show_leader_lines = true;
+        labels.shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:solidFill><a:srgbClr val="DDEEFF"/></a:solidFill></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        labels.text_properties = Some(
+            ChartTextProperties::from_xml(
+                br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:bodyPr rot="1200000"/><a:lstStyle/><a:p/></c:txPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        labels.leader_lines = Some(ChartLines {
+            shape_properties: Some(
+                ChartShapeProperties::from_xml(
+                    br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:ln w="38100"/></c:spPr>"#.to_vec(),
+                )
+                .unwrap(),
+            ),
+        });
+        labels.extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:x="urn:example:labels"><c:ext uri="labels"><x:payload/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
         labels.separator = Some(" & ".to_string());
         let mut point_label = DataLabel::new(2);
         point_label.layout = Some(Layout::new().with_position(0.6, 0.7));
@@ -8043,6 +8213,24 @@ mod tests {
         point_label.position = Some(DataLabelPosition::Left);
         point_label.show_category_name = true;
         point_label.separator = Some(" / ".to_string());
+        point_label.shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:noFill/></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        point_label.text_properties = Some(
+            ChartTextProperties::from_xml(
+                br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:bodyPr vert="vert"/><a:lstStyle/><a:p/></c:txPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        point_label.extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:x="urn:example:labels"><c:ext uri="point-label"><x:payload/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
         labels.labels.push(point_label);
         scatter_series.data_labels = Some(labels);
         let mut trendline = Trendline::linear();
@@ -8289,6 +8477,31 @@ mod tests {
         assert!(labels.show_value);
         assert!(labels.show_series_name);
         assert!(labels.show_leader_lines);
+        assert!(
+            std::str::from_utf8(labels.shape_properties.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("DDEEFF")
+        );
+        assert!(
+            std::str::from_utf8(labels.text_properties.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("1200000")
+        );
+        assert!(
+            std::str::from_utf8(
+                labels
+                    .leader_lines
+                    .as_ref()
+                    .unwrap()
+                    .shape_properties
+                    .as_ref()
+                    .unwrap()
+                    .as_xml()
+            )
+            .unwrap()
+            .contains("38100")
+        );
+        assert!(labels.extension_list.is_some());
         let number_format = labels.number_format.as_ref().unwrap();
         assert_eq!(number_format.format_code, "0.0%");
         assert!(!number_format.source_linked);
@@ -8309,6 +8522,13 @@ mod tests {
         assert_eq!(point_label.position, Some(DataLabelPosition::Left));
         assert!(point_label.show_category_name);
         assert_eq!(point_label.separator.as_deref(), Some(" / "));
+        assert!(point_label.shape_properties.is_some());
+        assert!(
+            std::str::from_utf8(point_label.text_properties.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("vert")
+        );
+        assert!(point_label.extension_list.is_some());
         assert_eq!(series.trendlines.len(), 1);
         assert_eq!(series.trendlines[0].name.as_deref(), Some("Forecast & fit"));
         assert_eq!(series.trendlines[0].forward, Some(2.5));

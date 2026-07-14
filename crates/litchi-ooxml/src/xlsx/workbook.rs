@@ -2681,6 +2681,54 @@ mod tests {
             .unwrap(),
         );
         line_series.data_points.push(line_point);
+        let mut line_labels = crate::charts::DataLabels::new();
+        line_labels.shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId430"/></a:blipFill></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        line_labels.text_properties = Some(
+            crate::charts::ChartTextProperties::from_xml(
+                br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr><a:hlinkClick r:id="rId431"/></a:defRPr></a:pPr></a:p></c:txPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        line_labels.leader_lines = Some(crate::charts::ChartLines {
+            shape_properties: Some(
+                ChartShapeProperties::from_xml(
+                    br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId432"/></a:blipFill></c:spPr>"#.to_vec(),
+                )
+                .unwrap(),
+            ),
+        });
+        line_labels.extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="labels"><x:reference r:id="rId433"/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        let mut line_label = crate::charts::DataLabel::new(0);
+        line_label.shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId434"/></a:blipFill></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        line_label.text_properties = Some(
+            crate::charts::ChartTextProperties::from_xml(
+                br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr><a:hlinkClick r:id="rId435"/></a:defRPr></a:pPr></a:p></c:txPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        line_label.extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="label"><x:reference r:id="rId436"/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        line_labels.labels.push(line_label);
+        line_series.data_labels = Some(line_labels);
         line.common.series.push(line_series);
         chart
             .chart
@@ -2831,6 +2879,13 @@ mod tests {
                 "rId427".to_string(),
                 "rId428".to_string(),
                 "rId429".to_string(),
+                "rId430".to_string(),
+                "rId431".to_string(),
+                "rId432".to_string(),
+                "rId433".to_string(),
+                "rId434".to_string(),
+                "rId435".to_string(),
+                "rId436".to_string(),
             ]
             .into()
         );
@@ -2843,7 +2898,8 @@ mod tests {
                 "rId403", "rId404", "rId405", "rId406", "rId407", "rId408", "rId409", "rId410",
                 "rId411", "rId412", "rId413", "rId414", "rId415", "rId416", "rId417", "rId418",
                 "rId419", "rId420", "rId421", "rId422", "rId423", "rId424", "rId425", "rId426",
-                "rId427", "rId428", "rId429",
+                "rId427", "rId428", "rId429", "rId430", "rId431", "rId432", "rId433", "rId434",
+                "rId435", "rId436",
             ]
             .iter()
             .any(|relationship_id| error.contains(relationship_id))

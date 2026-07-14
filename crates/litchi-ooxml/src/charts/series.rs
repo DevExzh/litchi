@@ -5,7 +5,7 @@
 
 use crate::charts::chart::{ChartExtensionList, ChartShapeProperties, PictureOptions};
 use crate::charts::models::{Layout, NumberFormat, NumericData, StringData, TitleText};
-use crate::charts::plot_area::BarShape;
+use crate::charts::plot_area::{BarShape, ChartLines};
 use crate::charts::types::{DataLabelPosition, MarkerStyle};
 
 /// Marker formatting shared by chart elements that support point symbols.
@@ -110,6 +110,10 @@ pub struct DataLabels {
     pub labels: Vec<DataLabel>,
     /// Number format for label values
     pub number_format: Option<NumberFormat>,
+    /// DrawingML shape properties for all labels
+    pub shape_properties: Option<ChartShapeProperties>,
+    /// DrawingML text properties for all labels
+    pub text_properties: Option<crate::charts::chart::ChartTextProperties>,
     /// Position of data labels
     pub position: Option<DataLabelPosition>,
     /// Show legend key
@@ -126,10 +130,14 @@ pub struct DataLabels {
     pub show_bubble_size: bool,
     /// Show leader lines between labels and data points
     pub show_leader_lines: bool,
+    /// Leader-line formatting
+    pub leader_lines: Option<ChartLines>,
     /// Separator between label components
     pub separator: Option<String>,
     /// Whether data labels are deleted
     pub deleted: bool,
+    /// Data-label collection extension list
+    pub extension_list: Option<ChartExtensionList>,
 }
 
 impl DataLabels {
@@ -139,6 +147,8 @@ impl DataLabels {
         Self {
             labels: Vec::new(),
             number_format: None,
+            shape_properties: None,
+            text_properties: None,
             position: None,
             show_legend_key: false,
             show_value: false,
@@ -147,8 +157,10 @@ impl DataLabels {
             show_percent: false,
             show_bubble_size: false,
             show_leader_lines: false,
+            leader_lines: None,
             separator: None,
             deleted: false,
+            extension_list: None,
         }
     }
 
@@ -180,6 +192,10 @@ pub struct DataLabel {
     pub text: Option<TitleText>,
     /// Number format for the label value
     pub number_format: Option<NumberFormat>,
+    /// DrawingML shape properties for this label
+    pub shape_properties: Option<ChartShapeProperties>,
+    /// DrawingML text properties for this label
+    pub text_properties: Option<crate::charts::chart::ChartTextProperties>,
     /// Position of the label
     pub position: Option<DataLabelPosition>,
     /// Show legend key
@@ -196,6 +212,8 @@ pub struct DataLabel {
     pub show_bubble_size: bool,
     /// Separator between label components
     pub separator: Option<String>,
+    /// Point data-label extension list
+    pub extension_list: Option<ChartExtensionList>,
 }
 
 impl DataLabel {
@@ -208,6 +226,8 @@ impl DataLabel {
             layout: None,
             text: None,
             number_format: None,
+            shape_properties: None,
+            text_properties: None,
             position: None,
             show_legend_key: false,
             show_value: false,
@@ -216,6 +236,7 @@ impl DataLabel {
             show_percent: false,
             show_bubble_size: false,
             separator: None,
+            extension_list: None,
         }
     }
 }

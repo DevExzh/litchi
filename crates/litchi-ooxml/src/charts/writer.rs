@@ -1623,7 +1623,28 @@ fn write_data_labels<W: Write>(writer: &mut W, labels: &DataLabels) -> std::io::
         write_data_label(writer, label)?;
     }
     if labels.deleted {
+        if labels.number_format.is_some()
+            || labels.shape_properties.is_some()
+            || labels.text_properties.is_some()
+            || labels.position.is_some()
+            || labels.show_legend_key
+            || labels.show_value
+            || labels.show_category_name
+            || labels.show_series_name
+            || labels.show_percent
+            || labels.show_bubble_size
+            || labels.separator.is_some()
+            || labels.show_leader_lines
+            || labels.leader_lines.is_some()
+        {
+            return Err(invalid_chart_input(
+                "chart data labels cannot mix deletion with shared settings",
+            ));
+        }
         write!(writer, r#"<c:delete val="1"/>"#)?;
+        if let Some(extension_list) = labels.extension_list.as_ref() {
+            writer.write_all(extension_list.as_xml())?;
+        }
         write!(writer, "</c:dLbls>")?;
         return Ok(());
     }
@@ -1638,6 +1659,12 @@ fn write_data_labels<W: Write>(writer: &mut W, labels: &DataLabels) -> std::io::
                 "0"
             }
         )?;
+    }
+    if let Some(shape_properties) = labels.shape_properties.as_ref() {
+        writer.write_all(shape_properties.as_xml())?;
+    }
+    if let Some(text_properties) = labels.text_properties.as_ref() {
+        writer.write_all(text_properties.as_xml())?;
     }
     if let Some(position) = labels.position {
         write!(writer, r#"<c:dLblPos val="{}"/>"#, position.xml_value())?;
@@ -1666,6 +1693,12 @@ fn write_data_labels<W: Write>(writer: &mut W, labels: &DataLabels) -> std::io::
     if labels.show_leader_lines {
         write!(writer, r#"<c:showLeaderLines val="1"/>"#)?;
     }
+    if let Some(lines) = labels.leader_lines.as_ref() {
+        write_chart_lines(writer, "leaderLines", lines)?;
+    }
+    if let Some(extension_list) = labels.extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
+    }
     write!(writer, "</c:dLbls>")?;
     Ok(())
 }
@@ -1673,7 +1706,29 @@ fn write_data_labels<W: Write>(writer: &mut W, labels: &DataLabels) -> std::io::
 fn write_data_label<W: Write>(writer: &mut W, label: &DataLabel) -> std::io::Result<()> {
     write!(writer, r#"<c:dLbl><c:idx val="{}"/>"#, label.index)?;
     if label.deleted {
-        write!(writer, r#"<c:delete val="1"/></c:dLbl>"#)?;
+        if label.layout.is_some()
+            || label.text.is_some()
+            || label.number_format.is_some()
+            || label.shape_properties.is_some()
+            || label.text_properties.is_some()
+            || label.position.is_some()
+            || label.show_legend_key
+            || label.show_value
+            || label.show_category_name
+            || label.show_series_name
+            || label.show_percent
+            || label.show_bubble_size
+            || label.separator.is_some()
+        {
+            return Err(invalid_chart_input(
+                "chart point data label cannot mix deletion with label settings",
+            ));
+        }
+        write!(writer, r#"<c:delete val="1"/>"#)?;
+        if let Some(extension_list) = label.extension_list.as_ref() {
+            writer.write_all(extension_list.as_xml())?;
+        }
+        write!(writer, "</c:dLbl>")?;
         return Ok(());
     }
     if let Some(layout) = label.layout.as_ref() {
@@ -1693,6 +1748,12 @@ fn write_data_label<W: Write>(writer: &mut W, label: &DataLabel) -> std::io::Res
                 "0"
             }
         )?;
+    }
+    if let Some(shape_properties) = label.shape_properties.as_ref() {
+        writer.write_all(shape_properties.as_xml())?;
+    }
+    if let Some(text_properties) = label.text_properties.as_ref() {
+        writer.write_all(text_properties.as_xml())?;
     }
     if let Some(position) = label.position {
         write!(writer, r#"<c:dLblPos val="{}"/>"#, position.xml_value())?;
@@ -1717,6 +1778,9 @@ fn write_data_label<W: Write>(writer: &mut W, label: &DataLabel) -> std::io::Res
             "<c:separator>{}</c:separator>",
             escape_xml(separator)
         )?;
+    }
+    if let Some(extension_list) = label.extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
     }
     write!(writer, "</c:dLbl>")?;
     Ok(())
