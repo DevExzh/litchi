@@ -6,7 +6,7 @@ use crate::charts::axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, 
 use crate::charts::chart::{
     Chart, ChartExternalData, ChartHeaderFooter, ChartPageMargins, ChartPageSetup,
     ChartPrintSettings, ChartProtection, ChartUserShapes, ColorMapOverride, ColorMapping,
-    PivotFormat, PivotSource, View3D, WallFloor,
+    PictureOptions, PivotFormat, PivotSource, View3D, WallFloor,
 };
 use crate::charts::legend::Legend;
 use crate::charts::models::{Layout, NumericData, StringData, TitleText};
@@ -582,6 +582,49 @@ fn write_wall_floor<W: Write>(writer: &mut W, wall_floor: &WallFloor) -> std::io
     if let Some(thickness) = wall_floor.thickness {
         write!(writer, r#"<c:thickness val="{}"/>"#, thickness)?;
     }
+    if let Some(shape_properties) = wall_floor.shape_properties.as_ref() {
+        writer.write_all(shape_properties.as_xml())?;
+    }
+    if let Some(options) = wall_floor.picture_options.as_ref() {
+        write_picture_options(writer, options)?;
+    }
+    if let Some(extension_list) = wall_floor.extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
+    }
+    Ok(())
+}
+
+fn write_picture_options<W: Write>(
+    writer: &mut W,
+    options: &PictureOptions,
+) -> std::io::Result<()> {
+    write!(writer, "<c:pictureOptions>")?;
+    for (name, value) in [
+        ("applyToFront", options.apply_to_front),
+        ("applyToSides", options.apply_to_sides),
+        ("applyToEnd", options.apply_to_end),
+    ] {
+        if let Some(value) = value {
+            write!(
+                writer,
+                r#"<c:{} val="{}"/>"#,
+                name,
+                if value { "1" } else { "0" }
+            )?;
+        }
+    }
+    if let Some(format) = options.picture_format {
+        write!(writer, r#"<c:pictureFormat val="{}"/>"#, format.xml_value())?;
+    }
+    if let Some(unit) = options.picture_stack_unit {
+        if !unit.is_finite() {
+            return Err(invalid_chart_input(
+                "chart picture stack unit must be finite",
+            ));
+        }
+        write!(writer, r#"<c:pictureStackUnit val="{}"/>"#, unit)?;
+    }
+    write!(writer, "</c:pictureOptions>")?;
     Ok(())
 }
 

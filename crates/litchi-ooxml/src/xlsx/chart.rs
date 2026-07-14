@@ -825,6 +825,36 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
             .extension_list
             .as_ref()
             .map(crate::charts::ChartExtensionList::as_xml),
+        chart
+            .floor
+            .as_ref()
+            .and_then(|surface| surface.shape_properties.as_ref())
+            .map(crate::charts::ChartShapeProperties::as_xml),
+        chart
+            .back_wall
+            .as_ref()
+            .and_then(|surface| surface.shape_properties.as_ref())
+            .map(crate::charts::ChartShapeProperties::as_xml),
+        chart
+            .side_wall
+            .as_ref()
+            .and_then(|surface| surface.shape_properties.as_ref())
+            .map(crate::charts::ChartShapeProperties::as_xml),
+        chart
+            .floor
+            .as_ref()
+            .and_then(|surface| surface.extension_list.as_ref())
+            .map(crate::charts::ChartExtensionList::as_xml),
+        chart
+            .back_wall
+            .as_ref()
+            .and_then(|surface| surface.extension_list.as_ref())
+            .map(crate::charts::ChartExtensionList::as_xml),
+        chart
+            .side_wall
+            .as_ref()
+            .and_then(|surface| surface.extension_list.as_ref())
+            .map(crate::charts::ChartExtensionList::as_xml),
     ];
     for xml in fragments.into_iter().flatten() {
         let mut reader = NsReader::from_reader(xml);

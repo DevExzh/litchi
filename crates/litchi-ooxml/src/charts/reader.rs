@@ -11,7 +11,7 @@ use crate::charts::chart::{
     Chart, ChartExtensionList, ChartExternalData, ChartHeaderFooter, ChartPageMargins,
     ChartPageOrientation, ChartPageSetup, ChartPrintSettings, ChartProtection,
     ChartShapeProperties, ChartTextProperties, ChartUserShapes, ColorMapOverride, ColorMapping,
-    ColorSchemeIndex, PivotFormat, PivotSource, View3D, WallFloor,
+    ColorSchemeIndex, PictureFormat, PictureOptions, PivotFormat, PivotSource, View3D, WallFloor,
 };
 use crate::charts::legend::{Legend, LegendEntry};
 use crate::charts::models::{
@@ -470,6 +470,60 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
                 }
                 chart.pivot_formats = Some(Vec::new());
             },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"view3D" => {
+                if chart.view_3d.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate 3D views".into(),
+                    ));
+                }
+                chart.view_3d = Some(parse_view_3d(&mut xml_reader)?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"view3D" => {
+                if chart.view_3d.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate 3D views".into(),
+                    ));
+                }
+                chart.view_3d = Some(View3D::new());
+            },
+            Ok(Event::Start(ref e))
+                if matches!(
+                    e.local_name().as_ref(),
+                    b"floor" | b"backWall" | b"sideWall"
+                ) =>
+            {
+                let target = match e.local_name().as_ref() {
+                    b"floor" => &mut chart.floor,
+                    b"backWall" => &mut chart.back_wall,
+                    b"sideWall" => &mut chart.side_wall,
+                    _ => unreachable!(),
+                };
+                if target.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate 3D surfaces".into(),
+                    ));
+                }
+                *target = Some(parse_wall_floor(&mut xml_reader)?);
+            },
+            Ok(Event::Empty(ref e))
+                if matches!(
+                    e.local_name().as_ref(),
+                    b"floor" | b"backWall" | b"sideWall"
+                ) =>
+            {
+                let target = match e.local_name().as_ref() {
+                    b"floor" => &mut chart.floor,
+                    b"backWall" => &mut chart.back_wall,
+                    b"sideWall" => &mut chart.side_wall,
+                    _ => unreachable!(),
+                };
+                if target.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate 3D surfaces".into(),
+                    ));
+                }
+                *target = Some(WallFloor::new());
+            },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"plotArea" => {
                 chart.plot_area = PlotArea::new();
             },
@@ -614,18 +668,6 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
                     },
                     b"autoTitleDeleted" => {
                         chart.auto_title_deleted = parse_bool_attr(e)?;
-                    },
-                    b"view3D" => {
-                        chart.view_3d = Some(parse_view_3d(&mut xml_reader)?);
-                    },
-                    b"floor" => {
-                        chart.floor = Some(parse_wall_floor(&mut xml_reader)?);
-                    },
-                    b"backWall" => {
-                        chart.back_wall = Some(parse_wall_floor(&mut xml_reader)?);
-                    },
-                    b"sideWall" => {
-                        chart.side_wall = Some(parse_wall_floor(&mut xml_reader)?);
                     },
                     b"plotArea" => {
                         chart.plot_area = parse_plot_area(&mut xml_reader)?;
@@ -1498,10 +1540,78 @@ fn parse_wall_floor<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<WallFl
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e))
-                if e.local_name().as_ref() == b"thickness" =>
-            {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"thickness" => {
+                if wall_floor.thickness.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart surface contains duplicate thickness values".into(),
+                    ));
+                }
                 wall_floor.thickness = Some(bounded_u32_attr(e, "chart wall thickness", 0, 4096)?);
+                consume_empty_chart_element(reader, b"thickness", "chart surface thickness")?;
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"thickness" => {
+                if wall_floor.thickness.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart surface contains duplicate thickness values".into(),
+                    ));
+                }
+                wall_floor.thickness = Some(bounded_u32_attr(e, "chart wall thickness", 0, 4096)?);
+            },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"spPr" => {
+                if wall_floor.shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart surface contains duplicate shape properties".into(),
+                    ));
+                }
+                wall_floor.shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_fragment(e, "chart surface shape properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"spPr" => {
+                if wall_floor.shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart surface contains duplicate shape properties".into(),
+                    ));
+                }
+                wall_floor.shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_empty_fragment(e)?,
+                )?);
+            },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"pictureOptions" => {
+                if wall_floor.picture_options.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart surface contains duplicate picture options".into(),
+                    ));
+                }
+                wall_floor.picture_options = Some(parse_picture_options(reader)?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"pictureOptions" => {
+                if wall_floor.picture_options.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart surface contains duplicate picture options".into(),
+                    ));
+                }
+                wall_floor.picture_options = Some(PictureOptions::default());
+            },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"extLst" => {
+                if wall_floor.extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart surface contains duplicate extension lists".into(),
+                    ));
+                }
+                wall_floor.extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_fragment(e, "chart surface extension list")?,
+                )?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"extLst" => {
+                if wall_floor.extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart surface contains duplicate extension lists".into(),
+                    ));
+                }
+                wall_floor.extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_empty_fragment(e)?,
+                )?);
             },
             Ok(Event::End(ref e)) => {
                 let tag_name = e.local_name();
@@ -1524,6 +1634,97 @@ fn parse_wall_floor<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<WallFl
     }
 
     Ok(wall_floor)
+}
+
+fn parse_picture_options<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PictureOptions> {
+    let mut options = PictureOptions::default();
+    let mut buffer = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buffer) {
+            Ok(Event::Start(ref element))
+                if is_picture_option_child(element.local_name().as_ref()) =>
+            {
+                parse_picture_option_child(&mut options, element, reader.decoder())?;
+                let name = element.local_name().as_ref().to_vec();
+                consume_empty_chart_element(reader, &name, "chart picture option")?;
+            },
+            Ok(Event::Empty(ref element))
+                if is_picture_option_child(element.local_name().as_ref()) =>
+            {
+                parse_picture_option_child(&mut options, element, reader.decoder())?;
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"pictureOptions" => {
+                break;
+            },
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart picture options".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buffer.clear();
+    }
+    Ok(options)
+}
+
+fn is_picture_option_child(name: &[u8]) -> bool {
+    matches!(
+        name,
+        b"applyToFront" | b"applyToSides" | b"applyToEnd" | b"pictureFormat" | b"pictureStackUnit"
+    )
+}
+
+fn parse_picture_option_child(
+    options: &mut PictureOptions,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+) -> Result<()> {
+    let target = match element.local_name().as_ref() {
+        b"applyToFront" => Some(&mut options.apply_to_front),
+        b"applyToSides" => Some(&mut options.apply_to_sides),
+        b"applyToEnd" => Some(&mut options.apply_to_end),
+        b"pictureFormat" => {
+            if options.picture_format.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart picture options contain duplicate formats".into(),
+                ));
+            }
+            let value = required_string_attr(element, b"val", decoder, "chart picture format")?;
+            options.picture_format = Some(match value.as_str() {
+                "stretch" => PictureFormat::Stretch,
+                "stack" => PictureFormat::Stack,
+                "stackScale" => PictureFormat::StackScale,
+                _ => {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "invalid chart picture format '{value}'"
+                    )));
+                },
+            });
+            None
+        },
+        b"pictureStackUnit" => {
+            if options.picture_stack_unit.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart picture options contain duplicate stack units".into(),
+                ));
+            }
+            options.picture_stack_unit =
+                Some(required_f64_attr(element, "chart picture stack unit")?);
+            None
+        },
+        _ => unreachable!("picture option child was checked by caller"),
+    };
+    if let Some(target) = target {
+        if target.is_some() {
+            return Err(OoxmlError::InvalidFormat(
+                "chart picture options contain a duplicate apply flag".into(),
+            ));
+        }
+        *target = Some(parse_bool_attr(element)?);
+    }
+    Ok(())
 }
 
 fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotArea> {
@@ -5239,6 +5440,62 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn round_trips_chart_surface_shape_and_picture_options() {
+        let xml = br#"<c:chartSpace
+                xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+                xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                xmlns:x="urn:example:surface">
+            <c:chart><c:floor>
+                <c:thickness val="64"/>
+                <c:spPr><a:solidFill><a:srgbClr val="ABCDEF"/></a:solidFill></c:spPr>
+                <c:pictureOptions>
+                    <c:applyToFront val="0"/><c:applyToSides/><c:applyToEnd val="1"/>
+                    <c:pictureFormat val="stackScale"/><c:pictureStackUnit val="2.5"/>
+                </c:pictureOptions>
+                <c:extLst><c:ext uri="surface"><x:payload/></c:ext></c:extLst>
+            </c:floor><c:plotArea/></c:chart>
+        </c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let floor = chart.floor.as_ref().unwrap();
+        assert_eq!(floor.thickness, Some(64));
+        assert!(
+            std::str::from_utf8(floor.shape_properties.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("ABCDEF")
+        );
+        let options = floor.picture_options.as_ref().unwrap();
+        assert_eq!(options.apply_to_front, Some(false));
+        assert_eq!(options.apply_to_sides, Some(true));
+        assert_eq!(options.apply_to_end, Some(true));
+        assert_eq!(options.picture_format, Some(PictureFormat::StackScale));
+        assert_eq!(options.picture_stack_unit, Some(2.5));
+        assert!(
+            std::str::from_utf8(floor.extension_list.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("urn:example:surface")
+        );
+
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        let reparsed = parse_chart(output.as_slice()).unwrap();
+        let reparsed_floor = reparsed.floor.unwrap();
+        assert_eq!(reparsed_floor.thickness, floor.thickness);
+        assert_eq!(reparsed_floor.shape_properties, floor.shape_properties);
+        assert_eq!(reparsed_floor.picture_options, floor.picture_options);
+        assert_eq!(reparsed_floor.extension_list, floor.extension_list);
+
+        let invalid = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:floor><c:pictureOptions><c:pictureFormat val="tile"/></c:pictureOptions></c:floor><c:plotArea/></c:chart></c:chartSpace>"#;
+        assert!(parse_chart(invalid.as_slice()).is_err());
+
+        let empty = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:view3D/><c:floor/><c:backWall/><c:sideWall/><c:plotArea/></c:chart></c:chartSpace>"#;
+        let empty_chart = parse_chart(empty.as_slice()).unwrap();
+        assert!(empty_chart.view_3d.is_some());
+        assert!(empty_chart.floor.is_some());
+        assert!(empty_chart.back_wall.is_some());
+        assert!(empty_chart.side_wall.is_some());
     }
 
     #[test]

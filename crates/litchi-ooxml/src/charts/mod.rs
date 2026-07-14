@@ -83,7 +83,7 @@ pub use chart::{
     Chart, ChartExtensionList, ChartExternalData, ChartHeaderFooter, ChartPageMargins,
     ChartPageOrientation, ChartPageSetup, ChartPrintSettings, ChartProtection,
     ChartShapeProperties, ChartTextProperties, ChartUserShapes, ColorMapOverride, ColorMapping,
-    ColorSchemeIndex, PivotFormat, PivotSource, View3D, WallFloor,
+    ColorSchemeIndex, PictureFormat, PictureOptions, PivotFormat, PivotSource, View3D, WallFloor,
 };
 pub use legend::Legend;
 pub use models::{

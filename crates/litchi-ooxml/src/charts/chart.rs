@@ -604,18 +604,65 @@ impl Default for View3D {
     }
 }
 
+/// How a picture fill is applied to a chart surface.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PictureFormat {
+    /// Stretch one picture across the surface
+    Stretch,
+    /// Tile pictures at their natural scale
+    Stack,
+    /// Tile pictures using an explicit stack unit
+    StackScale,
+}
+
+impl PictureFormat {
+    pub(crate) fn xml_value(self) -> &'static str {
+        match self {
+            Self::Stretch => "stretch",
+            Self::Stack => "stack",
+            Self::StackScale => "stackScale",
+        }
+    }
+}
+
+/// Picture-fill placement options used by chart surfaces and data points.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PictureOptions {
+    /// Apply the picture to the front face
+    pub apply_to_front: Option<bool>,
+    /// Apply the picture to side faces
+    pub apply_to_sides: Option<bool>,
+    /// Apply the picture to the end face
+    pub apply_to_end: Option<bool>,
+    /// Stretch or stacking behavior
+    pub picture_format: Option<PictureFormat>,
+    /// Number of picture units represented by each stacked picture
+    pub picture_stack_unit: Option<f64>,
+}
+
 /// Wall or floor formatting in 3D charts.
 #[derive(Debug, Clone)]
 pub struct WallFloor {
     /// Thickness (0-4096 points)
     pub thickness: Option<u32>,
+    /// DrawingML shape properties for the surface
+    pub shape_properties: Option<ChartShapeProperties>,
+    /// Picture-fill placement options
+    pub picture_options: Option<PictureOptions>,
+    /// Surface extension list
+    pub extension_list: Option<ChartExtensionList>,
 }
 
 impl WallFloor {
     /// Create a new wall/floor with default settings.
     #[inline]
     pub fn new() -> Self {
-        Self { thickness: None }
+        Self {
+            thickness: None,
+            shape_properties: None,
+            picture_options: None,
+            extension_list: None,
+        }
     }
 
     /// Set thickness.
