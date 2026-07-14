@@ -104,7 +104,10 @@ pub use styles::{Style, Styles};
 pub use table::{Cell, Row, Table, VMergeState};
 pub use theme::Theme;
 pub use variables::DocumentVariables;
-pub use web_settings::{TargetScreenSize, WebSettings};
+pub use web_settings::{
+    Frame, FrameLayout, FrameScrollbarVisibility, Frameset, FramesetChild, FramesetColor,
+    FramesetSplitBar, TargetScreenSize, ThemeColor, WebSettings,
+};
 // Re-export shared formatting types
 pub use format::{ImageFormat, LineSpacing, ParagraphAlignment, TableBorderStyle, UnderlineStyle};
 // Re-export writer types
