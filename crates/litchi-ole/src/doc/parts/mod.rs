@@ -18,6 +18,7 @@ pub mod headers;
 pub mod hyperlinks;
 pub mod numbering;
 pub mod pap;
+pub mod pap_bin_table;
 pub mod paragraph_extractor;
 pub mod piece_table;
 pub mod tap;

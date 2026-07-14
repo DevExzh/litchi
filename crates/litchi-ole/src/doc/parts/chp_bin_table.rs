@@ -60,7 +60,7 @@ impl ChpBinTable {
         // Each PnBteChpx contains:
         // - pn (PN): Page number (offset / 512) of CHPXFKP page
 
-        if plcf_bte_chpx_data.len() < 8 {
+        if plcf_bte_chpx_data.len() < 12 || (plcf_bte_chpx_data.len() - 4) % 8 != 0 {
             return None;
         }
 
@@ -95,7 +95,7 @@ impl ChpBinTable {
             // PN (Page Number) format:
             // pageOffset = 512 * pn
             // FKP pages are stored in the WordDocument stream, not table stream!
-            if pn == 0 || pn == 0x3FFFFF {
+            if pn == 0 {
                 // Invalid PN - skip this entry
                 continue;
             }
@@ -112,36 +112,15 @@ impl ChpBinTable {
 
             // Parse CHPX FKP
             if let Some(fkp) = ChpxFkp::parse(fkp_page, word_document) {
-                let entry_count = fkp.count();
-
-                // Process entries in batch, caching next FC to avoid redundant lookups
-                for j in 0..entry_count {
-                    if let Some(entry) = fkp.entry(j) {
-                        // Cache end_fc by looking ahead once
-                        let end_fc = if j + 1 < entry_count {
-                            // Get next entry's FC (more efficient than two entry() calls)
-                            fkp.entry(j + 1).map(|e| e.fc).unwrap_or(entry.fc)
-                        } else {
-                            // Last entry - use large placeholder for document end
-                            entry.fc.saturating_add(1_000_000)
-                        };
-
-                        // Convert FC positions to CP using the piece table
-                        let start_cp = piece_table.fc_to_cp(entry.fc).unwrap_or(entry.fc);
-                        let end_cp = piece_table.fc_to_cp(end_fc).unwrap_or(end_fc);
-
-                        // Skip invalid ranges early
-                        if start_cp >= end_cp {
-                            continue;
-                        }
-
-                        // Parse CHPX (grpprl) to get character properties
-                        let properties = Self::parse_chpx(&entry.grpprl);
-
+                for entry in fkp.entries() {
+                    let properties = Self::parse_chpx(&entry.grpprl);
+                    for (start_cp, end_cp) in
+                        piece_table.fc_range_to_cp_ranges(entry.fc, entry.end_fc)
+                    {
                         all_runs.push(CharacterRun {
                             start_cp,
                             end_cp,
-                            properties,
+                            properties: properties.clone(),
                         });
                     }
                 }

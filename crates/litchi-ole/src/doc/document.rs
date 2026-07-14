@@ -12,7 +12,9 @@ use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
 use super::parts::hyperlinks::HyperlinksTable;
 use super::parts::numbering::ListTables;
+use super::parts::pap_bin_table::PapBinTable;
 use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
+use super::parts::piece_table::PieceTable;
 use super::parts::text::TextExtractor;
 use super::table::Table;
 #[cfg(feature = "formula")]
@@ -61,12 +63,12 @@ pub struct Document {
     /// The Data stream - contains embedded objects, pictures, etc.
     /// According to Apache POI, pictures are stored here, not in WordDocument stream.
     data_stream: Option<Vec<u8>>,
-    /// The table stream (0Table or 1Table) - contains formatting and structure
-    table_stream: Vec<u8>,
     /// Text extractor - holds the extracted document text
     text_extractor: TextExtractor,
     /// Character property bin table - parsed once and shared across all paragraph extractors
     chp_bin_table: Option<ChpBinTable>,
+    /// Paragraph property bin table - parsed once and shared across all paragraph extractors
+    pap_bin_table: Option<PapBinTable>,
     /// Fields table - contains field information (embedded equations, hyperlinks, etc.)
     /// Used during initialization for hyperlink extraction; exposed via `fields_table()` accessor.
     fields_table: Option<FieldsTable>,
@@ -164,17 +166,25 @@ impl Document {
         #[cfg(not(feature = "formula"))]
         let parsed_mtef = Self::parse_all_mtef_data(&mtef_data)?;
 
-        // Parse ChpBinTable once here to avoid re-parsing for each subdocument
-        // This is a major performance optimization since ChpBinTable::parse is expensive
-        let chp_bin_table = Self::parse_chp_bin_table(&fib, &table_stream, &word_document)?;
+        // Reconstruct both property bin tables from one shared piece-table parse.
+        let piece_table = Self::parse_piece_table(&fib, &table_stream);
+        let chp_bin_table = piece_table.as_ref().and_then(|piece_table| {
+            Self::table_slice(&fib, &table_stream, 12)
+                .and_then(|data| ChpBinTable::parse(data, &word_document, piece_table))
+        });
+        let pap_bin_table = piece_table.as_ref().and_then(|piece_table| {
+            Self::table_slice(&fib, &table_stream, 13).and_then(|data| {
+                PapBinTable::parse(data, &word_document, data_stream.as_deref(), piece_table)
+            })
+        });
 
         Ok(Self {
             fib,
             word_document,
             data_stream,
-            table_stream,
             text_extractor,
             chp_bin_table,
+            pap_bin_table,
             fields_table,
             headers_table,
             footnotes_table,
@@ -221,55 +231,23 @@ impl Document {
         Ok(HashMap::new())
     }
 
-    /// Parse ChpBinTable once during document initialization.
-    ///
-    /// This is a performance optimization - parsing ChpBinTable is expensive,
-    /// so we do it once and share the result across all paragraph extractors.
-    fn parse_chp_bin_table(
+    fn table_slice<'a>(
         fib: &FileInformationBlock,
-        table_stream: &[u8],
-        word_document: &[u8],
-    ) -> Result<Option<ChpBinTable>> {
-        use super::parts::piece_table::PieceTable;
+        table_stream: &'a [u8],
+        pointer_index: usize,
+    ) -> Option<&'a [u8]> {
+        let (offset, length) = fib.get_table_pointer(pointer_index)?;
+        let start = usize::try_from(offset).ok()?;
+        let length = usize::try_from(length).ok()?;
+        if length == 0 {
+            return None;
+        }
+        table_stream.get(start..start.checked_add(length)?)
+    }
 
-        // Parse piece table (required for FC-to-CP conversion in ChpBinTable)
-        // According to [MS-DOC], fcClx is at FIB offset 0x01A2
-        // In FibRgFcLcb97 (starting at FIB offset 154), this is index 33
-        let piece_table = if let Some((offset, length)) = fib.get_table_pointer(33) {
-            if length > 0 && (offset as usize) < table_stream.len() {
-                let clx_data = &table_stream[offset as usize..];
-                let clx_len = length.min((table_stream.len() - offset as usize) as u32) as usize;
-                PieceTable::parse(&clx_data[..clx_len])
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        // Parse ChpBinTable if we have a piece table
-        // Index 12 in FibRgFcLcb97 is fcPlcfBteChpx/lcbPlcfBteChpx (PLCFBTECHPX)
-        let chp_bin_table = if let (Some((offset, length)), Some(pt)) =
-            (fib.get_table_pointer(12), &piece_table)
-        {
-            if length > 0 && (offset as usize) < table_stream.len() {
-                let chp_data = &table_stream[offset as usize..];
-                let chp_len = length.min((table_stream.len() - offset as usize) as u32) as usize;
-                if chp_len >= 8 {
-                    // Parse CHPBinTable (PlcfBteChpx with FKP pages)
-                    // FKP pages are in WordDocument stream, not table stream!
-                    ChpBinTable::parse(&chp_data[..chp_len], word_document, pt)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        Ok(chp_bin_table)
+    /// Parse the CLX once for both property bin tables.
+    fn parse_piece_table(fib: &FileInformationBlock, table_stream: &[u8]) -> Option<PieceTable> {
+        Self::table_slice(fib, table_stream, 33).and_then(PieceTable::parse)
     }
 
     /// Parse all extracted MTEF data into AST nodes using proper arena allocation.
@@ -421,8 +399,7 @@ impl Document {
 
     /// Get the number of paragraphs in the document.
     ///
-    /// This method counts paragraphs using the PAPBinTable (Paragraph Properties Binary Table)
-    /// which provides accurate paragraph boundaries from the document's binary structures.
+    /// This method counts the same logical paragraphs returned by [`Self::paragraphs`].
     ///
     /// # Examples
     ///
@@ -436,28 +413,6 @@ impl Document {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn paragraph_count(&self) -> Result<usize> {
-        // Parse PAP PLCF to get accurate paragraph count
-        // Based on Apache POI's PAPBinTable approach
-        use crate::plcf::PlcfParser;
-
-        // Get PAP bin table location from FIB
-        // Index 13 in FibRgFcLcb97 is fcPlcfBtePapx/lcbPlcfBtePapx
-        if let Some((offset, length)) = self.fib.get_table_pointer(13)
-            && length > 0
-            && (offset as usize) < self.table_stream.len()
-        {
-            let pap_data = &self.table_stream[offset as usize..];
-            let pap_len = length.min((self.table_stream.len() - offset as usize) as u32) as usize;
-
-            // Each entry in PAP PLCF represents a paragraph boundary
-            if let Some(plcf) = PlcfParser::parse(&pap_data[..pap_len], 4) {
-                // PLCF count represents the number of paragraph boundaries
-                // The actual paragraph count is the number of intervals
-                return Ok(plcf.count().saturating_sub(1));
-            }
-        }
-
-        // Fallback: count from extracted paragraphs
         Ok(self.paragraphs()?.len())
     }
 
@@ -768,9 +723,8 @@ impl Document {
         let text = Arc::new(self.text()?);
 
         let para_extractor = ParagraphExtractor::new_with_range(
-            &self.fib,
-            &self.table_stream,
             Arc::clone(&text),
+            self.pap_bin_table.as_ref(),
             self.chp_bin_table.as_ref(),
             (start_cp, end_cp),
         )?;
@@ -892,9 +846,8 @@ impl Document {
             // Create extractor for this CP range - text is shared via Arc::clone (cheap pointer copy)
             // Pass ChpBinTable reference to avoid re-parsing
             let para_extractor = ParagraphExtractor::new_with_range(
-                &self.fib,
-                &self.table_stream,
                 Arc::clone(&text),
+                self.pap_bin_table.as_ref(),
                 self.chp_bin_table.as_ref(),
                 (start_cp, end_cp),
             )?;

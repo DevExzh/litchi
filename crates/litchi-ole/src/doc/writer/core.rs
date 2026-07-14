@@ -2413,6 +2413,57 @@ mod tests {
     }
 
     #[test]
+    fn test_paragraph_formatting_writer_reader_round_trip() {
+        let mut writer = DocWriter::new();
+        writer
+            .add_formatted_paragraph(
+                "Exactly spaced",
+                ParagraphFormatting {
+                    alignment: Some(1),
+                    space_before: Some(120),
+                    line_spacing: Some(LineSpacing::exact_twips(360).unwrap()),
+                    ..ParagraphFormatting::default()
+                },
+            )
+            .unwrap();
+        writer
+            .add_formatted_paragraph(
+                "Double spaced",
+                ParagraphFormatting {
+                    line_spacing: Some(LineSpacing::double()),
+                    ..ParagraphFormatting::default()
+                },
+            )
+            .unwrap();
+
+        let mut cursor = Cursor::new(Vec::new());
+        writer.write_to(&mut cursor).unwrap();
+        let mut package =
+            super::super::super::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+        let document = package.document().unwrap();
+        let paragraphs = document.paragraphs().unwrap();
+
+        assert_eq!(paragraphs.len(), 2);
+        assert_eq!(paragraphs[0].text().unwrap(), "Exactly spaced");
+        assert_eq!(
+            paragraphs[0].properties().justification,
+            crate::doc::parts::pap::Justification::Center
+        );
+        assert_eq!(paragraphs[0].properties().space_before, Some(120));
+        assert_eq!(paragraphs[0].properties().line_spacing, Some(-360));
+        assert_eq!(
+            paragraphs[0].properties().line_spacing_type,
+            crate::doc::parts::pap::LineSpacingType::Exactly
+        );
+        assert_eq!(paragraphs[1].text().unwrap(), "Double spaced");
+        assert_eq!(paragraphs[1].properties().line_spacing, Some(480));
+        assert_eq!(
+            paragraphs[1].properties().line_spacing_type,
+            crate::doc::parts::pap::LineSpacingType::Double
+        );
+    }
+
+    #[test]
     fn test_add_table_invalid_dimensions() {
         let mut writer = DocWriter::new();
         assert!(writer.add_table(0, 3).is_err());

@@ -99,6 +99,12 @@ impl Paragraph {
 
     /// Set the runs for this paragraph (internal use).
     pub(crate) fn set_runs(&mut self, runs: Vec<Run>) {
+        self.text.clear();
+        self.text
+            .reserve(runs.iter().map(|run| run.text.len()).sum());
+        for run in &runs {
+            self.text.push_str(&run.text);
+        }
         self.runs = runs;
     }
 

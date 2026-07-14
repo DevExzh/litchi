@@ -562,8 +562,8 @@ pub const SPRM_P_RSID: u16 = 0x6460;
 /// sprmPIstdListPermute - List style permutation (operation 0x61)
 pub const SPRM_P_ISTD_LIST_PERMUTE: u16 = 0xC661;
 
-/// sprmPTableProps - Table properties (operation 0x62)
-pub const SPRM_P_TABLE_PROPS: u16 = 0x6462;
+/// sprmPTableProps - Table properties (operation 0x6B)
+pub const SPRM_P_TABLE_PROPS: u16 = 0x646B;
 
 /// sprmPTIstdInfo - Table style info (operation 0x63)
 pub const SPRM_P_T_ISTD_INFO: u16 = 0xC663;

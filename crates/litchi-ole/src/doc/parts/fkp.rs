@@ -69,6 +69,8 @@ impl ParagraphHeight {
 pub struct FkpEntry {
     /// File Character position (byte offset in WordDocument stream)
     pub fc: u32,
+    /// Exclusive end File Character position from the next FKP boundary.
+    pub end_fc: u32,
     /// Property data (grpprl - group of SPRMs)
     /// For CHP: CHPX data
     /// For PAP: PAPX data
@@ -131,7 +133,13 @@ impl ChpxFkp {
         // Parse BX array (1 byte each, crun entries)
         // Each BX is offset*2 from start of page to grpprl
         let bx_offset = (crun + 1) * 4;
-        for (i, fc_start) in fcs.iter().enumerate().take(crun) {
+        let property_area_start = bx_offset.checked_add(crun)?;
+        for (i, fc_window) in fcs.windows(2).enumerate() {
+            let fc_start = fc_window[0];
+            let end_fc = fc_window[1];
+            if fc_start >= end_fc {
+                return None;
+            }
             let bx_index = bx_offset + i;
 
             if bx_index >= page_data.len() {
@@ -143,7 +151,8 @@ impl ChpxFkp {
             // BX = 0 means no formatting (use default)
             if bx == 0 {
                 entries.push(FkpEntry {
-                    fc: *fc_start,
+                    fc: fc_start,
+                    end_fc,
                     grpprl: Vec::new(),
                     paragraph_height: None,
                 });
@@ -152,7 +161,7 @@ impl ChpxFkp {
 
             // Calculate actual offset: bx * 2
             let grpprl_offset = bx * 2;
-            if grpprl_offset >= FKP_PAGE_SIZE {
+            if grpprl_offset < property_area_start || grpprl_offset >= FKP_PAGE_SIZE - 1 {
                 return None;
             }
 
@@ -167,14 +176,15 @@ impl ChpxFkp {
             let grpprl_start = grpprl_offset + 1;
             let grpprl_end = grpprl_start + cb;
 
-            if grpprl_end > FKP_PAGE_SIZE {
+            if grpprl_end > FKP_PAGE_SIZE - 1 {
                 return None;
             }
 
             let grpprl = page_data[grpprl_start..grpprl_end].to_vec();
 
             entries.push(FkpEntry {
-                fc: *fc_start,
+                fc: fc_start,
+                end_fc,
                 grpprl,
                 paragraph_height: None,
             });
@@ -226,7 +236,7 @@ impl PapxFkp {
     /// # Arguments
     ///
     /// * `page_data` - 512-byte FKP page data
-    /// * `_data_stream` - The data stream (for huge PAPX, not yet implemented)
+    /// * `_data_stream` - Reserved for callers that resolve Data-stream PAPX indirections
     ///
     /// # Returns
     ///
@@ -238,8 +248,8 @@ impl PapxFkp {
 
         // Last byte contains cpara (count of paragraphs)
         let cpara = page_data[511] as usize;
-        if cpara == 0 || cpara > 101 {
-            // Sanity check: max 101 entries per page
+        if cpara == 0 || cpara > 0x1d {
+            // PapxFkp.cpara cannot exceed 0x1D ([MS-DOC] 2.9.174).
             return None;
         }
 
@@ -260,7 +270,13 @@ impl PapxFkp {
         // Parse BX array (13 bytes each for PAPX)
         // Structure: [offset byte][12-byte ParagraphHeight]
         let bx_offset = (cpara + 1) * FC_SIZE;
-        for (i, fc_start) in fcs.iter().enumerate().take(cpara) {
+        let property_area_start = bx_offset.checked_add(cpara.checked_mul(PAPX_BX_SIZE)?)?;
+        for (i, fc_window) in fcs.windows(2).enumerate() {
+            let fc_start = fc_window[0];
+            let end_fc = fc_window[1];
+            if fc_start >= end_fc {
+                return None;
+            }
             let bx_index = bx_offset + (i * PAPX_BX_SIZE);
 
             if bx_index + PAPX_BX_SIZE > page_data.len() {
@@ -276,7 +292,8 @@ impl PapxFkp {
             // If bx_offset_byte is 0, use default formatting (empty grpprl)
             if bx_offset_byte == 0 {
                 entries.push(FkpEntry {
-                    fc: *fc_start,
+                    fc: fc_start,
+                    end_fc,
                     grpprl: Vec::new(),
                     paragraph_height: Some(phe),
                 });
@@ -285,7 +302,7 @@ impl PapxFkp {
 
             // Calculate actual offset: bx_offset_byte * 2
             let papx_offset = bx_offset_byte * 2;
-            if papx_offset >= FKP_PAGE_SIZE {
+            if papx_offset < property_area_start || papx_offset >= FKP_PAGE_SIZE - 1 {
                 return None;
             }
 
@@ -297,7 +314,8 @@ impl PapxFkp {
             let grpprl = Self::parse_papx_grpprl(page_data, papx_offset)?;
 
             entries.push(FkpEntry {
-                fc: *fc_start,
+                fc: fc_start,
+                end_fc,
                 grpprl,
                 paragraph_height: Some(phe),
             });
@@ -320,24 +338,21 @@ impl PapxFkp {
         }
 
         let first_byte = page_data[papx_offset] as usize;
-        let (size_in_words, grpprl_start) = if first_byte == 0 {
+        let (size_in_bytes, grpprl_start) = if first_byte == 0 {
             // Size is in next byte
             if papx_offset + 1 >= page_data.len() {
                 return None;
             }
-            let size = page_data[papx_offset + 1] as usize;
+            let size = usize::from(page_data[papx_offset + 1]).checked_mul(2)?;
             (size, papx_offset + 2)
         } else {
-            // Size is in first byte, but subtract 1
-            (first_byte - 1, papx_offset + 1)
+            // A nonzero cb encodes a GrpPrlAndIstd length of 2*cb-1.
+            (first_byte.checked_mul(2)?.checked_sub(1)?, papx_offset + 1)
         };
 
-        // Convert size from words to bytes
-        let size_in_bytes = size_in_words * 2;
-
         // Validate bounds
-        let grpprl_end = grpprl_start + size_in_bytes;
-        if grpprl_end > FKP_PAGE_SIZE {
+        let grpprl_end = grpprl_start.checked_add(size_in_bytes)?;
+        if grpprl_end > FKP_PAGE_SIZE - 1 {
             return None;
         }
 
@@ -482,9 +497,9 @@ mod tests {
         page[17..21].copy_from_slice(&360i32.to_le_bytes()); // dym_line_or_height
 
         // Place grpprl data at offset 200
-        // Size encoding: if first byte != 0, size = (first_byte - 1) * 2
-        page[200] = 3; // size = (3-1)*2 = 4 bytes
-        page[201..205].copy_from_slice(&[0x01, 0x02, 0x03, 0x04]); // grpprl data
+        // Size encoding: if first byte != 0, size = 2*first_byte - 1
+        page[200] = 3; // size = 2*3-1 = 5 bytes
+        page[201..206].copy_from_slice(&[0x01, 0x02, 0x03, 0x04, 0x05]); // grpprl data
 
         let fkp = PapxFkp::parse(&page, &[]).expect("Failed to parse PAPX FKP");
 
@@ -492,7 +507,8 @@ mod tests {
 
         let entry = fkp.entry(0).expect("Failed to get entry 0");
         assert_eq!(entry.fc, 0);
-        assert_eq!(entry.grpprl.len(), 4);
+        assert_eq!(entry.end_fc, 1000);
+        assert_eq!(entry.grpprl.len(), 5);
 
         let phe = entry
             .paragraph_height

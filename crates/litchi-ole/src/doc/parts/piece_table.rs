@@ -68,6 +68,14 @@ impl TextPiece {
         let cp = self.cp_start + char_offset;
         if cp > self.cp_end { None } else { Some(cp) }
     }
+
+    /// Exclusive FC boundary for this piece.
+    #[inline]
+    fn fc_end(&self) -> u32 {
+        let bytes_per_character = if self.is_unicode { 2 } else { 1 };
+        self.fc
+            .saturating_add(self.length().saturating_mul(bytes_per_character))
+    }
 }
 
 /// Piece Table - manages the mapping between CP and FC.
@@ -223,6 +231,39 @@ impl PieceTable {
         None
     }
 
+    /// Convert a physical FC interval into all logical CP intervals it intersects.
+    ///
+    /// Fast-saved documents can store logically adjacent text pieces in disjoint
+    /// physical locations. A single FKP range therefore can map to more than one
+    /// CP interval; returning every intersection avoids inventing CPs from raw FCs.
+    pub fn fc_range_to_cp_ranges(&self, start_fc: u32, end_fc: u32) -> Vec<(u32, u32)> {
+        if start_fc >= end_fc {
+            return Vec::new();
+        }
+
+        let mut ranges = Vec::new();
+        for piece in &self.pieces {
+            let intersection_start = start_fc.max(piece.fc);
+            let intersection_end = end_fc.min(piece.fc_end());
+            if intersection_start >= intersection_end {
+                continue;
+            }
+
+            let Some(start_cp) = piece.fc_to_cp(intersection_start) else {
+                continue;
+            };
+            let Some(end_cp) = piece.fc_to_cp(intersection_end) else {
+                continue;
+            };
+            if start_cp < end_cp {
+                ranges.push((start_cp, end_cp));
+            }
+        }
+
+        ranges.sort_unstable();
+        ranges
+    }
+
     /// Get the total number of characters (last CP).
     pub fn total_cps(&self) -> u32 {
         self.pieces.last().map(|p| p.cp_end).unwrap_or(0)
@@ -271,5 +312,28 @@ mod tests {
         // FC outside range
         assert_eq!(piece.fc_to_cp(400), None);
         assert_eq!(piece.fc_to_cp(700), None);
+    }
+
+    #[test]
+    fn maps_fkp_ranges_across_discontiguous_text_pieces() {
+        let table = PieceTable {
+            pieces: vec![
+                TextPiece {
+                    cp_start: 0,
+                    cp_end: 3,
+                    fc: 100,
+                    is_unicode: false,
+                },
+                TextPiece {
+                    cp_start: 3,
+                    cp_end: 5,
+                    fc: 200,
+                    is_unicode: true,
+                },
+            ],
+        };
+
+        assert_eq!(table.fc_range_to_cp_ranges(101, 204), vec![(1, 3), (3, 5)]);
+        assert!(table.fc_range_to_cp_ranges(150, 180).is_empty());
     }
 }
