@@ -1898,6 +1898,20 @@ mod tests {
     <brk id="20" min="0" max="16383" man="1" pt="true"/>
   </rowBreaks>
   <colBreaks count="1" manualBreakCount="0"><brk id="3"/></colBreaks>
+  <extLst>
+    <ext uri="{05C60535-1F16-4fd2-B633-F4F36F0B64E0}"
+         xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main">
+      <x14:sparklineGroups xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main">
+        <x14:sparklineGroup type="stacked" dateAxis="1">
+          <x14:colorSeries rgb="FF123456"/>
+          <x14:sparklines>
+            <x14:sparkline><xm:f>Sales!A1:A3</xm:f><xm:sqref>F2</xm:sqref></x14:sparkline>
+            <x14:sparkline><xm:f>Sales!B1:B3</xm:f><xm:sqref>G2</xm:sqref></x14:sparkline>
+          </x14:sparklines>
+        </x14:sparklineGroup>
+      </x14:sparklineGroups>
+    </ext>
+  </extLst>
 </worksheet>"#;
 
     fn package_with_worksheet_relationship(reltype: &str, external: bool) -> OpcPackage {
@@ -2020,6 +2034,14 @@ mod tests {
             Some(crate::xlsx::SheetPaneState::Frozen)
         );
         assert_eq!(view.selections[0].sqref.as_deref(), Some("B3:C4"));
+        let sparkline = &worksheet.sparkline_groups()[0];
+        assert_eq!(
+            sparkline.sparkline_type,
+            crate::xlsx::SparklineType::WinLoss
+        );
+        assert!(sparkline.options.date_axis);
+        assert_eq!(sparkline.sparklines.len(), 2);
+        assert_eq!(sparkline.sparklines[0].location, "F2");
     }
 
     #[test]

@@ -1,11 +1,16 @@
 use litchi_core::sheet::Result as SheetResult;
-use litchi_core::{
-    id::generate_guid_braced,
-    xml::{escape_xml, unescape_xml},
-};
-use memchr;
+use litchi_core::{id::generate_guid_braced, xml::escape_xml};
+use quick_xml::XmlVersion;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, QName, ResolveResult};
+use quick_xml::reader::NsReader;
 use ryu::Buffer as RyuBuffer;
 use std::fmt::Write as FmtWrite;
+
+use crate::common::xml::{decode_xml_reference, unqualified_attribute_value};
+use crate::xlsx::cell::Cell;
+use crate::xlsx::namespace::is_spreadsheetml_name;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SparklineType {
@@ -66,18 +71,28 @@ impl SparklineAxisMinMax {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SparklineColor {
     pub rgb: String,
+    pub indexed: Option<u32>,
+    pub automatic: Option<bool>,
+    pub theme: Option<u32>,
+    pub tint: Option<f64>,
 }
 
 impl SparklineColor {
     pub fn new(rgb: String) -> Self {
-        Self { rgb }
+        Self {
+            rgb,
+            indexed: None,
+            automatic: None,
+            theme: None,
+            tint: None,
+        }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SparklineGroupColors {
     pub series: Option<SparklineColor>,
     pub negative: Option<SparklineColor>,
@@ -107,6 +122,7 @@ impl Default for SparklineGroupColors {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SparklineGroupOptions {
     pub display_empty_cells_as: SparklineDisplayEmptyCellsAs,
+    pub date_axis: bool,
     pub display_hidden: bool,
     pub display_x_axis: bool,
     pub markers: bool,
@@ -126,7 +142,8 @@ pub struct SparklineGroupOptions {
 impl Default for SparklineGroupOptions {
     fn default() -> Self {
         Self {
-            display_empty_cells_as: SparklineDisplayEmptyCellsAs::Gap,
+            display_empty_cells_as: SparklineDisplayEmptyCellsAs::Zero,
+            date_axis: false,
             display_hidden: false,
             display_x_axis: false,
             markers: false,
@@ -150,7 +167,7 @@ impl SparklineType {
         match self {
             Self::Line => "line",
             Self::Column => "column",
-            Self::WinLoss => "winLoss",
+            Self::WinLoss => "stacked",
         }
     }
 
@@ -158,7 +175,7 @@ impl SparklineType {
         match s {
             "line" => Some(Self::Line),
             "column" => Some(Self::Column),
-            "winLoss" => Some(Self::WinLoss),
+            "stacked" => Some(Self::WinLoss),
             _ => None,
         }
     }
@@ -198,47 +215,7 @@ impl SparklineGroup {
 pub(crate) fn parse_sparkline_groups_from_worksheet_xml(
     content: &str,
 ) -> SheetResult<Vec<SparklineGroup>> {
-    // Find extLst and scan for the sparklineGroups ext.
-    let ext_lst_start = match content.find("<extLst") {
-        Some(p) => p,
-        None => return Ok(Vec::new()),
-    };
-    let ext_lst_end_rel = match content[ext_lst_start..].find("</extLst>") {
-        Some(p) => p,
-        None => return Ok(Vec::new()),
-    };
-    let ext_lst = &content[ext_lst_start..ext_lst_start + ext_lst_end_rel + "</extLst>".len()];
-
-    const SPARKLINE_EXT_URI: &str = "{05C60535-1F16-4fd2-B633-F4F36F0B64E0}";
-
-    let mut groups: Vec<SparklineGroup> = Vec::new();
-    let mut pos = 0usize;
-
-    while let Some(ext_pos_rel) = ext_lst[pos..].find("<ext ") {
-        let ext_pos = pos + ext_pos_rel;
-        let ext_end_rel = match ext_lst[ext_pos..].find("</ext>") {
-            Some(p) => p,
-            None => break,
-        };
-        let ext_end = ext_pos + ext_end_rel + "</ext>".len();
-        let ext_xml = &ext_lst[ext_pos..ext_end];
-
-        if extract_attribute(ext_xml, "uri")
-            .as_deref()
-            .is_some_and(|u| u.eq_ignore_ascii_case(SPARKLINE_EXT_URI))
-            && let Some(spark_groups_xml) = extract_element(ext_xml, "x14:sparklineGroups")
-        {
-            groups.extend(parse_sparkline_groups(spark_groups_xml)?);
-        }
-
-        pos = ext_end;
-    }
-
-    if groups.len() >= 231 {
-        return Err("sparklineGroups must contain fewer than 231 sparklineGroup elements".into());
-    }
-
-    Ok(groups)
+    SparklineParser::parse(content)
 }
 
 pub(crate) fn write_sparkline_groups_ext(
@@ -254,151 +231,154 @@ pub(crate) fn write_sparkline_groups_ext(
         r#"<x14:sparklineGroups xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main">"#,
     );
 
+    if groups.len() >= 231 {
+        return Err("sparklineGroups must contain fewer than 231 sparklineGroup elements".into());
+    }
     for group in groups {
-        for sp in &group.sparklines {
-            xml.push_str("<x14:sparklineGroup");
+        if group.sparklines.is_empty() {
+            return Err("sparklineGroup must contain at least one sparkline".into());
+        }
+        validate_group_options(&group.options)?;
+        xml.push_str("<x14:sparklineGroup");
 
-            // Excel omits the attribute for the default type (line).
-            if group.sparkline_type != SparklineType::Line {
-                xml.push_str(" type=\"");
-                xml.push_str(group.sparkline_type.as_str());
-                xml.push('"');
-            }
+        // Excel omits the attribute for the default type (line).
+        if group.sparkline_type != SparklineType::Line {
+            xml.push_str(" type=\"");
+            xml.push_str(group.sparkline_type.as_str());
+            xml.push('"');
+        }
 
-            let has_attr = |name: &str| group.extra_attributes.iter().any(|(k, _)| k == name);
+        let has_attr = |name: &str| group.extra_attributes.iter().any(|(k, _)| k == name);
 
-            if !has_attr("displayEmptyCellsAs") {
-                xml.push_str(" displayEmptyCellsAs=\"");
-                xml.push_str(group.options.display_empty_cells_as.as_str());
-                xml.push('"');
-            }
-            if group.options.display_hidden && !has_attr("displayHidden") {
-                xml.push_str(" displayHidden=\"1\"");
-            }
-            if group.options.display_x_axis && !has_attr("displayXAxis") {
-                xml.push_str(" displayXAxis=\"1\"");
-            }
-            if group.options.markers && !has_attr("markers") {
-                xml.push_str(" markers=\"1\"");
-            }
-            if group.options.high && !has_attr("high") {
-                xml.push_str(" high=\"1\"");
-            }
-            if group.options.low && !has_attr("low") {
-                xml.push_str(" low=\"1\"");
-            }
-            if group.options.first && !has_attr("first") {
-                xml.push_str(" first=\"1\"");
-            }
-            if group.options.last && !has_attr("last") {
-                xml.push_str(" last=\"1\"");
-            }
-            if group.options.negative && !has_attr("negative") {
-                xml.push_str(" negative=\"1\"");
-            }
-            if group.options.right_to_left && !has_attr("rightToLeft") {
-                xml.push_str(" rightToLeft=\"1\"");
-            }
-            if group.options.min_axis_type != SparklineAxisMinMax::Individual
+        if !has_attr("displayEmptyCellsAs") {
+            xml.push_str(" displayEmptyCellsAs=\"");
+            xml.push_str(group.options.display_empty_cells_as.as_str());
+            xml.push('"');
+        }
+        if group.options.date_axis && !has_attr("dateAxis") {
+            xml.push_str(" dateAxis=\"1\"");
+        }
+        if group.options.display_hidden && !has_attr("displayHidden") {
+            xml.push_str(" displayHidden=\"1\"");
+        }
+        if group.options.display_x_axis && !has_attr("displayXAxis") {
+            xml.push_str(" displayXAxis=\"1\"");
+        }
+        if group.options.markers && !has_attr("markers") {
+            xml.push_str(" markers=\"1\"");
+        }
+        if group.options.high && !has_attr("high") {
+            xml.push_str(" high=\"1\"");
+        }
+        if group.options.low && !has_attr("low") {
+            xml.push_str(" low=\"1\"");
+        }
+        if group.options.first && !has_attr("first") {
+            xml.push_str(" first=\"1\"");
+        }
+        if group.options.last && !has_attr("last") {
+            xml.push_str(" last=\"1\"");
+        }
+        if group.options.negative && !has_attr("negative") {
+            xml.push_str(" negative=\"1\"");
+        }
+        if group.options.right_to_left && !has_attr("rightToLeft") {
+            xml.push_str(" rightToLeft=\"1\"");
+        }
+        if group.options.min_axis_type != SparklineAxisMinMax::Individual
+            && !has_attr("minAxisType")
+        {
+            xml.push_str(" minAxisType=\"");
+            xml.push_str(group.options.min_axis_type.as_str());
+            xml.push('"');
+        }
+        if group.options.max_axis_type != SparklineAxisMinMax::Individual
+            && !has_attr("maxAxisType")
+        {
+            xml.push_str(" maxAxisType=\"");
+            xml.push_str(group.options.max_axis_type.as_str());
+            xml.push('"');
+        }
+
+        if let Some(min) = group.options.manual_min {
+            if group.options.min_axis_type != SparklineAxisMinMax::Custom
                 && !has_attr("minAxisType")
             {
-                xml.push_str(" minAxisType=\"");
-                xml.push_str(group.options.min_axis_type.as_str());
+                return Err("manualMin requires minAxisType=custom".into());
+            }
+            if !has_attr("manualMin") {
+                let mut b = RyuBuffer::new();
+                xml.push_str(" manualMin=\"");
+                xml.push_str(b.format(min));
                 xml.push('"');
             }
-            if group.options.max_axis_type != SparklineAxisMinMax::Individual
+        }
+        if let Some(max) = group.options.manual_max {
+            if group.options.max_axis_type != SparklineAxisMinMax::Custom
                 && !has_attr("maxAxisType")
             {
-                xml.push_str(" maxAxisType=\"");
-                xml.push_str(group.options.max_axis_type.as_str());
-                xml.push('"');
+                return Err("manualMax requires maxAxisType=custom".into());
             }
-
-            if let Some(min) = group.options.manual_min {
-                if group.options.min_axis_type != SparklineAxisMinMax::Custom
-                    && !has_attr("minAxisType")
-                {
-                    return Err("manualMin requires minAxisType=custom".into());
-                }
-                if !has_attr("manualMin") {
-                    let mut b = RyuBuffer::new();
-                    xml.push_str(" manualMin=\"");
-                    xml.push_str(b.format(min));
-                    xml.push('"');
-                }
-            }
-            if let Some(max) = group.options.manual_max {
-                if group.options.max_axis_type != SparklineAxisMinMax::Custom
-                    && !has_attr("maxAxisType")
-                {
-                    return Err("manualMax requires maxAxisType=custom".into());
-                }
-                if !has_attr("manualMax") {
-                    let mut b = RyuBuffer::new();
-                    xml.push_str(" manualMax=\"");
-                    xml.push_str(b.format(max));
-                    xml.push('"');
-                }
-            }
-            if let Some(w) = group.options.line_weight
-                && !has_attr("lineWeight")
-            {
+            if !has_attr("manualMax") {
                 let mut b = RyuBuffer::new();
-                xml.push_str(" lineWeight=\"");
-                xml.push_str(b.format(w));
+                xml.push_str(" manualMax=\"");
+                xml.push_str(b.format(max));
                 xml.push('"');
             }
+        }
+        if let Some(w) = group.options.line_weight
+            && !has_attr("lineWeight")
+        {
+            let mut b = RyuBuffer::new();
+            xml.push_str(" lineWeight=\"");
+            xml.push_str(b.format(w));
+            xml.push('"');
+        }
 
-            if !has_attr("xr2:uid") {
-                xml.push_str(" xr2:uid=\"");
-                xml.push_str(&generate_guid_braced());
-                xml.push('"');
-            }
+        if !has_attr("xr2:uid") {
+            xml.push_str(" xr2:uid=\"");
+            xml.push_str(&generate_guid_braced());
+            xml.push('"');
+        }
 
-            for (k, v) in &group.extra_attributes {
-                xml.push(' ');
-                xml.push_str(k);
-                xml.push_str("=\"");
-                xml.push_str(&escape_xml(v));
-                xml.push('"');
+        for (index, (k, v)) in group.extra_attributes.iter().enumerate() {
+            validate_extra_attribute_name(k)?;
+            if group.extra_attributes[..index]
+                .iter()
+                .any(|(previous, _)| previous == k)
+            {
+                return Err(format!("duplicate sparkline group attribute '{k}'").into());
             }
+            xml.push(' ');
+            xml.push_str(k);
+            xml.push_str("=\"");
+            xml.push_str(&escape_xml(v));
+            xml.push('"');
+        }
 
-            xml.push('>');
+        xml.push('>');
 
-            if let Some(ref c) = group.colors.series {
-                write!(xml, r#"<x14:colorSeries rgb="{}"/>"#, escape_xml(&c.rgb))
-                    .map_err(|e| format!("XML write error: {}", e))?;
+        for (name, color) in [
+            ("colorSeries", group.colors.series.as_ref()),
+            ("colorNegative", group.colors.negative.as_ref()),
+            ("colorAxis", group.colors.axis.as_ref()),
+            ("colorMarkers", group.colors.markers.as_ref()),
+            ("colorFirst", group.colors.first.as_ref()),
+            ("colorLast", group.colors.last.as_ref()),
+            ("colorHigh", group.colors.high.as_ref()),
+            ("colorLow", group.colors.low.as_ref()),
+        ] {
+            if let Some(color) = color {
+                write_sparkline_color(xml, name, color)?;
             }
-            if let Some(ref c) = group.colors.negative {
-                write!(xml, r#"<x14:colorNegative rgb="{}"/>"#, escape_xml(&c.rgb))
-                    .map_err(|e| format!("XML write error: {}", e))?;
-            }
-            if let Some(ref c) = group.colors.axis {
-                write!(xml, r#"<x14:colorAxis rgb="{}"/>"#, escape_xml(&c.rgb))
-                    .map_err(|e| format!("XML write error: {}", e))?;
-            }
-            if let Some(ref c) = group.colors.markers {
-                write!(xml, r#"<x14:colorMarkers rgb="{}"/>"#, escape_xml(&c.rgb))
-                    .map_err(|e| format!("XML write error: {}", e))?;
-            }
-            if let Some(ref c) = group.colors.first {
-                write!(xml, r#"<x14:colorFirst rgb="{}"/>"#, escape_xml(&c.rgb))
-                    .map_err(|e| format!("XML write error: {}", e))?;
-            }
-            if let Some(ref c) = group.colors.last {
-                write!(xml, r#"<x14:colorLast rgb="{}"/>"#, escape_xml(&c.rgb))
-                    .map_err(|e| format!("XML write error: {}", e))?;
-            }
-            if let Some(ref c) = group.colors.high {
-                write!(xml, r#"<x14:colorHigh rgb="{}"/>"#, escape_xml(&c.rgb))
-                    .map_err(|e| format!("XML write error: {}", e))?;
-            }
-            if let Some(ref c) = group.colors.low {
-                write!(xml, r#"<x14:colorLow rgb="{}"/>"#, escape_xml(&c.rgb))
-                    .map_err(|e| format!("XML write error: {}", e))?;
-            }
-            xml.push_str("<x14:sparklines>");
+        }
+        xml.push_str("<x14:sparklines>");
 
+        for sp in &group.sparklines {
+            if sp.data_range.trim().is_empty() {
+                return Err("sparkline data formula cannot be empty".into());
+            }
+            Cell::reference_to_coords(sp.location.trim())?;
             xml.push_str("<x14:sparkline>");
             xml.push_str("<xm:f>");
             xml.push_str(&escape_xml(&sp.data_range));
@@ -407,10 +387,10 @@ pub(crate) fn write_sparkline_groups_ext(
             xml.push_str(&escape_xml(&sp.location));
             xml.push_str("</xm:sqref>");
             xml.push_str("</x14:sparkline>");
-
-            xml.push_str("</x14:sparklines>");
-            xml.push_str("</x14:sparklineGroup>");
         }
+
+        xml.push_str("</x14:sparklines>");
+        xml.push_str("</x14:sparklineGroup>");
     }
 
     xml.push_str("</x14:sparklineGroups>");
@@ -418,282 +398,893 @@ pub(crate) fn write_sparkline_groups_ext(
     Ok(())
 }
 
-fn parse_sparkline_groups(content: &str) -> SheetResult<Vec<SparklineGroup>> {
-    let mut groups: Vec<SparklineGroup> = Vec::new();
+fn write_sparkline_color(xml: &mut String, name: &str, color: &SparklineColor) -> SheetResult<()> {
+    write!(xml, "<x14:{name}").map_err(|error| format!("XML write error: {error}"))?;
+    if !color.rgb.is_empty() {
+        if color.rgb.len() != 8 || !color.rgb.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(format!("invalid sparkline RGB color '{}'", color.rgb).into());
+        }
+        write!(xml, r#" rgb="{}""#, escape_xml(&color.rgb))
+            .map_err(|error| format!("XML write error: {error}"))?;
+    }
+    if let Some(indexed) = color.indexed {
+        write!(xml, r#" indexed="{indexed}""#)
+            .map_err(|error| format!("XML write error: {error}"))?;
+    }
+    if let Some(automatic) = color.automatic {
+        write!(xml, r#" auto="{}""#, if automatic { 1 } else { 0 })
+            .map_err(|error| format!("XML write error: {error}"))?;
+    }
+    if let Some(theme) = color.theme {
+        write!(xml, r#" theme="{theme}""#).map_err(|error| format!("XML write error: {error}"))?;
+    }
+    if let Some(tint) = color.tint {
+        if !tint.is_finite() || !(-1.0..=1.0).contains(&tint) {
+            return Err("sparkline color tint must be finite and between -1 and 1".into());
+        }
+        let mut buffer = RyuBuffer::new();
+        write!(xml, r#" tint="{}""#, buffer.format(tint))
+            .map_err(|error| format!("XML write error: {error}"))?;
+    }
+    xml.push_str("/>");
+    Ok(())
+}
 
-    let mut pos = 0usize;
-    while let Some(group_pos_rel) = content[pos..].find("<x14:sparklineGroup") {
-        let group_pos = pos + group_pos_rel;
-        let open_end_rel = match content[group_pos..].find('>') {
-            Some(p) => p,
-            None => break,
-        };
-        let open_end = group_pos + open_end_rel + 1;
-        let open_tag = &content[group_pos..open_end];
+fn validate_extra_attribute_name(name: &str) -> SheetResult<()> {
+    let mut parts = name.split(':');
+    let first = parts.next().unwrap_or_default();
+    let second = parts.next();
+    if parts.next().is_some()
+        || !valid_xml_name_part(first)
+        || second.is_some_and(|part| !valid_xml_name_part(part))
+    {
+        return Err(format!("invalid sparkline group attribute name '{name}'").into());
+    }
+    if let Some(prefix) = second.map(|_| first)
+        && !matches!(prefix, "xr" | "xr2" | "xr3" | "x14ac" | "x14" | "xm")
+    {
+        return Err(format!("undeclared sparkline group attribute prefix '{prefix}'").into());
+    }
+    if name == "xmlns" || name.starts_with("xmlns:") {
+        return Err("sparkline group attributes cannot declare namespaces".into());
+    }
+    Ok(())
+}
 
-        let close_rel = match content[open_end..].find("</x14:sparklineGroup>") {
-            Some(p) => p,
-            None => break,
-        };
-        let group_end = open_end + close_rel + "</x14:sparklineGroup>".len();
-        let group_inner = &content[open_end..open_end + close_rel];
+fn valid_xml_name_part(part: &str) -> bool {
+    let mut bytes = part.bytes();
+    bytes
+        .next()
+        .is_some_and(|byte| byte.is_ascii_alphabetic() || byte == b'_')
+        && bytes.all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
+}
 
-        let sparkline_type = extract_attribute(open_tag, "type")
-            .as_deref()
-            .and_then(SparklineType::parse)
-            .unwrap_or(SparklineType::Line);
+const SPARKLINE_EXT_URI: &str = "{05C60535-1F16-4fd2-B633-F4F36F0B64E0}";
+const SPARKLINE_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
+const EXCEL_MAIN_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/excel/2006/main";
+const MAX_SPARKLINE_GROUPS: usize = 230;
 
-        let mut group = SparklineGroup::new(sparkline_type);
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SparklineContext {
+    Worksheet,
+    ExtensionList,
+    SparklineExtension,
+    SparklineGroups,
+    SparklineGroup,
+    Sparklines,
+    Sparkline,
+    Formula,
+    Location,
+    Other,
+}
 
-        if let Some(v) = extract_attribute(open_tag, "displayEmptyCellsAs")
-            .as_deref()
-            .and_then(SparklineDisplayEmptyCellsAs::parse)
-        {
-            group.options.display_empty_cells_as = v;
-        }
-        if let Some(v) = extract_attribute(open_tag, "displayHidden").and_then(parse_bool_attr) {
-            group.options.display_hidden = v;
-        }
-        if let Some(v) = extract_attribute(open_tag, "displayXAxis").and_then(parse_bool_attr) {
-            group.options.display_x_axis = v;
-        }
-        if let Some(v) = extract_attribute(open_tag, "markers").and_then(parse_bool_attr) {
-            group.options.markers = v;
-        }
-        if let Some(v) = extract_attribute(open_tag, "high").and_then(parse_bool_attr) {
-            group.options.high = v;
-        }
-        if let Some(v) = extract_attribute(open_tag, "low").and_then(parse_bool_attr) {
-            group.options.low = v;
-        }
-        if let Some(v) = extract_attribute(open_tag, "first").and_then(parse_bool_attr) {
-            group.options.first = v;
-        }
-        if let Some(v) = extract_attribute(open_tag, "last").and_then(parse_bool_attr) {
-            group.options.last = v;
-        }
-        if let Some(v) = extract_attribute(open_tag, "negative").and_then(parse_bool_attr) {
-            group.options.negative = v;
-        }
-        if let Some(v) = extract_attribute(open_tag, "rightToLeft").and_then(parse_bool_attr) {
-            group.options.right_to_left = v;
-        }
-        if let Some(v) = extract_attribute(open_tag, "minAxisType")
-            .as_deref()
-            .and_then(SparklineAxisMinMax::parse)
-        {
-            group.options.min_axis_type = v;
-        }
-        if let Some(v) = extract_attribute(open_tag, "maxAxisType")
-            .as_deref()
-            .and_then(SparklineAxisMinMax::parse)
-        {
-            group.options.max_axis_type = v;
-        }
-        if let Some(v) = extract_attribute(open_tag, "manualMin").and_then(parse_f64_attr) {
-            group.options.manual_min = Some(v);
-        }
-        if let Some(v) = extract_attribute(open_tag, "manualMax").and_then(parse_f64_attr) {
-            group.options.manual_max = Some(v);
-        }
-        if let Some(v) = extract_attribute(open_tag, "lineWeight").and_then(parse_f64_attr) {
-            group.options.line_weight = Some(v);
-        }
+#[derive(Default)]
+struct PendingSparkline {
+    data_range: String,
+    location: String,
+    saw_formula: bool,
+    saw_location: bool,
+}
 
-        group.extra_attributes = extract_extra_attributes(
-            open_tag,
-            &[
-                "type",
-                "displayEmptyCellsAs",
-                "displayHidden",
-                "displayXAxis",
-                "markers",
-                "high",
-                "low",
-                "first",
-                "last",
-                "negative",
-                "rightToLeft",
-                "minAxisType",
-                "maxAxisType",
-                "manualMin",
-                "manualMax",
-                "lineWeight",
-            ],
-        );
+struct SparklineParser {
+    groups: Vec<SparklineGroup>,
+    group: Option<SparklineGroup>,
+    sparkline: Option<PendingSparkline>,
+    groups_start: Option<usize>,
+    group_saw_sparklines: bool,
+    seen_extension: bool,
+    extension_saw_groups: bool,
+    seen_colors: u8,
+}
 
-        if let Some(rgb) = extract_child_rgb(group_inner, "x14:colorSeries") {
-            group.colors.series = Some(SparklineColor::new(rgb));
+impl SparklineParser {
+    fn new() -> Self {
+        Self {
+            groups: Vec::new(),
+            group: None,
+            sparkline: None,
+            groups_start: None,
+            group_saw_sparklines: false,
+            seen_extension: false,
+            extension_saw_groups: false,
+            seen_colors: 0,
         }
-        if let Some(rgb) = extract_child_rgb(group_inner, "x14:colorNegative") {
-            group.colors.negative = Some(SparklineColor::new(rgb));
-        }
-        if let Some(rgb) = extract_child_rgb(group_inner, "x14:colorAxis") {
-            group.colors.axis = Some(SparklineColor::new(rgb));
-        }
-        if let Some(rgb) = extract_child_rgb(group_inner, "x14:colorMarkers") {
-            group.colors.markers = Some(SparklineColor::new(rgb));
-        }
-        if let Some(rgb) = extract_child_rgb(group_inner, "x14:colorFirst") {
-            group.colors.first = Some(SparklineColor::new(rgb));
-        }
-        if let Some(rgb) = extract_child_rgb(group_inner, "x14:colorLast") {
-            group.colors.last = Some(SparklineColor::new(rgb));
-        }
-        if let Some(rgb) = extract_child_rgb(group_inner, "x14:colorHigh") {
-            group.colors.high = Some(SparklineColor::new(rgb));
-        }
-        if let Some(rgb) = extract_child_rgb(group_inner, "x14:colorLow") {
-            group.colors.low = Some(SparklineColor::new(rgb));
-        }
-
-        if let Some(sparklines_xml) = extract_element(group_inner, "x14:sparklines") {
-            group.sparklines = parse_sparklines(sparklines_xml);
-        }
-
-        groups.push(group);
-        pos = group_end;
     }
 
-    Ok(groups)
-}
+    fn parse(content: &str) -> SheetResult<Vec<SparklineGroup>> {
+        let mut reader = NsReader::from_reader(content.as_bytes());
+        let mut parser = Self::new();
+        let mut stack = Vec::new();
+        let mut closed_root = false;
 
-fn parse_sparklines(content: &str) -> Vec<Sparkline> {
-    let mut sparklines: Vec<Sparkline> = Vec::new();
-
-    let mut pos = 0usize;
-    while let Some(sp_pos_rel) = content[pos..].find("<x14:sparkline") {
-        let sp_pos = pos + sp_pos_rel;
-        let open_end_rel = match content[sp_pos..].find('>') {
-            Some(p) => p,
-            None => break,
-        };
-        let open_end = sp_pos + open_end_rel + 1;
-
-        let close_rel = match content[open_end..].find("</x14:sparkline>") {
-            Some(p) => p,
-            None => break,
-        };
-        let sp_end = open_end + close_rel + "</x14:sparkline>".len();
-        let sp_inner = &content[open_end..open_end + close_rel];
-
-        let data_range = extract_text_element(sp_inner, "xm:f")
-            .or_else(|| extract_text_element(sp_inner, "f"))
-            .unwrap_or_default();
-        let location = extract_text_element(sp_inner, "xm:sqref")
-            .or_else(|| extract_text_element(sp_inner, "sqref"))
-            .or_else(|| extract_text_element(sp_inner, "xm:ref"))
-            .or_else(|| extract_text_element(sp_inner, "ref"))
-            .unwrap_or_default();
-
-        if !data_range.is_empty() && !location.is_empty() {
-            sparklines.push(Sparkline {
-                data_range,
-                location,
-            });
-        }
-
-        pos = sp_end;
-    }
-
-    sparklines
-}
-
-fn extract_element<'a>(xml: &'a str, tag: &str) -> Option<&'a str> {
-    let open_pat = format!("<{}", tag);
-    let start = xml.find(&open_pat)?;
-    let after_open = &xml[start..];
-    let gt_rel = after_open.find('>')?;
-    let inner_start = start + gt_rel + 1;
-
-    let close_pat = format!("</{}>", tag);
-    let close_rel = xml[inner_start..].find(&close_pat)?;
-    let inner_end = inner_start + close_rel;
-    Some(&xml[inner_start..inner_end])
-}
-
-fn extract_text_element(xml: &str, tag: &str) -> Option<String> {
-    let open = format!("<{}>", tag);
-    let start = xml.find(&open)? + open.len();
-    let close = format!("</{}>", tag);
-    let end_rel = xml[start..].find(&close)?;
-    Some(unescape_xml(&xml[start..start + end_rel]))
-}
-
-fn extract_attribute(tag: &str, attr: &str) -> Option<String> {
-    let pat = format!("{}=\"", attr);
-    let start = tag.find(&pat)? + pat.len();
-    let tail = &tag[start..];
-    let end = tail.find('"')?;
-    Some(tail[..end].to_string())
-}
-
-fn extract_extra_attributes(tag: &str, known: &[&str]) -> Vec<(String, String)> {
-    // Very small attribute scanner: only handles quoted attributes and ignores namespaces.
-    let mut out: Vec<(String, String)> = Vec::new();
-    let mut i = 0usize;
-    let bytes = tag.as_bytes();
-
-    while i < bytes.len() {
-        // Find '='
-        let eq_rel = match memchr::memchr(b'=', &bytes[i..]) {
-            Some(p) => p,
-            None => break,
-        };
-        let eq = i + eq_rel;
-        // Find attribute name start by scanning backwards to whitespace or '<'
-        let name_end = eq;
-        let mut name_start = name_end;
-        while name_start > 0 {
-            let b = bytes[name_start - 1];
-            if b == b' ' || b == b'\n' || b == b'\r' || b == b'\t' || b == b'<' {
-                break;
+        loop {
+            let decoder = reader.decoder();
+            let event = reader.read_event()?.into_owned();
+            let resolver = reader.resolver().clone();
+            let (namespace, event) = resolver.resolve_event(event);
+            match event {
+                Event::Start(element) if stack.is_empty() => {
+                    if closed_root
+                        || !is_spreadsheetml_name(&namespace, element.name(), b"worksheet")
+                    {
+                        return Err(
+                            "sparkline source must have one SpreadsheetML worksheet root".into(),
+                        );
+                    }
+                    stack.push(SparklineContext::Worksheet);
+                },
+                Event::Empty(element) if stack.is_empty() => {
+                    if closed_root
+                        || !is_spreadsheetml_name(&namespace, element.name(), b"worksheet")
+                    {
+                        return Err(
+                            "sparkline source must have one SpreadsheetML worksheet root".into(),
+                        );
+                    }
+                    closed_root = true;
+                },
+                Event::Start(element) => {
+                    let parent = *stack
+                        .last()
+                        .ok_or("sparkline parser is missing its root context")?;
+                    let context = parser.start(parent, &namespace, &element, decoder)?;
+                    stack.push(context);
+                },
+                Event::Empty(element) => {
+                    let parent = *stack
+                        .last()
+                        .ok_or("sparkline parser is missing its root context")?;
+                    let context = parser.start(parent, &namespace, &element, decoder)?;
+                    parser.finish(context)?;
+                },
+                Event::Text(text) => {
+                    if let Some(context) = sparkline_text_context(&stack) {
+                        parser.push_text(&text.decode()?, context)?;
+                    }
+                },
+                Event::CData(text) => {
+                    if let Some(context) = sparkline_text_context(&stack) {
+                        parser.push_text(&text.decode()?, context)?;
+                    }
+                },
+                Event::GeneralRef(reference) => {
+                    if let Some(context) = sparkline_text_context(&stack) {
+                        parser.push_text(&decode_xml_reference(&reference)?, context)?;
+                    }
+                },
+                Event::End(element) => {
+                    let context = stack
+                        .pop()
+                        .ok_or("sparkline XML has a closing element outside its root")?;
+                    parser.finish(context)?;
+                    if context == SparklineContext::Worksheet {
+                        if !is_spreadsheetml_name(&namespace, element.name(), b"worksheet") {
+                            return Err(
+                                "sparkline XML has an invalid worksheet closing element".into()
+                            );
+                        }
+                        closed_root = true;
+                    }
+                },
+                Event::Eof if !closed_root || !stack.is_empty() => {
+                    return Err(
+                        "sparkline source has a missing or unterminated worksheet root".into(),
+                    );
+                },
+                Event::Eof => break,
+                _ => {},
             }
-            name_start -= 1;
         }
-        let name = &tag[name_start..name_end];
-        if known.contains(&name) {
-            i = eq + 1;
-            continue;
-        }
-        // Expect "
-        if bytes.get(eq + 1) != Some(&b'"') {
-            i = eq + 1;
-            continue;
-        }
-        let val_start = eq + 2;
-        let quote_rel = match memchr::memchr(b'"', &bytes[val_start..]) {
-            Some(p) => p,
-            None => break,
-        };
-        let val_end = val_start + quote_rel;
-        let val = &tag[val_start..val_end];
-        if !name.is_empty() {
-            out.push((name.to_string(), unescape_xml(val)));
-        }
-        i = val_end + 1;
+        Ok(parser.groups)
     }
 
-    out
+    fn start(
+        &mut self,
+        parent: SparklineContext,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+    ) -> SheetResult<SparklineContext> {
+        if parent == SparklineContext::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"extLst")
+        {
+            return Ok(SparklineContext::ExtensionList);
+        }
+        if parent == SparklineContext::ExtensionList
+            && is_spreadsheetml_name(namespace, element.name(), b"ext")
+        {
+            let uri = unqualified_attribute_value(element, b"uri", decoder)?;
+            if uri
+                .as_deref()
+                .is_some_and(|uri| uri.eq_ignore_ascii_case(SPARKLINE_EXT_URI))
+            {
+                if self.seen_extension {
+                    return Err("duplicate worksheet sparkline extension".into());
+                }
+                self.seen_extension = true;
+                return Ok(SparklineContext::SparklineExtension);
+            }
+            return Ok(SparklineContext::Other);
+        }
+        if parent == SparklineContext::SparklineExtension
+            && is_name(
+                namespace,
+                element.name(),
+                b"sparklineGroups",
+                SPARKLINE_NAMESPACE,
+            )
+        {
+            if self.extension_saw_groups {
+                return Err("duplicate sparklineGroups element".into());
+            }
+            self.extension_saw_groups = true;
+            self.groups_start = Some(self.groups.len());
+            return Ok(SparklineContext::SparklineGroups);
+        }
+        if parent == SparklineContext::SparklineGroups
+            && is_name(
+                namespace,
+                element.name(),
+                b"sparklineGroup",
+                SPARKLINE_NAMESPACE,
+            )
+        {
+            self.start_group(element, decoder)?;
+            return Ok(SparklineContext::SparklineGroup);
+        }
+        if parent == SparklineContext::SparklineGroup {
+            if let Some((slot, bit)) = color_slot(element.name().local_name().as_ref())
+                && is_name(
+                    namespace,
+                    element.name(),
+                    element.name().local_name().as_ref(),
+                    SPARKLINE_NAMESPACE,
+                )
+            {
+                self.color(slot, bit, element, decoder)?;
+                return Ok(SparklineContext::Other);
+            }
+            if is_name(
+                namespace,
+                element.name(),
+                b"sparklines",
+                SPARKLINE_NAMESPACE,
+            ) {
+                if self.group_saw_sparklines {
+                    return Err("duplicate sparklines element in sparkline group".into());
+                }
+                self.group_saw_sparklines = true;
+                return Ok(SparklineContext::Sparklines);
+            }
+        }
+        if parent == SparklineContext::Sparklines
+            && is_name(namespace, element.name(), b"sparkline", SPARKLINE_NAMESPACE)
+        {
+            if self.sparkline.is_some() {
+                return Err("nested worksheet sparkline".into());
+            }
+            self.sparkline = Some(PendingSparkline::default());
+            return Ok(SparklineContext::Sparkline);
+        }
+        if parent == SparklineContext::Sparkline
+            && is_name(namespace, element.name(), b"f", EXCEL_MAIN_NAMESPACE)
+        {
+            let sparkline = self
+                .sparkline
+                .as_mut()
+                .ok_or("sparkline formula outside a sparkline")?;
+            if sparkline.saw_formula {
+                return Err("duplicate sparkline formula".into());
+            }
+            sparkline.saw_formula = true;
+            return Ok(SparklineContext::Formula);
+        }
+        if parent == SparklineContext::Sparkline
+            && is_name(namespace, element.name(), b"sqref", EXCEL_MAIN_NAMESPACE)
+        {
+            let sparkline = self
+                .sparkline
+                .as_mut()
+                .ok_or("sparkline location outside a sparkline")?;
+            if sparkline.saw_location {
+                return Err("duplicate sparkline location".into());
+            }
+            sparkline.saw_location = true;
+            return Ok(SparklineContext::Location);
+        }
+        Ok(SparklineContext::Other)
+    }
+
+    fn start_group(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> SheetResult<()> {
+        if self.group.is_some() {
+            return Err("nested sparkline group".into());
+        }
+        if self.groups.len() >= MAX_SPARKLINE_GROUPS {
+            return Err(
+                "sparklineGroups must contain fewer than 231 sparklineGroup elements".into(),
+            );
+        }
+        let sparkline_type = parse_enum_attribute(
+            element,
+            b"type",
+            decoder,
+            "sparkline type",
+            SparklineType::parse,
+        )?
+        .unwrap_or(SparklineType::Line);
+        let mut group = SparklineGroup::new(sparkline_type);
+        group.options.display_empty_cells_as = parse_enum_attribute(
+            element,
+            b"displayEmptyCellsAs",
+            decoder,
+            "sparkline empty-cell mode",
+            SparklineDisplayEmptyCellsAs::parse,
+        )?
+        .unwrap_or(SparklineDisplayEmptyCellsAs::Zero);
+        group.options.date_axis = sparkline_bool(element, b"dateAxis", decoder)?.unwrap_or(false);
+        group.options.display_hidden =
+            sparkline_bool(element, b"displayHidden", decoder)?.unwrap_or(false);
+        group.options.display_x_axis =
+            sparkline_bool(element, b"displayXAxis", decoder)?.unwrap_or(false);
+        group.options.markers = sparkline_bool(element, b"markers", decoder)?.unwrap_or(false);
+        group.options.high = sparkline_bool(element, b"high", decoder)?.unwrap_or(false);
+        group.options.low = sparkline_bool(element, b"low", decoder)?.unwrap_or(false);
+        group.options.first = sparkline_bool(element, b"first", decoder)?.unwrap_or(false);
+        group.options.last = sparkline_bool(element, b"last", decoder)?.unwrap_or(false);
+        group.options.negative = sparkline_bool(element, b"negative", decoder)?.unwrap_or(false);
+        group.options.right_to_left =
+            sparkline_bool(element, b"rightToLeft", decoder)?.unwrap_or(false);
+        group.options.min_axis_type = parse_enum_attribute(
+            element,
+            b"minAxisType",
+            decoder,
+            "sparkline minimum-axis type",
+            SparklineAxisMinMax::parse,
+        )?
+        .unwrap_or(SparklineAxisMinMax::Individual);
+        group.options.max_axis_type = parse_enum_attribute(
+            element,
+            b"maxAxisType",
+            decoder,
+            "sparkline maximum-axis type",
+            SparklineAxisMinMax::parse,
+        )?
+        .unwrap_or(SparklineAxisMinMax::Individual);
+        group.options.manual_min = sparkline_f64(element, b"manualMin", decoder)?;
+        group.options.manual_max = sparkline_f64(element, b"manualMax", decoder)?;
+        group.options.line_weight = sparkline_f64(element, b"lineWeight", decoder)?;
+        group.extra_attributes = extra_group_attributes(element, decoder)?;
+        self.group = Some(group);
+        self.group_saw_sparklines = false;
+        self.seen_colors = 0;
+        Ok(())
+    }
+
+    fn color(
+        &mut self,
+        slot: ColorSlot,
+        bit: u8,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+    ) -> SheetResult<()> {
+        if self.seen_colors & bit != 0 {
+            return Err("duplicate sparkline group color element".into());
+        }
+        self.seen_colors |= bit;
+        let rgb = unqualified_attribute_value(element, b"rgb", decoder)?.unwrap_or_default();
+        if !rgb.is_empty() && (rgb.len() != 8 || !rgb.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        {
+            return Err(format!("invalid sparkline RGB color '{rgb}'").into());
+        }
+        let mut color = SparklineColor::new(rgb);
+        color.indexed = sparkline_u32(element, b"indexed", decoder)?;
+        color.automatic = sparkline_bool(element, b"auto", decoder)?;
+        color.theme = sparkline_u32(element, b"theme", decoder)?;
+        color.tint = sparkline_f64(element, b"tint", decoder)?;
+        if color.tint.is_some_and(|tint| !(-1.0..=1.0).contains(&tint)) {
+            return Err("sparkline color tint must be between -1 and 1".into());
+        }
+        let color = Some(color);
+        let colors = &mut self
+            .group
+            .as_mut()
+            .ok_or("sparkline color outside a group")?
+            .colors;
+        match slot {
+            ColorSlot::Series => colors.series = color,
+            ColorSlot::Negative => colors.negative = color,
+            ColorSlot::Axis => colors.axis = color,
+            ColorSlot::Markers => colors.markers = color,
+            ColorSlot::First => colors.first = color,
+            ColorSlot::Last => colors.last = color,
+            ColorSlot::High => colors.high = color,
+            ColorSlot::Low => colors.low = color,
+        }
+        Ok(())
+    }
+
+    fn push_text(&mut self, value: &str, context: SparklineContext) -> SheetResult<()> {
+        let sparkline = self
+            .sparkline
+            .as_mut()
+            .ok_or("sparkline text outside a sparkline")?;
+        match context {
+            SparklineContext::Formula => sparkline.data_range.push_str(value),
+            SparklineContext::Location => sparkline.location.push_str(value),
+            _ => return Err("unexpected sparkline text context".into()),
+        }
+        Ok(())
+    }
+
+    fn finish(&mut self, context: SparklineContext) -> SheetResult<()> {
+        match context {
+            SparklineContext::Sparkline => {
+                let pending = self.sparkline.take().ok_or("missing pending sparkline")?;
+                let data_range = pending.data_range.trim().to_string();
+                let location = pending.location.trim().to_string();
+                if !pending.saw_formula || data_range.is_empty() {
+                    return Err("sparkline is missing its data formula".into());
+                }
+                if !pending.saw_location || location.is_empty() {
+                    return Err("sparkline is missing its location".into());
+                }
+                Cell::reference_to_coords(&location)?;
+                self.group
+                    .as_mut()
+                    .ok_or("sparkline outside a group")?
+                    .sparklines
+                    .push(Sparkline {
+                        data_range,
+                        location,
+                    });
+            },
+            SparklineContext::Sparklines
+                if self
+                    .group
+                    .as_ref()
+                    .is_none_or(|group| group.sparklines.is_empty()) =>
+            {
+                return Err("sparklines element contains no sparkline".into());
+            },
+            SparklineContext::SparklineGroup => {
+                let group = self.group.take().ok_or("missing pending sparkline group")?;
+                if !self.group_saw_sparklines || group.sparklines.is_empty() {
+                    return Err("sparklineGroup contains no sparklines".into());
+                }
+                validate_group_options(&group.options)?;
+                self.groups.push(group);
+            },
+            SparklineContext::SparklineGroups => {
+                let start = self
+                    .groups_start
+                    .take()
+                    .ok_or("missing sparklineGroups start")?;
+                if self.groups.len() == start {
+                    return Err("sparklineGroups contains no sparklineGroup".into());
+                }
+            },
+            SparklineContext::SparklineExtension if !self.extension_saw_groups => {
+                return Err("sparkline extension contains no sparklineGroups".into());
+            },
+            _ => {},
+        }
+        Ok(())
+    }
 }
 
-fn parse_bool_attr(v: String) -> Option<bool> {
-    match v.as_str() {
-        "1" | "true" | "TRUE" => Some(true),
-        "0" | "false" | "FALSE" => Some(false),
+#[derive(Clone, Copy)]
+enum ColorSlot {
+    Series,
+    Negative,
+    Axis,
+    Markers,
+    First,
+    Last,
+    High,
+    Low,
+}
+
+fn color_slot(local_name: &[u8]) -> Option<(ColorSlot, u8)> {
+    match local_name {
+        b"colorSeries" => Some((ColorSlot::Series, 1)),
+        b"colorNegative" => Some((ColorSlot::Negative, 2)),
+        b"colorAxis" => Some((ColorSlot::Axis, 4)),
+        b"colorMarkers" => Some((ColorSlot::Markers, 8)),
+        b"colorFirst" => Some((ColorSlot::First, 16)),
+        b"colorLast" => Some((ColorSlot::Last, 32)),
+        b"colorHigh" => Some((ColorSlot::High, 64)),
+        b"colorLow" => Some((ColorSlot::Low, 128)),
         _ => None,
     }
 }
 
-fn parse_f64_attr(v: String) -> Option<f64> {
-    v.parse().ok()
+fn is_name(
+    namespace: &ResolveResult<'_>,
+    name: QName<'_>,
+    local_name: &[u8],
+    expected_namespace: &[u8],
+) -> bool {
+    name.local_name().as_ref() == local_name
+        && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == expected_namespace)
 }
 
-fn extract_child_rgb(xml: &str, tag: &str) -> Option<String> {
-    let open_pat = format!("<{}", tag);
-    let start = xml.find(&open_pat)?;
-    let after_open = &xml[start..];
-    let gt_rel = after_open.find('>')?;
-    let open_tag = &after_open[..gt_rel + 1];
-    extract_attribute(open_tag, "rgb")
+fn sparkline_text_context(stack: &[SparklineContext]) -> Option<SparklineContext> {
+    stack.last().copied().filter(|context| {
+        matches!(
+            context,
+            SparklineContext::Formula | SparklineContext::Location
+        )
+    })
+}
+
+fn sparkline_bool(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+) -> SheetResult<Option<bool>> {
+    unqualified_attribute_value(element, name, decoder)?
+        .map(|value| match value.as_str() {
+            "1" | "true" => Ok(true),
+            "0" | "false" => Ok(false),
+            _ => Err(format!(
+                "invalid sparkline boolean {}='{value}'",
+                String::from_utf8_lossy(name)
+            )
+            .into()),
+        })
+        .transpose()
+}
+
+fn sparkline_f64(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+) -> SheetResult<Option<f64>> {
+    unqualified_attribute_value(element, name, decoder)?
+        .map(|value| {
+            let number = value.parse::<f64>().map_err(|_| {
+                format!(
+                    "invalid sparkline number {}='{value}'",
+                    String::from_utf8_lossy(name)
+                )
+            })?;
+            if !number.is_finite() {
+                return Err(format!(
+                    "sparkline number {} must be finite",
+                    String::from_utf8_lossy(name)
+                )
+                .into());
+            }
+            Ok(number)
+        })
+        .transpose()
+}
+
+fn sparkline_u32(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+) -> SheetResult<Option<u32>> {
+    unqualified_attribute_value(element, name, decoder)?
+        .map(|value| {
+            value.parse::<u32>().map_err(|_| {
+                format!(
+                    "invalid sparkline unsigned integer {}='{value}'",
+                    String::from_utf8_lossy(name)
+                )
+                .into()
+            })
+        })
+        .transpose()
+}
+
+fn parse_enum_attribute<T>(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+    parse: impl FnOnce(&str) -> Option<T>,
+) -> SheetResult<Option<T>> {
+    unqualified_attribute_value(element, name, decoder)?
+        .map(|value| parse(&value).ok_or_else(|| format!("invalid {description} '{value}'").into()))
+        .transpose()
+}
+
+fn validate_group_options(options: &SparklineGroupOptions) -> SheetResult<()> {
+    if options.manual_min.is_some() && options.min_axis_type != SparklineAxisMinMax::Custom {
+        return Err("manualMin requires minAxisType=custom".into());
+    }
+    if options.manual_max.is_some() && options.max_axis_type != SparklineAxisMinMax::Custom {
+        return Err("manualMax requires maxAxisType=custom".into());
+    }
+    for (name, value) in [
+        ("manualMin", options.manual_min),
+        ("manualMax", options.manual_max),
+        ("lineWeight", options.line_weight),
+    ] {
+        if value.is_some_and(|value| !value.is_finite()) {
+            return Err(format!("sparkline {name} must be finite").into());
+        }
+    }
+    Ok(())
+}
+
+fn extra_group_attributes(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+) -> SheetResult<Vec<(String, String)>> {
+    const KNOWN: &[&[u8]] = &[
+        b"type",
+        b"displayEmptyCellsAs",
+        b"dateAxis",
+        b"displayHidden",
+        b"displayXAxis",
+        b"markers",
+        b"high",
+        b"low",
+        b"first",
+        b"last",
+        b"negative",
+        b"rightToLeft",
+        b"minAxisType",
+        b"maxAxisType",
+        b"manualMin",
+        b"manualMax",
+        b"lineWeight",
+    ];
+    let mut extra = Vec::new();
+    for attribute in element.attributes() {
+        let attribute = attribute?;
+        let key = attribute.key.as_ref();
+        if key == b"xmlns" || key.starts_with(b"xmlns:") {
+            continue;
+        }
+        if !key.contains(&b':') && KNOWN.contains(&key) {
+            continue;
+        }
+        let name = std::str::from_utf8(key)?.to_string();
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)?
+            .into_owned();
+        extra.push((name, value));
+    }
+    Ok(extra)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const STRICT_S: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
+
+    fn worksheet(extension_contents: &str) -> String {
+        format!(
+            r#"<s:worksheet xmlns:s="{STRICT_S}"
+                    xmlns:sl="{x14}" xmlns:m="{xm}"
+                    xmlns:f="urn:foreign" xmlns:xr2="urn:revision">
+                <f:extLst><s:ext uri="{uri}"><sl:sparklineGroups/></s:ext></f:extLst>
+                <s:extLst><s:ext uri="{uri}">{extension_contents}</s:ext></s:extLst>
+            </s:worksheet>"#,
+            x14 = String::from_utf8_lossy(SPARKLINE_NAMESPACE),
+            xm = String::from_utf8_lossy(EXCEL_MAIN_NAMESPACE),
+            uri = SPARKLINE_EXT_URI.to_ascii_lowercase(),
+        )
+    }
+
+    fn group_xml(attributes: &str, contents: &str) -> String {
+        worksheet(&format!(
+            r#"<sl:sparklineGroups><sl:sparklineGroup {attributes}>{contents}</sl:sparklineGroup></sl:sparklineGroups>"#
+        ))
+    }
+
+    fn sparkline_xml(formula: &str, location: &str) -> String {
+        format!(
+            "<sl:sparklines><sl:sparkline><m:f>{formula}</m:f><m:sqref>{location}</m:sqref></sl:sparkline></sl:sparklines>"
+        )
+    }
+
+    #[test]
+    fn parses_namespace_aware_sparkline_groups() {
+        let xml = group_xml(
+            r#"type="stacked" displayEmptyCellsAs="span" dateAxis="1"
+                displayHidden="true" displayXAxis="1" markers="1" high="1"
+                low="0" first="true" last="false" negative="1" rightToLeft="0"
+                minAxisType="custom" maxAxisType="group" manualMin="-2.5"
+                lineWeight="1.25" xr2:uid="{ABC}""#,
+            r#"<sl:colorSeries rgb="FF102030"/>
+                    <sl:colorAxis theme="4" tint="-0.25"/>
+                    <sl:sparklines>
+                        <sl:sparkline><m:f>'Data &amp; More'!A1:A3</m:f><m:sqref>B2</m:sqref></sl:sparkline>
+                        <sl:sparkline><m:f>Sheet1!C1:C3</m:f><m:sqref>C2</m:sqref></sl:sparkline>
+                    </sl:sparklines>"#,
+        );
+        let groups = parse_sparkline_groups_from_worksheet_xml(&xml).unwrap();
+
+        assert_eq!(groups.len(), 1);
+        let group = &groups[0];
+        assert_eq!(group.sparkline_type, SparklineType::WinLoss);
+        assert_eq!(
+            group.options.display_empty_cells_as,
+            SparklineDisplayEmptyCellsAs::Span
+        );
+        assert!(group.options.date_axis);
+        assert!(group.options.display_hidden);
+        assert!(group.options.display_x_axis);
+        assert!(group.options.markers);
+        assert!(group.options.high);
+        assert!(!group.options.low);
+        assert_eq!(group.options.min_axis_type, SparklineAxisMinMax::Custom);
+        assert_eq!(group.options.max_axis_type, SparklineAxisMinMax::Group);
+        assert_eq!(group.options.manual_min, Some(-2.5));
+        assert_eq!(group.options.line_weight, Some(1.25));
+        assert_eq!(group.colors.series.as_ref().unwrap().rgb, "FF102030");
+        assert_eq!(group.colors.axis.as_ref().unwrap().theme, Some(4));
+        assert_eq!(group.colors.axis.as_ref().unwrap().tint, Some(-0.25));
+        assert_eq!(group.sparklines.len(), 2);
+        assert_eq!(group.sparklines[0].data_range, "'Data & More'!A1:A3");
+        assert_eq!(group.sparklines[0].location, "B2");
+        assert_eq!(
+            group.extra_attributes,
+            vec![("xr2:uid".to_string(), "{ABC}".to_string())]
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_sparkline_extensions() {
+        let valid_sparkline = sparkline_xml("Sheet1!A1:A3", "B2");
+        let invalid = [
+            worksheet(""),
+            worksheet("<sl:sparklineGroups/>"),
+            group_xml("", ""),
+            group_xml("type=\"winLoss\"", &valid_sparkline),
+            group_xml("displayHidden=\"TRUE\"", &valid_sparkline),
+            group_xml("displayEmptyCellsAs=\"blank\"", &valid_sparkline),
+            group_xml("minAxisType=\"customish\"", &valid_sparkline),
+            group_xml("manualMin=\"NaN\" minAxisType=\"custom\"", &valid_sparkline),
+            group_xml("manualMin=\"1\"", &valid_sparkline),
+            group_xml("", "<sl:sparklines/>"),
+            group_xml(
+                "",
+                "<sl:sparklines><sl:sparkline><m:sqref>B2</m:sqref></sl:sparkline></sl:sparklines>",
+            ),
+            group_xml(
+                "",
+                "<sl:sparklines><sl:sparkline><m:f>Sheet1!A1:A3</m:f></sl:sparkline></sl:sparklines>",
+            ),
+            group_xml("", &sparkline_xml("Sheet1!A1:A3", "B2:C3")),
+            group_xml(
+                "",
+                &format!(
+                    "<sl:colorSeries rgb=\"FF000000\"/><sl:colorSeries rgb=\"FFFFFFFF\"/>{valid_sparkline}"
+                ),
+            ),
+            group_xml(
+                "",
+                &format!("<sl:colorSeries rgb=\"123\"/>{valid_sparkline}"),
+            ),
+            group_xml(
+                "",
+                &format!("<sl:colorAxis theme=\"4\" tint=\"2\"/>{valid_sparkline}"),
+            ),
+            group_xml("", &format!("{valid_sparkline}{valid_sparkline}")),
+        ];
+
+        for xml in invalid {
+            assert!(
+                parse_sparkline_groups_from_worksheet_xml(&xml).is_err(),
+                "accepted invalid sparkline XML: {xml}"
+            );
+        }
+
+        let group = format!("<sl:sparklineGroup>{valid_sparkline}</sl:sparklineGroup>");
+        let too_many = worksheet(&format!(
+            "<sl:sparklineGroups>{}</sl:sparklineGroups>",
+            group.repeat(MAX_SPARKLINE_GROUPS + 1)
+        ));
+        assert!(parse_sparkline_groups_from_worksheet_xml(&too_many).is_err());
+
+        let duplicate_extension = format!(
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                    xmlns:sl="{}" xmlns:m="{}">
+                <extLst><ext uri="{SPARKLINE_EXT_URI}"><sl:sparklineGroups><sl:sparklineGroup>{valid_sparkline}</sl:sparklineGroup></sl:sparklineGroups></ext>
+                <ext uri="{SPARKLINE_EXT_URI}"><sl:sparklineGroups><sl:sparklineGroup>{valid_sparkline}</sl:sparklineGroup></sl:sparklineGroups></ext></extLst>
+            </worksheet>"#,
+            String::from_utf8_lossy(SPARKLINE_NAMESPACE),
+            String::from_utf8_lossy(EXCEL_MAIN_NAMESPACE),
+        );
+        assert!(parse_sparkline_groups_from_worksheet_xml(&duplicate_extension).is_err());
+    }
+
+    #[test]
+    fn writer_preserves_group_membership_and_round_trips() {
+        let mut group = SparklineGroup::new(SparklineType::WinLoss);
+        group.options.date_axis = true;
+        group.colors.axis = Some(SparklineColor {
+            rgb: String::new(),
+            indexed: None,
+            automatic: None,
+            theme: Some(4),
+            tint: Some(-0.25),
+        });
+        group.push(Sparkline {
+            data_range: "Sheet1!A1:A3".to_string(),
+            location: "B2".to_string(),
+        });
+        group.push(Sparkline {
+            data_range: "Sheet1!C1:C3".to_string(),
+            location: "C2".to_string(),
+        });
+
+        let mut extension = String::new();
+        write_sparkline_groups_ext(&mut extension, &[group]).unwrap();
+        assert_eq!(extension.matches("<x14:sparklineGroup ").count(), 1);
+        assert_eq!(extension.matches("<x14:sparkline>").count(), 2);
+        assert!(extension.contains("type=\"stacked\""));
+        assert!(extension.contains("dateAxis=\"1\""));
+
+        let xml = format!(
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                xmlns:xr2="urn:revision"><extLst>{extension}</extLst></worksheet>"#
+        );
+        let parsed = parse_sparkline_groups_from_worksheet_xml(&xml).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].sparklines.len(), 2);
+        assert_eq!(parsed[0].sparkline_type, SparklineType::WinLoss);
+        assert!(parsed[0].options.date_axis);
+        assert_eq!(parsed[0].colors.axis.as_ref().unwrap().theme, Some(4));
+        assert_eq!(parsed[0].colors.axis.as_ref().unwrap().tint, Some(-0.25));
+    }
+
+    #[test]
+    fn writer_rejects_invalid_groups() {
+        let empty = SparklineGroup::new(SparklineType::Line);
+        let mut xml = String::new();
+        assert!(write_sparkline_groups_ext(&mut xml, &[empty]).is_err());
+
+        let mut invalid = SparklineGroup::new(SparklineType::Line);
+        invalid.options.manual_min = Some(1.0);
+        invalid.push(Sparkline {
+            data_range: "Sheet1!A1:A2".to_string(),
+            location: "B2".to_string(),
+        });
+        let mut xml = String::new();
+        assert!(write_sparkline_groups_ext(&mut xml, &[invalid]).is_err());
+
+        let mut valid = SparklineGroup::new(SparklineType::Line);
+        valid.push(Sparkline {
+            data_range: "Sheet1!A1:A2".to_string(),
+            location: "B2".to_string(),
+        });
+        let mut invalid_attribute = valid.clone();
+        invalid_attribute
+            .extra_attributes
+            .push(("bad name".to_string(), "value".to_string()));
+        let mut xml = String::new();
+        assert!(write_sparkline_groups_ext(&mut xml, &[invalid_attribute]).is_err());
+
+        let mut xml = String::new();
+        assert!(
+            write_sparkline_groups_ext(&mut xml, &vec![valid; MAX_SPARKLINE_GROUPS + 1]).is_err()
+        );
+    }
 }
