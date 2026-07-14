@@ -2,9 +2,47 @@
 
 use super::{Shape, Slide};
 use litchi_core::{Error, Result, ShapeType};
-use quick_xml::Reader;
 use quick_xml::XmlVersion;
-use quick_xml::events::{BytesRef, BytesStart, Event, attributes::Attribute};
+use quick_xml::events::{BytesRef, BytesStart, Event};
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
+
+const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
+const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+const SVG_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
+const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
+
+#[derive(Clone, Copy)]
+enum ShapeElement {
+    Frame,
+    Rect,
+    Ellipse,
+    Line,
+    CustomShape,
+    Circle,
+    Path,
+    Polygon,
+    Polyline,
+    Connector,
+    Group,
+}
+
+#[derive(Clone, Copy)]
+enum OdpElement {
+    Page,
+    Notes,
+    Shape(ShapeElement),
+    Image,
+    Table,
+    Object,
+    TextParagraph,
+    TextSpace,
+    TextTab,
+    TextLineBreak,
+    Other,
+}
 
 /// Parser for ODP-specific structures.
 ///
@@ -110,52 +148,80 @@ impl ShapeBuilder {
 }
 
 impl OdpParser {
-    fn is_shape_element(name: &[u8]) -> bool {
-        matches!(
-            name,
-            b"draw:frame"
-                | b"draw:rect"
-                | b"draw:ellipse"
-                | b"draw:line"
-                | b"draw:custom-shape"
-                | b"draw:circle"
-                | b"draw:path"
-                | b"draw:polygon"
-                | b"draw:polyline"
-                | b"draw:connector"
-                | b"draw:g"
-        )
+    fn is_namespace(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
+        matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == expected)
     }
 
-    fn shape_builder(element: &BytesStart<'_>) -> ShapeBuilder {
+    fn classify(namespace: &ResolveResult<'_>, local_name: &[u8]) -> OdpElement {
+        if Self::is_namespace(namespace, DRAW_NAMESPACE) {
+            match local_name {
+                b"page" => OdpElement::Page,
+                b"frame" => OdpElement::Shape(ShapeElement::Frame),
+                b"rect" => OdpElement::Shape(ShapeElement::Rect),
+                b"ellipse" => OdpElement::Shape(ShapeElement::Ellipse),
+                b"line" => OdpElement::Shape(ShapeElement::Line),
+                b"custom-shape" => OdpElement::Shape(ShapeElement::CustomShape),
+                b"circle" => OdpElement::Shape(ShapeElement::Circle),
+                b"path" => OdpElement::Shape(ShapeElement::Path),
+                b"polygon" => OdpElement::Shape(ShapeElement::Polygon),
+                b"polyline" => OdpElement::Shape(ShapeElement::Polyline),
+                b"connector" => OdpElement::Shape(ShapeElement::Connector),
+                b"g" => OdpElement::Shape(ShapeElement::Group),
+                b"image" => OdpElement::Image,
+                b"object" | b"object-ole" | b"plugin" => OdpElement::Object,
+                _ => OdpElement::Other,
+            }
+        } else if Self::is_namespace(namespace, PRESENTATION_NAMESPACE) && local_name == b"notes" {
+            OdpElement::Notes
+        } else if Self::is_namespace(namespace, TABLE_NAMESPACE) && local_name == b"table" {
+            OdpElement::Table
+        } else if Self::is_namespace(namespace, TEXT_NAMESPACE) {
+            match local_name {
+                b"p" | b"h" => OdpElement::TextParagraph,
+                b"s" => OdpElement::TextSpace,
+                b"tab" => OdpElement::TextTab,
+                b"line-break" => OdpElement::TextLineBreak,
+                _ => OdpElement::Other,
+            }
+        } else {
+            OdpElement::Other
+        }
+    }
+
+    fn shape_builder(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+        shape_element: ShapeElement,
+    ) -> Result<ShapeBuilder> {
         let mut builder = ShapeBuilder::new();
-        let presentation_class = Self::get_attr(element.attributes(), b"presentation:class");
+        let presentation_class = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"class")?;
         builder.is_title = presentation_class.as_deref() == Some("title");
-        builder.shape_type = match element.name().as_ref() {
-            b"draw:frame" => match presentation_class.as_deref() {
+        builder.shape_type = match shape_element {
+            ShapeElement::Frame => match presentation_class.as_deref() {
                 Some(_) => ShapeType::Placeholder,
                 _ => ShapeType::TextBox,
             },
-            b"draw:line" => ShapeType::Line,
-            b"draw:connector" => ShapeType::Connector,
-            b"draw:g" => ShapeType::Group,
+            ShapeElement::Line => ShapeType::Line,
+            ShapeElement::Connector => ShapeType::Connector,
+            ShapeElement::Group => ShapeType::Group,
             _ => ShapeType::AutoShape,
         };
-        builder.name = Self::get_attr(element.attributes(), b"draw:name");
-        if matches!(element.name().as_ref(), b"draw:line" | b"draw:connector") {
-            builder.x = Self::get_attr(element.attributes(), b"svg:x1");
-            builder.y = Self::get_attr(element.attributes(), b"svg:y1");
-            builder.width = Self::get_attr(element.attributes(), b"svg:x2");
-            builder.height = Self::get_attr(element.attributes(), b"svg:y2");
+        builder.name = Self::get_attr(reader, element, DRAW_NAMESPACE, b"name")?;
+        if matches!(shape_element, ShapeElement::Line | ShapeElement::Connector) {
+            builder.x = Self::get_attr(reader, element, SVG_NAMESPACE, b"x1")?;
+            builder.y = Self::get_attr(reader, element, SVG_NAMESPACE, b"y1")?;
+            builder.width = Self::get_attr(reader, element, SVG_NAMESPACE, b"x2")?;
+            builder.height = Self::get_attr(reader, element, SVG_NAMESPACE, b"y2")?;
         } else {
-            builder.x = Self::get_attr(element.attributes(), b"svg:x");
-            builder.y = Self::get_attr(element.attributes(), b"svg:y");
-            builder.width = Self::get_attr(element.attributes(), b"svg:width");
-            builder.height = Self::get_attr(element.attributes(), b"svg:height");
+            builder.x = Self::get_attr(reader, element, SVG_NAMESPACE, b"x")?;
+            builder.y = Self::get_attr(reader, element, SVG_NAMESPACE, b"y")?;
+            builder.width = Self::get_attr(reader, element, SVG_NAMESPACE, b"width")?;
+            builder.height = Self::get_attr(reader, element, SVG_NAMESPACE, b"height")?;
         }
-        builder.style_name = Self::get_attr(element.attributes(), b"draw:style-name")
-            .or_else(|| Self::get_attr(element.attributes(), b"presentation:style-name"));
-        builder
+        builder.style_name = Self::get_attr(reader, element, DRAW_NAMESPACE, b"style-name")?.or(
+            Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"style-name")?,
+        );
+        Ok(builder)
     }
 
     fn append_segment(target: &mut String, has_segment: &mut bool, text: &str) {
@@ -234,12 +300,17 @@ impl OdpParser {
         }
     }
 
-    fn push_text_control(element: &BytesStart<'_>, paragraph: &mut ParagraphText) -> Result<()> {
-        match element.name().as_ref() {
-            b"text:line-break" => paragraph.push_explicit('\n', 1),
-            b"text:tab" => paragraph.push_explicit('\t', 1),
-            b"text:s" => {
-                let count = Self::get_attr(element.attributes(), b"text:c")
+    fn push_text_control(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+        element_type: OdpElement,
+        paragraph: &mut ParagraphText,
+    ) -> Result<()> {
+        match element_type {
+            OdpElement::TextLineBreak => paragraph.push_explicit('\n', 1),
+            OdpElement::TextTab => paragraph.push_explicit('\t', 1),
+            OdpElement::TextSpace => {
+                let count = Self::get_attr(reader, element, TEXT_NAMESPACE, b"c")?
                     .map(|value| {
                         value.parse::<usize>().map_err(|_| {
                             Error::InvalidFormat(format!("invalid text:s count '{value}'"))
@@ -261,7 +332,7 @@ impl OdpParser {
 
     /// Parse all slides from ODP content.xml
     pub fn parse_slides(xml_content: &str) -> Result<Vec<Slide>> {
-        let mut reader = Reader::from_str(xml_content);
+        let mut reader = NsReader::from_str(xml_content);
         let mut buf = Vec::new();
         let mut slides = Vec::new();
 
@@ -282,11 +353,14 @@ impl OdpParser {
         let mut current_paragraph: Option<ParagraphText> = None;
 
         loop {
-            match reader.read_event_into(&mut buf) {
-                Ok(Event::Start(ref e)) => {
-                    match e.name().as_ref() {
-                        b"draw:page" => {
-                            // Finish previous slide if any
+            let (namespace, event) = reader
+                .read_resolved_event_into(&mut buf)
+                .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+            match event {
+                Event::Start(ref element) => {
+                    let element_type = Self::classify(&namespace, element.local_name().as_ref());
+                    match element_type {
+                        OdpElement::Page => {
                             if in_slide {
                                 slides.push(Slide {
                                     title: current_slide_title.take(),
@@ -298,17 +372,13 @@ impl OdpParser {
                                 });
                                 slide_index += 1;
                             }
-
-                            // Start new slide
                             current_slide_title = None;
                             current_slide_has_segment = false;
                             current_notes_has_paragraph = false;
                             in_slide = true;
                         },
-                        b"presentation:notes" if in_slide => {
-                            in_notes = true;
-                        },
-                        b"text:p" | b"text:h" if in_slide => {
+                        OdpElement::Notes if in_slide => in_notes = true,
+                        OdpElement::TextParagraph if in_slide => {
                             if current_paragraph.is_some() {
                                 return Err(Error::InvalidFormat(
                                     "nested ODP text paragraphs are not supported".to_string(),
@@ -316,37 +386,39 @@ impl OdpParser {
                             }
                             current_paragraph = Some(ParagraphText::default());
                         },
-                        b"text:s" | b"text:tab" | b"text:line-break"
+                        OdpElement::TextSpace | OdpElement::TextTab | OdpElement::TextLineBreak
                             if current_paragraph.is_some() =>
                         {
                             Self::push_text_control(
-                                e,
+                                &reader,
+                                element,
+                                element_type,
                                 current_paragraph.as_mut().expect("paragraph checked above"),
                             )?;
                         },
                         _ if in_notes => {},
-                        name if Self::is_shape_element(name) => {
+                        OdpElement::Shape(shape_element) => {
                             if in_slide && current_shape.is_none() {
-                                current_shape = Some(Self::shape_builder(e));
+                                current_shape =
+                                    Some(Self::shape_builder(&reader, element, shape_element)?);
                                 shape_depth = 0;
                             } else if current_shape.is_some() {
                                 shape_depth += 1;
                             }
                         },
-                        b"draw:image" if current_shape.is_some() => {
+                        OdpElement::Image if current_shape.is_some() => {
                             let builder = current_shape.as_mut().expect("shape checked above");
                             builder.shape_type = ShapeType::Picture;
-                            builder.image_href = Self::get_attr(e.attributes(), b"xlink:href");
+                            builder.image_href =
+                                Self::get_attr(&reader, element, XLINK_NAMESPACE, b"href")?;
                         },
-                        b"table:table" if current_shape.is_some() => {
+                        OdpElement::Table if current_shape.is_some() => {
                             current_shape
                                 .as_mut()
                                 .expect("shape checked above")
                                 .shape_type = ShapeType::Table;
                         },
-                        b"draw:object" | b"draw:object-ole" | b"draw:plugin"
-                            if current_shape.is_some() =>
-                        {
+                        OdpElement::Object if current_shape.is_some() => {
                             current_shape
                                 .as_mut()
                                 .expect("shape checked above")
@@ -355,14 +427,14 @@ impl OdpParser {
                         _ => {},
                     }
                 },
-                Ok(Event::Text(ref t)) if current_paragraph.is_some() => {
-                    let text = Self::decode_text(t)?;
+                Event::Text(ref text) if current_paragraph.is_some() => {
+                    let text = Self::decode_text(text)?;
                     current_paragraph
                         .as_mut()
                         .expect("paragraph checked above")
                         .push_text(&text);
                 },
-                Ok(Event::CData(ref text)) if current_paragraph.is_some() => {
+                Event::CData(ref text) if current_paragraph.is_some() => {
                     let decoded = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                         Error::InvalidFormat(format!("invalid presentation CDATA: {error}"))
                     })?;
@@ -371,68 +443,70 @@ impl OdpParser {
                         .expect("paragraph checked above")
                         .push_text(&decoded);
                 },
-                Ok(Event::GeneralRef(ref reference)) if current_paragraph.is_some() => {
+                Event::GeneralRef(ref reference) if current_paragraph.is_some() => {
                     let text = Self::decode_reference(reference)?;
                     current_paragraph
                         .as_mut()
                         .expect("paragraph checked above")
                         .push_text(&text);
                 },
-                Ok(Event::Empty(ref e))
-                    if in_slide && matches!(e.name().as_ref(), b"text:p" | b"text:h") =>
-                {
-                    Self::push_parsed_paragraph(
-                        "",
-                        in_notes,
-                        &mut current_notes_text,
-                        &mut current_notes_has_paragraph,
-                        current_shape.as_mut(),
-                        &mut current_slide_text,
-                        &mut current_slide_has_segment,
-                    );
+                Event::Empty(ref element) => {
+                    let element_type = Self::classify(&namespace, element.local_name().as_ref());
+                    match element_type {
+                        OdpElement::TextParagraph if in_slide => {
+                            Self::push_parsed_paragraph(
+                                "",
+                                in_notes,
+                                &mut current_notes_text,
+                                &mut current_notes_has_paragraph,
+                                current_shape.as_mut(),
+                                &mut current_slide_text,
+                                &mut current_slide_has_segment,
+                            );
+                        },
+                        OdpElement::TextSpace | OdpElement::TextTab | OdpElement::TextLineBreak
+                            if current_paragraph.is_some() =>
+                        {
+                            Self::push_text_control(
+                                &reader,
+                                element,
+                                element_type,
+                                current_paragraph.as_mut().expect("paragraph checked above"),
+                            )?;
+                        },
+                        _ if in_notes => {},
+                        OdpElement::Image => {
+                            if let Some(builder) = current_shape.as_mut() {
+                                builder.shape_type = ShapeType::Picture;
+                                builder.image_href =
+                                    Self::get_attr(&reader, element, XLINK_NAMESPACE, b"href")?;
+                            }
+                        },
+                        OdpElement::Table => {
+                            if let Some(builder) = current_shape.as_mut() {
+                                builder.shape_type = ShapeType::Table;
+                            }
+                        },
+                        OdpElement::Object => {
+                            if let Some(builder) = current_shape.as_mut() {
+                                builder.shape_type = ShapeType::GraphicFrame;
+                            }
+                        },
+                        OdpElement::Shape(shape_element) if in_slide && current_shape.is_none() => {
+                            Self::finish_shape(
+                                Self::shape_builder(&reader, element, shape_element)?,
+                                &mut current_slide_title,
+                                &mut current_slide_text,
+                                &mut current_slide_has_segment,
+                                &mut current_shapes,
+                            );
+                        },
+                        _ => {},
+                    }
                 },
-                Ok(Event::Empty(ref e))
-                    if current_paragraph.is_some()
-                        && matches!(
-                            e.name().as_ref(),
-                            b"text:s" | b"text:tab" | b"text:line-break"
-                        ) =>
-                {
-                    Self::push_text_control(
-                        e,
-                        current_paragraph.as_mut().expect("paragraph checked above"),
-                    )?;
-                },
-                Ok(Event::Empty(ref e)) if !in_notes => match e.name().as_ref() {
-                    b"draw:image" => {
-                        if let Some(builder) = current_shape.as_mut() {
-                            builder.shape_type = ShapeType::Picture;
-                            builder.image_href = Self::get_attr(e.attributes(), b"xlink:href");
-                        }
-                    },
-                    b"table:table" => {
-                        if let Some(builder) = current_shape.as_mut() {
-                            builder.shape_type = ShapeType::Table;
-                        }
-                    },
-                    b"draw:object" | b"draw:object-ole" | b"draw:plugin" => {
-                        if let Some(builder) = current_shape.as_mut() {
-                            builder.shape_type = ShapeType::GraphicFrame;
-                        }
-                    },
-                    name if in_slide && current_shape.is_none() && Self::is_shape_element(name) => {
-                        Self::finish_shape(
-                            Self::shape_builder(e),
-                            &mut current_slide_title,
-                            &mut current_slide_text,
-                            &mut current_slide_has_segment,
-                            &mut current_shapes,
-                        );
-                    },
-                    _ => {},
-                },
-                Ok(Event::End(ref e)) => {
-                    if matches!(e.name().as_ref(), b"text:p" | b"text:h")
+                Event::End(ref element) => {
+                    let element_type = Self::classify(&namespace, element.local_name().as_ref());
+                    if matches!(element_type, OdpElement::TextParagraph)
                         && current_paragraph.is_some()
                     {
                         let paragraph = current_paragraph
@@ -451,7 +525,7 @@ impl OdpParser {
                         buf.clear();
                         continue;
                     }
-                    if e.name().as_ref() == b"presentation:notes" {
+                    if matches!(element_type, OdpElement::Notes) {
                         in_notes = false;
                         buf.clear();
                         continue;
@@ -460,9 +534,8 @@ impl OdpParser {
                         buf.clear();
                         continue;
                     }
-                    match e.name().as_ref() {
-                        b"draw:page" => {
-                            // Finish current slide
+                    match element_type {
+                        OdpElement::Page => {
                             if in_slide {
                                 slides.push(Slide {
                                     title: current_slide_title.take(),
@@ -478,13 +551,10 @@ impl OdpParser {
                             current_notes_has_paragraph = false;
                             in_slide = false;
                         },
-                        b"draw:frame" | b"draw:rect" | b"draw:ellipse" | b"draw:line"
-                        | b"draw:custom-shape" | b"draw:circle" | b"draw:path"
-                        | b"draw:polygon" | b"draw:polyline" | b"draw:connector" | b"draw:g" => {
+                        OdpElement::Shape(_) => {
                             if shape_depth > 0 {
                                 shape_depth -= 1;
                             } else if let Some(builder) = current_shape.take() {
-                                // Finish the shape and add it to the slide
                                 Self::finish_shape(
                                     builder,
                                     &mut current_slide_title,
@@ -497,10 +567,7 @@ impl OdpParser {
                         _ => {},
                     }
                 },
-                Ok(Event::Eof) => break,
-                Err(e) => {
-                    return Err(Error::InvalidFormat(format!("XML parsing error: {}", e)));
-                },
+                Event::Eof => break,
                 _ => {},
             }
             buf.clear();
@@ -510,21 +577,26 @@ impl OdpParser {
     }
 
     /// Helper to extract attribute values
-    fn get_attr(attrs: quick_xml::events::attributes::Attributes, name: &[u8]) -> Option<String> {
-        for attr_result in attrs {
-            if let Ok(attr) = attr_result
-                && attr.key.as_ref() == name
-            {
-                return Self::normalize_attr(&attr);
+    fn get_attr(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+        namespace_uri: &[u8],
+        local_name: &[u8],
+    ) -> Result<Option<String>> {
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+            if Self::is_namespace(&namespace, namespace_uri) && local.as_ref() == local_name {
+                return attribute
+                    .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                    .map(|value| Some(value.into_owned()))
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid XML attribute value: {error}"))
+                    });
             }
         }
-        None
-    }
-
-    fn normalize_attr(attr: &Attribute<'_>) -> Option<String> {
-        attr.normalized_value(XmlVersion::Implicit1_0)
-            .ok()
-            .map(|value| value.into_owned())
+        Ok(None)
     }
 }
 
@@ -832,5 +904,23 @@ mod tests {
 
         let error = OdpParser::parse_slides(xml).unwrap_err();
         assert!(error.to_string().contains("safety limit"));
+    }
+
+    #[test]
+    fn parses_arbitrary_odf_namespace_prefixes() {
+        let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:l="http://www.w3.org/1999/xlink" xmlns:tb="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:f="urn:example:wrong"><o:body><o:presentation><f:page><t:p>ignored</t:p></f:page><d:page><d:frame d:name="Aliased Title" p:class="title" s:x="1cm"><d:text-box><t:p>Aliased<t:s/>title</t:p></d:text-box></d:frame><d:frame d:name="Picture"><d:image l:href="Pictures/a&amp;b.png"/></d:frame><d:connector d:name="Link" s:x1="1cm" s:y1="2cm" s:x2="3cm" s:y2="4cm"/><d:frame d:name="Table"><tb:table/></d:frame><p:notes><d:frame><d:text-box><t:p>Aliased note</t:p></d:text-box></d:frame></p:notes></d:page></o:presentation></o:body></o:document-content>"#;
+
+        let slides = OdpParser::parse_slides(xml).unwrap();
+        assert_eq!(slides.len(), 1);
+        assert_eq!(slides[0].title.as_deref(), Some("Aliased title"));
+        assert_eq!(slides[0].notes.as_deref(), Some("Aliased note"));
+        let picture = &slides[0].shapes[0];
+        assert_eq!(picture.name(), Some("Picture"));
+        assert_eq!(picture.image_href(), Some("Pictures/a&b.png"));
+        let connector = &slides[0].shapes[1];
+        assert_eq!(connector.shape_type, ShapeType::Connector);
+        assert_eq!(connector.position(), (Some("1cm"), Some("2cm")));
+        assert_eq!(connector.dimensions(), (Some("3cm"), Some("4cm")));
+        assert_eq!(slides[0].shapes[2].shape_type, ShapeType::Table);
     }
 }
