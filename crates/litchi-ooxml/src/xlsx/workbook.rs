@@ -2603,11 +2603,29 @@ mod tests {
             .unwrap(),
         );
         series.data_points.push(point);
+        chart.chart.chart_extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="chart"><x:reference r:id="rId405"/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        chart.chart.plot_area.shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId406"/></a:blipFill></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
         let fragment_ids = crate::xlsx::chart::chart_fragment_relationship_ids(&chart.chart)
             .expect("relationship-bearing fragments should be valid XML");
         assert_eq!(
             fragment_ids,
-            ["rId403".to_string(), "rId404".to_string()].into()
+            [
+                "rId403".to_string(),
+                "rId404".to_string(),
+                "rId405".to_string(),
+                "rId406".to_string(),
+            ]
+            .into()
         );
         workbook.worksheet_mut(0).unwrap().add_chart(chart);
 

@@ -630,6 +630,30 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
                     e,
                 )?));
             },
+            Ok(Event::Start(ref e))
+                if saw_chart && !closed_chart && e.local_name().as_ref() == b"extLst" =>
+            {
+                if chart.chart_extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate chart extension lists".into(),
+                    ));
+                }
+                chart.chart_extension_list = Some(ChartExtensionList::from_xml(
+                    xml_reader.capture_fragment(e, "chart extension list")?,
+                )?);
+            },
+            Ok(Event::Empty(ref e))
+                if saw_chart && !closed_chart && e.local_name().as_ref() == b"extLst" =>
+            {
+                if chart.chart_extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate chart extension lists".into(),
+                    ));
+                }
+                chart.chart_extension_list = Some(ChartExtensionList::from_xml(
+                    xml_reader.capture_empty_fragment(e)?,
+                )?);
+            },
             Ok(Event::Start(ref e)) if closed_chart && e.local_name().as_ref() == b"extLst" => {
                 if chart.extension_list.is_some() {
                     return Err(OoxmlError::InvalidFormat(
@@ -1757,6 +1781,46 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
                 }
                 saw_data_table = true;
                 plot_area.data_table = Some(DataTable::default());
+            },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"spPr" => {
+                if plot_area.shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart plot area contains duplicate shape properties".into(),
+                    ));
+                }
+                plot_area.shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_fragment(e, "chart plot-area shape properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"spPr" => {
+                if plot_area.shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart plot area contains duplicate shape properties".into(),
+                    ));
+                }
+                plot_area.shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_empty_fragment(e)?,
+                )?);
+            },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"extLst" => {
+                if plot_area.extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart plot area contains duplicate extension lists".into(),
+                    ));
+                }
+                plot_area.extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_fragment(e, "chart plot-area extension list")?,
+                )?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"extLst" => {
+                if plot_area.extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart plot area contains duplicate extension lists".into(),
+                    ));
+                }
+                plot_area.extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_empty_fragment(e)?,
+                )?);
             },
             Ok(Event::Empty(ref e))
                 if is_chart_type_group_name(e.local_name().as_ref())
@@ -5518,7 +5582,10 @@ mod tests {
                 xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
                 xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
                 xmlns:x="urn:example:chart-extension">
-            <c:chart><c:plotArea/></c:chart>
+            <c:chart><c:plotArea>
+                <c:spPr><a:solidFill><a:srgbClr val="654321"/></a:solidFill></c:spPr>
+                <c:extLst><c:ext uri="plot"><x:plotPayload/></c:ext></c:extLst>
+            </c:plotArea><c:extLst><c:ext uri="chart"><x:chartPayload/></c:ext></c:extLst></c:chart>
             <c:spPr><a:solidFill><a:srgbClr val="123456"/></a:solidFill></c:spPr>
             <c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Label</a:t></a:r></a:p></c:txPr>
             <c:extLst><c:ext uri="example"><x:payload enabled="1"/></c:ext></c:extLst>
@@ -5536,6 +5603,16 @@ mod tests {
                 .unwrap()
                 .contains(r#"xmlns:x="urn:example:chart-extension""#)
         );
+        assert!(
+            std::str::from_utf8(chart.plot_area.shape_properties.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("654321")
+        );
+        assert!(
+            std::str::from_utf8(chart.chart_extension_list.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("chartPayload")
+        );
 
         let mut output = Vec::new();
         crate::charts::writer::write_chart(&mut output, &chart).unwrap();
@@ -5543,6 +5620,15 @@ mod tests {
         assert_eq!(reparsed.shape_properties, chart.shape_properties);
         assert_eq!(reparsed.text_properties, chart.text_properties);
         assert_eq!(reparsed.extension_list, chart.extension_list);
+        assert_eq!(
+            reparsed.plot_area.shape_properties,
+            chart.plot_area.shape_properties
+        );
+        assert_eq!(
+            reparsed.plot_area.extension_list,
+            chart.plot_area.extension_list
+        );
+        assert_eq!(reparsed.chart_extension_list, chart.chart_extension_list);
 
         assert!(
             ChartShapeProperties::from_xml(
@@ -5703,6 +5789,17 @@ mod tests {
             </c:chartSpace>"#;
         let unsupported = parse_chart(unsupported.as_slice()).unwrap();
         assert!(crate::charts::writer::write_chart(&mut Vec::new(), &unsupported).is_err());
+
+        for supported in [
+            br#"<c:areaChart><c:grouping val="standard"/><c:ser><c:idx val="0"/><c:order val="0"/><c:pictureOptions/></c:ser></c:areaChart>"#.as_slice(),
+            br#"<c:bubbleChart><c:ser><c:idx val="0"/><c:order val="0"/><c:invertIfNegative/></c:ser></c:bubbleChart>"#.as_slice(),
+        ] {
+            let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea>"#.to_vec();
+            document.extend_from_slice(supported);
+            document.extend_from_slice(b"</c:plotArea></c:chart></c:chartSpace>");
+            let supported = parse_chart(document.as_slice()).unwrap();
+            crate::charts::writer::write_chart(&mut Vec::new(), &supported).unwrap();
+        }
     }
 
     #[test]

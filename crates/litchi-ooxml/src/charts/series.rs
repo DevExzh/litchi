@@ -377,7 +377,7 @@ pub struct Series {
     pub trendlines: Vec<Trendline>,
     /// DrawingML shape properties
     pub shape_properties: Option<ChartShapeProperties>,
-    /// Bar-series picture-fill placement options
+    /// Area- and bar-series picture-fill placement options
     pub picture_options: Option<PictureOptions>,
     /// Series extension list
     pub extension_list: Option<ChartExtensionList>,

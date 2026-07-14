@@ -711,6 +711,8 @@ pub struct Chart {
     pub plot_visible_only: bool,
     /// Show data in hidden rows and columns
     pub show_data_labels_over_max: bool,
+    /// Optional extension list inside the chart element
+    pub chart_extension_list: Option<ChartExtensionList>,
     /// Chart style index
     pub style: Option<u32>,
     /// Optional DrawingML theme color-map override
@@ -758,6 +760,7 @@ impl Chart {
             display_blanks_as: DisplayBlanks::Gap,
             plot_visible_only: true,
             show_data_labels_over_max: false,
+            chart_extension_list: None,
             style: None,
             color_map_override: None,
             language: None,

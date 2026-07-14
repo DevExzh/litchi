@@ -47,7 +47,7 @@ impl SeriesFeatures {
         smooth: false,
     };
     const AREA: Self = Self {
-        invert_if_negative: true,
+        picture_options: true,
         ..Self::BASIC
     };
     const BAR: Self = Self {
@@ -58,6 +58,10 @@ impl SeriesFeatures {
     const LINE: Self = Self {
         marker: true,
         smooth: true,
+        ..Self::BASIC
+    };
+    const BUBBLE: Self = Self {
+        invert_if_negative: true,
         ..Self::BASIC
     };
     const LINE_3D: Self = Self {
@@ -202,6 +206,9 @@ pub(crate) fn write_chart_with_relationship_ids<W: Write>(
 
     if chart.show_data_labels_over_max {
         write!(writer, r#"<c:showDLblsOverMax val="1"/>"#)?;
+    }
+    if let Some(extension_list) = chart.chart_extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
     }
 
     write!(writer, "</c:chart>")?;
@@ -644,6 +651,12 @@ fn write_plot_area<W: Write>(writer: &mut W, plot_area: &PlotArea) -> std::io::R
     }
     if let Some(data_table) = plot_area.data_table.as_ref() {
         write_data_table(writer, data_table)?;
+    }
+    if let Some(shape_properties) = plot_area.shape_properties.as_ref() {
+        writer.write_all(shape_properties.as_xml())?;
+    }
+    if let Some(extension_list) = plot_area.extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
     }
 
     write!(writer, "</c:plotArea>")?;
@@ -1867,7 +1880,7 @@ fn write_bubble_series<W: Write>(writer: &mut W, series: &Series) -> std::io::Re
         writer.write_all(shape_properties.as_xml())?;
     }
 
-    write_series_presentation(writer, series, SeriesFeatures::BASIC)?;
+    write_series_presentation(writer, series, SeriesFeatures::BUBBLE)?;
 
     if let Some(ref x_values) = series.x_values {
         write_numeric_data_ref(writer, "c:xVal", x_values)?;

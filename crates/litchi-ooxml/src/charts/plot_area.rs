@@ -4,6 +4,7 @@
 //! and chart type groups.
 
 use crate::charts::axis::Axis;
+use crate::charts::chart::{ChartExtensionList, ChartShapeProperties};
 use crate::charts::models::Layout;
 use crate::charts::series::{DataLabels, Series};
 use crate::charts::types::{
@@ -21,6 +22,10 @@ pub struct PlotArea {
     pub axes: Vec<Axis>,
     /// Optional chart data table
     pub data_table: Option<DataTable>,
+    /// DrawingML shape properties for the plot area
+    pub shape_properties: Option<ChartShapeProperties>,
+    /// Plot-area extension list
+    pub extension_list: Option<ChartExtensionList>,
 }
 
 impl PlotArea {
@@ -32,6 +37,8 @@ impl PlotArea {
             type_groups: Vec::new(),
             axes: Vec::new(),
             data_table: None,
+            shape_properties: None,
+            extension_list: None,
         }
     }
 
