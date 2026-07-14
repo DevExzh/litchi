@@ -1,5 +1,5 @@
 /// DocumentPart - the main document.xml part of a Word document.
-use crate::docx::paragraph::Paragraph;
+use crate::docx::paragraph::{Paragraph, extract_word_text};
 use crate::docx::table::Table;
 use crate::error::{OoxmlError, Result};
 use litchi_opc::part::Part;
@@ -50,38 +50,7 @@ impl<'a> DocumentPart<'a> {
     /// Uses `quick-xml` for efficient streaming XML parsing with pre-allocated
     /// buffer and unsafe string conversion for optimal performance.
     pub fn extract_text(&self) -> Result<String> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
-
-        // Pre-allocate with estimated capacity to reduce reallocations
-        let estimated_capacity = self.xml_bytes().len() / 8; // Rough estimate for text content
-        let mut result = String::with_capacity(estimated_capacity);
-        let mut in_text_element = false;
-
-        // Use read_event() for zero-copy parsing from slice
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e))
-                    // Check if this is a w:t element
-                    if e.local_name().as_ref() == b"t" => {
-                        in_text_element = true;
-                    },
-                Ok(Event::Text(e)) if in_text_element => {
-                    // Extract text content - use unsafe conversion for better performance
-                    let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
-                    result.push_str(text);
-                },
-                Ok(Event::End(e))
-                    if e.local_name().as_ref() == b"t" => {
-                        in_text_element = false;
-                    },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
-        Ok(result)
+        extract_word_text(self.xml_bytes())
     }
 
     /// Count the number of paragraphs in the document.

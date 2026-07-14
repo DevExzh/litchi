@@ -7,11 +7,80 @@ use crate::error::{OoxmlError, Result};
 use litchi_core::VerticalPosition;
 use litchi_core::XmlSlice;
 use litchi_opc::rel::Relationships;
-use quick_xml::events::Event;
+use quick_xml::events::{BytesRef, Event};
 use quick_xml::{Reader, XmlVersion};
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::sync::Arc;
+
+pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
+    let mut reader = Reader::from_reader(xml_bytes);
+    reader.config_mut().trim_text(false);
+    let mut result = String::with_capacity(xml_bytes.len() / 8);
+    let mut in_text_element = false;
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(e)) if e.local_name().as_ref() == b"t" => {
+                in_text_element = true;
+            },
+            Ok(Event::Empty(e)) if e.local_name().as_ref() == b"t" => {},
+            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => match e.local_name().as_ref() {
+                b"tab" => result.push('\t'),
+                b"br" | b"cr" => result.push('\n'),
+                b"noBreakHyphen" => result.push('\u{2011}'),
+                b"softHyphen" => result.push('\u{00ad}'),
+                _ => {},
+            },
+            Ok(Event::Text(text)) if in_text_element => {
+                let decoded = text
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                let unescaped = quick_xml::escape::unescape(&decoded)
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                result.push_str(&unescaped);
+            },
+            Ok(Event::CData(text)) if in_text_element => {
+                let decoded = text
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                result.push_str(&decoded);
+            },
+            Ok(Event::GeneralRef(reference)) if in_text_element => {
+                result.push_str(&decode_xml_reference(&reference)?);
+            },
+            Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
+                in_text_element = false;
+            },
+            Ok(Event::Eof) => break,
+            Err(error) => return Err(OoxmlError::Xml(error.to_string())),
+            _ => {},
+        }
+    }
+    result.shrink_to_fit();
+    Ok(result)
+}
+
+fn decode_xml_reference(reference: &BytesRef<'_>) -> Result<String> {
+    if let Some(character) = reference
+        .resolve_char_ref()
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?
+    {
+        return Ok(character.to_string());
+    }
+    let name = reference
+        .decode()
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    match name.as_ref() {
+        "amp" => Ok("&".to_string()),
+        "lt" => Ok("<".to_string()),
+        "gt" => Ok(">".to_string()),
+        "quot" => Ok("\"".to_string()),
+        "apos" => Ok("'".to_string()),
+        _ => Err(OoxmlError::InvalidFormat(format!(
+            "unsupported XML entity reference '&{name};'"
+        ))),
+    }
+}
 
 /// A paragraph in a Word document.
 ///
@@ -111,37 +180,7 @@ impl Paragraph {
     ///
     /// Uses streaming XML parsing with pre-allocated buffer to extract text efficiently.
     pub fn text(&self) -> Result<String> {
-        let xml_bytes = self.xml_bytes();
-        let mut reader = Reader::from_reader(xml_bytes);
-        reader.config_mut().trim_text(true);
-
-        // Pre-allocate string with estimated capacity to reduce reallocations
-        let estimated_capacity = xml_bytes.len() / 4; // Rough estimate
-        let mut result = String::with_capacity(estimated_capacity);
-        let mut in_text_element = false;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"t" => {
-                    in_text_element = true;
-                },
-                Ok(Event::Text(e)) if in_text_element => {
-                    // Use unsafe conversion for better performance (safe since we validate XML)
-                    let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
-                    result.push_str(text);
-                },
-                Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
-                    in_text_element = false;
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
-        // Shrink to fit to release unused capacity
-        result.shrink_to_fit();
-        Ok(result)
+        extract_word_text(self.xml_bytes())
     }
 
     /// Get an iterator over the runs in this paragraph.
@@ -663,42 +702,7 @@ impl Run {
     /// - `<w:tab/>` → tab character
     /// - `<w:br/>` → newline character
     pub fn text(&self) -> Result<String> {
-        let xml_bytes = self.xml_bytes();
-        let mut reader = Reader::from_reader(xml_bytes);
-        reader.config_mut().trim_text(true);
-
-        // Pre-allocate with estimated capacity
-        let estimated_capacity = xml_bytes.len() / 8; // Rough estimate for text content
-        let mut result = String::with_capacity(estimated_capacity);
-        let mut in_text_element = false;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    let name = e.local_name();
-                    if name.as_ref() == b"t" {
-                        in_text_element = true;
-                    } else if name.as_ref() == b"tab" {
-                        result.push('\t');
-                    } else if name.as_ref() == b"br" {
-                        result.push('\n');
-                    }
-                },
-                Ok(Event::Text(e)) if in_text_element => {
-                    // Use unsafe conversion for better performance (safe since we validate XML)
-                    let text = unsafe { std::str::from_utf8_unchecked(e.as_ref()) };
-                    result.push_str(text);
-                },
-                Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
-                    in_text_element = false;
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
-        Ok(result)
+        extract_word_text(self.xml_bytes())
     }
 
     /// Parse all explicit break elements in this run, preserving type and clear behavior.
@@ -1557,6 +1561,31 @@ mod tests {
         let run = Run::new(xml.to_vec());
         let text = run.text().unwrap();
         assert_eq!(text, "Hello, World!");
+    }
+
+    #[test]
+    fn extracts_decoded_word_text_and_special_characters() {
+        let xml = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+            <w:r><w:t xml:space="preserve">  A &amp; B &lt; C &#x1F600;  </w:t></w:r>
+            <w:r><w:tab/><w:t/><w:br/><w:cr/><w:noBreakHyphen/><w:softHyphen/><w:t>tail</w:t></w:r>
+        </w:p>"#;
+        let paragraph = Paragraph::new(xml.to_vec());
+        assert_eq!(
+            paragraph.text().unwrap(),
+            "  A & B < C 😀  \t\n\n‑\u{00ad}tail"
+        );
+        let runs = paragraph.runs().unwrap();
+        assert_eq!(runs[0].text().unwrap(), "  A & B < C 😀  ");
+        assert_eq!(runs[1].text().unwrap(), "\t\n\n‑\u{00ad}tail");
+    }
+
+    #[test]
+    fn rejects_unknown_entities_in_word_text() {
+        let run = Run::new(
+            br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:t>&unknown;</w:t></w:r>"#
+                .to_vec(),
+        );
+        assert!(run.text().is_err());
     }
 
     #[test]
