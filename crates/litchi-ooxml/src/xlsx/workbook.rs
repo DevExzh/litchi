@@ -153,7 +153,9 @@ impl Workbook {
         package.relate_to("docProps/app.xml", rt::EXTENDED_PROPERTIES);
         package.add_part(Box::new(app_props_part));
 
-        Self::new(package)
+        let mut workbook = Self::new(package)?;
+        workbook.mutable_data = Some(MutableWorkbookData::new());
+        Ok(workbook)
     }
 
     /// Create a new workbook from an OPC package.
@@ -183,7 +185,7 @@ impl Workbook {
             active_sheet_index: 0,
             shared_strings: SharedStrings::new(),
             styles: Styles::new(),
-            mutable_data: Some(MutableWorkbookData::new()),
+            mutable_data: None,
             properties: DocumentProperties::new(),
             is_1904_date_system: false,
         };
@@ -2461,7 +2463,7 @@ mod tests {
             b"shape image"
         );
 
-        let reopened = Workbook::open(&path).unwrap();
+        let mut reopened = Workbook::open(&path).unwrap();
         let worksheet = reopened.get_worksheet(0).unwrap();
 
         assert_eq!(worksheet.tables().len(), 1);
@@ -2556,14 +2558,8 @@ mod tests {
             "Sheet1!$B$2:$B$4"
         );
 
-        let loaded_chart = worksheet.charts()[0].clone();
         let second_path = directory.path().join("tables-roundtrip.xlsx");
-        let mut second_workbook = Workbook::create().unwrap();
-        second_workbook
-            .worksheet_mut(0)
-            .unwrap()
-            .add_chart(loaded_chart);
-        second_workbook.save(&second_path).unwrap();
+        reopened.save(&second_path).unwrap();
         let second_reopen = Workbook::open(&second_path).unwrap();
         assert_eq!(
             second_reopen.get_worksheet(0).unwrap().charts()[0]
