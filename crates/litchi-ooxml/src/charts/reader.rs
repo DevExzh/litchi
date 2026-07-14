@@ -18,7 +18,10 @@ use crate::charts::plot_area::{
     RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup, SurfaceTypeGroup,
     TypeGroup, TypeGroupCommon,
 };
-use crate::charts::series::{DataLabels, DataPoint, Series};
+use crate::charts::series::{
+    DataLabels, DataPoint, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType, Series,
+    Trendline, TrendlineType,
+};
 use crate::charts::types::{
     AxisOrientation, AxisPosition, BarDirection, BarGrouping, DataLabelPosition, DisplayBlanks,
     LegendPosition, MarkerStyle, RadarStyle, ScatterStyle, TickLabelPosition, TickMark,
@@ -966,6 +969,20 @@ fn parse_series<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<Series>> {
                         saw_data_labels = true;
                         series.data_labels = Some(parse_data_labels(reader)?);
                     },
+                    b"trendline" => series.trendlines.push(parse_trendline(reader)?),
+                    b"errBars" => {
+                        let error_bar = parse_error_bar(reader)?;
+                        if series
+                            .error_bars
+                            .iter()
+                            .any(|existing| existing.direction == error_bar.direction)
+                        {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart series has duplicate error-bar direction".to_string(),
+                            ));
+                        }
+                        series.error_bars.push(error_bar);
+                    },
                     b"cat" => {
                         series.categories = parse_string_data(reader)?;
                     },
@@ -1138,6 +1155,187 @@ fn parse_data_labels<R: BufRead>(reader: &mut Reader<R>) -> Result<DataLabels> {
     Ok(labels)
 }
 
+fn parse_trendline<R: BufRead>(reader: &mut Reader<R>) -> Result<Trendline> {
+    let mut trendline = Trendline::linear();
+    let mut saw_type = false;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"trendlineName" => {
+                trendline.name = Some(parse_text_element(reader, b"trendlineName")?);
+            },
+            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => match e.local_name().as_ref() {
+                b"trendlineType" => {
+                    let value = get_attr(e, b"val")
+                        .ok_or_else(|| missing_attribute("chart trendline type"))?;
+                    trendline.trendline_type = match value.as_slice() {
+                        b"exp" => TrendlineType::Exponential,
+                        b"linear" => TrendlineType::Linear,
+                        b"log" => TrendlineType::Logarithmic,
+                        b"movingAvg" => TrendlineType::MovingAverage,
+                        b"poly" => TrendlineType::Polynomial,
+                        b"power" => TrendlineType::Power,
+                        _ => return Err(invalid_attribute("chart trendline type", &value)),
+                    };
+                    saw_type = true;
+                },
+                b"order" => trendline.order = Some(bounded_u32_attr(e, "trendline order", 2, 6)?),
+                b"period" => {
+                    trendline.period = Some(bounded_u32_attr(e, "trendline period", 2, 255)?)
+                },
+                b"forward" => {
+                    trendline.forward = Some(required_nonnegative_f64_attr(e, "trendline forward")?)
+                },
+                b"backward" => {
+                    trendline.backward =
+                        Some(required_nonnegative_f64_attr(e, "trendline backward")?)
+                },
+                b"intercept" => {
+                    trendline.intercept = Some(required_f64_attr(e, "trendline intercept")?)
+                },
+                b"dispEq" => trendline.display_equation = parse_bool_attr(e)?,
+                b"dispRSqr" => trendline.display_r_squared = parse_bool_attr(e)?,
+                _ => {},
+            },
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"trendline" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart trendline".into(),
+                ));
+            },
+            Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+            _ => {},
+        }
+        buf.clear();
+    }
+    if !saw_type {
+        return Err(missing_attribute("chart trendline type"));
+    }
+    if matches!(trendline.trendline_type, TrendlineType::Polynomial) && trendline.order.is_none() {
+        return Err(missing_attribute("polynomial trendline order"));
+    }
+    if matches!(trendline.trendline_type, TrendlineType::MovingAverage)
+        && trendline.period.is_none()
+    {
+        return Err(missing_attribute("moving-average trendline period"));
+    }
+    if !matches!(trendline.trendline_type, TrendlineType::Polynomial) && trendline.order.is_some() {
+        return Err(OoxmlError::InvalidFormat(
+            "only polynomial trendlines can specify an order".to_string(),
+        ));
+    }
+    if !matches!(trendline.trendline_type, TrendlineType::MovingAverage)
+        && trendline.period.is_some()
+    {
+        return Err(OoxmlError::InvalidFormat(
+            "only moving-average trendlines can specify a period".to_string(),
+        ));
+    }
+    Ok(trendline)
+}
+
+fn parse_error_bar<R: BufRead>(reader: &mut Reader<R>) -> Result<ErrorBar> {
+    let mut direction = None;
+    let mut error_type = None;
+    let mut value_type = None;
+    let mut value = None;
+    let mut plus_values = None;
+    let mut minus_values = None;
+    let mut no_end_cap = false;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"plus" => {
+                plus_values = parse_numeric_data(reader)?
+            },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"minus" => {
+                minus_values = parse_numeric_data(reader)?
+            },
+            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => match e.local_name().as_ref() {
+                b"errDir" => {
+                    direction = Some(
+                        match required_enum_attr(e, "error-bar direction")?.as_str() {
+                            "x" => ErrorBarDirection::X,
+                            "y" => ErrorBarDirection::Y,
+                            value => {
+                                return Err(invalid_attribute(
+                                    "error-bar direction",
+                                    value.as_bytes(),
+                                ));
+                            },
+                        },
+                    )
+                },
+                b"errBarType" => {
+                    error_type = Some(match required_enum_attr(e, "error-bar type")?.as_str() {
+                        "both" => ErrorBarType::Both,
+                        "plus" => ErrorBarType::Plus,
+                        "minus" => ErrorBarType::Minus,
+                        value => return Err(invalid_attribute("error-bar type", value.as_bytes())),
+                    })
+                },
+                b"errValType" => {
+                    value_type = Some(
+                        match required_enum_attr(e, "error-bar value type")?.as_str() {
+                            "fixedVal" => ErrorBarValueType::Fixed,
+                            "percentage" => ErrorBarValueType::Percentage,
+                            "stdDev" => ErrorBarValueType::StdDev,
+                            "stdErr" => ErrorBarValueType::StdErr,
+                            "cust" => ErrorBarValueType::Custom,
+                            value => {
+                                return Err(invalid_attribute(
+                                    "error-bar value type",
+                                    value.as_bytes(),
+                                ));
+                            },
+                        },
+                    )
+                },
+                b"noEndCap" => no_end_cap = parse_bool_attr(e)?,
+                b"val" => value = Some(required_nonnegative_f64_attr(e, "error-bar value")?),
+                _ => {},
+            },
+            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"errBars" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart error bars".into(),
+                ));
+            },
+            Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+            _ => {},
+        }
+        buf.clear();
+    }
+    let error_bar = ErrorBar {
+        direction: direction.ok_or_else(|| missing_attribute("error-bar direction"))?,
+        error_type: error_type.ok_or_else(|| missing_attribute("error-bar type"))?,
+        value_type: value_type.ok_or_else(|| missing_attribute("error-bar value type"))?,
+        value,
+        plus_values,
+        minus_values,
+        no_end_cap,
+    };
+    match error_bar.value_type {
+        ErrorBarValueType::Fixed | ErrorBarValueType::Percentage | ErrorBarValueType::StdDev
+            if error_bar.value.is_none() =>
+        {
+            return Err(missing_attribute("error-bar scalar value"));
+        },
+        ErrorBarValueType::Custom
+            if error_bar.plus_values.is_none() && error_bar.minus_values.is_none() =>
+        {
+            return Err(missing_attribute("custom error-bar values"));
+        },
+        ErrorBarValueType::StdErr | ErrorBarValueType::Custom if error_bar.value.is_some() => {
+            return Err(OoxmlError::InvalidFormat(
+                "standard-error and custom error bars cannot have a scalar value".to_string(),
+            ));
+        },
+        _ => {},
+    }
+    Ok(error_bar)
+}
+
 fn parse_string_data<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<StringData>> {
     let mut data = StringData::from_values(Vec::new());
     let mut buf = Vec::new();
@@ -1189,7 +1387,7 @@ fn parse_numeric_data<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<Numer
             Ok(Event::End(ref e))
                 if matches!(
                     e.local_name().as_ref(),
-                    b"val" | b"xVal" | b"yVal" | b"bubbleSize"
+                    b"val" | b"xVal" | b"yVal" | b"bubbleSize" | b"plus" | b"minus"
                 ) =>
             {
                 break;
@@ -2004,6 +2202,21 @@ fn required_positive_f64_attr(element: &BytesStart<'_>, description: &str) -> Re
     Ok(value)
 }
 
+fn required_nonnegative_f64_attr(element: &BytesStart<'_>, description: &str) -> Result<f64> {
+    let value = required_f64_attr(element, description)?;
+    if value < 0.0 {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "{description} must be nonnegative"
+        )));
+    }
+    Ok(value)
+}
+
+fn required_enum_attr(element: &BytesStart<'_>, description: &str) -> Result<String> {
+    let value = get_attr(element, b"val").ok_or_else(|| missing_attribute(description))?;
+    String::from_utf8(value).map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
+}
+
 fn bounded_u32_attr(
     element: &BytesStart<'_>,
     description: &str,
@@ -2143,6 +2356,31 @@ mod tests {
         labels.show_series_name = true;
         labels.separator = Some(" & ".to_string());
         scatter_series.data_labels = Some(labels);
+        let mut trendline = Trendline::linear();
+        trendline.name = Some("Forecast & fit".to_string());
+        trendline.forward = Some(2.5);
+        trendline.intercept = Some(-1.0);
+        trendline.display_equation = true;
+        trendline.display_r_squared = true;
+        scatter_series.trendlines.push(trendline);
+        scatter_series.error_bars.push(ErrorBar {
+            direction: ErrorBarDirection::Y,
+            error_type: ErrorBarType::Both,
+            value_type: ErrorBarValueType::Fixed,
+            value: Some(1.5),
+            plus_values: None,
+            minus_values: None,
+            no_end_cap: true,
+        });
+        scatter_series.error_bars.push(ErrorBar {
+            direction: ErrorBarDirection::X,
+            error_type: ErrorBarType::Plus,
+            value_type: ErrorBarValueType::Custom,
+            value: None,
+            plus_values: Some(NumericData::from_ref("Sheet1!$D$2:$D$4")),
+            minus_values: None,
+            no_end_cap: false,
+        });
         scatter.common.series.push(scatter_series);
 
         let mut chart = Chart::new();
@@ -2259,6 +2497,28 @@ mod tests {
         assert!(labels.show_value);
         assert!(labels.show_series_name);
         assert_eq!(labels.separator.as_deref(), Some(" & "));
+        assert_eq!(series.trendlines.len(), 1);
+        assert_eq!(series.trendlines[0].name.as_deref(), Some("Forecast & fit"));
+        assert_eq!(series.trendlines[0].forward, Some(2.5));
+        assert_eq!(series.trendlines[0].intercept, Some(-1.0));
+        assert!(series.trendlines[0].display_equation);
+        assert!(series.trendlines[0].display_r_squared);
+        assert_eq!(series.error_bars.len(), 2);
+        assert_eq!(series.error_bars[0].direction, ErrorBarDirection::Y);
+        assert_eq!(series.error_bars[0].value, Some(1.5));
+        assert!(series.error_bars[0].no_end_cap);
+        assert_eq!(series.error_bars[1].value_type, ErrorBarValueType::Custom);
+        assert_eq!(
+            series.error_bars[1]
+                .plus_values
+                .as_ref()
+                .unwrap()
+                .source_ref
+                .as_ref()
+                .unwrap()
+                .formula,
+            "Sheet1!$D$2:$D$4"
+        );
     }
 
     #[test]

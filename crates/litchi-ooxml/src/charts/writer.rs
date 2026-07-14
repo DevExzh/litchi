@@ -12,13 +12,18 @@ use crate::charts::plot_area::{
     RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup, SurfaceTypeGroup,
     TypeGroup,
 };
-use crate::charts::series::{DataLabels, DataPoint, Series};
+use crate::charts::series::{
+    DataLabels, DataPoint, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType, Series,
+    Trendline, TrendlineType,
+};
 use litchi_core::xml::escape_xml;
 use std::io::Write;
 
 #[derive(Clone, Copy)]
 struct SeriesFeatures {
     point_and_label_overrides: bool,
+    error_bars: bool,
+    trendlines: bool,
     explosion: bool,
     invert_if_negative: bool,
     marker: bool,
@@ -28,6 +33,8 @@ struct SeriesFeatures {
 impl SeriesFeatures {
     const BASIC: Self = Self {
         point_and_label_overrides: true,
+        error_bars: true,
+        trendlines: true,
         explosion: false,
         invert_if_negative: false,
         marker: false,
@@ -52,14 +59,20 @@ impl SeriesFeatures {
     };
     const PIE: Self = Self {
         explosion: true,
+        error_bars: false,
+        trendlines: false,
         ..Self::BASIC
     };
     const RADAR: Self = Self {
         marker: true,
+        error_bars: false,
+        trendlines: false,
         ..Self::BASIC
     };
     const SURFACE: Self = Self {
         point_and_label_overrides: false,
+        error_bars: false,
+        trendlines: false,
         ..Self::BASIC
     };
 }
@@ -755,6 +768,16 @@ fn write_series_presentation<W: Write>(
             "chart type does not support point or data-label overrides",
         ));
     }
+    if !features.error_bars && !series.error_bars.is_empty() {
+        return Err(invalid_chart_input(
+            "chart type does not support error bars",
+        ));
+    }
+    if !features.trendlines && !series.trendlines.is_empty() {
+        return Err(invalid_chart_input(
+            "chart type does not support trendlines",
+        ));
+    }
     if series
         .marker_size
         .is_some_and(|size| !(2..=72).contains(&size))
@@ -794,6 +817,12 @@ fn write_series_presentation<W: Write>(
     }
     if let Some(labels) = &series.data_labels {
         write_data_labels(writer, labels)?;
+    }
+    for trendline in &series.trendlines {
+        write_trendline(writer, trendline)?;
+    }
+    for error_bar in &series.error_bars {
+        write_error_bar(writer, error_bar)?;
     }
     Ok(())
 }
@@ -872,7 +901,172 @@ fn write_data_labels<W: Write>(writer: &mut W, labels: &DataLabels) -> std::io::
     Ok(())
 }
 
+fn write_trendline<W: Write>(writer: &mut W, trendline: &Trendline) -> std::io::Result<()> {
+    validate_trendline(trendline)?;
+    write!(writer, "<c:trendline>")?;
+    if let Some(name) = &trendline.name {
+        write!(
+            writer,
+            "<c:trendlineName>{}</c:trendlineName>",
+            escape_xml(name)
+        )?;
+    }
+    let kind = match trendline.trendline_type {
+        TrendlineType::Exponential => "exp",
+        TrendlineType::Linear => "linear",
+        TrendlineType::Logarithmic => "log",
+        TrendlineType::MovingAverage => "movingAvg",
+        TrendlineType::Polynomial => "poly",
+        TrendlineType::Power => "power",
+    };
+    write!(writer, r#"<c:trendlineType val="{kind}"/>"#)?;
+    for (name, value) in [("order", trendline.order), ("period", trendline.period)] {
+        if let Some(value) = value {
+            write!(writer, r#"<c:{name} val="{value}"/>"#)?;
+        }
+    }
+    for (name, value) in [
+        ("forward", trendline.forward),
+        ("backward", trendline.backward),
+        ("intercept", trendline.intercept),
+    ] {
+        if let Some(value) = value {
+            write!(writer, r#"<c:{name} val="{value}"/>"#)?;
+        }
+    }
+    write!(
+        writer,
+        r#"<c:dispRSqr val="{}"/><c:dispEq val="{}"/>"#,
+        if trendline.display_r_squared {
+            "1"
+        } else {
+            "0"
+        },
+        if trendline.display_equation { "1" } else { "0" }
+    )?;
+    write!(writer, "</c:trendline>")?;
+    Ok(())
+}
+
+fn validate_trendline(trendline: &Trendline) -> std::io::Result<()> {
+    match trendline.trendline_type {
+        TrendlineType::Polynomial if !matches!(trendline.order, Some(2..=6)) => {
+            return Err(invalid_chart_input(
+                "polynomial trendline order must be 2-6",
+            ));
+        },
+        TrendlineType::MovingAverage if !matches!(trendline.period, Some(2..=255)) => {
+            return Err(invalid_chart_input(
+                "moving-average trendline period must be 2-255",
+            ));
+        },
+        _ => {},
+    }
+    if !matches!(trendline.trendline_type, TrendlineType::Polynomial) && trendline.order.is_some() {
+        return Err(invalid_chart_input(
+            "only polynomial trendlines can specify an order",
+        ));
+    }
+    if !matches!(trendline.trendline_type, TrendlineType::MovingAverage)
+        && trendline.period.is_some()
+    {
+        return Err(invalid_chart_input(
+            "only moving-average trendlines can specify a period",
+        ));
+    }
+    for (name, value) in [
+        ("forward", trendline.forward),
+        ("backward", trendline.backward),
+    ] {
+        if value.is_some_and(|value| !value.is_finite() || value < 0.0) {
+            return Err(invalid_chart_input(format!(
+                "trendline {name} value must be finite and nonnegative"
+            )));
+        }
+    }
+    if trendline.intercept.is_some_and(|value| !value.is_finite()) {
+        return Err(invalid_chart_input("trendline intercept must be finite"));
+    }
+    Ok(())
+}
+
+fn write_error_bar<W: Write>(writer: &mut W, error_bar: &ErrorBar) -> std::io::Result<()> {
+    validate_error_bar(error_bar)?;
+    let direction = match error_bar.direction {
+        ErrorBarDirection::X => "x",
+        ErrorBarDirection::Y => "y",
+    };
+    let bar_type = match error_bar.error_type {
+        ErrorBarType::Both => "both",
+        ErrorBarType::Plus => "plus",
+        ErrorBarType::Minus => "minus",
+    };
+    let value_type = match error_bar.value_type {
+        ErrorBarValueType::Fixed => "fixedVal",
+        ErrorBarValueType::Percentage => "percentage",
+        ErrorBarValueType::StdDev => "stdDev",
+        ErrorBarValueType::StdErr => "stdErr",
+        ErrorBarValueType::Custom => "cust",
+    };
+    write!(
+        writer,
+        r#"<c:errBars><c:errDir val="{direction}"/><c:errBarType val="{bar_type}"/><c:errValType val="{value_type}"/>"#
+    )?;
+    write!(
+        writer,
+        r#"<c:noEndCap val="{}"/>"#,
+        if error_bar.no_end_cap { "1" } else { "0" }
+    )?;
+    if let Some(values) = &error_bar.plus_values {
+        write_numeric_data_ref(writer, "c:plus", values)?;
+    }
+    if let Some(values) = &error_bar.minus_values {
+        write_numeric_data_ref(writer, "c:minus", values)?;
+    }
+    if let Some(value) = error_bar.value {
+        write!(writer, r#"<c:val val="{}"/>"#, value)?;
+    }
+    write!(writer, "</c:errBars>")?;
+    Ok(())
+}
+
+fn validate_error_bar(error_bar: &ErrorBar) -> std::io::Result<()> {
+    if error_bar
+        .value
+        .is_some_and(|value| !value.is_finite() || value < 0.0)
+    {
+        return Err(invalid_chart_input(
+            "error-bar value must be finite and nonnegative",
+        ));
+    }
+    match error_bar.value_type {
+        ErrorBarValueType::Fixed | ErrorBarValueType::Percentage | ErrorBarValueType::StdDev
+            if error_bar.value.is_none() =>
+        {
+            Err(invalid_chart_input(
+                "fixed, percentage, and standard-deviation error bars require a value",
+            ))
+        },
+        ErrorBarValueType::Custom
+            if error_bar.plus_values.is_none() && error_bar.minus_values.is_none() =>
+        {
+            Err(invalid_chart_input(
+                "custom error bars require plus or minus values",
+            ))
+        },
+        ErrorBarValueType::StdErr | ErrorBarValueType::Custom if error_bar.value.is_some() => Err(
+            invalid_chart_input("standard-error and custom error bars cannot have a scalar value"),
+        ),
+        _ => Ok(()),
+    }
+}
+
 fn write_scatter_series<W: Write>(writer: &mut W, series: &Series) -> std::io::Result<()> {
+    if series.bubble_sizes.is_some() {
+        return Err(invalid_chart_input(
+            "scatter series cannot contain bubble sizes",
+        ));
+    }
     write!(writer, "<c:ser>")?;
     write!(writer, r#"<c:idx val="{}"/>"#, series.index)?;
     write!(writer, r#"<c:order val="{}"/>"#, series.order)?;
@@ -907,10 +1101,6 @@ fn write_scatter_series<W: Write>(writer: &mut W, series: &Series) -> std::io::R
         r#"<c:smooth val="{}"/>"#,
         if series.smooth { "1" } else { "0" }
     )?;
-
-    if let Some(ref bubble_sizes) = series.bubble_sizes {
-        write_numeric_data_ref(writer, "c:bubbleSize", bubble_sizes)?;
-    }
 
     write!(writer, "</c:ser>")?;
 
