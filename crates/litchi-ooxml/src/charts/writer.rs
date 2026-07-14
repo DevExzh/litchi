@@ -10,7 +10,7 @@ use crate::charts::plot_area::{
     Area3DTypeGroup, AreaTypeGroup, Bar3DTypeGroup, BarTypeGroup, BubbleTypeGroup, DataTable,
     DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup, Pie3DTypeGroup,
     PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup,
-    SurfaceTypeGroup, TypeGroup,
+    SurfaceTypeGroup, TypeGroup, TypeGroupCommon,
 };
 use crate::charts::series::{
     DataLabels, DataPoint, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType, Series,
@@ -390,7 +390,7 @@ fn write_area_chart<W: Write>(writer: &mut W, group: &AreaTypeGroup) -> std::io:
         write_series(writer, series, SeriesFeatures::AREA)?;
     }
 
-    write_data_labels_default(writer)?;
+    write_group_data_labels(writer, &group.common)?;
     write!(writer, r#"<c:axId val="1"/><c:axId val="2"/>"#)?;
     write!(writer, "</c:areaChart>")?;
 
@@ -415,7 +415,7 @@ fn write_area_3d_chart<W: Write>(writer: &mut W, group: &Area3DTypeGroup) -> std
         write_series(writer, series, SeriesFeatures::BASIC)?;
     }
 
-    write_data_labels_default(writer)?;
+    write_group_data_labels(writer, &group.common)?;
     if let Some(gap_depth) = group.gap_depth {
         write!(writer, r#"<c:gapDepth val="{gap_depth}"/>"#)?;
     }
@@ -456,7 +456,7 @@ fn write_bar_chart<W: Write>(writer: &mut W, group: &BarTypeGroup) -> std::io::R
         write_series(writer, series, SeriesFeatures::BAR)?;
     }
 
-    write_data_labels_default(writer)?;
+    write_group_data_labels(writer, &group.common)?;
 
     if let Some(gap_width) = group.gap_width {
         write!(writer, r#"<c:gapWidth val="{}"/>"#, gap_width)?;
@@ -498,7 +498,7 @@ fn write_bar_3d_chart<W: Write>(writer: &mut W, group: &Bar3DTypeGroup) -> std::
         write_series(writer, series, SeriesFeatures::BAR)?;
     }
 
-    write_data_labels_default(writer)?;
+    write_group_data_labels(writer, &group.common)?;
 
     if let Some(gap_width) = group.gap_width {
         write!(writer, r#"<c:gapWidth val="{}"/>"#, gap_width)?;
@@ -536,7 +536,7 @@ fn write_bubble_chart<W: Write>(writer: &mut W, group: &BubbleTypeGroup) -> std:
         write_bubble_series(writer, series)?;
     }
 
-    write_data_labels_default(writer)?;
+    write_group_data_labels(writer, &group.common)?;
 
     write!(
         writer,
@@ -594,7 +594,7 @@ fn write_doughnut_chart<W: Write>(
         write_series(writer, series, SeriesFeatures::PIE)?;
     }
 
-    write_data_labels_default(writer)?;
+    write_group_data_labels(writer, &group.common)?;
     write!(
         writer,
         r#"<c:firstSliceAng val="{}"/>"#,
@@ -623,7 +623,7 @@ fn write_line_chart<W: Write>(writer: &mut W, group: &LineTypeGroup) -> std::io:
         write_series(writer, series, SeriesFeatures::LINE)?;
     }
 
-    write_data_labels_default(writer)?;
+    write_group_data_labels(writer, &group.common)?;
     write!(
         writer,
         r#"<c:marker val="{}"/>"#,
@@ -658,7 +658,7 @@ fn write_line_3d_chart<W: Write>(writer: &mut W, group: &Line3DTypeGroup) -> std
         write_series(writer, series, SeriesFeatures::LINE_3D)?;
     }
 
-    write_data_labels_default(writer)?;
+    write_group_data_labels(writer, &group.common)?;
     if let Some(gap_depth) = group.gap_depth {
         write!(writer, r#"<c:gapDepth val="{gap_depth}"/>"#)?;
     }
@@ -688,7 +688,7 @@ fn write_pie_chart<W: Write>(writer: &mut W, group: &PieTypeGroup) -> std::io::R
         write_series(writer, series, SeriesFeatures::PIE)?;
     }
 
-    write_data_labels_default(writer)?;
+    write_group_data_labels(writer, &group.common)?;
     write!(
         writer,
         r#"<c:firstSliceAng val="{}"/>"#,
@@ -733,7 +733,7 @@ fn write_of_pie_chart<W: Write>(writer: &mut W, group: &OfPieTypeGroup) -> std::
     for series in &group.common.series {
         write_series(writer, series, SeriesFeatures::PIE)?;
     }
-    write_data_labels_default(writer)?;
+    write_group_data_labels(writer, &group.common)?;
     if let Some(gap_width) = group.gap_width {
         write!(writer, r#"<c:gapWidth val="{gap_width}"/>"#)?;
     }
@@ -769,7 +769,7 @@ fn write_pie_3d_chart<W: Write>(writer: &mut W, group: &Pie3DTypeGroup) -> std::
         write_series(writer, series, SeriesFeatures::PIE)?;
     }
 
-    write_data_labels_default(writer)?;
+    write_group_data_labels(writer, &group.common)?;
     write!(writer, "</c:pie3DChart>")?;
 
     Ok(())
@@ -792,7 +792,7 @@ fn write_radar_chart<W: Write>(writer: &mut W, group: &RadarTypeGroup) -> std::i
         write_series(writer, series, SeriesFeatures::RADAR)?;
     }
 
-    write_data_labels_default(writer)?;
+    write_group_data_labels(writer, &group.common)?;
     write!(writer, r#"<c:axId val="1"/><c:axId val="2"/>"#)?;
     write!(writer, "</c:radarChart>")?;
 
@@ -816,7 +816,7 @@ fn write_scatter_chart<W: Write>(writer: &mut W, group: &ScatterTypeGroup) -> st
         write_scatter_series(writer, series)?;
     }
 
-    write_data_labels_default(writer)?;
+    write_group_data_labels(writer, &group.common)?;
     write!(writer, r#"<c:axId val="1"/><c:axId val="2"/>"#)?;
     write!(writer, "</c:scatterChart>")?;
 
@@ -830,7 +830,7 @@ fn write_stock_chart<W: Write>(writer: &mut W, group: &StockTypeGroup) -> std::i
         write_series(writer, series, SeriesFeatures::LINE)?;
     }
 
-    write_data_labels_default(writer)?;
+    write_group_data_labels(writer, &group.common)?;
     write!(writer, r#"<c:axId val="1"/><c:axId val="2"/>"#)?;
     write!(writer, "</c:stockChart>")?;
 
@@ -1559,6 +1559,17 @@ fn write_data_labels_default<W: Write>(writer: &mut W) -> std::io::Result<()> {
     write!(writer, r#"<c:showBubbleSize val="0"/>"#)?;
     write!(writer, "</c:dLbls>")?;
     Ok(())
+}
+
+fn write_group_data_labels<W: Write>(
+    writer: &mut W,
+    common: &TypeGroupCommon,
+) -> std::io::Result<()> {
+    if let Some(labels) = common.data_labels.as_ref() {
+        write_data_labels(writer, labels)
+    } else {
+        write_data_labels_default(writer)
+    }
 }
 
 fn write_axis<W: Write>(writer: &mut W, axis: &Axis) -> std::io::Result<()> {

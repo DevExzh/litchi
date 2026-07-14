@@ -702,12 +702,26 @@ fn parse_layout_mode(element: &BytesStart<'_>) -> Result<LayoutMode> {
 fn parse_common_type_group<R: BufRead>(
     reader: &mut ChartXmlReader<R>,
     end_name: &[u8],
+    supports_data_labels: bool,
     mut extra: impl FnMut(&BytesStart<'_>) -> Result<()>,
 ) -> Result<TypeGroupCommon> {
     let mut common = TypeGroupCommon::new();
+    let mut saw_data_labels = false;
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element))
+                if supports_data_labels && element.local_name().as_ref() == b"dLbls" =>
+            {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                common.data_labels = Some(parse_data_labels(reader)?);
+            },
+            Ok(Event::Empty(ref element))
+                if supports_data_labels && element.local_name().as_ref() == b"dLbls" =>
+            {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                common.data_labels = Some(DataLabels::default());
+            },
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
                 match element.local_name().as_ref() {
                     b"varyColors" => common.vary_colors = parse_bool_attr(element)?,
@@ -733,10 +747,20 @@ fn parse_common_type_group<R: BufRead>(
     Ok(common)
 }
 
+fn begin_group_data_labels(seen: &mut bool) -> Result<()> {
+    if *seen {
+        return Err(OoxmlError::InvalidFormat(
+            "chart type group contains duplicate data-label settings".into(),
+        ));
+    }
+    *seen = true;
+    Ok(())
+}
+
 fn parse_area_3d_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Area3DTypeGroup> {
     let mut grouping = BarGrouping::Standard;
     let mut gap_depth = None;
-    let common = parse_common_type_group(reader, b"area3DChart", |element| {
+    let common = parse_common_type_group(reader, b"area3DChart", true, |element| {
         match element.local_name().as_ref() {
             b"grouping" => grouping = parse_grouping(element)?,
             b"gapDepth" => {
@@ -760,7 +784,7 @@ fn parse_bubble_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Bubb
     let mut bubble_scale = None;
     let mut show_negative_bubbles = true;
     let mut size_represents = "area".to_string();
-    let common = parse_common_type_group(reader, b"bubbleChart", |element| {
+    let common = parse_common_type_group(reader, b"bubbleChart", true, |element| {
         match element.local_name().as_ref() {
             b"bubble3D" => bubble_3d = parse_bool_attr(element)?,
             b"bubbleScale" => {
@@ -800,7 +824,7 @@ fn parse_bubble_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Bubb
 fn parse_doughnut_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DoughnutTypeGroup> {
     let mut first_slice_angle = 0;
     let mut hole_size = 50;
-    let common = parse_common_type_group(reader, b"doughnutChart", |element| {
+    let common = parse_common_type_group(reader, b"doughnutChart", true, |element| {
         match element.local_name().as_ref() {
             b"firstSliceAng" => {
                 first_slice_angle = match get_attr(element, b"val") {
@@ -833,7 +857,7 @@ fn parse_doughnut_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Do
 fn parse_line_3d_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Line3DTypeGroup> {
     let mut grouping = BarGrouping::Standard;
     let mut gap_depth = None;
-    let common = parse_common_type_group(reader, b"line3DChart", |element| {
+    let common = parse_common_type_group(reader, b"line3DChart", true, |element| {
         match element.local_name().as_ref() {
             b"grouping" => grouping = parse_grouping(element)?,
             b"gapDepth" => {
@@ -854,7 +878,7 @@ fn parse_line_3d_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lin
 
 fn parse_pie_3d_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pie3DTypeGroup> {
     let mut group = Pie3DTypeGroup::new();
-    group.common = parse_common_type_group(reader, b"pie3DChart", |_| Ok(()))?;
+    group.common = parse_common_type_group(reader, b"pie3DChart", true, |_| Ok(()))?;
     Ok(group)
 }
 
@@ -866,10 +890,19 @@ fn parse_of_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<OfPi
     let mut saw_split_position = false;
     let mut saw_custom_split = false;
     let mut saw_second_pie_size = false;
+    let mut saw_data_labels = false;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"dLbls" => {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                group.common.data_labels = Some(parse_data_labels(reader)?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"dLbls" => {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                group.common.data_labels = Some(DataLabels::default());
+            },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"custSplit" => {
                 if saw_custom_split {
                     return Err(OoxmlError::InvalidFormat(
@@ -1017,7 +1050,7 @@ fn parse_custom_pie_split<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<
 
 fn parse_radar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<RadarTypeGroup> {
     let mut style = RadarStyle::Standard;
-    let common = parse_common_type_group(reader, b"radarChart", |element| {
+    let common = parse_common_type_group(reader, b"radarChart", true, |element| {
         if element.local_name().as_ref() == b"radarStyle" {
             let value =
                 get_attr(element, b"val").ok_or_else(|| missing_attribute("chart radar style"))?;
@@ -1037,13 +1070,13 @@ fn parse_radar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Radar
 
 fn parse_stock_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<StockTypeGroup> {
     let mut group = StockTypeGroup::new();
-    group.common = parse_common_type_group(reader, b"stockChart", |_| Ok(()))?;
+    group.common = parse_common_type_group(reader, b"stockChart", true, |_| Ok(()))?;
     Ok(group)
 }
 
 fn parse_surface_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<SurfaceTypeGroup> {
     let mut wireframe = false;
-    let common = parse_common_type_group(reader, b"surfaceChart", |element| {
+    let common = parse_common_type_group(reader, b"surfaceChart", false, |element| {
         if element.local_name().as_ref() == b"wireframe" {
             wireframe = parse_bool_attr(element)?;
         }
@@ -1059,7 +1092,7 @@ fn parse_surface_3d_chart<R: BufRead>(
     reader: &mut ChartXmlReader<R>,
 ) -> Result<Surface3DTypeGroup> {
     let mut wireframe = false;
-    let common = parse_common_type_group(reader, b"surface3DChart", |element| {
+    let common = parse_common_type_group(reader, b"surface3DChart", false, |element| {
         if element.local_name().as_ref() == b"wireframe" {
             wireframe = parse_bool_attr(element)?;
         }
@@ -1075,12 +1108,21 @@ fn parse_bar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
     let mut direction = BarDirection::Column;
     let mut grouping = BarGrouping::Clustered;
     let mut common = TypeGroupCommon::new();
+    let mut saw_data_labels = false;
     let mut gap_width = None;
     let mut overlap = None;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"dLbls" => {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                common.data_labels = Some(parse_data_labels(reader)?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"dLbls" => {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                common.data_labels = Some(DataLabels::default());
+            },
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
@@ -1146,6 +1188,7 @@ fn parse_bar_3d_chart<R: BufRead>(
     let mut direction = BarDirection::Column;
     let mut grouping = BarGrouping::Clustered;
     let mut common = TypeGroupCommon::new();
+    let mut saw_data_labels = false;
     let mut gap_width = None;
     let mut gap_depth = None;
     let mut shape = None;
@@ -1153,6 +1196,14 @@ fn parse_bar_3d_chart<R: BufRead>(
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"dLbls" => {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                common.data_labels = Some(parse_data_labels(reader)?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"dLbls" => {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                common.data_labels = Some(DataLabels::default());
+            },
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
@@ -1228,12 +1279,21 @@ fn parse_bar_3d_chart<R: BufRead>(
 fn parse_line_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<LineTypeGroup>> {
     let mut grouping = BarGrouping::Standard;
     let mut common = TypeGroupCommon::new();
+    let mut saw_data_labels = false;
     let mut marker = true;
     let mut smooth = false;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"dLbls" => {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                common.data_labels = Some(parse_data_labels(reader)?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"dLbls" => {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                common.data_labels = Some(DataLabels::default());
+            },
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
@@ -1274,11 +1334,20 @@ fn parse_line_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
 
 fn parse_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<PieTypeGroup>> {
     let mut common = TypeGroupCommon::new();
+    let mut saw_data_labels = false;
     let mut first_slice_angle = 0;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"dLbls" => {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                common.data_labels = Some(parse_data_labels(reader)?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"dLbls" => {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                common.data_labels = Some(DataLabels::default());
+            },
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
@@ -1320,10 +1389,19 @@ fn parse_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
 fn parse_area_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<AreaTypeGroup>> {
     let mut grouping = BarGrouping::Standard;
     let mut common = TypeGroupCommon::new();
+    let mut saw_data_labels = false;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"dLbls" => {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                common.data_labels = Some(parse_data_labels(reader)?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"dLbls" => {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                common.data_labels = Some(DataLabels::default());
+            },
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
@@ -1363,10 +1441,19 @@ fn parse_scatter_chart<R: BufRead>(
 ) -> Result<Option<ScatterTypeGroup>> {
     let mut style = ScatterStyle::LineMarker;
     let mut common = TypeGroupCommon::new();
+    let mut saw_data_labels = false;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"dLbls" => {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                common.data_labels = Some(parse_data_labels(reader)?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"dLbls" => {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                common.data_labels = Some(DataLabels::default());
+            },
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
@@ -3614,6 +3701,42 @@ mod tests {
     }
 
     #[test]
+    fn parses_and_validates_chart_group_data_labels() {
+        let xml =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea>
+                <c:lineChart><c:dLbls><c:numFmt formatCode="0.0%" sourceLinked="0"/>
+                    <c:dLblPos val="r"/><c:showVal/><c:showCatName val="true"/>
+                    <c:separator> / </c:separator><c:showLeaderLines/>
+                </c:dLbls></c:lineChart>
+                <c:area3DChart><c:dLbls/></c:area3DChart>
+            </c:plotArea></c:chart>
+        </c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let TypeGroup::Line(line) = &chart.plot_area.type_groups[0] else {
+            panic!("expected line chart");
+        };
+        let labels = line.common.data_labels.as_ref().unwrap();
+        assert_eq!(labels.position, Some(DataLabelPosition::Right));
+        assert!(labels.show_value);
+        assert!(labels.show_category_name);
+        assert!(labels.show_leader_lines);
+        assert_eq!(labels.separator.as_deref(), Some(" / "));
+        assert_eq!(labels.number_format.as_ref().unwrap().format_code, "0.0%");
+        assert!(!labels.number_format.as_ref().unwrap().source_linked);
+        let TypeGroup::Area3D(area) = &chart.plot_area.type_groups[1] else {
+            panic!("expected 3D area chart");
+        };
+        assert!(area.common.data_labels.is_some());
+
+        let duplicate =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea><c:barChart><c:dLbls/><c:dLbls/>
+            </c:barChart></c:plotArea></c:chart></c:chartSpace>"#;
+        assert!(parse_chart(duplicate.as_slice()).is_err());
+    }
+
+    #[test]
     fn parses_of_pie_schema_defaults_and_empty_custom_split() {
         let xml =
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
@@ -3887,6 +4010,12 @@ mod tests {
         of_pie.second_pie_size = Some(80);
         let mut line = LineTypeGroup::new(BarGrouping::Standard);
         line.smooth = true;
+        let mut group_labels = DataLabels::new()
+            .with_position(DataLabelPosition::Right)
+            .with_show_value(true);
+        group_labels.show_category_name = true;
+        group_labels.separator = Some(" | ".to_string());
+        line.common.data_labels = Some(group_labels);
         let mut line_3d = Line3DTypeGroup::new(BarGrouping::PercentStacked);
         line_3d.gap_depth = Some(210);
 
@@ -3957,6 +4086,11 @@ mod tests {
             unreachable!();
         };
         assert!(group.smooth);
+        let labels = group.common.data_labels.as_ref().unwrap();
+        assert_eq!(labels.position, Some(DataLabelPosition::Right));
+        assert!(labels.show_value);
+        assert!(labels.show_category_name);
+        assert_eq!(labels.separator.as_deref(), Some(" | "));
         let TypeGroup::Line3D(group) = &parsed.plot_area.type_groups[7] else {
             unreachable!();
         };

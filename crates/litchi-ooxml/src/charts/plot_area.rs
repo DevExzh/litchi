@@ -5,7 +5,7 @@
 
 use crate::charts::axis::Axis;
 use crate::charts::models::Layout;
-use crate::charts::series::Series;
+use crate::charts::series::{DataLabels, Series};
 use crate::charts::types::{
     BarDirection, BarGrouping, OfPieSplitType, OfPieType, RadarStyle, ScatterStyle,
 };
@@ -114,6 +114,8 @@ pub struct TypeGroupCommon {
     pub vary_colors: bool,
     /// Series in this group
     pub series: Vec<Series>,
+    /// Data-label settings shared by the chart group
+    pub data_labels: Option<DataLabels>,
 }
 
 impl TypeGroupCommon {
@@ -123,6 +125,7 @@ impl TypeGroupCommon {
         Self {
             vary_colors: false,
             series: Vec::new(),
+            data_labels: None,
         }
     }
 
