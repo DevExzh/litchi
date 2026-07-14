@@ -1396,22 +1396,78 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
 
 fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLabels> {
     let mut labels = DataLabels::new();
+    let mut saw_number_format = false;
+    let mut saw_delete = false;
+    let mut saw_shared_settings = false;
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"dLbl" => {
+                // Point-specific label overrides have their own choice and must not leak
+                // their nested settings into the series-wide defaults.
+                skip_chart_element(reader, b"dLbl")?;
+            },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"separator" => {
+                saw_shared_settings = true;
                 labels.separator = Some(parse_text_element(reader, b"separator")?);
             },
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
                 match element.local_name().as_ref() {
-                    b"delete" => labels.deleted = parse_bool_attr(element)?,
-                    b"dLblPos" => labels.position = Some(parse_data_label_position(element)?),
-                    b"showLegendKey" => labels.show_legend_key = parse_bool_attr(element)?,
-                    b"showVal" => labels.show_value = parse_bool_attr(element)?,
-                    b"showCatName" => labels.show_category_name = parse_bool_attr(element)?,
-                    b"showSerName" => labels.show_series_name = parse_bool_attr(element)?,
-                    b"showPercent" => labels.show_percent = parse_bool_attr(element)?,
-                    b"showBubbleSize" => labels.show_bubble_size = parse_bool_attr(element)?,
+                    b"delete" => {
+                        if saw_delete {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart data labels contain duplicate delete flags".into(),
+                            ));
+                        }
+                        labels.deleted = parse_bool_attr(element)?;
+                        saw_delete = true;
+                    },
+                    b"numFmt" => {
+                        if saw_number_format {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart data labels contain duplicate number formats".into(),
+                            ));
+                        }
+                        labels.number_format = Some(parse_number_format(
+                            element,
+                            reader.decoder(),
+                            "chart data-label",
+                        )?);
+                        saw_number_format = true;
+                        saw_shared_settings = true;
+                    },
+                    b"dLblPos" => {
+                        labels.position = Some(parse_data_label_position(element)?);
+                        saw_shared_settings = true;
+                    },
+                    b"showLegendKey" => {
+                        labels.show_legend_key = parse_bool_attr(element)?;
+                        saw_shared_settings = true;
+                    },
+                    b"showVal" => {
+                        labels.show_value = parse_bool_attr(element)?;
+                        saw_shared_settings = true;
+                    },
+                    b"showCatName" => {
+                        labels.show_category_name = parse_bool_attr(element)?;
+                        saw_shared_settings = true;
+                    },
+                    b"showSerName" => {
+                        labels.show_series_name = parse_bool_attr(element)?;
+                        saw_shared_settings = true;
+                    },
+                    b"showPercent" => {
+                        labels.show_percent = parse_bool_attr(element)?;
+                        saw_shared_settings = true;
+                    },
+                    b"showBubbleSize" => {
+                        labels.show_bubble_size = parse_bool_attr(element)?;
+                        saw_shared_settings = true;
+                    },
+                    b"showLeaderLines" => {
+                        labels.show_leader_lines = parse_bool_attr(element)?;
+                        saw_shared_settings = true;
+                    },
                     _ => {},
                 }
             },
@@ -1426,7 +1482,45 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
         }
         buf.clear();
     }
+    if saw_delete && saw_shared_settings {
+        return Err(OoxmlError::InvalidFormat(
+            "chart data labels mix deletion with shared settings".into(),
+        ));
+    }
     Ok(labels)
+}
+
+fn skip_chart_element<R: BufRead>(reader: &mut ChartXmlReader<R>, end_name: &[u8]) -> Result<()> {
+    let mut depth = 1usize;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(_)) => {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("chart XML nesting is too deep".into())
+                })?;
+            },
+            Ok(Event::End(ref element)) => {
+                depth -= 1;
+                if depth == 0 {
+                    if element.local_name().as_ref() != end_name {
+                        return Err(OoxmlError::InvalidFormat(
+                            "chart XML closes an unexpected element".into(),
+                        ));
+                    }
+                    return Ok(());
+                }
+            },
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart element".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
 }
 
 fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendline> {
@@ -1909,7 +2003,9 @@ fn parse_axis_common_element(
         b"axPos" => common.position = Some(parse_axis_position(element)?),
         b"majorGridlines" => common.show_major_gridlines = true,
         b"minorGridlines" => common.show_minor_gridlines = true,
-        b"numFmt" => common.number_format = Some(parse_axis_number_format(element, decoder)?),
+        b"numFmt" => {
+            common.number_format = Some(parse_number_format(element, decoder, "chart axis")?)
+        },
         b"majorTickMark" => common.major_tick_mark = parse_tick_mark(element)?,
         b"minorTickMark" => common.minor_tick_mark = parse_tick_mark(element)?,
         b"tickLblPos" => common.tick_label_position = parse_tick_label_position(element)?,
@@ -2652,16 +2748,20 @@ fn parse_data_label_position(element: &BytesStart<'_>) -> Result<DataLabelPositi
     }
 }
 
-fn parse_axis_number_format(element: &BytesStart<'_>, decoder: Decoder) -> Result<NumberFormat> {
+fn parse_number_format(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    description: &str,
+) -> Result<NumberFormat> {
     let format_code = element
         .try_get_attribute(b"formatCode")
         .map_err(|error| OoxmlError::Xml(error.to_string()))?
-        .ok_or_else(|| missing_attribute("chart axis number format code"))?
+        .ok_or_else(|| missing_attribute(&format!("{description} number format code")))?
         .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
         .map_err(|error| OoxmlError::Xml(error.to_string()))?
         .into_owned();
     let source_linked = match get_attr(element, b"sourceLinked") {
-        Some(value) => parse_bool_value(&value, "chart axis source-linked flag")?,
+        Some(value) => parse_bool_value(&value, &format!("{description} source-linked flag"))?,
         None => true,
     };
     Ok(NumberFormat::new(format_code).with_source_linked(source_linked))
@@ -2810,6 +2910,8 @@ mod tests {
                         </c:strCache></c:strRef></c:cat>
                     <c:val><c:numRef><c:f>Sheet1!$B$1</c:f><c:numCache><c:formatCode>0.0</c:formatCode><c:pt idx="0"><c:v>42.5</c:v></c:pt>
                         </c:numCache></c:numRef></c:val>
+                    <c:dLbls><c:dLbl><c:idx val="0"/><c:delete val="1"/></c:dLbl>
+                        <c:showVal val="1"/></c:dLbls>
                 </c:ser></c:barChart></c:plotArea>
                 <c:legend><c:legendPos val="b"/><c:overlay val="1"/></c:legend>
                 <c:showDLblsOverMax val="1"/>
@@ -2850,6 +2952,9 @@ mod tests {
         let values = group.common.series[0].values.as_ref().unwrap();
         assert_eq!(values.source_ref.as_ref().unwrap().formula, "Sheet1!$B$1");
         assert_eq!(values.format_code.as_deref(), Some("0.0"));
+        let labels = group.common.series[0].data_labels.as_ref().unwrap();
+        assert!(labels.show_value);
+        assert!(!labels.deleted);
         assert_eq!(chart.legend.unwrap().position, LegendPosition::Bottom);
         assert!(chart.show_data_labels_over_max);
         assert_eq!(chart.style, Some(12));
@@ -3017,7 +3122,9 @@ mod tests {
         let mut labels = DataLabels::new()
             .with_position(DataLabelPosition::Top)
             .with_show_value(true);
+        labels.number_format = Some(NumberFormat::new("0.0%").with_source_linked(false));
         labels.show_series_name = true;
+        labels.show_leader_lines = true;
         labels.separator = Some(" & ".to_string());
         scatter_series.data_labels = Some(labels);
         let mut trendline = Trendline::linear();
@@ -3160,6 +3267,10 @@ mod tests {
         assert_eq!(labels.position, Some(DataLabelPosition::Top));
         assert!(labels.show_value);
         assert!(labels.show_series_name);
+        assert!(labels.show_leader_lines);
+        let number_format = labels.number_format.as_ref().unwrap();
+        assert_eq!(number_format.format_code, "0.0%");
+        assert!(!number_format.source_linked);
         assert_eq!(labels.separator.as_deref(), Some(" & "));
         assert_eq!(series.trendlines.len(), 1);
         assert_eq!(series.trendlines[0].name.as_deref(), Some("Forecast & fit"));

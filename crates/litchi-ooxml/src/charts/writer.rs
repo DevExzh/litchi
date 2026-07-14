@@ -939,6 +939,20 @@ fn write_data_labels<W: Write>(writer: &mut W, labels: &DataLabels) -> std::io::
     write!(writer, "<c:dLbls>")?;
     if labels.deleted {
         write!(writer, r#"<c:delete val="1"/>"#)?;
+        write!(writer, "</c:dLbls>")?;
+        return Ok(());
+    }
+    if let Some(number_format) = labels.number_format.as_ref() {
+        write!(
+            writer,
+            r#"<c:numFmt formatCode="{}" sourceLinked="{}"/>"#,
+            escape_xml(&number_format.format_code),
+            if number_format.source_linked {
+                "1"
+            } else {
+                "0"
+            }
+        )?;
     }
     if let Some(position) = labels.position {
         write!(writer, r#"<c:dLblPos val="{}"/>"#, position.xml_value())?;
@@ -963,6 +977,9 @@ fn write_data_labels<W: Write>(writer: &mut W, labels: &DataLabels) -> std::io::
             "<c:separator>{}</c:separator>",
             escape_xml(separator)
         )?;
+    }
+    if labels.show_leader_lines {
+        write!(writer, r#"<c:showLeaderLines val="1"/>"#)?;
     }
     write!(writer, "</c:dLbls>")?;
     Ok(())

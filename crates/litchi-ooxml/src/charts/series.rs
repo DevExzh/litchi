@@ -3,7 +3,7 @@
 //! This module contains structures for representing chart series,
 //! data points, and their associated properties.
 
-use crate::charts::models::{NumericData, StringData, TitleText};
+use crate::charts::models::{NumberFormat, NumericData, StringData, TitleText};
 use crate::charts::types::{DataLabelPosition, MarkerStyle};
 
 /// A single data point with optional formatting.
@@ -56,6 +56,8 @@ impl DataPoint {
 /// Data label settings.
 #[derive(Debug, Clone)]
 pub struct DataLabels {
+    /// Number format for label values
+    pub number_format: Option<NumberFormat>,
     /// Position of data labels
     pub position: Option<DataLabelPosition>,
     /// Show legend key
@@ -70,6 +72,8 @@ pub struct DataLabels {
     pub show_percent: bool,
     /// Show bubble size (for bubble charts)
     pub show_bubble_size: bool,
+    /// Show leader lines between labels and data points
+    pub show_leader_lines: bool,
     /// Separator between label components
     pub separator: Option<String>,
     /// Whether data labels are deleted
@@ -81,6 +85,7 @@ impl DataLabels {
     #[inline]
     pub fn new() -> Self {
         Self {
+            number_format: None,
             position: None,
             show_legend_key: false,
             show_value: false,
@@ -88,6 +93,7 @@ impl DataLabels {
             show_series_name: false,
             show_percent: false,
             show_bubble_size: false,
+            show_leader_lines: false,
             separator: None,
             deleted: false,
         }
