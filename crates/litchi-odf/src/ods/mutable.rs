@@ -14,7 +14,7 @@ use crate::ods::{
         has_extensions as has_protection_extensions, write_sheet_attributes, write_sheet_options,
         write_spreadsheet_attributes,
     },
-    style_protection::{AutomaticStylesFragment, extract_automatic_styles},
+    style_protection::{PreservedXmlFragment, extract_automatic_styles, extract_font_face_decls},
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
@@ -46,7 +46,9 @@ pub struct MutableSpreadsheet {
     /// Original styles XML
     styles_xml: Option<String>,
     /// Original content automatic styles, including unsupported style properties.
-    automatic_styles: Option<AutomaticStylesFragment>,
+    automatic_styles: Option<PreservedXmlFragment>,
+    /// Original content font-face declarations referenced by preserved styles.
+    font_face_decls: Option<PreservedXmlFragment>,
     /// Global and sheet-local named ranges and expressions.
     named_definitions: Vec<NamedDefinition>,
     content_validations: Vec<ContentValidation>,
@@ -110,6 +112,7 @@ impl MutableSpreadsheet {
     pub fn from_spreadsheet(mut spreadsheet: Spreadsheet) -> Result<Self> {
         let styles_xml = spreadsheet.styles_xml().map(str::to_owned);
         let automatic_styles = extract_automatic_styles(spreadsheet.content_xml())?;
+        let font_face_decls = extract_font_face_decls(spreadsheet.content_xml())?;
         let sheets = spreadsheet.sheets()?;
         let metadata = spreadsheet.metadata()?;
         let named_definitions = spreadsheet.named_definitions().to_vec();
@@ -123,6 +126,7 @@ impl MutableSpreadsheet {
             mimetype,
             styles_xml,
             automatic_styles,
+            font_face_decls,
             named_definitions,
             content_validations,
             protection,
@@ -137,6 +141,7 @@ impl MutableSpreadsheet {
             mimetype: "application/vnd.oasis.opendocument.spreadsheet".to_string(),
             styles_xml: None,
             automatic_styles: None,
+            font_face_decls: None,
             named_definitions: Vec::new(),
             content_validations: Vec::new(),
             protection: SpreadsheetProtection::default(),
@@ -864,7 +869,7 @@ impl MutableSpreadsheet {
         if has_protection_extensions && !has_annotations {
             out.push_str(r#" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0""#);
         }
-        if let Some(automatic_styles) = &self.automatic_styles {
+        if self.automatic_styles.is_some() || self.font_face_decls.is_some() {
             let mut declared = vec!["office", "table", "text"];
             if self.has_formulas() {
                 declared.push("of");
@@ -881,9 +886,20 @@ impl MutableSpreadsheet {
             if has_protection_extensions && !has_annotations {
                 declared.push("loext");
             }
-            automatic_styles.write_missing_namespaces(&mut out, declared);
+            if let Some(font_face_decls) = &self.font_face_decls {
+                font_face_decls.write_missing_namespaces(&mut out, declared.iter().copied());
+                declared.extend(font_face_decls.namespace_prefixes());
+            }
+            if let Some(automatic_styles) = &self.automatic_styles {
+                automatic_styles.write_missing_namespaces(&mut out, declared.iter().copied());
+            }
         }
-        out.push_str(r#" office:version="1.3"><office:font-face-decls/>"#);
+        out.push_str(r#" office:version="1.3">"#);
+        if let Some(font_face_decls) = &self.font_face_decls {
+            out.push_str(&font_face_decls.xml);
+        } else {
+            out.push_str("<office:font-face-decls/>");
+        }
         if let Some(automatic_styles) = &self.automatic_styles {
             out.push_str(&automatic_styles.xml);
         } else {
@@ -950,7 +966,7 @@ mod tests {
     };
 
     fn package_with_cell_styles() -> Vec<u8> {
-        let content = r##"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:f="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" office:version="1.3"><office:font-face-decls/><o:automatic-styles><s:style s:name="Auto&amp;Locked" s:family="table-cell" s:parent-style-name="Named&amp;Locked"><s:table-cell-properties f:background-color="#fff"/></s:style></o:automatic-styles><office:body><office:spreadsheet><table:table table:name="Sheet1"><table:table-row><table:table-cell table:style-name="Auto&amp;Locked"/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"##;
+        let content = r##"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:f="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:v="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.3"><o:font-face-decls><s:font-face s:name="Test Font" v:font-family="'Test Font'"/></o:font-face-decls><o:automatic-styles><s:style s:name="Auto&amp;Locked" s:family="table-cell" s:parent-style-name="Named&amp;Locked"><s:table-cell-properties f:background-color="#fff" s:font-name="Test Font"/></s:style></o:automatic-styles><office:body><office:spreadsheet><table:table table:name="Sheet1"><table:table-row><table:table-cell table:style-name="Auto&amp;Locked"/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"##;
         let styles = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.3"><office:styles><style:style style:name="Named&amp;Locked" style:family="table-cell"><style:table-cell-properties style:cell-protect="protected"/></style:style></office:styles></office:document-styles>"#;
         let mut writer = PackageWriter::new();
         writer
@@ -1143,6 +1159,8 @@ mod tests {
         let content = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
         let styles = String::from_utf8(package.get_file("styles.xml").unwrap()).unwrap();
         assert!(content.contains(r##"f:background-color="#fff""##));
+        assert!(content.contains(r#"v:font-family="'Test Font'""#));
+        assert_eq!(content.matches("xmlns:s=").count(), 1);
         assert!(content.contains(r#"table:style-name="Auto&amp;Locked""#));
         assert!(styles.contains(r#"style:name="Named&amp;Locked""#));
 

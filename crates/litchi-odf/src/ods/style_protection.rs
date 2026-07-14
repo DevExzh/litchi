@@ -63,12 +63,16 @@ pub(crate) struct CellStyleRegistry {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct AutomaticStylesFragment {
+pub(crate) struct PreservedXmlFragment {
     pub xml: String,
     namespaces: BTreeMap<String, String>,
 }
 
-impl AutomaticStylesFragment {
+impl PreservedXmlFragment {
+    pub(crate) fn namespace_prefixes(&self) -> impl Iterator<Item = &str> {
+        self.namespaces.keys().map(String::as_str)
+    }
+
     pub(crate) fn write_missing_namespaces<'a>(
         &self,
         out: &mut String,
@@ -88,7 +92,19 @@ impl AutomaticStylesFragment {
     }
 }
 
-pub(crate) fn extract_automatic_styles(xml: &str) -> Result<Option<AutomaticStylesFragment>> {
+pub(crate) fn extract_automatic_styles(xml: &str) -> Result<Option<PreservedXmlFragment>> {
+    extract_office_fragment(xml, b"automatic-styles")
+}
+
+pub(crate) fn extract_font_face_decls(xml: &str) -> Result<Option<PreservedXmlFragment>> {
+    extract_office_fragment(xml, b"font-face-decls")
+}
+
+fn extract_office_fragment(
+    xml: &str,
+    expected_local_name: &[u8],
+) -> Result<Option<PreservedXmlFragment>> {
+    let fragment_name = String::from_utf8_lossy(expected_local_name);
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut namespaces = BTreeMap::new();
@@ -110,25 +126,25 @@ pub(crate) fn extract_automatic_styles(xml: &str) -> Result<Option<AutomaticStyl
                 collect_namespaces(&reader, &element, &mut namespaces)?;
             },
             Event::Start(element)
-                if is_office_namespace && element.local_name().as_ref() == b"automatic-styles" =>
+                if is_office_namespace && element.local_name().as_ref() == expected_local_name =>
             {
                 if range_start.is_some() {
                     return Err(Error::InvalidFormat(
-                        "nested office:automatic-styles element".to_string(),
+                        "nested preserved office fragment".to_string(),
                     ));
                 }
                 range_start = Some(event_start);
                 depth = 1;
             },
             Event::Empty(element)
-                if is_office_namespace && element.local_name().as_ref() == b"automatic-styles" =>
+                if is_office_namespace && element.local_name().as_ref() == expected_local_name =>
             {
                 if range_start.is_some() {
                     return Err(Error::InvalidFormat(
-                        "duplicate office:automatic-styles element".to_string(),
+                        "duplicate preserved office fragment".to_string(),
                     ));
                 }
-                return Ok(Some(AutomaticStylesFragment {
+                return Ok(Some(PreservedXmlFragment {
                     xml: xml[event_start..event_end].to_string(),
                     namespaces,
                 }));
@@ -136,17 +152,17 @@ pub(crate) fn extract_automatic_styles(xml: &str) -> Result<Option<AutomaticStyl
             Event::Start(_) if range_start.is_some() => depth += 1,
             Event::End(element) if range_start.is_some() => {
                 depth = depth.checked_sub(1).ok_or_else(|| {
-                    Error::InvalidFormat("invalid automatic-styles depth".to_string())
+                    Error::InvalidFormat(format!("invalid office:{fragment_name} depth"))
                 })?;
                 if depth == 0 {
-                    if !is_office_namespace || element.local_name().as_ref() != b"automatic-styles"
+                    if !is_office_namespace || element.local_name().as_ref() != expected_local_name
                     {
-                        return Err(Error::InvalidFormat(
-                            "malformed office:automatic-styles element".to_string(),
-                        ));
+                        return Err(Error::InvalidFormat(format!(
+                            "malformed office:{fragment_name} element"
+                        )));
                     }
                     let start = range_start.take().expect("checked range");
-                    return Ok(Some(AutomaticStylesFragment {
+                    return Ok(Some(PreservedXmlFragment {
                         xml: xml[start..event_end].to_string(),
                         namespaces,
                     }));
@@ -158,9 +174,9 @@ pub(crate) fn extract_automatic_styles(xml: &str) -> Result<Option<AutomaticStyl
         buffer.clear();
     }
     if range_start.is_some() {
-        return Err(Error::InvalidFormat(
-            "unterminated office:automatic-styles element".to_string(),
-        ));
+        return Err(Error::InvalidFormat(format!(
+            "unterminated office:{fragment_name} element"
+        )));
     }
     Ok(None)
 }
@@ -435,5 +451,7 @@ mod tests {
         assert!(!declarations.contains("xmlns:o="));
         assert!(declarations.contains("xmlns:s="));
         assert!(declarations.contains("xmlns:f="));
+        let font_faces = extract_font_face_decls(xml).unwrap().unwrap();
+        assert!(font_faces.xml.starts_with("<o:font-face-decls"));
     }
 }
