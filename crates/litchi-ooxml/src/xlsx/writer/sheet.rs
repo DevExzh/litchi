@@ -19,7 +19,9 @@ pub use super::super::format::{
 };
 
 // Import chart types
-pub use super::super::chart::{ChartAnchor, WorksheetChart};
+pub use super::super::chart::{
+    ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, WorksheetChart,
+};
 
 // Import from other writer modules
 use super::strings::MutableSharedStrings;

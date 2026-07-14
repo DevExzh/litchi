@@ -24,7 +24,13 @@ use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml
 use super::table::{Table, parse_table_xml};
 use super::views::SheetView;
 use super::writer::sheet::Image;
-use super::{WorksheetChart, chart::parse_chart_from_xml};
+use super::{
+    ChartExternalDataPart, ChartExternalDataTarget, WorksheetChart,
+    chart::{
+        chart_external_data_content_type, is_chart_external_data_relationship_type,
+        parse_chart_from_xml,
+    },
+};
 
 /// Information about a worksheet
 #[derive(Debug, Clone)]
@@ -474,7 +480,53 @@ impl<'a> Worksheet<'a> {
                 )
                 .into());
             }
-            charts.push(parse_chart_from_xml(chart_part.blob(), chart.anchor)?);
+            let mut worksheet_chart = parse_chart_from_xml(chart_part.blob(), chart.anchor)?;
+            if let Some(external_data) = worksheet_chart.chart.external_data.as_ref() {
+                let relationship_id =
+                    external_data.relationship_id.as_deref().ok_or_else(|| {
+                        "Parsed chart external data has no relationship ID".to_string()
+                    })?;
+                let relationship = chart_part.rels().get(relationship_id).ok_or_else(|| {
+                    format!(
+                        "Chart external data references missing relationship '{relationship_id}'"
+                    )
+                })?;
+                if !is_chart_external_data_relationship_type(relationship.reltype()) {
+                    return Err(format!(
+                        "Chart external-data relationship '{relationship_id}' has invalid type '{}'",
+                        relationship.reltype()
+                    )
+                    .into());
+                }
+                let target = if relationship.is_external() {
+                    ChartExternalDataTarget::Linked {
+                        target: relationship.target_ref().to_string(),
+                    }
+                } else {
+                    let external_uri = relationship.target_partname()?;
+                    let external_part = self.workbook.package().get_part(&external_uri)?;
+                    let expected_content_type =
+                        chart_external_data_content_type(relationship.reltype())
+                            .expect("relationship type was validated above");
+                    if external_part.content_type() != expected_content_type {
+                        return Err(format!(
+                            "Chart external-data part '{external_uri}' has content type '{}', expected '{expected_content_type}'",
+                            external_part.content_type()
+                        )
+                        .into());
+                    }
+                    ChartExternalDataTarget::Embedded {
+                        data: external_part.blob().to_vec(),
+                        content_type: external_part.content_type().to_string(),
+                        extension: external_uri.ext().to_string(),
+                    }
+                };
+                worksheet_chart.external_data_part = Some(ChartExternalDataPart {
+                    relationship_type: relationship.reltype().to_string(),
+                    target,
+                });
+            }
+            charts.push(worksheet_chart);
         }
         self.images = images;
         self.charts = charts;

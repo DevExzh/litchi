@@ -8,9 +8,9 @@ use crate::charts::axis::{
     DateAxis, DisplayUnits, SeriesAxis, TimeUnit, ValueAxis,
 };
 use crate::charts::chart::{
-    Chart, ChartHeaderFooter, ChartPageMargins, ChartPageOrientation, ChartPageSetup,
-    ChartPrintSettings, ChartProtection, ColorMapOverride, ColorMapping, ColorSchemeIndex,
-    PivotFormat, PivotSource, View3D, WallFloor,
+    Chart, ChartExternalData, ChartHeaderFooter, ChartPageMargins, ChartPageOrientation,
+    ChartPageSetup, ChartPrintSettings, ChartProtection, ColorMapOverride, ColorMapping,
+    ColorSchemeIndex, PivotFormat, PivotSource, View3D, WallFloor,
 };
 use crate::charts::legend::{Legend, LegendEntry};
 use crate::charts::models::{
@@ -36,7 +36,7 @@ use crate::error::{OoxmlError, Result};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
-use quick_xml::name::ResolveResult;
+use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::{Config, NsReader};
 use std::io::BufRead;
 
@@ -75,6 +75,47 @@ impl<R: BufRead> ChartXmlReader<R> {
 
     fn decoder(&self) -> Decoder {
         self.inner.decoder()
+    }
+
+    fn relationship_attribute_value(
+        &self,
+        element: &BytesStart<'_>,
+        name: &[u8],
+    ) -> Result<Option<String>> {
+        const RELATIONSHIPS_NAMESPACE: &[u8] =
+            b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+        const STRICT_RELATIONSHIPS_NAMESPACE: &[u8] =
+            b"http://purl.oclc.org/ooxml/officeDocument/relationships";
+
+        let mut value = None;
+        for attribute in element.attributes() {
+            let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            if attribute.key.local_name().as_ref() != name {
+                continue;
+            }
+            let (namespace, _) = self.inner.resolver().resolve_attribute(attribute.key);
+            let is_relationship = matches!(
+                namespace,
+                ResolveResult::Bound(Namespace(value))
+                    if value == RELATIONSHIPS_NAMESPACE
+                        || value == STRICT_RELATIONSHIPS_NAMESPACE
+            ) || matches!(namespace, ResolveResult::Unknown(prefix) if prefix.as_slice() == b"r");
+            if !is_relationship {
+                continue;
+            }
+            if value.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart element contains duplicate relationship IDs".into(),
+                ));
+            }
+            value = Some(
+                attribute
+                    .decoded_and_normalized_value(XmlVersion::Explicit1_0, self.decoder())
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                    .into_owned(),
+            );
+        }
+        Ok(value)
     }
 
     fn read_event_into<'buffer>(&mut self, buffer: &'buffer mut Vec<u8>) -> Result<Event<'buffer>> {
@@ -333,6 +374,26 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
                     ));
                 }
                 chart.print_settings = Some(ChartPrintSettings::new());
+            },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"externalData" => {
+                if chart.external_data.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate external-data relationships".into(),
+                    ));
+                }
+                let relationship_id = required_chart_relationship_id(&xml_reader, e)?;
+                chart.external_data = Some(parse_external_data(&mut xml_reader, relationship_id)?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"externalData" => {
+                if chart.external_data.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate external-data relationships".into(),
+                    ));
+                }
+                chart.external_data = Some(ChartExternalData::new(required_chart_relationship_id(
+                    &xml_reader,
+                    e,
+                )?));
             },
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
@@ -632,6 +693,70 @@ fn parse_color_mapping(element: &BytesStart<'_>) -> Result<ColorMapping> {
         hyperlink: required_color_scheme_index(element, b"hlink")?,
         followed_hyperlink: required_color_scheme_index(element, b"folHlink")?,
     })
+}
+
+fn required_chart_relationship_id<R: BufRead>(
+    reader: &ChartXmlReader<R>,
+    element: &BytesStart<'_>,
+) -> Result<String> {
+    reader
+        .relationship_attribute_value(element, b"id")?
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| OoxmlError::InvalidFormat("chart relationship ID is required".into()))
+}
+
+fn parse_external_data<R: BufRead>(
+    reader: &mut ChartXmlReader<R>,
+    relationship_id: String,
+) -> Result<ChartExternalData> {
+    let mut external_data = ChartExternalData::new(relationship_id);
+    let mut saw_auto_update = false;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"autoUpdate" => {
+                if saw_auto_update {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart external data contains duplicate auto-update settings".into(),
+                    ));
+                }
+                saw_auto_update = true;
+                external_data.auto_update = Some(parse_bool_attr(element)?);
+                consume_empty_chart_element(
+                    reader,
+                    b"autoUpdate",
+                    "chart external-data auto-update setting",
+                )?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"autoUpdate" => {
+                if saw_auto_update {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart external data contains duplicate auto-update settings".into(),
+                    ));
+                }
+                saw_auto_update = true;
+                external_data.auto_update = Some(parse_bool_attr(element)?);
+            },
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+                if element.local_name().as_ref() != IGNORED_NAMESPACE_ELEMENT.as_bytes() =>
+            {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart external data contains an unexpected child".into(),
+                ));
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"externalData" => {
+                return Ok(external_data);
+            },
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart external data is not closed".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
 }
 
 fn required_color_scheme_index(
@@ -4777,6 +4902,58 @@ mod tests {
             document.extend_from_slice(b"<c:chart><c:plotArea/></c:chart></c:chartSpace>");
             assert!(parse_chart(document.as_slice()).is_err());
         }
+    }
+
+    #[test]
+    fn round_trips_and_validates_chart_external_data() {
+        let xml = br#"<c:chartSpace
+                xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+                xmlns:rel="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+            <c:chart><c:plotArea/></c:chart>
+            <c:externalData rel:id="rId7"><c:autoUpdate val="0"/></c:externalData>
+        </c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let external_data = chart.external_data.as_ref().unwrap();
+        assert_eq!(external_data.relationship_id.as_deref(), Some("rId7"));
+        assert_eq!(external_data.auto_update, Some(false));
+
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        let reparsed = parse_chart(output.as_slice()).unwrap();
+        assert_eq!(reparsed.external_data, chart.external_data);
+
+        let implicit_true = br#"<c:chartSpace
+                xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+                xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+            <c:chart></c:chart><c:externalData r:id="rId1"><c:autoUpdate/></c:externalData>
+        </c:chartSpace>"#;
+        assert_eq!(
+            parse_chart(implicit_true.as_slice())
+                .unwrap()
+                .external_data
+                .unwrap()
+                .auto_update,
+            Some(true)
+        );
+
+        for invalid in [
+            br#"<c:externalData/>"#.as_slice(),
+            br#"<c:externalData id="rId1"/>"#.as_slice(),
+            br#"<c:externalData r:id="rId1"><c:autoUpdate/><c:autoUpdate/></c:externalData>"#
+                .as_slice(),
+            br#"<c:externalData r:id="rId1"><c:autoUpdate val="maybe"/></c:externalData>"#
+                .as_slice(),
+            br#"<c:externalData r:id="rId1"/><c:externalData r:id="rId2"/>"#.as_slice(),
+        ] {
+            let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:chart></c:chart>"#.to_vec();
+            document.extend_from_slice(invalid);
+            document.extend_from_slice(b"</c:chartSpace>");
+            assert!(parse_chart(document.as_slice()).is_err());
+        }
+
+        let mut pending = Chart::new();
+        pending.external_data = Some(ChartExternalData::pending());
+        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &pending).is_err());
     }
 
     #[test]

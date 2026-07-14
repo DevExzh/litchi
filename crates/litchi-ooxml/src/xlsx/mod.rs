@@ -49,7 +49,7 @@ pub mod writer;
 
 // Re-export main types for convenience
 pub use cell::Cell;
-pub use chart::{ChartAnchor, WorksheetChart};
+pub use chart::{ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, WorksheetChart};
 // Re-export shared formatting types
 pub use format::{
     CellBorder, CellBorderLineStyle, CellBorderSide, CellFill, CellFillPatternType, CellFont,

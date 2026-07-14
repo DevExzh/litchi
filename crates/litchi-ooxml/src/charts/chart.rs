@@ -332,6 +332,33 @@ pub enum ColorMapOverride {
     Override(ColorMapping),
 }
 
+/// Relationship metadata for the data source embedded in or linked from a chart.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChartExternalData {
+    /// Relationship identifier in the chart part, if already allocated
+    pub relationship_id: Option<String>,
+    /// Automatic-update setting; `None` preserves an omitted child element
+    pub auto_update: Option<bool>,
+}
+
+impl ChartExternalData {
+    /// Create external-data metadata for an existing chart relationship.
+    pub fn new(relationship_id: impl Into<String>) -> Self {
+        Self {
+            relationship_id: Some(relationship_id.into()),
+            auto_update: None,
+        }
+    }
+
+    /// Create metadata whose relationship will be allocated by a package writer.
+    pub fn pending() -> Self {
+        Self {
+            relationship_id: None,
+            auto_update: None,
+        }
+    }
+}
+
 impl PivotFormat {
     /// Create a pivot-format entry for one data point.
     #[inline]
@@ -472,6 +499,8 @@ pub struct Chart {
     pub date_1904: bool,
     /// Rounding corners
     pub rounded_corners: bool,
+    /// Optional external or embedded chart data relationship metadata
+    pub external_data: Option<ChartExternalData>,
     /// Optional chart printing configuration
     pub print_settings: Option<ChartPrintSettings>,
 }
@@ -502,6 +531,7 @@ impl Chart {
             protection: None,
             date_1904: false,
             rounded_corners: false,
+            external_data: None,
             print_settings: None,
         }
     }

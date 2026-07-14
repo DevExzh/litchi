@@ -4,8 +4,9 @@
 
 use crate::charts::axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
 use crate::charts::chart::{
-    Chart, ChartHeaderFooter, ChartPageMargins, ChartPageSetup, ChartPrintSettings,
-    ChartProtection, ColorMapOverride, ColorMapping, PivotFormat, PivotSource, View3D, WallFloor,
+    Chart, ChartExternalData, ChartHeaderFooter, ChartPageMargins, ChartPageSetup,
+    ChartPrintSettings, ChartProtection, ColorMapOverride, ColorMapping, PivotFormat, PivotSource,
+    View3D, WallFloor,
 };
 use crate::charts::legend::Legend;
 use crate::charts::models::{Layout, NumericData, StringData, TitleText};
@@ -82,6 +83,14 @@ impl SeriesFeatures {
 
 /// Write a chart to XML.
 pub fn write_chart<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<()> {
+    write_chart_with_external_data_id(writer, chart, None)
+}
+
+pub(crate) fn write_chart_with_external_data_id<W: Write>(
+    writer: &mut W,
+    chart: &Chart,
+    external_data_relationship_id: Option<&str>,
+) -> std::io::Result<()> {
     write!(
         writer,
         r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#
@@ -193,12 +202,45 @@ pub fn write_chart<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<(
 
     write!(writer, "</c:chart>")?;
 
+    if let Some(external_data) = chart.external_data.as_ref() {
+        write_external_data(writer, external_data, external_data_relationship_id)?;
+    } else if external_data_relationship_id.is_some() {
+        return Err(invalid_chart_input(
+            "chart package supplied external data without chart metadata",
+        ));
+    }
+
     if let Some(settings) = chart.print_settings.as_ref() {
         write_print_settings(writer, settings)?;
     }
 
     write!(writer, "</c:chartSpace>")?;
 
+    Ok(())
+}
+
+fn write_external_data<W: Write>(
+    writer: &mut W,
+    external_data: &ChartExternalData,
+    relationship_id_override: Option<&str>,
+) -> std::io::Result<()> {
+    let relationship_id = relationship_id_override
+        .or(external_data.relationship_id.as_deref())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| invalid_chart_input("chart external data has no relationship ID"))?;
+    write!(
+        writer,
+        r#"<c:externalData r:id="{}">"#,
+        escape_xml(relationship_id)
+    )?;
+    if let Some(auto_update) = external_data.auto_update {
+        write!(
+            writer,
+            r#"<c:autoUpdate val="{}"/>"#,
+            if auto_update { "1" } else { "0" }
+        )?;
+    }
+    write!(writer, "</c:externalData>")?;
     Ok(())
 }
 

@@ -20,6 +20,76 @@ use crate::charts::{
 };
 use crate::error::{OoxmlError, Result};
 
+/// Storage target for a chart's external-data relationship.
+#[derive(Debug, Clone)]
+pub enum ChartExternalDataTarget {
+    /// A part embedded in the containing OOXML package
+    Embedded {
+        /// Complete bytes of the embedded object
+        data: Vec<u8>,
+        /// OPC content type for the embedded part
+        content_type: String,
+        /// Filename extension without a leading dot
+        extension: String,
+    },
+    /// An externally linked object
+    Linked {
+        /// External relationship target
+        target: String,
+    },
+}
+
+/// Package payload and relationship type for chart external data.
+#[derive(Debug, Clone)]
+pub struct ChartExternalDataPart {
+    /// Relationship type, normally package or OLE object
+    pub relationship_type: String,
+    /// Embedded or linked relationship target
+    pub target: ChartExternalDataTarget,
+}
+
+impl ChartExternalDataPart {
+    /// Create an embedded OOXML spreadsheet payload.
+    pub fn embedded_workbook(data: Vec<u8>) -> Self {
+        Self {
+            relationship_type: litchi_opc::constants::relationship_type::PACKAGE.to_string(),
+            target: ChartExternalDataTarget::Embedded {
+                data,
+                content_type: litchi_opc::constants::content_type::OFC_PACKAGE.to_string(),
+                extension: "xlsx".to_string(),
+            },
+        }
+    }
+
+    /// Create a linked OOXML package relationship.
+    pub fn linked_package(target: impl Into<String>) -> Self {
+        Self {
+            relationship_type: litchi_opc::constants::relationship_type::PACKAGE.to_string(),
+            target: ChartExternalDataTarget::Linked {
+                target: target.into(),
+            },
+        }
+    }
+}
+
+pub(crate) fn is_chart_external_data_relationship_type(relationship_type: &str) -> bool {
+    chart_external_data_content_type(relationship_type).is_some()
+}
+
+pub(crate) fn chart_external_data_content_type(relationship_type: &str) -> Option<&'static str> {
+    match relationship_type {
+        litchi_opc::constants::relationship_type::PACKAGE
+        | "http://purl.oclc.org/ooxml/officeDocument/relationships/package" => {
+            Some(litchi_opc::constants::content_type::OFC_PACKAGE)
+        },
+        litchi_opc::constants::relationship_type::OLE_OBJECT
+        | "http://purl.oclc.org/ooxml/officeDocument/relationships/oleObject" => {
+            Some(litchi_opc::constants::content_type::OFC_OLE_OBJECT)
+        },
+        _ => None,
+    }
+}
+
 /// Chart anchor position in a worksheet.
 ///
 /// Specifies the position and size of a chart using cell anchors and offsets.
@@ -112,12 +182,38 @@ pub struct WorksheetChart {
     pub chart: ChartModel,
     /// Position and size of the chart in the worksheet
     pub anchor: ChartAnchor,
+    /// Optional package payload targeted by `chart.external_data`
+    pub external_data_part: Option<ChartExternalDataPart>,
 }
 
 impl WorksheetChart {
     /// Create a new worksheet chart.
     pub fn new(chart: ChartModel, anchor: ChartAnchor) -> Self {
-        Self { chart, anchor }
+        Self {
+            chart,
+            anchor,
+            external_data_part: None,
+        }
+    }
+
+    /// Attach an embedded OOXML workbook as the chart's external data.
+    pub fn with_embedded_workbook(mut self, data: Vec<u8>) -> Self {
+        self.chart.external_data = Some(crate::charts::ChartExternalData::pending());
+        self.external_data_part = Some(ChartExternalDataPart::embedded_workbook(data));
+        self
+    }
+
+    /// Attach a package-backed external-data relationship.
+    pub fn with_external_data_part(
+        mut self,
+        part: ChartExternalDataPart,
+        auto_update: Option<bool>,
+    ) -> Self {
+        let mut metadata = crate::charts::ChartExternalData::pending();
+        metadata.auto_update = auto_update;
+        self.chart.external_data = Some(metadata);
+        self.external_data_part = Some(part);
+        self
     }
 
     /// Create a simple bar chart from data ranges.
@@ -483,6 +579,16 @@ pub fn parse_chart_from_xml(chart_xml: &[u8], anchor: ChartAnchor) -> Result<Wor
 pub fn generate_chart_xml(chart: &ChartModel) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     crate::charts::writer::write_chart(&mut output, chart)
+        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+    Ok(output)
+}
+
+pub(crate) fn generate_chart_xml_with_external_data_id(
+    chart: &ChartModel,
+    relationship_id: Option<&str>,
+) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    crate::charts::writer::write_chart_with_external_data_id(&mut output, chart, relationship_id)
         .map_err(|e| OoxmlError::Xml(e.to_string()))?;
     Ok(output)
 }

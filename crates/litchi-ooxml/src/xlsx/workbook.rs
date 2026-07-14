@@ -1273,13 +1273,95 @@ impl Workbook {
                 for (idx, chart) in ws.charts().iter().enumerate() {
                     let chart_name = format!("chart{}_{}", ws.sheet_id(), idx + 1);
                     let chart_uri = PackURI::new(format!("/xl/charts/{chart_name}.xml"))?;
+                    if chart.chart.external_data.is_some() != chart.external_data_part.is_some() {
+                        return Err(format!(
+                            "Worksheet chart {} external-data metadata and package payload disagree",
+                            idx + 1
+                        )
+                        .into());
+                    }
 
-                    // Generate chart XML
-                    let chart_xml = crate::xlsx::chart::generate_chart_xml(&chart.chart)
-                        .map_err(|e| format!("Failed to generate chart XML: {}", e))?;
+                    let mut chart_part =
+                        BlobPart::new(chart_uri.clone(), ct::DML_CHART.to_string(), Vec::new());
+                    let mut embedded_external_part = None;
+                    let external_data_relationship_id = if let Some(external_data) =
+                        chart.external_data_part.as_ref()
+                    {
+                        if !crate::xlsx::chart::is_chart_external_data_relationship_type(
+                            &external_data.relationship_type,
+                        ) {
+                            return Err(format!(
+                                    "Worksheet chart {} has invalid external-data relationship type '{}'",
+                                    idx + 1,
+                                    external_data.relationship_type
+                                )
+                                .into());
+                        }
+                        let relationship_id = match &external_data.target {
+                            crate::xlsx::ChartExternalDataTarget::Embedded {
+                                data,
+                                content_type,
+                                extension,
+                            } => {
+                                let expected_content_type =
+                                    crate::xlsx::chart::chart_external_data_content_type(
+                                        &external_data.relationship_type,
+                                    )
+                                    .expect("relationship type was validated above");
+                                if content_type.is_empty()
+                                    || content_type != expected_content_type
+                                    || extension.is_empty()
+                                    || !extension.bytes().all(|byte| byte.is_ascii_alphanumeric())
+                                {
+                                    return Err(format!(
+                                            "Worksheet chart {} has invalid embedded external-data metadata",
+                                            idx + 1
+                                        )
+                                        .into());
+                                }
+                                let external_name = format!(
+                                    "chartData{}_{}.{}",
+                                    ws.sheet_id(),
+                                    idx + 1,
+                                    extension.to_ascii_lowercase()
+                                );
+                                let external_uri =
+                                    PackURI::new(format!("/xl/embeddings/{external_name}"))?;
+                                embedded_external_part = Some(BlobPart::new(
+                                    external_uri,
+                                    content_type.clone(),
+                                    data.clone(),
+                                ));
+                                chart_part.relate_to(
+                                    &format!("../embeddings/{external_name}"),
+                                    &external_data.relationship_type,
+                                )
+                            },
+                            crate::xlsx::ChartExternalDataTarget::Linked { target } => {
+                                if target.is_empty() {
+                                    return Err(format!(
+                                            "Worksheet chart {} has an empty linked external-data target",
+                                            idx + 1
+                                        )
+                                        .into());
+                                }
+                                chart_part.relate_to_ext(target, &external_data.relationship_type)
+                            },
+                        };
+                        Some(relationship_id)
+                    } else {
+                        None
+                    };
 
-                    let chart_part =
-                        BlobPart::new(chart_uri.clone(), ct::DML_CHART.to_string(), chart_xml);
+                    let chart_xml = crate::xlsx::chart::generate_chart_xml_with_external_data_id(
+                        &chart.chart,
+                        external_data_relationship_id.as_deref(),
+                    )
+                    .map_err(|e| format!("Failed to generate chart XML: {e}"))?;
+                    chart_part.set_blob(chart_xml);
+                    if let Some(external_part) = embedded_external_part {
+                        self.package.add_part(Box::new(external_part));
+                    }
                     self.package.add_part(Box::new(chart_part));
 
                     // Add relationship from drawing to chart
@@ -1958,8 +2040,8 @@ mod tests {
     use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 
     use crate::xlsx::{
-        ChartAnchor, Mention, Person, PersonList, Table, TableColumn, ThreadedComment,
-        WorksheetChart,
+        ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, Mention, Person, PersonList,
+        Table, TableColumn, ThreadedComment, WorksheetChart,
     };
 
     const WORKBOOK_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -2003,7 +2085,11 @@ mod tests {
                 "Sheet1!$B$2:$B$4",
                 ChartAnchor::new(3, 1, 9, 14),
             )
-            .unwrap(),
+            .unwrap()
+            .with_external_data_part(
+                ChartExternalDataPart::embedded_workbook(b"PK chart workbook".to_vec()),
+                Some(false),
+            ),
         );
 
         workbook.save(&path).unwrap();
@@ -2031,6 +2117,22 @@ mod tests {
             drawing_part.rels().get("rId2").unwrap().reltype(),
             rt::CHART
         );
+        let chart_relationship = drawing_part.rels().get("rId2").unwrap();
+        let chart_part = package
+            .get_part(&chart_relationship.target_partname().unwrap())
+            .unwrap();
+        let external_relationship = chart_part.rels().get("rId1").unwrap();
+        assert_eq!(external_relationship.reltype(), rt::PACKAGE);
+        assert_eq!(
+            package
+                .get_part(&external_relationship.target_partname().unwrap())
+                .unwrap()
+                .blob(),
+            b"PK chart workbook"
+        );
+        let chart_xml = std::str::from_utf8(chart_part.blob()).unwrap();
+        assert!(chart_xml.contains(r#"<c:externalData r:id="rId1">"#));
+        assert!(chart_xml.contains(r#"<c:autoUpdate val="0"/>"#));
 
         let reopened = Workbook::open(&path).unwrap();
         let worksheet = reopened.get_worksheet(0).unwrap();
@@ -2048,6 +2150,30 @@ mod tests {
         assert_eq!(worksheet.charts().len(), 1);
         assert_eq!(worksheet.charts()[0].anchor.from_col, 3);
         assert_eq!(worksheet.charts()[0].anchor.to_row, 14);
+        assert_eq!(
+            worksheet.charts()[0]
+                .chart
+                .external_data
+                .as_ref()
+                .unwrap()
+                .auto_update,
+            Some(false)
+        );
+        let ChartExternalDataTarget::Embedded {
+            data,
+            content_type,
+            extension,
+        } = &worksheet.charts()[0]
+            .external_data_part
+            .as_ref()
+            .unwrap()
+            .target
+        else {
+            panic!("expected embedded chart workbook");
+        };
+        assert_eq!(data, b"PK chart workbook");
+        assert_eq!(content_type, ct::OFC_PACKAGE);
+        assert_eq!(extension, "xlsx");
         let TypeGroup::Bar(group) = &worksheet.charts()[0].chart.plot_area.type_groups[0] else {
             panic!("expected reopened bar chart");
         };
