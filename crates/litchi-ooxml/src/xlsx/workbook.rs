@@ -2750,6 +2750,39 @@ mod tests {
                 .unwrap(),
             ),
         });
+        let mut line_trendline = crate::charts::series::Trendline::linear();
+        line_trendline.show_label = true;
+        line_trendline.shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId439"/></a:blipFill></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        line_trendline.label_shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId440"/></a:blipFill></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        line_trendline.label_text_properties = Some(
+            crate::charts::ChartTextProperties::from_xml(
+                br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr><a:hlinkClick r:id="rId441"/></a:defRPr></a:pPr></a:p></c:txPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        line_trendline.label_extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="trendline-label"><x:reference r:id="rId442"/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        line_trendline.extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="trendline"><x:reference r:id="rId443"/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        line_series.trendlines.push(line_trendline);
         line.common.series.push(line_series);
         chart
             .chart
@@ -2909,6 +2942,11 @@ mod tests {
                 "rId436".to_string(),
                 "rId437".to_string(),
                 "rId438".to_string(),
+                "rId439".to_string(),
+                "rId440".to_string(),
+                "rId441".to_string(),
+                "rId442".to_string(),
+                "rId443".to_string(),
             ]
             .into()
         );
@@ -2922,7 +2960,8 @@ mod tests {
                 "rId411", "rId412", "rId413", "rId414", "rId415", "rId416", "rId417", "rId418",
                 "rId419", "rId420", "rId421", "rId422", "rId423", "rId424", "rId425", "rId426",
                 "rId427", "rId428", "rId429", "rId430", "rId431", "rId432", "rId433", "rId434",
-                "rId435", "rId436", "rId437", "rId438",
+                "rId435", "rId436", "rId437", "rId438", "rId439", "rId440", "rId441", "rId442",
+                "rId443",
             ]
             .iter()
             .any(|relationship_id| error.contains(relationship_id))

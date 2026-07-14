@@ -4467,8 +4467,55 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"trendlineName" => {
-                trendline.name = Some(parse_text_element(reader, b"trendlineName")?);
+            Ok(Event::Start(ref e))
+                if matches!(e.local_name().as_ref(), b"name" | b"trendlineName") =>
+            {
+                if trendline.name.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart trendline contains duplicate names".into(),
+                    ));
+                }
+                trendline.name = Some(parse_text_element(reader, e.local_name().as_ref())?);
+            },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"spPr" => {
+                if trendline.shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart trendline contains duplicate shape properties".into(),
+                    ));
+                }
+                trendline.shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_fragment(e, "chart trendline shape properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"spPr" => {
+                if trendline.shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart trendline contains duplicate shape properties".into(),
+                    ));
+                }
+                trendline.shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_empty_fragment(e)?,
+                )?);
+            },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"extLst" => {
+                if trendline.extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart trendline contains duplicate extension lists".into(),
+                    ));
+                }
+                trendline.extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_fragment(e, "chart trendline extension list")?,
+                )?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"extLst" => {
+                if trendline.extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart trendline contains duplicate extension lists".into(),
+                    ));
+                }
+                trendline.extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_empty_fragment(e)?,
+                )?);
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"trendlineLbl" => {
                 if trendline.show_label {
@@ -4477,11 +4524,13 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
                     ));
                 }
                 trendline.show_label = true;
-                (
-                    trendline.label,
-                    trendline.label_layout,
-                    trendline.label_number_format,
-                ) = parse_trendline_label(reader)?;
+                let label = parse_trendline_label(reader)?;
+                trendline.label = label.text;
+                trendline.label_layout = label.layout;
+                trendline.label_number_format = label.number_format;
+                trendline.label_shape_properties = label.shape_properties;
+                trendline.label_text_properties = label.text_properties;
+                trendline.label_extension_list = label.extension_list;
             },
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"trendlineLbl" => {
                 if trendline.show_label {
@@ -4561,13 +4610,26 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
     Ok(trendline)
 }
 
+#[derive(Default)]
+struct ParsedTrendlineLabel {
+    text: Option<TitleText>,
+    layout: Option<Layout>,
+    number_format: Option<NumberFormat>,
+    shape_properties: Option<ChartShapeProperties>,
+    text_properties: Option<ChartTextProperties>,
+    extension_list: Option<ChartExtensionList>,
+}
+
 fn parse_trendline_label<R: BufRead>(
     reader: &mut ChartXmlReader<R>,
-) -> Result<(Option<TitleText>, Option<Layout>, Option<NumberFormat>)> {
+) -> Result<ParsedTrendlineLabel> {
     let mut text = None;
     let mut saw_text = false;
     let mut layout = None;
     let mut number_format = None;
+    let mut shape_properties = None;
+    let mut text_properties = None;
+    let mut extension_list = None;
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
@@ -4612,6 +4674,66 @@ fn parse_trendline_label<R: BufRead>(
                     "chart trendline-label",
                 )?);
             },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart trendline label contains duplicate shape properties".into(),
+                    ));
+                }
+                shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_fragment(element, "chart trendline-label shape properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart trendline label contains duplicate shape properties".into(),
+                    ));
+                }
+                shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"txPr" => {
+                if text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart trendline label contains duplicate text properties".into(),
+                    ));
+                }
+                text_properties = Some(ChartTextProperties::from_xml(
+                    reader.capture_fragment(element, "chart trendline-label text properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"txPr" => {
+                if text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart trendline label contains duplicate text properties".into(),
+                    ));
+                }
+                text_properties = Some(ChartTextProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart trendline label contains duplicate extension lists".into(),
+                    ));
+                }
+                extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_fragment(element, "chart trendline-label extension list")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart trendline label contains duplicate extension lists".into(),
+                    ));
+                }
+                extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"trendlineLbl" => {
                 break;
             },
@@ -4625,7 +4747,14 @@ fn parse_trendline_label<R: BufRead>(
         }
         buf.clear();
     }
-    Ok((text, layout, number_format))
+    Ok(ParsedTrendlineLabel {
+        text,
+        layout,
+        number_format,
+        shape_properties,
+        text_properties,
+        extension_list,
+    })
 }
 
 fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ErrorBar> {
@@ -8287,6 +8416,36 @@ mod tests {
         trendline.label = Some(TitleText::from_ref("Sheet1!$F$2"));
         trendline.label_layout = Some(Layout::new().with_size(0.3, 0.2));
         trendline.label_number_format = Some(NumberFormat::new("0.000").with_source_linked(false));
+        trendline.shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:ln w="63500"/></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        trendline.label_shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:solidFill><a:srgbClr val="FEDCBA"/></a:solidFill></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        trendline.label_text_properties = Some(
+            ChartTextProperties::from_xml(
+                br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:bodyPr rot="1800000"/><a:lstStyle/><a:p/></c:txPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        trendline.label_extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:x="urn:example:trendline"><c:ext uri="label"><x:payload/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        trendline.extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:x="urn:example:trendline"><c:ext uri="trendline"><x:payload/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
         scatter_series.trendlines.push(trendline);
         scatter_series.error_bars.push(ErrorBar {
             direction: ErrorBarDirection::Y,
@@ -8384,6 +8543,11 @@ mod tests {
 
         let mut xml = Vec::new();
         crate::charts::writer::write_chart(&mut xml, &chart).unwrap();
+        assert!(
+            std::str::from_utf8(&xml)
+                .unwrap()
+                .contains("<c:name>Forecast &amp; fit</c:name>")
+        );
         let parsed = parse_chart(xml.as_slice()).unwrap();
 
         assert_eq!(parsed.plot_area.type_groups.len(), 16);
@@ -8563,6 +8727,41 @@ mod tests {
         let number_format = labels.number_format.as_ref().unwrap();
         assert_eq!(number_format.format_code, "0.0%");
         assert!(!number_format.source_linked);
+        assert!(
+            std::str::from_utf8(
+                series.trendlines[0]
+                    .shape_properties
+                    .as_ref()
+                    .unwrap()
+                    .as_xml()
+            )
+            .unwrap()
+            .contains("63500")
+        );
+        assert!(
+            std::str::from_utf8(
+                series.trendlines[0]
+                    .label_shape_properties
+                    .as_ref()
+                    .unwrap()
+                    .as_xml()
+            )
+            .unwrap()
+            .contains("FEDCBA")
+        );
+        assert!(
+            std::str::from_utf8(
+                series.trendlines[0]
+                    .label_text_properties
+                    .as_ref()
+                    .unwrap()
+                    .as_xml()
+            )
+            .unwrap()
+            .contains("1800000")
+        );
+        assert!(series.trendlines[0].label_extension_list.is_some());
+        assert!(series.trendlines[0].extension_list.is_some());
         assert_eq!(labels.separator.as_deref(), Some(" & "));
         assert_eq!(labels.labels.len(), 1);
         let point_label = &labels.labels[0];

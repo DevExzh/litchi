@@ -1174,6 +1174,34 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                     fragments.push(extension_list.as_xml());
                 }
             }
+            for trendline in &series.trendlines {
+                fragments.extend(
+                    [
+                        trendline
+                            .shape_properties
+                            .as_ref()
+                            .map(crate::charts::ChartShapeProperties::as_xml),
+                        trendline
+                            .label_shape_properties
+                            .as_ref()
+                            .map(crate::charts::ChartShapeProperties::as_xml),
+                        trendline
+                            .label_text_properties
+                            .as_ref()
+                            .map(crate::charts::ChartTextProperties::as_xml),
+                        trendline
+                            .label_extension_list
+                            .as_ref()
+                            .map(crate::charts::ChartExtensionList::as_xml),
+                        trendline
+                            .extension_list
+                            .as_ref()
+                            .map(crate::charts::ChartExtensionList::as_xml),
+                    ]
+                    .into_iter()
+                    .flatten(),
+                );
+            }
             for point in &series.data_points {
                 fragments.extend(
                     [

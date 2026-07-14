@@ -313,6 +313,8 @@ pub struct Trendline {
     pub trendline_type: TrendlineType,
     /// Name of the trendline
     pub name: Option<String>,
+    /// DrawingML shape properties for the trendline
+    pub shape_properties: Option<ChartShapeProperties>,
     /// Polynomial order (for polynomial trendlines, 2-6)
     pub order: Option<u32>,
     /// Moving average period (for moving average, 2-255)
@@ -335,6 +337,14 @@ pub struct Trendline {
     pub label_layout: Option<Layout>,
     /// Number format for the trendline label
     pub label_number_format: Option<NumberFormat>,
+    /// DrawingML shape properties for the trendline label
+    pub label_shape_properties: Option<ChartShapeProperties>,
+    /// DrawingML text properties for the trendline label
+    pub label_text_properties: Option<crate::charts::chart::ChartTextProperties>,
+    /// Trendline-label extension list
+    pub label_extension_list: Option<ChartExtensionList>,
+    /// Trendline extension list
+    pub extension_list: Option<ChartExtensionList>,
 }
 
 /// Trendline type.
@@ -361,6 +371,7 @@ impl Trendline {
         Self {
             trendline_type: TrendlineType::Linear,
             name: None,
+            shape_properties: None,
             order: None,
             period: None,
             forward: None,
@@ -372,6 +383,10 @@ impl Trendline {
             label: None,
             label_layout: None,
             label_number_format: None,
+            label_shape_properties: None,
+            label_text_properties: None,
+            label_extension_list: None,
+            extension_list: None,
         }
     }
 }

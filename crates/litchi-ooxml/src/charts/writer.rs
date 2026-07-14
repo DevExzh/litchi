@@ -1790,11 +1790,10 @@ fn write_trendline<W: Write>(writer: &mut W, trendline: &Trendline) -> std::io::
     validate_trendline(trendline)?;
     write!(writer, "<c:trendline>")?;
     if let Some(name) = &trendline.name {
-        write!(
-            writer,
-            "<c:trendlineName>{}</c:trendlineName>",
-            escape_xml(name)
-        )?;
+        write!(writer, "<c:name>{}</c:name>", escape_xml(name))?;
+    }
+    if let Some(shape_properties) = trendline.shape_properties.as_ref() {
+        writer.write_all(shape_properties.as_xml())?;
     }
     let kind = match trendline.trendline_type {
         TrendlineType::Exponential => "exp",
@@ -1833,6 +1832,9 @@ fn write_trendline<W: Write>(writer: &mut W, trendline: &Trendline) -> std::io::
         || trendline.label.is_some()
         || trendline.label_layout.is_some()
         || trendline.label_number_format.is_some()
+        || trendline.label_shape_properties.is_some()
+        || trendline.label_text_properties.is_some()
+        || trendline.label_extension_list.is_some()
     {
         write!(writer, "<c:trendlineLbl>")?;
         if let Some(layout) = trendline.label_layout.as_ref() {
@@ -1853,7 +1855,19 @@ fn write_trendline<W: Write>(writer: &mut W, trendline: &Trendline) -> std::io::
                 }
             )?;
         }
+        if let Some(shape_properties) = trendline.label_shape_properties.as_ref() {
+            writer.write_all(shape_properties.as_xml())?;
+        }
+        if let Some(text_properties) = trendline.label_text_properties.as_ref() {
+            writer.write_all(text_properties.as_xml())?;
+        }
+        if let Some(extension_list) = trendline.label_extension_list.as_ref() {
+            writer.write_all(extension_list.as_xml())?;
+        }
         write!(writer, "</c:trendlineLbl>")?;
+    }
+    if let Some(extension_list) = trendline.extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
     }
     write!(writer, "</c:trendline>")?;
     Ok(())
