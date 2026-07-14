@@ -2,11 +2,29 @@
 ///
 /// This module provides types and methods for accessing comments in Word documents.
 /// Comments contain author information, text content, and timestamps.
+use crate::docx::namespace::scan_word_element_ranges;
 use crate::docx::paragraph::extract_word_text;
 use crate::error::{OoxmlError, Result};
+use litchi_core::XmlSlice;
 use litchi_opc::part::Part;
 use quick_xml::Reader;
 use quick_xml::events::Event;
+use std::sync::Arc;
+
+#[derive(Debug, Clone)]
+enum CommentXmlData {
+    Owned(Box<[u8]>),
+    Shared(XmlSlice),
+}
+
+impl CommentXmlData {
+    fn as_bytes(&self) -> &[u8] {
+        match self {
+            Self::Owned(bytes) => bytes,
+            Self::Shared(slice) => slice.as_bytes(),
+        }
+    }
+}
 
 /// A comment in a Word document.
 ///
@@ -37,7 +55,7 @@ pub struct Comment {
     /// Date of comment creation (optional)
     date: Option<String>,
     /// The raw XML bytes for this comment
-    xml_bytes: Vec<u8>,
+    xml_data: CommentXmlData,
 }
 
 impl Comment {
@@ -62,7 +80,25 @@ impl Comment {
             author,
             initials,
             date,
-            xml_bytes,
+            xml_data: CommentXmlData::Owned(xml_bytes.into_boxed_slice()),
+        }
+    }
+
+    fn from_arc_range(
+        id: u32,
+        author: String,
+        initials: Option<String>,
+        date: Option<String>,
+        source: Arc<Vec<u8>>,
+        start: u32,
+        length: u32,
+    ) -> Self {
+        Self {
+            id,
+            author,
+            initials,
+            date,
+            xml_data: CommentXmlData::Shared(XmlSlice::new(source, start, length)),
         }
     }
 
@@ -93,7 +129,7 @@ impl Comment {
     /// Get the XML bytes of this comment.
     #[inline]
     pub fn xml_bytes(&self) -> &[u8] {
-        &self.xml_bytes
+        self.xml_data.as_bytes()
     }
 
     /// Extract all text content from this comment.
@@ -112,7 +148,7 @@ impl Comment {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn text(&self) -> Result<String> {
-        extract_word_text(&self.xml_bytes)
+        extract_word_text(self.xml_bytes())
     }
 
     /// Extract all comments from a comments.xml part.
@@ -125,124 +161,94 @@ impl Comment {
     ///
     /// A vector of comments
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Vec<Comment>> {
-        let xml_bytes = part.blob();
-        let mut reader = Reader::from_reader(xml_bytes);
-        reader.config_mut().trim_text(true);
-
+        let source = part.blob_arc();
         let mut comments = Vec::new();
-        let mut current_comment_xml = Vec::with_capacity(4096);
-        let mut in_comment = false;
-        let mut depth = 0;
-        let mut current_id: Option<u32> = None;
-        let mut current_author = String::new();
-        let mut current_initials: Option<String> = None;
-        let mut current_date: Option<String> = None;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"comment" && !in_comment {
-                        in_comment = true;
-                        depth = 1;
-                        current_comment_xml.clear();
-                        current_id = None;
-                        current_author.clear();
-                        current_initials = None;
-                        current_date = None;
-
-                        // Parse attributes
-                        for attr in e.attributes().flatten() {
-                            match attr.key.local_name().as_ref() {
-                                b"id" => {
-                                    let id_str = String::from_utf8_lossy(&attr.value);
-                                    current_id =
-                                        atoi_simd::parse::<u32, false, false>(id_str.as_bytes())
-                                            .ok();
-                                },
-                                b"author" => {
-                                    current_author =
-                                        String::from_utf8_lossy(&attr.value).into_owned();
-                                },
-                                b"initials" => {
-                                    current_initials =
-                                        Some(String::from_utf8_lossy(&attr.value).into_owned());
-                                },
-                                b"date" => {
-                                    current_date =
-                                        Some(String::from_utf8_lossy(&attr.value).into_owned());
-                                },
-                                _ => {},
-                            }
-                        }
-
-                        current_comment_xml.extend_from_slice(b"<w:comment>");
-                    } else if in_comment {
-                        depth += 1;
-                        current_comment_xml.extend_from_slice(b"<");
-                        current_comment_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_comment_xml.extend_from_slice(b" ");
-                            current_comment_xml.extend_from_slice(attr.key.as_ref());
-                            current_comment_xml.extend_from_slice(b"=\"");
-                            current_comment_xml.extend_from_slice(&attr.value);
-                            current_comment_xml.extend_from_slice(b"\"");
-                        }
-                        current_comment_xml.extend_from_slice(b">");
-                    }
-                },
-                Ok(Event::End(e)) if in_comment => {
-                    current_comment_xml.extend_from_slice(b"</");
-                    current_comment_xml.extend_from_slice(e.name().as_ref());
-                    current_comment_xml.extend_from_slice(b">");
-
-                    if e.local_name().as_ref() == b"comment" && depth == 1 {
-                        if let Some(id) = current_id {
-                            comments.push(Comment::new(
-                                id,
-                                current_author.clone(),
-                                current_initials.clone(),
-                                current_date.clone(),
-                                current_comment_xml.clone(),
-                            ));
-                        }
-                        in_comment = false;
-                    } else {
-                        depth -= 1;
-                    }
-                },
-                Ok(Event::Empty(e)) if in_comment => {
-                    current_comment_xml.extend_from_slice(b"<");
-                    current_comment_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        current_comment_xml.extend_from_slice(b" ");
-                        current_comment_xml.extend_from_slice(attr.key.as_ref());
-                        current_comment_xml.extend_from_slice(b"=\"");
-                        current_comment_xml.extend_from_slice(&attr.value);
-                        current_comment_xml.extend_from_slice(b"\"");
-                    }
-                    current_comment_xml.extend_from_slice(b"/>");
-                },
-                Ok(Event::Text(e)) if in_comment => {
-                    current_comment_xml.extend_from_slice(e.as_ref());
-                },
-                Ok(Event::CData(e)) if in_comment => {
-                    current_comment_xml.extend_from_slice(b"<![CDATA[");
-                    current_comment_xml.extend_from_slice(e.as_ref());
-                    current_comment_xml.extend_from_slice(b"]]>");
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_word_element_ranges(
+            source.as_slice(),
+            &[b"comment".as_slice()],
+            |_, start, length| {
+                let start_index = start as usize;
+                let end_index = start_index.checked_add(length as usize).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("Word comment range overflow".to_string())
+                })?;
+                let metadata = parse_comment_metadata(&source[start_index..end_index])?;
+                if let Some((id, author, initials, date)) = metadata {
+                    comments.push(Comment::from_arc_range(
+                        id,
+                        author,
+                        initials,
+                        date,
+                        Arc::clone(&source),
+                        start,
+                        length,
+                    ));
+                }
+                Ok(())
+            },
+        )?;
         Ok(comments)
     }
+}
+
+type CommentMetadata = (u32, String, Option<String>, Option<String>);
+
+fn parse_comment_metadata(xml_bytes: &[u8]) -> Result<Option<CommentMetadata>> {
+    let mut reader = Reader::from_reader(xml_bytes);
+    let element = loop {
+        match reader.read_event() {
+            Ok(Event::Start(element)) | Ok(Event::Empty(element)) => break element,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "missing Word comment element".to_string(),
+                ));
+            },
+            Err(error) => return Err(OoxmlError::Xml(error.to_string())),
+            _ => {},
+        }
+    };
+
+    let mut id = None;
+    let mut author = String::new();
+    let mut initials = None;
+    let mut date = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        match attribute.key.local_name().as_ref() {
+            b"id" => {
+                id = atoi_simd::parse::<u32, false, false>(attribute.value.as_ref()).ok();
+            },
+            b"author" => author = decode_comment_attribute(attribute.value.as_ref())?,
+            b"initials" => {
+                initials = Some(decode_comment_attribute(attribute.value.as_ref())?);
+            },
+            b"date" => date = Some(decode_comment_attribute(attribute.value.as_ref())?),
+            _ => {},
+        }
+    }
+    Ok(id.map(|id| (id, author, initials, date)))
+}
+
+fn decode_comment_attribute(value: &[u8]) -> Result<String> {
+    let value = std::str::from_utf8(value).map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    quick_xml::escape::unescape(value)
+        .map(|value| value.into_owned())
+        .map_err(|error| OoxmlError::Xml(error.to_string()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_opc::packuri::PackURI;
+    use litchi_opc::part::BlobPart;
+
+    fn comments_part(xml: &[u8]) -> BlobPart {
+        BlobPart::new(
+            PackURI::new("/word/comments.xml").unwrap(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"
+                .to_string(),
+            xml.to_vec(),
+        )
+    }
 
     #[test]
     fn test_comment_creation() {
@@ -260,5 +266,38 @@ mod tests {
         assert_eq!(comment.initials(), Some("JD"));
         assert_eq!(comment.date(), Some("2024-01-01"));
         assert_eq!(comment.text().unwrap(), " Test & comment \t\n");
+    }
+
+    #[test]
+    fn extracts_aliased_comment_slices_and_decodes_metadata() {
+        let xml = br#"<c:comments xmlns:c="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:false="urn:not-wordprocessingml">
+            <false:comment false:id="9"><false:p><false:r><false:t>ignored</false:t></false:r></false:p></false:comment>
+            <c:comment c:id="1" c:author="A &amp; B" c:initials="AB" c:date="2026-07-14T00:00:00Z"><c:p><c:r><c:t><![CDATA[x < y]]></c:t></c:r></c:p></c:comment>
+            <c:comment c:id="2"/>
+        </c:comments>"#;
+        let part = comments_part(xml);
+
+        let comments = Comment::extract_from_part(&part).unwrap();
+        assert_eq!(comments.len(), 2);
+        assert_eq!(comments[0].id(), 1);
+        assert_eq!(comments[0].author(), "A & B");
+        assert_eq!(comments[0].initials(), Some("AB"));
+        assert_eq!(comments[0].date(), Some("2026-07-14T00:00:00Z"));
+        assert_eq!(comments[0].text().unwrap(), "x < y");
+        assert!(
+            comments[0]
+                .xml_bytes()
+                .starts_with(br#"<c:comment c:id="1""#)
+        );
+        assert_eq!(comments[1].id(), 2);
+        assert_eq!(comments[1].author(), "");
+        assert_eq!(comments[1].text().unwrap(), "");
+    }
+
+    #[test]
+    fn rejects_unterminated_comment_slices() {
+        let xml = br#"<w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:comment w:id="1"><w:p/>"#;
+        let part = comments_part(xml);
+        assert!(Comment::extract_from_part(&part).is_err());
     }
 }
