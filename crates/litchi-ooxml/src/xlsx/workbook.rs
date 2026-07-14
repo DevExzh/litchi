@@ -1860,10 +1860,16 @@ mod tests {
 </workbook>"#;
 
     const WORKSHEET_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+           xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <cols><col min="2" max="3" width="12.5" hidden="1" customWidth="1"/></cols>
   <sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>
   <mergeCells count="1"><mergeCell ref="B2:C3"/></mergeCells>
+  <hyperlinks>
+    <hyperlink ref="B2:C3" r:id="rId1" location="Section 1"
+               display="Example &amp; Co" tooltip="Open example"/>
+    <hyperlink ref="D4" location="&apos;Other Sheet&apos;!A1"/>
+  </hyperlinks>
 </worksheet>"#;
 
     fn package_with_worksheet_relationship(reltype: &str, external: bool) -> OpcPackage {
@@ -1884,14 +1890,38 @@ mod tests {
         package.add_part(Box::new(workbook_part));
 
         if !external {
-            package.add_part(Box::new(BlobPart::new(
+            let mut worksheet_part = BlobPart::new(
                 PackURI::new("/xl/custom/sales-data.xml").unwrap(),
                 ct::SML_WORKSHEET.to_string(),
                 WORKSHEET_XML.as_bytes().to_vec(),
-            )));
+            );
+            let hyperlink_reltype = if reltype == rt::STRICT_WORKSHEET {
+                rt::STRICT_HYPERLINK
+            } else {
+                rt::HYPERLINK
+            };
+            assert_eq!(
+                worksheet_part.relate_to_ext("https://example.com/report", hyperlink_reltype),
+                "rId1"
+            );
+            package.add_part(Box::new(worksheet_part));
         }
 
         package
+    }
+
+    fn replace_hyperlink_relationship(package: &mut OpcPackage, reltype: &str, external: bool) {
+        let worksheet_uri = PackURI::new("/xl/custom/sales-data.xml").unwrap();
+        package
+            .get_part_mut(&worksheet_uri)
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                reltype.to_string(),
+                "https://example.com/replaced".to_string(),
+                "rId1".to_string(),
+                external,
+            );
     }
 
     #[test]
@@ -1907,6 +1937,15 @@ mod tests {
         assert_eq!(worksheet.get_column_width(2), Some(12.5));
         assert!(worksheet.is_column_hidden(3));
         assert_eq!(worksheet.get_merged_regions(), &[(2, 2, 3, 3)]);
+        let external_link = worksheet.get_hyperlink(3, 3).unwrap();
+        assert_eq!(external_link.target, "https://example.com/report");
+        assert_eq!(external_link.location.as_deref(), Some("Section 1"));
+        assert_eq!(external_link.display.as_deref(), Some("Example & Co"));
+        assert_eq!(external_link.tooltip.as_deref(), Some("Open example"));
+        assert_eq!(
+            worksheet.get_hyperlink(4, 4).unwrap().target,
+            "'Other Sheet'!A1"
+        );
     }
 
     #[test]
@@ -1947,5 +1986,55 @@ mod tests {
             error.contains("external target"),
             "unexpected error: {error}"
         );
+    }
+
+    #[test]
+    fn rejects_missing_hyperlink_relationship() {
+        let mut package = package_with_worksheet_relationship(rt::WORKSHEET, false);
+        let worksheet_uri = PackURI::new("/xl/custom/sales-data.xml").unwrap();
+        let worksheet_part = package.get_part_mut(&worksheet_uri).unwrap();
+        let xml = std::str::from_utf8(worksheet_part.blob())
+            .unwrap()
+            .replace("r:id=\"rId1\"", "r:id=\"missingLink\"");
+        worksheet_part.set_blob(xml.into_bytes());
+        let workbook = Workbook::new(package).unwrap();
+        let error = workbook
+            .get_worksheet(0)
+            .err()
+            .expect("missing hyperlink relationship must fail")
+            .to_string();
+
+        assert!(
+            error.contains("missing relationship 'missingLink'"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_hyperlink_relationship_type() {
+        let mut package = package_with_worksheet_relationship(rt::WORKSHEET, false);
+        replace_hyperlink_relationship(&mut package, rt::CHART, true);
+        let workbook = Workbook::new(package).unwrap();
+        let error = workbook
+            .get_worksheet(0)
+            .err()
+            .expect("non-hyperlink relationship must fail")
+            .to_string();
+
+        assert!(error.contains("invalid type"), "unexpected error: {error}");
+    }
+
+    #[test]
+    fn rejects_internal_hyperlink_relationship() {
+        let mut package = package_with_worksheet_relationship(rt::WORKSHEET, false);
+        replace_hyperlink_relationship(&mut package, rt::HYPERLINK, false);
+        let workbook = Workbook::new(package).unwrap();
+        let error = workbook
+            .get_worksheet(0)
+            .err()
+            .expect("internal hyperlink relationship must fail")
+            .to_string();
+
+        assert!(error.contains("not external"), "unexpected error: {error}");
     }
 }

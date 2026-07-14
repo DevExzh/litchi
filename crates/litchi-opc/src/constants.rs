@@ -268,6 +268,9 @@ pub mod relationship_type {
     // External links
     pub const HYPERLINK: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+    /// ISO/IEC 29500 Strict hyperlink relationship type.
+    pub const STRICT_HYPERLINK: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/hyperlink";
     pub const OLE_OBJECT: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject";
     pub const PACKAGE: &str =

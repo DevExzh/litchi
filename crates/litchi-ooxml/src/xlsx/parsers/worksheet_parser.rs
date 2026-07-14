@@ -5,14 +5,16 @@ use std::collections::{HashMap, HashSet};
 use litchi_core::sheet::{CellValue, Result as SheetResult};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::ResolveResult;
+use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use crate::common::xml::{decode_xml_reference, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::RichTextRun;
 use crate::xlsx::cell::Cell;
-use crate::xlsx::namespace::{SPREADSHEETML_NAMESPACE, is_spreadsheetml_name};
+use crate::xlsx::namespace::{
+    SPREADSHEETML_NAMESPACE, is_spreadsheetml_name, relationship_attribute_value,
+};
 use crate::xlsx::shared_strings::decode_spreadsheet_text;
 use crate::xlsx::worksheet::{ColumnInfo, RowInfo};
 
@@ -26,13 +28,23 @@ pub(crate) struct ParsedWorksheetData {
     pub(crate) rich_text_cells: HashMap<(u32, u32), Vec<RichTextRun>>,
     pub(crate) merged_regions: Vec<(u32, u32, u32, u32)>,
     pub(crate) columns: HashMap<u32, ColumnInfo>,
+    pub(crate) hyperlinks: Vec<ParsedHyperlink>,
     pub(crate) dimensions: Option<(u32, u32, u32, u32)>,
+}
+
+pub(crate) struct ParsedHyperlink {
+    pub(crate) cell_ref: String,
+    pub(crate) relationship_id: Option<String>,
+    pub(crate) location: Option<String>,
+    pub(crate) display: Option<String>,
+    pub(crate) tooltip: Option<String>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Context {
     Worksheet,
     Columns,
+    Hyperlinks,
     MergeCells,
     SheetData,
     Row,
@@ -113,8 +125,10 @@ struct Parser {
     previous_row: u32,
     rows: HashSet<u32>,
     merged_regions: HashSet<(u32, u32, u32, u32)>,
+    hyperlink_refs: HashSet<String>,
     seen_sheet_data: bool,
     seen_columns: bool,
+    seen_hyperlinks: bool,
     seen_merge_cells: bool,
     expected_merge_count: Option<usize>,
     min_row: u32,
@@ -133,8 +147,10 @@ impl Parser {
             previous_row: 0,
             rows: HashSet::new(),
             merged_regions: HashSet::new(),
+            hyperlink_refs: HashSet::new(),
             seen_sheet_data: false,
             seen_columns: false,
+            seen_hyperlinks: false,
             seen_merge_cells: false,
             expected_merge_count: None,
             min_row: u32::MAX,
@@ -171,7 +187,7 @@ impl Parser {
                         continue;
                     }
                     let parent = context(&stack)?;
-                    stack.push(parser.start(parent, &namespace, &element, decoder)?);
+                    stack.push(parser.start(parent, &namespace, &element, decoder, &resolver)?);
                 },
                 Event::Empty(element) if stack.is_empty() => {
                     if closed_root
@@ -184,7 +200,7 @@ impl Parser {
                     closed_root = true;
                 },
                 Event::Empty(element) => {
-                    parser.empty(context(&stack)?, &namespace, &element, decoder)?;
+                    parser.empty(context(&stack)?, &namespace, &element, decoder, &resolver)?;
                 },
                 Event::Text(text) => {
                     if let Some(target) = text_target(&stack) {
@@ -247,6 +263,7 @@ impl Parser {
         namespace: &ResolveResult<'_>,
         element: &BytesStart<'_>,
         decoder: Decoder,
+        resolver: &NamespaceResolver,
     ) -> Result<Context> {
         if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"sheetData")
@@ -273,6 +290,18 @@ impl Parser {
             && is_spreadsheetml_name(namespace, element.name(), b"mergeCell")
         {
             self.merge_cell(element, decoder)?;
+            return Ok(Context::Other);
+        }
+        if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"hyperlinks")
+        {
+            self.start_hyperlinks()?;
+            return Ok(Context::Hyperlinks);
+        }
+        if parent == Context::Hyperlinks
+            && is_spreadsheetml_name(namespace, element.name(), b"hyperlink")
+        {
+            self.hyperlink(element, decoder, resolver)?;
             return Ok(Context::Other);
         }
         if parent == Context::SheetData && is_spreadsheetml_name(namespace, element.name(), b"row")
@@ -326,6 +355,7 @@ impl Parser {
         namespace: &ResolveResult<'_>,
         element: &BytesStart<'_>,
         decoder: Decoder,
+        resolver: &NamespaceResolver,
     ) -> Result<()> {
         if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"sheetData")
@@ -348,6 +378,14 @@ impl Parser {
             && is_spreadsheetml_name(namespace, element.name(), b"mergeCell")
         {
             self.merge_cell(element, decoder)?;
+        } else if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"hyperlinks")
+        {
+            self.start_hyperlinks()?;
+        } else if parent == Context::Hyperlinks
+            && is_spreadsheetml_name(namespace, element.name(), b"hyperlink")
+        {
+            self.hyperlink(element, decoder, resolver)?;
         } else if parent == Context::SheetData
             && is_spreadsheetml_name(namespace, element.name(), b"row")
         {
@@ -432,6 +470,49 @@ impl Parser {
         for column in min..=max {
             self.data.columns.insert(column, info.clone());
         }
+        Ok(())
+    }
+
+    fn start_hyperlinks(&mut self) -> Result<()> {
+        if self.seen_hyperlinks {
+            return Err(invalid("duplicate worksheet hyperlinks element"));
+        }
+        self.seen_hyperlinks = true;
+        Ok(())
+    }
+
+    fn hyperlink(
+        &mut self,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        resolver: &NamespaceResolver,
+    ) -> Result<()> {
+        let cell_ref = required_string(element, b"ref", decoder, "worksheet hyperlink reference")?;
+        parse_range(&cell_ref, "worksheet hyperlink reference")?;
+        if !self.hyperlink_refs.insert(cell_ref.clone()) {
+            return Err(invalid(format!(
+                "duplicate worksheet hyperlink reference '{cell_ref}'"
+            )));
+        }
+
+        let relationship_id = relationship_attribute_value(element, b"id", decoder, resolver)?;
+        if relationship_id.as_deref() == Some("") {
+            return Err(invalid("worksheet hyperlink has an empty relationship ID"));
+        }
+        let location = unqualified_attribute_value(element, b"location", decoder)?;
+        if relationship_id.is_none() && location.as_deref().is_none_or(str::is_empty) {
+            return Err(invalid(
+                "worksheet hyperlink requires a relationship ID or location",
+            ));
+        }
+
+        self.data.hyperlinks.push(ParsedHyperlink {
+            cell_ref,
+            relationship_id,
+            location,
+            display: unqualified_attribute_value(element, b"display", decoder)?,
+            tooltip: unqualified_attribute_value(element, b"tooltip", decoder)?,
+        });
         Ok(())
     }
 
@@ -1312,6 +1393,41 @@ mod tests {
     }
 
     #[test]
+    fn parses_hyperlinks_namespace_aware() {
+        let xml = format!(
+            r#"<x:worksheet xmlns:x="{STRICT_S}"
+                    xmlns:rel="http://purl.oclc.org/ooxml/officeDocument/relationships"
+                    xmlns:f="urn:foreign">
+                <f:hyperlinks><x:hyperlink ref="A1" location="Ignored"/></f:hyperlinks>
+                <x:hyperlinks>
+                    <f:hyperlink ref="A1" location="Ignored"/>
+                    <x:hyperlink ref="A1:B2" rel:id="customRel" location="Section 1"
+                        display="Example &amp; Co" tooltip="Open &quot;example&quot;"/>
+                    <x:hyperlink ref="D4" location="&apos;Other Sheet&apos;!A1"></x:hyperlink>
+                </x:hyperlinks>
+            </x:worksheet>"#
+        );
+        let data = parse_worksheet_data(&xml).unwrap();
+
+        assert_eq!(data.hyperlinks.len(), 2);
+        assert_eq!(data.hyperlinks[0].cell_ref, "A1:B2");
+        assert_eq!(
+            data.hyperlinks[0].relationship_id.as_deref(),
+            Some("customRel")
+        );
+        assert_eq!(data.hyperlinks[0].location.as_deref(), Some("Section 1"));
+        assert_eq!(data.hyperlinks[0].display.as_deref(), Some("Example & Co"));
+        assert_eq!(
+            data.hyperlinks[0].tooltip.as_deref(),
+            Some("Open \"example\"")
+        );
+        assert_eq!(
+            data.hyperlinks[1].location.as_deref(),
+            Some("'Other Sheet'!A1")
+        );
+    }
+
+    #[test]
     fn rejects_invalid_columns_and_merged_regions() {
         let invalid_documents = [
             "<cols><col min=\"0\" max=\"1\"/></cols>",
@@ -1322,6 +1438,25 @@ mod tests {
             "<mergeCells count=\"2\"><mergeCell ref=\"A1:B2\"/></mergeCells>",
             "<mergeCells><mergeCell ref=\"C3:B2\"/></mergeCells>",
             "<mergeCells><mergeCell ref=\"A1:B2\"/><mergeCell ref=\"A1:B2\"/></mergeCells>",
+        ];
+
+        for fragment in invalid_documents {
+            let xml = wrap(fragment);
+            assert!(
+                parse_worksheet_data(&xml).is_err(),
+                "accepted invalid worksheet fragment: {fragment}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_hyperlinks() {
+        let invalid_documents = [
+            "<hyperlinks><hyperlink location=\"Sheet2!A1\"/></hyperlinks>",
+            "<hyperlinks><hyperlink ref=\"A1\"/></hyperlinks>",
+            "<hyperlinks><hyperlink ref=\"B2:A1\" location=\"Sheet2!A1\"/></hyperlinks>",
+            "<hyperlinks><hyperlink ref=\"A1\" location=\"Sheet2!A1\"/><hyperlink ref=\"A1\" location=\"Sheet3!A1\"/></hyperlinks>",
+            "<hyperlinks/><hyperlinks/>",
         ];
 
         for fragment in invalid_documents {

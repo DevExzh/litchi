@@ -10,6 +10,7 @@ use litchi_core::sheet::{
     Cell as CellTrait, CellIterator, CellValue, Result, RowIterator, Worksheet as WorksheetTrait,
 };
 use litchi_core::xml::unescape_xml;
+use litchi_opc::Relationships;
 
 use super::RichTextRun;
 use super::cell::{Cell, CellIterator as XlsxCellIterator, RowIterator as XlsxRowIterator};
@@ -79,8 +80,12 @@ pub struct Hyperlink {
     pub cell_ref: String,
     /// Target URL or reference
     pub target: String,
-    /// Display text (tooltip)
+    /// Optional location within the target document.
+    pub location: Option<String>,
+    /// Optional display text.
     pub display: Option<String>,
+    /// Optional ScreenTip text.
+    pub tooltip: Option<String>,
 }
 
 /// Cell comment information
@@ -213,22 +218,15 @@ impl<'a> Worksheet<'a> {
         let content = std::str::from_utf8(worksheet_part.blob())?;
 
         // Parse worksheet data
-        self.parse_worksheet_xml(content)?;
+        self.parse_worksheet_xml(content, worksheet_part.rels())?;
 
         Ok(())
     }
 
     /// Parse worksheet XML to extract cell data.
-    fn parse_worksheet_xml(&mut self, content: &str) -> Result<()> {
-        self.parse_sheet_data(content)?;
-
-        // Parse hyperlinks
-        if let Some(hyperlink_start) = content.find("<hyperlinks>")
-            && let Some(hyperlink_end) = content[hyperlink_start..].find("</hyperlinks>")
-        {
-            let hyperlink_content = &content[hyperlink_start..hyperlink_start + hyperlink_end];
-            self.parse_hyperlinks(hyperlink_content)?;
-        }
+    fn parse_worksheet_xml(&mut self, content: &str, relationships: &Relationships) -> Result<()> {
+        let hyperlinks = self.parse_sheet_data(content)?;
+        self.resolve_hyperlinks(hyperlinks, relationships)?;
 
         // Parse data validations
         if let Some(dv_start) = content.find("<dataValidations")
@@ -297,7 +295,10 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Parse sheetData content.
-    fn parse_sheet_data(&mut self, sheet_data: &str) -> Result<()> {
+    fn parse_sheet_data(
+        &mut self,
+        sheet_data: &str,
+    ) -> Result<Vec<worksheet_parser::ParsedHyperlink>> {
         let parsed = worksheet_parser::parse_worksheet_data(sheet_data)?;
         self.cells = parsed.cells;
         self.cell_styles = parsed.cell_styles;
@@ -306,7 +307,7 @@ impl<'a> Worksheet<'a> {
         self.merged_regions = parsed.merged_regions;
         self.columns = parsed.columns;
         self.dimensions = parsed.dimensions;
-        Ok(())
+        Ok(parsed.hyperlinks)
     }
 
     /// Parse a single row XML.
@@ -729,34 +730,55 @@ impl<'a> Worksheet<'a> {
         })
     }
 
-    /// Parse hyperlinks from XML.
-    fn parse_hyperlinks(&mut self, content: &str) -> Result<()> {
-        let mut pos = 0;
-        while let Some(hyperlink_start) = content[pos..].find("<hyperlink ") {
-            let hyperlink_start_pos = pos + hyperlink_start;
-            if let Some(hyperlink_end) = content[hyperlink_start_pos..].find("/>") {
-                let hyperlink_tag =
-                    &content[hyperlink_start_pos..hyperlink_start_pos + hyperlink_end + 2];
+    fn resolve_hyperlinks(
+        &mut self,
+        hyperlinks: Vec<worksheet_parser::ParsedHyperlink>,
+        relationships: &Relationships,
+    ) -> Result<()> {
+        use litchi_opc::constants::relationship_type as rt;
 
-                let cell_ref = Self::extract_attribute(hyperlink_tag, "ref");
-                let r_id = Self::extract_attribute(hyperlink_tag, "r:id");
-                let display = Self::extract_attribute(hyperlink_tag, "display");
-
-                if let Some(ref_val) = cell_ref {
-                    self.hyperlinks.insert(
-                        ref_val.clone(),
-                        Hyperlink {
-                            cell_ref: ref_val,
-                            target: r_id.unwrap_or_else(|| String::from("")),
-                            display,
-                        },
-                    );
+        for hyperlink in hyperlinks {
+            let target = if let Some(relationship_id) = hyperlink.relationship_id.as_deref() {
+                let relationship = relationships.get(relationship_id).ok_or_else(|| {
+                    format!(
+                        "Worksheet hyperlink '{}' references missing relationship '{}'",
+                        hyperlink.cell_ref, relationship_id
+                    )
+                })?;
+                if relationship.reltype() != rt::HYPERLINK
+                    && relationship.reltype() != rt::STRICT_HYPERLINK
+                {
+                    return Err(format!(
+                        "Relationship '{}' for worksheet hyperlink '{}' has invalid type '{}'",
+                        relationship_id,
+                        hyperlink.cell_ref,
+                        relationship.reltype()
+                    )
+                    .into());
                 }
-
-                pos = hyperlink_start_pos + hyperlink_end + 2;
+                if !relationship.is_external() {
+                    return Err(format!(
+                        "Relationship '{}' for worksheet hyperlink '{}' is not external",
+                        relationship_id, hyperlink.cell_ref
+                    )
+                    .into());
+                }
+                relationship.target_ref().to_string()
             } else {
-                break;
-            }
+                hyperlink.location.clone().ok_or_else(|| {
+                    format!("Worksheet hyperlink '{}' has no target", hyperlink.cell_ref)
+                })?
+            };
+            self.hyperlinks.insert(
+                hyperlink.cell_ref.clone(),
+                Hyperlink {
+                    cell_ref: hyperlink.cell_ref,
+                    target,
+                    location: hyperlink.location,
+                    display: hyperlink.display,
+                    tooltip: hyperlink.tooltip,
+                },
+            );
         }
         Ok(())
     }
@@ -1527,7 +1549,24 @@ impl<'a> Worksheet<'a> {
     /// ```
     pub fn get_hyperlink(&self, row: u32, column: u32) -> Option<&Hyperlink> {
         let cell_ref = format!("{}{}", Cell::column_to_letters(column), row);
-        self.hyperlinks.get(&cell_ref)
+        self.hyperlinks.get(&cell_ref).or_else(|| {
+            self.hyperlinks
+                .values()
+                .find(|hyperlink| Self::hyperlink_contains(&hyperlink.cell_ref, row, column))
+        })
+    }
+
+    fn hyperlink_contains(reference: &str, row: u32, column: u32) -> bool {
+        let Some((start, end)) = reference.split_once(':') else {
+            return false;
+        };
+        let Ok((start_column, start_row)) = Cell::reference_to_coords(start) else {
+            return false;
+        };
+        let Ok((end_column, end_row)) = Cell::reference_to_coords(end) else {
+            return false;
+        };
+        row >= start_row && row <= end_row && column >= start_column && column <= end_column
     }
 
     /// Get all hyperlinks in the worksheet.
