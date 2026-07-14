@@ -7,7 +7,7 @@ use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
     Cell, CellAnnotation, CellValue, Column, ContentValidation, NamedDefinition,
     NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, Spreadsheet,
-    SpreadsheetProtection, TableVisibility,
+    SpreadsheetProtection, TableStructure, TableVisibility,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     named_expression::{ensure_unique, write_named_definitions},
@@ -16,8 +16,8 @@ use crate::ods::{
         write_spreadsheet_attributes,
     },
     structure::{
-        MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, write_columns,
-        write_row_attributes,
+        MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, TableStructureAxis,
+        validate_table_structure, write_columns, write_row_attributes, write_table_structure,
     },
     style_protection::{PreservedXmlFragment, extract_automatic_styles, extract_font_face_decls},
 };
@@ -98,6 +98,21 @@ impl MutableSpreadsheet {
 
     fn push_cell(out: &mut String, cell: &Cell) {
         super::cell::write_cell_xml(out, cell);
+    }
+
+    fn push_row(out: &mut String, row: &Row) {
+        out.push_str("<table:table-row");
+        write_row_attributes(
+            out,
+            row.style_name.as_deref(),
+            row.default_cell_style_name.as_deref(),
+            row.visibility,
+        );
+        out.push('>');
+        for cell in &row.cells {
+            Self::push_cell(out, cell);
+        }
+        out.push_str("</table:table-row>");
     }
 
     /// Create a mutable spreadsheet from an existing Spreadsheet.
@@ -358,6 +373,8 @@ impl MutableSpreadsheet {
             name: name.to_string(),
             rows: Vec::new(),
             columns: Vec::new(),
+            column_structure: Vec::new(),
+            row_structure: Vec::new(),
             protection: crate::ods::SheetProtection::default(),
         };
         self.sheets.push(sheet);
@@ -854,6 +871,59 @@ impl MutableSpreadsheet {
         Ok(())
     }
 
+    /// Replace the nested row grouping and header structure in a sheet.
+    pub fn set_row_structure(
+        &mut self,
+        sheet_index: usize,
+        structure: Vec<TableStructure>,
+    ) -> Result<()> {
+        let required = validate_table_structure(&structure, TableStructureAxis::Rows)?;
+        if required > MAX_EXPANDED_ROWS_PER_SHEET {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "row structure exceeds the {MAX_EXPANDED_ROWS_PER_SHEET} row safety limit"
+            )));
+        }
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        while sheet.rows.len() < required {
+            sheet.rows.push(Row {
+                cells: Vec::new(),
+                index: sheet.rows.len(),
+                style_name: None,
+                default_cell_style_name: None,
+                visibility: TableVisibility::Visible,
+            });
+        }
+        sheet.row_structure = structure;
+        Ok(())
+    }
+
+    /// Replace the nested column grouping and header structure in a sheet.
+    pub fn set_column_structure(
+        &mut self,
+        sheet_index: usize,
+        structure: Vec<TableStructure>,
+    ) -> Result<()> {
+        let required = validate_table_structure(&structure, TableStructureAxis::Columns)?;
+        if required > MAX_EXPANDED_COLUMNS_PER_SHEET {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "column structure exceeds the {MAX_EXPANDED_COLUMNS_PER_SHEET} column safety limit"
+            )));
+        }
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        while sheet.columns.len() < required {
+            sheet.columns.push(Column {
+                index: sheet.columns.len(),
+                ..Column::default()
+            });
+        }
+        sheet.column_structure = structure;
+        Ok(())
+    }
+
     /// Merge a rectangular cell range in a sheet.
     pub fn merge_cells(
         &mut self,
@@ -942,6 +1012,7 @@ impl MutableSpreadsheet {
     pub fn clear_sheet(&mut self, sheet_index: usize) -> Result<()> {
         if sheet_index < self.sheets.len() {
             self.sheets[sheet_index].rows.clear();
+            self.sheets[sheet_index].row_structure.clear();
             Ok(())
         } else {
             Err(litchi_core::Error::InvalidFormat(format!(
@@ -952,7 +1023,7 @@ impl MutableSpreadsheet {
     }
 
     /// Generate content.xml from current state.
-    fn generate_content_xml(&self) -> String {
+    fn generate_content_xml(&self) -> Result<String> {
         let mut body = String::new();
         write_content_validations(&mut body, &self.content_validations);
 
@@ -965,31 +1036,35 @@ impl MutableSpreadsheet {
             body.push('>');
             write_sheet_options(&mut body, &sheet.protection.options);
 
-            if sheet.columns.is_empty() {
-                Self::push_table_columns(&mut body, Self::sheet_max_cols(sheet));
-            } else {
-                write_columns(&mut body, &sheet.columns);
-                let trailing_columns =
-                    Self::sheet_max_cols(sheet).saturating_sub(sheet.columns.len());
-                if trailing_columns > 0 {
-                    Self::push_table_columns(&mut body, trailing_columns);
-                }
-            }
+            let total_columns = Self::sheet_max_cols(sheet).max(sheet.columns.len()).max(1);
+            write_table_structure(
+                &mut body,
+                &sheet.column_structure,
+                total_columns,
+                TableStructureAxis::Columns,
+                |out, range| {
+                    let explicit_end = range.end.min(sheet.columns.len());
+                    if range.start < explicit_end {
+                        write_columns(out, &sheet.columns[range.start..explicit_end]);
+                    }
+                    let default_start = range.start.max(sheet.columns.len());
+                    if default_start < range.end {
+                        Self::push_table_columns(out, range.end - default_start);
+                    }
+                },
+            )?;
 
-            for row in &sheet.rows {
-                body.push_str("<table:table-row");
-                write_row_attributes(
-                    &mut body,
-                    row.style_name.as_deref(),
-                    row.default_cell_style_name.as_deref(),
-                    row.visibility,
-                );
-                body.push('>');
-                for cell in &row.cells {
-                    Self::push_cell(&mut body, cell);
-                }
-                body.push_str("</table:table-row>");
-            }
+            write_table_structure(
+                &mut body,
+                &sheet.row_structure,
+                sheet.rows.len(),
+                TableStructureAxis::Rows,
+                |out, range| {
+                    for row in &sheet.rows[range] {
+                        Self::push_row(out, row);
+                    }
+                },
+            )?;
 
             write_named_definitions(
                 &mut body,
@@ -1078,7 +1153,7 @@ impl MutableSpreadsheet {
         out.push('>');
         out.push_str(&body);
         out.push_str(r#"</office:spreadsheet></office:body></office:document-content>"#);
-        out
+        Ok(out)
     }
 
     fn generate_meta_xml(&self) -> String {
@@ -1105,7 +1180,7 @@ impl MutableSpreadsheet {
 
         writer.set_mimetype(&self.mimetype)?;
 
-        let content_xml = self.generate_content_xml();
+        let content_xml = self.generate_content_xml()?;
         writer.add_file("content.xml", content_xml.as_bytes())?;
 
         let default_styles = OdfStructure::default_styles_xml();
@@ -1486,5 +1561,25 @@ mod tests {
             sheets[0].rows[0].default_cell_style_name.as_deref(),
             Some("RowCell")
         );
+    }
+
+    #[test]
+    fn mutable_spreadsheet_round_trips_table_structure() {
+        let structure = vec![TableStructure::Group(crate::ods::TableGroup {
+            display: false,
+            children: vec![
+                TableStructure::Header(crate::ods::TableRange::new(0, 1).unwrap()),
+                TableStructure::Range(crate::ods::TableRange::new(1, 2).unwrap()),
+            ],
+        })];
+        let mut mutable = MutableSpreadsheet::new();
+        mutable.add_sheet("Outline").unwrap();
+        mutable.set_column_structure(0, structure.clone()).unwrap();
+        mutable.set_row_structure(0, structure.clone()).unwrap();
+
+        let mut output = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let sheets = output.sheets().unwrap();
+        assert_eq!(sheets[0].column_structure, structure);
+        assert_eq!(sheets[0].row_structure, sheets[0].column_structure);
     }
 }

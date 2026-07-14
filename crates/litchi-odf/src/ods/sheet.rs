@@ -1,6 +1,6 @@
 //! Sheet structures for ODS spreadsheets.
 
-use super::{Column, Row, SheetProtection};
+use super::{Column, Row, SheetProtection, TableStructure};
 use litchi_core::Result;
 
 /// A sheet (worksheet) in an ODS spreadsheet.
@@ -14,6 +14,10 @@ pub struct Sheet {
     pub rows: Vec<Row>,
     /// Logical table columns and their structural metadata.
     pub columns: Vec<Column>,
+    /// Nested grouping and header structure for logical columns.
+    pub column_structure: Vec<TableStructure>,
+    /// Nested grouping and header structure for logical rows.
+    pub row_structure: Vec<TableStructure>,
     /// Sheet protection metadata and edit permissions.
     pub protection: SheetProtection,
 }
@@ -32,6 +36,16 @@ impl Sheet {
     /// Get all explicitly declared logical columns.
     pub fn columns(&self) -> &[Column] {
         &self.columns
+    }
+
+    /// Get the nested column grouping and header structure.
+    pub fn column_structure(&self) -> &[TableStructure] {
+        &self.column_structure
+    }
+
+    /// Get the nested row grouping and header structure.
+    pub fn row_structure(&self) -> &[TableStructure] {
+        &self.row_structure
     }
 
     /// Get the number of rows in the sheet.
@@ -66,6 +80,8 @@ mod tests {
     fn test_sheet_new() {
         let sheet = Sheet {
             columns: Vec::new(),
+            column_structure: Vec::new(),
+            row_structure: Vec::new(),
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![],
@@ -79,6 +95,8 @@ mod tests {
     fn test_sheet_name() {
         let sheet = Sheet {
             columns: Vec::new(),
+            column_structure: Vec::new(),
+            row_structure: Vec::new(),
             protection: SheetProtection::default(),
             name: "Test Sheet".to_string(),
             rows: vec![],
@@ -90,6 +108,8 @@ mod tests {
     fn test_sheet_rows() {
         let sheet = Sheet {
             columns: Vec::new(),
+            column_structure: Vec::new(),
+            row_structure: Vec::new(),
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![
@@ -118,6 +138,8 @@ mod tests {
     fn test_sheet_column_count() {
         let sheet = Sheet {
             columns: Vec::new(),
+            column_structure: Vec::new(),
+            row_structure: Vec::new(),
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![
@@ -217,6 +239,8 @@ mod tests {
     fn test_sheet_column_count_empty() {
         let sheet = Sheet {
             columns: Vec::new(),
+            column_structure: Vec::new(),
+            row_structure: Vec::new(),
             protection: SheetProtection::default(),
             name: "Empty".to_string(),
             rows: vec![],
@@ -228,6 +252,8 @@ mod tests {
     fn test_sheet_with_data() {
         let sheet = Sheet {
             columns: Vec::new(),
+            column_structure: Vec::new(),
+            row_structure: Vec::new(),
             protection: SheetProtection::default(),
             name: "Data".to_string(),
             rows: vec![
@@ -320,6 +346,8 @@ mod tests {
     fn test_sheet_clone() {
         let sheet = Sheet {
             columns: Vec::new(),
+            column_structure: Vec::new(),
+            row_structure: Vec::new(),
             protection: SheetProtection::default(),
             name: "Original".to_string(),
             rows: vec![],

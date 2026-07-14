@@ -1,9 +1,11 @@
 //! ODS row and column structural metadata.
 
 use litchi_core::{Error, Result, xml::escape_xml};
+use std::ops::Range;
 
 pub(crate) const MAX_EXPANDED_ROWS_PER_SHEET: usize = 1_048_576;
 pub(crate) const MAX_EXPANDED_COLUMNS_PER_SHEET: usize = 1_048_576;
+pub(crate) const MAX_TABLE_STRUCTURE_DEPTH: usize = 256;
 
 /// Visibility state shared by ODF table rows and columns.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -49,6 +51,206 @@ pub struct Column {
     pub default_cell_style_name: Option<String>,
     /// Column visibility.
     pub visibility: TableVisibility,
+}
+
+/// A half-open range of logical rows or columns.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TableRange {
+    /// First included zero-based logical index.
+    pub start: usize,
+    /// First excluded zero-based logical index.
+    pub end: usize,
+}
+
+impl TableRange {
+    /// Create a non-empty half-open table range.
+    pub fn new(start: usize, end: usize) -> Result<Self> {
+        if start >= end {
+            return Err(Error::InvalidFormat(format!(
+                "table structure range {start}..{end} must be non-empty"
+            )));
+        }
+        Ok(Self { start, end })
+    }
+
+    fn as_range(self) -> Range<usize> {
+        self.start..self.end
+    }
+}
+
+/// A recursively nested group of adjacent rows or columns.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TableGroup {
+    /// Whether the group is expanded/displayed.
+    pub display: bool,
+    /// Ordered ranges and nested groups contained by this group.
+    pub children: Vec<TableStructure>,
+}
+
+/// One structural run in an ODF table's row or column layout.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TableStructure {
+    /// An ordinary run of direct rows or columns.
+    Range(TableRange),
+    /// A run repeated as table headers when the table is printed.
+    Header(TableRange),
+    /// A potentially collapsed nested group.
+    Group(TableGroup),
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum TableStructureAxis {
+    Rows,
+    Columns,
+}
+
+impl TableStructureAxis {
+    fn group_tag(self) -> &'static str {
+        match self {
+            Self::Rows => "table:table-row-group",
+            Self::Columns => "table:table-column-group",
+        }
+    }
+
+    fn header_tag(self) -> &'static str {
+        match self {
+            Self::Rows => "table:table-header-rows",
+            Self::Columns => "table:table-header-columns",
+        }
+    }
+}
+
+pub(crate) fn write_table_structure(
+    out: &mut String,
+    structure: &[TableStructure],
+    total: usize,
+    axis: TableStructureAxis,
+    mut write_range: impl FnMut(&mut String, Range<usize>),
+) -> Result<()> {
+    let mut cursor = 0usize;
+    for entry in structure {
+        let (start, end) = structure_bounds(entry, total, 0)?;
+        if start < cursor {
+            return Err(Error::InvalidFormat(
+                "table structure ranges overlap or are out of order".to_string(),
+            ));
+        }
+        if start > cursor {
+            write_range(out, cursor..start);
+        }
+        write_structure_entry(out, entry, total, axis, 0, &mut write_range)?;
+        cursor = end;
+    }
+    if cursor < total {
+        write_range(out, cursor..total);
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_table_structure(
+    structure: &[TableStructure],
+    axis: TableStructureAxis,
+) -> Result<usize> {
+    let total = structure.iter().try_fold(0usize, |maximum, entry| {
+        structure_declared_end(entry, 0).map(|end| maximum.max(end))
+    })?;
+    write_table_structure(&mut String::new(), structure, total, axis, |_, _| {})?;
+    Ok(total)
+}
+
+fn structure_declared_end(entry: &TableStructure, depth: usize) -> Result<usize> {
+    ensure_structure_depth(depth)?;
+    match entry {
+        TableStructure::Range(range) | TableStructure::Header(range) => Ok(range.end),
+        TableStructure::Group(group) => group
+            .children
+            .last()
+            .ok_or_else(|| {
+                Error::InvalidFormat("table groups must contain at least one item".to_string())
+            })
+            .and_then(|entry| structure_declared_end(entry, depth + 1)),
+    }
+}
+
+fn write_structure_entry(
+    out: &mut String,
+    entry: &TableStructure,
+    total: usize,
+    axis: TableStructureAxis,
+    depth: usize,
+    write_range: &mut impl FnMut(&mut String, Range<usize>),
+) -> Result<()> {
+    ensure_structure_depth(depth)?;
+    match entry {
+        TableStructure::Range(range) => write_range(out, range.as_range()),
+        TableStructure::Header(range) => {
+            let tag = axis.header_tag();
+            out.push('<');
+            out.push_str(tag);
+            out.push('>');
+            write_range(out, range.as_range());
+            out.push_str("</");
+            out.push_str(tag);
+            out.push('>');
+        },
+        TableStructure::Group(group) => {
+            let tag = axis.group_tag();
+            out.push('<');
+            out.push_str(tag);
+            if !group.display {
+                out.push_str(" table:display=\"false\"");
+            }
+            out.push('>');
+            let mut cursor = None;
+            for child in &group.children {
+                let (start, end) = structure_bounds(child, total, depth + 1)?;
+                if cursor.is_some_and(|previous| previous != start) {
+                    return Err(Error::InvalidFormat(
+                        "table group children must cover one contiguous range".to_string(),
+                    ));
+                }
+                write_structure_entry(out, child, total, axis, depth + 1, write_range)?;
+                cursor = Some(end);
+            }
+            out.push_str("</");
+            out.push_str(tag);
+            out.push('>');
+        },
+    }
+    Ok(())
+}
+
+fn structure_bounds(entry: &TableStructure, total: usize, depth: usize) -> Result<(usize, usize)> {
+    ensure_structure_depth(depth)?;
+    match entry {
+        TableStructure::Range(range) | TableStructure::Header(range) => {
+            if range.start >= range.end || range.end > total {
+                return Err(Error::InvalidFormat(format!(
+                    "table structure range {}..{} exceeds logical size {total}",
+                    range.start, range.end
+                )));
+            }
+            Ok((range.start, range.end))
+        },
+        TableStructure::Group(group) => {
+            let first = group.children.first().ok_or_else(|| {
+                Error::InvalidFormat("table groups must contain at least one item".to_string())
+            })?;
+            let last = group.children.last().expect("group has a first child");
+            let (start, _) = structure_bounds(first, total, depth + 1)?;
+            let (_, end) = structure_bounds(last, total, depth + 1)?;
+            Ok((start, end))
+        },
+    }
+}
+
+fn ensure_structure_depth(depth: usize) -> Result<()> {
+    if depth > MAX_TABLE_STRUCTURE_DEPTH {
+        return Err(Error::InvalidFormat(format!(
+            "table structure exceeds the {MAX_TABLE_STRUCTURE_DEPTH} level nesting safety limit"
+        )));
+    }
+    Ok(())
 }
 
 pub(crate) fn write_columns(out: &mut String, columns: &[Column]) {

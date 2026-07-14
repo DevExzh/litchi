@@ -6,7 +6,7 @@ use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
     Cell, CellAnnotation, CellValue, Column, ContentValidation, NamedDefinition,
     NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SpreadsheetProtection,
-    TableVisibility,
+    TableStructure, TableVisibility,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     named_expression::{ensure_unique, write_named_definitions},
@@ -15,8 +15,8 @@ use crate::ods::{
         write_spreadsheet_attributes,
     },
     structure::{
-        MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, write_columns,
-        write_row_attributes,
+        MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, TableStructureAxis,
+        validate_table_structure, write_columns, write_row_attributes, write_table_structure,
     },
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
@@ -263,6 +263,8 @@ impl SpreadsheetBuilder {
             name: name.to_string(),
             rows: Vec::new(),
             columns: Vec::new(),
+            column_structure: Vec::new(),
+            row_structure: Vec::new(),
             protection: crate::ods::SheetProtection::default(),
         };
         self.sheets.push(sheet);
@@ -960,6 +962,53 @@ impl SpreadsheetBuilder {
         Ok(self)
     }
 
+    /// Replace the nested row grouping and header structure in the current sheet.
+    pub fn set_row_structure(&mut self, structure: Vec<TableStructure>) -> Result<&mut Self> {
+        let required = validate_table_structure(&structure, TableStructureAxis::Rows)?;
+        if required > MAX_EXPANDED_ROWS_PER_SHEET {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "row structure exceeds the {MAX_EXPANDED_ROWS_PER_SHEET} row safety limit"
+            )));
+        }
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        let sheet = self.sheets.last_mut().expect("default sheet was added");
+        while sheet.rows.len() < required {
+            sheet.rows.push(Row {
+                cells: Vec::new(),
+                index: sheet.rows.len(),
+                style_name: None,
+                default_cell_style_name: None,
+                visibility: TableVisibility::Visible,
+            });
+        }
+        sheet.row_structure = structure;
+        Ok(self)
+    }
+
+    /// Replace the nested column grouping and header structure in the current sheet.
+    pub fn set_column_structure(&mut self, structure: Vec<TableStructure>) -> Result<&mut Self> {
+        let required = validate_table_structure(&structure, TableStructureAxis::Columns)?;
+        if required > MAX_EXPANDED_COLUMNS_PER_SHEET {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "column structure exceeds the {MAX_EXPANDED_COLUMNS_PER_SHEET} column safety limit"
+            )));
+        }
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        let sheet = self.sheets.last_mut().expect("default sheet was added");
+        while sheet.columns.len() < required {
+            sheet.columns.push(Column {
+                index: sheet.columns.len(),
+                ..Column::default()
+            });
+        }
+        sheet.column_structure = structure;
+        Ok(self)
+    }
+
     /// Merge a rectangular range in the current sheet.
     pub fn merge_cells(
         &mut self,
@@ -1133,8 +1182,23 @@ impl SpreadsheetBuilder {
         super::cell::write_cell_xml(out, cell);
     }
 
+    fn push_row(out: &mut String, row: &Row) {
+        out.push_str("<table:table-row");
+        write_row_attributes(
+            out,
+            row.style_name.as_deref(),
+            row.default_cell_style_name.as_deref(),
+            row.visibility,
+        );
+        out.push('>');
+        for cell in &row.cells {
+            Self::push_cell(out, cell);
+        }
+        out.push_str("</table:table-row>");
+    }
+
     /// Generate the content.xml body for spreadsheet
-    fn generate_content_body(&self) -> String {
+    fn generate_content_body(&self) -> Result<String> {
         let mut cell_count = 0usize;
         for sheet in &self.sheets {
             for row in &sheet.rows {
@@ -1161,31 +1225,35 @@ impl SpreadsheetBuilder {
 
         for sheet in &self.sheets {
             Self::push_table_start(&mut body, sheet);
-            if sheet.columns.is_empty() {
-                Self::push_table_columns(&mut body, Self::sheet_max_cols(sheet));
-            } else {
-                write_columns(&mut body, &sheet.columns);
-                let trailing_columns =
-                    Self::sheet_max_cols(sheet).saturating_sub(sheet.columns.len());
-                if trailing_columns > 0 {
-                    Self::push_table_columns(&mut body, trailing_columns);
-                }
-            }
+            let total_columns = Self::sheet_max_cols(sheet).max(sheet.columns.len()).max(1);
+            write_table_structure(
+                &mut body,
+                &sheet.column_structure,
+                total_columns,
+                TableStructureAxis::Columns,
+                |out, range| {
+                    let explicit_end = range.end.min(sheet.columns.len());
+                    if range.start < explicit_end {
+                        write_columns(out, &sheet.columns[range.start..explicit_end]);
+                    }
+                    let default_start = range.start.max(sheet.columns.len());
+                    if default_start < range.end {
+                        Self::push_table_columns(out, range.end - default_start);
+                    }
+                },
+            )?;
 
-            for row in &sheet.rows {
-                body.push_str("<table:table-row");
-                write_row_attributes(
-                    &mut body,
-                    row.style_name.as_deref(),
-                    row.default_cell_style_name.as_deref(),
-                    row.visibility,
-                );
-                body.push('>');
-                for cell in &row.cells {
-                    Self::push_cell(&mut body, cell);
-                }
-                body.push_str("</table:table-row>");
-            }
+            write_table_structure(
+                &mut body,
+                &sheet.row_structure,
+                sheet.rows.len(),
+                TableStructureAxis::Rows,
+                |out, range| {
+                    for row in &sheet.rows[range] {
+                        Self::push_row(out, row);
+                    }
+                },
+            )?;
 
             write_named_definitions(
                 &mut body,
@@ -1204,12 +1272,12 @@ impl SpreadsheetBuilder {
                 .filter(|definition| definition.scope() == &NamedDefinitionScope::Global),
         );
 
-        body
+        Ok(body)
     }
 
     /// Generate the complete content.xml for spreadsheet
-    fn generate_content_xml(&self) -> String {
-        let body = self.generate_content_body();
+    fn generate_content_xml(&self) -> Result<String> {
+        let body = self.generate_content_body()?;
 
         let of_ns = if self.has_formulas() {
             " xmlns:of=\"urn:oasis:names:tc:opendocument:xmlns:of:1.2\""
@@ -1247,7 +1315,7 @@ impl SpreadsheetBuilder {
         out.push('>');
         out.push_str(&body);
         out.push_str(r#"</office:spreadsheet></office:body></office:document-content>"#);
-        out
+        Ok(out)
     }
 
     fn generate_meta_xml(&self) -> String {
@@ -1297,7 +1365,7 @@ impl SpreadsheetBuilder {
         writer.set_mimetype("application/vnd.oasis.opendocument.spreadsheet")?;
 
         // Add content.xml
-        let content_xml = self.generate_content_xml();
+        let content_xml = self.generate_content_xml()?;
         writer.add_file("content.xml", content_xml.as_bytes())?;
 
         // Add styles.xml
@@ -1340,7 +1408,7 @@ impl SpreadsheetBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Spreadsheet;
+    use crate::{Spreadsheet, TableGroup, TableRange};
     use tempfile::tempdir;
 
     #[test]
@@ -1730,6 +1798,8 @@ mod tests {
             name: "CustomSheet".to_string(),
             rows: vec![],
             columns: vec![],
+            column_structure: vec![],
+            row_structure: vec![],
             protection: crate::ods::SheetProtection::default(),
         };
         builder.add_sheet_element(sheet).unwrap();
@@ -1779,7 +1849,7 @@ mod tests {
         builder.add_sheet("TestSheet").unwrap();
         builder.add_row_with_values(&["A", "B"]).unwrap();
 
-        let content = builder.generate_content_body();
+        let content = builder.generate_content_body().unwrap();
         assert!(content.contains("TestSheet"));
         assert!(content.contains("table:table"));
         assert!(content.contains("table:table-row"));
@@ -1791,7 +1861,7 @@ mod tests {
         builder.add_sheet("Sheet1").unwrap();
         builder.add_row_with_numbers(&[42.0]).unwrap();
 
-        let xml = builder.generate_content_xml();
+        let xml = builder.generate_content_xml().unwrap();
         assert!(xml.starts_with(r#"<?xml version="1.0" encoding="UTF-8"?>"#));
         assert!(xml.contains("office:document-content"));
         assert!(xml.contains("Sheet1"));
@@ -1804,7 +1874,7 @@ mod tests {
         builder.add_sheet("Sheet1").unwrap();
         builder.set_cell_formula(0, 0, "=SUM(A1:A10)").unwrap();
 
-        let xml = builder.generate_content_xml();
+        let xml = builder.generate_content_xml().unwrap();
         assert!(xml.contains("xmlns:of="));
         assert!(xml.contains("table:formula"));
         assert!(xml.contains("=SUM(A1:A10)"));
@@ -1933,7 +2003,7 @@ mod tests {
             ])
             .unwrap();
 
-        let xml = builder.generate_content_xml();
+        let xml = builder.generate_content_xml().unwrap();
         assert!(xml.contains(r#"office:value-type="string""#));
         assert!(xml.contains(r#"office:value-type="float""#));
         assert!(xml.contains(r#"office:value-type="currency""#));
@@ -1949,7 +2019,7 @@ mod tests {
         builder.add_sheet("Sheet1").unwrap();
         builder.set_cell_formula(0, 0, "=IF(TRUE,1,0)").unwrap();
 
-        let xml = builder.generate_content_xml();
+        let xml = builder.generate_content_xml().unwrap();
         // Empty cell with formula should have value type
         assert!(xml.contains("office:value-type="));
     }
@@ -1982,7 +2052,7 @@ mod tests {
         assert!(builder.set_cell_matrix_span(0, 0, 0, 2).is_err());
         builder.set_cell_formula(0, 0, "of:=SEQUENCE(3;2)").unwrap();
         builder.set_cell_matrix_span(0, 0, 3, 2).unwrap();
-        let xml = builder.generate_content_xml();
+        let xml = builder.generate_content_xml().unwrap();
         assert!(xml.contains(r#"table:number-matrix-rows-spanned="3""#));
         assert!(xml.contains(r#"table:number-matrix-columns-spanned="2""#));
         assert!(builder.clear_cell_matrix_span(0, 0));
@@ -2027,7 +2097,7 @@ mod tests {
                 TableVisibility::Collapse,
             )
             .unwrap();
-        let xml = builder.generate_content_xml();
+        let xml = builder.generate_content_xml().unwrap();
         assert!(xml.contains(r#"table:style-name="RowStyle""#));
         assert!(xml.contains(r#"table:default-cell-style-name="ColumnCell""#));
         assert!(xml.contains(r#"table:visibility="filter""#));
@@ -2058,8 +2128,65 @@ mod tests {
             )
             .unwrap();
 
-        let xml = builder.generate_content_xml();
+        let xml = builder.generate_content_xml().unwrap();
         assert!(xml.contains(r#"table:style-name="FirstColumn""#));
         assert!(xml.contains(r#"table:number-columns-repeated="3""#));
+    }
+
+    #[test]
+    fn builder_round_trips_nested_groups_and_headers() {
+        let structure = vec![TableStructure::Group(TableGroup {
+            display: false,
+            children: vec![
+                TableStructure::Header(TableRange::new(0, 1).unwrap()),
+                TableStructure::Group(TableGroup {
+                    display: true,
+                    children: vec![TableStructure::Range(TableRange::new(1, 3).unwrap())],
+                }),
+            ],
+        })];
+        let mut builder = SpreadsheetBuilder::new();
+        builder
+            .set_column_structure(structure.clone())
+            .unwrap()
+            .set_row_structure(structure.clone())
+            .unwrap();
+        let xml = builder.generate_content_xml().unwrap();
+        assert!(xml.contains(r#"<table:table-column-group table:display="false">"#));
+        assert!(xml.contains("<table:table-header-columns>"));
+        assert!(xml.contains(r#"<table:table-row-group table:display="false">"#));
+        assert!(xml.contains("<table:table-header-rows>"));
+
+        let mut spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+        let sheets = spreadsheet.sheets().unwrap();
+        assert_eq!(sheets[0].column_structure, structure);
+        assert_eq!(sheets[0].row_structure, sheets[0].column_structure);
+    }
+
+    #[test]
+    fn builder_rejects_invalid_table_structure() {
+        let overlapping = vec![
+            TableStructure::Range(TableRange::new(0, 2).unwrap()),
+            TableStructure::Header(TableRange::new(1, 3).unwrap()),
+        ];
+        let discontinuous_group = vec![TableStructure::Group(TableGroup {
+            display: true,
+            children: vec![
+                TableStructure::Range(TableRange::new(0, 1).unwrap()),
+                TableStructure::Range(TableRange::new(2, 3).unwrap()),
+            ],
+        })];
+        let mut builder = SpreadsheetBuilder::new();
+        assert!(builder.set_row_structure(overlapping).is_err());
+        assert!(builder.set_column_structure(discontinuous_group).is_err());
+
+        let mut too_deep = TableStructure::Range(TableRange::new(0, 1).unwrap());
+        for _ in 0..300 {
+            too_deep = TableStructure::Group(TableGroup {
+                display: true,
+                children: vec![too_deep],
+            });
+        }
+        assert!(builder.set_row_structure(vec![too_deep]).is_err());
     }
 }

@@ -94,7 +94,7 @@ pub use protection::{
 pub use row::Row;
 pub use sheet::Sheet;
 pub use spreadsheet::Spreadsheet;
-pub use structure::{Column, TableVisibility};
+pub use structure::{Column, TableGroup, TableRange, TableStructure, TableVisibility};
 pub use style_protection::CellStyleProtection;
 
 // Re-export formula types for public API

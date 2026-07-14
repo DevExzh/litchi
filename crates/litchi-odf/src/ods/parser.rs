@@ -2,9 +2,12 @@
 
 use super::{
     Cell, CellMatrixSpan, CellMerge, CellValue, Column, NamedDefinition, NamedDefinitionScope,
-    NamedExpression, NamedRange, NamedRangeUsage, Row, Sheet, TableVisibility,
+    NamedExpression, NamedRange, NamedRangeUsage, Row, Sheet, TableGroup, TableRange,
+    TableStructure, TableVisibility,
     annotation::{AnnotationBuilder, decode_reference},
-    structure::{MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET},
+    structure::{
+        MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, MAX_TABLE_STRUCTURE_DEPTH,
+    },
 };
 use litchi_core::{Error, Result};
 use quick_xml::Reader;
@@ -77,6 +80,60 @@ impl OdsParser {
                         let name =
                             Self::extract_table_name(e, reader.decoder(), &document_namespaces)?;
                         current_sheet = Some(SheetBuilder::new(name));
+                    } else if current_row.is_none()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "table-column-group",
+                        )
+                    {
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            let display = Self::parse_group_display(
+                                e,
+                                reader.decoder(),
+                                &document_namespaces,
+                            )?;
+                            sheet.column_structure.begin_group(display)?;
+                        }
+                    } else if current_row.is_none()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "table-header-columns",
+                        )
+                    {
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            sheet.column_structure.begin_header(sheet.columns.len())?;
+                        }
+                    } else if current_row.is_none()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "table-row-group",
+                        )
+                    {
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            let display = Self::parse_group_display(
+                                e,
+                                reader.decoder(),
+                                &document_namespaces,
+                            )?;
+                            sheet.row_structure.begin_group(display)?;
+                        }
+                    } else if current_row.is_none()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "table-header-rows",
+                        )
+                    {
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            sheet.row_structure.begin_header(sheet.rows.len())?;
+                        }
                     } else if current_row.is_none()
                         && Self::element_name_is(
                             e.name().as_ref(),
@@ -167,6 +224,27 @@ impl OdsParser {
                             &document_namespaces,
                             &mut text_content,
                         )?;
+                    } else if current_sheet.is_some()
+                        && current_row.is_none()
+                        && [
+                            "table-column-group",
+                            "table-header-columns",
+                            "table-row-group",
+                            "table-header-rows",
+                        ]
+                        .iter()
+                        .any(|local_name| {
+                            Self::element_name_is(
+                                e.name().as_ref(),
+                                &document_namespaces,
+                                TABLE_NAMESPACE_URI,
+                                local_name,
+                            )
+                        })
+                    {
+                        return Err(Error::InvalidFormat(
+                            "empty table groups and header containers are not valid".to_string(),
+                        ));
                     } else if current_row.is_none()
                         && Self::element_name_is(
                             e.name().as_ref(),
@@ -321,10 +399,46 @@ impl OdsParser {
                         e.name().as_ref(),
                         &document_namespaces,
                         TABLE_NAMESPACE_URI,
+                        "table-column-group",
+                    ) {
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            sheet.column_structure.end_group()?;
+                        }
+                    } else if Self::element_name_is(
+                        e.name().as_ref(),
+                        &document_namespaces,
+                        TABLE_NAMESPACE_URI,
+                        "table-header-columns",
+                    ) {
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            sheet.column_structure.end_header(sheet.columns.len())?;
+                        }
+                    } else if Self::element_name_is(
+                        e.name().as_ref(),
+                        &document_namespaces,
+                        TABLE_NAMESPACE_URI,
+                        "table-row-group",
+                    ) {
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            sheet.row_structure.end_group()?;
+                        }
+                    } else if Self::element_name_is(
+                        e.name().as_ref(),
+                        &document_namespaces,
+                        TABLE_NAMESPACE_URI,
+                        "table-header-rows",
+                    ) {
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            sheet.row_structure.end_header(sheet.rows.len())?;
+                        }
+                    } else if Self::element_name_is(
+                        e.name().as_ref(),
+                        &document_namespaces,
+                        TABLE_NAMESPACE_URI,
                         "table",
                     ) && let Some(sheet_builder) = current_sheet.take()
                     {
-                        sheets.push(sheet_builder.build());
+                        sheets.push(sheet_builder.build()?);
                     }
                     Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
                 },
@@ -783,6 +897,26 @@ impl OdsParser {
         Ok((style_name, default_cell_style_name, visibility))
     }
 
+    fn parse_group_display(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<bool> {
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                TABLE_NAMESPACE_URI,
+                "display",
+            ) {
+                return Self::parse_bool_attribute(&attribute, decoder);
+            }
+        }
+        Ok(true)
+    }
+
     fn parse_column(
         element: &BytesStart<'_>,
         decoder: Decoder,
@@ -958,11 +1092,154 @@ impl OdsParser {
     }
 }
 
+struct StructureContext {
+    display: Option<bool>,
+    children: Vec<TableStructure>,
+    header_start: Option<usize>,
+}
+
+impl StructureContext {
+    fn root() -> Self {
+        Self {
+            display: None,
+            children: Vec::new(),
+            header_start: None,
+        }
+    }
+}
+
+struct StructureStack {
+    contexts: Vec<StructureContext>,
+}
+
+impl StructureStack {
+    fn new() -> Self {
+        Self {
+            contexts: vec![StructureContext::root()],
+        }
+    }
+
+    fn begin_group(&mut self, display: bool) -> Result<()> {
+        if self.contexts.len() > MAX_TABLE_STRUCTURE_DEPTH {
+            return Err(Error::InvalidFormat(format!(
+                "table structure exceeds the {MAX_TABLE_STRUCTURE_DEPTH} level nesting safety limit"
+            )));
+        }
+        if self
+            .contexts
+            .last()
+            .is_some_and(|context| context.header_start.is_some())
+        {
+            return Err(Error::InvalidFormat(
+                "table groups cannot be nested inside a header container".to_string(),
+            ));
+        }
+        self.contexts.push(StructureContext {
+            display: Some(display),
+            children: Vec::new(),
+            header_start: None,
+        });
+        Ok(())
+    }
+
+    fn end_group(&mut self) -> Result<()> {
+        if self.contexts.len() <= 1 {
+            return Err(Error::InvalidFormat(
+                "table group end has no matching start".to_string(),
+            ));
+        }
+        let context = self.contexts.pop().expect("non-root context was checked");
+        if context.header_start.is_some() {
+            return Err(Error::InvalidFormat(
+                "table header container is not closed before its group".to_string(),
+            ));
+        }
+        if context.children.is_empty() {
+            return Err(Error::InvalidFormat(
+                "table groups must contain at least one row or column".to_string(),
+            ));
+        }
+        self.contexts
+            .last_mut()
+            .expect("root context is retained")
+            .children
+            .push(TableStructure::Group(TableGroup {
+                display: context.display.expect("group contexts have display state"),
+                children: context.children,
+            }));
+        Ok(())
+    }
+
+    fn begin_header(&mut self, position: usize) -> Result<()> {
+        let context = self.contexts.last_mut().expect("root context is retained");
+        if context.header_start.replace(position).is_some() {
+            return Err(Error::InvalidFormat(
+                "table header containers cannot be nested".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn end_header(&mut self, position: usize) -> Result<()> {
+        let context = self.contexts.last_mut().expect("root context is retained");
+        let start = context.header_start.take().ok_or_else(|| {
+            Error::InvalidFormat("table header end has no matching start".to_string())
+        })?;
+        if position <= start {
+            return Err(Error::InvalidFormat(
+                "table header containers must not be empty".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn add_range(&mut self, start: usize, end: usize) -> Result<()> {
+        let range = TableRange::new(start, end)?;
+        let context = self.contexts.last_mut().expect("root context is retained");
+        let entry = if context.header_start.is_some() {
+            TableStructure::Header(range)
+        } else {
+            TableStructure::Range(range)
+        };
+        if let Some(previous) = context.children.last_mut() {
+            match (previous, &entry) {
+                (TableStructure::Range(previous), TableStructure::Range(next))
+                | (TableStructure::Header(previous), TableStructure::Header(next))
+                    if previous.end == next.start =>
+                {
+                    previous.end = next.end;
+                    return Ok(());
+                },
+                _ => {},
+            }
+        }
+        context.children.push(entry);
+        Ok(())
+    }
+
+    fn finish(mut self) -> Result<Vec<TableStructure>> {
+        if self.contexts.len() != 1 {
+            return Err(Error::InvalidFormat(
+                "table group is not closed before the table ends".to_string(),
+            ));
+        }
+        let root = self.contexts.pop().expect("one root context was checked");
+        if root.header_start.is_some() {
+            return Err(Error::InvalidFormat(
+                "table header container is not closed before the table ends".to_string(),
+            ));
+        }
+        Ok(root.children)
+    }
+}
+
 /// Builder for constructing Sheet during parsing
 pub(crate) struct SheetBuilder {
     name: String,
     rows: Vec<Row>,
     columns: Vec<Column>,
+    row_structure: StructureStack,
+    column_structure: StructureStack,
     cell_count: usize,
 }
 
@@ -972,6 +1249,8 @@ impl SheetBuilder {
             name,
             rows: Vec::new(),
             columns: Vec::new(),
+            row_structure: StructureStack::new(),
+            column_structure: StructureStack::new(),
             cell_count: 0,
         }
     }
@@ -987,6 +1266,7 @@ impl SheetBuilder {
     }
 
     fn add_repeated_row(&mut self, row: Row, repeated: usize) -> Result<()> {
+        let start = self.rows.len();
         let expanded_rows = self.rows.len().checked_add(repeated).ok_or_else(|| {
             Error::InvalidFormat("table row repetition overflows address space".to_string())
         })?;
@@ -1010,10 +1290,12 @@ impl SheetBuilder {
         for _ in 0..repeated {
             self.add_row(row.clone());
         }
+        self.row_structure.add_range(start, self.rows.len())?;
         Ok(())
     }
 
     fn add_repeated_column(&mut self, column: Column, repeated: usize) -> Result<()> {
+        let start = self.columns.len();
         let expanded = self.columns.len().checked_add(repeated).ok_or_else(|| {
             Error::InvalidFormat("table column repetition overflows address space".to_string())
         })?;
@@ -1027,16 +1309,19 @@ impl SheetBuilder {
             item.index = self.columns.len();
             self.columns.push(item);
         }
+        self.column_structure.add_range(start, self.columns.len())?;
         Ok(())
     }
 
-    pub fn build(self) -> Sheet {
-        Sheet {
+    pub fn build(self) -> Result<Sheet> {
+        Ok(Sheet {
             name: self.name,
             rows: self.rows,
             columns: self.columns,
+            column_structure: self.column_structure.finish()?,
+            row_structure: self.row_structure.finish()?,
             protection: super::SheetProtection::default(),
-        }
+        })
     }
 }
 
@@ -1617,6 +1902,38 @@ mod tests {
     }
 
     #[test]
+    fn parses_nested_groups_and_header_ranges() {
+        let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><o:body><o:spreadsheet><t:table t:name="Outline"><t:table-column-group t:display="false"><t:table-header-columns><t:table-column/></t:table-header-columns><t:table-column-group><t:table-column t:number-columns-repeated="2"/></t:table-column-group></t:table-column-group><t:table-row-group t:display="false"><t:table-header-rows><t:table-row/></t:table-header-rows><t:table-row-group><t:table-row t:number-rows-repeated="2"/></t:table-row-group></t:table-row-group></t:table></o:spreadsheet></o:body></o:document-content>"#;
+        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        assert_eq!(
+            sheets[0].column_structure,
+            vec![TableStructure::Group(TableGroup {
+                display: false,
+                children: vec![
+                    TableStructure::Header(TableRange { start: 0, end: 1 }),
+                    TableStructure::Group(TableGroup {
+                        display: true,
+                        children: vec![TableStructure::Range(TableRange { start: 1, end: 3 })],
+                    }),
+                ],
+            })]
+        );
+        assert_eq!(
+            sheets[0].row_structure,
+            vec![TableStructure::Group(TableGroup {
+                display: false,
+                children: vec![
+                    TableStructure::Header(TableRange { start: 0, end: 1 }),
+                    TableStructure::Group(TableGroup {
+                        display: true,
+                        children: vec![TableStructure::Range(TableRange { start: 1, end: 3 })],
+                    }),
+                ],
+            })]
+        );
+    }
+
+    #[test]
     fn rejects_invalid_or_dangerous_repetition_counts() {
         let zero = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-row table:number-rows-repeated="0"/></table:table></office:spreadsheet></office:body></office:document-content>"#;
         assert!(OdsParser::parse_sheets(zero).is_err());
@@ -1635,6 +1952,12 @@ mod tests {
 
         let invalid_visibility = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-column table:visibility="hidden"/></table:table></office:spreadsheet></office:body></office:document-content>"#;
         assert!(OdsParser::parse_sheets(invalid_visibility).is_err());
+
+        let invalid_group_display = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-row-group table:display="collapsed"><table:table-row/></table:table-row-group></table:table></office:spreadsheet></office:body></office:document-content>"#;
+        assert!(OdsParser::parse_sheets(invalid_group_display).is_err());
+
+        let empty_group = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-column-group/></table:table></office:spreadsheet></office:body></office:document-content>"#;
+        assert!(OdsParser::parse_sheets(empty_group).is_err());
     }
 
     #[test]
@@ -1672,7 +1995,7 @@ mod tests {
         };
         builder.add_row(row2);
 
-        let sheet = builder.build();
+        let sheet = builder.build().unwrap();
         assert_eq!(sheet.name, "TestSheet");
         assert_eq!(sheet.rows.len(), 2);
         assert_eq!(sheet.rows[0].index, 0);
