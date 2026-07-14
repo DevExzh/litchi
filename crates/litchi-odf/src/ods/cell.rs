@@ -42,6 +42,10 @@ pub struct Cell {
     pub annotation: Option<CellAnnotation>,
     /// Name of the document-level content validation applied to this cell.
     pub validation_name: Option<String>,
+    /// Legacy ODF `table:protect` state, preserved independently when present.
+    pub protect: Option<bool>,
+    /// ODF `table:protected` state, preserved independently when present.
+    pub protected: Option<bool>,
     /// The row index (0-based)
     pub row: usize,
     /// The column index (0-based)
@@ -123,6 +127,28 @@ impl Cell {
     /// Remove the content-validation reference from this cell.
     pub fn clear_validation(&mut self) {
         self.validation_name = None;
+    }
+
+    /// Return the legacy `table:protect` state.
+    pub fn protect(&self) -> Option<bool> {
+        self.protect
+    }
+
+    /// Return the ODF `table:protected` state.
+    pub fn protected(&self) -> Option<bool> {
+        self.protected
+    }
+
+    /// Set both independently representable ODF cell-protection attributes.
+    pub fn set_protection(&mut self, protect: Option<bool>, protected: Option<bool>) {
+        self.protect = protect;
+        self.protected = protected;
+    }
+
+    /// Remove both cell-protection attributes.
+    pub fn clear_protection(&mut self) {
+        self.protect = None;
+        self.protected = None;
     }
 
     /// Parse and get the formula structure.
@@ -278,6 +304,20 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
         output.push_str(&escape_xml(validation_name));
         output.push('"');
     }
+    if let Some(protect) = cell.protect {
+        output.push_str(if protect {
+            " table:protect=\"true\""
+        } else {
+            " table:protect=\"false\""
+        });
+    }
+    if let Some(protected) = cell.protected {
+        output.push_str(if protected {
+            " table:protected=\"true\""
+        } else {
+            " table:protected=\"false\""
+        });
+    }
 
     match &cell.value {
         CellValue::Text(_) => output.push_str(" office:value-type=\"string\""),
@@ -405,6 +445,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             row: 0,
             col: 0,
         };
@@ -421,6 +463,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             row: 0,
             col: 0,
         };
@@ -435,6 +479,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             row: 0,
             col: 0,
         };
@@ -452,6 +498,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             row: 0,
             col: 0,
         };
@@ -463,6 +511,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             row: 0,
             col: 0,
         };
@@ -474,6 +524,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             row: 0,
             col: 0,
         };
@@ -485,6 +537,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             row: 0,
             col: 0,
         };
@@ -499,6 +553,8 @@ mod tests {
             formula: Some("=A1+B1".to_string()),
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             row: 0,
             col: 0,
         };
@@ -513,6 +569,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             row: 0,
             col: 0,
         };
@@ -527,6 +585,8 @@ mod tests {
             formula: Some("=A1".to_string()),
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             row: 0,
             col: 0,
         };
@@ -538,6 +598,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             row: 0,
             col: 0,
         };
@@ -552,6 +614,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             row: 5,
             col: 10,
         };
@@ -566,6 +630,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             row: 0,
             col: 0,
         };
@@ -577,6 +643,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             row: 0,
             col: 0,
         };

@@ -1,6 +1,6 @@
 //! Sheet structures for ODS spreadsheets.
 
-use super::Row;
+use super::{Row, SheetProtection};
 use litchi_core::Result;
 
 /// A sheet (worksheet) in an ODS spreadsheet.
@@ -12,6 +12,8 @@ pub struct Sheet {
     pub name: String,
     /// Rows in this sheet
     pub rows: Vec<Row>,
+    /// Sheet protection metadata and edit permissions.
+    pub protection: SheetProtection,
 }
 
 impl Sheet {
@@ -56,6 +58,7 @@ mod tests {
     #[test]
     fn test_sheet_new() {
         let sheet = Sheet {
+            protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![],
         };
@@ -67,6 +70,7 @@ mod tests {
     #[test]
     fn test_sheet_name() {
         let sheet = Sheet {
+            protection: SheetProtection::default(),
             name: "Test Sheet".to_string(),
             rows: vec![],
         };
@@ -76,6 +80,7 @@ mod tests {
     #[test]
     fn test_sheet_rows() {
         let sheet = Sheet {
+            protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![
                 Row {
@@ -96,6 +101,7 @@ mod tests {
     #[test]
     fn test_sheet_column_count() {
         let sheet = Sheet {
+            protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![
                 Row {
@@ -106,6 +112,8 @@ mod tests {
                             formula: None,
                             annotation: None,
                             validation_name: None,
+                            protect: None,
+                            protected: None,
                             row: 0,
                             col: 0,
                         },
@@ -115,6 +123,8 @@ mod tests {
                             formula: None,
                             annotation: None,
                             validation_name: None,
+                            protect: None,
+                            protected: None,
                             row: 0,
                             col: 1,
                         },
@@ -124,6 +134,8 @@ mod tests {
                             formula: None,
                             annotation: None,
                             validation_name: None,
+                            protect: None,
+                            protected: None,
                             row: 0,
                             col: 2,
                         },
@@ -138,6 +150,8 @@ mod tests {
                             formula: None,
                             annotation: None,
                             validation_name: None,
+                            protect: None,
+                            protected: None,
                             row: 1,
                             col: 0,
                         },
@@ -147,6 +161,8 @@ mod tests {
                             formula: None,
                             annotation: None,
                             validation_name: None,
+                            protect: None,
+                            protected: None,
                             row: 1,
                             col: 1,
                         },
@@ -162,6 +178,7 @@ mod tests {
     #[test]
     fn test_sheet_column_count_empty() {
         let sheet = Sheet {
+            protection: SheetProtection::default(),
             name: "Empty".to_string(),
             rows: vec![],
         };
@@ -171,6 +188,7 @@ mod tests {
     #[test]
     fn test_sheet_with_data() {
         let sheet = Sheet {
+            protection: SheetProtection::default(),
             name: "Data".to_string(),
             rows: vec![
                 Row {
@@ -181,6 +199,8 @@ mod tests {
                             formula: None,
                             annotation: None,
                             validation_name: None,
+                            protect: None,
+                            protected: None,
                             row: 0,
                             col: 0,
                         },
@@ -190,6 +210,8 @@ mod tests {
                             formula: None,
                             annotation: None,
                             validation_name: None,
+                            protect: None,
+                            protected: None,
                             row: 0,
                             col: 1,
                         },
@@ -204,6 +226,8 @@ mod tests {
                             formula: None,
                             annotation: None,
                             validation_name: None,
+                            protect: None,
+                            protected: None,
                             row: 1,
                             col: 0,
                         },
@@ -213,6 +237,8 @@ mod tests {
                             formula: None,
                             annotation: None,
                             validation_name: None,
+                            protect: None,
+                            protected: None,
                             row: 1,
                             col: 1,
                         },
@@ -235,6 +261,7 @@ mod tests {
     #[test]
     fn test_sheet_clone() {
         let sheet = Sheet {
+            protection: SheetProtection::default(),
             name: "Original".to_string(),
             rows: vec![],
         };

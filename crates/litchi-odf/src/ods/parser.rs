@@ -565,6 +565,8 @@ impl OdsParser {
         let mut currency = None;
         let mut formula = None;
         let mut validation_name = None;
+        let mut protect = None;
+        let mut protected = None;
         let mut repeated = 1;
 
         for attr_result in e.attributes() {
@@ -606,6 +608,12 @@ impl OdsParser {
                             .into_owned(),
                     );
                 },
+                b"table:protect" => {
+                    protect = Some(Self::parse_bool_attribute(&attr, decoder)?);
+                },
+                b"table:protected" => {
+                    protected = Some(Self::parse_bool_attribute(&attr, decoder)?);
+                },
                 b"table:number-columns-repeated" => {
                     if let Ok(rep) = String::from_utf8(attr.value.to_vec())
                         .map_err(|_| Error::InvalidFormat("Invalid UTF-8".to_string()))?
@@ -624,9 +632,27 @@ impl OdsParser {
             currency,
             formula,
             validation_name,
+            protect,
+            protected,
             repeated,
             annotation: None,
         })
+    }
+
+    fn parse_bool_attribute(
+        attribute: &quick_xml::events::attributes::Attribute<'_>,
+        decoder: Decoder,
+    ) -> Result<bool> {
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+            .map_err(|error| Error::InvalidFormat(format!("invalid Boolean attribute: {error}")))?;
+        match value.as_ref() {
+            "true" | "1" => Ok(true),
+            "false" | "0" => Ok(false),
+            _ => Err(Error::InvalidFormat(format!(
+                "invalid Boolean attribute value '{value}'"
+            ))),
+        }
     }
 }
 
@@ -658,6 +684,7 @@ impl SheetBuilder {
         Sheet {
             name: self.name,
             rows: self.rows,
+            protection: super::SheetProtection::default(),
         }
     }
 }
@@ -698,6 +725,8 @@ pub(crate) struct CellBuilder {
     currency: Option<String>,
     formula: Option<String>,
     validation_name: Option<String>,
+    protect: Option<bool>,
+    protected: Option<bool>,
     repeated: usize,
     annotation: Option<super::CellAnnotation>,
 }
@@ -713,6 +742,8 @@ impl CellBuilder {
             formula: self.formula.clone(),
             annotation: self.annotation.clone(),
             validation_name: self.validation_name.clone(),
+            protect: self.protect,
+            protected: self.protected,
             row: 0, // Will be set by parent
             col: 0, // Will be set by parent
         }
@@ -1129,6 +1160,8 @@ mod tests {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                protect: None,
+                protected: None,
                 row: 0,
                 col: 0,
             }],
@@ -1153,6 +1186,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             row: 0,
             col: 0,
         };
@@ -1164,6 +1199,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             row: 0,
             col: 0,
         };
@@ -1185,6 +1222,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             repeated: 1,
         };
         let cell = builder.build("123.45");
@@ -1201,6 +1240,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             repeated: 1,
         };
         let cell = builder.build("99.99");
@@ -1217,6 +1258,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             repeated: 1,
         };
         let cell = builder.build("0.001");
@@ -1235,6 +1278,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             repeated: 1,
         };
         let cell = builder.build("some text");
@@ -1254,6 +1299,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             repeated: 1,
         };
         let cell = builder.build("FALSE");
@@ -1270,6 +1317,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             repeated: 1,
         };
         let cell = builder.build("maybe");
@@ -1288,6 +1337,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             repeated: 1,
         };
         let cell = builder.build("   ");
@@ -1306,6 +1357,8 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            protect: None,
+            protected: None,
             repeated: 1,
         };
         let cell = builder.build("$50");

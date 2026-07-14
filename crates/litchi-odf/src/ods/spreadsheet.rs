@@ -2,7 +2,8 @@
 
 use super::{
     ContentValidation, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Sheet,
-    data_validation::parse_content_validations, parser::OdsParser,
+    SheetProtection, SpreadsheetProtection, data_validation::parse_content_validations,
+    parser::OdsParser, protection::parse_protection,
 };
 use crate::core::{Content, Meta, OwnedPackage, Styles};
 use litchi_core::{Error, Metadata, Result};
@@ -44,6 +45,8 @@ pub struct Spreadsheet {
     meta: Option<Meta>,
     named_definitions: Vec<NamedDefinition>,
     content_validations: Vec<ContentValidation>,
+    protection: SpreadsheetProtection,
+    sheet_protections: Vec<SheetProtection>,
 }
 
 impl Spreadsheet {
@@ -111,6 +114,7 @@ impl Spreadsheet {
         let content = Content::from_bytes(&content_bytes)?;
         let named_definitions = OdsParser::parse_named_definitions(content.xml_content())?;
         let content_validations = parse_content_validations(content.xml_content())?;
+        let (protection, sheet_protections) = parse_protection(content.xml_content())?;
 
         let styles = if package.has_file("styles.xml") {
             let styles_bytes = package.get_file("styles.xml")?;
@@ -133,6 +137,8 @@ impl Spreadsheet {
             meta,
             named_definitions,
             content_validations,
+            protection,
+            sheet_protections,
         })
     }
 
@@ -158,7 +164,17 @@ impl Spreadsheet {
         let content_bytes = package.get_file("content.xml")?;
         let content = Content::from_bytes(&content_bytes)?;
 
-        let sheets = OdsParser::parse_sheets(content.xml_content())?;
+        let mut sheets = OdsParser::parse_sheets(content.xml_content())?;
+        if sheets.len() != self.sheet_protections.len() {
+            return Err(Error::InvalidFormat(format!(
+                "sheet protection count {} does not match sheet count {}",
+                self.sheet_protections.len(),
+                sheets.len()
+            )));
+        }
+        for (sheet, protection) in sheets.iter_mut().zip(&self.sheet_protections) {
+            sheet.protection = protection.clone();
+        }
         for cell in sheets
             .iter()
             .flat_map(|sheet| sheet.rows.iter())
@@ -190,6 +206,11 @@ impl Spreadsheet {
         self.content_validations
             .iter()
             .find(|validation| validation.name == name)
+    }
+
+    /// Return document-structure protection metadata.
+    pub fn protection(&self) -> &SpreadsheetProtection {
+        &self.protection
     }
 
     /// Return all named ranges, including global and sheet-local ranges.

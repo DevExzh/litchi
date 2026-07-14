@@ -103,14 +103,15 @@
 //! - ✅ Insert/delete rows and columns
 //! - ✅ Set metadata
 //! - ✅ Create, replace, edit, remove, and round-trip cell annotations
+//! - ✅ Content-validation definitions, prompts, cell bindings, and inert event metadata
+//! - ✅ Document/sheet keys, direct cell protection flags, and LibreOffice permissions
 //! - ✅ Save to file or bytes
 //!
 //! ### TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing
-//! - ⚠️ Data validation rules
 //! - ⚠️ Conditional formatting
 //! - ⚠️ Pivot tables
-//! - ⚠️ Sheet protection
+//! - ⚠️ Cell-style protection resolution
 //! - ⚠️ Filter and sort criteria
 //!
 //! ## ✅ ODP - Presentations (COMPLETE for reading/writing)
@@ -235,7 +236,8 @@ pub use odp::{MutablePresentation, Presentation, PresentationBuilder};
 pub use ods::{
     AnnotationElement, AnnotationNode, Cell as SCell, CellAnnotation, CellValue, ContentValidation,
     FormulaNamespace, MutableSpreadsheet, NamedDefinition, NamedDefinitionScope, NamedExpression,
-    NamedRange, NamedRangeUsage, Row as SRow, Sheet, Spreadsheet, SpreadsheetBuilder,
+    NamedRange, NamedRangeUsage, ProtectionKey, Row as SRow, Sheet, SheetProtection,
+    SheetProtectionOptions, Spreadsheet, SpreadsheetBuilder, SpreadsheetProtection,
     ValidationDisplayList, ValidationErrorMacro, ValidationErrorMessage, ValidationEventListener,
     ValidationMessage, ValidationMessageType, ValidationPresentationEventListener,
     ValidationPresentationSound, ValidationScriptEventListener,

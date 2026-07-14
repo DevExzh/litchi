@@ -6,9 +6,13 @@
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
     Cell, CellAnnotation, CellValue, ContentValidation, NamedDefinition, NamedDefinitionScope,
-    NamedExpression, NamedRange, Row, Sheet, Spreadsheet,
+    NamedExpression, NamedRange, Row, Sheet, Spreadsheet, SpreadsheetProtection,
     data_validation::{validate_collection, write_content_validations},
     named_expression::{ensure_unique, write_named_definitions},
+    protection::{
+        has_extensions as has_protection_extensions, write_sheet_attributes, write_sheet_options,
+        write_spreadsheet_attributes,
+    },
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
@@ -42,6 +46,7 @@ pub struct MutableSpreadsheet {
     /// Global and sheet-local named ranges and expressions.
     named_definitions: Vec<NamedDefinition>,
     content_validations: Vec<ContentValidation>,
+    protection: SpreadsheetProtection,
 }
 
 impl MutableSpreadsheet {
@@ -103,6 +108,7 @@ impl MutableSpreadsheet {
         let metadata = spreadsheet.metadata()?;
         let named_definitions = spreadsheet.named_definitions().to_vec();
         let content_validations = spreadsheet.content_validations().to_vec();
+        let protection = spreadsheet.protection().clone();
         let mimetype = "application/vnd.oasis.opendocument.spreadsheet".to_string();
 
         // Extract styles XML from the spreadsheet's package (requires accessing internal package)
@@ -116,6 +122,7 @@ impl MutableSpreadsheet {
             styles_xml: None,
             named_definitions,
             content_validations,
+            protection,
         })
     }
 
@@ -128,6 +135,7 @@ impl MutableSpreadsheet {
             styles_xml: None,
             named_definitions: Vec::new(),
             content_validations: Vec::new(),
+            protection: SpreadsheetProtection::default(),
         }
     }
 
@@ -159,6 +167,43 @@ impl MutableSpreadsheet {
     /// Return document-level content validation definitions.
     pub fn content_validations(&self) -> &[ContentValidation] {
         &self.content_validations
+    }
+
+    /// Return document-structure protection metadata.
+    pub fn protection(&self) -> &SpreadsheetProtection {
+        &self.protection
+    }
+
+    /// Mutably access document-structure protection metadata.
+    pub fn protection_mut(&mut self) -> &mut SpreadsheetProtection {
+        &mut self.protection
+    }
+
+    /// Return protection metadata for a sheet by index.
+    pub fn sheet_protection(&self, sheet_index: usize) -> Result<&crate::ods::SheetProtection> {
+        self.sheets
+            .get(sheet_index)
+            .map(|sheet| &sheet.protection)
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "Sheet index {sheet_index} out of bounds"
+                ))
+            })
+    }
+
+    /// Mutably access protection metadata for a sheet by index.
+    pub fn sheet_protection_mut(
+        &mut self,
+        sheet_index: usize,
+    ) -> Result<&mut crate::ods::SheetProtection> {
+        self.sheets
+            .get_mut(sheet_index)
+            .map(|sheet| &mut sheet.protection)
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "Sheet index {sheet_index} out of bounds"
+                ))
+            })
     }
 
     /// Add a uniquely named content-validation definition.
@@ -298,6 +343,7 @@ impl MutableSpreadsheet {
         let sheet = Sheet {
             name: name.to_string(),
             rows: Vec::new(),
+            protection: crate::ods::SheetProtection::default(),
         };
         self.sheets.push(sheet);
         Ok(())
@@ -407,6 +453,8 @@ impl MutableSpreadsheet {
                     formula: None,
                     annotation: None,
                     validation_name: None,
+                    protect: None,
+                    protected: None,
                     row,
                     col: col_index,
                 });
@@ -459,6 +507,8 @@ impl MutableSpreadsheet {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                protect: None,
+                protected: None,
                 row,
                 col: row_data.cells.len(),
             });
@@ -518,6 +568,8 @@ impl MutableSpreadsheet {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                protect: None,
+                protected: None,
                 row,
                 col: row_data.cells.len(),
             });
@@ -541,6 +593,42 @@ impl MutableSpreadsheet {
             .get_mut(row)
             .and_then(|row| row.cells.get_mut(col))
             .and_then(|cell| cell.validation_name.take()))
+    }
+
+    /// Set both ODF cell-protection attributes.
+    pub fn set_cell_protection(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+        protect: Option<bool>,
+        protected: Option<bool>,
+    ) -> Result<()> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        while sheet.rows.len() <= row {
+            sheet.rows.push(Row {
+                cells: Vec::new(),
+                index: sheet.rows.len(),
+            });
+        }
+        let row_data = &mut sheet.rows[row];
+        while row_data.cells.len() <= col {
+            row_data.cells.push(Cell {
+                value: CellValue::Empty,
+                text: String::new(),
+                formula: None,
+                annotation: None,
+                validation_name: None,
+                protect: None,
+                protected: None,
+                row,
+                col: row_data.cells.len(),
+            });
+        }
+        row_data.cells[col].set_protection(protect, protected);
+        Ok(())
     }
 
     /// Clear a cell value.
@@ -619,7 +707,12 @@ impl MutableSpreadsheet {
 
         for sheet in &self.sheets {
             let escaped_name = escape_xml(&sheet.name);
-            body.push_str(&format!(r#"<table:table table:name="{}">"#, escaped_name));
+            body.push_str("<table:table table:name=\"");
+            body.push_str(&escaped_name);
+            body.push('"');
+            write_sheet_attributes(&mut body, &sheet.protection);
+            body.push('>');
+            write_sheet_options(&mut body, &sheet.protection.options);
 
             Self::push_table_columns(&mut body, Self::sheet_max_cols(sheet));
 
@@ -661,6 +754,10 @@ impl MutableSpreadsheet {
         out.push_str(of_ns);
         let has_annotations = self.has_annotations();
         let has_validation_event_listeners = self.has_validation_event_listeners();
+        let has_protection_extensions = has_protection_extensions(
+            &self.protection,
+            self.sheets.iter().map(|sheet| &sheet.protection),
+        );
         if has_annotations {
             out.push_str(r#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0""#);
         }
@@ -670,9 +767,14 @@ impl MutableSpreadsheet {
                 out.push_str(r#" xmlns:xlink="http://www.w3.org/1999/xlink""#);
             }
         }
+        if has_protection_extensions && !has_annotations {
+            out.push_str(r#" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0""#);
+        }
         out.push_str(
-            r#" office:version="1.3"><office:font-face-decls/><office:automatic-styles/><office:body><office:spreadsheet>"#,
+            r#" office:version="1.3"><office:font-face-decls/><office:automatic-styles/><office:body><office:spreadsheet"#,
         );
+        write_spreadsheet_attributes(&mut out, &self.protection);
+        out.push('>');
         out.push_str(&body);
         out.push_str(r#"</office:spreadsheet></office:body></office:document-content>"#);
         out
@@ -854,5 +956,34 @@ mod tests {
             Some("list")
         );
         assert!(mutable.to_bytes().is_ok());
+    }
+
+    #[test]
+    fn mutable_spreadsheet_preserves_protection_metadata() {
+        let mut mutable = MutableSpreadsheet::new();
+        mutable.add_sheet("Protected").unwrap();
+        mutable.protection_mut().structure_protected = Some(true);
+        mutable.protection_mut().key = crate::ods::ProtectionKey {
+            value: Some("document-key".to_string()),
+            digest_algorithm: Some("urn:sha256".to_string()),
+            secondary_digest_algorithm: None,
+        };
+        let sheet = mutable.sheet_protection_mut(0).unwrap();
+        sheet.protected = Some(true);
+        sheet.options.delete_rows = Some(false);
+        sheet.options.use_pivot = Some(true);
+        mutable
+            .set_cell_protection(0, 1, 1, Some(true), Some(false))
+            .unwrap();
+
+        let spreadsheet = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
+        let mut output = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        assert_eq!(output.protection().structure_protected, Some(true));
+        let sheets = output.sheets().unwrap();
+        assert_eq!(sheets[0].protection.options.delete_rows, Some(false));
+        assert_eq!(sheets[0].protection.options.use_pivot, Some(true));
+        assert_eq!(sheets[0].rows[1].cells[1].protect(), Some(true));
+        assert_eq!(sheets[0].rows[1].cells[1].protected(), Some(false));
     }
 }

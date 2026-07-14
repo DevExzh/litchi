@@ -39,13 +39,14 @@
 //! - ✅ `save()` / `to_bytes()` - Write to file or bytes
 //! - ✅ `MutableSpreadsheet` - Modify existing spreadsheets
 //! - ✅ Create, replace, edit, remove, and round-trip cell annotations
+//! - ✅ Content-validation definitions, prompts, cell bindings, and inert event metadata
+//! - ✅ Document/sheet keys, direct cell protection flags, and LibreOffice permissions
 //!
 //! ## 🚧 TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing (embedded charts)
-//! - ⚠️ Data validation rules
 //! - ⚠️ Conditional formatting
 //! - ⚠️ Pivot tables
-//! - ⚠️ Sheet protection and locking
+//! - ⚠️ Cell-style protection resolution
 //! - ⚠️ Filter and sort criteria
 //! - ⚠️ Sparklines
 //! - ⚠️ Data tables and scenarios
@@ -66,6 +67,7 @@ pub mod formula;
 mod mutable;
 mod named_expression;
 mod parser;
+mod protection;
 mod row;
 mod sheet;
 mod spreadsheet;
@@ -83,6 +85,9 @@ pub use mutable::MutableSpreadsheet;
 pub use named_expression::{
     FormulaNamespace, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
     NamedRangeUsage,
+};
+pub use protection::{
+    ProtectionKey, SheetProtection, SheetProtectionOptions, SpreadsheetProtection,
 };
 pub use row::Row;
 pub use sheet::Sheet;

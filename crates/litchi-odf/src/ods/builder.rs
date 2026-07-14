@@ -5,9 +5,13 @@
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
     Cell, CellAnnotation, CellValue, ContentValidation, NamedDefinition, NamedDefinitionScope,
-    NamedExpression, NamedRange, Row, Sheet,
+    NamedExpression, NamedRange, Row, Sheet, SpreadsheetProtection,
     data_validation::{validate_collection, write_content_validations},
     named_expression::{ensure_unique, write_named_definitions},
+    protection::{
+        has_extensions as has_protection_extensions, write_sheet_attributes, write_sheet_options,
+        write_spreadsheet_attributes,
+    },
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
@@ -36,6 +40,7 @@ pub struct SpreadsheetBuilder {
     metadata: Metadata,
     named_definitions: Vec<NamedDefinition>,
     content_validations: Vec<ContentValidation>,
+    protection: SpreadsheetProtection,
 }
 
 impl Default for SpreadsheetBuilder {
@@ -60,6 +65,7 @@ impl SpreadsheetBuilder {
             metadata: Metadata::default(),
             named_definitions: Vec::new(),
             content_validations: Vec::new(),
+            protection: SpreadsheetProtection::default(),
         }
     }
 
@@ -80,6 +86,43 @@ impl SpreadsheetBuilder {
     /// Return document-level cell validation definitions.
     pub fn content_validations(&self) -> &[ContentValidation] {
         &self.content_validations
+    }
+
+    /// Return document-structure protection metadata.
+    pub fn protection(&self) -> &SpreadsheetProtection {
+        &self.protection
+    }
+
+    /// Mutably access document-structure protection metadata.
+    pub fn protection_mut(&mut self) -> &mut SpreadsheetProtection {
+        &mut self.protection
+    }
+
+    /// Return protection metadata for a sheet by index.
+    pub fn sheet_protection(&self, sheet_index: usize) -> Result<&crate::ods::SheetProtection> {
+        self.sheets
+            .get(sheet_index)
+            .map(|sheet| &sheet.protection)
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "Sheet index {sheet_index} out of bounds"
+                ))
+            })
+    }
+
+    /// Mutably access protection metadata for a sheet by index.
+    pub fn sheet_protection_mut(
+        &mut self,
+        sheet_index: usize,
+    ) -> Result<&mut crate::ods::SheetProtection> {
+        self.sheets
+            .get_mut(sheet_index)
+            .map(|sheet| &mut sheet.protection)
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "Sheet index {sheet_index} out of bounds"
+                ))
+            })
     }
 
     /// Add a uniquely named content-validation definition.
@@ -213,6 +256,7 @@ impl SpreadsheetBuilder {
         let sheet = Sheet {
             name: name.to_string(),
             rows: Vec::new(),
+            protection: crate::ods::SheetProtection::default(),
         };
         self.sheets.push(sheet);
         Ok(self)
@@ -256,6 +300,8 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                protect: None,
+                protected: None,
                 row: row_index,
                 col,
             })
@@ -311,6 +357,8 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                protect: None,
+                protected: None,
                 row: row_index,
                 col,
             })
@@ -381,6 +429,8 @@ impl SpreadsheetBuilder {
                     formula: None,
                     annotation: None,
                     validation_name: None,
+                    protect: None,
+                    protected: None,
                     row: row_index,
                     col,
                 }
@@ -444,6 +494,8 @@ impl SpreadsheetBuilder {
                     formula: None,
                     annotation: None,
                     validation_name: None,
+                    protect: None,
+                    protected: None,
                     row,
                     col: row_data.cells.len(),
                 });
@@ -463,12 +515,16 @@ impl SpreadsheetBuilder {
 
             let annotation = row_data.cells[col].annotation.take();
             let validation_name = row_data.cells[col].validation_name.take();
+            let protect = row_data.cells[col].protect;
+            let protected = row_data.cells[col].protected;
             row_data.cells[col] = Cell {
                 text,
                 value,
                 formula: None,
                 annotation,
                 validation_name,
+                protect,
+                protected,
                 row,
                 col,
             };
@@ -521,6 +577,8 @@ impl SpreadsheetBuilder {
                     formula: None,
                     annotation: None,
                     validation_name: None,
+                    protect: None,
+                    protected: None,
                     row,
                     col: row_data.cells.len(),
                 });
@@ -561,6 +619,8 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                protect: None,
+                protected: None,
                 row,
                 col: row_data.cells.len(),
             });
@@ -617,6 +677,8 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                protect: None,
+                protected: None,
                 row,
                 col: row_data.cells.len(),
             });
@@ -633,6 +695,42 @@ impl SpreadsheetBuilder {
             .and_then(|sheet| sheet.rows.get_mut(row))
             .and_then(|row| row.cells.get_mut(col))
             .and_then(|cell| cell.validation_name.take()))
+    }
+
+    /// Set both ODF cell-protection attributes on a cell in the current sheet.
+    pub fn set_cell_protection(
+        &mut self,
+        row: usize,
+        col: usize,
+        protect: Option<bool>,
+        protected: Option<bool>,
+    ) -> Result<&mut Self> {
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        let sheet = self.sheets.last_mut().expect("default sheet was added");
+        while sheet.rows.len() <= row {
+            sheet.rows.push(Row {
+                cells: Vec::new(),
+                index: sheet.rows.len(),
+            });
+        }
+        let row_data = &mut sheet.rows[row];
+        while row_data.cells.len() <= col {
+            row_data.cells.push(Cell {
+                text: String::new(),
+                value: CellValue::Empty,
+                formula: None,
+                annotation: None,
+                validation_name: None,
+                protect: None,
+                protected: None,
+                row,
+                col: row_data.cells.len(),
+            });
+        }
+        row_data.cells[col].set_protection(protect, protected);
+        Ok(self)
     }
 
     /// Select a specific sheet by index for subsequent operations
@@ -758,11 +856,13 @@ impl SpreadsheetBuilder {
             .any(Cell::has_annotation)
     }
 
-    fn push_table_start(out: &mut String, name: &str) {
-        out.push_str(&format!(
-            r#"<table:table table:name="{}">"#,
-            escape_xml(name)
-        ));
+    fn push_table_start(out: &mut String, sheet: &Sheet) {
+        out.push_str("<table:table table:name=\"");
+        out.push_str(&escape_xml(&sheet.name));
+        out.push('"');
+        write_sheet_attributes(out, &sheet.protection);
+        out.push('>');
+        write_sheet_options(out, &sheet.protection.options);
     }
 
     fn push_table_columns(out: &mut String, max_cols: usize) {
@@ -807,7 +907,7 @@ impl SpreadsheetBuilder {
         write_content_validations(&mut body, &self.content_validations);
 
         for sheet in &self.sheets {
-            Self::push_table_start(&mut body, &sheet.name);
+            Self::push_table_start(&mut body, sheet);
             Self::push_table_columns(&mut body, Self::sheet_max_cols(sheet));
 
             for row in &sheet.rows {
@@ -855,6 +955,10 @@ impl SpreadsheetBuilder {
         out.push_str(of_ns);
         let has_annotations = self.has_annotations();
         let has_validation_event_listeners = self.has_validation_event_listeners();
+        let has_protection_extensions = has_protection_extensions(
+            &self.protection,
+            self.sheets.iter().map(|sheet| &sheet.protection),
+        );
         if has_annotations {
             out.push_str(r#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0""#);
         }
@@ -864,9 +968,14 @@ impl SpreadsheetBuilder {
                 out.push_str(r#" xmlns:xlink="http://www.w3.org/1999/xlink""#);
             }
         }
+        if has_protection_extensions && !has_annotations {
+            out.push_str(r#" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0""#);
+        }
         out.push_str(
-            r#" office:version="1.3"><office:font-face-decls/><office:automatic-styles/><office:body><office:spreadsheet>"#,
+            r#" office:version="1.3"><office:font-face-decls/><office:automatic-styles/><office:body><office:spreadsheet"#,
         );
+        write_spreadsheet_attributes(&mut out, &self.protection);
+        out.push('>');
         out.push_str(&body);
         out.push_str(r#"</office:spreadsheet></office:body></office:document-content>"#);
         out
@@ -1097,6 +1206,55 @@ mod tests {
     }
 
     #[test]
+    fn protection_metadata_round_trips_through_ods_package() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Protected").unwrap();
+        builder.protection_mut().structure_protected = Some(true);
+        builder.protection_mut().key = crate::ods::ProtectionKey {
+            value: Some("doc&key=".to_string()),
+            digest_algorithm: Some("http://www.w3.org/2001/04/xmlenc#sha256".to_string()),
+            secondary_digest_algorithm: Some("http://www.w3.org/2000/09/xmldsig#sha1".to_string()),
+        };
+        let sheet = builder.sheet_protection_mut(0).unwrap();
+        sheet.protected = Some(true);
+        sheet.key = crate::ods::ProtectionKey {
+            value: Some("sheet-key".to_string()),
+            digest_algorithm: Some("http://www.w3.org/2000/09/xmldsig#sha1".to_string()),
+            secondary_digest_algorithm: None,
+        };
+        sheet.options.select_protected_cells = Some(true);
+        sheet.options.select_unprotected_cells = Some(false);
+        sheet.options.insert_rows = Some(true);
+        builder
+            .set_cell_protection(2, 3, Some(false), Some(true))
+            .unwrap();
+
+        let mut spreadsheet =
+            crate::ods::Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+        assert_eq!(spreadsheet.protection().structure_protected, Some(true));
+        assert_eq!(
+            spreadsheet.protection().key.value.as_deref(),
+            Some("doc&key=")
+        );
+        assert_eq!(
+            spreadsheet
+                .protection()
+                .key
+                .secondary_digest_algorithm
+                .as_deref(),
+            Some("http://www.w3.org/2000/09/xmldsig#sha1")
+        );
+        let sheets = spreadsheet.sheets().unwrap();
+        assert_eq!(sheets[0].protection.protected, Some(true));
+        assert_eq!(
+            sheets[0].protection.options.select_unprotected_cells,
+            Some(false)
+        );
+        assert_eq!(sheets[0].rows[2].cells[3].protect(), Some(false));
+        assert_eq!(sheets[0].rows[2].cells[3].protected(), Some(true));
+    }
+
+    #[test]
     fn test_add_sheet() {
         let mut builder = SpreadsheetBuilder::new();
         let result = builder.add_sheet("TestSheet");
@@ -1266,6 +1424,8 @@ mod tests {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                protect: None,
+                protected: None,
                 row: 0,
                 col: 0,
             },
@@ -1275,6 +1435,8 @@ mod tests {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                protect: None,
+                protected: None,
                 row: 0,
                 col: 1,
             },
@@ -1291,6 +1453,7 @@ mod tests {
         let sheet = Sheet {
             name: "CustomSheet".to_string(),
             rows: vec![],
+            protection: crate::ods::SheetProtection::default(),
         };
         builder.add_sheet_element(sheet).unwrap();
 
