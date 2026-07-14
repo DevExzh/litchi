@@ -5078,15 +5078,15 @@ fn parse_value_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
     axis.minor_unit = minor_unit;
     axis.log_base = log_base;
     axis.cross_between = cross_between;
-    axis.display_units = display_units;
+    axis.display_units = display_units.map(Box::new);
     Ok(Some(axis))
 }
 
 fn parse_display_units<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DisplayUnits> {
     let mut built_in_unit = None;
     let mut custom_unit = None;
-    let mut label = None;
-    let mut layout = None;
+    let mut parsed_label = ParsedDisplayUnitsLabel::default();
+    let mut extension_list = None;
     let mut saw_label = false;
     let mut buf = Vec::new();
 
@@ -5099,7 +5099,7 @@ fn parse_display_units<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Dis
                     ));
                 }
                 saw_label = true;
-                (label, layout) = parse_display_units_label(reader)?;
+                parsed_label = parse_display_units_label(reader)?;
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"dispUnitsLbl" => {
                 if saw_label {
@@ -5108,6 +5108,26 @@ fn parse_display_units<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Dis
                     ));
                 }
                 saw_label = true;
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart display units contain duplicate extension lists".into(),
+                    ));
+                }
+                extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_fragment(element, "chart display-units extension list")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart display units contain duplicate extension lists".into(),
+                    ));
+                }
+                extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
             },
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
                 match element.local_name().as_ref() {
@@ -5154,19 +5174,32 @@ fn parse_display_units<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Dis
         built_in_unit,
         custom_unit,
         show_label: saw_label,
-        label,
-        layout,
+        label: parsed_label.label,
+        layout: parsed_label.layout,
+        label_shape_properties: parsed_label.shape_properties,
+        label_text_properties: parsed_label.text_properties,
+        extension_list,
     })
+}
+
+#[derive(Default)]
+struct ParsedDisplayUnitsLabel {
+    label: Option<TitleText>,
+    layout: Option<Layout>,
+    shape_properties: Option<ChartShapeProperties>,
+    text_properties: Option<ChartTextProperties>,
 }
 
 fn parse_display_units_label<R: BufRead>(
     reader: &mut ChartXmlReader<R>,
-) -> Result<(Option<TitleText>, Option<Layout>)> {
+) -> Result<ParsedDisplayUnitsLabel> {
     let mut text = String::new();
     let mut formula = None;
     let mut layout = None;
     let mut in_text = false;
     let mut saw_text = false;
+    let mut shape_properties = None;
+    let mut text_properties = None;
     let mut buf = Vec::new();
 
     loop {
@@ -5188,6 +5221,48 @@ fn parse_display_units_label<R: BufRead>(
                         ));
                     },
                 });
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart display-units label contains duplicate shape properties".into(),
+                    ));
+                }
+                shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader
+                        .capture_fragment(element, "chart display-units label shape properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart display-units label contains duplicate shape properties".into(),
+                    ));
+                }
+                shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"txPr" => {
+                if text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart display-units label contains duplicate text properties".into(),
+                    ));
+                }
+                text_properties = Some(ChartTextProperties::from_xml(
+                    reader
+                        .capture_fragment(element, "chart display-units label text properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"txPr" => {
+                if text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart display-units label contains duplicate text properties".into(),
+                    ));
+                }
+                text_properties = Some(ChartTextProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"f" => {
                 if formula.is_some() {
@@ -5247,7 +5322,12 @@ fn parse_display_units_label<R: BufRead>(
     } else {
         None
     };
-    Ok((label, layout))
+    Ok(ParsedDisplayUnitsLabel {
+        label,
+        layout,
+        shape_properties,
+        text_properties,
+    })
 }
 
 fn parse_date_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<DateAxis>> {
@@ -6818,6 +6898,78 @@ mod tests {
     }
 
     #[test]
+    fn round_trips_display_units_label_formatting_and_extensions() {
+        let xml = br#"<c:chartSpace
+                xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+                xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                xmlns:x="urn:example:display-units">
+            <c:chart><c:plotArea><c:valAx><c:axId val="1"/><c:scaling/>
+                <c:axPos val="l"/><c:crossAx val="2"/><c:dispUnits>
+                    <c:builtInUnit val="millions"/><c:dispUnitsLbl>
+                        <c:layout/><c:spPr><a:solidFill><a:srgbClr val="ABCDEF"/></a:solidFill></c:spPr>
+                        <c:txPr><a:bodyPr rot="600000"/><a:lstStyle/><a:p/></c:txPr>
+                    </c:dispUnitsLbl>
+                    <c:extLst><c:ext uri="display-units"><x:payload/></c:ext></c:extLst>
+                </c:dispUnits>
+            </c:valAx></c:plotArea></c:chart>
+        </c:chartSpace>"#;
+
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let Axis::Value(axis) = &chart.plot_area.axes[0] else {
+            panic!("expected value axis");
+        };
+        let display_units = axis.display_units.as_ref().unwrap();
+        assert!(display_units.show_label);
+        assert!(
+            std::str::from_utf8(
+                display_units
+                    .label_shape_properties
+                    .as_ref()
+                    .unwrap()
+                    .as_xml()
+            )
+            .unwrap()
+            .contains("ABCDEF")
+        );
+        assert!(
+            std::str::from_utf8(
+                display_units
+                    .label_text_properties
+                    .as_ref()
+                    .unwrap()
+                    .as_xml()
+            )
+            .unwrap()
+            .contains("600000")
+        );
+        assert!(
+            std::str::from_utf8(display_units.extension_list.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("payload")
+        );
+
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        let reparsed = parse_chart(output.as_slice()).unwrap();
+        let Axis::Value(reparsed_axis) = &reparsed.plot_area.axes[0] else {
+            panic!("expected value axis");
+        };
+        let reparsed_units = reparsed_axis.display_units.as_ref().unwrap();
+        assert_eq!(
+            reparsed_units.label_shape_properties,
+            display_units.label_shape_properties
+        );
+        assert_eq!(
+            reparsed_units.label_text_properties,
+            display_units.label_text_properties
+        );
+        assert_eq!(reparsed_units.extension_list, display_units.extension_list);
+
+        let duplicate = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:valAx><c:axId val="1"/><c:scaling/><c:axPos val="l"/><c:crossAx val="2"/><c:dispUnits><c:builtInUnit val="millions"/><c:dispUnitsLbl><c:spPr/><c:spPr/></c:dispUnitsLbl></c:dispUnits></c:valAx></c:plotArea></c:chart></c:chartSpace>"#;
+        assert!(parse_chart(duplicate.as_slice()).is_err());
+    }
+
+    #[test]
     fn parses_and_validates_chart_data_tables() {
         let xml =
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
@@ -7290,13 +7442,13 @@ mod tests {
         let mut axis = ValueAxis::new(1, AxisPosition::Left, 2);
         let mut units = DisplayUnits::custom(1_000.0);
         units.built_in_unit = Some(BuiltInUnit::Thousands);
-        axis.display_units = Some(units);
+        axis.display_units = Some(Box::new(units));
         chart.plot_area.axes.push(Axis::Value(axis));
         assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
 
         let mut chart = Chart::new();
         let mut axis = ValueAxis::new(1, AxisPosition::Left, 2);
-        axis.display_units = Some(DisplayUnits::custom(f64::NAN));
+        axis.display_units = Some(Box::new(DisplayUnits::custom(f64::NAN)));
         chart.plot_area.axes.push(Axis::Value(axis));
         assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
 
@@ -7927,7 +8079,7 @@ mod tests {
         display_units.show_label = true;
         display_units.label = Some(TitleText::from_string("Millions sold"));
         display_units.layout = Some(Layout::new().with_position(0.15, 0.25));
-        value.display_units = Some(display_units);
+        value.display_units = Some(Box::new(display_units));
 
         let mut date = DateAxis::new(30, AxisPosition::Top, 40);
         date.min = Some(45_000.0);

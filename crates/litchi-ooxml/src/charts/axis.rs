@@ -128,6 +128,12 @@ pub struct DisplayUnits {
     pub label: Option<TitleText>,
     /// Layout for the label
     pub layout: Option<Layout>,
+    /// Shape properties for the display-units label
+    pub label_shape_properties: Option<ChartShapeProperties>,
+    /// Text properties for the display-units label
+    pub label_text_properties: Option<ChartTextProperties>,
+    /// Display-units extension list
+    pub extension_list: Option<ChartExtensionList>,
 }
 
 impl DisplayUnits {
@@ -140,6 +146,9 @@ impl DisplayUnits {
             show_label: false,
             label: None,
             layout: None,
+            label_shape_properties: None,
+            label_text_properties: None,
+            extension_list: None,
         }
     }
 
@@ -152,6 +161,9 @@ impl DisplayUnits {
             show_label: false,
             label: None,
             layout: None,
+            label_shape_properties: None,
+            label_text_properties: None,
+            extension_list: None,
         }
     }
 }
@@ -332,8 +344,8 @@ pub struct ValueAxis {
     pub minor_unit: Option<f64>,
     /// Logarithmic scale base
     pub log_base: Option<f64>,
-    /// Display units
-    pub display_units: Option<DisplayUnits>,
+    /// Display units, boxed because this is a relatively large optional payload
+    pub display_units: Option<Box<DisplayUnits>>,
     /// Cross between categories
     pub cross_between: AxisCrossBetween,
 }

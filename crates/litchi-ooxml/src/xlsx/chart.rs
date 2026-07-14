@@ -1013,6 +1013,28 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
             .into_iter()
             .flatten(),
         );
+        if let Axis::Value(axis) = axis {
+            if let Some(display_units) = axis.display_units.as_ref() {
+                fragments.extend(
+                    [
+                        display_units
+                            .label_shape_properties
+                            .as_ref()
+                            .map(crate::charts::ChartShapeProperties::as_xml),
+                        display_units
+                            .label_text_properties
+                            .as_ref()
+                            .map(crate::charts::ChartTextProperties::as_xml),
+                        display_units
+                            .extension_list
+                            .as_ref()
+                            .map(crate::charts::ChartExtensionList::as_xml),
+                    ]
+                    .into_iter()
+                    .flatten(),
+                );
+            }
+        }
     }
     for group in &chart.plot_area.type_groups {
         match group {

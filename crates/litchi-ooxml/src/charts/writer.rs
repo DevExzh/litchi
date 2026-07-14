@@ -2370,6 +2370,8 @@ fn write_value_axis<W: Write>(writer: &mut W, axis: &ValueAxis) -> std::io::Resu
         if display_units.show_label
             || display_units.label.is_some()
             || display_units.layout.is_some()
+            || display_units.label_shape_properties.is_some()
+            || display_units.label_text_properties.is_some()
         {
             write!(writer, "<c:dispUnitsLbl>")?;
             if let Some(layout) = display_units.layout.as_ref() {
@@ -2378,7 +2380,16 @@ fn write_value_axis<W: Write>(writer: &mut W, axis: &ValueAxis) -> std::io::Resu
             if let Some(label) = display_units.label.as_ref() {
                 write_title_text(writer, label)?;
             }
+            if let Some(shape_properties) = display_units.label_shape_properties.as_ref() {
+                writer.write_all(shape_properties.as_xml())?;
+            }
+            if let Some(text_properties) = display_units.label_text_properties.as_ref() {
+                writer.write_all(text_properties.as_xml())?;
+            }
             write!(writer, "</c:dispUnitsLbl>")?;
+        }
+        if let Some(extension_list) = display_units.extension_list.as_ref() {
+            writer.write_all(extension_list.as_xml())?;
         }
         write!(writer, "</c:dispUnits>")?;
     }

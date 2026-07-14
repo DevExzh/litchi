@@ -2711,6 +2711,31 @@ mod tests {
             )
             .unwrap(),
         );
+        let crate::charts::Axis::Value(value_axis) = &mut chart.chart.plot_area.axes[1] else {
+            panic!("expected value axis");
+        };
+        let mut display_units =
+            crate::charts::axis::DisplayUnits::built_in(crate::charts::axis::BuiltInUnit::Millions);
+        display_units.show_label = true;
+        display_units.label_shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId418"/></a:blipFill></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        display_units.label_text_properties = Some(
+            crate::charts::ChartTextProperties::from_xml(
+                br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr><a:hlinkClick r:id="rId419"/></a:defRPr></a:pPr></a:p></c:txPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        display_units.extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="display-units"><x:reference r:id="rId420"/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        value_axis.display_units = Some(Box::new(display_units));
         let fragment_ids = crate::xlsx::chart::chart_fragment_relationship_ids(&chart.chart)
             .expect("relationship-bearing fragments should be valid XML");
         assert_eq!(
@@ -2731,6 +2756,9 @@ mod tests {
                 "rId415".to_string(),
                 "rId416".to_string(),
                 "rId417".to_string(),
+                "rId418".to_string(),
+                "rId419".to_string(),
+                "rId420".to_string(),
             ]
             .into()
         );
@@ -2741,7 +2769,8 @@ mod tests {
         assert!(
             [
                 "rId403", "rId404", "rId405", "rId406", "rId407", "rId408", "rId409", "rId410",
-                "rId411", "rId412", "rId413", "rId414", "rId415", "rId416", "rId417",
+                "rId411", "rId412", "rId413", "rId414", "rId415", "rId416", "rId417", "rId418",
+                "rId419", "rId420",
             ]
             .iter()
             .any(|relationship_id| error.contains(relationship_id))
