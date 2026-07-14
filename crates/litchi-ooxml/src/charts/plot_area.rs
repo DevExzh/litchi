@@ -151,6 +151,8 @@ pub struct Area3DTypeGroup {
     pub common: TypeGroupCommon,
     /// Grouping type
     pub grouping: BarGrouping,
+    /// Gap depth (0-500%)
+    pub gap_depth: Option<u32>,
 }
 
 impl Area3DTypeGroup {
@@ -160,6 +162,7 @@ impl Area3DTypeGroup {
         Self {
             common: TypeGroupCommon::new(),
             grouping,
+            gap_depth: None,
         }
     }
 }
@@ -300,7 +303,7 @@ pub struct DoughnutTypeGroup {
     pub common: TypeGroupCommon,
     /// First slice angle (0-360 degrees)
     pub first_slice_angle: u32,
-    /// Hole size (10-90%)
+    /// Hole size (1-90%)
     pub hole_size: u32,
 }
 
@@ -332,6 +335,8 @@ pub struct LineTypeGroup {
     pub grouping: BarGrouping,
     /// Show markers
     pub marker: bool,
+    /// Smooth the chart-group lines
+    pub smooth: bool,
 }
 
 impl LineTypeGroup {
@@ -342,6 +347,7 @@ impl LineTypeGroup {
             common: TypeGroupCommon::new(),
             grouping,
             marker: true,
+            smooth: false,
         }
     }
 }
@@ -353,6 +359,8 @@ pub struct Line3DTypeGroup {
     pub common: TypeGroupCommon,
     /// Grouping type
     pub grouping: BarGrouping,
+    /// Gap depth (0-500%)
+    pub gap_depth: Option<u32>,
 }
 
 impl Line3DTypeGroup {
@@ -362,6 +370,7 @@ impl Line3DTypeGroup {
         Self {
             common: TypeGroupCommon::new(),
             grouping,
+            gap_depth: None,
         }
     }
 }

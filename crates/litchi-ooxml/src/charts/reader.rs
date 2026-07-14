@@ -678,14 +678,23 @@ fn parse_common_type_group<R: BufRead>(
 
 fn parse_area_3d_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Area3DTypeGroup> {
     let mut grouping = BarGrouping::Standard;
+    let mut gap_depth = None;
     let common = parse_common_type_group(reader, b"area3DChart", |element| {
-        if element.local_name().as_ref() == b"grouping" {
-            grouping = parse_grouping(element)?;
+        match element.local_name().as_ref() {
+            b"grouping" => grouping = parse_grouping(element)?,
+            b"gapDepth" => {
+                gap_depth = Some(match get_attr(element, b"val") {
+                    Some(_) => bounded_percentage_u32_attr(element, "area 3D gap depth", 0, 500)?,
+                    None => 150,
+                });
+            },
+            _ => {},
         }
         Ok(())
     })?;
     let mut group = Area3DTypeGroup::new(grouping);
     group.common = common;
+    group.gap_depth = gap_depth;
     Ok(group)
 }
 
@@ -698,18 +707,14 @@ fn parse_bubble_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Bubb
         match element.local_name().as_ref() {
             b"bubble3D" => bubble_3d = parse_bool_attr(element)?,
             b"bubbleScale" => {
-                let value = required_u32_attr(element, "bubble scale")?;
-                if value > 300 {
-                    return Err(OoxmlError::InvalidFormat(format!(
-                        "chart bubble scale {value} exceeds 300"
-                    )));
-                }
-                bubble_scale = Some(value);
+                bubble_scale = Some(match get_attr(element, b"val") {
+                    Some(_) => bounded_percentage_u32_attr(element, "bubble scale", 0, 300)?,
+                    None => 100,
+                });
             },
             b"showNegBubbles" => show_negative_bubbles = parse_bool_attr(element)?,
             b"sizeRepresents" => {
-                let value = get_attr(element, b"val")
-                    .ok_or_else(|| missing_attribute("chart bubble size representation"))?;
+                let value = get_attr(element, b"val").unwrap_or_else(|| b"area".to_vec());
                 match value.as_slice() {
                     b"area" | b"w" => {
                         size_represents = String::from_utf8_lossy(&value).into_owned();
@@ -741,7 +746,10 @@ fn parse_doughnut_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Do
     let common = parse_common_type_group(reader, b"doughnutChart", |element| {
         match element.local_name().as_ref() {
             b"firstSliceAng" => {
-                first_slice_angle = required_u32_attr(element, "first-slice angle")?;
+                first_slice_angle = match get_attr(element, b"val") {
+                    Some(_) => required_u32_attr(element, "first-slice angle")?,
+                    None => 0,
+                };
                 if first_slice_angle > 360 {
                     return Err(OoxmlError::InvalidFormat(
                         "chart first-slice angle exceeds 360".to_string(),
@@ -749,12 +757,10 @@ fn parse_doughnut_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Do
                 }
             },
             b"holeSize" => {
-                hole_size = required_u32_attr(element, "doughnut hole size")?;
-                if !(10..=90).contains(&hole_size) {
-                    return Err(OoxmlError::InvalidFormat(
-                        "chart doughnut hole size must be between 10 and 90".to_string(),
-                    ));
-                }
+                hole_size = match get_attr(element, b"val") {
+                    Some(_) => bounded_percentage_u32_attr(element, "doughnut hole size", 1, 90)?,
+                    None => 10,
+                };
             },
             _ => {},
         }
@@ -769,14 +775,23 @@ fn parse_doughnut_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Do
 
 fn parse_line_3d_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Line3DTypeGroup> {
     let mut grouping = BarGrouping::Standard;
+    let mut gap_depth = None;
     let common = parse_common_type_group(reader, b"line3DChart", |element| {
-        if element.local_name().as_ref() == b"grouping" {
-            grouping = parse_grouping(element)?;
+        match element.local_name().as_ref() {
+            b"grouping" => grouping = parse_grouping(element)?,
+            b"gapDepth" => {
+                gap_depth = Some(match get_attr(element, b"val") {
+                    Some(_) => bounded_percentage_u32_attr(element, "line 3D gap depth", 0, 500)?,
+                    None => 150,
+                });
+            },
+            _ => {},
         }
         Ok(())
     })?;
     let mut group = Line3DTypeGroup::new(grouping);
     group.common = common;
+    group.gap_depth = gap_depth;
     Ok(group)
 }
 
@@ -1035,22 +1050,16 @@ fn parse_bar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
                         }
                     },
                     b"gapWidth" => {
-                        let value = required_u32_attr(e, "chart gap width")?;
-                        if value > 500 {
-                            return Err(OoxmlError::InvalidFormat(
-                                "chart gap width exceeds 500".to_string(),
-                            ));
-                        }
-                        gap_width = Some(value);
+                        gap_width = Some(match get_attr(e, b"val") {
+                            Some(_) => bounded_percentage_u32_attr(e, "chart gap width", 0, 500)?,
+                            None => 150,
+                        });
                     },
                     b"overlap" => {
-                        let value = required_i32_attr(e, "chart overlap")?;
-                        if !(-100..=100).contains(&value) {
-                            return Err(OoxmlError::InvalidFormat(
-                                "chart overlap must be between -100 and 100".to_string(),
-                            ));
-                        }
-                        overlap = Some(value);
+                        overlap = Some(match get_attr(e, b"val") {
+                            Some(_) => bounded_percentage_i32_attr(e, "chart overlap", -100, 100)?,
+                            None => 0,
+                        });
                     },
                     _ => {},
                 }
@@ -1113,14 +1122,19 @@ fn parse_bar_3d_chart<R: BufRead>(
                         }
                     },
                     b"gapWidth" => {
-                        gap_width = Some(bounded_u32_attr(e, "chart gap width", 0, 500)?);
+                        gap_width = Some(match get_attr(e, b"val") {
+                            Some(_) => bounded_percentage_u32_attr(e, "chart gap width", 0, 500)?,
+                            None => 150,
+                        });
                     },
                     b"gapDepth" => {
-                        gap_depth = Some(bounded_u32_attr(e, "chart gap depth", 0, 500)?);
+                        gap_depth = Some(match get_attr(e, b"val") {
+                            Some(_) => bounded_percentage_u32_attr(e, "chart gap depth", 0, 500)?,
+                            None => 150,
+                        });
                     },
                     b"shape" => {
-                        let value = get_attr(e, b"val")
-                            .ok_or_else(|| missing_attribute("chart bar shape"))?;
+                        let value = get_attr(e, b"val").unwrap_or_else(|| b"box".to_vec());
                         shape = Some(match value.as_slice() {
                             b"box" => BarShape::Box,
                             b"cone" => BarShape::Cone,
@@ -1158,6 +1172,7 @@ fn parse_line_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
     let mut grouping = BarGrouping::Standard;
     let mut common = TypeGroupCommon::new();
     let mut marker = true;
+    let mut smooth = false;
     let mut buf = Vec::new();
 
     loop {
@@ -1177,6 +1192,7 @@ fn parse_line_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
                         }
                     },
                     b"marker" => marker = parse_bool_attr(e)?,
+                    b"smooth" => smooth = parse_bool_attr(e)?,
                     _ => {},
                 }
             },
@@ -1195,6 +1211,7 @@ fn parse_line_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
     let mut group = LineTypeGroup::new(grouping);
     group.common = common;
     group.marker = marker;
+    group.smooth = smooth;
     Ok(Some(group))
 }
 
@@ -1217,7 +1234,10 @@ fn parse_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
                         }
                     },
                     b"firstSliceAng" => {
-                        first_slice_angle = bounded_u32_attr(e, "chart first-slice angle", 0, 360)?;
+                        first_slice_angle = match get_attr(e, b"val") {
+                            Some(_) => bounded_u32_attr(e, "chart first-slice angle", 0, 360)?,
+                            None => 0,
+                        };
                     },
                     _ => {},
                 }
@@ -3238,14 +3258,6 @@ fn required_u32_attr(element: &BytesStart<'_>, description: &str) -> Result<u32>
         .ok_or_else(|| invalid_attribute(description, &value))
 }
 
-fn required_i32_attr(element: &BytesStart<'_>, description: &str) -> Result<i32> {
-    let value = get_attr(element, b"val").ok_or_else(|| missing_attribute(description))?;
-    std::str::from_utf8(&value)
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .ok_or_else(|| invalid_attribute(description, &value))
-}
-
 fn required_positive_u32_attr(element: &BytesStart<'_>, description: &str) -> Result<u32> {
     let value = required_u32_attr(element, description)?;
     if value == 0 {
@@ -3317,6 +3329,26 @@ fn bounded_percentage_u32_attr(
     let digits = text.strip_suffix('%').unwrap_or(text);
     let parsed = digits
         .parse::<u32>()
+        .map_err(|_| invalid_attribute(description, &value))?;
+    if !(minimum..=maximum).contains(&parsed) {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "{description} must be between {minimum} and {maximum}"
+        )));
+    }
+    Ok(parsed)
+}
+
+fn bounded_percentage_i32_attr(
+    element: &BytesStart<'_>,
+    description: &str,
+    minimum: i32,
+    maximum: i32,
+) -> Result<i32> {
+    let value = get_attr(element, b"val").ok_or_else(|| missing_attribute(description))?;
+    let text = std::str::from_utf8(&value).map_err(|_| invalid_attribute(description, &value))?;
+    let digits = text.strip_suffix('%').unwrap_or(text);
+    let parsed = digits
+        .parse::<i32>()
         .map_err(|_| invalid_attribute(description, &value))?;
     if !(minimum..=maximum).contains(&parsed) {
         return Err(OoxmlError::InvalidFormat(format!(
@@ -3567,6 +3599,86 @@ mod tests {
     }
 
     #[test]
+    fn parses_chart_group_percentage_union_values() {
+        let xml =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea>
+                <c:barChart><c:barDir val="col"/><c:gapWidth val="225%"/><c:overlap val="-25%"/></c:barChart>
+                <c:bar3DChart><c:barDir val="bar"/><c:gapWidth/><c:gapDepth val="175%"/><c:shape/></c:bar3DChart>
+                <c:bubbleChart><c:bubbleScale val="125%"/><c:sizeRepresents/></c:bubbleChart>
+                <c:doughnutChart><c:firstSliceAng/><c:holeSize val="5%"/></c:doughnutChart>
+                <c:area3DChart><c:gapDepth val="500%"/></c:area3DChart>
+                <c:lineChart><c:smooth/></c:lineChart>
+                <c:line3DChart><c:gapDepth/></c:line3DChart>
+            </c:plotArea></c:chart>
+        </c:chartSpace>"#;
+
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let TypeGroup::Bar(bar) = &chart.plot_area.type_groups[0] else {
+            panic!("expected bar chart");
+        };
+        assert_eq!(bar.gap_width, Some(225));
+        assert_eq!(bar.overlap, Some(-25));
+        let TypeGroup::Bar3D(bar) = &chart.plot_area.type_groups[1] else {
+            panic!("expected 3D bar chart");
+        };
+        assert_eq!(bar.gap_width, Some(150));
+        assert_eq!(bar.gap_depth, Some(175));
+        assert_eq!(bar.shape, Some(BarShape::Box));
+        let TypeGroup::Bubble(bubble) = &chart.plot_area.type_groups[2] else {
+            panic!("expected bubble chart");
+        };
+        assert_eq!(bubble.bubble_scale, Some(125));
+        assert_eq!(bubble.size_represents, "area");
+        let TypeGroup::Doughnut(doughnut) = &chart.plot_area.type_groups[3] else {
+            panic!("expected doughnut chart");
+        };
+        assert_eq!(doughnut.first_slice_angle, 0);
+        assert_eq!(doughnut.hole_size, 5);
+        let TypeGroup::Area3D(area) = &chart.plot_area.type_groups[4] else {
+            panic!("expected 3D area chart");
+        };
+        assert_eq!(area.gap_depth, Some(500));
+        let TypeGroup::Line(line) = &chart.plot_area.type_groups[5] else {
+            panic!("expected line chart");
+        };
+        assert!(line.smooth);
+        let TypeGroup::Line3D(line) = &chart.plot_area.type_groups[6] else {
+            panic!("expected 3D line chart");
+        };
+        assert_eq!(line.gap_depth, Some(150));
+    }
+
+    #[test]
+    fn writer_rejects_invalid_chart_group_ranges() {
+        let mut bar = BarTypeGroup::new(BarDirection::Column, BarGrouping::Clustered);
+        bar.gap_width = Some(501);
+        let mut bar_3d = Bar3DTypeGroup::new(BarDirection::Column, BarGrouping::Clustered);
+        bar_3d.gap_depth = Some(501);
+        let mut bubble = BubbleTypeGroup::new();
+        bubble.size_represents = "diameter".to_string();
+        let mut doughnut = DoughnutTypeGroup::new();
+        doughnut.hole_size = 0;
+        let mut line_3d = Line3DTypeGroup::new(BarGrouping::Standard);
+        line_3d.gap_depth = Some(501);
+        let mut pie = PieTypeGroup::new();
+        pie.first_slice_angle = 361;
+
+        for group in [
+            TypeGroup::Bar(bar),
+            TypeGroup::Bar3D(bar_3d),
+            TypeGroup::Bubble(bubble),
+            TypeGroup::Doughnut(doughnut),
+            TypeGroup::Line3D(line_3d),
+            TypeGroup::Pie(pie),
+        ] {
+            let mut chart = Chart::new();
+            chart.plot_area.type_groups.push(group);
+            assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
+        }
+    }
+
+    #[test]
     fn writer_rejects_invalid_display_units_and_duplicate_legend_entries() {
         let mut chart = Chart::new();
         let mut axis = ValueAxis::new(1, AxisPosition::Left, 2);
@@ -3607,6 +3719,8 @@ mod tests {
 
     #[test]
     fn writer_round_trips_every_modeled_chart_group() {
+        let mut area_3d = Area3DTypeGroup::new(BarGrouping::Stacked);
+        area_3d.gap_depth = Some(175);
         let mut doughnut = DoughnutTypeGroup::new();
         doughnut.first_slice_angle = 45;
         doughnut.hole_size = 60;
@@ -3688,11 +3802,15 @@ mod tests {
         of_pie.split_position = Some(3.5);
         of_pie.custom_split_points = Some(vec![1, 4]);
         of_pie.second_pie_size = Some(80);
+        let mut line = LineTypeGroup::new(BarGrouping::Standard);
+        line.smooth = true;
+        let mut line_3d = Line3DTypeGroup::new(BarGrouping::PercentStacked);
+        line_3d.gap_depth = Some(210);
 
         let mut chart = Chart::new();
         chart.plot_area.type_groups = vec![
             TypeGroup::Area(AreaTypeGroup::new(BarGrouping::Standard)),
-            TypeGroup::Area3D(Area3DTypeGroup::new(BarGrouping::Stacked)),
+            TypeGroup::Area3D(area_3d),
             TypeGroup::Bar(BarTypeGroup::new(
                 BarDirection::Column,
                 BarGrouping::Clustered,
@@ -3700,8 +3818,8 @@ mod tests {
             TypeGroup::Bar3D(Bar3DTypeGroup::new(BarDirection::Bar, BarGrouping::Stacked)),
             TypeGroup::Bubble(bubble),
             TypeGroup::Doughnut(doughnut),
-            TypeGroup::Line(LineTypeGroup::new(BarGrouping::Standard)),
-            TypeGroup::Line3D(Line3DTypeGroup::new(BarGrouping::PercentStacked)),
+            TypeGroup::Line(line),
+            TypeGroup::Line3D(line_3d),
             TypeGroup::OfPie(of_pie),
             TypeGroup::Pie(PieTypeGroup::new()),
             TypeGroup::Pie3D(Pie3DTypeGroup::new()),
@@ -3725,6 +3843,10 @@ mod tests {
             parsed.plot_area.type_groups[1],
             TypeGroup::Area3D(_)
         ));
+        let TypeGroup::Area3D(group) = &parsed.plot_area.type_groups[1] else {
+            unreachable!();
+        };
+        assert_eq!(group.gap_depth, Some(175));
         assert!(matches!(
             parsed.plot_area.type_groups[4],
             TypeGroup::Bubble(_)
@@ -3737,6 +3859,14 @@ mod tests {
             parsed.plot_area.type_groups[7],
             TypeGroup::Line3D(_)
         ));
+        let TypeGroup::Line(group) = &parsed.plot_area.type_groups[6] else {
+            unreachable!();
+        };
+        assert!(group.smooth);
+        let TypeGroup::Line3D(group) = &parsed.plot_area.type_groups[7] else {
+            unreachable!();
+        };
+        assert_eq!(group.gap_depth, Some(210));
         assert!(matches!(parsed.plot_area.type_groups[9], TypeGroup::Pie(_)));
         assert!(matches!(
             parsed.plot_area.type_groups[10],

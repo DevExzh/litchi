@@ -379,6 +379,7 @@ fn write_area_chart<W: Write>(writer: &mut W, group: &AreaTypeGroup) -> std::io:
 }
 
 fn write_area_3d_chart<W: Write>(writer: &mut W, group: &Area3DTypeGroup) -> std::io::Result<()> {
+    validate_optional_u32_range(group.gap_depth, 0, 500, "area 3D chart gap depth")?;
     write!(writer, "<c:area3DChart>")?;
     write!(
         writer,
@@ -396,6 +397,9 @@ fn write_area_3d_chart<W: Write>(writer: &mut W, group: &Area3DTypeGroup) -> std
     }
 
     write_data_labels_default(writer)?;
+    if let Some(gap_depth) = group.gap_depth {
+        write!(writer, r#"<c:gapDepth val="{gap_depth}"/>"#)?;
+    }
     write!(writer, r#"<c:axId val="1"/><c:axId val="2"/>"#)?;
     write!(writer, "</c:area3DChart>")?;
 
@@ -403,6 +407,15 @@ fn write_area_3d_chart<W: Write>(writer: &mut W, group: &Area3DTypeGroup) -> std
 }
 
 fn write_bar_chart<W: Write>(writer: &mut W, group: &BarTypeGroup) -> std::io::Result<()> {
+    validate_optional_u32_range(group.gap_width, 0, 500, "bar chart gap width")?;
+    if group
+        .overlap
+        .is_some_and(|value| !(-100..=100).contains(&value))
+    {
+        return Err(invalid_chart_input(
+            "bar chart overlap must be between -100 and 100",
+        ));
+    }
     write!(writer, "<c:barChart>")?;
     write!(
         writer,
@@ -443,6 +456,8 @@ fn write_bar_chart<W: Write>(writer: &mut W, group: &BarTypeGroup) -> std::io::R
 }
 
 fn write_bar_3d_chart<W: Write>(writer: &mut W, group: &Bar3DTypeGroup) -> std::io::Result<()> {
+    validate_optional_u32_range(group.gap_width, 0, 500, "bar 3D chart gap width")?;
+    validate_optional_u32_range(group.gap_depth, 0, 500, "bar 3D chart gap depth")?;
     write!(writer, "<c:bar3DChart>")?;
     write!(
         writer,
@@ -485,6 +500,12 @@ fn write_bar_3d_chart<W: Write>(writer: &mut W, group: &Bar3DTypeGroup) -> std::
 }
 
 fn write_bubble_chart<W: Write>(writer: &mut W, group: &BubbleTypeGroup) -> std::io::Result<()> {
+    validate_optional_u32_range(group.bubble_scale, 0, 300, "bubble chart scale")?;
+    if !matches!(group.size_represents.as_str(), "area" | "w") {
+        return Err(invalid_chart_input(
+            "bubble chart size representation must be 'area' or 'w'",
+        ));
+    }
     write!(writer, "<c:bubbleChart>")?;
     write!(
         writer,
@@ -533,6 +554,16 @@ fn write_doughnut_chart<W: Write>(
     writer: &mut W,
     group: &DoughnutTypeGroup,
 ) -> std::io::Result<()> {
+    if group.first_slice_angle > 360 {
+        return Err(invalid_chart_input(
+            "doughnut chart first-slice angle must be between 0 and 360",
+        ));
+    }
+    if !(1..=90).contains(&group.hole_size) {
+        return Err(invalid_chart_input(
+            "doughnut chart hole size must be between 1 and 90",
+        ));
+    }
     write!(writer, "<c:doughnutChart>")?;
     write!(
         writer,
@@ -579,6 +610,11 @@ fn write_line_chart<W: Write>(writer: &mut W, group: &LineTypeGroup) -> std::io:
         r#"<c:marker val="{}"/>"#,
         if group.marker { "1" } else { "0" }
     )?;
+    write!(
+        writer,
+        r#"<c:smooth val="{}"/>"#,
+        if group.smooth { "1" } else { "0" }
+    )?;
     write!(writer, r#"<c:axId val="1"/><c:axId val="2"/>"#)?;
     write!(writer, "</c:lineChart>")?;
 
@@ -586,6 +622,7 @@ fn write_line_chart<W: Write>(writer: &mut W, group: &LineTypeGroup) -> std::io:
 }
 
 fn write_line_3d_chart<W: Write>(writer: &mut W, group: &Line3DTypeGroup) -> std::io::Result<()> {
+    validate_optional_u32_range(group.gap_depth, 0, 500, "line 3D chart gap depth")?;
     write!(writer, "<c:line3DChart>")?;
     write!(
         writer,
@@ -603,13 +640,24 @@ fn write_line_3d_chart<W: Write>(writer: &mut W, group: &Line3DTypeGroup) -> std
     }
 
     write_data_labels_default(writer)?;
-    write!(writer, r#"<c:axId val="1"/><c:axId val="2"/>"#)?;
+    if let Some(gap_depth) = group.gap_depth {
+        write!(writer, r#"<c:gapDepth val="{gap_depth}"/>"#)?;
+    }
+    write!(
+        writer,
+        r#"<c:axId val="1"/><c:axId val="2"/><c:axId val="3"/>"#
+    )?;
     write!(writer, "</c:line3DChart>")?;
 
     Ok(())
 }
 
 fn write_pie_chart<W: Write>(writer: &mut W, group: &PieTypeGroup) -> std::io::Result<()> {
+    if group.first_slice_angle > 360 {
+        return Err(invalid_chart_input(
+            "pie chart first-slice angle must be between 0 and 360",
+        ));
+    }
     write!(writer, "<c:pieChart>")?;
     write!(
         writer,
@@ -992,6 +1040,20 @@ fn write_data_point<W: Write>(writer: &mut W, point: &DataPoint) -> std::io::Res
 
 fn invalid_chart_input(message: impl Into<String>) -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::InvalidInput, message.into())
+}
+
+fn validate_optional_u32_range(
+    value: Option<u32>,
+    minimum: u32,
+    maximum: u32,
+    description: &str,
+) -> std::io::Result<()> {
+    if value.is_some_and(|value| !(minimum..=maximum).contains(&value)) {
+        return Err(invalid_chart_input(format!(
+            "{description} must be between {minimum} and {maximum}"
+        )));
+    }
+    Ok(())
 }
 
 fn write_data_labels<W: Write>(writer: &mut W, labels: &DataLabels) -> std::io::Result<()> {
