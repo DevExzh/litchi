@@ -63,6 +63,7 @@ pub mod format;
 pub mod handout;
 pub mod hyperlinks;
 pub mod media;
+mod namespace;
 pub mod package;
 pub mod parts;
 pub mod presentation;

@@ -2,10 +2,15 @@
 ///
 /// This module contains parts for slides, slide layouts, and slide masters.
 use crate::error::{OoxmlError, Result};
+use crate::pptx::namespace::{
+    is_presentationml_name, presentation_name, relationship_attribute_value,
+    scan_presentationml_element_ranges,
+};
 use crate::pptx::shapes::base::{BaseShape, ShapeType};
+use crate::pptx::shapes::textframe::extract_drawingml_text;
 use litchi_opc::part::Part;
-use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::reader::NsReader;
 
 /// A slide part.
 ///
@@ -31,66 +36,14 @@ impl<'a> SlidePart<'a> {
     ///
     /// Returns the name attribute from the <p:cSld> element.
     pub fn name(&self) -> Result<String> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"cSld" => {
-                    for attr in e.attributes().flatten() {
-                        if attr.key.as_ref() == b"name" {
-                            let name = std::str::from_utf8(&attr.value)
-                                .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                            return Ok(name.to_string());
-                        }
-                    }
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
-        Ok(String::new())
+        presentation_name(self.xml_bytes())
     }
 
     /// Extract all text content from the slide.
     ///
     /// This extracts text from all `<a:t>` elements in the slide (DrawingML text).
     pub fn extract_text(&self) -> Result<String> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
-
-        let mut text = String::new();
-        let mut in_text_element = false;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e))
-                    // Check if this is an a:t element (DrawingML text)
-                    if e.local_name().as_ref() == b"t" => {
-                        in_text_element = true;
-                    },
-                Ok(Event::Text(e)) if in_text_element => {
-                    // Extract text content
-                    let t = std::str::from_utf8(e.as_ref())
-                        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                    if !text.is_empty() && !text.ends_with('\n') {
-                        text.push('\n');
-                    }
-                    text.push_str(t);
-                },
-                Ok(Event::End(e))
-                    if e.local_name().as_ref() == b"t" => {
-                        in_text_element = false;
-                    },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
-        Ok(text)
+        extract_drawingml_text(self.xml_bytes(), Some('\n'))
     }
 
     /// Get the underlying OPC part.
@@ -104,108 +57,35 @@ impl<'a> SlidePart<'a> {
     /// Returns a vector of BaseShape objects that can be checked for type
     /// and converted to specific shape types.
     pub fn shapes(&self) -> Result<Vec<BaseShape>> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
-
         let mut shapes = Vec::new();
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(ref e)) => {
-                    let local_name = e.local_name();
-                    let tag_name_bytes = local_name.as_ref();
-
-                    // Extract individual shape elements
-                    let shape_type = match tag_name_bytes {
-                        b"sp" => Some(ShapeType::Shape),                  // Text shape
-                        b"pic" => Some(ShapeType::Picture),               // Picture
-                        b"graphicFrame" => Some(ShapeType::GraphicFrame), // Table/Chart
-                        b"grpSp" => Some(ShapeType::GroupShape),          // Group
-                        b"cxnSp" => Some(ShapeType::Connector),           // Connector
-                        _ => None,
-                    };
-
-                    if let Some(st) = shape_type {
-                        // Create a new buffer for extracting shape XML
-                        let mut shape_buf = Vec::new();
-                        // Extract the complete shape XML
-                        if let Ok(shape_xml) =
-                            Self::extract_shape_xml(&mut reader, tag_name_bytes, &mut shape_buf)
-                        {
-                            shapes.push(BaseShape::new(shape_xml, st));
-                        }
-                    }
-                },
-                Ok(Event::Eof) => break,
-                Err(_) => break,
-                _ => {},
-            }
-        }
-
+        const TARGETS: &[&[u8]] = &[b"sp", b"pic", b"graphicFrame", b"grpSp", b"cxnSp"];
+        const TYPES: &[ShapeType] = &[
+            ShapeType::Shape,
+            ShapeType::Picture,
+            ShapeType::GraphicFrame,
+            ShapeType::GroupShape,
+            ShapeType::Connector,
+        ];
+        scan_presentationml_element_ranges(self.xml_bytes(), TARGETS, |target, start, length| {
+            let start = usize::try_from(start).map_err(|_| {
+                OoxmlError::InvalidFormat("shape offset does not fit usize".to_string())
+            })?;
+            let length = usize::try_from(length).map_err(|_| {
+                OoxmlError::InvalidFormat("shape length does not fit usize".to_string())
+            })?;
+            let end = start.checked_add(length).ok_or_else(|| {
+                OoxmlError::InvalidFormat("shape byte range overflow".to_string())
+            })?;
+            let xml = self.xml_bytes().get(start..end).ok_or_else(|| {
+                OoxmlError::InvalidFormat("shape byte range is outside slide XML".to_string())
+            })?;
+            let shape_type = TYPES.get(target).ok_or_else(|| {
+                OoxmlError::InvalidFormat("invalid shape range target".to_string())
+            })?;
+            shapes.push(BaseShape::new(xml.to_vec(), shape_type.clone()));
+            Ok(())
+        })?;
         Ok(shapes)
-    }
-
-    /// Helper to extract complete shape XML.
-    fn extract_shape_xml(
-        reader: &mut Reader<&[u8]>,
-        tag_name: &[u8],
-        _buf: &mut Vec<u8>,
-    ) -> Result<Vec<u8>> {
-        let mut shape_xml = Vec::new();
-        let mut depth = 1;
-
-        // Start tag already consumed, write it
-        shape_xml.push(b'<');
-        shape_xml.extend_from_slice(tag_name);
-        shape_xml.push(b'>');
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    depth += 1;
-                    shape_xml.push(b'<');
-                    shape_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        shape_xml.push(b' ');
-                        shape_xml.extend_from_slice(attr.key.as_ref());
-                        shape_xml.extend_from_slice(b"=\"");
-                        shape_xml.extend_from_slice(&attr.value);
-                        shape_xml.push(b'"');
-                    }
-                    shape_xml.push(b'>');
-                },
-                Ok(Event::End(e)) => {
-                    shape_xml.extend_from_slice(b"</");
-                    shape_xml.extend_from_slice(e.name().as_ref());
-                    shape_xml.push(b'>');
-
-                    depth -= 1;
-                    if depth == 0 {
-                        return Ok(shape_xml);
-                    }
-                },
-                Ok(Event::Text(e)) => {
-                    shape_xml.extend_from_slice(e.as_ref());
-                },
-                Ok(Event::Empty(e)) => {
-                    shape_xml.push(b'<');
-                    shape_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        shape_xml.push(b' ');
-                        shape_xml.extend_from_slice(attr.key.as_ref());
-                        shape_xml.extend_from_slice(b"=\"");
-                        shape_xml.extend_from_slice(&attr.value);
-                        shape_xml.push(b'"');
-                    }
-                    shape_xml.extend_from_slice(b"/>");
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
-        Err(OoxmlError::Xml("Unexpected end of shape XML".to_string()))
     }
 
     /// Get the transition effect for this slide.
@@ -247,27 +127,7 @@ impl<'a> SlideLayoutPart<'a> {
 
     /// Get the layout name.
     pub fn name(&self) -> Result<String> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"cSld" => {
-                    for attr in e.attributes().flatten() {
-                        if attr.key.as_ref() == b"name" {
-                            let name = std::str::from_utf8(&attr.value)
-                                .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                            return Ok(name.to_string());
-                        }
-                    }
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
-        Ok(String::new())
+        presentation_name(self.xml_bytes())
     }
 
     /// Get the underlying OPC part.
@@ -299,61 +159,39 @@ impl<'a> SlideMasterPart<'a> {
 
     /// Get the master name.
     pub fn name(&self) -> Result<String> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"cSld" => {
-                    for attr in e.attributes().flatten() {
-                        if attr.key.as_ref() == b"name" {
-                            let name = std::str::from_utf8(&attr.value)
-                                .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                            return Ok(name.to_string());
-                        }
-                    }
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
-        Ok(String::new())
+        presentation_name(self.xml_bytes())
     }
 
     /// Get the relationship IDs of all slide layouts in this master.
     pub fn slide_layout_rids(&self) -> Result<Vec<String>> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
+        let mut reader = NsReader::from_reader(self.xml_bytes());
 
         let mut rids = Vec::new();
 
         loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e))
-                    if e.local_name().as_ref() == b"sldLayoutId" =>
+            let decoder = reader.decoder();
+            let event = reader
+                .read_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                .into_owned();
+            let resolver = reader.resolver().clone();
+            let (namespace, event) = resolver.resolve_event(event);
+            match event {
+                Event::Start(element) | Event::Empty(element)
+                    if is_presentationml_name(&namespace, element.name(), b"sldLayoutId") =>
                 {
-                    for attr in e.attributes().flatten() {
-                        // Look for r:id attribute (can be r:id or just id with relationships namespace)
-                        let key = attr.key.as_ref();
-                        // Check if this is the relationship ID attribute
-                        if key == b"r:id"
-                            || (key.starts_with(b"r:") && attr.key.local_name().as_ref() == b"id")
-                            || attr.key.local_name().as_ref() == b"id"
-                        {
-                            let rid = std::str::from_utf8(&attr.value)
-                                .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                            // Only push if it looks like a relationship ID (starts with "rId")
-                            if rid.starts_with("rId") {
-                                rids.push(rid.to_string());
-                                break;
-                            }
+                    if let Some(rid) =
+                        relationship_attribute_value(&element, b"id", decoder, &resolver)?
+                    {
+                        if rid.is_empty() {
+                            return Err(OoxmlError::InvalidFormat(
+                                "empty slide-layout relationship ID".to_string(),
+                            ));
                         }
+                        rids.push(rid);
                     }
                 },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+                Event::Eof => break,
                 _ => {},
             }
         }
@@ -365,5 +203,101 @@ impl<'a> SlideMasterPart<'a> {
     #[inline]
     pub fn part(&self) -> &'a dyn Part {
         self.part
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_opc::packuri::PackURI;
+    use litchi_opc::part::BlobPart;
+
+    const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+    const A: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
+    const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+
+    fn part(path: &str, xml: impl Into<Vec<u8>>) -> BlobPart {
+        BlobPart::new(
+            PackURI::new(path).unwrap(),
+            "application/xml".to_string(),
+            xml.into(),
+        )
+    }
+
+    #[test]
+    fn slide_metadata_and_text_resolve_namespaces() {
+        let xml = format!(
+            r#"<q:sld xmlns:q="{P}" xmlns:d="{A}" xmlns:f="urn:foreign">
+                <f:cSld name="Spoof"/><q:cSld name="A &amp; B"><q:spTree>
+                    <q:sp><q:txBody><d:p><d:r><d:t xml:space="preserve"> One &amp; <![CDATA[Two]]></d:t></d:r></d:p>
+                        <d:p><d:r><d:t>Three</d:t></d:r></d:p></q:txBody></q:sp>
+                    <f:t>Ignored</f:t>
+                </q:spTree></q:cSld></q:sld>"#
+        );
+        let blob = part("/ppt/slides/slide1.xml", xml);
+        let slide = SlidePart::from_part(&blob).unwrap();
+        assert_eq!(slide.name().unwrap(), "A & B");
+        assert_eq!(slide.extract_text().unwrap(), " One & Two\nThree");
+    }
+
+    #[test]
+    fn shapes_are_namespace_filtered_and_preserve_source_xml() {
+        let xml = format!(
+            r#"<p:sld xmlns:p="{P}" xmlns:a="{A}" xmlns:f="urn:foreign"><p:cSld><p:spTree>
+                <f:sp><f:cNvPr name="Spoof"/></f:sp>
+                <p:sp custom="kept"><p:nvSpPr><p:cNvPr name="Real &amp; Name"/></p:nvSpPr>
+                    <p:txBody><a:p><a:r><a:t><![CDATA[A < B]]></a:t></a:r></a:p></p:txBody>
+                    <!--keep-comment--><p:extLst><f:data key="value"/></p:extLst>
+                </p:sp>
+                <p:pic/><p:graphicFrame/><p:cxnSp/>
+            </p:spTree></p:cSld></p:sld>"#
+        );
+        let blob = part("/ppt/slides/slide1.xml", xml);
+        let slide = SlidePart::from_part(&blob).unwrap();
+        let mut shapes = slide.shapes().unwrap();
+        assert_eq!(shapes.len(), 4);
+        assert_eq!(shapes[0].shape_type(), &ShapeType::Shape);
+        assert_eq!(shapes[0].name().unwrap(), "Real & Name");
+        let raw = std::str::from_utf8(shapes[0].xml_bytes()).unwrap();
+        assert!(raw.starts_with("<p:sp custom=\"kept\">"));
+        assert!(raw.contains("<![CDATA[A < B]]>"));
+        assert!(raw.contains("<!--keep-comment-->"));
+        assert!(raw.ends_with("</p:sp>"));
+        assert_eq!(shapes[1].shape_type(), &ShapeType::Picture);
+        assert_eq!(shapes[2].shape_type(), &ShapeType::GraphicFrame);
+        assert_eq!(shapes[3].shape_type(), &ShapeType::Connector);
+    }
+
+    #[test]
+    fn strict_aliases_and_relationship_aliases_are_supported() {
+        let xml = r#"<x:sldMaster xmlns:x="http://purl.oclc.org/ooxml/presentationml/main"
+            xmlns:rel="http://purl.oclc.org/ooxml/officeDocument/relationships"
+            xmlns:f="urn:foreign"><x:cSld name="Strict"/>
+            <x:sldLayoutIdLst><f:sldLayoutId rel:id="spoof"/>
+                <x:sldLayoutId f:id="wrong" rel:id="layout-alpha"/>
+            </x:sldLayoutIdLst></x:sldMaster>"#;
+        let blob = part("/ppt/slideMasters/slideMaster1.xml", xml);
+        let master = SlideMasterPart::from_part(&blob).unwrap();
+        assert_eq!(master.name().unwrap(), "Strict");
+        assert_eq!(master.slide_layout_rids().unwrap(), ["layout-alpha"]);
+    }
+
+    #[test]
+    fn malformed_slide_xml_is_reported() {
+        let xml = format!(r#"<p:sld xmlns:p="{P}"><p:sp>"#);
+        let blob = part("/ppt/slides/slide1.xml", xml);
+        let slide = SlidePart::from_part(&blob).unwrap();
+        assert!(slide.shapes().is_err());
+    }
+
+    #[test]
+    fn duplicate_relationship_attributes_are_rejected() {
+        let xml = format!(
+            r#"<p:sldMaster xmlns:p="{P}" xmlns:r="{R}" xmlns:q="{R}">
+                <p:sldLayoutId r:id="one" q:id="two"/></p:sldMaster>"#
+        );
+        let blob = part("/ppt/slideMasters/slideMaster1.xml", xml);
+        let master = SlideMasterPart::from_part(&blob).unwrap();
+        assert!(master.slide_layout_rids().is_err());
     }
 }

@@ -3,14 +3,11 @@ use crate::common::xml::{
     DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE, unqualified_attribute_value,
 };
 use crate::error::{OoxmlError, Result};
+use crate::pptx::namespace::is_presentationml_name;
 use crate::pptx::shapes::textframe::TextFrame;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
-
-const PRESENTATIONML_NAMESPACE: &[u8] =
-    b"http://schemas.openxmlformats.org/presentationml/2006/main";
-const STRICT_PRESENTATIONML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
 
 fn is_shape_name(
     namespace: &ResolveResult<'_>,
@@ -30,21 +27,6 @@ fn is_shape_name(
         ResolveResult::Unknown(prefix) => prefix.as_slice() == expected_prefix,
         ResolveResult::Unbound => false,
     }
-}
-
-fn is_presentationml_name(
-    namespace: &ResolveResult<'_>,
-    name: QName<'_>,
-    local_name: &[u8],
-) -> bool {
-    is_shape_name(
-        namespace,
-        name,
-        local_name,
-        b"p",
-        PRESENTATIONML_NAMESPACE,
-        STRICT_PRESENTATIONML_NAMESPACE,
-    )
 }
 
 fn is_drawingml_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: &[u8]) -> bool {
