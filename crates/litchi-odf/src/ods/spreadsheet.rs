@@ -54,6 +54,10 @@ pub struct Spreadsheet {
 }
 
 impl Spreadsheet {
+    pub(crate) fn into_package(self) -> OwnedPackage {
+        self.package
+    }
+
     pub(crate) fn content_xml(&self) -> &str {
         self.content.xml_content()
     }
@@ -447,54 +451,7 @@ impl Spreadsheet {
     /// # }
     /// ```
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        use crate::core::PackageWriter;
-
-        let mut writer = PackageWriter::new();
-
-        // Set MIME type
-        writer.set_mimetype(&self.package.mimetype()?)?;
-
-        // Add content.xml
-        let content_xml = self.content.xml_content();
-        writer.add_file("content.xml", content_xml.as_bytes())?;
-
-        // Add styles.xml if present
-        if let Some(ref styles) = self.styles {
-            let styles_xml = styles.xml_content();
-            writer.add_file("styles.xml", styles_xml.as_bytes())?;
-        }
-
-        // Add meta.xml if present
-        if let Some(ref meta) = self.meta {
-            let meta_xml = meta.xml_content();
-            writer.add_file("meta.xml", meta_xml.as_bytes())?;
-        }
-
-        // Copy settings.xml if present
-        if self.package.has_file("settings.xml")? {
-            let settings_bytes = self.package.get_file("settings.xml")?;
-            writer.add_file("settings.xml", &settings_bytes)?;
-        }
-
-        // Copy all media files (images, charts, etc.) from the original package
-        let media_files = self.package.media_files()?;
-        for media_path in media_files {
-            if let Ok(media_bytes) = self.package.get_file(&media_path) {
-                writer.add_file(&media_path, &media_bytes)?;
-            }
-        }
-
-        // Copy other common ODF files if they exist
-        let other_files = vec!["Thumbnails/thumbnail.png", "Configurations2/"];
-        for file_path in other_files {
-            if self.package.has_file(file_path)?
-                && let Ok(file_bytes) = self.package.get_file(file_path)
-            {
-                writer.add_file(file_path, &file_bytes)?;
-            }
-        }
-
-        writer.finish_to_bytes()
+        Ok(self.package.as_bytes().to_vec())
     }
 
     // Note: DELETE operations are available via `MutableSpreadsheet`. To modify this spreadsheet:

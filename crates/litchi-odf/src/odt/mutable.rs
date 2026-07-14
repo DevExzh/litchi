@@ -8,7 +8,7 @@ use crate::elements::parser::DocumentOrderElement;
 use crate::elements::table::Table;
 use crate::elements::text::{Heading, List, Paragraph};
 use crate::odt::Document;
-use litchi_core::{Error, Metadata, Result, xml::escape_xml};
+use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
 
 /// Document element type for tracking insertion order
@@ -673,53 +673,12 @@ impl MutableDocument {
         let meta_xml = self.generate_meta_xml();
         writer.add_file("meta.xml", meta_xml.as_bytes())?;
 
-        if let Some(source) = &self.source_package {
-            let package = source.package()?;
-            if package.manifest().has_encrypted_entries() {
-                return Err(Error::InvalidFormat(
-                    "Cannot safely rewrite an ODT package containing encrypted entries".to_string(),
-                ));
-            }
-
-            // Some ODF directories exist only in the manifest. Retain them so
-            // embedded objects and application-specific package trees keep their
-            // declared media types.
-            for entry in package.manifest().entries.values() {
-                if entry.full_path.ends_with('/') && !is_regenerated_package_part(&entry.full_path)
-                {
-                    writer.add_manifest_entry(&entry.full_path, &entry.media_type)?;
-                }
-            }
-
-            for path in package.files()? {
-                if path.ends_with('/') || is_regenerated_package_part(&path) {
-                    continue;
-                }
-
-                let bytes = package.get_file(&path)?;
-                if let Some(media_type) = package.manifest().get_media_type(&path) {
-                    writer.add_file_with_media_type(&path, &bytes, media_type)?;
-                } else {
-                    writer.add_file(&path, &bytes)?;
-                }
-            }
+        if let Some(package) = &self.source_package {
+            writer.copy_auxiliary_files_from(package)?;
         }
 
         writer.finish_to_bytes()
     }
-}
-
-fn is_regenerated_package_part(path: &str) -> bool {
-    matches!(
-        path,
-        "/" | "mimetype"
-            | "content.xml"
-            | "styles.xml"
-            | "meta.xml"
-            | "manifest.xml"
-            | "META-INF/"
-            | "META-INF/manifest.xml"
-    ) || (path.starts_with("META-INF/") && path.ends_with("signatures.xml"))
 }
 
 impl Default for MutableDocument {
@@ -873,7 +832,9 @@ mod tests {
             .add_file("META-INF/documentsignatures.xml", b"stale signature")
             .unwrap();
 
-        let source = Document::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+        let source_bytes = writer.finish_to_bytes().unwrap();
+        let source = Document::from_bytes(source_bytes.clone()).unwrap();
+        assert_eq!(source.to_bytes().unwrap(), source_bytes);
         let mut mutable = MutableDocument::from_document(source).unwrap();
         mutable.add_paragraph("Modified").unwrap();
         let output = crate::core::OwnedPackage::from_bytes(mutable.to_bytes().unwrap()).unwrap();

@@ -3,7 +3,7 @@
 //! This module provides a mutable wrapper around ODS spreadsheets that allows
 //! for in-place modification of sheets, rows, and cells.
 
-use crate::core::{OdfStructure, PackageWriter};
+use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
 use crate::ods::{
     Cell, CellAnnotation, CellValue, Column, ContentValidation, NamedDefinition,
     NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings,
@@ -62,6 +62,8 @@ pub struct MutableSpreadsheet {
     named_definitions: Vec<NamedDefinition>,
     content_validations: Vec<ContentValidation>,
     protection: SpreadsheetProtection,
+    /// Original package retained for copying auxiliary package parts.
+    source_package: Option<OwnedPackage>,
 }
 
 impl MutableSpreadsheet {
@@ -143,6 +145,7 @@ impl MutableSpreadsheet {
         let content_validations = spreadsheet.content_validations().to_vec();
         let protection = spreadsheet.protection().clone();
         let mimetype = "application/vnd.oasis.opendocument.spreadsheet".to_string();
+        let source_package = Some(spreadsheet.into_package());
 
         Ok(Self {
             sheets,
@@ -154,6 +157,7 @@ impl MutableSpreadsheet {
             named_definitions,
             content_validations,
             protection,
+            source_package,
         })
     }
 
@@ -169,6 +173,7 @@ impl MutableSpreadsheet {
             named_definitions: Vec::new(),
             content_validations: Vec::new(),
             protection: SpreadsheetProtection::default(),
+            source_package: None,
         }
     }
 
@@ -1286,6 +1291,10 @@ impl MutableSpreadsheet {
         let meta_xml = self.generate_meta_xml();
         writer.add_file("meta.xml", meta_xml.as_bytes())?;
 
+        if let Some(package) = &self.source_package {
+            writer.copy_auxiliary_files_from(package)?;
+        }
+
         writer.finish_to_bytes()
     }
 }
@@ -1313,6 +1322,17 @@ mod tests {
             .unwrap();
         writer.add_file("content.xml", content.as_bytes()).unwrap();
         writer.add_file("styles.xml", styles.as_bytes()).unwrap();
+        writer.add_file("settings.xml", b"sheet settings").unwrap();
+        writer
+            .add_manifest_entry("Object 1/", "application/vnd.oasis.opendocument.text")
+            .unwrap();
+        writer
+            .add_file_with_media_type(
+                "custom/data.bin",
+                b"spreadsheet custom data",
+                "application/x-ods-test",
+            )
+            .unwrap();
         writer.finish_to_bytes().unwrap()
     }
 
@@ -1483,7 +1503,9 @@ mod tests {
 
     #[test]
     fn mutable_spreadsheet_preserves_and_resolves_cell_styles() {
-        let mut spreadsheet = Spreadsheet::from_bytes(package_with_cell_styles()).unwrap();
+        let source_bytes = package_with_cell_styles();
+        let mut spreadsheet = Spreadsheet::from_bytes(source_bytes.clone()).unwrap();
+        assert_eq!(spreadsheet.to_bytes().unwrap(), source_bytes);
         let sheets = spreadsheet.sheets().unwrap();
         let cell = &sheets[0].rows[0].cells[0];
         assert_eq!(cell.style_name(), Some("Auto&Locked"));
@@ -1502,6 +1524,20 @@ mod tests {
         assert_eq!(content.matches("xmlns:s=").count(), 1);
         assert!(content.contains(r#"table:style-name="Auto&amp;Locked""#));
         assert!(styles.contains(r#"style:name="Named&amp;Locked""#));
+        assert_eq!(package.get_file("settings.xml").unwrap(), b"sheet settings");
+        assert_eq!(
+            package.get_file("custom/data.bin").unwrap(),
+            b"spreadsheet custom data"
+        );
+        let borrowed = package.package().unwrap();
+        assert_eq!(
+            borrowed.manifest().get_media_type("Object 1/"),
+            Some("application/vnd.oasis.opendocument.text")
+        );
+        assert_eq!(
+            borrowed.manifest().get_media_type("custom/data.bin"),
+            Some("application/x-ods-test")
+        );
 
         let mut output = Spreadsheet::from_bytes(bytes).unwrap();
         let sheets = output.sheets().unwrap();

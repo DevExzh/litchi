@@ -41,7 +41,7 @@ pub struct MutablePresentation {
     mimetype: String,
     /// Original styles XML (preserved as-is)
     styles_xml: Option<String>,
-    /// Original package retained for lazy copying of embedded media and settings.
+    /// Original package retained for copying auxiliary package parts.
     source_package: Option<OwnedPackage>,
 }
 
@@ -560,14 +560,7 @@ impl MutablePresentation {
         writer.add_file("meta.xml", meta_xml.as_bytes())?;
 
         if let Some(package) = &self.source_package {
-            if package.has_file("settings.xml")? {
-                writer.add_file("settings.xml", &package.get_file("settings.xml")?)?;
-            }
-            for media_path in package.media_files()? {
-                if let Ok(media) = package.get_file(&media_path) {
-                    writer.add_file(&media_path, &media)?;
-                }
-            }
+            writer.copy_auxiliary_files_from(package)?;
         }
 
         writer.finish_to_bytes()
@@ -587,8 +580,9 @@ mod tests {
     const STYLES: &str = r#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:styles><office:marker>preserve-me</office:marker></office:styles></office:document-styles>"#;
     const SETTINGS: &[u8] = b"<settings>presentation-settings</settings>";
     const IMAGE: &[u8] = b"\x89PNG\r\n\x1a\nimage-payload";
+    const CUSTOM: &[u8] = b"custom-presentation-data";
 
-    fn presentation_with_image() -> Presentation {
+    fn presentation_bytes_with_image() -> Vec<u8> {
         let content = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:presentation><draw:page draw:name="Media"><draw:frame draw:name="Photo" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm"><draw:image xlink:href="Pictures/a&amp;b.png" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame><draw:line draw:name="Rule" svg:x1="1cm" svg:y1="1cm" svg:x2="5cm" svg:y2="1cm"/></draw:page></office:presentation></office:body></office:document-content>"#;
         let mut writer = PackageWriter::new();
         writer
@@ -598,12 +592,20 @@ mod tests {
         writer.add_file("styles.xml", STYLES.as_bytes()).unwrap();
         writer.add_file("settings.xml", SETTINGS).unwrap();
         writer.add_file("Pictures/a&b.png", IMAGE).unwrap();
-        Presentation::from_bytes(writer.finish_to_bytes().unwrap()).unwrap()
+        writer
+            .add_manifest_entry("Object 1/", "application/vnd.oasis.opendocument.text")
+            .unwrap();
+        writer
+            .add_file_with_media_type("custom/data.bin", CUSTOM, "application/x-odp-test")
+            .unwrap();
+        writer.finish_to_bytes().unwrap()
     }
 
     #[test]
     fn mutable_presentation_round_trips_images_styles_and_settings() {
-        let presentation = presentation_with_image();
+        let source_bytes = presentation_bytes_with_image();
+        let presentation = Presentation::from_bytes(source_bytes.clone()).unwrap();
+        assert_eq!(presentation.to_bytes().unwrap(), source_bytes);
         let source_shapes = presentation.slides().unwrap().remove(0).shapes;
         assert_eq!(source_shapes[0].image_href(), Some("Pictures/a&b.png"));
 
@@ -614,6 +616,16 @@ mod tests {
         assert_eq!(package.get_file("Pictures/a&b.png").unwrap(), IMAGE);
         assert_eq!(package.get_file("settings.xml").unwrap(), SETTINGS);
         assert_eq!(package.get_file("styles.xml").unwrap(), STYLES.as_bytes());
+        assert_eq!(package.get_file("custom/data.bin").unwrap(), CUSTOM);
+        let borrowed = package.package().unwrap();
+        assert_eq!(
+            borrowed.manifest().get_media_type("Object 1/"),
+            Some("application/vnd.oasis.opendocument.text")
+        );
+        assert_eq!(
+            borrowed.manifest().get_media_type("custom/data.bin"),
+            Some("application/x-odp-test")
+        );
 
         let content = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
         assert!(content.contains("<draw:image"));
