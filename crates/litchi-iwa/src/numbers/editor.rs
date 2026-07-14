@@ -1785,13 +1785,16 @@ impl NumbersEditor {
     }
 }
 
+mod column_insert;
 mod formula_clone;
+mod formula_dependency_shift;
 mod model;
 mod row_insert;
 mod sheet_duplicate;
 mod storage;
 mod table_duplicate;
 mod table_move;
+mod table_topology;
 mod text_box_duplicate;
 
 use model::*;

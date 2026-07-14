@@ -2998,6 +2998,311 @@ fn row_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
 }
 
 #[test]
+fn inserts_blank_table_column_and_shifts_cells_uids_headers_and_formulas() {
+    let mut editor =
+        NumbersEditor::from_package(test_package_with_column_headers_and_engine()).unwrap();
+    editor
+        .set_cell(10, 1, 1, CellValue::Text("Apples".to_owned()))
+        .unwrap();
+    editor
+        .set_formula(
+            10,
+            2,
+            2,
+            FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(1, 1)),
+        )
+        .unwrap();
+
+    editor.insert_table_column(10, 1).unwrap();
+
+    let bytes = editor.to_bytes().unwrap();
+    let document = NumbersDocument::from_bytes(&bytes).unwrap();
+    let table = &document.sheets().unwrap()[0].tables[0];
+    assert_eq!((table.row_count, table.column_count), (4, 5));
+    assert_eq!(table.get_cell(1, 1), None);
+    assert_eq!(
+        table.get_cell(1, 2),
+        Some(&CellValue::Text("Apples".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(2, 3),
+        Some(&CellValue::Formula("=C2".to_owned()))
+    );
+
+    let archive = editor.package().archive("Index/Document.iwa").unwrap();
+    let uid_map = tst::ColumnRowUidMapArchive::decode(
+        archive.object(40).unwrap().messages[0].data.as_slice(),
+    )
+    .unwrap();
+    assert_eq!(uid_map.sorted_column_uids.len(), 5);
+    assert_eq!(uid_map.column_index_for_uid, [0, 2, 3, 4, 1]);
+    assert_eq!(uid_map.column_uid_for_index, [0, 4, 1, 2, 3]);
+    let sidecar =
+        tst::StrokeSidecarArchive::decode(archive.object(41).unwrap().messages[0].data.as_slice())
+            .unwrap();
+    assert_eq!(sidecar.column_count, Some(5));
+    let headers =
+        tst::HeaderStorageBucket::decode(archive.object(43).unwrap().messages[0].data.as_slice())
+            .unwrap();
+    assert_eq!(
+        headers
+            .headers
+            .iter()
+            .map(|header| (header.index, header.number_of_cells))
+            .collect::<Vec<_>>(),
+        [(0, 1), (2, 1), (3, 1)]
+    );
+
+    let engine = editor
+        .package()
+        .archive("Index/CalculationEngine.iwa")
+        .unwrap();
+    let owner = tsce::FormulaOwnerDependenciesArchive::decode(
+        engine.object(101).unwrap().messages[0].data.as_slice(),
+    )
+    .unwrap();
+    let record = &owner.cell_dependencies.as_ref().unwrap().cell_record[0];
+    assert_eq!((record.row, record.column), (2, 3));
+    assert_eq!(
+        record
+            .expanded_edges
+            .as_ref()
+            .unwrap()
+            .edge_without_owner_columns,
+        [2]
+    );
+    let tile_id = owner.tiled_cell_dependencies.unwrap().cell_record_tiles[0].identifier;
+    let tile = tsce::CellRecordTileArchive::decode(
+        engine.object(tile_id).unwrap().messages[0].data.as_slice(),
+    )
+    .unwrap();
+    assert_eq!(
+        (tile.cell_records[0].row, tile.cell_records[0].column),
+        (2, 3)
+    );
+}
+
+#[test]
+fn appends_blank_table_column_and_grows_dependency_ranges() {
+    let mut package = test_package_with_calculation_engine();
+    package
+        .update_archive("Index/CalculationEngine.iwa", |archive| {
+            let object = archive.object_mut(101).unwrap();
+            let message = object.messages[0].clone();
+            let mut owner = tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())?;
+            let spanning = tsce::SpanningDependenciesExpandedArchive {
+                total_range_for_table: Some(tsce::RangeCoordinateArchive {
+                    top_left_column: 0,
+                    top_left_row: 0,
+                    bottom_right_column: 3,
+                    bottom_right_row: 3,
+                }),
+                body_range_for_table: Some(tsce::RangeCoordinateArchive {
+                    top_left_column: 0,
+                    top_left_row: 0,
+                    bottom_right_column: 3,
+                    bottom_right_row: 3,
+                }),
+                ..Default::default()
+            };
+            owner.spanning_column_dependencies = Some(spanning.clone());
+            owner.spanning_row_dependencies = Some(spanning);
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data: owner.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+
+    editor.insert_table_column(10, 4).unwrap();
+
+    assert_eq!(editor.tables().unwrap()[0].columns, 5);
+    let archive = editor
+        .package()
+        .archive("Index/CalculationEngine.iwa")
+        .unwrap();
+    let owner = tsce::FormulaOwnerDependenciesArchive::decode(
+        archive.object(101).unwrap().messages[0].data.as_slice(),
+    )
+    .unwrap();
+    assert_eq!(
+        owner
+            .spanning_column_dependencies
+            .unwrap()
+            .total_range_for_table
+            .unwrap()
+            .bottom_right_column,
+        4
+    );
+}
+
+#[test]
+fn column_insert_rejects_out_of_bounds_and_incoming_formulas_transactionally() {
+    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.insert_table_column(10, 5).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+
+    let mut editor = NumbersEditor::from_package(test_package_with_cross_table_engine()).unwrap();
+    editor
+        .set_formula(
+            11,
+            0,
+            0,
+            FormulaExpression::table_cell(10, crate::numbers::FormulaCellReference::relative(1, 1)),
+        )
+        .unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.insert_table_column(10, 1).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn column_insert_rejects_short_cell_offset_tables_transactionally() {
+    let mut package = test_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(30).unwrap();
+            let message = object.messages[0].clone();
+            let mut tile = Tile::decode(message.data.as_slice())?;
+            tile.row_infos[0].cell_offsets = Some(vec![0, 0]);
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data: tile.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+
+    assert!(editor.insert_table_column(10, 1).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn column_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
+    let mut editor =
+        NumbersEditor::from_package(test_package_with_column_headers_and_engine()).unwrap();
+    editor
+        .set_cell(10, 1, 1, CellValue::Text("opaque".to_owned()))
+        .unwrap();
+    editor
+        .set_formula(10, 2, 2, FormulaExpression::Number(7.0))
+        .unwrap();
+    let mut package = editor.into_package();
+    let dependency_tile_id = {
+        let archive = package.archive("Index/CalculationEngine.iwa").unwrap();
+        let owner = tsce::FormulaOwnerDependenciesArchive::decode(
+            archive.object(101).unwrap().messages[0].data.as_slice(),
+        )
+        .unwrap();
+        owner.tiled_cell_dependencies.unwrap().cell_record_tiles[0].identifier
+    };
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            for (object_id, path, field, value) in [(30, vec![5], 99, 990), (43, vec![2], 98, 980)]
+            {
+                let object = archive.object_mut(object_id).unwrap();
+                let message = object.messages[0].clone();
+                let data = crate::wire::transform_length_delimited_fields_at_path(
+                    &message.data,
+                    &path,
+                    |payload| {
+                        let mut payload = payload.to_vec();
+                        append_unknown_varint(&mut payload, field, value);
+                        Ok(payload)
+                    },
+                )?;
+                object.replace_message(
+                    0,
+                    RawMessage {
+                        type_: message.type_,
+                        data,
+                    },
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    package
+        .update_archive("Index/CalculationEngine.iwa", |archive| {
+            for (object_id, path, field, value) in [
+                (101, vec![4, 1], 97, 970),
+                (dependency_tile_id, vec![4], 96, 960),
+            ] {
+                let object = archive.object_mut(object_id).unwrap();
+                let message = object.messages[0].clone();
+                let data = crate::wire::transform_length_delimited_fields_at_path(
+                    &message.data,
+                    &path,
+                    |payload| {
+                        let mut payload = payload.to_vec();
+                        append_unknown_varint(&mut payload, field, value);
+                        Ok(payload)
+                    },
+                )?;
+                object.replace_message(
+                    0,
+                    RawMessage {
+                        type_: message.type_,
+                        data,
+                    },
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    editor.insert_table_column(10, 1).unwrap();
+
+    let document = editor.package().archive("Index/Document.iwa").unwrap();
+    let tile_rows =
+        repeated_length_delimited_payloads(&document.object(30).unwrap().messages[0].data, 5)
+            .unwrap();
+    let headers =
+        repeated_length_delimited_payloads(&document.object(43).unwrap().messages[0].data, 2)
+            .unwrap();
+    let engine = editor
+        .package()
+        .archive("Index/CalculationEngine.iwa")
+        .unwrap();
+    let owner_dependencies = repeated_length_delimited_payloads(
+        repeated_length_delimited_payloads(&engine.object(101).unwrap().messages[0].data, 4)
+            .unwrap()[0],
+        1,
+    )
+    .unwrap();
+    let tiled_dependencies = repeated_length_delimited_payloads(
+        &engine.object(dependency_tile_id).unwrap().messages[0].data,
+        4,
+    )
+    .unwrap();
+    let suffix = |field, value| {
+        let mut bytes = Vec::new();
+        append_unknown_varint(&mut bytes, field, value);
+        bytes
+    };
+    assert!(tile_rows.iter().all(|row| row.ends_with(&suffix(99, 990))));
+    assert!(
+        headers
+            .iter()
+            .all(|header| header.ends_with(&suffix(98, 980)))
+    );
+    assert!(owner_dependencies[0].ends_with(&suffix(97, 970)));
+    assert!(tiled_dependencies[0].ends_with(&suffix(96, 960)));
+}
+
+#[test]
 fn removes_table_from_owning_sheet_transactionally() {
     let mut editor = NumbersEditor::from_package(test_package()).unwrap();
     let removed = editor.remove_table(10).unwrap();
@@ -4186,6 +4491,50 @@ fn test_package_with_calculation_engine() -> IWorkPackage {
         .push(101);
     package
         .replace_archive("Index/CalculationEngine.iwa", &archive)
+        .unwrap();
+    package
+}
+
+fn test_package_with_column_headers_and_engine() -> IWorkPackage {
+    let mut package = test_package_with_calculation_engine();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(10).unwrap();
+            let message = object.messages[0].clone();
+            let mut model = TableModelArchive::decode(message.data.as_slice())?;
+            model.base_data_store.column_headers = Reference {
+                identifier: 43,
+                ..Default::default()
+            };
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data: model.encode_to_vec(),
+                },
+            )?;
+            let headers = tst::HeaderStorageBucket {
+                bucket_hash_function: 1,
+                headers: (0..3)
+                    .map(|index| tst::header_storage_bucket::Header {
+                        index,
+                        size: 0.0,
+                        hiding_state: 0,
+                        number_of_cells: 1,
+                        cell_style: None,
+                        text_style: None,
+                    })
+                    .collect(),
+            };
+            archive.insert_object(ArchiveObject::new(
+                43,
+                vec![RawMessage {
+                    type_: 6004,
+                    data: headers.encode_to_vec(),
+                }],
+            )?)?;
+            Ok(())
+        })
         .unwrap();
     package
 }

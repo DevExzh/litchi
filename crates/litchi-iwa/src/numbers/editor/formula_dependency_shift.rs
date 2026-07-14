@@ -1,10 +1,25 @@
-//! Formula dependency coordinate shifts for inserted table rows.
+//! Formula dependency coordinate shifts for inserted table axes.
 
 use super::*;
 
 mod wire;
 
 use wire::{rewrite_shifted_dependency_tile_wire, rewrite_shifted_formula_owner_wire};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum DependencyAxis {
+    Column,
+    Row,
+}
+
+impl DependencyAxis {
+    fn noun(self) -> &'static str {
+        match self {
+            Self::Column => "column",
+            Self::Row => "row",
+        }
+    }
+}
 
 fn checked_shift(value: u32, insertion: u32, what: &str) -> Result<u32> {
     if value < insertion {
@@ -18,6 +33,7 @@ fn checked_shift(value: u32, insertion: u32, what: &str) -> Result<u32> {
 pub(super) fn shift_formula_dependencies(
     package: &mut IWorkPackage,
     table_info_id: u64,
+    axis: DependencyAxis,
     insertion: u32,
 ) -> Result<()> {
     const COMPONENT: &str = "Index/CalculationEngine.iwa";
@@ -46,15 +62,15 @@ pub(super) fn shift_formula_dependencies(
         })?;
         let original = owner_object.messages[message_index].data.clone();
         let previous = tsce::FormulaOwnerDependenciesArchive::decode(original.as_slice())?;
-        validate_shiftable_formula_owner(&previous)?;
+        validate_shiftable_formula_owner(&previous, axis)?;
         let internal_owner_id = previous.internal_formula_owner_id;
-        reject_incoming_dependencies(archive, owner_id, internal_owner_id)?;
+        reject_incoming_dependencies(archive, owner_id, internal_owner_id, axis)?;
         let mut current = previous.clone();
-        shift_spanning_ranges(&mut current.spanning_column_dependencies, insertion)?;
-        shift_spanning_ranges(&mut current.spanning_row_dependencies, insertion)?;
+        shift_spanning_ranges(&mut current.spanning_column_dependencies, axis)?;
+        shift_spanning_ranges(&mut current.spanning_row_dependencies, axis)?;
         if let Some(dependencies) = &mut current.cell_dependencies {
             for record in &mut dependencies.cell_record {
-                shift_dependency_record(record, insertion, internal_owner_id)?;
+                shift_dependency_record(record, axis, insertion, internal_owner_id)?;
             }
         }
 
@@ -93,13 +109,13 @@ pub(super) fn shift_formula_dependencies(
             }
             let mut tile_current = tile_previous.clone();
             for record in &mut tile_current.cell_records {
-                shift_dependency_record(record, insertion, internal_owner_id)?;
+                shift_dependency_record(record, axis, insertion, internal_owner_id)?;
                 let expected_begin = record.row / FORMULA_DEPENDENCY_TILE_ROWS
                     * FORMULA_DEPENDENCY_TILE_ROWS;
                 if expected_begin != tile_current.tile_row_begin {
                     return Err(Error::ParseError(format!(
-                        "Cannot insert Numbers row: formula dependency at row {} would cross a dependency-tile boundary",
-                        record.row
+                        "Cannot insert Numbers {}: formula dependency at row {} would cross a dependency-tile boundary",
+                        axis.noun(), record.row
                     )));
                 }
             }
@@ -107,6 +123,7 @@ pub(super) fn shift_formula_dependencies(
                 &tile_original,
                 &tile_previous,
                 &tile_current,
+                axis,
             )?;
             object.replace_message(
                 tile_message_index,
@@ -117,7 +134,7 @@ pub(super) fn shift_formula_dependencies(
             )?;
         }
 
-        let data = rewrite_shifted_formula_owner_wire(&original, &previous, &current)?;
+        let data = rewrite_shifted_formula_owner_wire(&original, &previous, &current, axis)?;
         let object = archive.object_mut(owner_id).ok_or_else(|| {
             Error::InvalidFormat(format!("Numbers formula owner {owner_id} is missing"))
         })?;
@@ -137,6 +154,7 @@ fn reject_incoming_dependencies(
     archive: &Archive,
     target_object_id: u64,
     target_internal_owner_id: u32,
+    axis: DependencyAxis,
 ) -> Result<()> {
     for object in &archive.objects {
         for message in &object.messages {
@@ -147,7 +165,7 @@ fn reject_incoming_dependencies(
             if object.archive_info.identifier == Some(target_object_id) {
                 continue;
             }
-            validate_shiftable_formula_owner(&owner)?;
+            validate_shiftable_formula_owner(&owner, axis)?;
             if owner
                 .cell_dependencies
                 .as_ref()
@@ -158,7 +176,7 @@ fn reject_incoming_dependencies(
                         .any(|record| record_has_external_owner(record, target_internal_owner_id))
                 })
             {
-                return Err(incoming_dependency_error());
+                return Err(incoming_dependency_error(axis));
             }
             for reference in owner
                 .tiled_cell_dependencies
@@ -188,7 +206,7 @@ fn reject_incoming_dependencies(
                     .iter()
                     .any(|record| record_has_external_owner(record, target_internal_owner_id))
                 {
-                    return Err(incoming_dependency_error());
+                    return Err(incoming_dependency_error(axis));
                 }
             }
         }
@@ -207,13 +225,17 @@ fn record_has_external_owner(
     })
 }
 
-fn incoming_dependency_error() -> Error {
-    Error::ParseError(
-        "Cannot yet insert a Numbers row referenced by formulas in another table".to_owned(),
-    )
+fn incoming_dependency_error(axis: DependencyAxis) -> Error {
+    Error::ParseError(format!(
+        "Cannot yet insert a Numbers {} referenced by formulas in another table",
+        axis.noun()
+    ))
 }
 
-fn validate_shiftable_formula_owner(owner: &tsce::FormulaOwnerDependenciesArchive) -> Result<()> {
+fn validate_shiftable_formula_owner(
+    owner: &tsce::FormulaOwnerDependenciesArchive,
+    axis: DependencyAxis,
+) -> Result<()> {
     let range_dependencies = owner
         .range_dependencies
         .as_ref()
@@ -259,10 +281,10 @@ fn validate_shiftable_formula_owner(owner: &tsce::FormulaOwnerDependenciesArchiv
         || tiled_ranges
         || spills
     {
-        return Err(Error::ParseError(
-            "Cannot yet insert a row into a Numbers table with advanced range, volatile, spanning, error, UUID, or spill dependency state"
-                .to_owned(),
-        ));
+        return Err(Error::ParseError(format!(
+            "Cannot yet insert a {} into a Numbers table with advanced range, volatile, spanning, error, UUID, or spill dependency state",
+            axis.noun()
+        )));
     }
     Ok(())
 }
@@ -289,7 +311,7 @@ fn volatile_dependencies_are_populated(
 
 fn shift_spanning_ranges(
     dependencies: &mut Option<tsce::SpanningDependenciesExpandedArchive>,
-    _insertion: u32,
+    axis: DependencyAxis,
 ) -> Result<()> {
     let Some(dependencies) = dependencies else {
         return Ok(());
@@ -301,19 +323,42 @@ fn shift_spanning_ranges(
     .into_iter()
     .flatten()
     {
-        range.bottom_right_row = range.bottom_right_row.checked_add(1).ok_or_else(|| {
-            Error::ParseError("Numbers formula dependency range row overflow".to_owned())
-        })?;
+        match axis {
+            DependencyAxis::Column => {
+                range.bottom_right_column =
+                    range.bottom_right_column.checked_add(1).ok_or_else(|| {
+                        Error::ParseError(
+                            "Numbers formula dependency range column overflow".to_owned(),
+                        )
+                    })?;
+            },
+            DependencyAxis::Row => {
+                range.bottom_right_row =
+                    range.bottom_right_row.checked_add(1).ok_or_else(|| {
+                        Error::ParseError(
+                            "Numbers formula dependency range row overflow".to_owned(),
+                        )
+                    })?;
+            },
+        }
     }
     Ok(())
 }
 
 fn shift_dependency_record(
     record: &mut tsce::CellRecordExpandedArchive,
+    axis: DependencyAxis,
     insertion: u32,
     internal_owner_id: u32,
 ) -> Result<()> {
-    record.row = checked_shift(record.row, insertion, "formula row")?;
+    match axis {
+        DependencyAxis::Column => {
+            record.column = checked_shift(record.column, insertion, "formula column")?;
+        },
+        DependencyAxis::Row => {
+            record.row = checked_shift(record.row, insertion, "formula row")?;
+        },
+    }
     let Some(edges) = &mut record.expanded_edges else {
         return Ok(());
     };
@@ -325,16 +370,37 @@ fn shift_dependency_record(
             "Numbers formula dependency edge arrays have inconsistent lengths".to_owned(),
         ));
     }
-    for row in &mut edges.edge_without_owner_rows {
-        *row = checked_shift(*row, insertion, "local formula precedent row")?;
+    let local_coordinates = match axis {
+        DependencyAxis::Column => &mut edges.edge_without_owner_columns,
+        DependencyAxis::Row => &mut edges.edge_without_owner_rows,
+    };
+    for coordinate in local_coordinates {
+        *coordinate = checked_shift(
+            *coordinate,
+            insertion,
+            match axis {
+                DependencyAxis::Column => "local formula precedent column",
+                DependencyAxis::Row => "local formula precedent row",
+            },
+        )?;
     }
-    for (row, owner) in edges
-        .edge_with_owner_rows
+    let owned_coordinates = match axis {
+        DependencyAxis::Column => &mut edges.edge_with_owner_columns,
+        DependencyAxis::Row => &mut edges.edge_with_owner_rows,
+    };
+    for (coordinate, owner) in owned_coordinates
         .iter_mut()
         .zip(&edges.internal_owner_id_for_edge)
     {
         if *owner == internal_owner_id {
-            *row = checked_shift(*row, insertion, "formula precedent row")?;
+            *coordinate = checked_shift(
+                *coordinate,
+                insertion,
+                match axis {
+                    DependencyAxis::Column => "formula precedent column",
+                    DependencyAxis::Row => "formula precedent row",
+                },
+            )?;
         }
     }
     Ok(())
