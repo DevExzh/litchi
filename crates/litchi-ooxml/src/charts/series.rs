@@ -5,6 +5,7 @@
 
 use crate::charts::chart::{ChartExtensionList, ChartShapeProperties, PictureOptions};
 use crate::charts::models::{Layout, NumberFormat, NumericData, StringData, TitleText};
+use crate::charts::plot_area::BarShape;
 use crate::charts::types::{DataLabelPosition, MarkerStyle};
 
 /// Marker formatting shared by chart elements that support point symbols.
@@ -379,6 +380,8 @@ pub struct Series {
     pub shape_properties: Option<ChartShapeProperties>,
     /// Area- and bar-series picture-fill placement options
     pub picture_options: Option<PictureOptions>,
+    /// Per-series shape override for bar and column charts
+    pub bar_shape: Option<BarShape>,
     /// Series extension list
     pub extension_list: Option<ChartExtensionList>,
 }
@@ -408,6 +411,7 @@ impl Series {
             trendlines: Vec::new(),
             shape_properties: None,
             picture_options: None,
+            bar_shape: None,
             extension_list: None,
         }
     }

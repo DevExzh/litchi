@@ -90,10 +90,10 @@ pub use models::{
     Layout, MultiLevelStringData, NumberFormat, NumericData, RichText, StringData, TitleText,
 };
 pub use plot_area::{
-    Area3DTypeGroup, AreaTypeGroup, BandFormat, Bar3DTypeGroup, BarTypeGroup, BubbleTypeGroup,
-    ChartLines, DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup,
-    Pie3DTypeGroup, PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup, StockTypeGroup,
-    Surface3DTypeGroup, SurfaceTypeGroup, TypeGroup, UpDownBars,
+    Area3DTypeGroup, AreaTypeGroup, BandFormat, Bar3DTypeGroup, BarShape, BarTypeGroup,
+    BubbleTypeGroup, ChartLines, DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup,
+    OfPieTypeGroup, Pie3DTypeGroup, PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup,
+    StockTypeGroup, Surface3DTypeGroup, SurfaceTypeGroup, TypeGroup, UpDownBars,
 };
 pub use series::{DataLabel, DataLabels, DataPoint, Marker, Series};
 pub use types::{ChartType, OfPieSplitType, OfPieType};

@@ -31,6 +31,7 @@ struct SeriesFeatures {
     explosion: bool,
     invert_if_negative: bool,
     picture_options: bool,
+    bar_shape: bool,
     marker: bool,
     smooth: bool,
 }
@@ -43,6 +44,7 @@ impl SeriesFeatures {
         explosion: false,
         invert_if_negative: false,
         picture_options: false,
+        bar_shape: false,
         marker: false,
         smooth: false,
     };
@@ -53,6 +55,7 @@ impl SeriesFeatures {
     const BAR: Self = Self {
         invert_if_negative: true,
         picture_options: true,
+        bar_shape: true,
         ..Self::BASIC
     };
     const LINE: Self = Self {
@@ -1345,6 +1348,17 @@ fn write_series<W: Write>(
 
     if let Some(ref values) = series.values {
         write_numeric_data_ref(writer, "c:val", values)?;
+    }
+
+    if !features.bar_shape && series.bar_shape.is_some() {
+        return Err(invalid_chart_input(
+            "chart type does not support per-series bar shapes",
+        ));
+    }
+    if features.bar_shape
+        && let Some(shape) = series.bar_shape
+    {
+        write!(writer, r#"<c:shape val="{}"/>"#, shape.xml_value())?;
     }
 
     if features.smooth {

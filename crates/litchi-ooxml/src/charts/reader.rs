@@ -3115,16 +3115,7 @@ fn parse_bar_3d_chart<R: BufRead>(
                         });
                     },
                     b"shape" => {
-                        let value = get_attr(e, b"val").unwrap_or_else(|| b"box".to_vec());
-                        shape = Some(match value.as_slice() {
-                            b"box" => BarShape::Box,
-                            b"cone" => BarShape::Cone,
-                            b"coneToMax" => BarShape::ConeToMax,
-                            b"cylinder" => BarShape::Cylinder,
-                            b"pyramid" => BarShape::Pyramid,
-                            b"pyramidToMax" => BarShape::PyramidToMax,
-                            _ => return Err(invalid_attribute("chart bar shape", &value)),
-                        });
+                        shape = Some(parse_bar_shape(e, "chart bar shape")?);
                     },
                     _ => {},
                 }
@@ -3613,6 +3604,14 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
                     b"smooth" => {
                         series.smooth = parse_bool_attr(e)?;
                     },
+                    b"shape" => {
+                        if series.bar_shape.is_some() {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart series contains duplicate bar shapes".into(),
+                            ));
+                        }
+                        series.bar_shape = Some(parse_bar_shape(e, "chart series bar shape")?);
+                    },
                     _ => {},
                 }
             },
@@ -3634,6 +3633,19 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
         ));
     }
     Ok(Some(series))
+}
+
+fn parse_bar_shape(element: &BytesStart<'_>, description: &str) -> Result<BarShape> {
+    let value = get_attr(element, b"val").unwrap_or_else(|| b"box".to_vec());
+    match value.as_slice() {
+        b"box" => Ok(BarShape::Box),
+        b"cone" => Ok(BarShape::Cone),
+        b"coneToMax" => Ok(BarShape::ConeToMax),
+        b"cylinder" => Ok(BarShape::Cylinder),
+        b"pyramid" => Ok(BarShape::Pyramid),
+        b"pyramidToMax" => Ok(BarShape::PyramidToMax),
+        _ => Err(invalid_attribute(description, &value)),
+    }
 }
 
 fn parse_series_marker<R: BufRead>(
@@ -6011,6 +6023,7 @@ mod tests {
                         <c:pictureOptions><c:applyToSides/></c:pictureOptions>
                         <c:extLst><c:ext uri="point"><x:pointPayload/></c:ext></c:extLst>
                     </c:dPt>
+                    <c:shape val="cylinder"/>
                     <c:extLst><c:ext uri="series"><x:seriesPayload/></c:ext></c:extLst>
                 </c:ser><c:axId val="1"/><c:axId val="2"/>
             </c:barChart></c:plotArea></c:chart>
@@ -6033,6 +6046,7 @@ mod tests {
             series.picture_options.as_ref().unwrap().picture_stack_unit,
             Some(-2.0)
         );
+        assert_eq!(series.bar_shape, Some(BarShape::Cylinder));
         assert!(
             std::str::from_utf8(series.extension_list.as_ref().unwrap().as_xml())
                 .unwrap()
@@ -6058,6 +6072,7 @@ mod tests {
         let reparsed_series = &reparsed_group.common.series[0];
         assert_eq!(reparsed_series.shape_properties, series.shape_properties);
         assert_eq!(reparsed_series.picture_options, series.picture_options);
+        assert_eq!(reparsed_series.bar_shape, series.bar_shape);
         assert_eq!(reparsed_series.extension_list, series.extension_list);
         assert_eq!(
             reparsed_series.data_points[0].shape_properties,
@@ -6079,6 +6094,25 @@ mod tests {
             </c:chartSpace>"#;
         let unsupported = parse_chart(unsupported.as_slice()).unwrap();
         assert!(crate::charts::writer::write_chart(&mut Vec::new(), &unsupported).is_err());
+
+        let unsupported_shape =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea><c:lineChart><c:ser><c:idx val="0"/><c:order val="0"/>
+                <c:shape val="cone"/></c:ser></c:lineChart></c:plotArea></c:chart>
+            </c:chartSpace>"#;
+        let unsupported_shape = parse_chart(unsupported_shape.as_slice()).unwrap();
+        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &unsupported_shape).is_err());
+
+        for invalid_shape in [
+            br#"<c:shape val="sphere"/>"#.as_slice(),
+            br#"<c:shape/><c:shape/>"#.as_slice(),
+        ] {
+            let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:barChart><c:ser><c:idx val="0"/><c:order val="0"/>"#.to_vec();
+            document.extend_from_slice(invalid_shape);
+            document
+                .extend_from_slice(b"</c:ser></c:barChart></c:plotArea></c:chart></c:chartSpace>");
+            assert!(parse_chart(document.as_slice()).is_err());
+        }
 
         for supported in [
             br#"<c:areaChart><c:grouping val="standard"/><c:ser><c:idx val="0"/><c:order val="0"/><c:pictureOptions/></c:ser></c:areaChart>"#.as_slice(),
