@@ -30,6 +30,7 @@
 pub mod cell;
 pub mod chart;
 pub mod format;
+mod namespace;
 pub mod parsers;
 pub mod pivot;
 pub mod shared_strings;

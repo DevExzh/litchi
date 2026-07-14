@@ -1,160 +1,435 @@
-//! Parser for Excel workbook.xml files.
-//!
-//! This module provides parsing functionality for the main workbook.xml
-//! file which contains sheet definitions and workbook-level metadata.
-//!
-//! Performance optimizations:
-//! - Uses memchr for fast character searching
-//! - Uses atoi_simd for fast integer parsing
-//! - Pre-allocates vectors with reasonable capacities
+//! Namespace-aware streaming parser for `xl/workbook.xml`.
 
+use std::collections::HashSet;
+
+use litchi_core::sheet::Result as SheetResult;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{NamespaceResolver, ResolveResult};
+use quick_xml::reader::NsReader;
+
+use crate::common::xml::unqualified_attribute_value;
+use crate::error::{OoxmlError, Result};
+use crate::xlsx::namespace::{
+    SPREADSHEETML_NAMESPACE, is_spreadsheetml_name, relationship_attribute_value,
+};
 use crate::xlsx::worksheet::WorksheetInfo;
-use litchi_core::sheet::Result;
 
-// Performance: Pre-allocate typical capacity for worksheets
 const INITIAL_SHEETS_CAPACITY: usize = 16;
+const RELATIONSHIPS_NAMESPACE: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 
-/// Parse workbook.xml content to extract sheet information, active sheet, and date system.
-pub fn parse_workbook_xml(content: &str) -> Result<(Vec<WorksheetInfo>, usize, bool)> {
-    let mut sheets = Vec::with_capacity(INITIAL_SHEETS_CAPACITY);
-    let mut active_sheet_id = 0;
-    let mut uses_1904_date_system = false;
-
-    let bytes = content.as_bytes();
-
-    // Detect workbook properties (for date1904 flag)
-    if let Some(workbook_pr_start) = memchr::memmem::find(bytes, b"<workbookPr")
-        && let Some(workbook_pr_end_rel) = memchr::memchr(b'>', &bytes[workbook_pr_start..])
-            .or_else(|| {
-                // Handle self-closing tags split across chunks
-                memchr::memmem::find(&bytes[workbook_pr_start..], b"/>").map(|rel| rel + 1) // include '/' so slicing works
-            })
-    {
-        let workbook_pr_end = workbook_pr_start + workbook_pr_end_rel;
-        let workbook_pr_content = &content[workbook_pr_start..=workbook_pr_end];
-        uses_1904_date_system = extract_date1904_flag(workbook_pr_content);
-    }
-
-    // Look for <sheets> section - optimized search
-    if let Some(sheets_start) = memchr::memmem::find(bytes, b"<sheets>")
-        && let Some(sheets_end) = memchr::memmem::find(&bytes[sheets_start..], b"</sheets>")
-    {
-        let sheets_content = &content[sheets_start..sheets_start + sheets_end];
-
-        // Parse individual sheet entries - optimized parsing
-        parse_sheets_section(sheets_content, &mut sheets)?;
-    }
-
-    // Look for active sheet - optimized search
-    if let Some(book_views_start) = memchr::memmem::find(bytes, b"<bookViews>")
-        && let Some(book_views_end) =
-            memchr::memmem::find(&bytes[book_views_start..], b"</bookViews>")
-    {
-        let book_views_content = &content[book_views_start..book_views_start + book_views_end];
-
-        if let Some(active_tab_start) =
-            memchr::memmem::find(book_views_content.as_bytes(), b"activeTab=\"")
-        {
-            let active_tab_content = &book_views_content[active_tab_start + 11..];
-            if let Some(quote_pos) = memchr::memchr(b'"', active_tab_content.as_bytes()) {
-                // Performance: Use atoi_simd for fast integer parsing
-                if let Ok(tab) =
-                    atoi_simd::parse::<_, false, false>(&active_tab_content.as_bytes()[..quote_pos])
-                {
-                    active_sheet_id = tab;
-                }
-            }
-        }
-    }
-
-    let final_active_sheet_index = active_sheet_id.min(sheets.len().saturating_sub(1));
-    Ok((sheets, final_active_sheet_index, uses_1904_date_system))
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum WorkbookContext {
+    Workbook,
+    Sheets,
+    BookViews,
+    Other,
 }
 
-/// Parse the sheets section to extract individual sheet information.
-fn parse_sheets_section(sheets_content: &str, sheets: &mut Vec<WorksheetInfo>) -> Result<()> {
-    let bytes = sheets_content.as_bytes();
-    let mut sheet_start = 0;
+struct WorkbookInfo {
+    sheets: Vec<WorksheetInfo>,
+    active_tab: Option<usize>,
+    uses_1904_date_system: bool,
+    seen_workbook_properties: bool,
+    seen_sheets: bool,
+    seen_book_views: bool,
+    seen_workbook_view: bool,
+    sheet_ids: HashSet<u32>,
+    relationship_ids: HashSet<String>,
+}
 
-    while let Some(sheet_pos) = memchr::memmem::find(&bytes[sheet_start..], b"<sheet ") {
-        let sheet_start_pos = sheet_start + sheet_pos;
-        if let Some(sheet_end_pos) = memchr::memmem::find(&bytes[sheet_start_pos..], b"/>") {
-            let sheet_xml = &sheets_content[sheet_start_pos..sheet_start_pos + sheet_end_pos + 2];
-
-            if let Some(info) = parse_sheet_xml(sheet_xml)? {
-                sheets.push(info);
-            }
-            sheet_start = sheet_start_pos + sheet_end_pos + 2;
-        } else {
-            break;
+impl WorkbookInfo {
+    fn new() -> Self {
+        Self {
+            sheets: Vec::with_capacity(INITIAL_SHEETS_CAPACITY),
+            active_tab: None,
+            uses_1904_date_system: false,
+            seen_workbook_properties: false,
+            seen_sheets: false,
+            seen_book_views: false,
+            seen_workbook_view: false,
+            sheet_ids: HashSet::new(),
+            relationship_ids: HashSet::new(),
         }
     }
 
+    fn parse(content: &str) -> Result<Self> {
+        let mut reader = NsReader::from_reader(content.as_bytes());
+        let mut info = Self::new();
+        let mut stack = Vec::new();
+        let mut closed_root = false;
+
+        loop {
+            let decoder = reader.decoder();
+            let event = reader
+                .read_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                .into_owned();
+            let resolver = reader.resolver().clone();
+            let (namespace, event) = resolver.resolve_event(event);
+            match event {
+                Event::Start(element) => {
+                    if stack.is_empty() {
+                        if closed_root
+                            || !is_spreadsheetml_name(&namespace, element.name(), b"workbook")
+                        {
+                            return Err(invalid(
+                                "workbook XML must have one SpreadsheetML workbook root",
+                            ));
+                        }
+                        stack.push(WorkbookContext::Workbook);
+                        continue;
+                    }
+                    let parent = current_context(&stack)?;
+                    info.process_element(parent, &namespace, &element, decoder, &resolver)?;
+                    stack.push(info.child_context(parent, &namespace, &element)?);
+                },
+                Event::Empty(element) if stack.is_empty() => {
+                    if closed_root
+                        || !is_spreadsheetml_name(&namespace, element.name(), b"workbook")
+                    {
+                        return Err(invalid(
+                            "workbook XML must have one SpreadsheetML workbook root",
+                        ));
+                    }
+                    closed_root = true;
+                },
+                Event::Empty(element) => {
+                    let parent = current_context(&stack)?;
+                    info.process_element(parent, &namespace, &element, decoder, &resolver)?;
+                    info.observe_empty_container(parent, &namespace, &element)?;
+                },
+                Event::End(element) => {
+                    let context = stack.pop().ok_or_else(|| {
+                        invalid("workbook XML has a closing element outside its root")
+                    })?;
+                    if context == WorkbookContext::Workbook {
+                        if !is_spreadsheetml_name(&namespace, element.name(), b"workbook") {
+                            return Err(invalid(
+                                "workbook XML has an invalid root closing element",
+                            ));
+                        }
+                        closed_root = true;
+                    }
+                },
+                Event::Eof if !closed_root || !stack.is_empty() => {
+                    return Err(invalid(
+                        "workbook XML has a missing or unterminated SpreadsheetML workbook root",
+                    ));
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+        }
+
+        if let Some(active_tab) = info.active_tab
+            && active_tab >= info.sheets.len()
+            && !info.sheets.is_empty()
+        {
+            return Err(invalid(format!(
+                "workbook activeTab {active_tab} exceeds the {} available sheets",
+                info.sheets.len()
+            )));
+        }
+        Ok(info)
+    }
+
+    fn process_element(
+        &mut self,
+        parent: WorkbookContext,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        resolver: &NamespaceResolver,
+    ) -> Result<()> {
+        if parent == WorkbookContext::Workbook
+            && is_spreadsheetml_name(namespace, element.name(), b"workbookPr")
+        {
+            mark_once(&mut self.seen_workbook_properties, "workbookPr element")?;
+            self.uses_1904_date_system =
+                optional_bool(element, b"date1904", decoder, "workbook date1904")?.unwrap_or(false);
+        } else if parent == WorkbookContext::Sheets
+            && is_spreadsheetml_name(namespace, element.name(), b"sheet")
+        {
+            let sheet = parse_sheet_element(element, decoder, resolver)?;
+            if !self.sheet_ids.insert(sheet.sheet_id) {
+                return Err(invalid(format!(
+                    "duplicate workbook sheet ID {}",
+                    sheet.sheet_id
+                )));
+            }
+            if !self.relationship_ids.insert(sheet.relationship_id.clone()) {
+                return Err(invalid(format!(
+                    "duplicate workbook sheet relationship ID '{}'",
+                    sheet.relationship_id
+                )));
+            }
+            self.sheets.push(sheet);
+        } else if parent == WorkbookContext::BookViews
+            && is_spreadsheetml_name(namespace, element.name(), b"workbookView")
+        {
+            let active_tab = optional_u32(element, b"activeTab", decoder, "workbook activeTab")?
+                .map(|value| {
+                    usize::try_from(value)
+                        .map_err(|_| invalid("workbook activeTab does not fit usize"))
+                })
+                .transpose()?;
+            if !self.seen_workbook_view {
+                self.active_tab = active_tab;
+                self.seen_workbook_view = true;
+            }
+        }
+        Ok(())
+    }
+
+    fn child_context(
+        &mut self,
+        parent: WorkbookContext,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+    ) -> Result<WorkbookContext> {
+        if parent != WorkbookContext::Workbook {
+            return Ok(WorkbookContext::Other);
+        }
+        if is_spreadsheetml_name(namespace, element.name(), b"sheets") {
+            mark_once(&mut self.seen_sheets, "sheets element")?;
+            Ok(WorkbookContext::Sheets)
+        } else if is_spreadsheetml_name(namespace, element.name(), b"bookViews") {
+            mark_once(&mut self.seen_book_views, "bookViews element")?;
+            Ok(WorkbookContext::BookViews)
+        } else {
+            Ok(WorkbookContext::Other)
+        }
+    }
+
+    fn observe_empty_container(
+        &mut self,
+        parent: WorkbookContext,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+    ) -> Result<()> {
+        if parent == WorkbookContext::Workbook
+            && is_spreadsheetml_name(namespace, element.name(), b"sheets")
+        {
+            mark_once(&mut self.seen_sheets, "sheets element")?;
+        } else if parent == WorkbookContext::Workbook
+            && is_spreadsheetml_name(namespace, element.name(), b"bookViews")
+        {
+            mark_once(&mut self.seen_book_views, "bookViews element")?;
+        }
+        Ok(())
+    }
+}
+
+/// Parse workbook metadata, returning sheets, the active sheet index, and the date system.
+pub fn parse_workbook_xml(content: &str) -> SheetResult<(Vec<WorksheetInfo>, usize, bool)> {
+    WorkbookInfo::parse(content)
+        .map(|info| {
+            (
+                info.sheets,
+                info.active_tab.unwrap_or(0),
+                info.uses_1904_date_system,
+            )
+        })
+        .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)
+}
+
+/// Parse a standalone `sheet` element.
+pub fn parse_sheet_xml(sheet_xml: &str) -> SheetResult<Option<WorksheetInfo>> {
+    let wrapped = format!(
+        r#"<workbook xmlns="{}" xmlns:r="{}"><sheets>{sheet_xml}</sheets></workbook>"#,
+        String::from_utf8_lossy(SPREADSHEETML_NAMESPACE),
+        RELATIONSHIPS_NAMESPACE
+    );
+    parse_workbook_xml(&wrapped).map(|(mut sheets, _, _)| sheets.pop())
+}
+
+fn parse_sheet_element(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+) -> Result<WorksheetInfo> {
+    let name = required_string(element, b"name", decoder, "workbook sheet name")?;
+    if name.is_empty() {
+        return Err(invalid("workbook sheet name cannot be empty"));
+    }
+    let relationship_id = relationship_attribute_value(element, b"id", decoder, resolver)?
+        .ok_or_else(|| invalid("workbook sheet is missing relationship ID"))?;
+    if relationship_id.is_empty() {
+        return Err(invalid("workbook sheet relationship ID cannot be empty"));
+    }
+    let sheet_id = required_u32(element, b"sheetId", decoder, "workbook sheet ID")?;
+    if sheet_id == 0 {
+        return Err(invalid("workbook sheet ID must be positive"));
+    }
+    if let Some(state) = unqualified_attribute_value(element, b"state", decoder)?
+        && !matches!(state.as_str(), "visible" | "hidden" | "veryHidden")
+    {
+        return Err(invalid(format!("invalid workbook sheet state '{state}'")));
+    }
+
+    Ok(WorksheetInfo {
+        name,
+        relationship_id,
+        sheet_id,
+        is_active: false,
+        print_area: None,
+        repeating_rows: None,
+        repeating_columns: None,
+    })
+}
+
+fn current_context(stack: &[WorkbookContext]) -> Result<WorkbookContext> {
+    stack
+        .last()
+        .copied()
+        .ok_or_else(|| invalid("workbook XML is missing its root context"))
+}
+
+fn required_string(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<String> {
+    unqualified_attribute_value(element, name, decoder)?
+        .ok_or_else(|| invalid(format!("missing {description} attribute")))
+}
+
+fn required_u32(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<u32> {
+    optional_u32(element, name, decoder, description)?
+        .ok_or_else(|| invalid(format!("missing {description} attribute")))
+}
+
+fn optional_u32(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<Option<u32>> {
+    unqualified_attribute_value(element, name, decoder)?
+        .map(|value| {
+            value
+                .parse::<u32>()
+                .map_err(|_| invalid(format!("invalid {description} value '{value}'")))
+        })
+        .transpose()
+}
+
+fn optional_bool(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<Option<bool>> {
+    unqualified_attribute_value(element, name, decoder)?
+        .map(|value| match value.as_str() {
+            "1" | "true" => Ok(true),
+            "0" | "false" => Ok(false),
+            _ => Err(invalid(format!("invalid {description} value '{value}'"))),
+        })
+        .transpose()
+}
+
+fn mark_once(seen: &mut bool, description: &str) -> Result<()> {
+    if *seen {
+        return Err(invalid(format!("duplicate workbook {description}")));
+    }
+    *seen = true;
     Ok(())
 }
 
-/// Parse individual sheet XML to extract worksheet information - optimized version.
-pub fn parse_sheet_xml(sheet_xml: &str) -> Result<Option<WorksheetInfo>> {
-    let bytes = sheet_xml.as_bytes();
-
-    // Extract name attribute - optimized attribute parsing
-    let name = if let Some(name_start) = memchr::memmem::find(bytes, b"name=\"") {
-        let name_content = &sheet_xml[name_start + 6..];
-        memchr::memchr(b'"', name_content.as_bytes())
-            .map(|quote_pos| name_content[..quote_pos].to_string())
-    } else {
-        None
-    };
-
-    // Extract relationship ID - optimized attribute parsing
-    let relationship_id = if let Some(r_start) = memchr::memmem::find(bytes, b"r:id=\"") {
-        let r_content = &sheet_xml[r_start + 6..];
-        memchr::memchr(b'"', r_content.as_bytes())
-            .map(|quote_pos| r_content[..quote_pos].to_string())
-    } else {
-        None
-    };
-
-    // Extract sheet ID - optimized attribute parsing with fast integer conversion
-    let sheet_id = if let Some(id_start) = memchr::memmem::find(bytes, b"sheetId=\"") {
-        let id_content = &sheet_xml[id_start + 9..];
-        if let Some(quote_pos) = memchr::memchr(b'"', id_content.as_bytes()) {
-            // Performance: Use atoi_simd for fast integer parsing
-            atoi_simd::parse::<_, false, false>(&id_content.as_bytes()[..quote_pos]).ok()
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-
-    match (name, relationship_id, sheet_id) {
-        (Some(name), Some(relationship_id), Some(sheet_id)) => {
-            Ok(Some(WorksheetInfo {
-                name,
-                relationship_id,
-                sheet_id,
-                is_active: false, // Will be set later
-                print_area: None,
-                repeating_rows: None,
-                repeating_columns: None,
-            }))
-        },
-        _ => Ok(None),
-    }
+fn invalid(message: impl Into<String>) -> OoxmlError {
+    OoxmlError::InvalidFormat(message.into())
 }
 
-fn extract_date1904_flag(fragment: &str) -> bool {
-    if let Some(attr_start) = memchr::memmem::find(fragment.as_bytes(), b"date1904=\"") {
-        let value_start = attr_start + 9;
-        let bytes = fragment.as_bytes();
-        if value_start < bytes.len()
-            && let Some(quote_end_rel) = memchr::memchr(b'"', &bytes[value_start..])
-        {
-            let value = &fragment[value_start..value_start + quote_end_rel];
-            return value.eq_ignore_ascii_case("1") || value.eq_ignore_ascii_case("true");
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const S: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    const STRICT_S: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
+    const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const STRICT_R: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
+
+    #[test]
+    fn parses_namespaced_workbook_metadata_and_decodes_attributes() {
+        let xml = format!(
+            r#"<x:workbook xmlns:x="{S}" xmlns:rel="{R}" xmlns:f="urn:foreign">
+                <x:workbookPr date1904="true"/>
+                <x:bookViews><x:workbookView activeTab="1"/><x:workbookView activeTab="0"/></x:bookViews>
+                <f:sheets><x:sheet name="Ignored" sheetId="99" rel:id="ignored"/></f:sheets>
+                <x:sheets>
+                    <x:sheet name="A &amp; B" sheetId="1" rel:id="custom-one"/>
+                    <x:sheet name="Hidden" sheetId="7" state="veryHidden" rel:id="custom-two"/>
+                </x:sheets>
+            </x:workbook>"#
+        );
+        let (sheets, active, date_1904) = parse_workbook_xml(&xml).unwrap();
+        assert_eq!(sheets.len(), 2);
+        assert_eq!(sheets[0].name, "A & B");
+        assert_eq!(sheets[0].relationship_id, "custom-one");
+        assert_eq!(sheets[1].sheet_id, 7);
+        assert_eq!(active, 1);
+        assert!(date_1904);
     }
 
-    false
+    #[test]
+    fn supports_strict_namespaces_and_standalone_sheet_fragments() {
+        let xml = format!(
+            r#"<workbook xmlns="{STRICT_S}" xmlns:r="{STRICT_R}"><sheets>
+                <sheet name="Strict" sheetId="4" r:id="strictRel"/>
+            </sheets></workbook>"#
+        );
+        let (sheets, active, date_1904) = parse_workbook_xml(&xml).unwrap();
+        assert_eq!(sheets[0].name, "Strict");
+        assert_eq!(sheets[0].relationship_id, "strictRel");
+        assert_eq!(active, 0);
+        assert!(!date_1904);
+
+        let sheet = parse_sheet_xml(r#"<sheet name="One &amp; Two" sheetId="2" r:id="r9"/>"#)
+            .unwrap()
+            .unwrap();
+        assert_eq!(sheet.name, "One & Two");
+        assert_eq!(sheet.relationship_id, "r9");
+    }
+
+    #[test]
+    fn rejects_spoofed_duplicate_and_malformed_workbook_metadata() {
+        let foreign = format!(
+            r#"<workbook xmlns="{S}" xmlns:f="urn:foreign" xmlns:r="{R}"><f:sheets>
+                <sheet name="Nested" sheetId="1" r:id="r1"/>
+            </f:sheets><sheets><sheet name="Real" sheetId="2" r:id="r2"/></sheets></workbook>"#
+        );
+        let (sheets, _, _) = parse_workbook_xml(&foreign).unwrap();
+        assert_eq!(sheets.len(), 1);
+        assert_eq!(sheets[0].name, "Real");
+
+        let duplicate = format!(
+            r#"<workbook xmlns="{S}" xmlns:r="{R}"><sheets>
+                <sheet name="Same" sheetId="1" r:id="r1"/>
+                <sheet name="Other" sheetId="1" r:id="r2"/>
+            </sheets></workbook>"#
+        );
+        assert!(parse_workbook_xml(&duplicate).is_err());
+
+        for xml in [
+            format!(r#"<workbook xmlns="{S}"><workbookPr date1904="yes"/></workbook>"#),
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}"><sheets><sheet name="Missing" sheetId="0" r:id="r1"/></sheets></workbook>"#
+            ),
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}"><bookViews><workbookView activeTab="3"/></bookViews><sheets><sheet name="One" sheetId="1" r:id="r1"/></sheets></workbook>"#
+            ),
+            format!(r#"<workbook xmlns="{S}"><sheets>"#),
+        ] {
+            assert!(parse_workbook_xml(&xml).is_err(), "accepted {xml}");
+        }
+    }
 }
