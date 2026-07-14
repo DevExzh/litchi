@@ -260,15 +260,15 @@ impl MutableContentControl {
             ContentControlType::DatePicker { format } => {
                 write!(
                     &mut xml,
-                    r#"<w:date w:fullDate="2000-01-01T00:00:00Z"><w:dateFormat w:val="{}"/></w:date>"#,
+                    r#"<w:date><w:dateFormat w:val="{}"/></w:date>"#,
                     escape_xml(format)
                 )?;
             },
             ContentControlType::Checkbox { checked } => {
                 if *checked {
-                    xml.push_str(r#"<w14:checkbox><w14:checked w14:val="1"/></w14:checkbox>"#);
+                    xml.push_str(r#"<w14:checkbox xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w14:checked w14:val="1"/></w14:checkbox>"#);
                 } else {
-                    xml.push_str(r#"<w14:checkbox><w14:checked w14:val="0"/></w14:checkbox>"#);
+                    xml.push_str(r#"<w14:checkbox xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w14:checked w14:val="0"/></w14:checkbox>"#);
                 }
             },
         }
@@ -282,12 +282,12 @@ impl MutableContentControl {
             )?;
         }
 
-        // Add lock properties
-        if !self.allow_delete {
-            xml.push_str("<w:lock w:val=\"sdtContentLocked\"/>");
-        }
-        if !self.allow_edit {
-            xml.push_str("<w:lock w:val=\"contentLocked\"/>");
+        // ST_Lock is a single property encoding both independent permissions.
+        match (self.allow_delete, self.allow_edit) {
+            (true, true) => {},
+            (false, true) => xml.push_str("<w:lock w:val=\"sdtLocked\"/>"),
+            (true, false) => xml.push_str("<w:lock w:val=\"contentLocked\"/>"),
+            (false, false) => xml.push_str("<w:lock w:val=\"sdtContentLocked\"/>"),
         }
 
         xml.push_str("</w:sdtPr><w:sdtContent>");
@@ -386,11 +386,40 @@ mod tests {
 
     #[test]
     fn test_lock_properties() {
-        let mut control = MutableContentControl::plain_text(1, None);
-        control.set_allow_delete(false);
-        control.set_allow_edit(false);
+        let cases = [
+            (true, true, None),
+            (false, true, Some("sdtLocked")),
+            (true, false, Some("contentLocked")),
+            (false, false, Some("sdtContentLocked")),
+        ];
+        for (allow_delete, allow_edit, expected) in cases {
+            let mut control = MutableContentControl::plain_text(1, None);
+            control.set_allow_delete(allow_delete);
+            control.set_allow_edit(allow_edit);
+            let xml = control.to_xml_start().unwrap();
+            assert_eq!(
+                xml.matches("<w:lock ").count(),
+                usize::from(expected.is_some())
+            );
+            if let Some(expected) = expected {
+                assert!(xml.contains(&format!(r#"w:val="{expected}""#)));
+            }
+        }
+    }
 
-        let xml = control.to_xml_start().unwrap();
-        assert!(xml.contains("w:lock"));
+    #[test]
+    fn generated_checkbox_round_trips_through_reader() {
+        let control = MutableContentControl::checkbox(5, Some("Check & Verify"), true);
+        let xml = format!(
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{}{}</w:document>"#,
+            control.to_xml_start().unwrap(),
+            MutableContentControl::to_xml_end()
+        );
+        let parsed = crate::docx::ContentControl::extract_from_document(xml.as_bytes()).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].id(), 5);
+        assert_eq!(parsed[0].tag(), Some("Check & Verify"));
+        assert_eq!(parsed[0].control_type(), Some("checkbox"));
+        assert_eq!(parsed[0].checked(), Some(true));
     }
 }
