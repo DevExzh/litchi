@@ -1,34 +1,23 @@
 //! Semantic Keynote slide-background access.
 
+use super::slide_background_color::{color_from_native, validate_color};
+use super::slide_background_gradient::{KeynoteGradient, validate_gradient};
+use super::slide_background_gradient_wire::gradient_from_fill;
 use super::*;
 
 const SLIDE_MESSAGE_TYPE: u32 = 5;
 const SLIDE_STYLE_MESSAGE_TYPE: u32 = 9;
-
-/// RGB color space used by a solid Keynote slide background.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteRgbColorSpace {
-    Srgb,
-    DisplayP3,
-}
-
-/// Normalized RGBA components used by Keynote's native solid-fill archive.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct KeynoteRgbaColor {
-    pub red: f32,
-    pub green: f32,
-    pub blue: f32,
-    pub alpha: f32,
-    pub color_space: KeynoteRgbColorSpace,
-}
 
 /// Effective background of one Keynote slide.
 #[derive(Debug, Clone, PartialEq)]
 pub enum KeynoteSlideBackground {
     /// Native explicit “No Fill”.
     None,
-    Solid(KeynoteRgbaColor),
-    /// Byte-exact native fill for gradients, images, and future fill kinds.
+    /// Native RGB color fill.
+    Solid(super::slide_background_color::KeynoteRgbaColor),
+    /// Native simple or advanced linear/radial gradient fill.
+    Gradient(KeynoteGradient),
+    /// Byte-exact native fill for images and future or extended fill kinds.
     Opaque(Vec<u8>),
 }
 
@@ -199,57 +188,29 @@ pub(super) fn background_from_fill(fill_payload: &[u8]) -> Result<KeynoteSlideBa
     {
         return Ok(KeynoteSlideBackground::None);
     }
-    let Some(color) = fill.color else {
+    if fill.color.is_none() && fill.gradient.is_some() && fill.image.is_none() {
+        return Ok(match gradient_from_fill(fill_payload)? {
+            Some(gradient) => KeynoteSlideBackground::Gradient(gradient),
+            None => KeynoteSlideBackground::Opaque(fill_payload.to_vec()),
+        });
+    }
+    let Some(color) = fill.color.as_ref() else {
         return Ok(KeynoteSlideBackground::Opaque(fill_payload.to_vec()));
     };
-    if fill.gradient.is_some()
-        || fill.image.is_some()
-        || color.model != tsp::color::ColorModel::Rgb as i32
-        || color.c.is_some()
-        || color.m.is_some()
-        || color.y.is_some()
-        || color.k.is_some()
-        || color.w.is_some()
-    {
+    if fill.gradient.is_some() || fill.image.is_some() {
         return Ok(KeynoteSlideBackground::Opaque(fill_payload.to_vec()));
     }
-    let (Some(red), Some(green), Some(blue), Some(rgbspace)) =
-        (color.r, color.g, color.b, color.rgbspace)
-    else {
-        return Ok(KeynoteSlideBackground::Opaque(fill_payload.to_vec()));
-    };
-    let color_space = match tsp::color::RgbColorSpace::try_from(rgbspace) {
-        Ok(tsp::color::RgbColorSpace::Srgb) => KeynoteRgbColorSpace::Srgb,
-        Ok(tsp::color::RgbColorSpace::P3) => KeynoteRgbColorSpace::DisplayP3,
-        Err(_) => return Ok(KeynoteSlideBackground::Opaque(fill_payload.to_vec())),
-    };
-    Ok(KeynoteSlideBackground::Solid(KeynoteRgbaColor {
-        red,
-        green,
-        blue,
-        alpha: color.a.unwrap_or(1.0),
-        color_space,
-    }))
+    Ok(match color_from_native(color) {
+        Some(color) => KeynoteSlideBackground::Solid(color),
+        None => KeynoteSlideBackground::Opaque(fill_payload.to_vec()),
+    })
 }
 
 pub(super) fn validate_background(background: &KeynoteSlideBackground) -> Result<()> {
     match background {
         KeynoteSlideBackground::None => Ok(()),
-        KeynoteSlideBackground::Solid(color) => {
-            for (name, value) in [
-                ("red", color.red),
-                ("green", color.green),
-                ("blue", color.blue),
-                ("alpha", color.alpha),
-            ] {
-                if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-                    return Err(Error::ParseError(format!(
-                        "Keynote slide-background {name} channel must be finite and between 0 and 1"
-                    )));
-                }
-            }
-            Ok(())
-        },
+        KeynoteSlideBackground::Solid(color) => validate_color(*color, "Keynote slide-background"),
+        KeynoteSlideBackground::Gradient(gradient) => validate_gradient(gradient),
         KeynoteSlideBackground::Opaque(payload) => {
             if payload.is_empty() {
                 return Err(Error::ParseError(

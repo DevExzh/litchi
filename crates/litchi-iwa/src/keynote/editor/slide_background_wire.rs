@@ -1,6 +1,8 @@
 //! Wire-preserving Keynote slide-style variation lifecycle.
 
-use super::slide_background::{KeynoteRgbColorSpace, KeynoteSlideBackground};
+use super::slide_background::KeynoteSlideBackground;
+use super::slide_background_color::native_color_space;
+use super::slide_background_gradient_wire::gradient_to_fill;
 use super::slide_style_graph::{
     SLIDE_MESSAGE_TYPE, SLIDE_STYLE_MESSAGE_TYPE, is_collapsible_background_variation,
     patch_slide_style_reference, reference, style_is_exclusive,
@@ -109,6 +111,7 @@ fn encode_background_fill(
             tsd::FillArchive::decode(payload.as_slice())?;
             Ok(payload.clone())
         },
+        KeynoteSlideBackground::Gradient(gradient) => Ok(gradient_to_fill(gradient)),
         KeynoteSlideBackground::Solid(color) => {
             let existing = tsd::FillArchive::decode(inherited_fill_payload)?;
             let mut data = if existing.gradient.is_none() && existing.image.is_none() {
@@ -171,13 +174,6 @@ fn encode_background_fill(
             }
             Ok(data)
         },
-    }
-}
-
-fn native_color_space(color_space: KeynoteRgbColorSpace) -> i32 {
-    match color_space {
-        KeynoteRgbColorSpace::Srgb => tsp::color::RgbColorSpace::Srgb as i32,
-        KeynoteRgbColorSpace::DisplayP3 => tsp::color::RgbColorSpace::P3 as i32,
     }
 }
 

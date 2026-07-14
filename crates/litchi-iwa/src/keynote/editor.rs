@@ -3180,6 +3180,9 @@ mod builds;
 mod placeholder_ownership;
 mod placeholder_visibility;
 mod slide_background;
+mod slide_background_color;
+mod slide_background_gradient;
+mod slide_background_gradient_wire;
 mod slide_background_reset;
 mod slide_background_wire;
 mod slide_create;
@@ -3190,7 +3193,11 @@ mod slide_style_metadata;
 mod slide_style_registry;
 
 use builds::*;
-pub use slide_background::{KeynoteRgbColorSpace, KeynoteRgbaColor, KeynoteSlideBackground};
+pub use slide_background::KeynoteSlideBackground;
+pub use slide_background_color::{KeynoteRgbColorSpace, KeynoteRgbaColor};
+pub use slide_background_gradient::{
+    KeynoteGradient, KeynoteGradientAngle, KeynoteGradientKind, KeynoteGradientStop,
+};
 use slide_graph::*;
 #[cfg(test)]
 mod tests;

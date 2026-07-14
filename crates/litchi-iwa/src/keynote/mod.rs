@@ -39,7 +39,8 @@ pub use document::KeynoteDocument;
 pub use editor::{
     KeynoteBuildAcceleration, KeynoteBuildChunkInfo, KeynoteBuildCustomParameters,
     KeynoteBuildInfo, KeynoteBuildSettings, KeynoteBuildStart, KeynoteEditor,
-    KeynoteEmphasisAction, KeynoteFlipDirection, KeynoteHorizontalBuildDirection,
+    KeynoteEmphasisAction, KeynoteFlipDirection, KeynoteGradient, KeynoteGradientAngle,
+    KeynoteGradientKind, KeynoteGradientStop, KeynoteHorizontalBuildDirection,
     KeynoteJiggleIntensity, KeynoteKeyboardBuild, KeynoteKeyboardDirection, KeynoteMotionPath,
     KeynoteMotionPathNode, KeynoteMotionPathNodeType, KeynoteMotionPathPoint, KeynoteMotionSubpath,
     KeynoteMoveAction, KeynoteObjectBuildEffect, KeynoteOpacityAction, KeynoteRgbColorSpace,
