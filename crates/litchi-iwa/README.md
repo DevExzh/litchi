@@ -40,6 +40,8 @@ println!("{}", structured.summary());
   explicit password-protected document rejection
 - Semantic editors for Numbers sheets/tables/cells/formulas, Pages
   body/header/footer/text-box text, and Keynote slides/placeholders/text boxes/speaker notes
+- Typed Keynote theme-layout discovery and fresh empty-slide creation with native
+  component registration, speaker notes, slide numbers, and transactional insertion
 - Native Keynote build-in/build-out object CRUD with typed On Click / After Transition /
   With Previous / After Previous timing, typed Rotate / Scale / Opacity / Move actions,
   editable Bézier motion paths, typed Blink / Bounce / Flip / Jiggle / Pop / Pulse
@@ -241,6 +243,9 @@ if let Some(text_box) = keynote
 }
 keynote.set_slide_name(0, Some("Opening"))?;
 keynote.set_slide_skipped(0, false)?;
+let layout = keynote.default_slide_layout()?;
+let fresh = keynote.add_slide(layout)?;
+keynote.set_slide_title(fresh.index, "New from theme")?;
 let mut transition = keynote.slides()?[0].transition.clone().expect("transition");
 transition.duration = Some(1.5);
 keynote.set_slide_transition(0, transition)?;

@@ -2710,6 +2710,54 @@ fn removes_slide_tree_node_and_slide_transactionally() {
 }
 
 #[test]
+fn creates_empty_slide_from_typed_theme_layout_transactionally() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_theme()).unwrap();
+    let layouts = editor.slide_layouts().unwrap();
+    assert_eq!(
+        layouts,
+        [KeynoteSlideLayoutInfo {
+            id: KeynoteSlideLayoutId(30),
+            name: "Title & Bullets".to_owned(),
+            is_default: true,
+        }]
+    );
+    assert_eq!(editor.default_slide_layout().unwrap(), layouts[0].id);
+
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.insert_slide(3, layouts[0].id).is_err());
+    assert!(editor.insert_slide(1, KeynoteSlideLayoutId(999)).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+
+    let created = editor.insert_slide(1, layouts[0].id).unwrap();
+    assert_eq!(created.index, 1);
+    assert_eq!(created.title.as_deref(), Some(""));
+    assert_eq!(created.body.as_deref(), Some(""));
+    assert_eq!(created.notes.as_deref(), Some(""));
+    let slides = editor.slides().unwrap();
+    assert_eq!(slides.len(), 3);
+    assert_eq!(slides[0].title.as_deref(), Some("Old title"));
+    assert_eq!(slides[0].notes.as_deref(), Some("Speaker 🚀"));
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let slide: kn::SlideArchive = graph
+        .decode_type(created.slide_id, 5, "KN.SlideArchive")
+        .unwrap();
+    assert_eq!(slide.template_slide, Some(reference(31)));
+    assert_eq!(slide.name, None);
+    assert!(slide.in_document);
+    assert_eq!(slide.title_placeholder, Some(reference(39)));
+    assert_eq!(slide.body_placeholder, Some(reference(40)));
+    assert_eq!(graph.drawable_storage(39).unwrap(), Some(41));
+    assert_eq!(graph.drawable_storage(40).unwrap(), Some(42));
+    assert_eq!(graph.storage_text(34).unwrap(), "Slide Title");
+    assert_eq!(graph.storage_text(35).unwrap(), "Slide bullet text");
+
+    assert_eq!(editor.remove_slide(1).unwrap().slide_id, created.slide_id);
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    assert_eq!(graph.storage_text(34).unwrap(), "Slide Title");
+    assert_eq!(graph.storage_text(35).unwrap(), "Slide bullet text");
+}
+
+#[test]
 fn reorders_slides_without_rewriting_slide_components() {
     let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
     let first_component = editor
@@ -3415,6 +3463,105 @@ fn test_package() -> IWorkPackage {
                             ..Default::default()
                         },
                     ),
+                ],
+            },
+        )
+        .unwrap();
+    package
+}
+
+fn test_package_with_theme() -> IWorkPackage {
+    let mut package = test_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let show = archive.object_mut(2).unwrap();
+            let mut decoded = kn::ShowArchive::decode(show.messages[0].data.as_slice())?;
+            decoded.theme = reference(29);
+            show.replace_message(
+                0,
+                RawMessage {
+                    type_: 2,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+            archive.insert_object(object(
+                29,
+                10,
+                kn::ThemeArchive {
+                    templates: vec![reference(30)],
+                    default_template_slide_node: Some(reference(30)),
+                    ..Default::default()
+                },
+            ))?;
+            archive.insert_object(object(
+                30,
+                4,
+                kn::SlideNodeArchive {
+                    slide: Some(reference(31)),
+                    ..Default::default()
+                },
+            ))?;
+            Ok(())
+        })
+        .unwrap();
+    package
+        .replace_archive(
+            "Index/TemplateSlide-31.iwa",
+            &Archive {
+                objects: vec![
+                    object(
+                        31,
+                        5,
+                        kn::SlideArchive {
+                            title_placeholder: Some(reference(32)),
+                            body_placeholder: Some(reference(33)),
+                            owned_drawables: vec![reference(32), reference(33)],
+                            drawables_z_order: vec![reference(32), reference(33)],
+                            name: Some("Title & Bullets".to_owned()),
+                            user_defined_guide_storage: Some(reference(36)),
+                            in_document: true,
+                            ..Default::default()
+                        },
+                    ),
+                    object(
+                        32,
+                        7,
+                        kn::PlaceholderArchive {
+                            super_: tswp::ShapeInfoArchive {
+                                owned_storage: Some(reference(34)),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        },
+                    ),
+                    object(
+                        33,
+                        7,
+                        kn::PlaceholderArchive {
+                            super_: tswp::ShapeInfoArchive {
+                                owned_storage: Some(reference(35)),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        },
+                    ),
+                    object(
+                        34,
+                        2_001,
+                        StorageArchive {
+                            text: vec!["Slide Title".to_owned()],
+                            ..Default::default()
+                        },
+                    ),
+                    object(
+                        35,
+                        2_001,
+                        StorageArchive {
+                            text: vec!["Slide bullet text".to_owned()],
+                            ..Default::default()
+                        },
+                    ),
+                    object(36, 3_047, tsd::GuideStorageArchive::default()),
                 ],
             },
         )

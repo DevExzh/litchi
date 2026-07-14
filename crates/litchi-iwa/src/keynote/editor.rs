@@ -12,9 +12,11 @@ use crate::comments::{
 };
 use crate::media::reachable_embedded_assets;
 use crate::package_metadata::{
-    add_component_object_uuids, component_uuid_identifiers, next_object_identifier,
+    add_component_external_reference, add_component_link, add_component_object_uuids,
+    clone_component_registration, component_identifier_for_entry,
+    component_identifier_for_object_uuid, component_uuid_identifiers, next_object_identifier,
     release_package_identifier_suffix, remove_component_object_uuids,
-    set_package_last_object_identifier,
+    remove_component_registration, set_package_last_object_identifier,
 };
 use crate::protobuf::{kn, tsd, tsp, tswp};
 use crate::shapes::{
@@ -70,6 +72,24 @@ pub struct KeynoteSlideInfo {
     pub body: Option<String>,
     pub notes_storage_id: Option<u64>,
     pub notes: Option<String>,
+}
+
+/// Stable identity of a slide layout in the presentation theme.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct KeynoteSlideLayoutId(u64);
+
+impl KeynoteSlideLayoutId {
+    pub fn as_u64(self) -> u64 {
+        self.0
+    }
+}
+
+/// A theme-provided layout that can create a fresh Keynote slide.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeynoteSlideLayoutInfo {
+    pub id: KeynoteSlideLayoutId,
+    pub name: String,
+    pub is_default: bool,
 }
 
 /// Semantic role of a writable text-bearing drawable owned by a slide.
@@ -2469,14 +2489,7 @@ impl KeynoteEditor {
             )));
         }
         let source_archive = self.text.package().archive(&source_archive_name)?;
-        let mut next_identifier = graph
-            .objects
-            .keys()
-            .copied()
-            .max()
-            .unwrap_or(0)
-            .checked_add(1)
-            .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+        let mut next_identifier = next_object_identifier(self.package())?;
         let new_node_id = next_identifier;
         next_identifier = next_identifier
             .checked_add(1)
@@ -2589,6 +2602,25 @@ impl KeynoteEditor {
             Ok(())
         })?;
 
+        if let Some(source_component) =
+            component_identifier_for_entry(&staged, &source_archive_name)?
+        {
+            clone_component_registration(
+                &mut staged,
+                source_component,
+                new_slide_id,
+                &format!("Slide-{new_slide_id}"),
+                &remap,
+            )?;
+            if let Some(document_component) =
+                component_identifier_for_entry(&staged, &node_archive_name)?
+            {
+                add_component_object_uuids(&mut staged, document_component, &[new_node_id])?;
+                add_component_link(&mut staged, document_component, new_slide_id)?;
+            }
+            set_package_last_object_identifier(&mut staged, next_identifier - 1)?;
+        }
+
         let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
         let created = verified
             .slides()?
@@ -2631,6 +2663,13 @@ impl KeynoteEditor {
         let show_archive = graph.archive_name(show_id)?.to_owned();
         let node_archive = graph.archive_name(removed.node_id)?.to_owned();
         let slide_archive = graph.archive_name(removed.slide_id)?.to_owned();
+        let removed_slide_object_ids = self
+            .package()
+            .archive(&slide_archive)?
+            .objects
+            .iter()
+            .filter_map(|object| object.archive_info.identifier)
+            .collect::<Vec<_>>();
         let mut staged = self.text.package().clone();
 
         staged.update_archive(&show_archive, |archive| {
@@ -2685,6 +2724,9 @@ impl KeynoteEditor {
         })?;
 
         remove_object(&mut staged, &node_archive, removed.node_id)?;
+        if let Some(document_component) = component_identifier_for_entry(&staged, &node_archive)? {
+            remove_component_object_uuids(&mut staged, document_component, &[removed.node_id])?;
+        }
         let dedicated_slide_archive = format!("Index/Slide-{}.iwa", removed.slide_id);
         if slide_archive == dedicated_slide_archive {
             staged.remove_entry(&slide_archive).ok_or_else(|| {
@@ -2692,9 +2734,13 @@ impl KeynoteEditor {
                     "Keynote slide component {slide_archive} is missing"
                 ))
             })?;
+            remove_component_registration(&mut staged, removed.slide_id)?;
         } else {
             remove_object(&mut staged, &slide_archive, removed.slide_id)?;
         }
+        let mut removed_object_ids = removed_slide_object_ids;
+        removed_object_ids.push(removed.node_id);
+        release_package_identifier_suffix(&mut staged, &removed_object_ids)?;
 
         let bytes = staged.to_bytes()?;
         let verified = KeynoteEditor::from_bytes(&bytes)?;
@@ -3087,6 +3133,7 @@ impl KeynoteEditor {
 }
 
 mod builds;
+mod slide_create;
 mod slide_graph;
 
 use builds::*;

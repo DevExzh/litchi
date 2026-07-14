@@ -85,6 +85,17 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
             {
                 println!("  keynote_build={build:#?}");
             }
+            if message.type_ == 10
+                && let Ok(theme) = kn::ThemeArchive::decode(message.data.as_slice())
+            {
+                println!("  keynote_theme={theme:#?}");
+            }
+            if message.type_ == 2_043
+                && let Ok(attachment) =
+                    kn::SlideNumberAttachmentArchive::decode(message.data.as_slice())
+            {
+                println!("  keynote_slide_number_attachment={attachment:#?}");
+            }
             if message.type_ == 153
                 && let Ok(chunk) = kn::BuildChunkArchive::decode(message.data.as_slice())
             {
