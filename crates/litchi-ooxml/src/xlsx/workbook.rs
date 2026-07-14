@@ -2677,6 +2677,20 @@ mod tests {
         );
         legend.entries.push(legend_entry);
         chart.chart.legend = Some(legend);
+        chart.chart.title_extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="title"><x:reference r:id="rId413"/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        let axis_common = chart.chart.plot_area.axes[0].common_mut();
+        axis_common.title = Some(crate::charts::TitleText::from_string("Axis"));
+        axis_common.title_shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId414"/></a:blipFill></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
         let fragment_ids = crate::xlsx::chart::chart_fragment_relationship_ids(&chart.chart)
             .expect("relationship-bearing fragments should be valid XML");
         assert_eq!(
@@ -2692,6 +2706,8 @@ mod tests {
                 "rId410".to_string(),
                 "rId411".to_string(),
                 "rId412".to_string(),
+                "rId413".to_string(),
+                "rId414".to_string(),
             ]
             .into()
         );
@@ -2702,7 +2718,7 @@ mod tests {
         assert!(
             [
                 "rId403", "rId404", "rId405", "rId406", "rId407", "rId408", "rId409", "rId410",
-                "rId411", "rId412",
+                "rId411", "rId412", "rId413", "rId414",
             ]
             .iter()
             .any(|relationship_id| error.contains(relationship_id))

@@ -4,9 +4,10 @@
 
 use crate::charts::axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
 use crate::charts::chart::{
-    Chart, ChartExternalData, ChartHeaderFooter, ChartPageMargins, ChartPageSetup,
-    ChartPrintSettings, ChartProtection, ChartUserShapes, ColorMapOverride, ColorMapping,
-    PictureOptions, PivotFormat, PivotSource, View3D, WallFloor,
+    Chart, ChartExtensionList, ChartExternalData, ChartHeaderFooter, ChartPageMargins,
+    ChartPageSetup, ChartPrintSettings, ChartProtection, ChartShapeProperties, ChartTextProperties,
+    ChartUserShapes, ColorMapOverride, ColorMapping, PictureOptions, PivotFormat, PivotSource,
+    View3D, WallFloor,
 };
 use crate::charts::legend::Legend;
 use crate::charts::models::{Layout, NumericData, StringData, TitleText};
@@ -155,6 +156,9 @@ pub(crate) fn write_chart_with_relationship_ids<W: Write>(
             title,
             chart.title_layout.as_ref(),
             chart.title_overlay,
+            chart.title_shape_properties.as_ref(),
+            chart.title_text_properties.as_ref(),
+            chart.title_extension_list.as_ref(),
         )?;
     }
 
@@ -297,6 +301,9 @@ fn write_title<W: Write>(
     title: &TitleText,
     layout: Option<&Layout>,
     overlay: bool,
+    shape_properties: Option<&ChartShapeProperties>,
+    text_properties: Option<&ChartTextProperties>,
+    extension_list: Option<&ChartExtensionList>,
 ) -> std::io::Result<()> {
     write!(writer, "<c:title>")?;
 
@@ -311,6 +318,15 @@ fn write_title<W: Write>(
         r#"<c:overlay val="{}"/>"#,
         if overlay { "1" } else { "0" }
     )?;
+    if let Some(shape_properties) = shape_properties {
+        writer.write_all(shape_properties.as_xml())?;
+    }
+    if let Some(text_properties) = text_properties {
+        writer.write_all(text_properties.as_xml())?;
+    }
+    if let Some(extension_list) = extension_list {
+        writer.write_all(extension_list.as_xml())?;
+    }
     write!(writer, "</c:title>")?;
 
     Ok(())
@@ -2214,7 +2230,15 @@ fn write_axis_common<W: Write>(
     }
 
     if let Some(ref title) = common.title {
-        write_title(writer, title, common.layout.as_ref(), common.title_overlay)?;
+        write_title(
+            writer,
+            title,
+            common.layout.as_ref(),
+            common.title_overlay,
+            common.title_shape_properties.as_ref(),
+            common.title_text_properties.as_ref(),
+            common.title_extension_list.as_ref(),
+        )?;
     }
 
     if let Some(number_format) = &common.number_format {

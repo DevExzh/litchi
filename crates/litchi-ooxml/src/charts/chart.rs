@@ -689,6 +689,12 @@ pub struct Chart {
     pub title_layout: Option<Layout>,
     /// Whether the chart title overlays the plot area
     pub title_overlay: bool,
+    /// DrawingML shape properties for the chart title
+    pub title_shape_properties: Option<ChartShapeProperties>,
+    /// DrawingML text properties for the chart title
+    pub title_text_properties: Option<ChartTextProperties>,
+    /// Chart-title extension list
+    pub title_extension_list: Option<ChartExtensionList>,
     /// Whether auto-generated title has been deleted
     pub auto_title_deleted: bool,
     /// Optional pivot-chart formatting collection; `Some` preserves an empty wrapper
@@ -749,6 +755,9 @@ impl Chart {
             title: None,
             title_layout: None,
             title_overlay: false,
+            title_shape_properties: None,
+            title_text_properties: None,
+            title_extension_list: None,
             auto_title_deleted: false,
             pivot_formats: None,
             plot_area: PlotArea::new(),

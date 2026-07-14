@@ -689,6 +689,9 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
                         chart.title = Some(title.text);
                         chart.title_layout = title.layout;
                         chart.title_overlay = title.overlay;
+                        chart.title_shape_properties = title.shape_properties;
+                        chart.title_text_properties = title.text_properties;
+                        chart.title_extension_list = title.extension_list;
                     },
                     b"autoTitleDeleted" => {
                         chart.auto_title_deleted = parse_bool_attr(e)?;
@@ -1417,6 +1420,9 @@ struct ParsedTitle {
     text: TitleText,
     layout: Option<Layout>,
     overlay: bool,
+    shape_properties: Option<ChartShapeProperties>,
+    text_properties: Option<ChartTextProperties>,
+    extension_list: Option<ChartExtensionList>,
 }
 
 fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle> {
@@ -1425,6 +1431,9 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
     let mut layout = None;
     let mut overlay = false;
     let mut saw_overlay = false;
+    let mut shape_properties = None;
+    let mut text_properties = None;
+    let mut extension_list = None;
     let mut buf = Vec::new();
     let mut in_text = false;
     let mut saw_text = false;
@@ -1459,6 +1468,66 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
                 }
                 overlay = parse_bool_attr(element)?;
                 saw_overlay = true;
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart title contains duplicate shape properties".into(),
+                    ));
+                }
+                shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_fragment(element, "chart title shape properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart title contains duplicate shape properties".into(),
+                    ));
+                }
+                shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"txPr" => {
+                if text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart title contains duplicate text properties".into(),
+                    ));
+                }
+                text_properties = Some(ChartTextProperties::from_xml(
+                    reader.capture_fragment(element, "chart title text properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"txPr" => {
+                if text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart title contains duplicate text properties".into(),
+                    ));
+                }
+                text_properties = Some(ChartTextProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart title contains duplicate extension lists".into(),
+                    ));
+                }
+                extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_fragment(element, "chart title extension list")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart title contains duplicate extension lists".into(),
+                    ));
+                }
+                extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"f" => {
                 if formula.is_some() {
@@ -1510,6 +1579,9 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
         text,
         layout,
         overlay,
+        shape_properties,
+        text_properties,
+        extension_list,
     })
 }
 
@@ -4582,6 +4654,9 @@ struct ParsedAxisCommon {
     title: Option<TitleText>,
     title_layout: Option<Layout>,
     title_overlay: bool,
+    title_shape_properties: Option<ChartShapeProperties>,
+    title_text_properties: Option<ChartTextProperties>,
+    title_extension_list: Option<ChartExtensionList>,
     number_format: Option<NumberFormat>,
     orientation: AxisOrientation,
     major_tick_mark: TickMark,
@@ -4603,6 +4678,9 @@ impl ParsedAxisCommon {
             title: None,
             title_layout: None,
             title_overlay: false,
+            title_shape_properties: None,
+            title_text_properties: None,
+            title_extension_list: None,
             number_format: None,
             orientation: AxisOrientation::MinMax,
             major_tick_mark: TickMark::Out,
@@ -4630,6 +4708,9 @@ impl ParsedAxisCommon {
         common.title = self.title;
         common.layout = self.title_layout;
         common.title_overlay = self.title_overlay;
+        common.title_shape_properties = self.title_shape_properties;
+        common.title_text_properties = self.title_text_properties;
+        common.title_extension_list = self.title_extension_list;
         common.number_format = self.number_format;
         common.orientation = self.orientation;
         common.major_tick_mark = self.major_tick_mark;
@@ -4657,6 +4738,9 @@ fn parse_axis_title<R: BufRead>(
     common.title = Some(title.text);
     common.title_layout = title.layout;
     common.title_overlay = title.overlay;
+    common.title_shape_properties = title.shape_properties;
+    common.title_text_properties = title.text_properties;
+    common.title_extension_list = title.extension_list;
     Ok(())
 }
 
@@ -7109,6 +7193,78 @@ mod tests {
         legend.entries.push(entry);
         invalid.legend = Some(legend);
         assert!(crate::charts::writer::write_chart(&mut Vec::new(), &invalid).is_err());
+    }
+
+    #[test]
+    fn round_trips_chart_and_axis_title_formatting_fragments() {
+        let xml = br#"<c:chartSpace
+                xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+                xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                xmlns:x="urn:example:title">
+            <c:chart><c:title><c:tx><c:rich><a:p><a:r><a:t>Sales</a:t></a:r></a:p></c:rich></c:tx>
+                <c:spPr><a:solidFill><a:srgbClr val="112233"/></a:solidFill></c:spPr>
+                <c:txPr><a:bodyPr rot="600000"/><a:lstStyle/><a:p/></c:txPr>
+                <c:extLst><c:ext uri="chart-title"><x:chartPayload/></c:ext></c:extLst>
+            </c:title><c:plotArea><c:catAx><c:axId val="1"/><c:scaling/>
+                <c:axPos val="b"/><c:title><c:tx><c:rich><a:p><a:r><a:t>Quarter</a:t></a:r></a:p></c:rich></c:tx>
+                    <c:spPr><a:noFill/></c:spPr><c:txPr><a:bodyPr vert="vert"/><a:lstStyle/><a:p/></c:txPr>
+                    <c:extLst><c:ext uri="axis-title"><x:axisPayload/></c:ext></c:extLst>
+                </c:title><c:crossAx val="2"/></c:catAx></c:plotArea></c:chart>
+        </c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        assert!(
+            std::str::from_utf8(chart.title_shape_properties.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("112233")
+        );
+        assert!(
+            std::str::from_utf8(chart.title_text_properties.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("600000")
+        );
+        assert!(
+            std::str::from_utf8(chart.title_extension_list.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("chartPayload")
+        );
+        let common = chart.plot_area.axes[0].common();
+        assert!(common.title_shape_properties.is_some());
+        assert!(
+            std::str::from_utf8(common.title_text_properties.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("vert")
+        );
+        assert!(
+            std::str::from_utf8(common.title_extension_list.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("axisPayload")
+        );
+
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        let reparsed = parse_chart(output.as_slice()).unwrap();
+        assert_eq!(
+            reparsed.title_shape_properties,
+            chart.title_shape_properties
+        );
+        assert_eq!(reparsed.title_text_properties, chart.title_text_properties);
+        assert_eq!(reparsed.title_extension_list, chart.title_extension_list);
+        let reparsed_common = reparsed.plot_area.axes[0].common();
+        assert_eq!(
+            reparsed_common.title_shape_properties,
+            common.title_shape_properties
+        );
+        assert_eq!(
+            reparsed_common.title_text_properties,
+            common.title_text_properties
+        );
+        assert_eq!(
+            reparsed_common.title_extension_list,
+            common.title_extension_list
+        );
+
+        let duplicate = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:title><c:spPr/><c:spPr/></c:title><c:plotArea/></c:chart></c:chartSpace>"#;
+        assert!(parse_chart(duplicate.as_slice()).is_err());
     }
 
     #[test]

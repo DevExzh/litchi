@@ -855,6 +855,21 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                 .as_ref()
                 .map(crate::charts::ChartExtensionList::as_xml),
             chart
+                .title
+                .as_ref()
+                .and(chart.title_shape_properties.as_ref())
+                .map(crate::charts::ChartShapeProperties::as_xml),
+            chart
+                .title
+                .as_ref()
+                .and(chart.title_text_properties.as_ref())
+                .map(crate::charts::ChartTextProperties::as_xml),
+            chart
+                .title
+                .as_ref()
+                .and(chart.title_extension_list.as_ref())
+                .map(crate::charts::ChartExtensionList::as_xml),
+            chart
                 .plot_area
                 .shape_properties
                 .as_ref()
@@ -948,6 +963,30 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                 .flatten(),
             );
         }
+    }
+    for axis in &chart.plot_area.axes {
+        let common = axis.common();
+        let Some(_) = common.title.as_ref() else {
+            continue;
+        };
+        fragments.extend(
+            [
+                common
+                    .title_shape_properties
+                    .as_ref()
+                    .map(crate::charts::ChartShapeProperties::as_xml),
+                common
+                    .title_text_properties
+                    .as_ref()
+                    .map(crate::charts::ChartTextProperties::as_xml),
+                common
+                    .title_extension_list
+                    .as_ref()
+                    .map(crate::charts::ChartExtensionList::as_xml),
+            ]
+            .into_iter()
+            .flatten(),
+        );
     }
     for group in &chart.plot_area.type_groups {
         match group {

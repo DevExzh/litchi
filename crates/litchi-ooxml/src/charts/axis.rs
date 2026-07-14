@@ -3,6 +3,7 @@
 //! This module contains structures for representing chart axes,
 //! including category, value, date, and series axes.
 
+use crate::charts::chart::{ChartExtensionList, ChartShapeProperties, ChartTextProperties};
 use crate::charts::models::{Layout, NumberFormat, TitleText};
 use crate::charts::types::{AxisOrientation, AxisPosition, AxisType, TickLabelPosition, TickMark};
 
@@ -189,6 +190,12 @@ pub struct AxisCommon {
     pub show_minor_gridlines: bool,
     /// Manual layout for the axis title
     pub layout: Option<Layout>,
+    /// DrawingML shape properties for the axis title
+    pub title_shape_properties: Option<ChartShapeProperties>,
+    /// DrawingML text properties for the axis title
+    pub title_text_properties: Option<ChartTextProperties>,
+    /// Axis-title extension list
+    pub title_extension_list: Option<ChartExtensionList>,
 }
 
 impl AxisCommon {
@@ -212,6 +219,9 @@ impl AxisCommon {
             show_major_gridlines: false,
             show_minor_gridlines: false,
             layout: None,
+            title_shape_properties: None,
+            title_text_properties: None,
+            title_extension_list: None,
         }
     }
 
