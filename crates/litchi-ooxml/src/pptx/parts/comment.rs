@@ -2,11 +2,16 @@
 //!
 //! This module provides types for working with comments in PPTX files.
 
+use crate::common::xml::{decode_xml_reference, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
+use crate::pptx::namespace::is_presentationml_name;
 use litchi_core::xml::escape_xml;
 use litchi_opc::part::Part;
-use quick_xml::Reader;
+use quick_xml::XmlVersion;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::BytesStart;
 use quick_xml::events::Event;
+use quick_xml::reader::NsReader;
 
 /// A comment author.
 ///
@@ -199,109 +204,128 @@ impl<'a> CommentsPart<'a> {
     /// }
     /// ```
     pub fn comments(&self) -> Result<Vec<Comment>> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
-
+        let mut reader = NsReader::from_reader(self.xml_bytes());
         let mut comments = Vec::new();
-        let mut current_comment: Option<Comment> = None;
-        let mut in_text = false;
+        let mut pending: Option<PendingComment> = None;
+        let mut depth = 0usize;
 
         loop {
-            match reader.read_event() {
-                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
-                    let tag_name = e.local_name();
-
-                    match tag_name.as_ref() {
-                        b"cm" => {
-                            // Start of a comment element
-                            let mut author_id = 0;
-                            let x = 0;
-                            let y = 0;
-                            let mut datetime = None;
-                            let mut index = None;
-
-                            for attr in e.attributes().flatten() {
-                                match attr.key.as_ref() {
-                                    b"authorId" => {
-                                        author_id = std::str::from_utf8(&attr.value)
-                                            .ok()
-                                            .and_then(|s| s.parse().ok())
-                                            .unwrap_or(0);
-                                    },
-                                    b"dt" => {
-                                        datetime = std::str::from_utf8(&attr.value)
-                                            .ok()
-                                            .map(|s| s.to_string());
-                                    },
-                                    b"idx" => {
-                                        index = std::str::from_utf8(&attr.value)
-                                            .ok()
-                                            .and_then(|s| s.parse().ok());
-                                    },
-                                    _ => {},
-                                }
-                            }
-
-                            current_comment = Some(Comment {
-                                author_id,
-                                text: String::new(),
-                                x,
-                                y,
-                                datetime,
-                                index,
-                            });
-                        },
-                        b"pos" => {
-                            // Position element
-                            if let Some(ref mut comment) = current_comment {
-                                for attr in e.attributes().flatten() {
-                                    match attr.key.as_ref() {
-                                        b"x" => {
-                                            comment.x = std::str::from_utf8(&attr.value)
-                                                .ok()
-                                                .and_then(|s| s.parse().ok())
-                                                .unwrap_or(0);
-                                        },
-                                        b"y" => {
-                                            comment.y = std::str::from_utf8(&attr.value)
-                                                .ok()
-                                                .and_then(|s| s.parse().ok())
-                                                .unwrap_or(0);
-                                        },
-                                        _ => {},
-                                    }
-                                }
-                            }
-                        },
-                        b"text" => {
-                            in_text = true;
-                        },
-                        _ => {},
+            let decoder = reader.decoder();
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            match event {
+                Event::Start(element) => {
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("comment XML nesting is too deep".to_string())
+                    })?;
+                    if is_presentationml_name(&namespace, element.name(), b"cm") {
+                        if pending.is_some() {
+                            return Err(OoxmlError::InvalidFormat(
+                                "nested PowerPoint comments are invalid".to_string(),
+                            ));
+                        }
+                        pending = Some(parse_comment_start(&element, decoder, depth)?);
+                    } else if let Some(comment) = pending.as_mut()
+                        && depth == comment.depth + 1
+                    {
+                        if is_presentationml_name(&namespace, element.name(), b"pos") {
+                            comment.set_position(&element, decoder)?;
+                        } else if is_presentationml_name(&namespace, element.name(), b"text") {
+                            comment.start_text(depth)?;
+                        }
                     }
                 },
-                Ok(Event::Text(e)) if in_text => {
-                    if let Some(ref mut comment) = current_comment {
-                        let text = std::str::from_utf8(e.as_ref())
-                            .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                        comment.text.push_str(text);
+                Event::Empty(element) => {
+                    let child_depth = depth.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("comment XML nesting is too deep".to_string())
+                    })?;
+                    if is_presentationml_name(&namespace, element.name(), b"cm") {
+                        if pending.is_some() {
+                            return Err(OoxmlError::InvalidFormat(
+                                "nested PowerPoint comments are invalid".to_string(),
+                            ));
+                        }
+                        let comment =
+                            parse_comment_start(&element, decoder, child_depth)?.finish()?;
+                        comments.push(comment);
+                    } else if let Some(comment) = pending.as_mut()
+                        && child_depth == comment.depth + 1
+                    {
+                        if is_presentationml_name(&namespace, element.name(), b"pos") {
+                            comment.set_position(&element, decoder)?;
+                        } else if is_presentationml_name(&namespace, element.name(), b"text") {
+                            comment.mark_empty_text()?;
+                        }
                     }
                 },
-                Ok(Event::End(e)) => {
-                    let tag_name = e.local_name();
-                    match tag_name.as_ref() {
-                        b"cm" => {
-                            if let Some(comment) = current_comment.take() {
-                                comments.push(comment);
-                            }
-                        },
-                        b"text" => {
-                            in_text = false;
-                        },
-                        _ => {},
-                    }
+                Event::Text(text) if pending.as_ref().is_some_and(PendingComment::in_text) => {
+                    let decoded = text
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    pending
+                        .as_mut()
+                        .ok_or_else(|| {
+                            OoxmlError::InvalidFormat("missing PowerPoint comment".to_string())
+                        })?
+                        .text
+                        .push_str(
+                            &quick_xml::escape::unescape(&decoded)
+                                .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                        );
                 },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+                Event::CData(text) if pending.as_ref().is_some_and(PendingComment::in_text) => {
+                    pending
+                        .as_mut()
+                        .ok_or_else(|| {
+                            OoxmlError::InvalidFormat("missing PowerPoint comment".to_string())
+                        })?
+                        .text
+                        .push_str(
+                            &text
+                                .xml_content(XmlVersion::Explicit1_0)
+                                .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                        );
+                },
+                Event::GeneralRef(reference)
+                    if pending.as_ref().is_some_and(PendingComment::in_text) =>
+                {
+                    pending
+                        .as_mut()
+                        .ok_or_else(|| {
+                            OoxmlError::InvalidFormat("missing PowerPoint comment".to_string())
+                        })?
+                        .text
+                        .push_str(&decode_xml_reference(&reference)?);
+                },
+                Event::End(element) => {
+                    if let Some(comment) = pending.as_mut()
+                        && comment.text_depth == Some(depth)
+                        && is_presentationml_name(&namespace, element.name(), b"text")
+                    {
+                        comment.text_depth = None;
+                    } else if pending.as_ref().is_some_and(|comment| {
+                        comment.depth == depth
+                            && is_presentationml_name(&namespace, element.name(), b"cm")
+                    }) {
+                        let comment = pending
+                            .take()
+                            .ok_or_else(|| {
+                                OoxmlError::InvalidFormat("missing PowerPoint comment".to_string())
+                            })?
+                            .finish()?;
+                        comments.push(comment);
+                    }
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("invalid comment XML nesting".to_string())
+                    })?;
+                },
+                Event::Eof if pending.is_some() || depth != 0 => {
+                    return Err(OoxmlError::InvalidFormat(
+                        "unterminated PowerPoint comments XML".to_string(),
+                    ));
+                },
+                Event::Eof => break,
                 _ => {},
             }
         }
@@ -314,6 +338,127 @@ impl<'a> CommentsPart<'a> {
     pub fn part(&self) -> &'a dyn Part {
         self.part
     }
+}
+
+struct PendingComment {
+    depth: usize,
+    author_id: u32,
+    text: String,
+    position: Option<(i64, i64)>,
+    datetime: Option<String>,
+    index: Option<u32>,
+    text_seen: bool,
+    text_depth: Option<usize>,
+}
+
+impl PendingComment {
+    fn set_position(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+        if self.position.is_some() {
+            return Err(OoxmlError::InvalidFormat(
+                "duplicate PowerPoint comment position".to_string(),
+            ));
+        }
+        self.position = Some((
+            required_i64_attribute(element, b"x", decoder, "comment x coordinate")?,
+            required_i64_attribute(element, b"y", decoder, "comment y coordinate")?,
+        ));
+        Ok(())
+    }
+
+    fn start_text(&mut self, depth: usize) -> Result<()> {
+        if self.text_seen {
+            return Err(OoxmlError::InvalidFormat(
+                "duplicate PowerPoint comment text".to_string(),
+            ));
+        }
+        self.text_seen = true;
+        self.text_depth = Some(depth);
+        Ok(())
+    }
+
+    fn mark_empty_text(&mut self) -> Result<()> {
+        self.start_text(usize::MAX)?;
+        self.text_depth = None;
+        Ok(())
+    }
+
+    fn in_text(&self) -> bool {
+        self.text_depth.is_some()
+    }
+
+    fn finish(self) -> Result<Comment> {
+        let (x, y) = self.position.ok_or_else(|| {
+            OoxmlError::InvalidFormat("PowerPoint comment is missing its position".to_string())
+        })?;
+        if !self.text_seen {
+            return Err(OoxmlError::InvalidFormat(
+                "PowerPoint comment is missing its text element".to_string(),
+            ));
+        }
+        Ok(Comment {
+            author_id: self.author_id,
+            text: self.text,
+            x,
+            y,
+            datetime: self.datetime,
+            index: self.index,
+        })
+    }
+}
+
+fn parse_comment_start(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    depth: usize,
+) -> Result<PendingComment> {
+    Ok(PendingComment {
+        depth,
+        author_id: required_u32_attribute(element, b"authorId", decoder, "comment author ID")?,
+        text: String::new(),
+        position: None,
+        datetime: unqualified_attribute_value(element, b"dt", decoder)?,
+        index: optional_u32_attribute(element, b"idx", decoder, "comment index")?,
+        text_seen: false,
+        text_depth: None,
+    })
+}
+
+fn required_u32_attribute(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<u32> {
+    optional_u32_attribute(element, name, decoder, description)?
+        .ok_or_else(|| OoxmlError::InvalidFormat(format!("missing {description} attribute")))
+}
+
+fn optional_u32_attribute(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<Option<u32>> {
+    unqualified_attribute_value(element, name, decoder)?
+        .map(|value| {
+            value.parse::<u32>().map_err(|_| {
+                OoxmlError::InvalidFormat(format!("invalid {description} value '{value}'"))
+            })
+        })
+        .transpose()
+}
+
+fn required_i64_attribute(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<i64> {
+    let value = unqualified_attribute_value(element, name, decoder)?
+        .ok_or_else(|| OoxmlError::InvalidFormat(format!("missing {description} attribute")))?;
+    value
+        .parse::<i64>()
+        .map_err(|_| OoxmlError::InvalidFormat(format!("invalid {description} value '{value}'")))
 }
 
 /// Comment authors part - contains author information.
@@ -348,46 +493,42 @@ impl<'a> CommentAuthorsPart<'a> {
     /// }
     /// ```
     pub fn authors(&self) -> Result<Vec<CommentAuthor>> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
-
+        let mut reader = NsReader::from_reader(self.xml_bytes());
         let mut authors = Vec::new();
+        let mut depth = 0usize;
 
         loop {
-            match reader.read_event() {
-                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e))
-                    if e.local_name().as_ref() == b"cmAuthor" =>
-                {
-                    let mut id = 0;
-                    let mut name = String::new();
-                    let mut initials = String::new();
-
-                    for attr in e.attributes().flatten() {
-                        match attr.key.as_ref() {
-                            b"id" => {
-                                id = std::str::from_utf8(&attr.value)
-                                    .ok()
-                                    .and_then(|s| s.parse().ok())
-                                    .unwrap_or(0);
-                            },
-                            b"name" => {
-                                name = std::str::from_utf8(&attr.value)
-                                    .map(|s| s.to_string())
-                                    .unwrap_or_default();
-                            },
-                            b"initials" => {
-                                initials = std::str::from_utf8(&attr.value)
-                                    .map(|s| s.to_string())
-                                    .unwrap_or_default();
-                            },
-                            _ => {},
-                        }
+            let decoder = reader.decoder();
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            match event {
+                Event::Start(element) => {
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "comment-author XML nesting is too deep".to_string(),
+                        )
+                    })?;
+                    if is_presentationml_name(&namespace, element.name(), b"cmAuthor") {
+                        push_author(&mut authors, parse_author(&element, decoder)?)?;
                     }
-
-                    authors.push(CommentAuthor { id, name, initials });
                 },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+                Event::Empty(element)
+                    if is_presentationml_name(&namespace, element.name(), b"cmAuthor") =>
+                {
+                    push_author(&mut authors, parse_author(&element, decoder)?)?;
+                },
+                Event::End(_) => {
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("invalid comment-author XML nesting".to_string())
+                    })?;
+                },
+                Event::Eof if depth != 0 => {
+                    return Err(OoxmlError::InvalidFormat(
+                        "unterminated comment-author XML".to_string(),
+                    ));
+                },
+                Event::Eof => break,
                 _ => {},
             }
         }
@@ -402,9 +543,44 @@ impl<'a> CommentAuthorsPart<'a> {
     }
 }
 
+fn parse_author(element: &BytesStart<'_>, decoder: Decoder) -> Result<CommentAuthor> {
+    let id = required_u32_attribute(element, b"id", decoder, "comment-author ID")?;
+    let name = unqualified_attribute_value(element, b"name", decoder)?.ok_or_else(|| {
+        OoxmlError::InvalidFormat("missing comment-author name attribute".to_string())
+    })?;
+    let initials =
+        unqualified_attribute_value(element, b"initials", decoder)?.ok_or_else(|| {
+            OoxmlError::InvalidFormat("missing comment-author initials attribute".to_string())
+        })?;
+    Ok(CommentAuthor { id, name, initials })
+}
+
+fn push_author(authors: &mut Vec<CommentAuthor>, author: CommentAuthor) -> Result<()> {
+    if authors.iter().any(|existing| existing.id == author.id) {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "duplicate PowerPoint comment-author ID {}",
+            author.id
+        )));
+    }
+    authors.push(author);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_opc::packuri::PackURI;
+    use litchi_opc::part::BlobPart;
+
+    const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+
+    fn part(path: &str, xml: impl Into<Vec<u8>>) -> BlobPart {
+        BlobPart::new(
+            PackURI::new(path).unwrap(),
+            "application/xml".to_string(),
+            xml.into(),
+        )
+    }
 
     #[test]
     fn test_comment_author_new() {
@@ -582,5 +758,100 @@ mod tests {
         assert!(xml.contains("name=\"Alice\""));
         assert!(xml.contains("name=\"Bob\""));
         assert!(xml.contains("</p:cmAuthorLst>"));
+    }
+
+    #[test]
+    fn comments_resolve_namespaces_and_decode_content() {
+        let xml = format!(
+            r#"<q:cmLst xmlns:q="{P}" xmlns:f="urn:foreign">
+                <f:cm authorId="9"><f:pos x="9" y="9"/><f:text>Spoof</f:text></f:cm>
+                <q:cm authorId="2" dt="2026-07-14T10:30:00&amp;08:00" idx="3">
+                    <q:pos x="-10" y="20"/><q:text>A &amp; <![CDATA[B < C]]></q:text>
+                </q:cm><q:cm authorId="4"><q:pos x="0" y="0"/><q:text/></q:cm>
+            </q:cmLst>"#
+        );
+        let blob = part("/ppt/comments/comment1.xml", xml);
+        let comments = CommentsPart::from_part(&blob).unwrap().comments().unwrap();
+        assert_eq!(comments.len(), 2);
+        assert_eq!(comments[0].author_id, 2);
+        assert_eq!(comments[0].text, "A & B < C");
+        assert_eq!((comments[0].x, comments[0].y), (-10, 20));
+        assert_eq!(
+            comments[0].datetime.as_deref(),
+            Some("2026-07-14T10:30:00&08:00")
+        );
+        assert_eq!(comments[0].index, Some(3));
+        assert_eq!(comments[1].text, "");
+    }
+
+    #[test]
+    fn generated_comments_round_trip() {
+        let expected = vec![
+            Comment::new(1, "A & B < C", 100, 200)
+                .with_datetime("2026-07-14T10:30:00+08:00")
+                .with_index(7),
+        ];
+        let xml = generate_comments_xml(&expected);
+        let blob = part("/ppt/comments/comment1.xml", xml);
+        let parsed = CommentsPart::from_part(&blob).unwrap().comments().unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].author_id, expected[0].author_id);
+        assert_eq!(parsed[0].text, expected[0].text);
+        assert_eq!((parsed[0].x, parsed[0].y), (100, 200));
+        assert_eq!(parsed[0].datetime, expected[0].datetime);
+        assert_eq!(parsed[0].index, expected[0].index);
+    }
+
+    #[test]
+    fn comment_authors_resolve_strict_aliases_and_decode_attributes() {
+        let xml = r#"<x:cmAuthorLst xmlns:x="http://purl.oclc.org/ooxml/presentationml/main"
+            xmlns:f="urn:foreign"><f:cmAuthor id="0" name="Spoof" initials="S"/>
+            <x:cmAuthor id="5" name="A &amp; B" initials="A&lt;B"/></x:cmAuthorLst>"#;
+        let blob = part("/ppt/commentAuthors.xml", xml);
+        let authors = CommentAuthorsPart::from_part(&blob)
+            .unwrap()
+            .authors()
+            .unwrap();
+        assert_eq!(authors, [CommentAuthor::new(5, "A & B", "A<B")]);
+    }
+
+    #[test]
+    fn malformed_comments_and_authors_are_rejected() {
+        let invalid_comments = [
+            format!(
+                r#"<p:cmLst xmlns:p="{P}"><p:cm><p:pos x="0" y="0"/><p:text/></p:cm></p:cmLst>"#
+            ),
+            format!(
+                r#"<p:cmLst xmlns:p="{P}"><p:cm authorId="x"><p:pos x="0" y="0"/><p:text/></p:cm></p:cmLst>"#
+            ),
+            format!(
+                r#"<p:cmLst xmlns:p="{P}"><p:cm authorId="1"><p:pos x="x" y="0"/><p:text/></p:cm></p:cmLst>"#
+            ),
+            format!(r#"<p:cmLst xmlns:p="{P}"><p:cm authorId="1"><p:text/></p:cm></p:cmLst>"#),
+            format!(r#"<p:cmLst xmlns:p="{P}"><p:cm authorId="1"><p:pos x="0" y="0"/>"#),
+        ];
+        for xml in invalid_comments {
+            let blob = part("/ppt/comments/comment1.xml", xml);
+            assert!(CommentsPart::from_part(&blob).unwrap().comments().is_err());
+        }
+
+        let invalid_authors = [
+            format!(
+                r#"<p:cmAuthorLst xmlns:p="{P}"><p:cmAuthor name="A" initials="A"/></p:cmAuthorLst>"#
+            ),
+            format!(
+                r#"<p:cmAuthorLst xmlns:p="{P}"><p:cmAuthor id="1" name="A" initials="A"/><p:cmAuthor id="1" name="B" initials="B"/></p:cmAuthorLst>"#
+            ),
+            format!(r#"<p:cmAuthorLst xmlns:p="{P}"><p:cmAuthor id="1" name="A" initials="A">"#),
+        ];
+        for xml in invalid_authors {
+            let blob = part("/ppt/commentAuthors.xml", xml);
+            assert!(
+                CommentAuthorsPart::from_part(&blob)
+                    .unwrap()
+                    .authors()
+                    .is_err()
+            );
+        }
     }
 }
