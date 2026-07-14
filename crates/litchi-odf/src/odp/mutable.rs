@@ -391,7 +391,7 @@ impl MutablePresentation {
     }
 
     /// Generate content.xml from the current mutable state.
-    fn generate_content_xml(&self) -> String {
+    fn generate_content_xml(&self) -> Result<String> {
         let shape_count = self.slides.iter().map(|s| s.shapes.len()).sum::<usize>();
         let mut estimated = 256usize;
         estimated += self.slides.len() * 128;
@@ -421,7 +421,7 @@ impl MutablePresentation {
             if let Some(ref title) = slide.title {
                 let escaped_title = escape_xml(title);
                 body.push_str(&xml_minifier::minified_xml_format!(
-                    r#"<draw:frame draw:style-name="gr1" draw:text-style-name="P1" draw:layer="layout" svg:width="25.199cm" svg:height="3.506cm" svg:x="1.4cm" svg:y="0.962cm"><draw:text-box><text:p text:style-name="P1">{}</text:p></draw:text-box></draw:frame>"#,
+                    r#"<draw:frame draw:style-name="gr1" draw:text-style-name="P1" draw:layer="layout" presentation:class="title" svg:width="25.199cm" svg:height="3.506cm" svg:x="1.4cm" svg:y="0.962cm"><draw:text-box><text:p text:style-name="P1">{}</text:p></draw:text-box></draw:frame>"#,
                     escaped_title
                 ));
             }
@@ -435,7 +435,7 @@ impl MutablePresentation {
                 };
                 let escaped_text = escape_xml(&slide.text);
                 body.push_str(&xml_minifier::minified_xml_format!(
-                    r#"<draw:frame draw:style-name="gr2" draw:text-style-name="P2" draw:layer="layout" svg:width="25.199cm" svg:height="10cm" svg:x="1.4cm" svg:y="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
+                    r#"<draw:frame draw:style-name="gr2" draw:text-style-name="P2" draw:layer="layout" presentation:class="object" svg:width="25.199cm" svg:height="10cm" svg:x="1.4cm" svg:y="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
                     y_position,
                     escaped_text
                 ));
@@ -445,16 +445,20 @@ impl MutablePresentation {
             for (shape_idx, shape) in slide.shapes.iter().enumerate() {
                 body.push_str(&super::builder::PresentationBuilder::generate_shape_xml(
                     shape, shape_idx,
-                ));
+                )?);
             }
+
+            body.push_str(&super::builder::PresentationBuilder::generate_notes_xml(
+                slide.notes.as_deref(),
+            ));
 
             body.push_str("</draw:page>");
         }
 
-        xml_minifier::minified_xml_format!(
+        Ok(xml_minifier::minified_xml_format!(
             r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles/><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
             body
-        )
+        ))
     }
 
     /// Generate meta.xml with current metadata.
@@ -547,7 +551,7 @@ impl MutablePresentation {
         writer.set_mimetype(&self.mimetype)?;
 
         // Add content.xml (regenerated from mutable state)
-        let content_xml = self.generate_content_xml();
+        let content_xml = self.generate_content_xml()?;
         writer.add_file("content.xml", content_xml.as_bytes())?;
 
         // Add styles.xml (preserved or default)
@@ -583,7 +587,7 @@ mod tests {
     const CUSTOM: &[u8] = b"custom-presentation-data";
 
     fn presentation_bytes_with_image() -> Vec<u8> {
-        let content = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:presentation><draw:page draw:name="Media"><draw:frame draw:name="Photo" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm"><draw:image xlink:href="Pictures/a&amp;b.png" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame><draw:line draw:name="Rule" svg:x1="1cm" svg:y1="1cm" svg:x2="5cm" svg:y2="1cm"/></draw:page></office:presentation></office:body></office:document-content>"#;
+        let content = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:presentation><draw:page draw:name="Media"><draw:frame presentation:class="title"><draw:text-box><text:p>Visible Title</text:p></draw:text-box></draw:frame><draw:frame presentation:class="object"><draw:text-box><text:p>Body &amp; more</text:p></draw:text-box></draw:frame><draw:frame draw:name="Photo" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm"><draw:image xlink:href="Pictures/a&amp;b.png" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame><draw:rect draw:name="Labeled"><text:p>Shape label</text:p></draw:rect><draw:connector draw:name="Link" svg:x1="0cm" svg:y1="0cm" svg:x2="2cm" svg:y2="2cm"/><draw:line draw:name="Rule" svg:x1="1cm" svg:y1="1cm" svg:x2="5cm" svg:y2="1cm"/><presentation:notes><draw:frame><draw:text-box><text:p>Speaker note</text:p></draw:text-box></draw:frame></presentation:notes></draw:page></office:presentation></office:body></office:document-content>"#;
         let mut writer = PackageWriter::new();
         writer
             .set_mimetype("application/vnd.oasis.opendocument.presentation")
@@ -632,9 +636,22 @@ mod tests {
         assert!(content.contains(r#"xlink:href="Pictures/a&amp;b.png""#));
         assert!(content.contains(r#"xlink:show="embed""#));
         assert!(content.contains("<draw:line"));
+        assert!(content.contains("<draw:rect"));
+        assert!(content.contains("<draw:connector"));
+        assert_eq!(content.matches("Visible Title").count(), 1);
+        assert_eq!(content.matches("Body &amp; more").count(), 1);
+        assert_eq!(content.matches("Shape label").count(), 1);
+        assert_eq!(content.matches("Speaker note").count(), 1);
 
         let reparsed = Presentation::from_bytes(bytes).unwrap();
         let slides = reparsed.slides().unwrap();
+        assert_eq!(slides[0].title.as_deref(), Some("Visible Title"));
+        assert_eq!(slides[0].text, "Body & more");
+        assert_eq!(slides[0].notes.as_deref(), Some("Speaker note"));
+        assert_eq!(
+            slides[0].all_text(),
+            "Visible Title\nBody & more\nShape label"
+        );
         let picture = slides[0]
             .shapes
             .iter()

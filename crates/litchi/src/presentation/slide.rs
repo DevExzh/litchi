@@ -49,9 +49,7 @@ impl Slide {
                 Ok(text)
             },
             #[cfg(feature = "odf")]
-            Slide::Odp(slide) => slide.text().map(|s| s.to_string()).map_err(|e| {
-                litchi_core::Error::ParseError(format!("Failed to get ODP slide text: {}", e))
-            }),
+            Slide::Odp(slide) => Ok(slide.all_text()),
         }
     }
 

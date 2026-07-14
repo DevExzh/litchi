@@ -175,8 +175,9 @@ impl Presentation {
         let mut all_text = Vec::new();
 
         for slide in slides {
-            if !slide.text.trim().is_empty() {
-                all_text.push(slide.text.trim().to_string());
+            let text = slide.all_text();
+            if !text.is_empty() {
+                all_text.push(text);
             }
         }
 

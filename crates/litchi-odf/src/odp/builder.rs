@@ -152,7 +152,7 @@ impl PresentationBuilder {
     }
 
     /// Generate XML for a shape
-    pub(super) fn generate_shape_xml(shape: &crate::odp::Shape, idx: usize) -> String {
+    pub(super) fn generate_shape_xml(shape: &crate::odp::Shape, idx: usize) -> Result<String> {
         use litchi_core::ShapeType;
 
         // Determine default position and size if not provided
@@ -170,14 +170,19 @@ impl PresentationBuilder {
         let escaped_width = escape_xml(width);
         let escaped_height = escape_xml(height);
 
-        match shape.shape_type {
-            ShapeType::TextBox | ShapeType::AutoShape | ShapeType::Placeholder => {
-                // Text box or auto shape with text content
+        let xml = match shape.shape_type {
+            ShapeType::TextBox | ShapeType::Placeholder => {
+                let presentation_class = if shape.shape_type == ShapeType::Placeholder {
+                    r#" presentation:class="object""#
+                } else {
+                    ""
+                };
                 if shape.has_text() {
                     format!(
-                        r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
+                        r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
                         escaped_name,
                         escaped_style_name,
+                        presentation_class,
                         escaped_x,
                         escaped_y,
                         escaped_width,
@@ -187,7 +192,32 @@ impl PresentationBuilder {
                 } else {
                     // Empty frame
                     format!(
-                        r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"/>"#,
+                        r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"/>"#,
+                        escaped_name,
+                        escaped_style_name,
+                        presentation_class,
+                        escaped_x,
+                        escaped_y,
+                        escaped_width,
+                        escaped_height
+                    )
+                }
+            },
+            ShapeType::AutoShape => {
+                if shape.has_text() {
+                    format!(
+                        r#"<draw:rect draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><text:p text:style-name="P2">{}</text:p></draw:rect>"#,
+                        escaped_name,
+                        escaped_style_name,
+                        escaped_x,
+                        escaped_y,
+                        escaped_width,
+                        escaped_height,
+                        escape_xml(&shape.text)
+                    )
+                } else {
+                    format!(
+                        r#"<draw:rect draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"/>"#,
                         escaped_name,
                         escaped_style_name,
                         escaped_x,
@@ -222,8 +252,14 @@ impl PresentationBuilder {
                 // Line shape - use x,y as start and width,height as end offsets
                 let x2 = shape.width.as_deref().unwrap_or("12cm");
                 let y2 = shape.height.as_deref().unwrap_or("8cm");
+                let element_name = if shape.shape_type == ShapeType::Connector {
+                    "draw:connector"
+                } else {
+                    "draw:line"
+                };
                 format!(
-                    r#"<draw:line draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x1="{}" svg:y1="{}" svg:x2="{}" svg:y2="{}"/>"#,
+                    r#"<{} draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x1="{}" svg:y1="{}" svg:x2="{}" svg:y2="{}"/>"#,
+                    element_name,
                     escaped_name,
                     escaped_style_name,
                     escaped_x,
@@ -232,28 +268,37 @@ impl PresentationBuilder {
                     escape_xml(y2)
                 )
             },
-            _ => {
-                // Generic shape or unsupported - render as text frame if it has text
-                if shape.has_text() {
-                    format!(
-                        r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
-                        escaped_name,
-                        escaped_style_name,
-                        escaped_x,
-                        escaped_y,
-                        escaped_width,
-                        escaped_height,
-                        escape_xml(&shape.text)
-                    )
-                } else {
-                    String::new() // Skip unsupported shapes without text
-                }
+            ShapeType::Group | ShapeType::Table | ShapeType::GraphicFrame | ShapeType::Unknown => {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "ODP serialization does not have enough data to write {} shape '{}'",
+                    shape.shape_type, name
+                )));
             },
-        }
+            _ => {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "unsupported ODP shape type '{}' for shape '{}'",
+                    shape.shape_type, name
+                )));
+            },
+        };
+        Ok(xml)
+    }
+
+    pub(super) fn generate_notes_xml(notes: Option<&str>) -> String {
+        notes
+            .map(str::trim)
+            .filter(|notes| !notes.is_empty())
+            .map(|notes| {
+                format!(
+                    r#"<presentation:notes><draw:frame draw:layer="layout" presentation:class="notes"><draw:text-box><text:p>{}</text:p></draw:text-box></draw:frame></presentation:notes>"#,
+                    escape_xml(notes)
+                )
+            })
+            .unwrap_or_default()
     }
 
     /// Generate the content.xml body for presentation
-    fn generate_content_body(&self) -> String {
+    fn generate_content_body(&self) -> Result<String> {
         let shape_count = self.slides.iter().map(|s| s.shapes.len()).sum::<usize>();
         let mut estimated = 256usize;
         estimated += self.slides.len() * 128;
@@ -281,7 +326,7 @@ impl PresentationBuilder {
             // Add title frame if title exists
             if let Some(ref title) = slide.title {
                 body.push_str(&format!(
-                    r#"<draw:frame draw:style-name="gr1" draw:text-style-name="P1" draw:layer="layout" svg:width="25.199cm" svg:height="3.506cm" svg:x="1.4cm" svg:y="0.962cm"><draw:text-box><text:p text:style-name="P1">{}</text:p></draw:text-box></draw:frame>"#,
+                    r#"<draw:frame draw:style-name="gr1" draw:text-style-name="P1" draw:layer="layout" presentation:class="title" svg:width="25.199cm" svg:height="3.506cm" svg:x="1.4cm" svg:y="0.962cm"><draw:text-box><text:p text:style-name="P1">{}</text:p></draw:text-box></draw:frame>"#,
                     escape_xml(title)
                 ));
             }
@@ -294,7 +339,7 @@ impl PresentationBuilder {
                     "2.0cm"
                 };
                 body.push_str(&format!(
-                    r#"<draw:frame draw:style-name="gr2" draw:text-style-name="P2" draw:layer="layout" svg:width="25.199cm" svg:height="10cm" svg:x="1.4cm" svg:y="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
+                    r#"<draw:frame draw:style-name="gr2" draw:text-style-name="P2" draw:layer="layout" presentation:class="object" svg:width="25.199cm" svg:height="10cm" svg:x="1.4cm" svg:y="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
                     y_position,
                     escape_xml(&slide.text)
                 ));
@@ -302,23 +347,25 @@ impl PresentationBuilder {
 
             // Add custom shapes
             for (shape_idx, shape) in slide.shapes.iter().enumerate() {
-                body.push_str(&Self::generate_shape_xml(shape, shape_idx));
+                body.push_str(&Self::generate_shape_xml(shape, shape_idx)?);
             }
+
+            body.push_str(&Self::generate_notes_xml(slide.notes.as_deref()));
 
             body.push_str("</draw:page>");
         }
 
-        body
+        Ok(body)
     }
 
     /// Generate the complete content.xml for presentation
-    fn generate_content_xml(&self) -> String {
-        let body = self.generate_content_body();
+    fn generate_content_xml(&self) -> Result<String> {
+        let body = self.generate_content_body()?;
 
-        format!(
+        Ok(format!(
             r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:math="http://www.w3.org/1998/Math/MathML" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:ooo="http://openoffice.org/2004/office" office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles/><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
             body
-        )
+        ))
     }
 
     /// Generate meta.xml with metadata
@@ -366,7 +413,7 @@ impl PresentationBuilder {
         writer.set_mimetype("application/vnd.oasis.opendocument.presentation")?;
 
         // Add content.xml
-        let content_xml = self.generate_content_xml();
+        let content_xml = self.generate_content_xml()?;
         writer.add_file("content.xml", content_xml.as_bytes())?;
 
         // Add styles.xml
@@ -403,5 +450,41 @@ impl PresentationBuilder {
         let bytes = self.build()?;
         std::fs::write(path, bytes)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::odp::Shape;
+    use litchi_core::ShapeType;
+
+    #[test]
+    fn writes_native_rectangles_and_connectors() {
+        let mut rectangle = Shape::new();
+        rectangle.name = Some("Box & label".to_string());
+        rectangle.text = "Visible <text>".to_string();
+        let rectangle_xml = PresentationBuilder::generate_shape_xml(&rectangle, 0).unwrap();
+        assert!(rectangle_xml.starts_with("<draw:rect"));
+        assert!(rectangle_xml.contains("Visible &lt;text&gt;"));
+
+        let mut connector = Shape::new();
+        connector.shape_type = ShapeType::Connector;
+        let connector_xml = PresentationBuilder::generate_shape_xml(&connector, 1).unwrap();
+        assert!(connector_xml.starts_with("<draw:connector"));
+    }
+
+    #[test]
+    fn rejects_shapes_without_enough_serializable_data() {
+        for shape_type in [
+            ShapeType::Group,
+            ShapeType::Table,
+            ShapeType::GraphicFrame,
+            ShapeType::Unknown,
+        ] {
+            let mut shape = Shape::new();
+            shape.shape_type = shape_type;
+            assert!(PresentationBuilder::generate_shape_xml(&shape, 0).is_err());
+        }
     }
 }

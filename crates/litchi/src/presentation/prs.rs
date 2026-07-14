@@ -276,21 +276,9 @@ impl Presentation {
                 Error::ParseError(format!("Failed to extract text from Keynote: {}", e))
             }),
             #[cfg(feature = "odf")]
-            PresentationImpl::Odp(doc) => {
-                let mut text = String::new();
-                let slides = doc
-                    .slides()
-                    .map_err(|e| Error::ParseError(format!("Failed to get ODP slides: {}", e)))?;
-                for slide in slides {
-                    if let Ok(slide_text) = slide.text() {
-                        if !text.is_empty() {
-                            text.push_str("\n\n");
-                        }
-                        text.push_str(slide_text.as_ref());
-                    }
-                }
-                Ok(text)
-            },
+            PresentationImpl::Odp(doc) => doc
+                .text()
+                .map_err(|e| Error::ParseError(format!("Failed to extract ODP text: {}", e))),
         }
     }
 

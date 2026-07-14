@@ -4,7 +4,7 @@ use super::{Shape, Slide};
 use litchi_core::{Error, Result, ShapeType};
 use quick_xml::Reader;
 use quick_xml::XmlVersion;
-use quick_xml::events::{BytesStart, Event, attributes::Attribute};
+use quick_xml::events::{BytesRef, BytesStart, Event, attributes::Attribute};
 
 /// Parser for ODP-specific structures.
 ///
@@ -24,6 +24,7 @@ struct ShapeBuilder {
     height: Option<String>,
     style_name: Option<String>,
     image_href: Option<String>,
+    is_title: bool,
 }
 
 #[allow(dead_code)]
@@ -39,6 +40,7 @@ impl ShapeBuilder {
             height: None,
             style_name: None,
             image_href: None,
+            is_title: false,
         }
     }
 
@@ -70,23 +72,27 @@ impl OdpParser {
                 | b"draw:path"
                 | b"draw:polygon"
                 | b"draw:polyline"
+                | b"draw:connector"
+                | b"draw:g"
         )
     }
 
     fn shape_builder(element: &BytesStart<'_>) -> ShapeBuilder {
         let mut builder = ShapeBuilder::new();
+        let presentation_class = Self::get_attr(element.attributes(), b"presentation:class");
+        builder.is_title = presentation_class.as_deref() == Some("title");
         builder.shape_type = match element.name().as_ref() {
-            b"draw:frame" => {
-                match Self::get_attr(element.attributes(), b"presentation:class").as_deref() {
-                    Some("title" | "subtitle" | "object") => ShapeType::Placeholder,
-                    _ => ShapeType::TextBox,
-                }
+            b"draw:frame" => match presentation_class.as_deref() {
+                Some(_) => ShapeType::Placeholder,
+                _ => ShapeType::TextBox,
             },
             b"draw:line" => ShapeType::Line,
+            b"draw:connector" => ShapeType::Connector,
+            b"draw:g" => ShapeType::Group,
             _ => ShapeType::AutoShape,
         };
         builder.name = Self::get_attr(element.attributes(), b"draw:name");
-        if element.name().as_ref() == b"draw:line" {
+        if matches!(element.name().as_ref(), b"draw:line" | b"draw:connector") {
             builder.x = Self::get_attr(element.attributes(), b"svg:x1");
             builder.y = Self::get_attr(element.attributes(), b"svg:y1");
             builder.width = Self::get_attr(element.attributes(), b"svg:x2");
@@ -102,6 +108,82 @@ impl OdpParser {
         builder
     }
 
+    fn append_text(target: &mut String, text: &str) {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        if !target.is_empty() {
+            target.push(' ');
+        }
+        target.push_str(trimmed);
+    }
+
+    fn finish_shape(
+        builder: ShapeBuilder,
+        slide_title: &mut Option<String>,
+        slide_text: &mut String,
+        shapes: &mut Vec<Shape>,
+    ) {
+        let is_title = builder.is_title;
+        let shape = builder.build();
+        if is_title {
+            *slide_title = Some(shape.text.trim().to_string());
+        } else if matches!(
+            shape.shape_type,
+            ShapeType::TextBox | ShapeType::Placeholder
+        ) && shape.has_text()
+        {
+            Self::append_text(slide_text, &shape.text);
+        } else {
+            shapes.push(shape);
+        }
+    }
+
+    fn decode_text(text: &quick_xml::events::BytesText<'_>) -> Result<String> {
+        let decoded = text
+            .xml_content(XmlVersion::Explicit1_0)
+            .map_err(|error| Error::InvalidFormat(format!("invalid presentation text: {error}")))?;
+        Ok(decoded.into_owned())
+    }
+
+    fn decode_reference(reference: &BytesRef<'_>) -> Result<String> {
+        if let Some(character) = reference.resolve_char_ref().map_err(|error| {
+            Error::InvalidFormat(format!("invalid presentation character reference: {error}"))
+        })? {
+            return Ok(character.to_string());
+        }
+        let name = reference.decode().map_err(|error| {
+            Error::InvalidFormat(format!("invalid presentation entity reference: {error}"))
+        })?;
+        match name.as_ref() {
+            "amp" => Ok("&".to_string()),
+            "lt" => Ok("<".to_string()),
+            "gt" => Ok(">".to_string()),
+            "quot" => Ok("\"".to_string()),
+            "apos" => Ok("'".to_string()),
+            _ => Err(Error::InvalidFormat(format!(
+                "unsupported presentation entity reference '&{name};'"
+            ))),
+        }
+    }
+
+    fn push_parsed_text(
+        text: &str,
+        in_notes: bool,
+        notes: &mut String,
+        shape: Option<&mut ShapeBuilder>,
+        slide_text: &mut String,
+    ) {
+        if in_notes {
+            Self::append_text(notes, text);
+        } else if let Some(shape) = shape {
+            Self::append_text(&mut shape.text, text);
+        } else {
+            Self::append_text(slide_text, text);
+        }
+    }
+
     /// Parse all slides from ODP content.xml
     pub fn parse_slides(xml_content: &str) -> Result<Vec<Slide>> {
         let mut reader = Reader::from_str(xml_content);
@@ -115,10 +197,11 @@ impl OdpParser {
         let mut current_shapes: Vec<Shape> = Vec::new();
         let mut in_slide = false;
         let mut slide_index = 0;
+        let mut current_notes_text = String::new();
+        let mut in_notes = false;
 
         // Shape parsing state
         let mut current_shape: Option<ShapeBuilder> = None;
-        let mut in_text_box = false;
         let mut shape_depth = 0;
 
         loop {
@@ -134,17 +217,21 @@ impl OdpParser {
                                         .trim()
                                         .to_string(),
                                     index: slide_index,
-                                    notes: None,
+                                    notes: (!current_notes_text.is_empty())
+                                        .then(|| std::mem::take(&mut current_notes_text)),
                                     shapes: std::mem::take(&mut current_shapes),
                                 });
                                 slide_index += 1;
                             }
 
                             // Start new slide
-                            current_slide_title = Self::get_attr(e.attributes(), b"draw:name")
-                                .or_else(|| Some(format!("Slide{}", slide_index + 1)));
+                            current_slide_title = None;
                             in_slide = true;
                         },
+                        b"presentation:notes" if in_slide => {
+                            in_notes = true;
+                        },
+                        _ if in_notes => {},
                         name if Self::is_shape_element(name) => {
                             if in_slide && current_shape.is_none() {
                                 current_shape = Some(Self::shape_builder(e));
@@ -153,13 +240,24 @@ impl OdpParser {
                                 shape_depth += 1;
                             }
                         },
-                        b"draw:text-box" if current_shape.is_some() => {
-                            in_text_box = true;
-                        },
                         b"draw:image" if current_shape.is_some() => {
                             let builder = current_shape.as_mut().expect("shape checked above");
                             builder.shape_type = ShapeType::Picture;
                             builder.image_href = Self::get_attr(e.attributes(), b"xlink:href");
+                        },
+                        b"table:table" if current_shape.is_some() => {
+                            current_shape
+                                .as_mut()
+                                .expect("shape checked above")
+                                .shape_type = ShapeType::Table;
+                        },
+                        b"draw:object" | b"draw:object-ole" | b"draw:plugin"
+                            if current_shape.is_some() =>
+                        {
+                            current_shape
+                                .as_mut()
+                                .expect("shape checked above")
+                                .shape_type = ShapeType::GraphicFrame;
                         },
                         b"text:p" | b"text:span" => {
                             // Text will be collected in Text event
@@ -167,41 +265,63 @@ impl OdpParser {
                         _ => {},
                     }
                 },
-                Ok(Event::Text(ref t)) => {
-                    if in_slide && let Ok(text) = String::from_utf8(t.to_vec()) {
-                        let trimmed = text.trim();
-                        if !trimmed.is_empty() {
-                            // Add to slide text
-                            if !current_slide_text.is_empty() {
-                                current_slide_text.push(' ');
-                            }
-                            current_slide_text.push_str(trimmed);
-
-                            // Add to shape text if in a shape
-                            if let Some(ref mut shape) = current_shape
-                                && in_text_box
-                            {
-                                if !shape.text.is_empty() {
-                                    shape.text.push(' ');
-                                }
-                                shape.text.push_str(trimmed);
-                            }
-                        }
-                    }
+                Ok(Event::Text(ref t)) if in_slide => {
+                    let text = Self::decode_text(t)?;
+                    Self::push_parsed_text(
+                        &text,
+                        in_notes,
+                        &mut current_notes_text,
+                        current_shape.as_mut(),
+                        &mut current_slide_text,
+                    );
                 },
-                Ok(Event::Empty(ref e)) => match e.name().as_ref() {
+                Ok(Event::GeneralRef(ref reference)) if in_slide => {
+                    let text = Self::decode_reference(reference)?;
+                    Self::push_parsed_text(
+                        &text,
+                        in_notes,
+                        &mut current_notes_text,
+                        current_shape.as_mut(),
+                        &mut current_slide_text,
+                    );
+                },
+                Ok(Event::Empty(ref e)) if !in_notes => match e.name().as_ref() {
                     b"draw:image" => {
                         if let Some(builder) = current_shape.as_mut() {
                             builder.shape_type = ShapeType::Picture;
                             builder.image_href = Self::get_attr(e.attributes(), b"xlink:href");
                         }
                     },
+                    b"table:table" => {
+                        if let Some(builder) = current_shape.as_mut() {
+                            builder.shape_type = ShapeType::Table;
+                        }
+                    },
+                    b"draw:object" | b"draw:object-ole" | b"draw:plugin" => {
+                        if let Some(builder) = current_shape.as_mut() {
+                            builder.shape_type = ShapeType::GraphicFrame;
+                        }
+                    },
                     name if in_slide && current_shape.is_none() && Self::is_shape_element(name) => {
-                        current_shapes.push(Self::shape_builder(e).build());
+                        Self::finish_shape(
+                            Self::shape_builder(e),
+                            &mut current_slide_title,
+                            &mut current_slide_text,
+                            &mut current_shapes,
+                        );
                     },
                     _ => {},
                 },
                 Ok(Event::End(ref e)) => {
+                    if e.name().as_ref() == b"presentation:notes" {
+                        in_notes = false;
+                        buf.clear();
+                        continue;
+                    }
+                    if in_notes {
+                        buf.clear();
+                        continue;
+                    }
                     match e.name().as_ref() {
                         b"draw:page" => {
                             // Finish current slide
@@ -212,7 +332,8 @@ impl OdpParser {
                                         .trim()
                                         .to_string(),
                                     index: slide_index,
-                                    notes: None,
+                                    notes: (!current_notes_text.is_empty())
+                                        .then(|| std::mem::take(&mut current_notes_text)),
                                     shapes: std::mem::take(&mut current_shapes),
                                 });
                                 slide_index += 1;
@@ -221,17 +342,18 @@ impl OdpParser {
                         },
                         b"draw:frame" | b"draw:rect" | b"draw:ellipse" | b"draw:line"
                         | b"draw:custom-shape" | b"draw:circle" | b"draw:path"
-                        | b"draw:polygon" | b"draw:polyline" => {
+                        | b"draw:polygon" | b"draw:polyline" | b"draw:connector" | b"draw:g" => {
                             if shape_depth > 0 {
                                 shape_depth -= 1;
                             } else if let Some(builder) = current_shape.take() {
                                 // Finish the shape and add it to the slide
-                                current_shapes.push(builder.build());
-                                in_text_box = false;
+                                Self::finish_shape(
+                                    builder,
+                                    &mut current_slide_title,
+                                    &mut current_slide_text,
+                                    &mut current_shapes,
+                                );
                             }
-                        },
-                        b"draw:text-box" => {
-                            in_text_box = false;
                         },
                         _ => {},
                     }
@@ -316,7 +438,8 @@ mod tests {
 <office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
     xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
     xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
-    xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0">
+    xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+    xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0">
     <office:body>
         <office:presentation>
             <draw:page draw:name="Shapes">
@@ -326,7 +449,9 @@ mod tests {
                     </draw:text-box>
                 </draw:ellipse>
                 <draw:line draw:name="Line1" svg:x1="0cm" svg:y1="0cm" svg:x2="10cm" svg:y2="10cm"/>
+                <draw:connector draw:name="Connector1" svg:x1="1cm" svg:y1="2cm" svg:x2="3cm" svg:y2="4cm"/>
                 <draw:custom-shape draw:name="Custom1" svg:x="5cm" svg:y="5cm"/>
+                <presentation:notes><draw:frame><draw:text-box><text:p>Speaker note</text:p></draw:text-box></draw:frame></presentation:notes>
             </draw:page>
         </office:presentation>
     </office:body>
@@ -338,14 +463,18 @@ mod tests {
         assert_eq!(slides.len(), 2);
 
         // First slide
-        assert_eq!(slides[0].title, Some("Slide1".to_string()));
+        assert_eq!(slides[0].title, Some("Welcome".to_string()));
         assert_eq!(slides[0].index, 0);
-        assert!(slides[0].text.contains("Welcome"));
-        assert!(!slides[0].shapes.is_empty());
+        assert!(slides[0].text.is_empty());
+        assert_eq!(slides[0].shapes.len(), 1);
+        assert_eq!(slides[0].shapes[0].text, "Rectangle content");
+        assert_eq!(slides[0].all_text(), "Welcome\nRectangle content");
 
         // Second slide
-        assert_eq!(slides[1].title, Some("Slide2".to_string()));
+        assert_eq!(slides[1].title, None);
         assert_eq!(slides[1].index, 1);
+        assert_eq!(slides[1].text, "Bullet 1 Bullet 2");
+        assert!(slides[1].shapes.is_empty());
     }
 
     #[test]
@@ -360,9 +489,15 @@ mod tests {
         assert_eq!(slides.len(), 1);
 
         let slide = &slides[0];
-        // Parser extracts shapes from draw:ellipse, draw:line, draw:custom-shape, etc.
-        // Verify that at least one shape was parsed (actual count depends on parser implementation)
-        assert!(!slide.shapes.is_empty());
+        assert_eq!(slide.shapes.len(), 4);
+        assert!(
+            slide
+                .shapes
+                .iter()
+                .any(|shape| shape.shape_type == ShapeType::Connector)
+        );
+        assert_eq!(slide.notes.as_deref(), Some("Speaker note"));
+        assert!(!slide.all_text().contains("Speaker note"));
     }
 
     #[test]
@@ -523,5 +658,21 @@ mod tests {
         let shape = &slides[0].shapes[0];
         assert_eq!(shape.shape_type, ShapeType::Picture);
         assert_eq!(shape.image_href(), Some("Pictures/a&b.png"));
+    }
+
+    #[test]
+    fn identifies_shapes_that_cannot_be_losslessly_rebuilt() {
+        let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:presentation><draw:page><draw:g draw:name="Group"><draw:rect/></draw:g><draw:frame draw:name="Table"><table:table/></draw:frame><draw:frame draw:name="Object"><draw:object/></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#;
+
+        let slides = OdpParser::parse_slides(xml).unwrap();
+        let types: Vec<_> = slides[0]
+            .shapes
+            .iter()
+            .map(|shape| shape.shape_type)
+            .collect();
+        assert_eq!(
+            types,
+            [ShapeType::Group, ShapeType::Table, ShapeType::GraphicFrame]
+        );
     }
 }

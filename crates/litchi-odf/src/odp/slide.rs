@@ -27,11 +27,32 @@ impl Slide {
         Ok(self.title.as_deref())
     }
 
-    /// Extract all text content from the slide.
+    /// Get the slide's primary body text.
     ///
-    /// Returns the combined text from all text elements on the slide.
+    /// Use [`Self::all_text`] to include the title and labeled drawing shapes.
     pub fn text(&self) -> Result<&str> {
         Ok(&self.text)
+    }
+
+    /// Compose all visible text from the title, body, and labeled shapes.
+    pub fn all_text(&self) -> String {
+        let mut parts = Vec::with_capacity(self.shapes.len() + 2);
+        if let Some(title) = self.title.as_deref().map(str::trim)
+            && !title.is_empty()
+        {
+            parts.push(title);
+        }
+        let body = self.text.trim();
+        if !body.is_empty() {
+            parts.push(body);
+        }
+        parts.extend(
+            self.shapes
+                .iter()
+                .map(|shape| shape.text.trim())
+                .filter(|text| !text.is_empty()),
+        );
+        parts.join("\n")
     }
 
     /// Get all shapes on the slide.
