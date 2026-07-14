@@ -3,11 +3,36 @@
 /// This module provides types and methods for accessing footnotes and endnotes
 /// in Word documents. Footnotes appear at the bottom of pages, while endnotes
 /// appear at the end of the document or section.
+use crate::docx::namespace::scan_word_element_ranges;
 use crate::docx::paragraph::{Paragraph, extract_word_text};
 use crate::error::{OoxmlError, Result};
+use litchi_core::XmlSlice;
 use litchi_opc::part::Part;
 use quick_xml::Reader;
 use quick_xml::events::Event;
+use std::sync::Arc;
+
+#[derive(Debug, Clone)]
+enum NoteXmlData {
+    Owned(Box<[u8]>),
+    Shared(XmlSlice),
+}
+
+impl NoteXmlData {
+    fn as_bytes(&self) -> &[u8] {
+        match self {
+            Self::Owned(bytes) => bytes,
+            Self::Shared(slice) => slice.as_bytes(),
+        }
+    }
+
+    fn get_or_create_arc(&self) -> (Arc<Vec<u8>>, u32) {
+        match self {
+            Self::Owned(bytes) => (Arc::new(bytes.to_vec()), 0),
+            Self::Shared(slice) => (slice.arc(), slice.start()),
+        }
+    }
+}
 
 /// A footnote or endnote in a Word document.
 ///
@@ -40,7 +65,7 @@ pub struct Note {
     /// The note ID
     id: u32,
     /// The raw XML bytes for this note
-    xml_bytes: Vec<u8>,
+    xml_data: NoteXmlData,
     /// The type of note (normal, separator, continuation separator, etc.)
     note_type: NoteType,
 }
@@ -87,7 +112,21 @@ impl Note {
     pub fn new(id: u32, xml_bytes: Vec<u8>, note_type: NoteType) -> Self {
         Self {
             id,
-            xml_bytes,
+            xml_data: NoteXmlData::Owned(xml_bytes.into_boxed_slice()),
+            note_type,
+        }
+    }
+
+    fn from_arc_range(
+        id: u32,
+        source: Arc<Vec<u8>>,
+        start: u32,
+        length: u32,
+        note_type: NoteType,
+    ) -> Self {
+        Self {
+            id,
+            xml_data: NoteXmlData::Shared(XmlSlice::new(source, start, length)),
             note_type,
         }
     }
@@ -107,7 +146,7 @@ impl Note {
     /// Get the XML bytes of this note.
     #[inline]
     pub fn xml_bytes(&self) -> &[u8] {
-        &self.xml_bytes
+        self.xml_data.as_bytes()
     }
 
     /// Extract all text content from this note.
@@ -129,7 +168,7 @@ impl Note {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn text(&self) -> Result<String> {
-        extract_word_text(&self.xml_bytes)
+        extract_word_text(self.xml_bytes())
     }
 
     /// Get all paragraphs in this note.
@@ -154,82 +193,18 @@ impl Note {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
-
+        let (source, base_offset) = self.xml_data.get_or_create_arc();
         let mut paragraphs = Vec::new();
-        let mut current_para_xml = Vec::with_capacity(4096);
-        let mut in_para = false;
-        let mut depth = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"p" && !in_para {
-                        in_para = true;
-                        depth = 1;
-                        current_para_xml.clear();
-                        current_para_xml.extend_from_slice(b"<w:p");
-                        for attr in e.attributes().flatten() {
-                            current_para_xml.extend_from_slice(b" ");
-                            current_para_xml.extend_from_slice(attr.key.as_ref());
-                            current_para_xml.extend_from_slice(b"=\"");
-                            current_para_xml.extend_from_slice(&attr.value);
-                            current_para_xml.extend_from_slice(b"\"");
-                        }
-                        current_para_xml.extend_from_slice(b">");
-                    } else if in_para {
-                        depth += 1;
-                        current_para_xml.extend_from_slice(b"<");
-                        current_para_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_para_xml.extend_from_slice(b" ");
-                            current_para_xml.extend_from_slice(attr.key.as_ref());
-                            current_para_xml.extend_from_slice(b"=\"");
-                            current_para_xml.extend_from_slice(&attr.value);
-                            current_para_xml.extend_from_slice(b"\"");
-                        }
-                        current_para_xml.extend_from_slice(b">");
-                    }
-                },
-                Ok(Event::End(e)) if in_para => {
-                    current_para_xml.extend_from_slice(b"</");
-                    current_para_xml.extend_from_slice(e.name().as_ref());
-                    current_para_xml.extend_from_slice(b">");
-
-                    if e.local_name().as_ref() == b"p" && depth == 1 {
-                        paragraphs.push(Paragraph::new(current_para_xml.clone()));
-                        in_para = false;
-                    } else {
-                        depth -= 1;
-                    }
-                },
-                Ok(Event::Empty(e)) if in_para => {
-                    current_para_xml.extend_from_slice(b"<");
-                    current_para_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        current_para_xml.extend_from_slice(b" ");
-                        current_para_xml.extend_from_slice(attr.key.as_ref());
-                        current_para_xml.extend_from_slice(b"=\"");
-                        current_para_xml.extend_from_slice(&attr.value);
-                        current_para_xml.extend_from_slice(b"\"");
-                    }
-                    current_para_xml.extend_from_slice(b"/>");
-                },
-                Ok(Event::Text(e)) if in_para => {
-                    current_para_xml.extend_from_slice(e.as_ref());
-                },
-                Ok(Event::CData(e)) if in_para => {
-                    current_para_xml.extend_from_slice(b"<![CDATA[");
-                    current_para_xml.extend_from_slice(e.as_ref());
-                    current_para_xml.extend_from_slice(b"]]>");
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_word_element_ranges(self.xml_bytes(), &[b"p".as_slice()], |_, start, length| {
+            paragraphs.push(Paragraph::from_arc_range(
+                Arc::clone(&source),
+                base_offset.checked_add(start).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("Word note offset exceeds u32".to_string())
+                })?,
+                length,
+            ));
+            Ok(())
+        })?;
         Ok(paragraphs)
     }
 
@@ -261,108 +236,64 @@ impl Note {
 
     /// Extract notes from a part (generic for footnotes and endnotes).
     fn extract_notes_from_part(part: &dyn Part, note_tag: &[u8]) -> Result<Vec<Note>> {
-        let xml_bytes = part.blob();
-        let mut reader = Reader::from_reader(xml_bytes);
-        reader.config_mut().trim_text(true);
-
+        let source = part.blob_arc();
         let mut notes = Vec::new();
-        let mut current_note_xml = Vec::with_capacity(4096);
-        let mut in_note = false;
-        let mut depth = 0;
-        let mut current_id: Option<u32> = None;
-        let mut current_type = NoteType::Normal;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == note_tag && !in_note {
-                        in_note = true;
-                        depth = 1;
-                        current_note_xml.clear();
-                        current_id = None;
-                        current_type = NoteType::Normal;
-
-                        // Parse attributes
-                        for attr in e.attributes().flatten() {
-                            match attr.key.local_name().as_ref() {
-                                b"id" => {
-                                    let id_str = String::from_utf8_lossy(&attr.value);
-                                    current_id =
-                                        atoi_simd::parse::<u32, false, false>(id_str.as_bytes())
-                                            .ok();
-                                },
-                                b"type" => {
-                                    let type_str = String::from_utf8_lossy(&attr.value);
-                                    current_type = NoteType::from_xml(&type_str);
-                                },
-                                _ => {},
-                            }
-                        }
-
-                        // Build opening tag
-                        current_note_xml.extend_from_slice(b"<w:");
-                        current_note_xml.extend_from_slice(note_tag);
-                        current_note_xml.extend_from_slice(b">");
-                    } else if in_note {
-                        depth += 1;
-                        current_note_xml.extend_from_slice(b"<");
-                        current_note_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_note_xml.extend_from_slice(b" ");
-                            current_note_xml.extend_from_slice(attr.key.as_ref());
-                            current_note_xml.extend_from_slice(b"=\"");
-                            current_note_xml.extend_from_slice(&attr.value);
-                            current_note_xml.extend_from_slice(b"\"");
-                        }
-                        current_note_xml.extend_from_slice(b">");
-                    }
-                },
-                Ok(Event::End(e)) if in_note => {
-                    current_note_xml.extend_from_slice(b"</");
-                    current_note_xml.extend_from_slice(e.name().as_ref());
-                    current_note_xml.extend_from_slice(b">");
-
-                    if e.local_name().as_ref() == note_tag && depth == 1 {
-                        // End of note element
-                        if let Some(id) = current_id {
-                            // Skip separator notes (negative IDs or special types)
-                            if id > 0 && current_type.is_normal() {
-                                notes.push(Note::new(id, current_note_xml.clone(), current_type));
-                            }
-                        }
-                        in_note = false;
-                    } else {
-                        depth -= 1;
-                    }
-                },
-                Ok(Event::Empty(e)) if in_note => {
-                    current_note_xml.extend_from_slice(b"<");
-                    current_note_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        current_note_xml.extend_from_slice(b" ");
-                        current_note_xml.extend_from_slice(attr.key.as_ref());
-                        current_note_xml.extend_from_slice(b"=\"");
-                        current_note_xml.extend_from_slice(&attr.value);
-                        current_note_xml.extend_from_slice(b"\"");
-                    }
-                    current_note_xml.extend_from_slice(b"/>");
-                },
-                Ok(Event::Text(e)) if in_note => {
-                    current_note_xml.extend_from_slice(e.as_ref());
-                },
-                Ok(Event::CData(e)) if in_note => {
-                    current_note_xml.extend_from_slice(b"<![CDATA[");
-                    current_note_xml.extend_from_slice(e.as_ref());
-                    current_note_xml.extend_from_slice(b"]]>");
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
+        scan_word_element_ranges(source.as_slice(), &[note_tag], |_, start, length| {
+            let start_index = start as usize;
+            let end_index = start_index
+                .checked_add(length as usize)
+                .ok_or_else(|| OoxmlError::InvalidFormat("Word note range overflow".to_string()))?;
+            let (id, note_type) = parse_note_metadata(&source[start_index..end_index])?;
+            if let Some(id) = id
+                && id > 0
+                && note_type.is_normal()
+            {
+                notes.push(Note::from_arc_range(
+                    id,
+                    Arc::clone(&source),
+                    start,
+                    length,
+                    note_type,
+                ));
             }
-        }
-
+            Ok(())
+        })?;
         Ok(notes)
     }
+}
+
+fn parse_note_metadata(xml_bytes: &[u8]) -> Result<(Option<u32>, NoteType)> {
+    let mut reader = Reader::from_reader(xml_bytes);
+    let element = loop {
+        match reader.read_event() {
+            Ok(Event::Start(element)) | Ok(Event::Empty(element)) => break element,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "missing Word note element".to_string(),
+                ));
+            },
+            Err(error) => return Err(OoxmlError::Xml(error.to_string())),
+            _ => {},
+        }
+    };
+
+    let mut id = None;
+    let mut note_type = NoteType::Normal;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        match attribute.key.local_name().as_ref() {
+            b"id" => {
+                id = atoi_simd::parse::<u32, false, false>(attribute.value.as_ref()).ok();
+            },
+            b"type" => {
+                let value = std::str::from_utf8(attribute.value.as_ref())
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                note_type = NoteType::from_xml(value);
+            },
+            _ => {},
+        }
+    }
+    Ok((id, note_type))
 }
 
 #[cfg(test)]
@@ -658,6 +589,34 @@ mod tests {
         assert_eq!(notes.len(), 2);
         assert_eq!(notes[0].id(), 1);
         assert_eq!(notes[1].id(), 2);
+    }
+
+    #[test]
+    fn extracts_aliased_note_slices_and_ignores_foreign_lookalikes() {
+        let xml = br#"<fn:footnotes xmlns:fn="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:false="urn:not-wordprocessingml">
+            <false:footnote false:id="9"><false:p><false:r><false:t>ignored</false:t></false:r></false:p></false:footnote>
+            <fn:footnote fn:id="1"><fn:p><fn:r><fn:t><![CDATA[A < B]]></fn:t></fn:r></fn:p></fn:footnote>
+            <fn:footnote fn:id="2" fn:type="separator"><fn:p><fn:r><fn:t>separator</fn:t></fn:r></fn:p></fn:footnote>
+            <fn:footnote fn:id="3"/>
+        </fn:footnotes>"#;
+        let part = MockPart::new(xml.to_vec());
+
+        let notes = Note::extract_footnotes_from_part(&part).unwrap();
+        assert_eq!(notes.len(), 2);
+        assert_eq!(notes[0].id(), 1);
+        assert_eq!(notes[0].text().unwrap(), "A < B");
+        let paragraphs = notes[0].paragraphs().unwrap();
+        assert_eq!(paragraphs.len(), 1);
+        assert_eq!(paragraphs[0].runs().unwrap()[0].text().unwrap(), "A < B");
+        assert_eq!(notes[1].id(), 3);
+        assert_eq!(notes[1].text().unwrap(), "");
+    }
+
+    #[test]
+    fn rejects_unterminated_note_slices() {
+        let xml = br#"<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnote w:id="1"><w:p/>"#;
+        let part = MockPart::new(xml.to_vec());
+        assert!(Note::extract_footnotes_from_part(&part).is_err());
     }
 
     #[test]
