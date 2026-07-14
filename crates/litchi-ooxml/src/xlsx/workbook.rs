@@ -2632,6 +2632,33 @@ mod tests {
             ),
             ..crate::charts::DataTable::default()
         });
+        let TypeGroup::Bar(group) = &mut chart.chart.plot_area.type_groups[0] else {
+            panic!("expected a bar chart");
+        };
+        group.series_lines.push(crate::charts::ChartLines {
+            shape_properties: Some(
+                ChartShapeProperties::from_xml(
+                    br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId409"/></a:blipFill></c:spPr>"#.to_vec(),
+                )
+                .unwrap(),
+            ),
+        });
+        let mut line =
+            crate::charts::LineTypeGroup::new(crate::charts::types::BarGrouping::Standard);
+        line.up_down_bars = Some(crate::charts::UpDownBars {
+            extension_list: Some(
+                ChartExtensionList::from_xml(
+                    br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="bars"><x:reference r:id="rId410"/></c:ext></c:extLst>"#.to_vec(),
+                )
+                .unwrap(),
+            ),
+            ..crate::charts::UpDownBars::default()
+        });
+        chart
+            .chart
+            .plot_area
+            .type_groups
+            .push(TypeGroup::Line(line));
         let fragment_ids = crate::xlsx::chart::chart_fragment_relationship_ids(&chart.chart)
             .expect("relationship-bearing fragments should be valid XML");
         assert_eq!(
@@ -2643,13 +2670,22 @@ mod tests {
                 "rId406".to_string(),
                 "rId407".to_string(),
                 "rId408".to_string(),
+                "rId409".to_string(),
+                "rId410".to_string(),
             ]
             .into()
         );
         workbook.worksheet_mut(0).unwrap().add_chart(chart);
 
         let error = workbook.save(&path).unwrap_err().to_string();
-        assert!(error.contains("fragment references missing relationship 'rId40"));
+        assert!(error.contains("fragment references missing relationship"));
+        assert!(
+            [
+                "rId403", "rId404", "rId405", "rId406", "rId407", "rId408", "rId409", "rId410",
+            ]
+            .iter()
+            .any(|relationship_id| error.contains(relationship_id))
+        );
     }
 
     #[test]

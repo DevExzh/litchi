@@ -12,9 +12,9 @@ use crate::charts::legend::Legend;
 use crate::charts::models::{Layout, NumericData, StringData, TitleText};
 use crate::charts::plot_area::{
     Area3DTypeGroup, AreaTypeGroup, BandFormat, Bar3DTypeGroup, BarTypeGroup, BubbleTypeGroup,
-    DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup, Pie3DTypeGroup,
-    PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup,
-    SurfaceTypeGroup, TypeGroup, TypeGroupCommon, UpDownBars,
+    ChartLines, DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup,
+    Pie3DTypeGroup, PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup, StockTypeGroup,
+    Surface3DTypeGroup, SurfaceTypeGroup, TypeGroup, TypeGroupCommon, UpDownBars,
 };
 use crate::charts::series::{
     DataLabel, DataLabels, DataPoint, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType,
@@ -772,8 +772,8 @@ fn write_area_chart<W: Write>(writer: &mut W, group: &AreaTypeGroup) -> std::io:
     }
 
     write_group_data_labels(writer, &group.common)?;
-    if group.drop_lines.is_some() {
-        write!(writer, "<c:dropLines/>")?;
+    if let Some(lines) = group.drop_lines.as_ref() {
+        write_chart_lines(writer, "dropLines", lines)?;
     }
     write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "area chart")?;
     write_type_group_extension(writer, &group.common)?;
@@ -797,12 +797,12 @@ fn write_area_3d_chart<W: Write>(writer: &mut W, group: &Area3DTypeGroup) -> std
     )?;
 
     for series in &group.common.series {
-        write_series(writer, series, SeriesFeatures::BASIC)?;
+        write_series(writer, series, SeriesFeatures::AREA)?;
     }
 
     write_group_data_labels(writer, &group.common)?;
-    if group.drop_lines.is_some() {
-        write!(writer, "<c:dropLines/>")?;
+    if let Some(lines) = group.drop_lines.as_ref() {
+        write_chart_lines(writer, "dropLines", lines)?;
     }
     if let Some(gap_depth) = group.gap_depth {
         write!(writer, r#"<c:gapDepth val="{gap_depth}"/>"#)?;
@@ -856,8 +856,8 @@ fn write_bar_chart<W: Write>(writer: &mut W, group: &BarTypeGroup) -> std::io::R
     if let Some(overlap) = group.overlap {
         write!(writer, r#"<c:overlap val="{}"/>"#, overlap)?;
     }
-    for _ in &group.series_lines {
-        write!(writer, "<c:serLines/>")?;
+    for lines in &group.series_lines {
+        write_chart_lines(writer, "serLines", lines)?;
     }
 
     write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "bar chart")?;
@@ -1020,11 +1020,11 @@ fn write_line_chart<W: Write>(writer: &mut W, group: &LineTypeGroup) -> std::io:
     }
 
     write_group_data_labels(writer, &group.common)?;
-    if group.drop_lines.is_some() {
-        write!(writer, "<c:dropLines/>")?;
+    if let Some(lines) = group.drop_lines.as_ref() {
+        write_chart_lines(writer, "dropLines", lines)?;
     }
-    if group.high_low_lines.is_some() {
-        write!(writer, "<c:hiLowLines/>")?;
+    if let Some(lines) = group.high_low_lines.as_ref() {
+        write_chart_lines(writer, "hiLowLines", lines)?;
     }
     if let Some(up_down_bars) = group.up_down_bars.as_ref() {
         write_up_down_bars(writer, up_down_bars)?;
@@ -1065,8 +1065,8 @@ fn write_line_3d_chart<W: Write>(writer: &mut W, group: &Line3DTypeGroup) -> std
     }
 
     write_group_data_labels(writer, &group.common)?;
-    if group.drop_lines.is_some() {
-        write!(writer, "<c:dropLines/>")?;
+    if let Some(lines) = group.drop_lines.as_ref() {
+        write_chart_lines(writer, "dropLines", lines)?;
     }
     if let Some(gap_depth) = group.gap_depth {
         write!(writer, r#"<c:gapDepth val="{gap_depth}"/>"#)?;
@@ -1161,8 +1161,8 @@ fn write_of_pie_chart<W: Write>(writer: &mut W, group: &OfPieTypeGroup) -> std::
     if let Some(second_pie_size) = group.second_pie_size {
         write!(writer, r#"<c:secondPieSize val="{second_pie_size}"/>"#)?;
     }
-    for _ in &group.series_lines {
-        write!(writer, "<c:serLines/>")?;
+    for lines in &group.series_lines {
+        write_chart_lines(writer, "serLines", lines)?;
     }
     write_type_group_extension(writer, &group.common)?;
     write!(writer, "</c:ofPieChart>")?;
@@ -1246,11 +1246,11 @@ fn write_stock_chart<W: Write>(writer: &mut W, group: &StockTypeGroup) -> std::i
     }
 
     write_group_data_labels(writer, &group.common)?;
-    if group.drop_lines.is_some() {
-        write!(writer, "<c:dropLines/>")?;
+    if let Some(lines) = group.drop_lines.as_ref() {
+        write_chart_lines(writer, "dropLines", lines)?;
     }
-    if group.high_low_lines.is_some() {
-        write!(writer, "<c:hiLowLines/>")?;
+    if let Some(lines) = group.high_low_lines.as_ref() {
+        write_chart_lines(writer, "hiLowLines", lines)?;
     }
     if let Some(up_down_bars) = group.up_down_bars.as_ref() {
         write_up_down_bars(writer, up_down_bars)?;
@@ -2053,13 +2053,31 @@ fn write_up_down_bars<W: Write>(writer: &mut W, bars: &UpDownBars) -> std::io::R
     if let Some(gap_width) = bars.gap_width {
         write!(writer, r#"<c:gapWidth val="{gap_width}"/>"#)?;
     }
-    if bars.up_bars.is_some() {
-        write!(writer, "<c:upBars/>")?;
+    if let Some(lines) = bars.up_bars.as_ref() {
+        write_chart_lines(writer, "upBars", lines)?;
     }
-    if bars.down_bars.is_some() {
-        write!(writer, "<c:downBars/>")?;
+    if let Some(lines) = bars.down_bars.as_ref() {
+        write_chart_lines(writer, "downBars", lines)?;
+    }
+    if let Some(extension_list) = bars.extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
     }
     write!(writer, "</c:upDownBars>")?;
+    Ok(())
+}
+
+fn write_chart_lines<W: Write>(
+    writer: &mut W,
+    element_name: &str,
+    lines: &ChartLines,
+) -> std::io::Result<()> {
+    if let Some(shape_properties) = lines.shape_properties.as_ref() {
+        write!(writer, "<c:{element_name}>")?;
+        writer.write_all(shape_properties.as_xml())?;
+        write!(writer, "</c:{element_name}>")?;
+    } else {
+        write!(writer, "<c:{element_name}/>")?;
+    }
     Ok(())
 }
 

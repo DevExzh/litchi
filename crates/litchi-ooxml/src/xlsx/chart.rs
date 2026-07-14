@@ -805,6 +805,29 @@ pub(crate) fn chart_user_shapes_relationship_ids(xml: &[u8]) -> Result<HashSet<S
     Ok(relationship_ids)
 }
 
+fn append_chart_line_fragment<'a>(
+    fragments: &mut Vec<&'a [u8]>,
+    lines: Option<&'a crate::charts::ChartLines>,
+) {
+    if let Some(shape_properties) = lines.and_then(|lines| lines.shape_properties.as_ref()) {
+        fragments.push(shape_properties.as_xml());
+    }
+}
+
+fn append_up_down_bar_fragments<'a>(
+    fragments: &mut Vec<&'a [u8]>,
+    bars: Option<&'a crate::charts::UpDownBars>,
+) {
+    let Some(bars) = bars else {
+        return;
+    };
+    append_chart_line_fragment(fragments, bars.up_bars.as_ref());
+    append_chart_line_fragment(fragments, bars.down_bars.as_ref());
+    if let Some(extension_list) = bars.extension_list.as_ref() {
+        fragments.push(extension_list.as_xml());
+    }
+}
+
 pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<HashSet<String>> {
     const RELATIONSHIPS_NAMESPACE: &[u8] =
         b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -894,6 +917,38 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
         .flatten(),
     );
     for group in &chart.plot_area.type_groups {
+        match group {
+            crate::charts::TypeGroup::Area(group) => {
+                append_chart_line_fragment(&mut fragments, group.drop_lines.as_ref());
+            },
+            crate::charts::TypeGroup::Area3D(group) => {
+                append_chart_line_fragment(&mut fragments, group.drop_lines.as_ref());
+            },
+            crate::charts::TypeGroup::Bar(group) => {
+                for lines in &group.series_lines {
+                    append_chart_line_fragment(&mut fragments, Some(lines));
+                }
+            },
+            crate::charts::TypeGroup::Line(group) => {
+                append_chart_line_fragment(&mut fragments, group.drop_lines.as_ref());
+                append_chart_line_fragment(&mut fragments, group.high_low_lines.as_ref());
+                append_up_down_bar_fragments(&mut fragments, group.up_down_bars.as_ref());
+            },
+            crate::charts::TypeGroup::Line3D(group) => {
+                append_chart_line_fragment(&mut fragments, group.drop_lines.as_ref());
+            },
+            crate::charts::TypeGroup::OfPie(group) => {
+                for lines in &group.series_lines {
+                    append_chart_line_fragment(&mut fragments, Some(lines));
+                }
+            },
+            crate::charts::TypeGroup::Stock(group) => {
+                append_chart_line_fragment(&mut fragments, group.drop_lines.as_ref());
+                append_chart_line_fragment(&mut fragments, group.high_low_lines.as_ref());
+                append_up_down_bar_fragments(&mut fragments, group.up_down_bars.as_ref());
+            },
+            _ => {},
+        }
         for series in &group.common().series {
             fragments.extend(
                 [

@@ -209,8 +209,19 @@ impl Default for TypeGroupCommon {
 }
 
 /// A schema-defined chart line whose DrawingML styling is optional.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct ChartLines;
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ChartLines {
+    /// DrawingML shape properties for the line
+    pub shape_properties: Option<ChartShapeProperties>,
+}
+
+impl ChartLines {
+    /// Create an unformatted chart line.
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
 
 /// Up/down bars shown between corresponding points in line or stock charts.
 #[derive(Debug, Clone, Default)]
@@ -221,6 +232,8 @@ pub struct UpDownBars {
     pub up_bars: Option<ChartLines>,
     /// Optional formatting container for falling-value bars
     pub down_bars: Option<ChartLines>,
+    /// Up/down-bar extension list
+    pub extension_list: Option<ChartExtensionList>,
 }
 
 /// Area chart type group.
