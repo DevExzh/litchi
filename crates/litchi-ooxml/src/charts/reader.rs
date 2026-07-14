@@ -19,8 +19,8 @@ use crate::charts::plot_area::{
     TypeGroup, TypeGroupCommon,
 };
 use crate::charts::series::{
-    DataLabels, DataPoint, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType, Series,
-    Trendline, TrendlineType,
+    DataLabel, DataLabels, DataPoint, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType,
+    Series, Trendline, TrendlineType,
 };
 use crate::charts::types::{
     AxisOrientation, AxisPosition, BarDirection, BarGrouping, DataLabelPosition, DisplayBlanks,
@@ -1403,9 +1403,23 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"dLbl" => {
-                // Point-specific label overrides have their own choice and must not leak
-                // their nested settings into the series-wide defaults.
-                skip_chart_element(reader, b"dLbl")?;
+                let label = parse_data_label(reader)?;
+                if labels
+                    .labels
+                    .iter()
+                    .any(|existing| existing.index == label.index)
+                {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "chart data labels contain duplicate point index {}",
+                        label.index
+                    )));
+                }
+                labels.labels.push(label);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"dLbl" => {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart point data label is missing its index".into(),
+                ));
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"separator" => {
                 saw_shared_settings = true;
@@ -1490,36 +1504,197 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
     Ok(labels)
 }
 
-fn skip_chart_element<R: BufRead>(reader: &mut ChartXmlReader<R>, end_name: &[u8]) -> Result<()> {
-    let mut depth = 1usize;
+fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLabel> {
+    let mut label = DataLabel::new(0);
+    let mut saw_index = false;
+    let mut saw_delete = false;
+    let mut saw_settings = false;
     let mut buf = Vec::new();
+
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(_)) => {
-                depth = depth.checked_add(1).ok_or_else(|| {
-                    OoxmlError::InvalidFormat("chart XML nesting is too deep".into())
-                })?;
-            },
-            Ok(Event::End(ref element)) => {
-                depth -= 1;
-                if depth == 0 {
-                    if element.local_name().as_ref() != end_name {
-                        return Err(OoxmlError::InvalidFormat(
-                            "chart XML closes an unexpected element".into(),
-                        ));
-                    }
-                    return Ok(());
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"layout" => {
+                if label.layout.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart point data label contains duplicate layouts".into(),
+                    ));
                 }
+                label.layout = Some(parse_layout(reader)?);
+                saw_settings = true;
             },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"layout" => {
+                label.layout = Some(match label.layout {
+                    None => Layout::new(),
+                    Some(_) => {
+                        return Err(OoxmlError::InvalidFormat(
+                            "chart point data label contains duplicate layouts".into(),
+                        ));
+                    },
+                });
+                saw_settings = true;
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"tx" => {
+                if label.text.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart point data label contains duplicate text".into(),
+                    ));
+                }
+                label.text = parse_label_text(reader)?;
+                saw_settings = true;
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"separator" => {
+                label.separator = Some(parse_text_element(reader, b"separator")?);
+                saw_settings = true;
+            },
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+                let is_setting = match element.local_name().as_ref() {
+                    b"idx" => {
+                        if saw_index {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart point data label contains duplicate indexes".into(),
+                            ));
+                        }
+                        label.index = required_u32_attr(element, "chart point data-label index")?;
+                        saw_index = true;
+                        false
+                    },
+                    b"delete" => {
+                        if saw_delete {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart point data label contains duplicate delete flags".into(),
+                            ));
+                        }
+                        label.deleted = parse_bool_attr(element)?;
+                        saw_delete = true;
+                        false
+                    },
+                    b"numFmt" => {
+                        if label.number_format.is_some() {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart point data label contains duplicate number formats".into(),
+                            ));
+                        }
+                        label.number_format = Some(parse_number_format(
+                            element,
+                            reader.decoder(),
+                            "chart point data-label",
+                        )?);
+                        true
+                    },
+                    b"dLblPos" => {
+                        label.position = Some(parse_data_label_position(element)?);
+                        true
+                    },
+                    b"showLegendKey" => {
+                        label.show_legend_key = parse_bool_attr(element)?;
+                        true
+                    },
+                    b"showVal" => {
+                        label.show_value = parse_bool_attr(element)?;
+                        true
+                    },
+                    b"showCatName" => {
+                        label.show_category_name = parse_bool_attr(element)?;
+                        true
+                    },
+                    b"showSerName" => {
+                        label.show_series_name = parse_bool_attr(element)?;
+                        true
+                    },
+                    b"showPercent" => {
+                        label.show_percent = parse_bool_attr(element)?;
+                        true
+                    },
+                    b"showBubbleSize" => {
+                        label.show_bubble_size = parse_bool_attr(element)?;
+                        true
+                    },
+                    _ => false,
+                };
+                saw_settings |= is_setting;
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"dLbl" => break,
             Ok(Event::Eof) => {
                 return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".into(),
+                    "unterminated chart point data label".into(),
                 ));
             },
             Err(error) => return Err(error),
             _ => {},
         }
         buf.clear();
+    }
+
+    if !saw_index {
+        return Err(missing_attribute("chart point data-label index"));
+    }
+    if saw_delete && saw_settings {
+        return Err(OoxmlError::InvalidFormat(
+            "chart point data label mixes deletion with label settings".into(),
+        ));
+    }
+    Ok(label)
+}
+
+fn parse_label_text<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<TitleText>> {
+    let mut text = String::new();
+    let mut formula = None;
+    let mut saw_text = false;
+    let mut in_text = false;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"f" => {
+                if formula.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart data label contains duplicate formula references".into(),
+                    ));
+                }
+                formula = Some(parse_text_element(reader, b"f")?);
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"t" => {
+                saw_text = true;
+                in_text = true;
+            },
+            Ok(Event::Text(value)) if in_text => text.push_str(
+                &value
+                    .decode()
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+            ),
+            Ok(Event::CData(value)) if in_text => text.push_str(
+                &value
+                    .decode()
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+            ),
+            Ok(Event::GeneralRef(reference)) if in_text => {
+                text.push_str(&decode_xml_reference(&reference)?);
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"t" => {
+                in_text = false;
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"tx" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart data-label text".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+
+    if let Some(formula) = formula {
+        if saw_text {
+            return Err(OoxmlError::InvalidFormat(
+                "chart data label mixes a formula reference with literal text".into(),
+            ));
+        }
+        Ok(Some(TitleText::Reference(DataSourceRef::new(formula))))
+    } else if saw_text {
+        Ok(Some(TitleText::Literal(RichText::new(text))))
+    } else {
+        Ok(None)
     }
 }
 
@@ -2955,6 +3130,9 @@ mod tests {
         let labels = group.common.series[0].data_labels.as_ref().unwrap();
         assert!(labels.show_value);
         assert!(!labels.deleted);
+        assert_eq!(labels.labels.len(), 1);
+        assert_eq!(labels.labels[0].index, 0);
+        assert!(labels.labels[0].deleted);
         assert_eq!(chart.legend.unwrap().position, LegendPosition::Bottom);
         assert!(chart.show_data_labels_over_max);
         assert_eq!(chart.style, Some(12));
@@ -3126,6 +3304,14 @@ mod tests {
         labels.show_series_name = true;
         labels.show_leader_lines = true;
         labels.separator = Some(" & ".to_string());
+        let mut point_label = DataLabel::new(2);
+        point_label.layout = Some(Layout::new().with_position(0.6, 0.7));
+        point_label.text = Some(TitleText::from_ref("Sheet1!$E$2"));
+        point_label.number_format = Some(NumberFormat::new("$0.00"));
+        point_label.position = Some(DataLabelPosition::Left);
+        point_label.show_category_name = true;
+        point_label.separator = Some(" / ".to_string());
+        labels.labels.push(point_label);
         scatter_series.data_labels = Some(labels);
         let mut trendline = Trendline::linear();
         trendline.name = Some("Forecast & fit".to_string());
@@ -3272,6 +3458,22 @@ mod tests {
         assert_eq!(number_format.format_code, "0.0%");
         assert!(!number_format.source_linked);
         assert_eq!(labels.separator.as_deref(), Some(" & "));
+        assert_eq!(labels.labels.len(), 1);
+        let point_label = &labels.labels[0];
+        assert_eq!(point_label.index, 2);
+        assert_eq!(point_label.layout.as_ref().unwrap().x, Some(0.6));
+        assert_eq!(point_label.layout.as_ref().unwrap().y, Some(0.7));
+        let Some(TitleText::Reference(text)) = point_label.text.as_ref() else {
+            panic!("expected point data-label formula");
+        };
+        assert_eq!(text.formula, "Sheet1!$E$2");
+        assert_eq!(
+            point_label.number_format.as_ref().unwrap().format_code,
+            "$0.00"
+        );
+        assert_eq!(point_label.position, Some(DataLabelPosition::Left));
+        assert!(point_label.show_category_name);
+        assert_eq!(point_label.separator.as_deref(), Some(" / "));
         assert_eq!(series.trendlines.len(), 1);
         assert_eq!(series.trendlines[0].name.as_deref(), Some("Forecast & fit"));
         assert_eq!(series.trendlines[0].forward, Some(2.5));

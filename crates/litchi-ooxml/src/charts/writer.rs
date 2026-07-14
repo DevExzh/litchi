@@ -937,6 +937,63 @@ fn invalid_chart_input(message: impl Into<String>) -> std::io::Error {
 
 fn write_data_labels<W: Write>(writer: &mut W, labels: &DataLabels) -> std::io::Result<()> {
     write!(writer, "<c:dLbls>")?;
+    let mut point_indexes = std::collections::HashSet::with_capacity(labels.labels.len());
+    for label in &labels.labels {
+        if !point_indexes.insert(label.index) {
+            return Err(invalid_chart_input(format!(
+                "chart data labels contain duplicate point index {}",
+                label.index
+            )));
+        }
+        write!(writer, r#"<c:dLbl><c:idx val="{}"/>"#, label.index)?;
+        if label.deleted {
+            write!(writer, r#"<c:delete val="1"/></c:dLbl>"#)?;
+            continue;
+        }
+        if let Some(layout) = label.layout.as_ref() {
+            write_layout(writer, Some(layout))?;
+        }
+        if let Some(text) = label.text.as_ref() {
+            write_title_text(writer, text)?;
+        }
+        if let Some(number_format) = label.number_format.as_ref() {
+            write!(
+                writer,
+                r#"<c:numFmt formatCode="{}" sourceLinked="{}"/>"#,
+                escape_xml(&number_format.format_code),
+                if number_format.source_linked {
+                    "1"
+                } else {
+                    "0"
+                }
+            )?;
+        }
+        if let Some(position) = label.position {
+            write!(writer, r#"<c:dLblPos val="{}"/>"#, position.xml_value())?;
+        }
+        for (name, value) in [
+            ("showLegendKey", label.show_legend_key),
+            ("showVal", label.show_value),
+            ("showCatName", label.show_category_name),
+            ("showSerName", label.show_series_name),
+            ("showPercent", label.show_percent),
+            ("showBubbleSize", label.show_bubble_size),
+        ] {
+            write!(
+                writer,
+                r#"<c:{name} val="{}"/>"#,
+                if value { "1" } else { "0" }
+            )?;
+        }
+        if let Some(separator) = label.separator.as_ref() {
+            write!(
+                writer,
+                "<c:separator>{}</c:separator>",
+                escape_xml(separator)
+            )?;
+        }
+        write!(writer, "</c:dLbl>")?;
+    }
     if labels.deleted {
         write!(writer, r#"<c:delete val="1"/>"#)?;
         write!(writer, "</c:dLbls>")?;

@@ -3,7 +3,7 @@
 //! This module contains structures for representing chart series,
 //! data points, and their associated properties.
 
-use crate::charts::models::{NumberFormat, NumericData, StringData, TitleText};
+use crate::charts::models::{Layout, NumberFormat, NumericData, StringData, TitleText};
 use crate::charts::types::{DataLabelPosition, MarkerStyle};
 
 /// A single data point with optional formatting.
@@ -56,6 +56,8 @@ impl DataPoint {
 /// Data label settings.
 #[derive(Debug, Clone)]
 pub struct DataLabels {
+    /// Point-specific data-label overrides
+    pub labels: Vec<DataLabel>,
     /// Number format for label values
     pub number_format: Option<NumberFormat>,
     /// Position of data labels
@@ -85,6 +87,7 @@ impl DataLabels {
     #[inline]
     pub fn new() -> Self {
         Self {
+            labels: Vec::new(),
             number_format: None,
             position: None,
             show_legend_key: false,
@@ -111,6 +114,59 @@ impl DataLabels {
     pub fn with_position(mut self, position: DataLabelPosition) -> Self {
         self.position = Some(position);
         self
+    }
+}
+
+/// Data-label settings for one data point.
+#[derive(Debug, Clone)]
+pub struct DataLabel {
+    /// Zero-based data-point index
+    pub index: u32,
+    /// Whether this label is deleted
+    pub deleted: bool,
+    /// Manual layout for this label
+    pub layout: Option<Layout>,
+    /// Explicit label text or formula reference
+    pub text: Option<TitleText>,
+    /// Number format for the label value
+    pub number_format: Option<NumberFormat>,
+    /// Position of the label
+    pub position: Option<DataLabelPosition>,
+    /// Show legend key
+    pub show_legend_key: bool,
+    /// Show value
+    pub show_value: bool,
+    /// Show category name
+    pub show_category_name: bool,
+    /// Show series name
+    pub show_series_name: bool,
+    /// Show percentage
+    pub show_percent: bool,
+    /// Show bubble size
+    pub show_bubble_size: bool,
+    /// Separator between label components
+    pub separator: Option<String>,
+}
+
+impl DataLabel {
+    /// Create an empty override for one point.
+    #[inline]
+    pub fn new(index: u32) -> Self {
+        Self {
+            index,
+            deleted: false,
+            layout: None,
+            text: None,
+            number_format: None,
+            position: None,
+            show_legend_key: false,
+            show_value: false,
+            show_category_name: false,
+            show_series_name: false,
+            show_percent: false,
+            show_bubble_size: false,
+            separator: None,
+        }
     }
 }
 
