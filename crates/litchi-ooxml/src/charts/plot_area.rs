@@ -19,6 +19,8 @@ pub struct PlotArea {
     pub type_groups: Vec<TypeGroup>,
     /// All axes in the plot area
     pub axes: Vec<Axis>,
+    /// Optional chart data table
+    pub data_table: Option<DataTable>,
 }
 
 impl PlotArea {
@@ -29,6 +31,7 @@ impl PlotArea {
             layout: None,
             type_groups: Vec::new(),
             axes: Vec::new(),
+            data_table: None,
         }
     }
 
@@ -45,6 +48,19 @@ impl PlotArea {
         self.axes.push(axis);
         self
     }
+}
+
+/// Visibility settings for the chart data table.
+#[derive(Debug, Clone, Default)]
+pub struct DataTable {
+    /// Show horizontal cell borders
+    pub show_horizontal_border: bool,
+    /// Show vertical cell borders
+    pub show_vertical_border: bool,
+    /// Show the outside border
+    pub show_outline: bool,
+    /// Show legend keys beside series rows
+    pub show_legend_keys: bool,
 }
 
 impl Default for PlotArea {

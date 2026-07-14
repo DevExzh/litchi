@@ -14,7 +14,7 @@ use crate::charts::models::{
 };
 use crate::charts::plot_area::{
     Area3DTypeGroup, AreaTypeGroup, Bar3DTypeGroup, BarShape, BarTypeGroup, BubbleTypeGroup,
-    DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup, Pie3DTypeGroup,
+    DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup, Pie3DTypeGroup,
     PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup,
     SurfaceTypeGroup, TypeGroup, TypeGroupCommon,
 };
@@ -461,12 +461,31 @@ fn parse_wall_floor<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<WallFl
 
 fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotArea> {
     let mut plot_area = PlotArea::new();
+    let mut saw_data_table = false;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"layout" => {
                 plot_area.layout = Some(parse_layout(reader)?);
+            },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"dTable" => {
+                if saw_data_table {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart plot area contains duplicate data tables".into(),
+                    ));
+                }
+                saw_data_table = true;
+                plot_area.data_table = Some(parse_data_table(reader)?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"dTable" => {
+                if saw_data_table {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart plot area contains duplicate data tables".into(),
+                    ));
+                }
+                saw_data_table = true;
+                plot_area.data_table = Some(DataTable::default());
             },
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
@@ -587,6 +606,44 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
     }
 
     Ok(plot_area)
+}
+
+fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataTable> {
+    let mut data_table = DataTable::default();
+    let mut seen = [false; 4];
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+                let field = match element.local_name().as_ref() {
+                    b"showHorzBorder" => Some((0, &mut data_table.show_horizontal_border)),
+                    b"showVertBorder" => Some((1, &mut data_table.show_vertical_border)),
+                    b"showOutline" => Some((2, &mut data_table.show_outline)),
+                    b"showKeys" => Some((3, &mut data_table.show_legend_keys)),
+                    _ => None,
+                };
+                if let Some((index, field)) = field {
+                    if seen[index] {
+                        return Err(OoxmlError::InvalidFormat(
+                            "chart data table contains a duplicate visibility setting".into(),
+                        ));
+                    }
+                    seen[index] = true;
+                    *field = parse_bool_attr(element)?;
+                }
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"dTable" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart data table".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok(data_table)
 }
 
 fn parse_layout<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Layout> {
@@ -3531,6 +3588,32 @@ mod tests {
     }
 
     #[test]
+    fn parses_and_validates_chart_data_tables() {
+        let xml =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea><c:lineChart></c:lineChart>
+                <c:dTable><c:showHorzBorder/><c:showVertBorder val="0"/>
+                    <c:showOutline val="true"/><c:showKeys val="false"/>
+                </c:dTable>
+            </c:plotArea></c:chart>
+        </c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let table = chart.plot_area.data_table.as_ref().unwrap();
+        assert!(table.show_horizontal_border);
+        assert!(!table.show_vertical_border);
+        assert!(table.show_outline);
+        assert!(!table.show_legend_keys);
+
+        let duplicate =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea><c:lineChart></c:lineChart><c:dTable>
+                <c:showKeys/><c:showKeys val="0"/>
+            </c:dTable></c:plotArea></c:chart>
+        </c:chartSpace>"#;
+        assert!(parse_chart(duplicate.as_slice()).is_err());
+    }
+
+    #[test]
     fn parses_of_pie_schema_defaults_and_empty_custom_split() {
         let xml =
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
@@ -3808,6 +3891,12 @@ mod tests {
         line_3d.gap_depth = Some(210);
 
         let mut chart = Chart::new();
+        chart.plot_area.data_table = Some(DataTable {
+            show_horizontal_border: true,
+            show_vertical_border: false,
+            show_outline: true,
+            show_legend_keys: true,
+        });
         chart.plot_area.type_groups = vec![
             TypeGroup::Area(AreaTypeGroup::new(BarGrouping::Standard)),
             TypeGroup::Area3D(area_3d),
@@ -3835,6 +3924,11 @@ mod tests {
         let parsed = parse_chart(xml.as_slice()).unwrap();
 
         assert_eq!(parsed.plot_area.type_groups.len(), 16);
+        let data_table = parsed.plot_area.data_table.as_ref().unwrap();
+        assert!(data_table.show_horizontal_border);
+        assert!(!data_table.show_vertical_border);
+        assert!(data_table.show_outline);
+        assert!(data_table.show_legend_keys);
         assert!(matches!(
             parsed.plot_area.type_groups[0],
             TypeGroup::Area(_)

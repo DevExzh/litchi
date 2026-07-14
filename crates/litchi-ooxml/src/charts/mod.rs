@@ -85,7 +85,7 @@ pub use models::{
     Layout, MultiLevelStringData, NumberFormat, NumericData, RichText, StringData, TitleText,
 };
 pub use plot_area::{
-    Area3DTypeGroup, AreaTypeGroup, Bar3DTypeGroup, BarTypeGroup, BubbleTypeGroup,
+    Area3DTypeGroup, AreaTypeGroup, Bar3DTypeGroup, BarTypeGroup, BubbleTypeGroup, DataTable,
     DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup, Pie3DTypeGroup,
     PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup,
     SurfaceTypeGroup, TypeGroup,

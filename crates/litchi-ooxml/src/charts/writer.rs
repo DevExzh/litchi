@@ -7,7 +7,7 @@ use crate::charts::chart::{Chart, View3D, WallFloor};
 use crate::charts::legend::Legend;
 use crate::charts::models::{Layout, NumericData, StringData, TitleText};
 use crate::charts::plot_area::{
-    Area3DTypeGroup, AreaTypeGroup, Bar3DTypeGroup, BarTypeGroup, BubbleTypeGroup,
+    Area3DTypeGroup, AreaTypeGroup, Bar3DTypeGroup, BarTypeGroup, BubbleTypeGroup, DataTable,
     DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup, Pie3DTypeGroup,
     PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup,
     SurfaceTypeGroup, TypeGroup,
@@ -283,9 +283,28 @@ fn write_plot_area<W: Write>(writer: &mut W, plot_area: &PlotArea) -> std::io::R
     for axis in &plot_area.axes {
         write_axis(writer, axis)?;
     }
+    if let Some(data_table) = plot_area.data_table.as_ref() {
+        write_data_table(writer, data_table)?;
+    }
 
     write!(writer, "</c:plotArea>")?;
 
+    Ok(())
+}
+
+fn write_data_table<W: Write>(writer: &mut W, data_table: &DataTable) -> std::io::Result<()> {
+    write!(writer, "<c:dTable>")?;
+    for (name, show) in [
+        ("showHorzBorder", data_table.show_horizontal_border),
+        ("showVertBorder", data_table.show_vertical_border),
+        ("showOutline", data_table.show_outline),
+        ("showKeys", data_table.show_legend_keys),
+    ] {
+        if show {
+            write!(writer, r#"<c:{name} val="1"/>"#)?;
+        }
+    }
+    write!(writer, "</c:dTable>")?;
     Ok(())
 }
 
