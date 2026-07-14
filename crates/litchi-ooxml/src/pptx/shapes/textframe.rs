@@ -1,13 +1,12 @@
 /// Text frame for accessing text content in shapes.
-use crate::common::xml::{decode_xml_reference, extract_omml_formulas};
+use crate::common::xml::{
+    DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE, decode_xml_reference, extract_omml_formulas,
+};
 use crate::error::{OoxmlError, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
-
-const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
-const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 
 fn is_drawingml_name(
     namespace: &ResolveResult<'_>,

@@ -1,10 +1,14 @@
 /// Theme support for Word documents.
 ///
 /// Themes define the color scheme, fonts, and effects used in a document.
+use crate::common::xml::{is_drawingml_name, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use litchi_opc::part::Part;
-use quick_xml::Reader;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::BytesStart;
 use quick_xml::events::Event;
+use quick_xml::name::ResolveResult;
+use quick_xml::reader::NsReader;
 
 /// Document theme containing color scheme, font scheme, and format scheme.
 ///
@@ -73,65 +77,91 @@ impl Theme {
     /// Extract theme from a theme part.
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Self> {
         let xml_bytes = part.blob();
-        let mut reader = Reader::from_reader(xml_bytes);
-        reader.config_mut().trim_text(true);
+        let mut reader = NsReader::from_reader(xml_bytes);
 
         let mut theme = Self::new();
         let mut in_major_font = false;
         let mut in_minor_font = false;
+        let mut depth = 0usize;
 
         loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => match e.local_name().as_ref() {
-                    b"theme" => {
-                        for attr in e.attributes().flatten() {
-                            if attr.key.local_name().as_ref() == b"name" {
-                                theme.name =
-                                    Some(String::from_utf8_lossy(&attr.value).into_owned());
-                            }
-                        }
-                    },
-                    b"clrScheme" => {
-                        for attr in e.attributes().flatten() {
-                            if attr.key.local_name().as_ref() == b"name" {
-                                theme.color_scheme =
-                                    Some(String::from_utf8_lossy(&attr.value).into_owned());
-                            }
-                        }
-                    },
-                    b"majorFont" => {
+            let decoder = reader.decoder();
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            match event {
+                Event::Start(element) => {
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("DrawingML nesting is too deep".to_string())
+                    })?;
+                    parse_theme_element(
+                        &mut theme,
+                        &namespace,
+                        &element,
+                        decoder,
+                        in_major_font,
+                        in_minor_font,
+                    )?;
+                    if is_drawingml_name(&namespace, element.name(), b"majorFont") {
                         in_major_font = true;
-                    },
-                    b"minorFont" => {
+                    } else if is_drawingml_name(&namespace, element.name(), b"minorFont") {
                         in_minor_font = true;
-                    },
-                    b"latin" => {
-                        for attr in e.attributes().flatten() {
-                            if attr.key.local_name().as_ref() == b"typeface" {
-                                let font = String::from_utf8_lossy(&attr.value).into_owned();
-                                if in_major_font && theme.major_font.is_none() {
-                                    theme.major_font = Some(font);
-                                } else if in_minor_font && theme.minor_font.is_none() {
-                                    theme.minor_font = Some(font);
-                                }
-                            }
-                        }
-                    },
-                    _ => {},
+                    }
                 },
-                Ok(Event::End(e)) => match e.local_name().as_ref() {
-                    b"majorFont" => in_major_font = false,
-                    b"minorFont" => in_minor_font = false,
-                    _ => {},
+                Event::Empty(element) => parse_theme_element(
+                    &mut theme,
+                    &namespace,
+                    &element,
+                    decoder,
+                    in_major_font,
+                    in_minor_font,
+                )?,
+                Event::End(element) => {
+                    if is_drawingml_name(&namespace, element.name(), b"majorFont") {
+                        in_major_font = false;
+                    } else if is_drawingml_name(&namespace, element.name(), b"minorFont") {
+                        in_minor_font = false;
+                    }
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("invalid DrawingML nesting".to_string())
+                    })?;
                 },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+                Event::Eof if depth != 0 => {
+                    return Err(OoxmlError::InvalidFormat(
+                        "unterminated DrawingML theme XML".to_string(),
+                    ));
+                },
+                Event::Eof => break,
                 _ => {},
             }
         }
 
         Ok(theme)
     }
+}
+
+fn parse_theme_element(
+    theme: &mut Theme,
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    in_major_font: bool,
+    in_minor_font: bool,
+) -> Result<()> {
+    if is_drawingml_name(namespace, element.name(), b"theme") {
+        theme.name = unqualified_attribute_value(element, b"name", decoder)?;
+    } else if is_drawingml_name(namespace, element.name(), b"clrScheme") {
+        theme.color_scheme = unqualified_attribute_value(element, b"name", decoder)?;
+    } else if is_drawingml_name(namespace, element.name(), b"latin")
+        && let Some(font) = unqualified_attribute_value(element, b"typeface", decoder)?
+    {
+        if in_major_font && theme.major_font.is_none() {
+            theme.major_font = Some(font);
+        } else if in_minor_font && theme.minor_font.is_none() {
+            theme.minor_font = Some(font);
+        }
+    }
+    Ok(())
 }
 
 impl Default for Theme {
@@ -143,6 +173,17 @@ impl Default for Theme {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_opc::PackURI;
+    use litchi_opc::part::BlobPart;
+
+    fn parse_theme(xml: &[u8]) -> Result<Theme> {
+        let part = BlobPart::new(
+            PackURI::new("/word/theme/theme1.xml").unwrap(),
+            "application/xml".to_string(),
+            xml.to_vec(),
+        );
+        Theme::extract_from_part(&part)
+    }
 
     #[test]
     fn test_theme_creation() {
@@ -151,5 +192,41 @@ mod tests {
         assert!(theme.major_font().is_none());
         assert!(theme.minor_font().is_none());
         assert!(theme.color_scheme().is_none());
+    }
+
+    #[test]
+    fn parses_aliased_theme_names_and_fonts() {
+        let theme = parse_theme(
+            br#"<d:theme xmlns:d="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:false="urn:not-drawingml" name="A &amp; B">
+                <d:themeElements><d:clrScheme name="Office &amp; More"/>
+                <d:fontScheme><false:majorFont><d:latin typeface="ignored"/></false:majorFont>
+                <d:majorFont><false:latin typeface="ignored"/><d:latin typeface="Major &amp; Co"/></d:majorFont>
+                <d:minorFont><d:latin typeface="Minor"/></d:minorFont></d:fontScheme></d:themeElements>
+            </d:theme>"#,
+        )
+        .unwrap();
+        assert_eq!(theme.name(), Some("A & B"));
+        assert_eq!(theme.color_scheme(), Some("Office & More"));
+        assert_eq!(theme.major_font(), Some("Major & Co"));
+        assert_eq!(theme.minor_font(), Some("Minor"));
+    }
+
+    #[test]
+    fn parses_strict_theme_and_rejects_malformed_xml() {
+        let strict = parse_theme(
+            br#"<s:theme xmlns:s="http://purl.oclc.org/ooxml/drawingml/main" name="Strict"><s:themeElements><s:fontScheme><s:majorFont><s:latin typeface="Heading"/></s:majorFont></s:fontScheme></s:themeElements></s:theme>"#,
+        )
+        .unwrap();
+        assert_eq!(strict.name(), Some("Strict"));
+        assert_eq!(strict.major_font(), Some("Heading"));
+
+        assert!(parse_theme(
+            br#"<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="one" name="two"/>"#
+        )
+        .is_err());
+        assert!(parse_theme(
+            br#"<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:themeElements>"#
+        )
+        .is_err());
     }
 }

@@ -1,10 +1,15 @@
 //! Shared XML decoding helpers.
 
 use crate::error::{OoxmlError, Result};
-use quick_xml::events::{BytesRef, Event};
+use quick_xml::XmlVersion;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
+pub(crate) const DRAWINGML_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/drawingml/2006/main";
+pub(crate) const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 const OMML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/officeDocument/2006/math";
 const STRICT_OMML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/math";
 
@@ -29,6 +34,45 @@ pub(crate) fn decode_xml_reference(reference: &BytesRef<'_>) -> Result<String> {
             "unsupported XML entity reference '&{name};'"
         ))),
     }
+}
+
+pub(crate) fn is_drawingml_name(
+    namespace: &ResolveResult<'_>,
+    name: QName<'_>,
+    local_name: &[u8],
+) -> bool {
+    name.local_name().as_ref() == local_name
+        && matches!(
+            namespace,
+            ResolveResult::Bound(Namespace(value))
+                if *value == DRAWINGML_NAMESPACE || *value == STRICT_DRAWINGML_NAMESPACE
+        )
+}
+
+pub(crate) fn unqualified_attribute_value(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+) -> Result<Option<String>> {
+    let mut value = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        if attribute.key.prefix().is_none() && attribute.key.local_name().as_ref() == name {
+            if value.is_some() {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "duplicate XML attribute '{}'",
+                    String::from_utf8_lossy(name)
+                )));
+            }
+            value = Some(
+                attribute
+                    .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                    .into_owned(),
+            );
+        }
+    }
+    Ok(value)
 }
 
 fn is_omml_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: &[u8]) -> bool {
