@@ -1,8 +1,62 @@
 /// Base shape types for PowerPoint presentations.
-use crate::error::Result;
+use crate::common::xml::{
+    DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE, unqualified_attribute_value,
+};
+use crate::error::{OoxmlError, Result};
 use crate::pptx::shapes::textframe::TextFrame;
-use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::name::{Namespace, QName, ResolveResult};
+use quick_xml::reader::NsReader;
+
+const PRESENTATIONML_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/presentationml/2006/main";
+const STRICT_PRESENTATIONML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
+
+fn is_shape_name(
+    namespace: &ResolveResult<'_>,
+    name: QName<'_>,
+    local_name: &[u8],
+    expected_prefix: &[u8],
+    transitional_namespace: &[u8],
+    strict_namespace: &[u8],
+) -> bool {
+    if name.local_name().as_ref() != local_name {
+        return false;
+    }
+    match namespace {
+        ResolveResult::Bound(Namespace(value)) => {
+            *value == transitional_namespace || *value == strict_namespace
+        },
+        ResolveResult::Unknown(prefix) => prefix.as_slice() == expected_prefix,
+        ResolveResult::Unbound => false,
+    }
+}
+
+fn is_presentationml_name(
+    namespace: &ResolveResult<'_>,
+    name: QName<'_>,
+    local_name: &[u8],
+) -> bool {
+    is_shape_name(
+        namespace,
+        name,
+        local_name,
+        b"p",
+        PRESENTATIONML_NAMESPACE,
+        STRICT_PRESENTATIONML_NAMESPACE,
+    )
+}
+
+fn is_drawingml_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: &[u8]) -> bool {
+    is_shape_name(
+        namespace,
+        name,
+        local_name,
+        b"a",
+        DRAWINGML_NAMESPACE,
+        STRICT_DRAWINGML_NAMESPACE,
+    )
+}
 
 /// Shape type enumeration.
 ///
@@ -87,24 +141,23 @@ impl BaseShape {
             return Ok(name.clone());
         }
 
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
+        let mut reader = NsReader::from_reader(&self.xml_bytes[..]);
 
         loop {
-            match reader.read_event() {
-                Ok(Event::Empty(e)) | Ok(Event::Start(e))
-                    if e.local_name().as_ref() == b"cNvPr" =>
+            let decoder = reader.decoder();
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            match event {
+                Event::Empty(element) | Event::Start(element)
+                    if is_presentationml_name(&namespace, element.name(), b"cNvPr") =>
                 {
-                    for attr in e.attributes().flatten() {
-                        if attr.key.as_ref() == b"name" {
-                            let name = std::str::from_utf8(&attr.value).unwrap_or("").to_string();
-                            self.name = Some(name.clone());
-                            return Ok(name);
-                        }
+                    if let Some(name) = unqualified_attribute_value(&element, b"name", decoder)? {
+                        self.name = Some(name.clone());
+                        return Ok(name);
                     }
                 },
-                Ok(Event::Eof) => break,
-                Err(_) => break,
+                Event::Eof => break,
                 _ => {},
             }
         }
@@ -115,38 +168,52 @@ impl BaseShape {
     /// Get the X position (left edge) in EMUs.
     pub fn left(&mut self) -> Result<i64> {
         self.ensure_geometry()?;
-        Ok(self.geometry.unwrap().x)
+        Ok(self
+            .geometry
+            .ok_or_else(|| OoxmlError::InvalidFormat("shape geometry is missing".to_string()))?
+            .x)
     }
 
     /// Get the Y position (top edge) in EMUs.
     pub fn top(&mut self) -> Result<i64> {
         self.ensure_geometry()?;
-        Ok(self.geometry.unwrap().y)
+        Ok(self
+            .geometry
+            .ok_or_else(|| OoxmlError::InvalidFormat("shape geometry is missing".to_string()))?
+            .y)
     }
 
     /// Get the width in EMUs.
     pub fn width(&mut self) -> Result<i64> {
         self.ensure_geometry()?;
-        Ok(self.geometry.unwrap().cx)
+        Ok(self
+            .geometry
+            .ok_or_else(|| OoxmlError::InvalidFormat("shape geometry is missing".to_string()))?
+            .cx)
     }
 
     /// Get the height in EMUs.
     pub fn height(&mut self) -> Result<i64> {
         self.ensure_geometry()?;
-        Ok(self.geometry.unwrap().cy)
+        Ok(self
+            .geometry
+            .ok_or_else(|| OoxmlError::InvalidFormat("shape geometry is missing".to_string()))?
+            .cy)
     }
 
     /// Check if this shape is a placeholder.
     pub fn is_placeholder(&self) -> bool {
         // Look for <p:ph> element
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let mut reader = NsReader::from_reader(&self.xml_bytes[..]);
 
         loop {
-            match reader.read_event() {
-                Ok(Event::Empty(e)) | Ok(Event::Start(e)) if e.local_name().as_ref() == b"ph" => {
+            match reader.read_resolved_event() {
+                Ok((namespace, Event::Empty(element) | Event::Start(element)))
+                    if is_presentationml_name(&namespace, element.name(), b"ph") =>
+                {
                     return true;
                 },
-                Ok(Event::Eof) => break,
+                Ok((_, Event::Eof)) => break,
                 Err(_) => break,
                 _ => {},
             }
@@ -170,24 +237,26 @@ impl BaseShape {
     /// }
     /// ```
     pub fn placeholder_type(&self) -> Result<String> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let mut reader = NsReader::from_reader(&self.xml_bytes[..]);
 
         loop {
-            match reader.read_event() {
-                Ok(Event::Empty(e)) | Ok(Event::Start(e)) if e.local_name().as_ref() == b"ph" => {
-                    // Look for the type attribute
-                    for attr in e.attributes().flatten() {
-                        if attr.key.as_ref() == b"type" {
-                            return std::str::from_utf8(&attr.value)
-                                .map(|s| s.to_string())
-                                .map_err(|e| crate::error::OoxmlError::Xml(e.to_string()));
-                        }
+            let decoder = reader.decoder();
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            match event {
+                Event::Empty(element) | Event::Start(element)
+                    if is_presentationml_name(&namespace, element.name(), b"ph") =>
+                {
+                    if let Some(placeholder_type) =
+                        unqualified_attribute_value(&element, b"type", decoder)?
+                    {
+                        return Ok(placeholder_type);
                     }
                     // If no type attribute, it's usually a body placeholder
                     return Ok("body".to_string());
                 },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(crate::error::OoxmlError::Xml(e.to_string())),
+                Event::Eof => break,
                 _ => {},
             }
         }
@@ -207,8 +276,18 @@ impl BaseShape {
 
     /// Internal helper to check for table marker in XML.
     fn contains_table_marker(&self) -> bool {
-        let xml_str = String::from_utf8_lossy(&self.xml_bytes);
-        xml_str.contains("a:tbl") || xml_str.contains("<a:tbl")
+        let mut reader = NsReader::from_reader(&self.xml_bytes[..]);
+        loop {
+            match reader.read_resolved_event() {
+                Ok((namespace, Event::Start(element) | Event::Empty(element)))
+                    if is_drawingml_name(&namespace, element.name(), b"tbl") =>
+                {
+                    return true;
+                },
+                Ok((_, Event::Eof)) | Err(_) => return false,
+                _ => {},
+            }
+        }
     }
 
     /// Ensure geometry is parsed and cached.
@@ -217,64 +296,44 @@ impl BaseShape {
             return Ok(());
         }
 
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
+        let mut reader = NsReader::from_reader(&self.xml_bytes[..]);
 
-        let mut x = 0;
-        let mut y = 0;
-        let mut cx = 0;
-        let mut cy = 0;
+        let mut x = None;
+        let mut y = None;
+        let mut cx = None;
+        let mut cy = None;
 
         loop {
-            match reader.read_event() {
-                Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e)) => {
-                    let tag_name = e.local_name();
-
-                    if tag_name.as_ref() == b"off" {
-                        for attr in e.attributes().flatten() {
-                            match attr.key.as_ref() {
-                                b"x" => {
-                                    x = std::str::from_utf8(&attr.value)
-                                        .ok()
-                                        .and_then(|s| s.parse().ok())
-                                        .unwrap_or(0);
-                                },
-                                b"y" => {
-                                    y = std::str::from_utf8(&attr.value)
-                                        .ok()
-                                        .and_then(|s| s.parse().ok())
-                                        .unwrap_or(0);
-                                },
-                                _ => {},
-                            }
-                        }
-                    } else if tag_name.as_ref() == b"ext" {
-                        for attr in e.attributes().flatten() {
-                            match attr.key.as_ref() {
-                                b"cx" => {
-                                    cx = std::str::from_utf8(&attr.value)
-                                        .ok()
-                                        .and_then(|s| s.parse().ok())
-                                        .unwrap_or(0);
-                                },
-                                b"cy" => {
-                                    cy = std::str::from_utf8(&attr.value)
-                                        .ok()
-                                        .and_then(|s| s.parse().ok())
-                                        .unwrap_or(0);
-                                },
-                                _ => {},
-                            }
-                        }
-                    }
+            let decoder = reader.decoder();
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            match event {
+                Event::Empty(element) | Event::Start(element)
+                    if is_drawingml_name(&namespace, element.name(), b"off")
+                        && (x.is_none() || y.is_none()) =>
+                {
+                    x = Some(parse_coordinate(&element, b"x", decoder)?);
+                    y = Some(parse_coordinate(&element, b"y", decoder)?);
                 },
-                Ok(Event::Eof) => break,
-                Err(_) => break,
+                Event::Empty(element) | Event::Start(element)
+                    if is_drawingml_name(&namespace, element.name(), b"ext")
+                        && (cx.is_none() || cy.is_none()) =>
+                {
+                    cx = Some(parse_positive_coordinate(&element, b"cx", decoder)?);
+                    cy = Some(parse_positive_coordinate(&element, b"cy", decoder)?);
+                },
+                Event::Eof => break,
                 _ => {},
             }
         }
 
-        self.geometry = Some(ShapeGeometry { x, y, cx, cy });
+        self.geometry = Some(ShapeGeometry {
+            x: x.unwrap_or(0),
+            y: y.unwrap_or(0),
+            cx: cx.unwrap_or(0),
+            cy: cy.unwrap_or(0),
+        });
         Ok(())
     }
 
@@ -299,6 +358,37 @@ impl BaseShape {
             Err(_) => Ok(None),
         }
     }
+}
+
+fn parse_coordinate(
+    element: &quick_xml::events::BytesStart<'_>,
+    name: &[u8],
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<i64> {
+    let value = unqualified_attribute_value(element, name, decoder)?.ok_or_else(|| {
+        OoxmlError::InvalidFormat(format!(
+            "DrawingML coordinate is missing {}",
+            String::from_utf8_lossy(name)
+        ))
+    })?;
+    value
+        .parse::<i64>()
+        .map_err(|_| OoxmlError::InvalidFormat(format!("invalid DrawingML coordinate '{}'", value)))
+}
+
+fn parse_positive_coordinate(
+    element: &quick_xml::events::BytesStart<'_>,
+    name: &[u8],
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<i64> {
+    let value = parse_coordinate(element, name, decoder)?;
+    if value < 0 {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "DrawingML extent {} cannot be negative",
+            String::from_utf8_lossy(name)
+        )));
+    }
+    Ok(value)
 }
 
 /// A shape containing text (p:sp).
@@ -337,5 +427,71 @@ impl Shape {
     pub fn text(&self) -> Result<String> {
         let tf = self.text_frame()?;
         tf.text()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shape_properties_resolve_namespaces_and_decode_attributes() {
+        let xml = br#"<q:sp xmlns:q="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:d="http://schemas.openxmlformats.org/drawingml/2006/main"
+            xmlns:false="urn:not-office">
+            <q:nvSpPr><false:cNvPr name="ignored"/><q:cNvPr name="A &amp; B"/><q:nvPr><false:ph type="title"/><q:ph type="ctrTitle"/></q:nvPr></q:nvSpPr>
+            <q:spPr><d:xfrm><false:off x="999" y="999"/><d:off x="-10" y="20"/><d:ext cx="30" cy="40"/></d:xfrm></q:spPr>
+        </q:sp>"#;
+        let mut shape = BaseShape::new(xml.to_vec(), ShapeType::Shape);
+        assert_eq!(shape.name().unwrap(), "A & B");
+        assert!(shape.is_placeholder());
+        assert_eq!(shape.placeholder_type().unwrap(), "ctrTitle");
+        assert_eq!(shape.left().unwrap(), -10);
+        assert_eq!(shape.top().unwrap(), 20);
+        assert_eq!(shape.width().unwrap(), 30);
+        assert_eq!(shape.height().unwrap(), 40);
+    }
+
+    #[test]
+    fn shape_properties_accept_strict_and_inherited_prefixes() {
+        let strict = br#"<s:sp xmlns:s="http://purl.oclc.org/ooxml/presentationml/main" xmlns:d="http://purl.oclc.org/ooxml/drawingml/main"><s:cNvPr name="Strict"/><d:off x="1" y="2"/><d:ext cx="3" cy="4"/></s:sp>"#;
+        let mut shape = BaseShape::new(strict.to_vec(), ShapeType::Shape);
+        assert_eq!(shape.name().unwrap(), "Strict");
+        assert_eq!(shape.width().unwrap(), 3);
+
+        let inherited = br#"<p:sp><p:cNvPr name="Inherited"/><a:off x="5" y="6"/><a:ext cx="7" cy="8"/></p:sp>"#;
+        let mut shape = BaseShape::new(inherited.to_vec(), ShapeType::Shape);
+        assert_eq!(shape.name().unwrap(), "Inherited");
+        assert_eq!(shape.height().unwrap(), 8);
+    }
+
+    #[test]
+    fn table_detection_requires_a_drawingml_element() {
+        let spoof = br#"<p:graphicFrame xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:false="urn:not-drawingml"><p:meta value="a:tbl"/><false:tbl/></p:graphicFrame>"#;
+        assert!(!BaseShape::new(spoof.to_vec(), ShapeType::GraphicFrame).has_table());
+
+        let table = br#"<p:graphicFrame><a:graphic><a:graphicData><a:tbl/></a:graphicData></a:graphic></p:graphicFrame>"#;
+        assert!(BaseShape::new(table.to_vec(), ShapeType::GraphicFrame).has_table());
+    }
+
+    #[test]
+    fn malformed_shape_attributes_are_errors() {
+        let duplicate_name = br#"<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cNvPr name="one" name="two"/></p:sp>"#;
+        assert!(
+            BaseShape::new(duplicate_name.to_vec(), ShapeType::Shape)
+                .name()
+                .is_err()
+        );
+
+        let invalid_geometry = br#"<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:off x="NaN" y="2"/><a:ext cx="-1" cy="4"/></p:sp>"#;
+        let mut shape = BaseShape::new(invalid_geometry.to_vec(), ShapeType::Shape);
+        assert!(shape.left().is_err());
+
+        let missing_extent = br#"<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:ext cx="3"/></p:sp>"#;
+        assert!(
+            BaseShape::new(missing_extent.to_vec(), ShapeType::Shape)
+                .width()
+                .is_err()
+        );
     }
 }
