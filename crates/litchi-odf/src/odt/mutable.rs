@@ -3,12 +3,12 @@
 //! This module provides a mutable wrapper around ODT documents that allows
 //! for in-place modification of content, styles, and metadata.
 
-use crate::core::{OdfStructure, PackageWriter};
+use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
 use crate::elements::parser::DocumentOrderElement;
 use crate::elements::table::Table;
 use crate::elements::text::{Heading, List, Paragraph};
 use crate::odt::Document;
-use litchi_core::{Metadata, Result, xml::escape_xml};
+use litchi_core::{Error, Metadata, Result, xml::escape_xml};
 use std::path::Path;
 
 /// Document element type for tracking insertion order
@@ -57,8 +57,8 @@ pub struct MutableDocument {
     mimetype: String,
     /// Original styles XML (preserved as-is for now)
     styles_xml: Option<String>,
-    /// Original meta XML (will be regenerated)
-    _original_meta: Option<String>,
+    /// Original package used to retain auxiliary package parts during rewriting.
+    source_package: Option<OwnedPackage>,
 }
 
 impl MutableDocument {
@@ -103,13 +103,14 @@ impl MutableDocument {
                 DocumentOrderElement::List(list) => DocumentElement::List(list),
             })
             .collect();
+        let source_package = Some(doc.into_package());
 
         Ok(Self {
             elements,
             metadata,
             mimetype,
             styles_xml,
-            _original_meta: None,
+            source_package,
         })
     }
 
@@ -128,7 +129,7 @@ impl MutableDocument {
             metadata: Metadata::default(),
             mimetype: "application/vnd.oasis.opendocument.text".to_string(),
             styles_xml: None,
-            _original_meta: None,
+            source_package: None,
         }
     }
 
@@ -672,8 +673,53 @@ impl MutableDocument {
         let meta_xml = self.generate_meta_xml();
         writer.add_file("meta.xml", meta_xml.as_bytes())?;
 
+        if let Some(source) = &self.source_package {
+            let package = source.package()?;
+            if package.manifest().has_encrypted_entries() {
+                return Err(Error::InvalidFormat(
+                    "Cannot safely rewrite an ODT package containing encrypted entries".to_string(),
+                ));
+            }
+
+            // Some ODF directories exist only in the manifest. Retain them so
+            // embedded objects and application-specific package trees keep their
+            // declared media types.
+            for entry in package.manifest().entries.values() {
+                if entry.full_path.ends_with('/') && !is_regenerated_package_part(&entry.full_path)
+                {
+                    writer.add_manifest_entry(&entry.full_path, &entry.media_type)?;
+                }
+            }
+
+            for path in package.files()? {
+                if path.ends_with('/') || is_regenerated_package_part(&path) {
+                    continue;
+                }
+
+                let bytes = package.get_file(&path)?;
+                if let Some(media_type) = package.manifest().get_media_type(&path) {
+                    writer.add_file_with_media_type(&path, &bytes, media_type)?;
+                } else {
+                    writer.add_file(&path, &bytes)?;
+                }
+            }
+        }
+
         writer.finish_to_bytes()
     }
+}
+
+fn is_regenerated_package_part(path: &str) -> bool {
+    matches!(
+        path,
+        "/" | "mimetype"
+            | "content.xml"
+            | "styles.xml"
+            | "meta.xml"
+            | "manifest.xml"
+            | "META-INF/"
+            | "META-INF/manifest.xml"
+    ) || (path.starts_with("META-INF/") && path.ends_with("signatures.xml"))
 }
 
 impl Default for MutableDocument {
@@ -689,6 +735,8 @@ mod tests {
     use crate::elements::table::{TableCell, TableRow};
     use crate::elements::text::{ListItem, Paragraph};
     use crate::odt::DocumentBuilder;
+
+    const MINIMAL_CONTENT: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>Original</text:p></office:text></office:body></office:document-content>"#;
 
     fn source_document() -> Document {
         let mut builder = DocumentBuilder::new();
@@ -791,5 +839,72 @@ mod tests {
 
         let round_trip = Document::from_bytes(document.to_bytes().unwrap()).unwrap();
         assert_eq!(element_kinds(&round_trip), ["heading", "list"]);
+    }
+
+    #[test]
+    fn read_modify_write_preserves_auxiliary_package_parts_and_media_types() {
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        writer
+            .add_file("content.xml", MINIMAL_CONTENT.as_bytes())
+            .unwrap();
+        writer
+            .add_file("settings.xml", b"document settings")
+            .unwrap();
+        writer
+            .add_file_with_media_type("Pictures/photo.bin", b"image", "image/x-test")
+            .unwrap();
+        writer
+            .add_manifest_entry("Object 1/", "application/vnd.oasis.opendocument.text")
+            .unwrap();
+        writer
+            .add_file("Object 1/content.xml", b"embedded object")
+            .unwrap();
+        writer
+            .add_file_with_media_type(
+                "custom/data.bin",
+                b"custom payload",
+                "application/x-litchi-test",
+            )
+            .unwrap();
+        writer
+            .add_file("META-INF/documentsignatures.xml", b"stale signature")
+            .unwrap();
+
+        let source = Document::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+        let mut mutable = MutableDocument::from_document(source).unwrap();
+        mutable.add_paragraph("Modified").unwrap();
+        let output = crate::core::OwnedPackage::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+
+        assert_eq!(
+            output.get_file("settings.xml").unwrap(),
+            b"document settings"
+        );
+        assert_eq!(output.get_file("Pictures/photo.bin").unwrap(), b"image");
+        assert_eq!(
+            output.get_file("Object 1/content.xml").unwrap(),
+            b"embedded object"
+        );
+        assert_eq!(
+            output.get_file("custom/data.bin").unwrap(),
+            b"custom payload"
+        );
+        assert!(!output.has_file("META-INF/documentsignatures.xml").unwrap());
+
+        let package = output.package().unwrap();
+        assert_eq!(
+            package.manifest().get_media_type("Pictures/photo.bin"),
+            Some("image/x-test")
+        );
+        assert_eq!(
+            package.manifest().get_media_type("Object 1/"),
+            Some("application/vnd.oasis.opendocument.text")
+        );
+        assert_eq!(
+            package.manifest().get_media_type("custom/data.bin"),
+            Some("application/x-litchi-test")
+        );
     }
 }

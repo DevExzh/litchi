@@ -167,6 +167,26 @@ impl PackageWriter {
         Ok(())
     }
 
+    /// Add an entry to the package manifest without writing a ZIP member.
+    ///
+    /// ODF uses manifest-only entries for directories such as embedded objects.
+    pub fn add_manifest_entry(&mut self, path: &str, media_type: &str) -> Result<()> {
+        if !self.wrote_mimetype {
+            return Err(Error::InvalidFormat("MIME type not set".to_string()));
+        }
+        if path.is_empty() || path == "mimetype" {
+            return Err(Error::InvalidFormat(
+                "Invalid manifest-only path".to_string(),
+            ));
+        }
+
+        self.manifest_entries.push(ManifestEntry {
+            full_path: path.to_string(),
+            media_type: media_type.to_string(),
+        });
+        Ok(())
+    }
+
     /// Generate the manifest.xml content
     fn generate_manifest(&self) -> String {
         let mut manifest = String::from(

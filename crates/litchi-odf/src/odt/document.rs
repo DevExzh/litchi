@@ -55,6 +55,10 @@ pub struct Document {
 }
 
 impl Document {
+    pub(crate) fn into_package(self) -> OwnedPackage {
+        self.package
+    }
+
     /// Open an ODT document from a file path.
     ///
     /// This method reads the entire file into memory and parses it. For large files,

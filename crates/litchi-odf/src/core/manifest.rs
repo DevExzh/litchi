@@ -52,6 +52,7 @@ impl Manifest {
         let mut buf = Vec::new();
 
         let mut entries = HashMap::new();
+        let mut current_file_entry = None;
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -60,7 +61,13 @@ impl Manifest {
                         && let Some(entry) = Self::parse_file_entry(e)?
                     {
                         let full_path = entry.full_path.clone();
+                        current_file_entry = Some(full_path.clone());
                         entries.insert(full_path, entry);
+                    } else if e.name().as_ref() == b"manifest:encryption-data"
+                        && let Some(path) = &current_file_entry
+                        && let Some(entry) = entries.get_mut(path)
+                    {
+                        entry.encrypted = true;
                     }
                 },
                 Ok(Event::Empty(ref e)) => {
@@ -69,7 +76,15 @@ impl Manifest {
                     {
                         let full_path = entry.full_path.clone();
                         entries.insert(full_path, entry);
+                    } else if e.name().as_ref() == b"manifest:encryption-data"
+                        && let Some(path) = &current_file_entry
+                        && let Some(entry) = entries.get_mut(path)
+                    {
+                        entry.encrypted = true;
                     }
+                },
+                Ok(Event::End(ref e)) if e.name().as_ref() == b"manifest:file-entry" => {
+                    current_file_entry = None;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(Error::InvalidFormat(format!("XML parsing error: {}", e))),
@@ -113,14 +128,11 @@ impl Manifest {
         }
 
         if !full_path.is_empty() {
-            let encrypted = media_type == "application/vnd.sun.star.oleobject"
-                || media_type.contains("encrypted");
-
             Ok(Some(ManifestEntry {
                 full_path,
                 media_type,
                 size,
-                encrypted,
+                encrypted: false,
             }))
         } else {
             Ok(None)
@@ -151,6 +163,11 @@ impl Manifest {
     #[allow(dead_code)]
     pub fn get_entry(&self, path: &str) -> Option<&ManifestEntry> {
         self.entries.get(path)
+    }
+
+    /// Whether any package entry carries ODF encryption metadata.
+    pub fn has_encrypted_entries(&self) -> bool {
+        self.entries.values().any(|entry| entry.encrypted)
     }
 }
 
@@ -226,10 +243,15 @@ mod tests {
     fn test_manifest_entry_encrypted() {
         let xml = r#"<?xml version="1.0"?>
 <manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">
-    <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="application/vnd.sun.star.oleobject"/>
+    <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml">
+        <manifest:encryption-data manifest:checksum-type="SHA256" manifest:checksum="checksum"/>
+    </manifest:file-entry>
+    <manifest:file-entry manifest:full-path="Object 1/object.bin" manifest:media-type="application/vnd.sun.star.oleobject"/>
 </manifest:manifest>"#;
         let manifest = Manifest::parse(xml).unwrap();
         let entry = manifest.get_entry("content.xml").unwrap();
         assert!(entry.encrypted);
+        assert!(!manifest.get_entry("Object 1/object.bin").unwrap().encrypted);
+        assert!(manifest.has_encrypted_entries());
     }
 }
