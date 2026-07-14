@@ -11,9 +11,11 @@ use litchi_core::sheet::{
 };
 use litchi_core::xml::unescape_xml;
 use litchi_opc::Relationships;
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 
 use super::RichTextRun;
 use super::cell::{Cell, CellIterator as XlsxCellIterator, RowIterator as XlsxRowIterator};
+use super::comments::parse_comments_xml;
 use super::format::{CellBorder, CellFill, CellFont, CellFormat};
 use super::parsers::worksheet_parser;
 use super::sort::SortState;
@@ -97,8 +99,14 @@ pub struct Comment {
     pub cell_ref: String,
     /// Author of the comment
     pub author: Option<String>,
+    /// Zero-based author index stored in the comments part.
+    pub author_id: u32,
     /// Comment text
     pub text: String,
+    /// Optional comment GUID.
+    pub guid: Option<String>,
+    /// Optional VML shape identifier.
+    pub shape_id: Option<u32>,
 }
 
 /// Data validation rule information (parsed from worksheet XML)
@@ -253,9 +261,40 @@ impl<'a> Worksheet<'a> {
     fn parse_worksheet_xml(&mut self, content: &str, relationships: &Relationships) -> Result<()> {
         let hyperlinks = self.parse_sheet_data(content)?;
         self.resolve_hyperlinks(hyperlinks, relationships)?;
+        self.load_comments(relationships)?;
 
         self.sparkline_groups = parse_sparkline_groups_from_worksheet_xml(content)?;
 
+        Ok(())
+    }
+
+    fn load_comments(&mut self, relationships: &Relationships) -> Result<()> {
+        let mut matching = relationships.iter().filter(|relationship| {
+            matches!(relationship.reltype(), rt::COMMENTS | rt::STRICT_COMMENTS)
+        });
+        let Some(relationship) = matching.next() else {
+            self.comments.clear();
+            return Ok(());
+        };
+        if matching.next().is_some() {
+            return Err("Worksheet has multiple comments relationships".into());
+        }
+        if relationship.is_external() {
+            return Err("Worksheet comments relationship cannot be external".into());
+        }
+        let comments_uri = relationship.target_partname()?;
+        let comments_part = self.workbook.package().get_part(&comments_uri)?;
+        if comments_part.content_type() != ct::SML_COMMENTS {
+            return Err(format!(
+                "Worksheet comments part '{}' has content type '{}', expected '{}'",
+                comments_uri,
+                comments_part.content_type(),
+                ct::SML_COMMENTS
+            )
+            .into());
+        }
+        let content = std::str::from_utf8(comments_part.blob())?;
+        self.comments = parse_comments_xml(content)?;
         Ok(())
     }
 

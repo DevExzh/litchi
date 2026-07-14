@@ -1914,6 +1914,15 @@ mod tests {
   </extLst>
 </worksheet>"#;
 
+    const COMMENTS_XML: &str = r#"<comments xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <authors><author>Alice &amp; Bob</author></authors>
+  <commentList>
+    <comment ref="C3" authorId="0" guid="{comment-guid}" shapeId="5">
+      <text><r><t>Hello </t></r><r><t>world</t></r></text>
+    </comment>
+  </commentList>
+</comments>"#;
+
     fn package_with_worksheet_relationship(reltype: &str, external: bool) -> OpcPackage {
         let mut package = OpcPackage::new();
         let workbook_uri = PackURI::new("/xl/workbook.xml").unwrap();
@@ -1946,7 +1955,21 @@ mod tests {
                 worksheet_part.relate_to_ext("https://example.com/report", hyperlink_reltype),
                 "rId1"
             );
+            let comments_reltype = if reltype == rt::STRICT_WORKSHEET {
+                rt::STRICT_COMMENTS
+            } else {
+                rt::COMMENTS
+            };
+            assert_eq!(
+                worksheet_part.relate_to("../comments/custom-comments.xml", comments_reltype),
+                "rId2"
+            );
             package.add_part(Box::new(worksheet_part));
+            package.add_part(Box::new(BlobPart::new(
+                PackURI::new("/xl/comments/custom-comments.xml").unwrap(),
+                ct::SML_COMMENTS.to_string(),
+                COMMENTS_XML.as_bytes().to_vec(),
+            )));
         }
 
         package
@@ -2042,6 +2065,12 @@ mod tests {
         assert!(sparkline.options.date_axis);
         assert_eq!(sparkline.sparklines.len(), 2);
         assert_eq!(sparkline.sparklines[0].location, "F2");
+        let comment = worksheet.get_cell_comment(3, 3).unwrap();
+        assert_eq!(comment.author.as_deref(), Some("Alice & Bob"));
+        assert_eq!(comment.author_id, 0);
+        assert_eq!(comment.text, "Hello world");
+        assert_eq!(comment.guid.as_deref(), Some("{comment-guid}"));
+        assert_eq!(comment.shape_id, Some(5));
     }
 
     #[test]
@@ -2053,6 +2082,57 @@ mod tests {
         .unwrap();
 
         assert_eq!(workbook.worksheet_by_index(0).unwrap().row_count(), 1);
+    }
+
+    #[test]
+    fn rejects_external_comments_relationship() {
+        let mut package = package_with_worksheet_relationship(rt::WORKSHEET, false);
+        let worksheet_uri = PackURI::new("/xl/custom/sales-data.xml").unwrap();
+        package
+            .get_part_mut(&worksheet_uri)
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                rt::COMMENTS.to_string(),
+                "https://example.com/comments.xml".to_string(),
+                "rId2".to_string(),
+                true,
+            );
+        let workbook = Workbook::new(package).unwrap();
+
+        assert!(workbook.get_worksheet(0).is_err());
+    }
+
+    #[test]
+    fn rejects_duplicate_comments_relationships() {
+        let mut package = package_with_worksheet_relationship(rt::WORKSHEET, false);
+        let worksheet_uri = PackURI::new("/xl/custom/sales-data.xml").unwrap();
+        package
+            .get_part_mut(&worksheet_uri)
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                rt::COMMENTS.to_string(),
+                "../comments/other-comments.xml".to_string(),
+                "rId3".to_string(),
+                false,
+            );
+        let workbook = Workbook::new(package).unwrap();
+
+        assert!(workbook.get_worksheet(0).is_err());
+    }
+
+    #[test]
+    fn rejects_wrong_comments_content_type() {
+        let mut package = package_with_worksheet_relationship(rt::WORKSHEET, false);
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/comments/custom-comments.xml").unwrap(),
+            ct::SML_WORKSHEET.to_string(),
+            COMMENTS_XML.as_bytes().to_vec(),
+        )));
+        let workbook = Workbook::new(package).unwrap();
+
+        assert!(workbook.get_worksheet(0).is_err());
     }
 
     #[test]

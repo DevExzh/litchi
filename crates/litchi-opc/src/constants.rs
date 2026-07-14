@@ -200,6 +200,9 @@ pub mod relationship_type {
     // Document parts
     pub const COMMENTS: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments";
+    /// ISO/IEC 29500 Strict comments relationship type.
+    pub const STRICT_COMMENTS: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/comments";
     pub const ENDNOTES: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes";
     pub const FONT: &str =

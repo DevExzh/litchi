@@ -29,6 +29,7 @@
 
 pub mod cell;
 pub mod chart;
+mod comments;
 pub mod format;
 mod namespace;
 pub mod parsers;
