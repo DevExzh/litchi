@@ -25,6 +25,47 @@ struct ShapeBuilder {
     style_name: Option<String>,
     image_href: Option<String>,
     is_title: bool,
+    has_paragraph: bool,
+}
+
+#[derive(Default)]
+struct ParagraphText {
+    value: String,
+    trailing_collapsible_space: bool,
+}
+
+impl ParagraphText {
+    fn push_text(&mut self, text: &str) {
+        for character in text.chars() {
+            if character.is_whitespace() {
+                if !self.value.is_empty()
+                    && !self
+                        .value
+                        .chars()
+                        .next_back()
+                        .is_some_and(char::is_whitespace)
+                {
+                    self.value.push(' ');
+                    self.trailing_collapsible_space = true;
+                }
+            } else {
+                self.value.push(character);
+                self.trailing_collapsible_space = false;
+            }
+        }
+    }
+
+    fn push_explicit(&mut self, character: char, count: usize) {
+        self.value.extend(std::iter::repeat_n(character, count));
+        self.trailing_collapsible_space = false;
+    }
+
+    fn finish(mut self) -> String {
+        if self.trailing_collapsible_space {
+            self.value.pop();
+        }
+        self.value
+    }
 }
 
 #[allow(dead_code)]
@@ -41,6 +82,7 @@ impl ShapeBuilder {
             style_name: None,
             image_href: None,
             is_title: false,
+            has_paragraph: false,
         }
     }
 
@@ -56,6 +98,14 @@ impl ShapeBuilder {
             style_name: self.style_name,
             image_href: self.image_href,
         }
+    }
+
+    fn push_paragraph(&mut self, text: &str) {
+        if self.has_paragraph {
+            self.text.push('\n');
+        }
+        self.text.push_str(text);
+        self.has_paragraph = true;
     }
 }
 
@@ -108,33 +158,31 @@ impl OdpParser {
         builder
     }
 
-    fn append_text(target: &mut String, text: &str) {
-        let trimmed = text.trim();
-        if trimmed.is_empty() {
-            return;
+    fn append_segment(target: &mut String, has_segment: &mut bool, text: &str) {
+        if *has_segment {
+            target.push('\n');
         }
-        if !target.is_empty() {
-            target.push(' ');
-        }
-        target.push_str(trimmed);
+        target.push_str(text);
+        *has_segment = true;
     }
 
     fn finish_shape(
         builder: ShapeBuilder,
         slide_title: &mut Option<String>,
         slide_text: &mut String,
+        slide_has_segment: &mut bool,
         shapes: &mut Vec<Shape>,
     ) {
         let is_title = builder.is_title;
         let shape = builder.build();
         if is_title {
-            *slide_title = Some(shape.text.trim().to_string());
+            *slide_title = Some(shape.text);
         } else if matches!(
             shape.shape_type,
             ShapeType::TextBox | ShapeType::Placeholder
         ) && shape.has_text()
         {
-            Self::append_text(slide_text, &shape.text);
+            Self::append_segment(slide_text, slide_has_segment, &shape.text);
         } else {
             shapes.push(shape);
         }
@@ -168,26 +216,52 @@ impl OdpParser {
         }
     }
 
-    fn push_parsed_text(
+    fn push_parsed_paragraph(
         text: &str,
         in_notes: bool,
         notes: &mut String,
+        notes_has_paragraph: &mut bool,
         shape: Option<&mut ShapeBuilder>,
         slide_text: &mut String,
+        slide_has_segment: &mut bool,
     ) {
         if in_notes {
-            Self::append_text(notes, text);
+            Self::append_segment(notes, notes_has_paragraph, text);
         } else if let Some(shape) = shape {
-            Self::append_text(&mut shape.text, text);
+            shape.push_paragraph(text);
         } else {
-            Self::append_text(slide_text, text);
+            Self::append_segment(slide_text, slide_has_segment, text);
         }
+    }
+
+    fn push_text_control(element: &BytesStart<'_>, paragraph: &mut ParagraphText) -> Result<()> {
+        match element.name().as_ref() {
+            b"text:line-break" => paragraph.push_explicit('\n', 1),
+            b"text:tab" => paragraph.push_explicit('\t', 1),
+            b"text:s" => {
+                let count = Self::get_attr(element.attributes(), b"text:c")
+                    .map(|value| {
+                        value.parse::<usize>().map_err(|_| {
+                            Error::InvalidFormat(format!("invalid text:s count '{value}'"))
+                        })
+                    })
+                    .transpose()?
+                    .unwrap_or(1);
+                if count > 1_000_000 {
+                    return Err(Error::InvalidFormat(
+                        "text:s count exceeds the supported safety limit".to_string(),
+                    ));
+                }
+                paragraph.push_explicit(' ', count);
+            },
+            _ => {},
+        }
+        Ok(())
     }
 
     /// Parse all slides from ODP content.xml
     pub fn parse_slides(xml_content: &str) -> Result<Vec<Slide>> {
         let mut reader = Reader::from_str(xml_content);
-        reader.config_mut().trim_text(true);
         let mut buf = Vec::new();
         let mut slides = Vec::new();
 
@@ -198,11 +272,14 @@ impl OdpParser {
         let mut in_slide = false;
         let mut slide_index = 0;
         let mut current_notes_text = String::new();
+        let mut current_notes_has_paragraph = false;
         let mut in_notes = false;
+        let mut current_slide_has_segment = false;
 
         // Shape parsing state
         let mut current_shape: Option<ShapeBuilder> = None;
         let mut shape_depth = 0;
+        let mut current_paragraph: Option<ParagraphText> = None;
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -213,9 +290,7 @@ impl OdpParser {
                             if in_slide {
                                 slides.push(Slide {
                                     title: current_slide_title.take(),
-                                    text: std::mem::take(&mut current_slide_text)
-                                        .trim()
-                                        .to_string(),
+                                    text: std::mem::take(&mut current_slide_text),
                                     index: slide_index,
                                     notes: (!current_notes_text.is_empty())
                                         .then(|| std::mem::take(&mut current_notes_text)),
@@ -226,10 +301,28 @@ impl OdpParser {
 
                             // Start new slide
                             current_slide_title = None;
+                            current_slide_has_segment = false;
+                            current_notes_has_paragraph = false;
                             in_slide = true;
                         },
                         b"presentation:notes" if in_slide => {
                             in_notes = true;
+                        },
+                        b"text:p" | b"text:h" if in_slide => {
+                            if current_paragraph.is_some() {
+                                return Err(Error::InvalidFormat(
+                                    "nested ODP text paragraphs are not supported".to_string(),
+                                ));
+                            }
+                            current_paragraph = Some(ParagraphText::default());
+                        },
+                        b"text:s" | b"text:tab" | b"text:line-break"
+                            if current_paragraph.is_some() =>
+                        {
+                            Self::push_text_control(
+                                e,
+                                current_paragraph.as_mut().expect("paragraph checked above"),
+                            )?;
                         },
                         _ if in_notes => {},
                         name if Self::is_shape_element(name) => {
@@ -259,31 +352,56 @@ impl OdpParser {
                                 .expect("shape checked above")
                                 .shape_type = ShapeType::GraphicFrame;
                         },
-                        b"text:p" | b"text:span" => {
-                            // Text will be collected in Text event
-                        },
                         _ => {},
                     }
                 },
-                Ok(Event::Text(ref t)) if in_slide => {
+                Ok(Event::Text(ref t)) if current_paragraph.is_some() => {
                     let text = Self::decode_text(t)?;
-                    Self::push_parsed_text(
-                        &text,
+                    current_paragraph
+                        .as_mut()
+                        .expect("paragraph checked above")
+                        .push_text(&text);
+                },
+                Ok(Event::CData(ref text)) if current_paragraph.is_some() => {
+                    let decoded = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid presentation CDATA: {error}"))
+                    })?;
+                    current_paragraph
+                        .as_mut()
+                        .expect("paragraph checked above")
+                        .push_text(&decoded);
+                },
+                Ok(Event::GeneralRef(ref reference)) if current_paragraph.is_some() => {
+                    let text = Self::decode_reference(reference)?;
+                    current_paragraph
+                        .as_mut()
+                        .expect("paragraph checked above")
+                        .push_text(&text);
+                },
+                Ok(Event::Empty(ref e))
+                    if in_slide && matches!(e.name().as_ref(), b"text:p" | b"text:h") =>
+                {
+                    Self::push_parsed_paragraph(
+                        "",
                         in_notes,
                         &mut current_notes_text,
+                        &mut current_notes_has_paragraph,
                         current_shape.as_mut(),
                         &mut current_slide_text,
+                        &mut current_slide_has_segment,
                     );
                 },
-                Ok(Event::GeneralRef(ref reference)) if in_slide => {
-                    let text = Self::decode_reference(reference)?;
-                    Self::push_parsed_text(
-                        &text,
-                        in_notes,
-                        &mut current_notes_text,
-                        current_shape.as_mut(),
-                        &mut current_slide_text,
-                    );
+                Ok(Event::Empty(ref e))
+                    if current_paragraph.is_some()
+                        && matches!(
+                            e.name().as_ref(),
+                            b"text:s" | b"text:tab" | b"text:line-break"
+                        ) =>
+                {
+                    Self::push_text_control(
+                        e,
+                        current_paragraph.as_mut().expect("paragraph checked above"),
+                    )?;
                 },
                 Ok(Event::Empty(ref e)) if !in_notes => match e.name().as_ref() {
                     b"draw:image" => {
@@ -307,12 +425,32 @@ impl OdpParser {
                             Self::shape_builder(e),
                             &mut current_slide_title,
                             &mut current_slide_text,
+                            &mut current_slide_has_segment,
                             &mut current_shapes,
                         );
                     },
                     _ => {},
                 },
                 Ok(Event::End(ref e)) => {
+                    if matches!(e.name().as_ref(), b"text:p" | b"text:h")
+                        && current_paragraph.is_some()
+                    {
+                        let paragraph = current_paragraph
+                            .take()
+                            .expect("paragraph checked above")
+                            .finish();
+                        Self::push_parsed_paragraph(
+                            &paragraph,
+                            in_notes,
+                            &mut current_notes_text,
+                            &mut current_notes_has_paragraph,
+                            current_shape.as_mut(),
+                            &mut current_slide_text,
+                            &mut current_slide_has_segment,
+                        );
+                        buf.clear();
+                        continue;
+                    }
                     if e.name().as_ref() == b"presentation:notes" {
                         in_notes = false;
                         buf.clear();
@@ -328,9 +466,7 @@ impl OdpParser {
                             if in_slide {
                                 slides.push(Slide {
                                     title: current_slide_title.take(),
-                                    text: std::mem::take(&mut current_slide_text)
-                                        .trim()
-                                        .to_string(),
+                                    text: std::mem::take(&mut current_slide_text),
                                     index: slide_index,
                                     notes: (!current_notes_text.is_empty())
                                         .then(|| std::mem::take(&mut current_notes_text)),
@@ -338,6 +474,8 @@ impl OdpParser {
                                 });
                                 slide_index += 1;
                             }
+                            current_slide_has_segment = false;
+                            current_notes_has_paragraph = false;
                             in_slide = false;
                         },
                         b"draw:frame" | b"draw:rect" | b"draw:ellipse" | b"draw:line"
@@ -351,6 +489,7 @@ impl OdpParser {
                                     builder,
                                     &mut current_slide_title,
                                     &mut current_slide_text,
+                                    &mut current_slide_has_segment,
                                     &mut current_shapes,
                                 );
                             }
@@ -473,7 +612,7 @@ mod tests {
         // Second slide
         assert_eq!(slides[1].title, None);
         assert_eq!(slides[1].index, 1);
-        assert_eq!(slides[1].text, "Bullet 1 Bullet 2");
+        assert_eq!(slides[1].text, "Bullet 1\nBullet 2");
         assert!(slides[1].shapes.is_empty());
     }
 
@@ -674,5 +813,24 @@ mod tests {
             types,
             [ShapeType::Group, ShapeType::Table, ShapeType::GraphicFrame]
         );
+    }
+
+    #[test]
+    fn preserves_text_across_spans_and_odf_whitespace_elements() {
+        let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:presentation><draw:page><draw:frame presentation:class="object"><draw:text-box><text:p><text:s/>Hel<text:span>lo</text:span> <text:span>world</text:span><text:s text:c="2"/>again<text:tab/>tab<text:line-break/>line &amp; more</text:p><text:p/><text:p>second paragraph<text:s/></text:p></draw:text-box></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#;
+
+        let slides = OdpParser::parse_slides(xml).unwrap();
+        assert_eq!(
+            slides[0].text,
+            " Hello world  again\ttab\nline & more\n\nsecond paragraph "
+        );
+    }
+
+    #[test]
+    fn rejects_excessive_explicit_space_expansion() {
+        let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:presentation><draw:page><draw:frame><draw:text-box><text:p>x<text:s text:c="1000001"/></text:p></draw:text-box></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#;
+
+        let error = OdpParser::parse_slides(xml).unwrap_err();
+        assert!(error.to_string().contains("safety limit"));
     }
 }

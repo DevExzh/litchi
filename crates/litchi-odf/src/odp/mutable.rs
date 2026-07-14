@@ -419,10 +419,10 @@ impl MutablePresentation {
 
             // Add title frame if title exists
             if let Some(ref title) = slide.title {
-                let escaped_title = escape_xml(title);
+                let title_paragraphs = super::builder::generate_text_paragraphs(title, Some("P1"));
                 body.push_str(&xml_minifier::minified_xml_format!(
-                    r#"<draw:frame draw:style-name="gr1" draw:text-style-name="P1" draw:layer="layout" presentation:class="title" svg:width="25.199cm" svg:height="3.506cm" svg:x="1.4cm" svg:y="0.962cm"><draw:text-box><text:p text:style-name="P1">{}</text:p></draw:text-box></draw:frame>"#,
-                    escaped_title
+                    r#"<draw:frame draw:style-name="gr1" draw:text-style-name="P1" draw:layer="layout" presentation:class="title" svg:width="25.199cm" svg:height="3.506cm" svg:x="1.4cm" svg:y="0.962cm"><draw:text-box>{}</draw:text-box></draw:frame>"#,
+                    title_paragraphs
                 ));
             }
 
@@ -433,11 +433,12 @@ impl MutablePresentation {
                 } else {
                     "2.0cm"
                 };
-                let escaped_text = escape_xml(&slide.text);
+                let text_paragraphs =
+                    super::builder::generate_text_paragraphs(&slide.text, Some("P2"));
                 body.push_str(&xml_minifier::minified_xml_format!(
-                    r#"<draw:frame draw:style-name="gr2" draw:text-style-name="P2" draw:layer="layout" presentation:class="object" svg:width="25.199cm" svg:height="10cm" svg:x="1.4cm" svg:y="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
+                    r#"<draw:frame draw:style-name="gr2" draw:text-style-name="P2" draw:layer="layout" presentation:class="object" svg:width="25.199cm" svg:height="10cm" svg:x="1.4cm" svg:y="{}"><draw:text-box>{}</draw:text-box></draw:frame>"#,
                     y_position,
-                    escaped_text
+                    text_paragraphs
                 ));
             }
 

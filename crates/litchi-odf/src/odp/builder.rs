@@ -30,6 +30,66 @@ pub struct PresentationBuilder {
     metadata: Metadata,
 }
 
+fn encode_text_content(text: &str) -> String {
+    fn flush_plain(output: &mut String, plain: &mut String) {
+        if !plain.is_empty() {
+            output.push_str(&escape_xml(plain));
+            plain.clear();
+        }
+    }
+
+    let mut output = String::with_capacity(text.len());
+    let mut plain = String::new();
+    let mut characters = text.chars().peekable();
+    while let Some(character) = characters.next() {
+        match character {
+            ' ' => {
+                flush_plain(&mut output, &mut plain);
+                let mut count = 1usize;
+                while characters.next_if_eq(&' ').is_some() {
+                    count += 1;
+                }
+                if count == 1 && !output.is_empty() && characters.peek().is_some() {
+                    output.push(' ');
+                } else if count == 1 {
+                    output.push_str("<text:s/>");
+                } else {
+                    output.push_str(&format!(r#"<text:s text:c="{count}"/>"#));
+                }
+            },
+            '\t' => {
+                flush_plain(&mut output, &mut plain);
+                output.push_str("<text:tab/>");
+            },
+            '\r' => {
+                flush_plain(&mut output, &mut plain);
+                output.push_str("<text:line-break/>");
+            },
+            _ => plain.push(character),
+        }
+    }
+    flush_plain(&mut output, &mut plain);
+    output
+}
+
+pub(super) fn generate_text_paragraphs(text: &str, style_name: Option<&str>) -> String {
+    let escaped_style = style_name.map(escape_xml);
+    let mut output = String::with_capacity(text.len() + 32);
+    for paragraph in text.split('\n') {
+        output.push_str("<text:p");
+        if let Some(style) = escaped_style.as_deref() {
+            output.push_str(r#" text:style-name="#);
+            output.push('"');
+            output.push_str(style);
+            output.push('"');
+        }
+        output.push('>');
+        output.push_str(&encode_text_content(paragraph));
+        output.push_str("</text:p>");
+    }
+    output
+}
+
 impl Default for PresentationBuilder {
     fn default() -> Self {
         Self::new()
@@ -179,7 +239,7 @@ impl PresentationBuilder {
                 };
                 if shape.has_text() {
                     format!(
-                        r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
+                        r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><draw:text-box>{}</draw:text-box></draw:frame>"#,
                         escaped_name,
                         escaped_style_name,
                         presentation_class,
@@ -187,7 +247,7 @@ impl PresentationBuilder {
                         escaped_y,
                         escaped_width,
                         escaped_height,
-                        escape_xml(&shape.text)
+                        generate_text_paragraphs(&shape.text, Some("P2"))
                     )
                 } else {
                     // Empty frame
@@ -206,14 +266,14 @@ impl PresentationBuilder {
             ShapeType::AutoShape => {
                 if shape.has_text() {
                     format!(
-                        r#"<draw:rect draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><text:p text:style-name="P2">{}</text:p></draw:rect>"#,
+                        r#"<draw:rect draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}">{}</draw:rect>"#,
                         escaped_name,
                         escaped_style_name,
                         escaped_x,
                         escaped_y,
                         escaped_width,
                         escaped_height,
-                        escape_xml(&shape.text)
+                        generate_text_paragraphs(&shape.text, Some("P2"))
                     )
                 } else {
                     format!(
@@ -286,12 +346,11 @@ impl PresentationBuilder {
 
     pub(super) fn generate_notes_xml(notes: Option<&str>) -> String {
         notes
-            .map(str::trim)
             .filter(|notes| !notes.is_empty())
             .map(|notes| {
                 format!(
-                    r#"<presentation:notes><draw:frame draw:layer="layout" presentation:class="notes"><draw:text-box><text:p>{}</text:p></draw:text-box></draw:frame></presentation:notes>"#,
-                    escape_xml(notes)
+                    r#"<presentation:notes><draw:frame draw:layer="layout" presentation:class="notes"><draw:text-box>{}</draw:text-box></draw:frame></presentation:notes>"#,
+                    generate_text_paragraphs(notes, None)
                 )
             })
             .unwrap_or_default()
@@ -326,8 +385,8 @@ impl PresentationBuilder {
             // Add title frame if title exists
             if let Some(ref title) = slide.title {
                 body.push_str(&format!(
-                    r#"<draw:frame draw:style-name="gr1" draw:text-style-name="P1" draw:layer="layout" presentation:class="title" svg:width="25.199cm" svg:height="3.506cm" svg:x="1.4cm" svg:y="0.962cm"><draw:text-box><text:p text:style-name="P1">{}</text:p></draw:text-box></draw:frame>"#,
-                    escape_xml(title)
+                    r#"<draw:frame draw:style-name="gr1" draw:text-style-name="P1" draw:layer="layout" presentation:class="title" svg:width="25.199cm" svg:height="3.506cm" svg:x="1.4cm" svg:y="0.962cm"><draw:text-box>{}</draw:text-box></draw:frame>"#,
+                    generate_text_paragraphs(title, Some("P1"))
                 ));
             }
 
@@ -339,9 +398,9 @@ impl PresentationBuilder {
                     "2.0cm"
                 };
                 body.push_str(&format!(
-                    r#"<draw:frame draw:style-name="gr2" draw:text-style-name="P2" draw:layer="layout" presentation:class="object" svg:width="25.199cm" svg:height="10cm" svg:x="1.4cm" svg:y="{}"><draw:text-box><text:p text:style-name="P2">{}</text:p></draw:text-box></draw:frame>"#,
+                    r#"<draw:frame draw:style-name="gr2" draw:text-style-name="P2" draw:layer="layout" presentation:class="object" svg:width="25.199cm" svg:height="10cm" svg:x="1.4cm" svg:y="{}"><draw:text-box>{}</draw:text-box></draw:frame>"#,
                     y_position,
-                    escape_xml(&slide.text)
+                    generate_text_paragraphs(&slide.text, Some("P2"))
                 ));
             }
 
@@ -486,5 +545,13 @@ mod tests {
             shape.shape_type = shape_type;
             assert!(PresentationBuilder::generate_shape_xml(&shape, 0).is_err());
         }
+    }
+
+    #[test]
+    fn writes_paragraphs_and_explicit_odf_whitespace() {
+        assert_eq!(
+            generate_text_paragraphs(" leading  text\ttab\nnext ", Some("P&1")),
+            r#"<text:p text:style-name="P&amp;1"><text:s/>leading<text:s text:c="2"/>text<text:tab/>tab</text:p><text:p text:style-name="P&amp;1">next<text:s/></text:p>"#
+        );
     }
 }
