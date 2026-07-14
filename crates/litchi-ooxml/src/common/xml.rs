@@ -10,6 +10,10 @@ use quick_xml::reader::NsReader;
 pub(crate) const DRAWINGML_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/drawingml/2006/main";
 pub(crate) const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
+pub(crate) const DRAWINGML_CHART_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/drawingml/2006/chart";
+pub(crate) const STRICT_DRAWINGML_CHART_NAMESPACE: &[u8] =
+    b"http://purl.oclc.org/ooxml/drawingml/chart";
 const OMML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/officeDocument/2006/math";
 const STRICT_OMML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/math";
 
@@ -46,6 +50,20 @@ pub(crate) fn is_drawingml_name(
             namespace,
             ResolveResult::Bound(Namespace(value))
                 if *value == DRAWINGML_NAMESPACE || *value == STRICT_DRAWINGML_NAMESPACE
+        )
+}
+
+pub(crate) fn is_drawingml_chart_name(
+    namespace: &ResolveResult<'_>,
+    name: QName<'_>,
+    local_name: &[u8],
+) -> bool {
+    name.local_name().as_ref() == local_name
+        && matches!(
+            namespace,
+            ResolveResult::Bound(Namespace(value))
+                if *value == DRAWINGML_CHART_NAMESPACE
+                    || *value == STRICT_DRAWINGML_CHART_NAMESPACE
         )
 }
 

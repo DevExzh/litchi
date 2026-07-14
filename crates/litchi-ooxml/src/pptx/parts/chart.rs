@@ -2,13 +2,17 @@
 //!
 //! This module provides types for working with charts in PPTX files.
 
-use crate::common::xml::decode_xml_reference;
+use crate::common::xml::{
+    decode_xml_reference, is_drawingml_chart_name, is_drawingml_name, unqualified_attribute_value,
+};
 use crate::error::{OoxmlError, Result};
 use litchi_core::xml::escape_xml;
 use litchi_opc::part::Part;
-use quick_xml::Reader;
 use quick_xml::XmlVersion;
+use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::ResolveResult;
+use quick_xml::reader::NsReader;
 
 /// Chart type enumeration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,33 +79,6 @@ impl<'a> ChartPart<'a> {
         }
     }
 
-    fn inspect_plot_element(
-        element: &BytesStart<'_>,
-        chart_type: &mut ChartType,
-        in_primary_bar_chart: &mut bool,
-    ) {
-        let name = element.local_name();
-        if let Some(detected) = Self::plot_type(name.as_ref())
-            && *chart_type == ChartType::Unknown
-        {
-            *chart_type = detected;
-            *in_primary_bar_chart = matches!(name.as_ref(), b"barChart" | b"bar3DChart");
-        }
-
-        if name.as_ref() == b"barDir" && *in_primary_bar_chart {
-            for attribute in element.attributes().flatten() {
-                if attribute.key.local_name().as_ref() == b"val" {
-                    *chart_type = match attribute.value.as_ref() {
-                        b"col" => ChartType::Column,
-                        b"bar" => ChartType::Bar,
-                        _ => *chart_type,
-                    };
-                    break;
-                }
-            }
-        }
-    }
-
     /// Create a ChartPart from an OPC Part.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
         Ok(Self { part })
@@ -123,86 +100,112 @@ impl<'a> ChartPart<'a> {
     /// println!("Chart type: {:?}", info.chart_type);
     /// ```
     pub fn chart_info(&self) -> Result<ChartInfo> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(false);
+        let mut reader = NsReader::from_reader(self.xml_bytes());
 
-        let mut chart_type = ChartType::Unknown;
-        let mut title: Option<String> = None;
-        let mut has_legend = false;
-
-        let mut in_title = false;
-        let mut in_title_text = false;
-        let mut in_primary_bar_chart = false;
+        let mut state = ChartScanState::new();
 
         loop {
-            match reader.read_event() {
-                Ok(Event::Start(ref e)) => {
-                    let tag_name = e.local_name();
-                    Self::inspect_plot_element(e, &mut chart_type, &mut in_primary_bar_chart);
-
-                    match tag_name.as_ref() {
-                        b"title" => in_title = true,
-                        b"legend" => {
-                            has_legend = true;
-                        },
-                        b"t" if in_title => {
-                            in_title_text = true;
-                        },
-                        _ => {},
+            let decoder = reader.decoder();
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            match event {
+                Event::Start(element) => {
+                    state.depth = state.depth.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("chart XML nesting is too deep".to_string())
+                    })?;
+                    if state.depth == 1 {
+                        if state.root_depth.is_some()
+                            || !is_drawingml_chart_name(&namespace, element.name(), b"chartSpace")
+                        {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart XML must have one DrawingML chartSpace root".to_string(),
+                            ));
+                        }
+                        state.root_depth = Some(state.depth);
                     }
+                    inspect_chart_start(&namespace, &element, decoder, &mut state)?;
                 },
-                Ok(Event::Empty(ref e)) => {
-                    Self::inspect_plot_element(e, &mut chart_type, &mut in_primary_bar_chart);
-                    if e.local_name().as_ref() == b"legend" {
-                        has_legend = true;
-                    }
+                Event::Empty(element) => {
+                    let child_depth = state.depth.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("chart XML nesting is too deep".to_string())
+                    })?;
+                    inspect_chart_empty(&namespace, &element, decoder, child_depth, &mut state)?;
                 },
-                Ok(Event::Text(e)) if in_title_text => {
+                Event::Text(e) if state.title_text_depth.is_some() => {
                     let decoded = e
-                        .xml_content(XmlVersion::Implicit1_0)
+                        .xml_content(XmlVersion::Explicit1_0)
                         .map_err(|error| OoxmlError::Xml(error.to_string()))?;
                     let text = quick_xml::escape::unescape(&decoded)
                         .map_err(|error| OoxmlError::Xml(error.to_string()))?;
-                    match &mut title {
-                        Some(current) => current.push_str(&text),
-                        None => title = Some(text.into_owned()),
-                    }
+                    append_title(&mut state.title, &text);
                 },
-                Ok(Event::CData(e)) if in_title_text => {
+                Event::CData(e) if state.title_text_depth.is_some() => {
                     let text = e
-                        .xml_content(XmlVersion::Implicit1_0)
+                        .xml_content(XmlVersion::Explicit1_0)
                         .map_err(|error| OoxmlError::Xml(error.to_string()))?;
-                    match &mut title {
-                        Some(current) => current.push_str(&text),
-                        None => title = Some(text.into_owned()),
-                    }
+                    append_title(&mut state.title, &text);
                 },
-                Ok(Event::GeneralRef(reference)) if in_title_text => {
+                Event::GeneralRef(reference) if state.title_text_depth.is_some() => {
                     let text = decode_xml_reference(&reference)?;
-                    match &mut title {
-                        Some(current) => current.push_str(&text),
-                        None => title = Some(text),
-                    }
+                    append_title(&mut state.title, &text);
                 },
-                Ok(Event::End(e)) => {
-                    let tag_name = e.local_name();
-                    match tag_name.as_ref() {
-                        b"title" => in_title = false,
-                        b"t" => in_title_text = false,
-                        b"barChart" | b"bar3DChart" => in_primary_bar_chart = false,
-                        _ => {},
+                Event::End(element) => {
+                    if state.title_text_depth == Some(state.depth)
+                        && (is_drawingml_name(&namespace, element.name(), b"t")
+                            || is_drawingml_chart_name(&namespace, element.name(), b"v"))
+                    {
+                        state.title_text_depth = None;
                     }
+                    if state.title_depth == Some(state.depth)
+                        && is_drawingml_chart_name(&namespace, element.name(), b"title")
+                    {
+                        state.title_depth = None;
+                    }
+                    if state.primary_bar_depth == Some(state.depth) {
+                        state.primary_bar_depth = None;
+                    }
+                    if state.plot_area_depth == Some(state.depth)
+                        && is_drawingml_chart_name(&namespace, element.name(), b"plotArea")
+                    {
+                        state.plot_area_depth = None;
+                    }
+                    if state.chart_depth == Some(state.depth)
+                        && is_drawingml_chart_name(&namespace, element.name(), b"chart")
+                    {
+                        state.chart_depth = None;
+                    }
+                    if state.root_depth == Some(state.depth)
+                        && is_drawingml_chart_name(&namespace, element.name(), b"chartSpace")
+                    {
+                        state.closed_root = true;
+                    }
+                    state.depth = state.depth.checked_sub(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("invalid chart XML nesting".to_string())
+                    })?;
                 },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+                Event::Eof
+                    if state.depth != 0 || state.root_depth.is_none() || !state.closed_root =>
+                {
+                    return Err(OoxmlError::InvalidFormat(
+                        "missing or unterminated DrawingML chartSpace XML".to_string(),
+                    ));
+                },
+                Event::Eof => break,
                 _ => {},
             }
         }
 
+        if !state.seen_chart || !state.seen_plot_area {
+            return Err(OoxmlError::InvalidFormat(
+                "DrawingML chart is missing its chart or plotArea element".to_string(),
+            ));
+        }
+
         Ok(ChartInfo {
-            chart_type,
-            title,
-            has_legend,
+            chart_type: state.chart_type,
+            title: state.title,
+            has_legend: state.has_legend,
         })
     }
 
@@ -210,6 +213,203 @@ impl<'a> ChartPart<'a> {
     #[inline]
     pub fn part(&self) -> &'a dyn Part {
         self.part
+    }
+}
+
+struct ChartScanState {
+    chart_type: ChartType,
+    title: Option<String>,
+    has_legend: bool,
+    depth: usize,
+    root_depth: Option<usize>,
+    closed_root: bool,
+    chart_depth: Option<usize>,
+    plot_area_depth: Option<usize>,
+    title_depth: Option<usize>,
+    title_text_depth: Option<usize>,
+    primary_bar_depth: Option<usize>,
+    seen_chart: bool,
+    seen_plot_area: bool,
+    seen_title: bool,
+    seen_legend: bool,
+}
+
+impl ChartScanState {
+    fn new() -> Self {
+        Self {
+            chart_type: ChartType::Unknown,
+            title: None,
+            has_legend: false,
+            depth: 0,
+            root_depth: None,
+            closed_root: false,
+            chart_depth: None,
+            plot_area_depth: None,
+            title_depth: None,
+            title_text_depth: None,
+            primary_bar_depth: None,
+            seen_chart: false,
+            seen_plot_area: false,
+            seen_title: false,
+            seen_legend: false,
+        }
+    }
+}
+
+fn inspect_chart_start(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    state: &mut ChartScanState,
+) -> Result<()> {
+    let depth = state.depth;
+    if state.root_depth.is_some_and(|root| depth == root + 1)
+        && is_drawingml_chart_name(namespace, element.name(), b"chart")
+    {
+        if state.seen_chart {
+            return Err(OoxmlError::InvalidFormat(
+                "duplicate DrawingML chart element".to_string(),
+            ));
+        }
+        state.seen_chart = true;
+        state.chart_depth = Some(depth);
+    } else if state.chart_depth.is_some_and(|chart| depth == chart + 1) {
+        if is_drawingml_chart_name(namespace, element.name(), b"title") {
+            if state.seen_title {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate DrawingML chart title".to_string(),
+                ));
+            }
+            state.seen_title = true;
+            state.title_depth = Some(depth);
+        } else if is_drawingml_chart_name(namespace, element.name(), b"legend") {
+            if state.seen_legend {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate DrawingML chart legend".to_string(),
+                ));
+            }
+            state.seen_legend = true;
+            state.has_legend = true;
+        } else if is_drawingml_chart_name(namespace, element.name(), b"plotArea") {
+            if state.seen_plot_area {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate DrawingML plot area".to_string(),
+                ));
+            }
+            state.seen_plot_area = true;
+            state.plot_area_depth = Some(depth);
+        }
+    }
+
+    if state.title_depth.is_some_and(|title| depth > title)
+        && (is_drawingml_name(namespace, element.name(), b"t")
+            || is_drawingml_chart_name(namespace, element.name(), b"v"))
+    {
+        if state.title_text_depth.is_some() {
+            return Err(OoxmlError::InvalidFormat(
+                "nested chart title text is invalid".to_string(),
+            ));
+        }
+        state.title_text_depth = Some(depth);
+    }
+
+    inspect_plot_element(namespace, element, decoder, depth, state)
+}
+
+fn inspect_chart_empty(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    depth: usize,
+    state: &mut ChartScanState,
+) -> Result<()> {
+    if state.root_depth.is_some_and(|root| depth == root + 1)
+        && is_drawingml_chart_name(namespace, element.name(), b"chart")
+    {
+        if state.seen_chart {
+            return Err(OoxmlError::InvalidFormat(
+                "duplicate DrawingML chart element".to_string(),
+            ));
+        }
+        state.seen_chart = true;
+    } else if state.chart_depth.is_some_and(|chart| depth == chart + 1) {
+        if is_drawingml_chart_name(namespace, element.name(), b"title") {
+            if state.seen_title {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate DrawingML chart title".to_string(),
+                ));
+            }
+            state.seen_title = true;
+        } else if is_drawingml_chart_name(namespace, element.name(), b"legend") {
+            if state.seen_legend {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate DrawingML chart legend".to_string(),
+                ));
+            }
+            state.seen_legend = true;
+            state.has_legend = true;
+        } else if is_drawingml_chart_name(namespace, element.name(), b"plotArea") {
+            if state.seen_plot_area {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate DrawingML plot area".to_string(),
+                ));
+            }
+            state.seen_plot_area = true;
+        }
+    }
+    inspect_plot_element(namespace, element, decoder, depth, state)?;
+    if state.primary_bar_depth == Some(depth) {
+        state.primary_bar_depth = None;
+    }
+    Ok(())
+}
+
+fn inspect_plot_element(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    depth: usize,
+    state: &mut ChartScanState,
+) -> Result<()> {
+    if state
+        .plot_area_depth
+        .is_some_and(|plot_area| depth == plot_area + 1)
+        && is_drawingml_chart_name(namespace, element.name(), element.local_name().as_ref())
+        && let Some(detected) = ChartPart::plot_type(element.local_name().as_ref())
+        && state.chart_type == ChartType::Unknown
+    {
+        state.chart_type = detected;
+        if matches!(element.local_name().as_ref(), b"barChart" | b"bar3DChart") {
+            state.primary_bar_depth = Some(depth);
+        }
+    }
+
+    if state
+        .primary_bar_depth
+        .is_some_and(|bar_chart| depth == bar_chart + 1)
+        && is_drawingml_chart_name(namespace, element.name(), b"barDir")
+    {
+        let direction =
+            unqualified_attribute_value(element, b"val", decoder)?.ok_or_else(|| {
+                OoxmlError::InvalidFormat("barDir is missing its val attribute".to_string())
+            })?;
+        state.chart_type = match direction.as_str() {
+            "col" => ChartType::Column,
+            "bar" => ChartType::Bar,
+            _ => {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "invalid barDir value '{direction}'"
+                )));
+            },
+        };
+    }
+    Ok(())
+}
+
+fn append_title(title: &mut Option<String>, text: &str) {
+    match title {
+        Some(current) => current.push_str(text),
+        None => *title = Some(text.to_string()),
     }
 }
 
@@ -433,6 +633,12 @@ pub(crate) fn validate_chart_data(chart: &ChartData) -> Result<()> {
     if chart.chart_type == ChartType::Unknown {
         return Err(OoxmlError::InvalidFormat(
             "cannot generate XML for an unknown chart type".to_string(),
+        ));
+    }
+
+    if chart.width <= 0 || chart.height <= 0 {
+        return Err(OoxmlError::InvalidFormat(
+            "chart width and height must be positive".to_string(),
         ));
     }
 
@@ -846,7 +1052,7 @@ pub fn generate_chart_graphic_frame(
     xml.push_str(r#"<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">"#);
     xml.push_str(&format!(
         r#"<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="{}"/>"#,
-        chart_rel_id
+        escape_xml(chart_rel_id)
     ));
     xml.push_str("</a:graphicData>");
     xml.push_str("</a:graphic>");
@@ -861,6 +1067,9 @@ mod tests {
     use super::*;
     use litchi_opc::{packuri::PackURI, part::BlobPart};
 
+    const C: &str = "http://schemas.openxmlformats.org/drawingml/2006/chart";
+    const A: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
+
     fn parse_chart_info(xml: &str) -> ChartInfo {
         let part = BlobPart::new(
             PackURI::new("/ppt/charts/chart1.xml").unwrap(),
@@ -872,29 +1081,66 @@ mod tests {
 
     #[test]
     fn chart_info_distinguishes_column_and_decodes_title() {
-        let xml = r#"<c:chartSpace xmlns:c="urn:chart" xmlns:a="urn:drawing"><c:chart><c:title><c:tx><c:rich><a:p><a:r><a:t>Revenue &amp; Growth</a:t></a:r></a:p></c:rich></c:tx></c:title><c:plotArea><c:barChart><c:barDir c:val="col"/></c:barChart></c:plotArea><c:legend/></c:chart></c:chartSpace>"#;
-        let info = parse_chart_info(xml);
+        let xml = format!(
+            r#"<c:chartSpace xmlns:c="{C}" xmlns:a="{A}"><c:chart><c:title><c:tx><c:rich><a:p><a:r><a:t>Revenue &amp; <![CDATA[Growth < 2027]]></a:t></a:r></a:p></c:rich></c:tx></c:title><c:plotArea><c:barChart><c:barDir val="col"/></c:barChart></c:plotArea><c:legend/></c:chart></c:chartSpace>"#
+        );
+        let info = parse_chart_info(&xml);
 
         assert_eq!(info.chart_type, ChartType::Column);
-        assert_eq!(info.title.as_deref(), Some("Revenue & Growth"));
+        assert_eq!(info.title.as_deref(), Some("Revenue & Growth < 2027"));
         assert!(info.has_legend);
     }
 
     #[test]
     fn chart_info_uses_first_plot_in_combination_chart() {
-        let xml = r#"<chartSpace><chart><plotArea><lineChart/><barChart><barDir val="col"/></barChart></plotArea></chart></chartSpace>"#;
-        let info = parse_chart_info(xml);
+        let xml = format!(
+            r#"<c:chartSpace xmlns:c="{C}"><c:chart><c:plotArea><c:lineChart/><c:barChart><c:barDir val="col"/></c:barChart></c:plotArea></c:chart></c:chartSpace>"#
+        );
+        let info = parse_chart_info(&xml);
 
         assert_eq!(info.chart_type, ChartType::Line);
     }
 
     #[test]
     fn empty_title_does_not_capture_later_text() {
-        let xml = r#"<chartSpace><chart><title/><plotArea><barChart><barDir val="bar"/></barChart><t>not a title</t></plotArea></chart></chartSpace>"#;
-        let info = parse_chart_info(xml);
+        let xml = format!(
+            r#"<c:chartSpace xmlns:c="{C}" xmlns:a="{A}"><c:chart><c:title/><c:plotArea><c:barChart><c:barDir val="bar"/></c:barChart><a:t>not a title</a:t></c:plotArea></c:chart></c:chartSpace>"#
+        );
+        let info = parse_chart_info(&xml);
 
         assert_eq!(info.chart_type, ChartType::Bar);
         assert!(info.title.is_none());
+    }
+
+    #[test]
+    fn strict_cached_titles_and_foreign_lookalikes_are_supported() {
+        let xml = r#"<x:chartSpace xmlns:x="http://purl.oclc.org/ooxml/drawingml/chart"
+            xmlns:f="urn:foreign"><x:chart><x:title><x:tx><x:strRef><x:strCache>
+            <x:pt idx="0"><x:v>Cached &amp; Strict</x:v></x:pt></x:strCache></x:strRef></x:tx></x:title>
+            <x:plotArea><f:pieChart/><x:doughnutChart/></x:plotArea><f:legend/></x:chart></x:chartSpace>"#;
+        let info = parse_chart_info(xml);
+        assert_eq!(info.chart_type, ChartType::Doughnut);
+        assert_eq!(info.title.as_deref(), Some("Cached & Strict"));
+        assert!(!info.has_legend);
+    }
+
+    #[test]
+    fn malformed_chart_info_is_rejected() {
+        let invalid = [
+            format!(
+                r#"<c:chartSpace xmlns:c="{C}"><c:chart><c:plotArea><c:barChart><c:barDir val="bad"/></c:barChart></c:plotArea></c:chart></c:chartSpace>"#
+            ),
+            format!(r#"<c:chartSpace xmlns:c="{C}"><c:chart>"#),
+            "<chartSpace/>".to_string(),
+        ];
+        for xml in invalid {
+            let part = BlobPart::new(
+                PackURI::new("/ppt/charts/chart1.xml").unwrap(),
+                "application/xml".to_string(),
+                xml.into_bytes(),
+            );
+            assert!(ChartPart::from_part(&part).unwrap().chart_info().is_err());
+        }
     }
 
     #[test]
@@ -1002,6 +1248,18 @@ mod tests {
     }
 
     #[test]
+    fn doughnut_xml_is_balanced_and_relationship_ids_are_escaped() {
+        let chart = chart_with_series(ChartType::Doughnut, 1);
+        let xml = generate_chart_xml(&chart).unwrap();
+        assert_eq!(xml.matches("<c:doughnutChart>").count(), 1);
+        assert_eq!(xml.matches("</c:doughnutChart>").count(), 1);
+        assert_eq!(parse_chart_info(&xml).chart_type, ChartType::Doughnut);
+
+        let frame = generate_chart_graphic_frame(1, "rId1&spoof", &chart);
+        assert!(frame.contains(r#"r:id="rId1&amp;spoof""#));
+    }
+
+    #[test]
     fn invalid_specialized_chart_data_is_rejected() {
         let unknown = ChartData::new(ChartType::Unknown, 0, 0, 100, 100);
         assert!(generate_chart_xml(&unknown).is_err());
@@ -1027,5 +1285,8 @@ mod tests {
         let non_finite = ChartData::new(ChartType::Line, 0, 0, 100, 100)
             .add_series(ChartSeries::new("Bad").with_values(vec![f64::NAN]));
         assert!(generate_chart_xml(&non_finite).is_err());
+
+        let invalid_geometry = ChartData::new(ChartType::Line, 0, 0, 0, 100);
+        assert!(generate_chart_xml(&invalid_geometry).is_err());
     }
 }
