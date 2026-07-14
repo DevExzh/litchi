@@ -71,6 +71,7 @@ mod protection;
 mod row;
 mod scenario;
 mod sheet;
+mod source;
 mod spreadsheet;
 mod structure;
 mod style_protection;
@@ -95,6 +96,7 @@ pub use protection::{
 pub use row::Row;
 pub use scenario::SheetScenario;
 pub use sheet::Sheet;
+pub use source::{SheetTableSource, TableSourceMode};
 pub use spreadsheet::Spreadsheet;
 pub use structure::{
     Column, SheetPrintSettings, SheetStyle, SheetStyleUsage, TableGroup, TableRange,

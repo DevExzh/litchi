@@ -6,7 +6,8 @@ use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
     Cell, CellAnnotation, CellValue, Column, ContentValidation, NamedDefinition,
     NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings,
-    SheetScenario, SheetStyle, SpreadsheetProtection, TableStructure, TableVisibility,
+    SheetScenario, SheetStyle, SheetTableSource, SpreadsheetProtection, TableStructure,
+    TableVisibility,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     named_expression::{ensure_unique, write_named_definitions},
@@ -15,6 +16,7 @@ use crate::ods::{
         write_spreadsheet_attributes,
     },
     scenario::{validate_scenario, write_sheet_preamble},
+    source::validate_table_source,
     structure::{
         MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, TableStructureAxis,
         validate_sheet_print_settings, validate_table_structure, write_columns,
@@ -271,6 +273,7 @@ impl SpreadsheetBuilder {
             print_settings: Default::default(),
             title: None,
             description: None,
+            table_source: None,
             scenario: None,
             protection: crate::ods::SheetProtection::default(),
         };
@@ -1065,6 +1068,24 @@ impl SpreadsheetBuilder {
         Ok(self)
     }
 
+    /// Set or clear the current sheet's inert external linked-table metadata.
+    pub fn set_sheet_table_source(
+        &mut self,
+        table_source: Option<SheetTableSource>,
+    ) -> Result<&mut Self> {
+        if let Some(source) = &table_source {
+            validate_table_source(source)?;
+        }
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        self.sheets
+            .last_mut()
+            .expect("default sheet was added")
+            .table_source = table_source;
+        Ok(self)
+    }
+
     /// Set or clear the current sheet's what-if scenario metadata.
     pub fn set_sheet_scenario(&mut self, scenario: Option<SheetScenario>) -> Result<&mut Self> {
         if let Some(scenario) = &scenario {
@@ -1240,6 +1261,7 @@ impl SpreadsheetBuilder {
             out,
             sheet.title.as_deref(),
             sheet.description.as_deref(),
+            sheet.table_source.as_ref(),
             sheet.scenario.as_ref(),
         )?;
         write_sheet_options(out, &sheet.protection.options);
@@ -1371,6 +1393,7 @@ impl SpreadsheetBuilder {
         out.push_str(of_ns);
         let has_annotations = self.has_annotations();
         let has_validation_event_listeners = self.has_validation_event_listeners();
+        let has_table_sources = self.sheets.iter().any(|sheet| sheet.table_source.is_some());
         let has_protection_extensions = has_protection_extensions(
             &self.protection,
             self.sheets.iter().map(|sheet| &sheet.protection),
@@ -1380,9 +1403,9 @@ impl SpreadsheetBuilder {
         }
         if has_validation_event_listeners {
             out.push_str(r#" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0""#);
-            if !has_annotations {
-                out.push_str(r#" xmlns:xlink="http://www.w3.org/1999/xlink""#);
-            }
+        }
+        if (has_validation_event_listeners || has_table_sources) && !has_annotations {
+            out.push_str(r#" xmlns:xlink="http://www.w3.org/1999/xlink""#);
         }
         if has_protection_extensions && !has_annotations {
             out.push_str(r#" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0""#);
@@ -1883,6 +1906,7 @@ mod tests {
             print_settings: Default::default(),
             title: None,
             description: None,
+            table_source: None,
             scenario: None,
             protection: crate::ods::SheetProtection::default(),
         };
@@ -2327,11 +2351,17 @@ mod tests {
         scenario.border_color = Some("#A1b2C3".to_string());
         scenario.copy_formulas = Some(true);
         scenario.comment = Some("Best & worst".to_string());
+        let mut source = SheetTableSource::new("../Source & Data.ods");
+        source.mode = Some(crate::ods::TableSourceMode::CopyResultsOnly);
+        source.table_name = Some("Source <Sheet>".to_string());
+        source.refresh_delay = Some("PT30M".to_string());
         let mut builder = SpreadsheetBuilder::new();
         builder
             .set_sheet_title(Some("Quarter & Forecast".to_string()))
             .unwrap()
             .set_sheet_description(Some("Best < worst".to_string()))
+            .unwrap()
+            .set_sheet_table_source(Some(source.clone()))
             .unwrap()
             .set_sheet_scenario(Some(scenario.clone()))
             .unwrap();
@@ -2340,6 +2370,7 @@ mod tests {
         let sheets = spreadsheet.sheets().unwrap();
         assert_eq!(sheets[0].title.as_deref(), Some("Quarter & Forecast"));
         assert_eq!(sheets[0].description.as_deref(), Some("Best < worst"));
+        assert_eq!(sheets[0].table_source.as_ref(), Some(&source));
         assert_eq!(sheets[0].scenario.as_ref(), Some(&scenario));
     }
 
@@ -2350,6 +2381,13 @@ mod tests {
         assert!(
             SpreadsheetBuilder::new()
                 .set_sheet_scenario(Some(scenario))
+                .is_err()
+        );
+        let mut source = SheetTableSource::new("source.ods");
+        source.refresh_delay = Some("every hour".to_string());
+        assert!(
+            SpreadsheetBuilder::new()
+                .set_sheet_table_source(Some(source))
                 .is_err()
         );
     }

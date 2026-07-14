@@ -7,7 +7,8 @@ use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
     Cell, CellAnnotation, CellValue, Column, ContentValidation, NamedDefinition,
     NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings,
-    SheetScenario, SheetStyle, Spreadsheet, SpreadsheetProtection, TableStructure, TableVisibility,
+    SheetScenario, SheetStyle, SheetTableSource, Spreadsheet, SpreadsheetProtection,
+    TableStructure, TableVisibility,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     named_expression::{ensure_unique, write_named_definitions},
@@ -16,6 +17,7 @@ use crate::ods::{
         write_spreadsheet_attributes,
     },
     scenario::{validate_scenario, write_sheet_preamble},
+    source::validate_table_source,
     structure::{
         MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, TableStructureAxis,
         validate_sheet_print_settings, validate_table_structure, write_columns,
@@ -381,6 +383,7 @@ impl MutableSpreadsheet {
             print_settings: Default::default(),
             title: None,
             description: None,
+            table_source: None,
             scenario: None,
             protection: crate::ods::SheetProtection::default(),
         };
@@ -976,6 +979,22 @@ impl MutableSpreadsheet {
         Ok(())
     }
 
+    /// Set or clear a sheet's inert external linked-table metadata.
+    pub fn set_sheet_table_source(
+        &mut self,
+        sheet_index: usize,
+        table_source: Option<SheetTableSource>,
+    ) -> Result<()> {
+        if let Some(source) = &table_source {
+            validate_table_source(source)?;
+        }
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        sheet.table_source = table_source;
+        Ok(())
+    }
+
     /// Set or clear a sheet's what-if scenario metadata.
     pub fn set_sheet_scenario(
         &mut self,
@@ -1107,6 +1126,7 @@ impl MutableSpreadsheet {
                 &mut body,
                 sheet.title.as_deref(),
                 sheet.description.as_deref(),
+                sheet.table_source.as_ref(),
                 sheet.scenario.as_ref(),
             )?;
             write_sheet_options(&mut body, &sheet.protection.options);
@@ -1171,6 +1191,7 @@ impl MutableSpreadsheet {
         out.push_str(of_ns);
         let has_annotations = self.has_annotations();
         let has_validation_event_listeners = self.has_validation_event_listeners();
+        let has_table_sources = self.sheets.iter().any(|sheet| sheet.table_source.is_some());
         let has_protection_extensions = has_protection_extensions(
             &self.protection,
             self.sheets.iter().map(|sheet| &sheet.protection),
@@ -1180,9 +1201,9 @@ impl MutableSpreadsheet {
         }
         if has_validation_event_listeners {
             out.push_str(r#" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0""#);
-            if !has_annotations {
-                out.push_str(r#" xmlns:xlink="http://www.w3.org/1999/xlink""#);
-            }
+        }
+        if (has_validation_event_listeners || has_table_sources) && !has_annotations {
+            out.push_str(r#" xmlns:xlink="http://www.w3.org/1999/xlink""#);
         }
         if has_protection_extensions && !has_annotations {
             out.push_str(r#" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0""#);
@@ -1197,9 +1218,9 @@ impl MutableSpreadsheet {
             }
             if has_validation_event_listeners {
                 declared.extend(["script", "presentation"]);
-                if !has_annotations {
-                    declared.push("xlink");
-                }
+            }
+            if (has_validation_event_listeners || has_table_sources) && !has_annotations {
+                declared.push("xlink");
             }
             if has_protection_extensions && !has_annotations {
                 declared.push("loext");
@@ -1686,6 +1707,9 @@ mod tests {
         let mut scenario = SheetScenario::new(vec![".A1:.C3".to_string()], false).unwrap();
         scenario.display_border = Some(true);
         scenario.comment = Some("Mutable & safe".to_string());
+        let mut source = SheetTableSource::new("../mutable.ods");
+        source.filter_options = Some("A&B".to_string());
+        source.actuate_on_request = true;
         let mut mutable = MutableSpreadsheet::new();
         mutable.add_sheet("Scenario").unwrap();
         mutable
@@ -1693,6 +1717,9 @@ mod tests {
             .unwrap();
         mutable
             .set_sheet_description(0, Some("Mutable description".to_string()))
+            .unwrap();
+        mutable
+            .set_sheet_table_source(0, Some(source.clone()))
             .unwrap();
         mutable
             .set_sheet_scenario(0, Some(scenario.clone()))
@@ -1705,6 +1732,7 @@ mod tests {
             sheets[0].description.as_deref(),
             Some("Mutable description")
         );
+        assert_eq!(sheets[0].table_source.as_ref(), Some(&source));
         assert_eq!(sheets[0].scenario.as_ref(), Some(&scenario));
     }
 }

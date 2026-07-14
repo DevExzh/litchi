@@ -3,9 +3,11 @@
 use super::{
     Cell, CellMatrixSpan, CellMerge, CellValue, Column, NamedDefinition, NamedDefinitionScope,
     NamedExpression, NamedRange, NamedRangeUsage, Row, Sheet, SheetPrintSettings, SheetScenario,
-    SheetStyle, TableGroup, TableRange, TableStructure, TableVisibility,
+    SheetStyle, SheetTableSource, TableGroup, TableRange, TableSourceMode, TableStructure,
+    TableVisibility,
     annotation::{AnnotationBuilder, decode_reference},
     scenario::validate_scenario,
+    source::validate_table_source,
     structure::{
         MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, MAX_TABLE_STRUCTURE_DEPTH,
         split_cell_range_addresses,
@@ -26,6 +28,7 @@ const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0
 const TABLE_NAMESPACE_URI: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+const XLINK_NAMESPACE: &str = "http://www.w3.org/1999/xlink";
 const MAX_EXPANDED_CELLS_PER_ROW: usize = 1_048_576;
 const MAX_EXPANDED_CELLS_PER_SHEET: usize = 4_194_304;
 
@@ -111,6 +114,20 @@ impl OdsParser {
                             e.name().as_ref(),
                             &document_namespaces,
                             TABLE_NAMESPACE_URI,
+                            "table-source",
+                        )
+                    {
+                        let source =
+                            Self::parse_table_source(e, reader.decoder(), &document_namespaces)?;
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            sheet.set_table_source(source)?;
+                        }
+                    } else if current_sheet.is_some()
+                        && current_row.is_none()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
                             "title",
                         )
                     {
@@ -151,10 +168,9 @@ impl OdsParser {
                     {
                         let scenario =
                             Self::parse_scenario(e, reader.decoder(), &document_namespaces)?;
-                        current_sheet
-                            .as_mut()
-                            .expect("active sheet was checked")
-                            .set_scenario(scenario)?;
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            sheet.set_scenario(scenario)?;
+                        }
                     } else if current_row.is_none()
                         && Self::element_name_is(
                             e.name().as_ref(),
@@ -322,6 +338,20 @@ impl OdsParser {
                     {
                         if let Some(sheet) = current_sheet.as_mut() {
                             sheet.set_description(String::new())?;
+                        }
+                    } else if current_sheet.is_some()
+                        && current_row.is_none()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "table-source",
+                        )
+                    {
+                        let source =
+                            Self::parse_table_source(e, reader.decoder(), &document_namespaces)?;
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            sheet.set_table_source(source)?;
                         }
                     } else if current_sheet.is_some()
                         && current_row.is_none()
@@ -1201,6 +1231,106 @@ impl OdsParser {
         Ok(scenario)
     }
 
+    fn parse_table_source(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<SheetTableSource> {
+        let mut link_type = None;
+        let mut href = None;
+        let mut actuate_on_request = false;
+        let mut mode = None;
+        let mut table_name = None;
+        let mut filter_name = None;
+        let mut filter_options = None;
+        let mut refresh_delay = None;
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let decode = |name| Self::decode_attribute(&attribute, decoder, name);
+            if Self::attribute_name_is(attribute.key.as_ref(), namespaces, XLINK_NAMESPACE, "type")
+            {
+                link_type = Some(decode("xlink:type")?);
+            } else if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                XLINK_NAMESPACE,
+                "href",
+            ) {
+                href = Some(decode("xlink:href")?);
+            } else if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                XLINK_NAMESPACE,
+                "actuate",
+            ) {
+                let value = decode("xlink:actuate")?;
+                if value != "onRequest" {
+                    return Err(Error::InvalidFormat(format!(
+                        "invalid table source xlink:actuate '{value}'"
+                    )));
+                }
+                actuate_on_request = true;
+            } else if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                TABLE_NAMESPACE_URI,
+                "mode",
+            ) {
+                mode = Some(TableSourceMode::parse(&decode("table:mode")?)?);
+            } else if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                TABLE_NAMESPACE_URI,
+                "table-name",
+            ) {
+                table_name = Some(decode("table:table-name")?);
+            } else if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                TABLE_NAMESPACE_URI,
+                "filter-name",
+            ) {
+                filter_name = Some(decode("table:filter-name")?);
+            } else if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                TABLE_NAMESPACE_URI,
+                "filter-options",
+            ) {
+                filter_options = Some(decode("table:filter-options")?);
+            } else if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                TABLE_NAMESPACE_URI,
+                "refresh-delay",
+            ) {
+                refresh_delay = Some(decode("table:refresh-delay")?);
+            }
+        }
+        let link_type = link_type.ok_or_else(|| {
+            Error::InvalidFormat("table:table-source requires xlink:type".to_string())
+        })?;
+        if link_type != "simple" {
+            return Err(Error::InvalidFormat(format!(
+                "invalid table source xlink:type '{link_type}'"
+            )));
+        }
+        let source = SheetTableSource {
+            href: href.ok_or_else(|| {
+                Error::InvalidFormat("table:table-source requires xlink:href".to_string())
+            })?,
+            mode,
+            table_name,
+            actuate_on_request,
+            filter_name,
+            filter_options,
+            refresh_delay,
+        };
+        validate_table_source(&source)?;
+        Ok(source)
+    }
+
     fn parse_column(
         element: &BytesStart<'_>,
         decoder: Decoder,
@@ -1528,6 +1658,7 @@ pub(crate) struct SheetBuilder {
     print_settings: SheetPrintSettings,
     title: Option<String>,
     description: Option<String>,
+    table_source: Option<SheetTableSource>,
     scenario: Option<SheetScenario>,
     cell_count: usize,
 }
@@ -1553,6 +1684,7 @@ impl SheetBuilder {
             print_settings,
             title: None,
             description: None,
+            table_source: None,
             scenario: None,
             cell_count: 0,
         }
@@ -1562,6 +1694,15 @@ impl SheetBuilder {
         if self.scenario.replace(scenario).is_some() {
             return Err(Error::InvalidFormat(
                 "a table must not contain more than one scenario".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn set_table_source(&mut self, source: SheetTableSource) -> Result<()> {
+        if self.table_source.replace(source).is_some() {
+            return Err(Error::InvalidFormat(
+                "a table must not contain more than one table source".to_string(),
             ));
         }
         Ok(())
@@ -1654,6 +1795,7 @@ impl SheetBuilder {
             print_settings: self.print_settings,
             title: self.title,
             description: self.description,
+            table_source: self.table_source,
             scenario: self.scenario,
             protection: super::SheetProtection::default(),
         })
@@ -2290,11 +2432,19 @@ mod tests {
 
     #[test]
     fn parses_sheet_title_description_and_scenario() {
-        let xml = r##"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><o:body><o:spreadsheet><t:table t:name="Scenario"><t:title>Quarter &amp; Forecast</t:title><t:desc><![CDATA[Best < worst]]></t:desc><t:scenario t:scenario-ranges="$Scenario.$A$1:$B$2 'Q1 Sales'.$C$3:$D$4" t:is-active="true" t:display-border="0" t:border-color="#12AbEF" t:copy-back="1" t:copy-styles="false" t:copy-formulas="true" t:comment="Best &amp; worst" t:protected="false"/></t:table></o:spreadsheet></o:body></o:document-content>"##;
+        let xml = r##"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:l="http://www.w3.org/1999/xlink"><o:body><o:spreadsheet><t:table t:name="Scenario"><t:title>Quarter &amp; Forecast</t:title><t:desc><![CDATA[Best < worst]]></t:desc><t:table-source l:type="simple" l:href="../Q1&amp;Q2.ods" l:actuate="onRequest" t:mode="copy-results-only" t:table-name="Source Sheet" t:filter-name="calc8" t:filter-options="A&amp;B" t:refresh-delay="P1DT2H3.5S"/><t:scenario t:scenario-ranges="$Scenario.$A$1:$B$2 'Q1 Sales'.$C$3:$D$4" t:is-active="true" t:display-border="0" t:border-color="#12AbEF" t:copy-back="1" t:copy-styles="false" t:copy-formulas="true" t:comment="Best &amp; worst" t:protected="false"/></t:table></o:spreadsheet></o:body></o:document-content>"##;
         let sheets = OdsParser::parse_sheets(xml).unwrap();
         let sheet = &sheets[0];
         assert_eq!(sheet.title.as_deref(), Some("Quarter & Forecast"));
         assert_eq!(sheet.description.as_deref(), Some("Best < worst"));
+        let source = sheet.table_source.as_ref().unwrap();
+        assert_eq!(source.href, "../Q1&Q2.ods");
+        assert_eq!(source.mode, Some(TableSourceMode::CopyResultsOnly));
+        assert_eq!(source.table_name.as_deref(), Some("Source Sheet"));
+        assert!(source.actuate_on_request);
+        assert_eq!(source.filter_name.as_deref(), Some("calc8"));
+        assert_eq!(source.filter_options.as_deref(), Some("A&B"));
+        assert_eq!(source.refresh_delay.as_deref(), Some("P1DT2H3.5S"));
         let scenario = sheet.scenario.as_ref().unwrap();
         assert_eq!(
             scenario.ranges,
@@ -2356,6 +2506,24 @@ mod tests {
 
         let duplicate_descriptions = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:desc>First</table:desc><table:desc>Second</table:desc></table:table></office:spreadsheet></office:body></office:document-content>"#;
         assert!(OdsParser::parse_sheets(duplicate_descriptions).is_err());
+
+        let invalid_sources = [
+            r#"<table:table-source xlink:href="a.ods"/>"#,
+            r#"<table:table-source xlink:type="extended" xlink:href="a.ods"/>"#,
+            r#"<table:table-source xlink:type="simple"/>"#,
+            r#"<table:table-source xlink:type="simple" xlink:href="a.ods" xlink:actuate="onLoad"/>"#,
+            r#"<table:table-source xlink:type="simple" xlink:href="a.ods" table:mode="values"/>"#,
+            r#"<table:table-source xlink:type="simple" xlink:href="a.ods" table:refresh-delay="15 minutes"/>"#,
+        ];
+        for source in invalid_sources {
+            let xml = format!(
+                r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:spreadsheet><table:table>{source}</table:table></office:spreadsheet></office:body></office:document-content>"#
+            );
+            assert!(OdsParser::parse_sheets(&xml).is_err(), "{source}");
+        }
+
+        let duplicate_sources = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:spreadsheet><table:table><table:table-source xlink:type="simple" xlink:href="a.ods"/><table:table-source xlink:type="simple" xlink:href="b.ods"/></table:table></office:spreadsheet></office:body></office:document-content>"#;
+        assert!(OdsParser::parse_sheets(duplicate_sources).is_err());
     }
 
     #[test]

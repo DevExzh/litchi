@@ -1,6 +1,8 @@
 //! ODS what-if scenario metadata.
 
-use super::structure::validate_cell_range_addresses;
+use super::{
+    SheetTableSource, source::write_table_source, structure::validate_cell_range_addresses,
+};
 use litchi_core::{Error, Result, xml::escape_xml};
 
 /// What-if scenario settings attached to an ODF spreadsheet sheet.
@@ -94,6 +96,7 @@ pub(crate) fn write_sheet_preamble(
     out: &mut String,
     title: Option<&str>,
     description: Option<&str>,
+    table_source: Option<&SheetTableSource>,
     scenario: Option<&SheetScenario>,
 ) -> Result<()> {
     if let Some(title) = title {
@@ -105,6 +108,9 @@ pub(crate) fn write_sheet_preamble(
         out.push_str("<table:desc>");
         out.push_str(&escape_xml(description));
         out.push_str("</table:desc>");
+    }
+    if let Some(table_source) = table_source {
+        write_table_source(out, table_source)?;
     }
     if let Some(scenario) = scenario {
         write_scenario(out, scenario)?;

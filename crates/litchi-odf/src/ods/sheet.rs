@@ -1,7 +1,8 @@
 //! Sheet structures for ODS spreadsheets.
 
 use super::{
-    Column, Row, SheetPrintSettings, SheetProtection, SheetScenario, SheetStyle, TableStructure,
+    Column, Row, SheetPrintSettings, SheetProtection, SheetScenario, SheetStyle, SheetTableSource,
+    TableStructure,
 };
 use litchi_core::Result;
 
@@ -28,6 +29,8 @@ pub struct Sheet {
     pub title: Option<String>,
     /// Optional human-readable table description.
     pub description: Option<String>,
+    /// Optional inert external linked-table metadata.
+    pub table_source: Option<SheetTableSource>,
     /// Optional what-if scenario metadata.
     pub scenario: Option<SheetScenario>,
     /// Sheet protection metadata and edit permissions.
@@ -80,6 +83,11 @@ impl Sheet {
         self.description.as_deref()
     }
 
+    /// Get optional external linked-table metadata without dereferencing it.
+    pub fn table_source(&self) -> Option<&SheetTableSource> {
+        self.table_source.as_ref()
+    }
+
     /// Get the optional what-if scenario metadata.
     pub fn scenario(&self) -> Option<&SheetScenario> {
         self.scenario.as_ref()
@@ -123,6 +131,7 @@ mod tests {
             print_settings: Default::default(),
             title: None,
             description: None,
+            table_source: None,
             scenario: None,
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
@@ -143,6 +152,7 @@ mod tests {
             print_settings: Default::default(),
             title: None,
             description: None,
+            table_source: None,
             scenario: None,
             protection: SheetProtection::default(),
             name: "Test Sheet".to_string(),
@@ -161,6 +171,7 @@ mod tests {
             print_settings: Default::default(),
             title: None,
             description: None,
+            table_source: None,
             scenario: None,
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
@@ -196,6 +207,7 @@ mod tests {
             print_settings: Default::default(),
             title: None,
             description: None,
+            table_source: None,
             scenario: None,
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
@@ -302,6 +314,7 @@ mod tests {
             print_settings: Default::default(),
             title: None,
             description: None,
+            table_source: None,
             scenario: None,
             protection: SheetProtection::default(),
             name: "Empty".to_string(),
@@ -320,6 +333,7 @@ mod tests {
             print_settings: Default::default(),
             title: None,
             description: None,
+            table_source: None,
             scenario: None,
             protection: SheetProtection::default(),
             name: "Data".to_string(),
@@ -419,6 +433,7 @@ mod tests {
             print_settings: Default::default(),
             title: None,
             description: None,
+            table_source: None,
             scenario: None,
             protection: SheetProtection::default(),
             name: "Original".to_string(),
