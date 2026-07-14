@@ -179,8 +179,11 @@ impl<'data> EscherShape<'data> {
             let shape_type_id = sp.instance;
 
             return match shape_type_id {
-                75 if Self::has_picture_data(container) => EscherShapeType::Picture,
-                75 | 202 => EscherShapeType::TextBox,
+                // MSOSPT 75 is the frame used for pictures in binary Office files.
+                // The image normally lives in the Pictures stream and is referenced
+                // through the pib property rather than embedded in this container.
+                75 => EscherShapeType::Picture,
+                202 => EscherShapeType::TextBox,
                 1 => EscherShapeType::Rectangle,
                 3 => EscherShapeType::Ellipse,
                 20 => EscherShapeType::Line,
@@ -206,24 +209,6 @@ impl<'data> EscherShape<'data> {
         }
 
         EscherShapeType::Unknown
-    }
-
-    fn has_picture_data(container: &EscherContainer<'data>) -> bool {
-        for child in container.children().flatten() {
-            match child.record_type {
-                EscherRecordType::BlipJpeg
-                | EscherRecordType::BlipPng
-                | EscherRecordType::BlipDib
-                | EscherRecordType::BlipTiff
-                | EscherRecordType::BlipEmf
-                | EscherRecordType::BlipWmf
-                | EscherRecordType::BlipPict => {
-                    return true;
-                },
-                _ => {},
-            }
-        }
-        false
     }
 
     fn extract_shape_id(container: &EscherContainer<'data>) -> Option<u32> {

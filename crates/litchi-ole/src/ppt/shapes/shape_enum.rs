@@ -25,13 +25,13 @@ pub enum ShapeEnum<'a> {
     Placeholder(Placeholder<'a>),
     /// Auto shape (rectangle, ellipse, arrow, etc.)
     AutoShape(AutoShape<'a>),
-    /// Picture/image shape (not yet implemented)
+    /// Picture/image shape
     Picture(PictureShape),
     /// Table shape (not yet implemented)
     Table(TableShape),
-    /// Group shape containing other shapes (not yet implemented)
+    /// Group shape containing other shapes
     Group(GroupShape<'a>),
-    /// Line/connector shape (not yet implemented)
+    /// Line/connector shape
     Line(LineShape),
 }
 

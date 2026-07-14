@@ -171,13 +171,15 @@ impl<'doc> Slide<'doc> {
                     picture.set_bounds(a.left, a.top, a.width(), a.height());
                 }
 
-                // Extract blip ID from properties
+                // Extract the one-based BLIP store index from the pib property.
                 use super::super::escher::EscherPropertyId;
                 if let Some(blip_id) = escher_shape
                     .properties()
-                    .get_int(EscherPropertyId::PictureId)
+                    .get_int(EscherPropertyId::BlipToDisplay)
+                    .and_then(|value| u32::try_from(value).ok())
+                    .filter(|value| *value != 0)
                 {
-                    picture.set_blip_id(blip_id as u32);
+                    picture.set_blip_id(blip_id);
                 }
 
                 Some(ShapeEnum::Picture(picture))
@@ -498,6 +500,34 @@ mod tests {
     use crate::ppt::records::PptRecord;
     use crate::ppt::slide::SlideData;
 
+    fn create_picture_escher_drawing(blip_id: u32) -> Vec<u8> {
+        use crate::escher::writer::{
+            PropertyBuilder, ShapeBuilder, record_type, write_client_anchor, write_container,
+        };
+
+        let mut shape_children = Vec::new();
+        ShapeBuilder::new(75, 42)
+            .write(&mut shape_children)
+            .unwrap();
+        let mut properties = PropertyBuilder::new();
+        properties.add_simple(0x4104, blip_id as i32);
+        properties.write(&mut shape_children).unwrap();
+        write_client_anchor(&mut shape_children, 10, 20, 210, 120).unwrap();
+
+        let mut shape_container = Vec::new();
+        write_container(
+            &mut shape_container,
+            0,
+            record_type::SP_CONTAINER,
+            &shape_children,
+        )
+        .unwrap();
+
+        let mut drawing = Vec::new();
+        write_container(&mut drawing, 0, record_type::DG_CONTAINER, &shape_container).unwrap();
+        drawing
+    }
+
     // Helper function to create a test record
     fn create_test_record(
         record_type: PptRecordType,
@@ -810,6 +840,28 @@ mod tests {
         // Should return empty vec for slide without PPDrawing
         let shapes = slide.shapes().unwrap();
         assert_eq!(shapes.len(), 0);
+    }
+
+    #[test]
+    fn referenced_picture_frame_is_exposed_as_picture_shape() {
+        let doc_data = vec![0u8; 32];
+        let ppdrawing = create_test_record(
+            PptRecordType::PPDrawing,
+            create_picture_escher_drawing(7),
+            Vec::new(),
+        );
+        let record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
+
+        let shapes = slide.shapes().unwrap();
+        assert_eq!(shapes.len(), 1);
+        let picture = shapes[0].as_picture().expect("picture frame");
+        assert_eq!(picture.properties.id, 42);
+        assert_eq!(picture.blip_id(), Some(7));
+        assert_eq!(picture.properties.x, 10);
+        assert_eq!(picture.properties.y, 20);
+        assert_eq!(picture.properties.width, 200);
+        assert_eq!(picture.properties.height, 100);
     }
 
     #[test]
