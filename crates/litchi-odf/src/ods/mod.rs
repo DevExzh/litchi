@@ -71,6 +71,7 @@ mod protection;
 mod row;
 mod sheet;
 mod spreadsheet;
+mod style_protection;
 
 pub use annotation::{AnnotationElement, AnnotationNode, CellAnnotation};
 pub use builder::SpreadsheetBuilder;
@@ -92,6 +93,7 @@ pub use protection::{
 pub use row::Row;
 pub use sheet::Sheet;
 pub use spreadsheet::Spreadsheet;
+pub use style_protection::CellStyleProtection;
 
 // Re-export formula types for public API
 #[allow(unused_imports)] // Public API exports

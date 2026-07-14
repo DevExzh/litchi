@@ -565,6 +565,7 @@ impl OdsParser {
         let mut currency = None;
         let mut formula = None;
         let mut validation_name = None;
+        let mut style_name = None;
         let mut protect = None;
         let mut protected = None;
         let mut repeated = 1;
@@ -608,6 +609,15 @@ impl OdsParser {
                             .into_owned(),
                     );
                 },
+                b"table:style-name" => {
+                    style_name = Some(
+                        attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+                            .map_err(|error| {
+                                Error::InvalidFormat(format!("invalid cell style name: {error}"))
+                            })?
+                            .into_owned(),
+                    );
+                },
                 b"table:protect" => {
                     protect = Some(Self::parse_bool_attribute(&attr, decoder)?);
                 },
@@ -632,6 +642,7 @@ impl OdsParser {
             currency,
             formula,
             validation_name,
+            style_name,
             protect,
             protected,
             repeated,
@@ -725,6 +736,7 @@ pub(crate) struct CellBuilder {
     currency: Option<String>,
     formula: Option<String>,
     validation_name: Option<String>,
+    style_name: Option<String>,
     protect: Option<bool>,
     protected: Option<bool>,
     repeated: usize,
@@ -742,6 +754,7 @@ impl CellBuilder {
             formula: self.formula.clone(),
             annotation: self.annotation.clone(),
             validation_name: self.validation_name.clone(),
+            style_name: self.style_name.clone(),
             protect: self.protect,
             protected: self.protected,
             row: 0, // Will be set by parent
@@ -1160,6 +1173,7 @@ mod tests {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                style_name: None,
                 protect: None,
                 protected: None,
                 row: 0,
@@ -1186,6 +1200,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             row: 0,
@@ -1199,6 +1214,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             row: 0,
@@ -1222,6 +1238,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             repeated: 1,
@@ -1240,6 +1257,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             repeated: 1,
@@ -1258,6 +1276,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             repeated: 1,
@@ -1278,6 +1297,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             repeated: 1,
@@ -1299,6 +1319,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             repeated: 1,
@@ -1317,6 +1338,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             repeated: 1,
@@ -1337,6 +1359,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             repeated: 1,
@@ -1357,6 +1380,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             repeated: 1,

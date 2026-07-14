@@ -13,6 +13,7 @@ use crate::ods::{
         has_extensions as has_protection_extensions, write_sheet_attributes, write_sheet_options,
         write_spreadsheet_attributes,
     },
+    style_protection::{AutomaticStylesFragment, extract_automatic_styles},
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
@@ -43,6 +44,8 @@ pub struct MutableSpreadsheet {
     mimetype: String,
     /// Original styles XML
     styles_xml: Option<String>,
+    /// Original content automatic styles, including unsupported style properties.
+    automatic_styles: Option<AutomaticStylesFragment>,
     /// Global and sheet-local named ranges and expressions.
     named_definitions: Vec<NamedDefinition>,
     content_validations: Vec<ContentValidation>,
@@ -104,6 +107,8 @@ impl MutableSpreadsheet {
     /// # }
     /// ```
     pub fn from_spreadsheet(mut spreadsheet: Spreadsheet) -> Result<Self> {
+        let styles_xml = spreadsheet.styles_xml().map(str::to_owned);
+        let automatic_styles = extract_automatic_styles(spreadsheet.content_xml())?;
         let sheets = spreadsheet.sheets()?;
         let metadata = spreadsheet.metadata()?;
         let named_definitions = spreadsheet.named_definitions().to_vec();
@@ -111,15 +116,12 @@ impl MutableSpreadsheet {
         let protection = spreadsheet.protection().clone();
         let mimetype = "application/vnd.oasis.opendocument.spreadsheet".to_string();
 
-        // Extract styles XML from the spreadsheet's package (requires accessing internal package)
-        // For now, we'll use None and rely on default styles
-        // TODO: Add method to Spreadsheet to expose get_file for extracting styles.xml
-
         Ok(Self {
             sheets,
             metadata,
             mimetype,
-            styles_xml: None,
+            styles_xml,
+            automatic_styles,
             named_definitions,
             content_validations,
             protection,
@@ -133,6 +135,7 @@ impl MutableSpreadsheet {
             metadata: Metadata::default(),
             mimetype: "application/vnd.oasis.opendocument.spreadsheet".to_string(),
             styles_xml: None,
+            automatic_styles: None,
             named_definitions: Vec::new(),
             content_validations: Vec::new(),
             protection: SpreadsheetProtection::default(),
@@ -453,6 +456,7 @@ impl MutableSpreadsheet {
                     formula: None,
                     annotation: None,
                     validation_name: None,
+                    style_name: None,
                     protect: None,
                     protected: None,
                     row,
@@ -507,6 +511,7 @@ impl MutableSpreadsheet {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                style_name: None,
                 protect: None,
                 protected: None,
                 row,
@@ -568,6 +573,7 @@ impl MutableSpreadsheet {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                style_name: None,
                 protect: None,
                 protected: None,
                 row,
@@ -621,6 +627,7 @@ impl MutableSpreadsheet {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                style_name: None,
                 protect: None,
                 protected: None,
                 row,
@@ -629,6 +636,59 @@ impl MutableSpreadsheet {
         }
         row_data.cells[col].set_protection(protect, protected);
         Ok(())
+    }
+
+    /// Apply a table-cell style name to a cell.
+    pub fn set_cell_style_name(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+        style_name: impl Into<String>,
+    ) -> Result<()> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        while sheet.rows.len() <= row {
+            sheet.rows.push(Row {
+                cells: Vec::new(),
+                index: sheet.rows.len(),
+            });
+        }
+        let row_data = &mut sheet.rows[row];
+        while row_data.cells.len() <= col {
+            row_data.cells.push(Cell {
+                value: CellValue::Empty,
+                text: String::new(),
+                formula: None,
+                annotation: None,
+                validation_name: None,
+                style_name: None,
+                protect: None,
+                protected: None,
+                row,
+                col: row_data.cells.len(),
+            });
+        }
+        row_data.cells[col].set_style_name(style_name);
+        Ok(())
+    }
+
+    /// Remove and return a cell's directly applied table-cell style name.
+    pub fn clear_cell_style_name(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+    ) -> Result<Option<String>> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        Ok(sheet
+            .rows
+            .get_mut(row)
+            .and_then(|row| row.cells.get_mut(col))
+            .and_then(|cell| cell.style_name.take()))
     }
 
     /// Clear a cell value.
@@ -770,9 +830,32 @@ impl MutableSpreadsheet {
         if has_protection_extensions && !has_annotations {
             out.push_str(r#" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0""#);
         }
-        out.push_str(
-            r#" office:version="1.3"><office:font-face-decls/><office:automatic-styles/><office:body><office:spreadsheet"#,
-        );
+        if let Some(automatic_styles) = &self.automatic_styles {
+            let mut declared = vec!["office", "table", "text"];
+            if self.has_formulas() {
+                declared.push("of");
+            }
+            if has_annotations {
+                declared.extend(["dc", "meta", "draw", "svg", "xlink", "fo", "style", "loext"]);
+            }
+            if has_validation_event_listeners {
+                declared.extend(["script", "presentation"]);
+                if !has_annotations {
+                    declared.push("xlink");
+                }
+            }
+            if has_protection_extensions && !has_annotations {
+                declared.push("loext");
+            }
+            automatic_styles.write_missing_namespaces(&mut out, declared);
+        }
+        out.push_str(r#" office:version="1.3"><office:font-face-decls/>"#);
+        if let Some(automatic_styles) = &self.automatic_styles {
+            out.push_str(&automatic_styles.xml);
+        } else {
+            out.push_str("<office:automatic-styles/>");
+        }
+        out.push_str("<office:body><office:spreadsheet");
         write_spreadsheet_attributes(&mut out, &self.protection);
         out.push('>');
         out.push_str(&body);
@@ -828,9 +911,21 @@ impl Default for MutableSpreadsheet {
 mod tests {
     use super::*;
     use crate::ods::{
-        NamedRangeUsage, SpreadsheetBuilder, ValidationDisplayList, ValidationErrorMacro,
-        ValidationEventListener, ValidationScriptEventListener,
+        CellStyleProtection, NamedRangeUsage, SpreadsheetBuilder, ValidationDisplayList,
+        ValidationErrorMacro, ValidationEventListener, ValidationScriptEventListener,
     };
+
+    fn package_with_cell_styles() -> Vec<u8> {
+        let content = r##"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:f="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" office:version="1.3"><office:font-face-decls/><o:automatic-styles><s:style s:name="Auto&amp;Locked" s:family="table-cell" s:parent-style-name="Named&amp;Locked"><s:table-cell-properties f:background-color="#fff"/></s:style></o:automatic-styles><office:body><office:spreadsheet><table:table table:name="Sheet1"><table:table-row><table:table-cell table:style-name="Auto&amp;Locked"/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"##;
+        let styles = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.3"><office:styles><style:style style:name="Named&amp;Locked" style:family="table-cell"><style:table-cell-properties style:cell-protect="protected"/></style:style></office:styles></office:document-styles>"#;
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.spreadsheet")
+            .unwrap();
+        writer.add_file("content.xml", content.as_bytes()).unwrap();
+        writer.add_file("styles.xml", styles.as_bytes()).unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
 
     #[test]
     fn mutable_spreadsheet_preserves_and_edits_named_definitions() {
@@ -985,5 +1080,35 @@ mod tests {
         assert_eq!(sheets[0].protection.options.use_pivot, Some(true));
         assert_eq!(sheets[0].rows[1].cells[1].protect(), Some(true));
         assert_eq!(sheets[0].rows[1].cells[1].protected(), Some(false));
+    }
+
+    #[test]
+    fn mutable_spreadsheet_preserves_and_resolves_cell_styles() {
+        let mut spreadsheet = Spreadsheet::from_bytes(package_with_cell_styles()).unwrap();
+        let sheets = spreadsheet.sheets().unwrap();
+        let cell = &sheets[0].rows[0].cells[0];
+        assert_eq!(cell.style_name(), Some("Auto&Locked"));
+        assert_eq!(
+            spreadsheet.cell_style_protection(cell).unwrap(),
+            Some(CellStyleProtection::Protected)
+        );
+
+        let mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
+        let bytes = mutable.to_bytes().unwrap();
+        let package = crate::core::OwnedPackage::from_bytes(bytes.clone()).unwrap();
+        let content = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
+        let styles = String::from_utf8(package.get_file("styles.xml").unwrap()).unwrap();
+        assert!(content.contains(r##"f:background-color="#fff""##));
+        assert!(content.contains(r#"table:style-name="Auto&amp;Locked""#));
+        assert!(styles.contains(r#"style:name="Named&amp;Locked""#));
+
+        let mut output = Spreadsheet::from_bytes(bytes).unwrap();
+        let sheets = output.sheets().unwrap();
+        let cell = &sheets[0].rows[0].cells[0];
+        assert_eq!(cell.style_name(), Some("Auto&Locked"));
+        assert_eq!(
+            output.cell_style_protection(cell).unwrap(),
+            Some(CellStyleProtection::Protected)
+        );
     }
 }

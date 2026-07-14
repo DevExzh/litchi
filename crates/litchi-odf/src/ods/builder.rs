@@ -300,6 +300,7 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                style_name: None,
                 protect: None,
                 protected: None,
                 row: row_index,
@@ -357,6 +358,7 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                style_name: None,
                 protect: None,
                 protected: None,
                 row: row_index,
@@ -429,6 +431,7 @@ impl SpreadsheetBuilder {
                     formula: None,
                     annotation: None,
                     validation_name: None,
+                    style_name: None,
                     protect: None,
                     protected: None,
                     row: row_index,
@@ -494,6 +497,7 @@ impl SpreadsheetBuilder {
                     formula: None,
                     annotation: None,
                     validation_name: None,
+                    style_name: None,
                     protect: None,
                     protected: None,
                     row,
@@ -515,6 +519,7 @@ impl SpreadsheetBuilder {
 
             let annotation = row_data.cells[col].annotation.take();
             let validation_name = row_data.cells[col].validation_name.take();
+            let style_name = row_data.cells[col].style_name.take();
             let protect = row_data.cells[col].protect;
             let protected = row_data.cells[col].protected;
             row_data.cells[col] = Cell {
@@ -523,6 +528,7 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation,
                 validation_name,
+                style_name,
                 protect,
                 protected,
                 row,
@@ -577,6 +583,7 @@ impl SpreadsheetBuilder {
                     formula: None,
                     annotation: None,
                     validation_name: None,
+                    style_name: None,
                     protect: None,
                     protected: None,
                     row,
@@ -619,6 +626,7 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                style_name: None,
                 protect: None,
                 protected: None,
                 row,
@@ -677,6 +685,7 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                style_name: None,
                 protect: None,
                 protected: None,
                 row,
@@ -723,6 +732,7 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                style_name: None,
                 protect: None,
                 protected: None,
                 row,
@@ -731,6 +741,52 @@ impl SpreadsheetBuilder {
         }
         row_data.cells[col].set_protection(protect, protected);
         Ok(self)
+    }
+
+    /// Apply a table-cell style name to a cell in the current sheet.
+    pub fn set_cell_style_name(
+        &mut self,
+        row: usize,
+        col: usize,
+        style_name: impl Into<String>,
+    ) -> Result<&mut Self> {
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        let sheet = self.sheets.last_mut().expect("default sheet was added");
+        while sheet.rows.len() <= row {
+            sheet.rows.push(Row {
+                cells: Vec::new(),
+                index: sheet.rows.len(),
+            });
+        }
+        let row_data = &mut sheet.rows[row];
+        while row_data.cells.len() <= col {
+            row_data.cells.push(Cell {
+                text: String::new(),
+                value: CellValue::Empty,
+                formula: None,
+                annotation: None,
+                validation_name: None,
+                style_name: None,
+                protect: None,
+                protected: None,
+                row,
+                col: row_data.cells.len(),
+            });
+        }
+        row_data.cells[col].set_style_name(style_name);
+        Ok(self)
+    }
+
+    /// Remove and return the table-cell style name applied to a cell.
+    pub fn clear_cell_style_name(&mut self, row: usize, col: usize) -> Result<Option<String>> {
+        Ok(self
+            .sheets
+            .last_mut()
+            .and_then(|sheet| sheet.rows.get_mut(row))
+            .and_then(|row| row.cells.get_mut(col))
+            .and_then(|cell| cell.style_name.take()))
     }
 
     /// Select a specific sheet by index for subsequent operations
@@ -1424,6 +1480,7 @@ mod tests {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                style_name: None,
                 protect: None,
                 protected: None,
                 row: 0,
@@ -1435,6 +1492,7 @@ mod tests {
                 formula: None,
                 annotation: None,
                 validation_name: None,
+                style_name: None,
                 protect: None,
                 protected: None,
                 row: 0,

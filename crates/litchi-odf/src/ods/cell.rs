@@ -42,6 +42,8 @@ pub struct Cell {
     pub annotation: Option<CellAnnotation>,
     /// Name of the document-level content validation applied to this cell.
     pub validation_name: Option<String>,
+    /// Name of the ODF table-cell style applied directly to this cell.
+    pub style_name: Option<String>,
     /// Legacy ODF `table:protect` state, preserved independently when present.
     pub protect: Option<bool>,
     /// ODF `table:protected` state, preserved independently when present.
@@ -127,6 +129,21 @@ impl Cell {
     /// Remove the content-validation reference from this cell.
     pub fn clear_validation(&mut self) {
         self.validation_name = None;
+    }
+
+    /// Return the directly applied table-cell style name.
+    pub fn style_name(&self) -> Option<&str> {
+        self.style_name.as_deref()
+    }
+
+    /// Apply a named table-cell style.
+    pub fn set_style_name(&mut self, name: impl Into<String>) {
+        self.style_name = Some(name.into());
+    }
+
+    /// Remove the directly applied table-cell style reference.
+    pub fn clear_style_name(&mut self) {
+        self.style_name = None;
     }
 
     /// Return the legacy `table:protect` state.
@@ -304,6 +321,11 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
         output.push_str(&escape_xml(validation_name));
         output.push('"');
     }
+    if let Some(style_name) = &cell.style_name {
+        output.push_str(" table:style-name=\"");
+        output.push_str(&escape_xml(style_name));
+        output.push('"');
+    }
     if let Some(protect) = cell.protect {
         output.push_str(if protect {
             " table:protect=\"true\""
@@ -445,6 +467,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             row: 0,
@@ -463,6 +486,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             row: 0,
@@ -479,6 +503,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             row: 0,
@@ -498,6 +523,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             row: 0,
@@ -511,6 +537,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             row: 0,
@@ -524,6 +551,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             row: 0,
@@ -537,6 +565,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             row: 0,
@@ -553,6 +582,7 @@ mod tests {
             formula: Some("=A1+B1".to_string()),
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             row: 0,
@@ -569,6 +599,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             row: 0,
@@ -585,6 +616,7 @@ mod tests {
             formula: Some("=A1".to_string()),
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             row: 0,
@@ -598,6 +630,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             row: 0,
@@ -614,6 +647,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             row: 5,
@@ -630,6 +664,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             row: 0,
@@ -643,6 +678,7 @@ mod tests {
             formula: None,
             annotation: None,
             validation_name: None,
+            style_name: None,
             protect: None,
             protected: None,
             row: 0,

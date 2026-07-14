@@ -2,8 +2,11 @@
 
 use super::{
     ContentValidation, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Sheet,
-    SheetProtection, SpreadsheetProtection, data_validation::parse_content_validations,
-    parser::OdsParser, protection::parse_protection,
+    SheetProtection, SpreadsheetProtection,
+    data_validation::parse_content_validations,
+    parser::OdsParser,
+    protection::parse_protection,
+    style_protection::{CellStyleProtection, CellStyleRegistry},
 };
 use crate::core::{Content, Meta, OwnedPackage, Styles};
 use litchi_core::{Error, Metadata, Result};
@@ -47,9 +50,18 @@ pub struct Spreadsheet {
     content_validations: Vec<ContentValidation>,
     protection: SpreadsheetProtection,
     sheet_protections: Vec<SheetProtection>,
+    cell_styles: CellStyleRegistry,
 }
 
 impl Spreadsheet {
+    pub(crate) fn content_xml(&self) -> &str {
+        self.content.xml_content()
+    }
+
+    pub(crate) fn styles_xml(&self) -> Option<&str> {
+        self.styles.as_ref().map(Styles::xml_content)
+    }
+
     /// Open an ODS spreadsheet from a file path.
     ///
     /// # Arguments
@@ -122,6 +134,10 @@ impl Spreadsheet {
         } else {
             None
         };
+        let cell_styles = CellStyleRegistry::parse(
+            styles.as_ref().map(Styles::xml_content),
+            content.xml_content(),
+        )?;
 
         let meta = if package.has_file("meta.xml") {
             let meta_bytes = package.get_file("meta.xml")?;
@@ -139,6 +155,7 @@ impl Spreadsheet {
             content_validations,
             protection,
             sheet_protections,
+            cell_styles,
         })
     }
 
@@ -211,6 +228,11 @@ impl Spreadsheet {
     /// Return document-structure protection metadata.
     pub fn protection(&self) -> &SpreadsheetProtection {
         &self.protection
+    }
+
+    /// Resolve the inherited `style:cell-protect` value for a cell.
+    pub fn cell_style_protection(&self, cell: &super::Cell) -> Result<Option<CellStyleProtection>> {
+        self.cell_styles.resolve(cell.style_name())
     }
 
     /// Return all named ranges, including global and sheet-local ranges.
