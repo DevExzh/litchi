@@ -1,4 +1,5 @@
 /// Table, Row, and Cell structures for Word documents.
+use crate::docx::namespace::scan_word_element_ranges;
 use crate::docx::paragraph::{Paragraph, extract_word_text};
 use crate::error::{OoxmlError, Result};
 use litchi_core::XmlSlice;
@@ -25,6 +26,20 @@ impl XmlData {
             XmlData::Shared(s) => s.as_bytes(),
         }
     }
+
+    #[inline]
+    fn get_or_create_arc(&self) -> (Arc<Vec<u8>>, u32) {
+        match self {
+            XmlData::Owned(bytes) => (Arc::new(bytes.to_vec()), 0),
+            XmlData::Shared(slice) => (slice.arc(), slice.start()),
+        }
+    }
+}
+
+fn absolute_start(base_offset: u32, relative_start: u32) -> Result<u32> {
+    base_offset.checked_add(relative_start).ok_or_else(|| {
+        OoxmlError::InvalidFormat("Word table element offset exceeds u32".to_string())
+    })
 }
 
 /// Vertical merge state for table cells.
@@ -108,22 +123,11 @@ impl Table {
 
     /// Get the number of rows in this table.
     pub fn row_count(&self) -> Result<usize> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
-
         let mut count = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) if e.local_name().as_ref() == b"tr" => {
-                    count += 1;
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_word_element_ranges(self.xml_bytes(), &[b"tr".as_slice()], |_, _, _| {
+            count += 1;
+            Ok(())
+        })?;
         Ok(count)
     }
 
@@ -157,80 +161,16 @@ impl Table {
 
     /// Parse rows from XML (internal method).
     fn parse_rows(&self) -> Result<SmallVec<[Row; 16]>> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
-
-        // Use SmallVec for efficient storage of row collections
+        let (source, base_offset) = self.xml_data.get_or_create_arc();
         let mut rows = SmallVec::new();
-        let mut current_row_xml = Vec::with_capacity(4096); // Pre-allocate for row XML (increased from 2048)
-        let mut in_row = false;
-        let mut depth = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"tr" && !in_row {
-                        in_row = true;
-                        depth = 1;
-                        current_row_xml.clear();
-                        current_row_xml.extend_from_slice(b"<w:tr");
-                        for attr in e.attributes().flatten() {
-                            current_row_xml.push(b' ');
-                            current_row_xml.extend_from_slice(attr.key.as_ref());
-                            current_row_xml.extend_from_slice(b"=\"");
-                            current_row_xml.extend_from_slice(&attr.value);
-                            current_row_xml.push(b'"');
-                        }
-                        current_row_xml.push(b'>');
-                    } else if in_row {
-                        depth += 1;
-                        current_row_xml.push(b'<');
-                        current_row_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_row_xml.push(b' ');
-                            current_row_xml.extend_from_slice(attr.key.as_ref());
-                            current_row_xml.extend_from_slice(b"=\"");
-                            current_row_xml.extend_from_slice(&attr.value);
-                            current_row_xml.push(b'"');
-                        }
-                        current_row_xml.push(b'>');
-                    }
-                },
-                Ok(Event::End(e)) if in_row => {
-                    current_row_xml.extend_from_slice(b"</");
-                    current_row_xml.extend_from_slice(e.name().as_ref());
-                    current_row_xml.push(b'>');
-
-                    depth -= 1;
-                    if depth == 0 && e.local_name().as_ref() == b"tr" {
-                        // Clone bytes and clear buffer (preserves capacity for next row)
-                        let row_xml = current_row_xml.clone();
-                        current_row_xml.clear();
-                        rows.push(Row::new(row_xml));
-                        in_row = false;
-                    }
-                },
-                Ok(Event::Text(e)) if in_row => {
-                    current_row_xml.extend_from_slice(e.as_ref());
-                },
-                Ok(Event::Empty(e)) if in_row => {
-                    current_row_xml.push(b'<');
-                    current_row_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        current_row_xml.push(b' ');
-                        current_row_xml.extend_from_slice(attr.key.as_ref());
-                        current_row_xml.extend_from_slice(b"=\"");
-                        current_row_xml.extend_from_slice(&attr.value);
-                        current_row_xml.push(b'"');
-                    }
-                    current_row_xml.extend_from_slice(b"/>");
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_word_element_ranges(self.xml_bytes(), &[b"tr".as_slice()], |_, start, length| {
+            rows.push(Row::from_arc_range(
+                Arc::clone(&source),
+                absolute_start(base_offset, start)?,
+                length,
+            ));
+            Ok(())
+        })?;
         Ok(rows)
     }
 
@@ -258,8 +198,8 @@ impl Table {
 /// then cached results are returned on subsequent calls.
 #[derive(Debug)]
 pub struct Row {
-    /// The raw XML bytes for this row (boxed slice for efficient storage)
-    xml_bytes: Box<[u8]>,
+    /// The raw XML data for this row.
+    xml_data: XmlData,
     /// Cached parsed cells (lazy initialization with thread-safe OnceLock)
     cached_cells: OnceLock<SmallVec<[Cell; 16]>>,
 }
@@ -267,7 +207,7 @@ pub struct Row {
 impl Clone for Row {
     fn clone(&self) -> Self {
         Self {
-            xml_bytes: self.xml_bytes.clone(),
+            xml_data: self.xml_data.clone(),
             // Don't clone the cache - it will be lazily recomputed if needed
             cached_cells: OnceLock::new(),
         }
@@ -279,29 +219,31 @@ impl Row {
     #[inline]
     pub fn new(xml_bytes: Vec<u8>) -> Self {
         Self {
-            xml_bytes: xml_bytes.into_boxed_slice(),
+            xml_data: XmlData::Owned(xml_bytes.into_boxed_slice()),
             cached_cells: OnceLock::new(),
         }
     }
 
+    #[inline]
+    fn from_arc_range(arena: Arc<Vec<u8>>, start: u32, len: u32) -> Self {
+        Self {
+            xml_data: XmlData::Shared(XmlSlice::new(arena, start, len)),
+            cached_cells: OnceLock::new(),
+        }
+    }
+
+    #[inline]
+    fn xml_bytes(&self) -> &[u8] {
+        self.xml_data.as_bytes()
+    }
+
     /// Get the number of cells in this row.
     pub fn cell_count(&self) -> Result<usize> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
-
         let mut count = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) if e.local_name().as_ref() == b"tc" => {
-                    count += 1;
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_word_element_ranges(self.xml_bytes(), &[b"tc".as_slice()], |_, _, _| {
+            count += 1;
+            Ok(())
+        })?;
         Ok(count)
     }
 
@@ -323,80 +265,16 @@ impl Row {
 
     /// Parse cells from XML (internal method).
     fn parse_cells(&self) -> Result<SmallVec<[Cell; 16]>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
-
-        // Use SmallVec for efficient storage of cell collections
+        let (source, base_offset) = self.xml_data.get_or_create_arc();
         let mut cells = SmallVec::new();
-        let mut current_cell_xml = Vec::with_capacity(4096); // Pre-allocate for cell XML (increased from 2048)
-        let mut in_cell = false;
-        let mut depth = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"tc" && !in_cell {
-                        in_cell = true;
-                        depth = 1;
-                        current_cell_xml.clear();
-                        current_cell_xml.extend_from_slice(b"<w:tc");
-                        for attr in e.attributes().flatten() {
-                            current_cell_xml.push(b' ');
-                            current_cell_xml.extend_from_slice(attr.key.as_ref());
-                            current_cell_xml.extend_from_slice(b"=\"");
-                            current_cell_xml.extend_from_slice(&attr.value);
-                            current_cell_xml.push(b'"');
-                        }
-                        current_cell_xml.push(b'>');
-                    } else if in_cell {
-                        depth += 1;
-                        current_cell_xml.push(b'<');
-                        current_cell_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_cell_xml.push(b' ');
-                            current_cell_xml.extend_from_slice(attr.key.as_ref());
-                            current_cell_xml.extend_from_slice(b"=\"");
-                            current_cell_xml.extend_from_slice(&attr.value);
-                            current_cell_xml.push(b'"');
-                        }
-                        current_cell_xml.push(b'>');
-                    }
-                },
-                Ok(Event::End(e)) if in_cell => {
-                    current_cell_xml.extend_from_slice(b"</");
-                    current_cell_xml.extend_from_slice(e.name().as_ref());
-                    current_cell_xml.push(b'>');
-
-                    depth -= 1;
-                    if depth == 0 && e.local_name().as_ref() == b"tc" {
-                        // Clone bytes and clear buffer (preserves capacity for next cell)
-                        let cell_xml = current_cell_xml.clone();
-                        current_cell_xml.clear();
-                        cells.push(Cell::new(cell_xml));
-                        in_cell = false;
-                    }
-                },
-                Ok(Event::Text(e)) if in_cell => {
-                    current_cell_xml.extend_from_slice(e.as_ref());
-                },
-                Ok(Event::Empty(e)) if in_cell => {
-                    current_cell_xml.push(b'<');
-                    current_cell_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        current_cell_xml.push(b' ');
-                        current_cell_xml.extend_from_slice(attr.key.as_ref());
-                        current_cell_xml.extend_from_slice(b"=\"");
-                        current_cell_xml.extend_from_slice(&attr.value);
-                        current_cell_xml.push(b'"');
-                    }
-                    current_cell_xml.extend_from_slice(b"/>");
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_word_element_ranges(self.xml_bytes(), &[b"tc".as_slice()], |_, start, length| {
+            cells.push(Cell::from_arc_range(
+                Arc::clone(&source),
+                absolute_start(base_offset, start)?,
+                length,
+            ));
+            Ok(())
+        })?;
         Ok(cells)
     }
 }
@@ -411,8 +289,8 @@ impl Row {
 /// then cached results are returned on subsequent calls.
 #[derive(Debug)]
 pub struct Cell {
-    /// The raw XML bytes for this cell (boxed slice for efficient storage)
-    xml_bytes: Box<[u8]>,
+    /// The raw XML data for this cell.
+    xml_data: XmlData,
     /// Cached extracted text (lazy initialization with thread-safe OnceLock)
     cached_text: OnceLock<String>,
 }
@@ -420,7 +298,7 @@ pub struct Cell {
 impl Clone for Cell {
     fn clone(&self) -> Self {
         Self {
-            xml_bytes: self.xml_bytes.clone(),
+            xml_data: self.xml_data.clone(),
             // Don't clone the cache - it will be lazily recomputed if needed
             cached_text: OnceLock::new(),
         }
@@ -432,9 +310,22 @@ impl Cell {
     #[inline]
     pub fn new(xml_bytes: Vec<u8>) -> Self {
         Self {
-            xml_bytes: xml_bytes.into_boxed_slice(),
+            xml_data: XmlData::Owned(xml_bytes.into_boxed_slice()),
             cached_text: OnceLock::new(),
         }
+    }
+
+    #[inline]
+    fn from_arc_range(arena: Arc<Vec<u8>>, start: u32, len: u32) -> Self {
+        Self {
+            xml_data: XmlData::Shared(XmlSlice::new(arena, start, len)),
+            cached_text: OnceLock::new(),
+        }
+    }
+
+    #[inline]
+    fn xml_bytes(&self) -> &[u8] {
+        self.xml_data.as_bytes()
     }
 
     /// Get the grid span (horizontal merge/colspan) of this cell.
@@ -453,7 +344,7 @@ impl Cell {
     /// </w:tc>
     /// ```
     pub fn grid_span(&self) -> Result<usize> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
         let mut in_tc_pr = false;
@@ -518,7 +409,7 @@ impl Cell {
     /// </w:tc>
     /// ```
     pub fn v_merge(&self) -> Result<Option<VMergeState>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
+        let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
         let mut in_tc_pr = false;
@@ -580,7 +471,7 @@ impl Cell {
     ///
     /// Uses proper XML event parsing to correctly extract text nodes.
     fn extract_text(&self) -> Result<String> {
-        extract_word_text(&self.xml_bytes)
+        extract_word_text(self.xml_bytes())
     }
 
     /// Get all paragraphs in this cell.
@@ -589,80 +480,16 @@ impl Cell {
     ///
     /// Uses SmallVec for efficient storage of typically small paragraph collections.
     pub fn paragraphs(&self) -> Result<SmallVec<[Paragraph; 8]>> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
-
-        // Use SmallVec for efficient storage of paragraph collections
+        let (source, base_offset) = self.xml_data.get_or_create_arc();
         let mut paragraphs = SmallVec::new();
-        let mut current_para_xml = Vec::with_capacity(1024); // Pre-allocate for paragraph XML
-        let mut in_para = false;
-        let mut depth = 0;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"p" && !in_para {
-                        in_para = true;
-                        depth = 1;
-                        current_para_xml.clear();
-                        current_para_xml.extend_from_slice(b"<w:p");
-                        for attr in e.attributes().flatten() {
-                            current_para_xml.push(b' ');
-                            current_para_xml.extend_from_slice(attr.key.as_ref());
-                            current_para_xml.extend_from_slice(b"=\"");
-                            current_para_xml.extend_from_slice(&attr.value);
-                            current_para_xml.push(b'"');
-                        }
-                        current_para_xml.push(b'>');
-                    } else if in_para {
-                        depth += 1;
-                        current_para_xml.push(b'<');
-                        current_para_xml.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            current_para_xml.push(b' ');
-                            current_para_xml.extend_from_slice(attr.key.as_ref());
-                            current_para_xml.extend_from_slice(b"=\"");
-                            current_para_xml.extend_from_slice(&attr.value);
-                            current_para_xml.push(b'"');
-                        }
-                        current_para_xml.push(b'>');
-                    }
-                },
-                Ok(Event::End(e)) if in_para => {
-                    current_para_xml.extend_from_slice(b"</");
-                    current_para_xml.extend_from_slice(e.name().as_ref());
-                    current_para_xml.push(b'>');
-
-                    depth -= 1;
-                    if depth == 0 && e.local_name().as_ref() == b"p" {
-                        // Clone bytes and clear buffer (preserves capacity for next paragraph)
-                        let para_xml = current_para_xml.clone();
-                        current_para_xml.clear();
-                        paragraphs.push(Paragraph::new(para_xml));
-                        in_para = false;
-                    }
-                },
-                Ok(Event::Text(e)) if in_para => {
-                    current_para_xml.extend_from_slice(e.as_ref());
-                },
-                Ok(Event::Empty(e)) if in_para => {
-                    current_para_xml.push(b'<');
-                    current_para_xml.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        current_para_xml.push(b' ');
-                        current_para_xml.extend_from_slice(attr.key.as_ref());
-                        current_para_xml.extend_from_slice(b"=\"");
-                        current_para_xml.extend_from_slice(&attr.value);
-                        current_para_xml.push(b'"');
-                    }
-                    current_para_xml.extend_from_slice(b"/>");
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
+        scan_word_element_ranges(self.xml_bytes(), &[b"p".as_slice()], |_, start, length| {
+            paragraphs.push(Paragraph::from_arc_range(
+                Arc::clone(&source),
+                absolute_start(base_offset, start)?,
+                length,
+            ));
+            Ok(())
+        })?;
         Ok(paragraphs)
     }
 }
@@ -680,5 +507,59 @@ mod tests {
         let cell = Cell::new(xml.to_vec());
         let text = cell.text().unwrap();
         assert_eq!(text, " Cell & text \t\n");
+    }
+
+    #[test]
+    fn table_hierarchy_shares_aliased_word_fragments_and_ignores_lookalikes() {
+        let xml = br#"<wp:tbl xmlns:wp="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:false="urn:not-wordprocessingml">
+            <false:tr><false:tc><false:p><false:r><false:t>ignored row</false:t></false:r></false:p></false:tc></false:tr>
+            <wp:tr>
+                <false:tc><false:p><false:r><false:t>ignored cell</false:t></false:r></false:p></false:tc>
+                <wp:tc>
+                    <wp:tcPr><wp:gridSpan wp:val="2"/><wp:vMerge wp:val="restart"/></wp:tcPr>
+                    <wp:p><wp:r><false:t>ignored text</false:t><wp:t><![CDATA[A < B]]></wp:t></wp:r></wp:p>
+                </wp:tc>
+                <wp:tc><wp:p/></wp:tc>
+            </wp:tr>
+        </wp:tbl>"#;
+        let table = Table::new(xml.to_vec());
+
+        assert_eq!(table.row_count().unwrap(), 1);
+        let rows = table.rows().unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].cell_count().unwrap(), 2);
+
+        let cells = rows[0].cells().unwrap();
+        assert_eq!(cells.len(), 2);
+        assert_eq!(cells[0].grid_span().unwrap(), 2);
+        assert_eq!(cells[0].v_merge().unwrap(), Some(VMergeState::Restart));
+        assert_eq!(cells[0].text().unwrap(), "A < B");
+        assert_eq!(cells[1].text().unwrap(), "");
+
+        let paragraphs = cells[0].paragraphs().unwrap();
+        assert_eq!(paragraphs.len(), 1);
+        assert_eq!(paragraphs[0].text().unwrap(), "A < B");
+        assert_eq!(paragraphs[0].runs().unwrap()[0].text().unwrap(), "A < B");
+    }
+
+    #[test]
+    fn table_hierarchy_accepts_strict_self_closing_rows() {
+        let xml =
+            br#"<s:tbl xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:tr/></s:tbl>"#;
+        let table = Table::new(xml.to_vec());
+
+        assert_eq!(table.row_count().unwrap(), 1);
+        let rows = table.rows().unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].cell_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn table_hierarchy_rejects_unterminated_selected_elements() {
+        let xml = br#"<w:tbl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tr><w:tc/>"#;
+        let table = Table::new(xml.to_vec());
+
+        assert!(table.row_count().is_err());
+        assert!(table.rows().is_err());
     }
 }

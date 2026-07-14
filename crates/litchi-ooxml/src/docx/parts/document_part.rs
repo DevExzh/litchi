@@ -1,13 +1,10 @@
 //! DocumentPart - the main document.xml part of a Word document.
 
-use crate::docx::namespace::is_wordprocessing_namespace;
+use crate::docx::namespace::scan_word_element_ranges;
 use crate::docx::paragraph::{Paragraph, extract_word_text};
 use crate::docx::table::Table;
-use crate::error::{OoxmlError, Result};
+use crate::error::Result;
 use litchi_opc::part::Part;
-use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::ResolveResult;
-use quick_xml::reader::NsReader;
 use smallvec::SmallVec;
 use std::sync::Arc;
 
@@ -19,135 +16,6 @@ use std::sync::Arc;
 pub struct DocumentPart<'a> {
     /// Reference to the underlying part
     part: &'a dyn Part,
-}
-
-#[derive(Clone, Copy)]
-enum ElementKind {
-    Paragraph,
-    Table,
-}
-
-#[derive(Clone, Copy)]
-struct ElementSelection {
-    paragraphs: bool,
-    tables: bool,
-}
-
-fn selected_element(
-    namespace: &ResolveResult<'_>,
-    element: &BytesStart<'_>,
-    selection: ElementSelection,
-) -> Option<ElementKind> {
-    if !is_wordprocessing_namespace(namespace) {
-        return None;
-    }
-    match element.local_name().as_ref() {
-        b"p" if selection.paragraphs => Some(ElementKind::Paragraph),
-        b"tbl" if selection.tables => Some(ElementKind::Table),
-        _ => None,
-    }
-}
-
-fn scan_element_ranges(
-    xml_bytes: &[u8],
-    selection: ElementSelection,
-    mut emit: impl FnMut(ElementKind, u32, u32) -> Result<()>,
-) -> Result<()> {
-    enum ScanEvent {
-        Start(ElementKind),
-        NestedStart,
-        Empty(ElementKind),
-        End,
-        Eof,
-        Other,
-    }
-
-    let mut reader = NsReader::from_reader(xml_bytes);
-    let mut capture: Option<(ElementKind, usize, usize)> = None;
-
-    loop {
-        let event_start = usize::try_from(reader.buffer_position()).map_err(|_| {
-            OoxmlError::InvalidFormat("Word document offset does not fit usize".to_string())
-        })?;
-        let event = {
-            let (namespace, event) = reader
-                .read_resolved_event()
-                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
-            match event {
-                Event::Start(_) if capture.is_some() => ScanEvent::NestedStart,
-                Event::Start(element) => selected_element(&namespace, &element, selection)
-                    .map_or(ScanEvent::Other, ScanEvent::Start),
-                Event::Empty(element) if capture.is_none() => {
-                    selected_element(&namespace, &element, selection)
-                        .map_or(ScanEvent::Other, ScanEvent::Empty)
-                },
-                Event::End(_) if capture.is_some() => ScanEvent::End,
-                Event::Eof => ScanEvent::Eof,
-                _ => ScanEvent::Other,
-            }
-        };
-        let event_end = usize::try_from(reader.buffer_position()).map_err(|_| {
-            OoxmlError::InvalidFormat("Word document offset does not fit usize".to_string())
-        })?;
-
-        match event {
-            ScanEvent::Start(kind) => capture = Some((kind, event_start, 1)),
-            ScanEvent::NestedStart => {
-                let Some((_, _, depth)) = capture.as_mut() else {
-                    return Err(OoxmlError::InvalidFormat(
-                        "missing captured Word element".to_string(),
-                    ));
-                };
-                *depth = depth.checked_add(1).ok_or_else(|| {
-                    OoxmlError::InvalidFormat("Word element nesting is too deep".to_string())
-                })?;
-            },
-            ScanEvent::Empty(kind) => emit_element_range(kind, event_start, event_end, &mut emit)?,
-            ScanEvent::End => {
-                let Some((_, _, depth)) = capture.as_mut() else {
-                    return Err(OoxmlError::InvalidFormat(
-                        "missing captured Word element".to_string(),
-                    ));
-                };
-                *depth = depth.checked_sub(1).ok_or_else(|| {
-                    OoxmlError::InvalidFormat("invalid Word element nesting".to_string())
-                })?;
-                if *depth == 0 {
-                    let Some((kind, start, _)) = capture.take() else {
-                        return Err(OoxmlError::InvalidFormat(
-                            "missing captured Word element range".to_string(),
-                        ));
-                    };
-                    emit_element_range(kind, start, event_end, &mut emit)?;
-                }
-            },
-            ScanEvent::Eof if capture.is_some() => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated Word document element".to_string(),
-                ));
-            },
-            ScanEvent::Eof => break,
-            ScanEvent::Other => {},
-        }
-    }
-
-    Ok(())
-}
-
-fn emit_element_range(
-    kind: ElementKind,
-    start: usize,
-    end: usize,
-    emit: &mut impl FnMut(ElementKind, u32, u32) -> Result<()>,
-) -> Result<()> {
-    let length = end
-        .checked_sub(start)
-        .ok_or_else(|| OoxmlError::InvalidFormat("invalid Word element byte range".to_string()))?;
-    let start = u32::try_from(start)
-        .map_err(|_| OoxmlError::InvalidFormat("Word element offset exceeds u32".to_string()))?;
-    let length = u32::try_from(length)
-        .map_err(|_| OoxmlError::InvalidFormat("Word element length exceeds u32".to_string()))?;
-    emit(kind, start, length)
 }
 
 impl<'a> DocumentPart<'a> {
@@ -190,17 +58,10 @@ impl<'a> DocumentPart<'a> {
     /// Counts `<w:p>` elements in the document body.
     pub fn paragraph_count(&self) -> Result<usize> {
         let mut count = 0;
-        scan_element_ranges(
-            self.xml_bytes(),
-            ElementSelection {
-                paragraphs: true,
-                tables: false,
-            },
-            |_, _, _| {
-                count += 1;
-                Ok(())
-            },
-        )?;
+        scan_word_element_ranges(self.xml_bytes(), &[b"p".as_slice()], |_, _, _| {
+            count += 1;
+            Ok(())
+        })?;
         Ok(count)
     }
 
@@ -209,17 +70,10 @@ impl<'a> DocumentPart<'a> {
     /// Counts `<w:tbl>` elements in the document body.
     pub fn table_count(&self) -> Result<usize> {
         let mut count = 0;
-        scan_element_ranges(
-            self.xml_bytes(),
-            ElementSelection {
-                paragraphs: false,
-                tables: true,
-            },
-            |_, _, _| {
-                count += 1;
-                Ok(())
-            },
-        )?;
+        scan_word_element_ranges(self.xml_bytes(), &[b"tbl".as_slice()], |_, _, _| {
+            count += 1;
+            Ok(())
+        })?;
         Ok(count)
     }
 
@@ -233,21 +87,14 @@ impl<'a> DocumentPart<'a> {
     pub fn paragraphs(&self) -> Result<SmallVec<[Paragraph; 32]>> {
         let source = self.get_xml_arc();
         let mut paragraphs = SmallVec::new();
-        scan_element_ranges(
-            source.as_slice(),
-            ElementSelection {
-                paragraphs: true,
-                tables: false,
-            },
-            |_, start, length| {
-                paragraphs.push(Paragraph::from_arc_range(
-                    Arc::clone(&source),
-                    start,
-                    length,
-                ));
-                Ok(())
-            },
-        )?;
+        scan_word_element_ranges(source.as_slice(), &[b"p".as_slice()], |_, start, length| {
+            paragraphs.push(Paragraph::from_arc_range(
+                Arc::clone(&source),
+                start,
+                length,
+            ));
+            Ok(())
+        })?;
         Ok(paragraphs)
     }
 
@@ -261,12 +108,9 @@ impl<'a> DocumentPart<'a> {
     pub fn tables(&self) -> Result<SmallVec<[Table; 8]>> {
         let source = self.get_xml_arc();
         let mut tables = SmallVec::new();
-        scan_element_ranges(
+        scan_word_element_ranges(
             source.as_slice(),
-            ElementSelection {
-                paragraphs: false,
-                tables: true,
-            },
+            &[b"tbl".as_slice()],
             |_, start, length| {
                 tables.push(Table::from_arc_range(Arc::clone(&source), start, length));
                 Ok(())
@@ -295,21 +139,17 @@ impl<'a> DocumentPart<'a> {
 
         let source = self.get_xml_arc();
         let mut elements = Vec::new();
-        scan_element_ranges(
+        scan_word_element_ranges(
             source.as_slice(),
-            ElementSelection {
-                paragraphs: true,
-                tables: true,
-            },
-            |kind, start, length| {
+            &[b"p".as_slice(), b"tbl".as_slice()],
+            |target, start, length| {
                 let source = Arc::clone(&source);
-                elements.push(match kind {
-                    ElementKind::Paragraph => DocxElement::Paragraph(Box::new(
-                        Paragraph::from_arc_range(source, start, length),
-                    )),
-                    ElementKind::Table => {
-                        DocxElement::Table(Box::new(Table::from_arc_range(source, start, length)))
-                    },
+                elements.push(if target == 0 {
+                    DocxElement::Paragraph(Box::new(Paragraph::from_arc_range(
+                        source, start, length,
+                    )))
+                } else {
+                    DocxElement::Table(Box::new(Table::from_arc_range(source, start, length)))
                 });
                 Ok(())
             },
