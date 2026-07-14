@@ -391,7 +391,7 @@ fn write_area_chart<W: Write>(writer: &mut W, group: &AreaTypeGroup) -> std::io:
     }
 
     write_group_data_labels(writer, &group.common)?;
-    write!(writer, r#"<c:axId val="1"/><c:axId val="2"/>"#)?;
+    write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "area chart")?;
     write!(writer, "</c:areaChart>")?;
 
     Ok(())
@@ -419,7 +419,7 @@ fn write_area_3d_chart<W: Write>(writer: &mut W, group: &Area3DTypeGroup) -> std
     if let Some(gap_depth) = group.gap_depth {
         write!(writer, r#"<c:gapDepth val="{gap_depth}"/>"#)?;
     }
-    write!(writer, r#"<c:axId val="1"/><c:axId val="2"/>"#)?;
+    write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 3, "3D area chart")?;
     write!(writer, "</c:area3DChart>")?;
 
     Ok(())
@@ -468,7 +468,7 @@ fn write_bar_chart<W: Write>(writer: &mut W, group: &BarTypeGroup) -> std::io::R
         write!(writer, r#"<c:overlap val="{}"/>"#, overlap)?;
     }
 
-    write!(writer, r#"<c:axId val="1"/><c:axId val="2"/>"#)?;
+    write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "bar chart")?;
     write!(writer, "</c:barChart>")?;
 
     Ok(())
@@ -512,7 +512,7 @@ fn write_bar_3d_chart<W: Write>(writer: &mut W, group: &Bar3DTypeGroup) -> std::
         write!(writer, r#"<c:shape val="{}"/>"#, shape.xml_value())?;
     }
 
-    write!(writer, r#"<c:axId val="1"/><c:axId val="2"/>"#)?;
+    write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 3, "3D bar chart")?;
     write!(writer, "</c:bar3DChart>")?;
 
     Ok(())
@@ -563,7 +563,7 @@ fn write_bubble_chart<W: Write>(writer: &mut W, group: &BubbleTypeGroup) -> std:
         escape_xml(&group.size_represents)
     )?;
 
-    write!(writer, r#"<c:axId val="1"/><c:axId val="2"/>"#)?;
+    write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "bubble chart")?;
     write!(writer, "</c:bubbleChart>")?;
 
     Ok(())
@@ -634,7 +634,7 @@ fn write_line_chart<W: Write>(writer: &mut W, group: &LineTypeGroup) -> std::io:
         r#"<c:smooth val="{}"/>"#,
         if group.smooth { "1" } else { "0" }
     )?;
-    write!(writer, r#"<c:axId val="1"/><c:axId val="2"/>"#)?;
+    write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "line chart")?;
     write!(writer, "</c:lineChart>")?;
 
     Ok(())
@@ -662,10 +662,7 @@ fn write_line_3d_chart<W: Write>(writer: &mut W, group: &Line3DTypeGroup) -> std
     if let Some(gap_depth) = group.gap_depth {
         write!(writer, r#"<c:gapDepth val="{gap_depth}"/>"#)?;
     }
-    write!(
-        writer,
-        r#"<c:axId val="1"/><c:axId val="2"/><c:axId val="3"/>"#
-    )?;
+    write_type_group_axis_ids(writer, &group.common, &[1, 2, 3], 3, 3, "3D line chart")?;
     write!(writer, "</c:line3DChart>")?;
 
     Ok(())
@@ -793,7 +790,7 @@ fn write_radar_chart<W: Write>(writer: &mut W, group: &RadarTypeGroup) -> std::i
     }
 
     write_group_data_labels(writer, &group.common)?;
-    write!(writer, r#"<c:axId val="1"/><c:axId val="2"/>"#)?;
+    write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "radar chart")?;
     write!(writer, "</c:radarChart>")?;
 
     Ok(())
@@ -817,7 +814,7 @@ fn write_scatter_chart<W: Write>(writer: &mut W, group: &ScatterTypeGroup) -> st
     }
 
     write_group_data_labels(writer, &group.common)?;
-    write!(writer, r#"<c:axId val="1"/><c:axId val="2"/>"#)?;
+    write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "scatter chart")?;
     write!(writer, "</c:scatterChart>")?;
 
     Ok(())
@@ -831,7 +828,7 @@ fn write_stock_chart<W: Write>(writer: &mut W, group: &StockTypeGroup) -> std::i
     }
 
     write_group_data_labels(writer, &group.common)?;
-    write!(writer, r#"<c:axId val="1"/><c:axId val="2"/>"#)?;
+    write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "stock chart")?;
     write!(writer, "</c:stockChart>")?;
 
     Ok(())
@@ -849,10 +846,7 @@ fn write_surface_chart<W: Write>(writer: &mut W, group: &SurfaceTypeGroup) -> st
         write_series(writer, series, SeriesFeatures::SURFACE)?;
     }
 
-    write!(
-        writer,
-        r#"<c:axId val="1"/><c:axId val="2"/><c:axId val="3"/>"#
-    )?;
+    write_type_group_axis_ids(writer, &group.common, &[1, 2, 3], 3, 3, "surface chart")?;
     write!(writer, "</c:surfaceChart>")?;
 
     Ok(())
@@ -873,10 +867,7 @@ fn write_surface_3d_chart<W: Write>(
         write_series(writer, series, SeriesFeatures::SURFACE)?;
     }
 
-    write!(
-        writer,
-        r#"<c:axId val="1"/><c:axId val="2"/><c:axId val="3"/>"#
-    )?;
+    write_type_group_axis_ids(writer, &group.common, &[1, 2, 3], 3, 3, "3D surface chart")?;
     write!(writer, "</c:surface3DChart>")?;
 
     Ok(())
@@ -1570,6 +1561,36 @@ fn write_group_data_labels<W: Write>(
     } else {
         write_data_labels_default(writer)
     }
+}
+
+fn write_type_group_axis_ids<W: Write>(
+    writer: &mut W,
+    common: &TypeGroupCommon,
+    default_ids: &[u32],
+    minimum_count: usize,
+    maximum_count: usize,
+    description: &str,
+) -> std::io::Result<()> {
+    let axis_ids = if common.axis_ids.is_empty() {
+        default_ids
+    } else {
+        common.axis_ids.as_slice()
+    };
+    if !(minimum_count..=maximum_count).contains(&axis_ids.len()) {
+        return Err(invalid_chart_input(format!(
+            "{description} must reference between {minimum_count} and {maximum_count} axes"
+        )));
+    }
+    let mut unique_ids = std::collections::HashSet::with_capacity(axis_ids.len());
+    for axis_id in axis_ids {
+        if !unique_ids.insert(*axis_id) {
+            return Err(invalid_chart_input(format!(
+                "{description} contains duplicate axis ID {axis_id}"
+            )));
+        }
+        write!(writer, r#"<c:axId val="{axis_id}"/>"#)?;
+    }
+    Ok(())
 }
 
 fn write_axis<W: Write>(writer: &mut W, axis: &Axis) -> std::io::Result<()> {

@@ -703,6 +703,7 @@ fn parse_common_type_group<R: BufRead>(
     reader: &mut ChartXmlReader<R>,
     end_name: &[u8],
     supports_data_labels: bool,
+    supports_axes: bool,
     mut extra: impl FnMut(&BytesStart<'_>) -> Result<()>,
 ) -> Result<TypeGroupCommon> {
     let mut common = TypeGroupCommon::new();
@@ -725,6 +726,9 @@ fn parse_common_type_group<R: BufRead>(
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
                 match element.local_name().as_ref() {
                     b"varyColors" => common.vary_colors = parse_bool_attr(element)?,
+                    b"axId" if supports_axes => common
+                        .axis_ids
+                        .push(required_u32_attr(element, "chart type-group axis ID")?),
                     b"ser" => {
                         if let Some(series) = parse_series(reader)? {
                             common.series.push(series);
@@ -760,7 +764,7 @@ fn begin_group_data_labels(seen: &mut bool) -> Result<()> {
 fn parse_area_3d_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Area3DTypeGroup> {
     let mut grouping = BarGrouping::Standard;
     let mut gap_depth = None;
-    let common = parse_common_type_group(reader, b"area3DChart", true, |element| {
+    let common = parse_common_type_group(reader, b"area3DChart", true, true, |element| {
         match element.local_name().as_ref() {
             b"grouping" => grouping = parse_grouping(element)?,
             b"gapDepth" => {
@@ -784,7 +788,7 @@ fn parse_bubble_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Bubb
     let mut bubble_scale = None;
     let mut show_negative_bubbles = true;
     let mut size_represents = "area".to_string();
-    let common = parse_common_type_group(reader, b"bubbleChart", true, |element| {
+    let common = parse_common_type_group(reader, b"bubbleChart", true, true, |element| {
         match element.local_name().as_ref() {
             b"bubble3D" => bubble_3d = parse_bool_attr(element)?,
             b"bubbleScale" => {
@@ -824,7 +828,7 @@ fn parse_bubble_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Bubb
 fn parse_doughnut_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DoughnutTypeGroup> {
     let mut first_slice_angle = 0;
     let mut hole_size = 50;
-    let common = parse_common_type_group(reader, b"doughnutChart", true, |element| {
+    let common = parse_common_type_group(reader, b"doughnutChart", true, false, |element| {
         match element.local_name().as_ref() {
             b"firstSliceAng" => {
                 first_slice_angle = match get_attr(element, b"val") {
@@ -857,7 +861,7 @@ fn parse_doughnut_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Do
 fn parse_line_3d_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Line3DTypeGroup> {
     let mut grouping = BarGrouping::Standard;
     let mut gap_depth = None;
-    let common = parse_common_type_group(reader, b"line3DChart", true, |element| {
+    let common = parse_common_type_group(reader, b"line3DChart", true, true, |element| {
         match element.local_name().as_ref() {
             b"grouping" => grouping = parse_grouping(element)?,
             b"gapDepth" => {
@@ -878,7 +882,7 @@ fn parse_line_3d_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lin
 
 fn parse_pie_3d_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pie3DTypeGroup> {
     let mut group = Pie3DTypeGroup::new();
-    group.common = parse_common_type_group(reader, b"pie3DChart", true, |_| Ok(()))?;
+    group.common = parse_common_type_group(reader, b"pie3DChart", true, false, |_| Ok(()))?;
     Ok(group)
 }
 
@@ -1050,7 +1054,7 @@ fn parse_custom_pie_split<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<
 
 fn parse_radar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<RadarTypeGroup> {
     let mut style = RadarStyle::Standard;
-    let common = parse_common_type_group(reader, b"radarChart", true, |element| {
+    let common = parse_common_type_group(reader, b"radarChart", true, true, |element| {
         if element.local_name().as_ref() == b"radarStyle" {
             let value =
                 get_attr(element, b"val").ok_or_else(|| missing_attribute("chart radar style"))?;
@@ -1070,13 +1074,13 @@ fn parse_radar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Radar
 
 fn parse_stock_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<StockTypeGroup> {
     let mut group = StockTypeGroup::new();
-    group.common = parse_common_type_group(reader, b"stockChart", true, |_| Ok(()))?;
+    group.common = parse_common_type_group(reader, b"stockChart", true, true, |_| Ok(()))?;
     Ok(group)
 }
 
 fn parse_surface_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<SurfaceTypeGroup> {
     let mut wireframe = false;
-    let common = parse_common_type_group(reader, b"surfaceChart", false, |element| {
+    let common = parse_common_type_group(reader, b"surfaceChart", false, true, |element| {
         if element.local_name().as_ref() == b"wireframe" {
             wireframe = parse_bool_attr(element)?;
         }
@@ -1092,7 +1096,7 @@ fn parse_surface_3d_chart<R: BufRead>(
     reader: &mut ChartXmlReader<R>,
 ) -> Result<Surface3DTypeGroup> {
     let mut wireframe = false;
-    let common = parse_common_type_group(reader, b"surface3DChart", false, |element| {
+    let common = parse_common_type_group(reader, b"surface3DChart", false, true, |element| {
         if element.local_name().as_ref() == b"wireframe" {
             wireframe = parse_bool_attr(element)?;
         }
@@ -1143,6 +1147,9 @@ fn parse_bar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
                     b"varyColors" => {
                         common.vary_colors = parse_bool_attr(e)?;
                     },
+                    b"axId" => common
+                        .axis_ids
+                        .push(required_u32_attr(e, "bar chart axis ID")?),
                     b"ser" => {
                         if let Some(series) = parse_series(reader)? {
                             common.series.push(series);
@@ -1224,6 +1231,9 @@ fn parse_bar_3d_chart<R: BufRead>(
                     b"varyColors" => {
                         common.vary_colors = parse_bool_attr(e)?;
                     },
+                    b"axId" => common
+                        .axis_ids
+                        .push(required_u32_attr(e, "3D bar chart axis ID")?),
                     b"ser" => {
                         if let Some(series) = parse_series(reader)? {
                             common.series.push(series);
@@ -1303,6 +1313,9 @@ fn parse_line_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
                     b"varyColors" => {
                         common.vary_colors = parse_bool_attr(e)?;
                     },
+                    b"axId" => common
+                        .axis_ids
+                        .push(required_u32_attr(e, "line chart axis ID")?),
                     b"ser" => {
                         if let Some(series) = parse_series(reader)? {
                             common.series.push(series);
@@ -1411,6 +1424,9 @@ fn parse_area_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
                     b"varyColors" => {
                         common.vary_colors = parse_bool_attr(e)?;
                     },
+                    b"axId" => common
+                        .axis_ids
+                        .push(required_u32_attr(e, "area chart axis ID")?),
                     b"ser" => {
                         if let Some(series) = parse_series(reader)? {
                             common.series.push(series);
@@ -1475,6 +1491,9 @@ fn parse_scatter_chart<R: BufRead>(
                     b"varyColors" => {
                         common.vary_colors = parse_bool_attr(e)?;
                     },
+                    b"axId" => common
+                        .axis_ids
+                        .push(required_u32_attr(e, "scatter chart axis ID")?),
                     b"ser" => {
                         if let Some(series) = parse_series(reader)? {
                             common.series.push(series);
@@ -3737,6 +3756,34 @@ mod tests {
     }
 
     #[test]
+    fn preserves_and_validates_chart_group_axis_bindings() {
+        let xml =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea>
+                <c:lineChart><c:axId val="17"/><c:axId val="29"/></c:lineChart>
+                <c:area3DChart><c:axId val="31"/><c:axId val="37"/><c:axId val="41"/></c:area3DChart>
+            </c:plotArea></c:chart>
+        </c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let TypeGroup::Line(line) = &chart.plot_area.type_groups[0] else {
+            panic!("expected line chart");
+        };
+        assert_eq!(line.common.axis_ids, [17, 29]);
+        let TypeGroup::Area3D(area) = &chart.plot_area.type_groups[1] else {
+            panic!("expected 3D area chart");
+        };
+        assert_eq!(area.common.axis_ids, [31, 37, 41]);
+
+        for axis_ids in [vec![7], vec![7, 7], vec![1, 2, 3]] {
+            let mut chart = Chart::new();
+            let mut line = LineTypeGroup::new(BarGrouping::Standard);
+            line.common.axis_ids = axis_ids;
+            chart.plot_area.type_groups.push(TypeGroup::Line(line));
+            assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
+        }
+    }
+
+    #[test]
     fn parses_of_pie_schema_defaults_and_empty_custom_split() {
         let xml =
             br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
@@ -3927,6 +3974,7 @@ mod tests {
     fn writer_round_trips_every_modeled_chart_group() {
         let mut area_3d = Area3DTypeGroup::new(BarGrouping::Stacked);
         area_3d.gap_depth = Some(175);
+        area_3d.common.axis_ids = vec![10, 20, 30];
         let mut doughnut = DoughnutTypeGroup::new();
         doughnut.first_slice_angle = 45;
         doughnut.hole_size = 60;
@@ -4010,6 +4058,7 @@ mod tests {
         of_pie.second_pie_size = Some(80);
         let mut line = LineTypeGroup::new(BarGrouping::Standard);
         line.smooth = true;
+        line.common.axis_ids = vec![41, 42];
         let mut group_labels = DataLabels::new()
             .with_position(DataLabelPosition::Right)
             .with_show_value(true);
@@ -4018,6 +4067,7 @@ mod tests {
         line.common.data_labels = Some(group_labels);
         let mut line_3d = Line3DTypeGroup::new(BarGrouping::PercentStacked);
         line_3d.gap_depth = Some(210);
+        line_3d.common.axis_ids = vec![50, 51, 52];
 
         let mut chart = Chart::new();
         chart.plot_area.data_table = Some(DataTable {
@@ -4070,6 +4120,7 @@ mod tests {
             unreachable!();
         };
         assert_eq!(group.gap_depth, Some(175));
+        assert_eq!(group.common.axis_ids, [10, 20, 30]);
         assert!(matches!(
             parsed.plot_area.type_groups[4],
             TypeGroup::Bubble(_)
@@ -4086,6 +4137,7 @@ mod tests {
             unreachable!();
         };
         assert!(group.smooth);
+        assert_eq!(group.common.axis_ids, [41, 42]);
         let labels = group.common.data_labels.as_ref().unwrap();
         assert_eq!(labels.position, Some(DataLabelPosition::Right));
         assert!(labels.show_value);
@@ -4095,6 +4147,7 @@ mod tests {
             unreachable!();
         };
         assert_eq!(group.gap_depth, Some(210));
+        assert_eq!(group.common.axis_ids, [50, 51, 52]);
         assert!(matches!(parsed.plot_area.type_groups[9], TypeGroup::Pie(_)));
         assert!(matches!(
             parsed.plot_area.type_groups[10],

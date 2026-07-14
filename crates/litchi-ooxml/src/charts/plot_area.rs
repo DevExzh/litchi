@@ -116,6 +116,8 @@ pub struct TypeGroupCommon {
     pub series: Vec<Series>,
     /// Data-label settings shared by the chart group
     pub data_labels: Option<DataLabels>,
+    /// Identifiers of the axes used by this chart group
+    pub axis_ids: Vec<u32>,
 }
 
 impl TypeGroupCommon {
@@ -126,6 +128,7 @@ impl TypeGroupCommon {
             vary_colors: false,
             series: Vec::new(),
             data_labels: None,
+            axis_ids: Vec::new(),
         }
     }
 
