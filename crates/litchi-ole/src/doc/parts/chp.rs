@@ -76,6 +76,26 @@ pub struct CharacterProperties {
     pub char_scale: Option<u16>,
     /// Language ID
     pub language_id: Option<u16>,
+    /// Far East language ID.
+    pub language_id_fe: Option<u16>,
+    /// Whether this run uses bidirectional/complex-script formatting.
+    pub is_bidi: Option<bool>,
+    /// Complex-script bold setting.
+    pub is_bold_bidi: Option<bool>,
+    /// Complex-script italic setting.
+    pub is_italic_bidi: Option<bool>,
+    /// Complex-script font index.
+    pub font_index_bidi: Option<u16>,
+    /// Complex-script language ID.
+    pub language_id_bidi: Option<u16>,
+    /// Complex-script indexed text color.
+    pub color_index_bidi: Option<u16>,
+    /// Complex-script font size in half-points.
+    pub font_size_bidi: Option<u16>,
+    /// Font/language bias for characters shared by multiple scripts.
+    pub script_hint: Option<CharacterScriptHint>,
+    /// Whether spelling and grammar proofing excludes this run.
+    pub is_no_proof: Option<bool>,
     /// Style index (istd)
     pub style_index: Option<u16>,
     /// Vanish (hidden)
@@ -128,6 +148,30 @@ pub enum HighlightColor {
     DarkYellow,
     DarkGray,
     LightGray,
+}
+
+/// Script bias stored by `sprmCIdctHint`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CharacterScriptHint {
+    /// Bias toward non-Far-East properties.
+    Default,
+    /// Bias toward Far East properties.
+    FarEast,
+    /// Bias toward complex-script properties.
+    ComplexScript,
+    /// A reserved value retained for forward compatibility.
+    Reserved(u8),
+}
+
+impl From<u8> for CharacterScriptHint {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Self::Default,
+            1 => Self::FarEast,
+            2 => Self::ComplexScript,
+            value => Self::Reserved(value),
+        }
+    }
 }
 
 // Re-export common VerticalPosition type
@@ -583,6 +627,38 @@ impl CharacterProperties {
             0x59 => {
                 // Text animation effect
             },
+            // Operation 0x5A: sprmCFBiDi - Complex-script formatting.
+            0x5A => {
+                if let Some(value) = sprm.operand_byte() {
+                    chp.is_bidi = Some(Self::get_toggle_value(value, chp.is_bidi));
+                }
+            },
+            // Operation 0x5C: sprmCFBoldBi - Complex-script bold.
+            0x5C => {
+                if let Some(value) = sprm.operand_byte() {
+                    chp.is_bold_bidi = Some(Self::get_toggle_value(value, chp.is_bold_bidi));
+                }
+            },
+            // Operation 0x5D: sprmCFItalicBi - Complex-script italic.
+            0x5D => {
+                if let Some(value) = sprm.operand_byte() {
+                    chp.is_italic_bidi = Some(Self::get_toggle_value(value, chp.is_italic_bidi));
+                }
+            },
+            // Operation 0x5E: sprmCFtcBi - Complex-script font.
+            0x5E => chp.font_index_bidi = sprm.operand_word(),
+            // Operation 0x5F: sprmCLidBi - Complex-script language.
+            0x5F => chp.language_id_bidi = sprm.operand_word(),
+            // Operation 0x60: sprmCIcoBi - Complex-script indexed color.
+            0x60 => chp.color_index_bidi = sprm.operand_word(),
+            // Operation 0x61: sprmCHpsBi - Complex-script size.
+            0x61 => chp.font_size_bidi = sprm.operand_word(),
+            // Operations 0x6D and 0x73: legacy and current default language.
+            0x6D | 0x73 => chp.language_id = sprm.operand_word(),
+            // Operations 0x6E and 0x74: legacy and current Far East language.
+            0x6E | 0x74 => chp.language_id_fe = sprm.operand_word(),
+            // Operation 0x6F: sprmCIdctHint - Script bias.
+            0x6F => chp.script_hint = sprm.operand_byte().map(CharacterScriptHint::from),
             // Operation 0x70: sprmCCv - Color value (RGB)
             0x70 => {
                 if let Some(cv) = sprm.operand_dword() {
@@ -593,10 +669,15 @@ impl CharacterProperties {
                     chp.color = Some((r, g, b));
                 }
             },
-            // Operations 0x5A-0x6F, 0x71-0x75: Various bi-directional, borders, shading, etc.
-            0x5A..=0x6F | 0x71..=0x75 => {
-                // Bi-directional, borders, shading, language IDs, etc.
-                // Not commonly needed for basic text extraction
+            // Operation 0x75: sprmCFNoProof - Exclude from proofing.
+            0x75 => {
+                if let Some(value) = sprm.operand_byte() {
+                    chp.is_no_proof = Some(Self::get_toggle_value(value, chp.is_no_proof));
+                }
+            },
+            // Remaining border, shading, and revision SPRMs.
+            0x5B | 0x62..=0x6C | 0x71 | 0x72 => {
+                // Retained for future structured border/revision metadata.
             },
             // Default: Unknown or unsupported SPRM
             _ => {
@@ -641,6 +722,16 @@ impl CharacterProperties {
             || self.color.is_some()
             || self.highlight.is_some()
             || self.vertical_position != VerticalPosition::Normal
+            || self.is_bidi.is_some()
+            || self.is_bold_bidi.is_some()
+            || self.is_italic_bidi.is_some()
+            || self.font_index_bidi.is_some()
+            || self.language_id_bidi.is_some()
+            || self.color_index_bidi.is_some()
+            || self.font_size_bidi.is_some()
+            || self.language_id_fe.is_some()
+            || self.script_hint.is_some()
+            || self.is_no_proof.is_some()
     }
 }
 
@@ -696,5 +787,51 @@ mod tests {
         .unwrap();
         assert_eq!(properties.is_bold, Some(true));
         assert_eq!(properties.is_strikethrough, None);
+    }
+
+    #[test]
+    fn parses_complex_script_language_and_proofing_sprms() {
+        let properties = CharacterProperties::from_sprm(&[
+            0x5A, 0x08, 0x01, // sprmCFBiDi
+            0x5C, 0x08, 0x01, // sprmCFBoldBi
+            0x5C, 0x08, 0x81, // toggle complex-script bold back off
+            0x5D, 0x08, 0x01, // sprmCFItalicBi
+            0x5E, 0x4A, 0x34, 0x12, // sprmCFtcBi
+            0x5F, 0x48, 0x01, 0x04, // sprmCLidBi
+            0x60, 0x4A, 0x0D, 0x00, // sprmCIcoBi
+            0x61, 0x4A, 0x1C, 0x00, // sprmCHpsBi
+            0x6D, 0x48, 0x09, 0x04, // sprmCRgLid0_80
+            0x6E, 0x48, 0x11, 0x04, // sprmCRgLid1_80
+            0x73, 0x48, 0x0C, 0x04, // sprmCRgLid0 supersedes legacy
+            0x74, 0x48, 0x12, 0x04, // sprmCRgLid1 supersedes legacy
+            0x6F, 0x28, 0x02, // sprmCIdctHint
+            0x75, 0x08, 0x01, // sprmCFNoProof
+        ])
+        .unwrap();
+
+        assert_eq!(properties.is_bidi, Some(true));
+        assert_eq!(properties.is_bold_bidi, Some(false));
+        assert_eq!(properties.is_italic_bidi, Some(true));
+        assert_eq!(properties.font_index_bidi, Some(0x1234));
+        assert_eq!(properties.language_id_bidi, Some(0x0401));
+        assert_eq!(properties.color_index_bidi, Some(13));
+        assert_eq!(properties.font_size_bidi, Some(28));
+        assert_eq!(properties.language_id, Some(0x040C));
+        assert_eq!(properties.language_id_fe, Some(0x0412));
+        assert_eq!(
+            properties.script_hint,
+            Some(CharacterScriptHint::ComplexScript)
+        );
+        assert_eq!(properties.is_no_proof, Some(true));
+        assert!(properties.has_formatting());
+    }
+
+    #[test]
+    fn preserves_reserved_script_hint_values() {
+        let properties = CharacterProperties::from_sprm(&[0x6F, 0x28, 0xFF]).unwrap();
+        assert_eq!(
+            properties.script_hint,
+            Some(CharacterScriptHint::Reserved(0xFF))
+        );
     }
 }
