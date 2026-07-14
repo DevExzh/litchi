@@ -1,8 +1,9 @@
 //! Main Spreadsheet structure and implementation.
 
 use super::{
-    ContentValidation, DatabaseRange, NamedDefinition, NamedDefinitionScope, NamedExpression,
-    NamedRange, Sheet, SheetProtection, SpreadsheetProtection,
+    CalculationSettings, ContentValidation, DatabaseRange, NamedDefinition, NamedDefinitionScope,
+    NamedExpression, NamedRange, Sheet, SheetProtection, SpreadsheetProtection,
+    calculation::parse_calculation_settings,
     data_validation::parse_content_validations,
     database_range::parse_database_ranges,
     parser::OdsParser,
@@ -50,6 +51,7 @@ pub struct Spreadsheet {
     named_definitions: Vec<NamedDefinition>,
     content_validations: Vec<ContentValidation>,
     database_ranges: Vec<DatabaseRange>,
+    calculation_settings: Option<CalculationSettings>,
     protection: SpreadsheetProtection,
     sheet_protections: Vec<SheetProtection>,
     cell_styles: CellStyleRegistry,
@@ -133,6 +135,7 @@ impl Spreadsheet {
         let named_definitions = OdsParser::parse_named_definitions(content.xml_content())?;
         let content_validations = parse_content_validations(content.xml_content())?;
         let database_ranges = parse_database_ranges(content.xml_content())?;
+        let calculation_settings = parse_calculation_settings(content.xml_content())?;
         let (protection, sheet_protections) = parse_protection(content.xml_content())?;
 
         let styles = if package.has_file("styles.xml") {
@@ -161,10 +164,16 @@ impl Spreadsheet {
             named_definitions,
             content_validations,
             database_ranges,
+            calculation_settings,
             protection,
             sheet_protections,
             cell_styles,
         })
+    }
+
+    /// Return spreadsheet-wide formula calculation settings.
+    pub fn calculation_settings(&self) -> Option<&CalculationSettings> {
+        self.calculation_settings.as_ref()
     }
 
     /// Create an ODS spreadsheet from raw bytes (ZIP archive data).

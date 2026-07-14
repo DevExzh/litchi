@@ -4,10 +4,11 @@
 
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
-    Cell, CellAnnotation, CellDetective, CellRangeSource, CellValue, Column, ContentValidation,
-    DatabaseRange, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
-    SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, SpreadsheetProtection,
-    TableStructure, TableVisibility,
+    CalculationSettings, Cell, CellAnnotation, CellDetective, CellRangeSource, CellValue, Column,
+    ContentValidation, DatabaseRange, NamedDefinition, NamedDefinitionScope, NamedExpression,
+    NamedRange, Row, Sheet, SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource,
+    SpreadsheetProtection, TableStructure, TableVisibility,
+    calculation::write_calculation_settings,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     database_range::write_database_ranges,
@@ -52,6 +53,7 @@ pub struct SpreadsheetBuilder {
     named_definitions: Vec<NamedDefinition>,
     content_validations: Vec<ContentValidation>,
     database_ranges: Vec<DatabaseRange>,
+    calculation_settings: Option<CalculationSettings>,
     protection: SpreadsheetProtection,
 }
 
@@ -78,6 +80,7 @@ impl SpreadsheetBuilder {
             named_definitions: Vec::new(),
             content_validations: Vec::new(),
             database_ranges: Vec::new(),
+            calculation_settings: None,
             protection: SpreadsheetProtection::default(),
         }
     }
@@ -99,6 +102,23 @@ impl SpreadsheetBuilder {
     /// Return document-level cell validation definitions.
     pub fn content_validations(&self) -> &[ContentValidation] {
         &self.content_validations
+    }
+
+    /// Return spreadsheet-wide formula calculation settings.
+    pub fn calculation_settings(&self) -> Option<&CalculationSettings> {
+        self.calculation_settings.as_ref()
+    }
+
+    /// Set or clear validated spreadsheet-wide calculation settings.
+    pub fn set_calculation_settings(
+        &mut self,
+        settings: Option<CalculationSettings>,
+    ) -> Result<&mut Self> {
+        if let Some(settings) = &settings {
+            settings.validate()?;
+        }
+        self.calculation_settings = settings;
+        Ok(self)
     }
 
     /// Return database ranges added to this spreadsheet.
@@ -1434,6 +1454,7 @@ impl SpreadsheetBuilder {
 
         let mut body = String::with_capacity(estimated);
 
+        write_calculation_settings(&mut body, self.calculation_settings.as_ref())?;
         write_content_validations(&mut body, &self.content_validations);
 
         for sheet in &self.sheets {
@@ -2572,5 +2593,30 @@ mod tests {
         let cell = &spreadsheet.sheets().unwrap()[0].rows[0].cells[0];
         assert_eq!(cell.value, CellValue::Number(11.0));
         assert_eq!(cell.detective(), Some(&detective));
+    }
+
+    #[test]
+    fn builder_round_trips_calculation_settings() {
+        let settings = CalculationSettings {
+            case_sensitive: Some(true),
+            use_regular_expressions: Some(false),
+            null_year: std::num::NonZeroUsize::new(1930),
+            null_date: Some(crate::CalculationNullDate {
+                value_type_date: true,
+                date_value: Some("1899-12-30Z".to_string()),
+            }),
+            iteration: Some(crate::CalculationIteration {
+                status: Some(crate::IterationStatus::Enable),
+                steps: std::num::NonZeroUsize::new(50),
+                maximum_difference: Some("INF".to_string()),
+            }),
+            ..CalculationSettings::default()
+        };
+        let mut builder = SpreadsheetBuilder::new();
+        builder
+            .set_calculation_settings(Some(settings.clone()))
+            .unwrap();
+        let spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+        assert_eq!(spreadsheet.calculation_settings(), Some(&settings));
     }
 }

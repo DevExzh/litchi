@@ -25,6 +25,7 @@
 //! - ✅ Inert database query/table/SQL source metadata
 //! - ✅ What-if scenarios and inert external cell-range sources
 //! - ✅ Inert formula-auditing highlights and operations (`table:detective`)
+//! - ✅ Formula calculation, null-date, and iteration settings
 //!
 //! ## ✅ Formula Support (`formula.rs`) - PARTIAL
 //! - ✅ Formula string representation
@@ -48,6 +49,7 @@
 //! - ✅ Database ranges, filters, sorting, subtotals, and inert source metadata
 //! - ✅ Create, edit, remove, and round-trip scenarios and external range links
 //! - ✅ Create, edit, remove, and round-trip cell formula-auditing metadata
+//! - ✅ Create, edit, clear, and round-trip calculation settings
 //!
 //! ## 🚧 TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing (embedded charts)
@@ -64,6 +66,7 @@
 
 mod annotation;
 mod builder;
+mod calculation;
 mod cell;
 mod data_validation;
 mod database_range;
@@ -84,6 +87,9 @@ mod style_protection;
 
 pub use annotation::{AnnotationElement, AnnotationNode, CellAnnotation};
 pub use builder::SpreadsheetBuilder;
+pub use calculation::{
+    CalculationIteration, CalculationNullDate, CalculationSettings, IterationStatus,
+};
 pub use cell::{Cell, CellMatrixSpan, CellMerge, CellValue};
 pub use data_validation::{
     ContentValidation, ValidationDisplayList, ValidationErrorMacro, ValidationErrorMessage,

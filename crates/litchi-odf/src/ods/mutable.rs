@@ -5,10 +5,11 @@
 
 use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
 use crate::ods::{
-    Cell, CellAnnotation, CellDetective, CellRangeSource, CellValue, Column, ContentValidation,
-    DatabaseRange, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
-    SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, Spreadsheet,
-    SpreadsheetProtection, TableStructure, TableVisibility,
+    CalculationSettings, Cell, CellAnnotation, CellDetective, CellRangeSource, CellValue, Column,
+    ContentValidation, DatabaseRange, NamedDefinition, NamedDefinitionScope, NamedExpression,
+    NamedRange, Row, Sheet, SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource,
+    Spreadsheet, SpreadsheetProtection, TableStructure, TableVisibility,
+    calculation::write_calculation_settings,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     database_range::write_database_ranges,
@@ -63,6 +64,7 @@ pub struct MutableSpreadsheet {
     named_definitions: Vec<NamedDefinition>,
     content_validations: Vec<ContentValidation>,
     database_ranges: Vec<DatabaseRange>,
+    calculation_settings: Option<CalculationSettings>,
     protection: SpreadsheetProtection,
     /// Original package retained for copying auxiliary package parts.
     source_package: Option<OwnedPackage>,
@@ -146,6 +148,7 @@ impl MutableSpreadsheet {
         let named_definitions = spreadsheet.named_definitions().to_vec();
         let content_validations = spreadsheet.content_validations().to_vec();
         let database_ranges = spreadsheet.database_ranges().to_vec();
+        let calculation_settings = spreadsheet.calculation_settings().cloned();
         let protection = spreadsheet.protection().clone();
         let mimetype = "application/vnd.oasis.opendocument.spreadsheet".to_string();
         let source_package = Some(spreadsheet.into_package());
@@ -160,6 +163,7 @@ impl MutableSpreadsheet {
             named_definitions,
             content_validations,
             database_ranges,
+            calculation_settings,
             protection,
             source_package,
         })
@@ -177,6 +181,7 @@ impl MutableSpreadsheet {
             named_definitions: Vec::new(),
             content_validations: Vec::new(),
             database_ranges: Vec::new(),
+            calculation_settings: None,
             protection: SpreadsheetProtection::default(),
             source_package: None,
         }
@@ -210,6 +215,23 @@ impl MutableSpreadsheet {
     /// Return document-level content validation definitions.
     pub fn content_validations(&self) -> &[ContentValidation] {
         &self.content_validations
+    }
+
+    /// Return spreadsheet-wide formula calculation settings.
+    pub fn calculation_settings(&self) -> Option<&CalculationSettings> {
+        self.calculation_settings.as_ref()
+    }
+
+    /// Set or clear validated spreadsheet-wide calculation settings.
+    pub fn set_calculation_settings(
+        &mut self,
+        settings: Option<CalculationSettings>,
+    ) -> Result<()> {
+        if let Some(settings) = &settings {
+            settings.validate()?;
+        }
+        self.calculation_settings = settings;
+        Ok(())
     }
 
     /// Return database ranges and their filter/sort metadata.
@@ -1240,6 +1262,7 @@ impl MutableSpreadsheet {
     /// Generate content.xml from current state.
     fn generate_content_xml(&self) -> Result<String> {
         let mut body = String::new();
+        write_calculation_settings(&mut body, self.calculation_settings.as_ref())?;
         write_content_validations(&mut body, &self.content_validations);
 
         for sheet in &self.sheets {
@@ -1959,5 +1982,30 @@ mod tests {
             mutable.remove_cell_detective(0, 2, 3).unwrap(),
             Some(detective)
         );
+    }
+
+    #[test]
+    fn mutable_spreadsheet_preserves_and_edits_calculation_settings() {
+        let original = CalculationSettings {
+            precision_as_shown: Some(true),
+            ..CalculationSettings::default()
+        };
+        let mut builder = SpreadsheetBuilder::new();
+        builder
+            .set_calculation_settings(Some(original.clone()))
+            .unwrap();
+        let spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+        let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
+        assert_eq!(mutable.calculation_settings(), Some(&original));
+
+        let replacement = CalculationSettings {
+            use_wildcards: Some(true),
+            ..CalculationSettings::default()
+        };
+        mutable
+            .set_calculation_settings(Some(replacement.clone()))
+            .unwrap();
+        let output = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        assert_eq!(output.calculation_settings(), Some(&replacement));
     }
 }
