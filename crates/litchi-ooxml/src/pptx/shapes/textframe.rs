@@ -1,5 +1,5 @@
 /// Text frame for accessing text content in shapes.
-use crate::common::xml::decode_xml_reference;
+use crate::common::xml::{decode_xml_reference, extract_omml_formulas};
 use crate::error::{OoxmlError, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
@@ -8,8 +8,6 @@ use quick_xml::reader::NsReader;
 
 const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
-const OMML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/officeDocument/2006/math";
-const STRICT_OMML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/math";
 
 fn is_drawingml_name(
     namespace: &ResolveResult<'_>,
@@ -267,100 +265,6 @@ fn emit_drawingml_range(
     )
 }
 
-fn is_omml_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: &[u8]) -> bool {
-    if name.local_name().as_ref() != local_name {
-        return false;
-    }
-    match namespace {
-        ResolveResult::Bound(Namespace(value)) => {
-            *value == OMML_NAMESPACE || *value == STRICT_OMML_NAMESPACE
-        },
-        // TextFrame and Paragraph are often slices whose namespace declarations live on
-        // an ancestor. The conventional OMML prefix is safe to accept when it is unresolved;
-        // an explicitly foreign binding is still rejected by the Bound branch above.
-        ResolveResult::Unknown(prefix) => prefix.as_slice() == b"m",
-        ResolveResult::Unbound => false,
-    }
-}
-
-fn scan_omml_formula_ranges(
-    xml_bytes: &[u8],
-    mut emit: impl FnMut(usize, usize) -> Result<()>,
-) -> Result<()> {
-    enum ScanEvent {
-        Start,
-        NestedStart,
-        Empty,
-        End,
-        Eof,
-        Other,
-    }
-
-    let mut reader = NsReader::from_reader(xml_bytes);
-    let mut capture: Option<(usize, usize)> = None;
-
-    loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| OoxmlError::InvalidFormat("OMML offset does not fit usize".to_string()))?;
-        let event = {
-            let (namespace, event) = reader
-                .read_resolved_event()
-                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
-            match event {
-                Event::Start(_) if capture.is_some() => ScanEvent::NestedStart,
-                Event::Start(element) if is_omml_name(&namespace, element.name(), b"oMath") => {
-                    ScanEvent::Start
-                },
-                Event::Empty(element)
-                    if capture.is_none() && is_omml_name(&namespace, element.name(), b"oMath") =>
-                {
-                    ScanEvent::Empty
-                },
-                Event::End(_) if capture.is_some() => ScanEvent::End,
-                Event::Eof => ScanEvent::Eof,
-                _ => ScanEvent::Other,
-            }
-        };
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| OoxmlError::InvalidFormat("OMML offset does not fit usize".to_string()))?;
-
-        match event {
-            ScanEvent::NestedStart => {
-                let Some((_, depth)) = capture.as_mut() else {
-                    unreachable!("capture was checked above");
-                };
-                *depth = depth.checked_add(1).ok_or_else(|| {
-                    OoxmlError::InvalidFormat("OMML nesting is too deep".to_string())
-                })?;
-            },
-            ScanEvent::Start => capture = Some((event_start, 1)),
-            ScanEvent::Empty => emit(event_start, event_end)?,
-            ScanEvent::End => {
-                let Some((_, depth)) = capture.as_mut() else {
-                    unreachable!("capture was checked above");
-                };
-                *depth = depth
-                    .checked_sub(1)
-                    .ok_or_else(|| OoxmlError::InvalidFormat("invalid OMML nesting".to_string()))?;
-                if *depth == 0 {
-                    let Some((start, _)) = capture.take() else {
-                        unreachable!("capture was checked above");
-                    };
-                    emit(start, event_end)?;
-                }
-            },
-            ScanEvent::Eof if capture.is_some() => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated OMML formula".to_string(),
-                ));
-            },
-            ScanEvent::Eof => break,
-            ScanEvent::Other => {},
-        }
-    }
-    Ok(())
-}
-
 /// A text frame containing text content.
 ///
 /// Text frames are found in shape objects and provide access to the
@@ -421,21 +325,7 @@ impl TextFrame {
     ///
     /// Returns the exact XML of each OMML `<oMath>` element in document order.
     pub fn omml_formulas(&self) -> Result<Vec<String>> {
-        let mut formulas = Vec::new();
-        scan_omml_formula_ranges(&self.xml_bytes, |start, end| {
-            let formula = self.xml_bytes.get(start..end).ok_or_else(|| {
-                OoxmlError::InvalidFormat("invalid OMML formula range".to_string())
-            })?;
-            formulas.push(
-                std::str::from_utf8(formula)
-                    .map_err(|_| {
-                        OoxmlError::InvalidFormat("OMML formula is not UTF-8".to_string())
-                    })?
-                    .to_owned(),
-            );
-            Ok(())
-        })?;
-        Ok(formulas)
+        extract_omml_formulas(&self.xml_bytes)
     }
 }
 
