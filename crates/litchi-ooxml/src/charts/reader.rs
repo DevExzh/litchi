@@ -5375,6 +5375,7 @@ fn parse_date_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
     let mut minor_time_unit = None;
     let mut base_time_unit = None;
     let mut auto = true;
+    let mut label_offset = None;
     let mut in_scaling = false;
     let mut buf = Vec::new();
 
@@ -5422,6 +5423,14 @@ fn parse_date_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
                     b"minorTimeUnit" => minor_time_unit = Some(parse_time_unit(element)?),
                     b"baseTimeUnit" => base_time_unit = Some(parse_time_unit(element)?),
                     b"auto" => auto = parse_bool_attr(element)?,
+                    b"lblOffset" => {
+                        label_offset = Some(bounded_u32_attr(
+                            element,
+                            "chart date-axis label offset",
+                            0,
+                            1000,
+                        )?);
+                    },
                     _ => {},
                 }
             },
@@ -5449,6 +5458,7 @@ fn parse_date_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
     axis.minor_time_unit = minor_time_unit;
     axis.base_time_unit = base_time_unit;
     axis.auto = auto;
+    axis.label_offset = label_offset;
     Ok(Some(axis))
 }
 
@@ -8144,6 +8154,7 @@ mod tests {
         date.minor_time_unit = Some(TimeUnit::Days);
         date.base_time_unit = Some(TimeUnit::Years);
         date.auto = false;
+        date.label_offset = Some(175);
 
         let mut series = SeriesAxis::new(40, AxisPosition::Right, 30);
         series.min = Some(1.0);
@@ -8270,6 +8281,7 @@ mod tests {
         assert_eq!(date.minor_time_unit, Some(TimeUnit::Days));
         assert_eq!(date.base_time_unit, Some(TimeUnit::Years));
         assert!(!date.auto);
+        assert_eq!(date.label_offset, Some(175));
 
         let Axis::Series(series) = &parsed.plot_area.axes[3] else {
             unreachable!();

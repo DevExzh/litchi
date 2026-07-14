@@ -2420,6 +2420,14 @@ fn write_date_axis<W: Write>(writer: &mut W, axis: &DateAxis) -> std::io::Result
         r#"<c:auto val="{}"/>"#,
         if axis.auto { "1" } else { "0" }
     )?;
+    if let Some(offset) = axis.label_offset {
+        if offset > 1000 {
+            return Err(invalid_chart_input(
+                "chart date-axis label offset must be between 0 and 1000",
+            ));
+        }
+        write!(writer, r#"<c:lblOffset val="{}"/>"#, offset)?;
+    }
     if let Some(unit) = axis.base_time_unit {
         write!(writer, r#"<c:baseTimeUnit val="{}"/>"#, unit.xml_value())?;
     }

@@ -421,6 +421,8 @@ pub struct DateAxis {
     pub base_time_unit: Option<TimeUnit>,
     /// Automatically determine text/date type
     pub auto: bool,
+    /// Label offset from axis (0-1000)
+    pub label_offset: Option<u32>,
 }
 
 impl DateAxis {
@@ -438,6 +440,7 @@ impl DateAxis {
             minor_time_unit: None,
             base_time_unit: None,
             auto: true,
+            label_offset: None,
         }
     }
 }
