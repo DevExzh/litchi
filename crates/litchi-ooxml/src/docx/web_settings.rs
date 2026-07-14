@@ -12,6 +12,7 @@ use quick_xml::reader::NsReader;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WebSettings {
     frameset: Option<Frameset>,
+    divs: Option<Vec<HtmlDiv>>,
     encoding: Option<String>,
     optimize_for_browser: Option<bool>,
     rely_on_vml: Option<bool>,
@@ -23,6 +24,43 @@ pub struct WebSettings {
     pixels_per_inch: Option<String>,
     target_screen_size: Option<TargetScreenSize>,
     save_smart_tags_as_xml: Option<bool>,
+}
+
+/// Fidelity information for one HTML `div`, `body`, or `blockquote` element.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct HtmlDiv {
+    id: String,
+    block_quote: Option<bool>,
+    body_div: Option<bool>,
+    margin_left_twips: Option<String>,
+    margin_right_twips: Option<String>,
+    margin_top_twips: Option<String>,
+    margin_bottom_twips: Option<String>,
+    borders: Option<HtmlDivBorders>,
+    children: Vec<HtmlDiv>,
+}
+
+/// Borders around an HTML division.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct HtmlDivBorders {
+    top: Option<HtmlDivBorder>,
+    left: Option<HtmlDivBorder>,
+    bottom: Option<HtmlDivBorder>,
+    right: Option<HtmlDivBorder>,
+}
+
+/// One border around an HTML division.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HtmlDivBorder {
+    style: String,
+    color: Option<String>,
+    theme_color: Option<ThemeColor>,
+    theme_tint: Option<u8>,
+    theme_shade: Option<u8>,
+    size_eighth_points: Option<u64>,
+    space_points: Option<u64>,
+    shadow: Option<bool>,
+    frame: Option<bool>,
 }
 
 /// A recursive web frameset definition.
@@ -344,10 +382,109 @@ impl FramesetColor {
     }
 }
 
+impl HtmlDiv {
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn is_block_quote(&self) -> Option<bool> {
+        self.block_quote
+    }
+
+    pub fn is_body_div(&self) -> Option<bool> {
+        self.body_div
+    }
+
+    pub fn margin_left_twips(&self) -> Option<&str> {
+        self.margin_left_twips.as_deref()
+    }
+
+    pub fn margin_right_twips(&self) -> Option<&str> {
+        self.margin_right_twips.as_deref()
+    }
+
+    pub fn margin_top_twips(&self) -> Option<&str> {
+        self.margin_top_twips.as_deref()
+    }
+
+    pub fn margin_bottom_twips(&self) -> Option<&str> {
+        self.margin_bottom_twips.as_deref()
+    }
+
+    pub fn borders(&self) -> Option<&HtmlDivBorders> {
+        self.borders.as_ref()
+    }
+
+    pub fn children(&self) -> &[HtmlDiv] {
+        &self.children
+    }
+}
+
+impl HtmlDivBorders {
+    pub fn top(&self) -> Option<&HtmlDivBorder> {
+        self.top.as_ref()
+    }
+
+    pub fn left(&self) -> Option<&HtmlDivBorder> {
+        self.left.as_ref()
+    }
+
+    pub fn bottom(&self) -> Option<&HtmlDivBorder> {
+        self.bottom.as_ref()
+    }
+
+    pub fn right(&self) -> Option<&HtmlDivBorder> {
+        self.right.as_ref()
+    }
+}
+
+impl HtmlDivBorder {
+    pub fn style(&self) -> &str {
+        &self.style
+    }
+
+    pub fn color(&self) -> Option<&str> {
+        self.color.as_deref()
+    }
+
+    pub fn theme_color(&self) -> Option<ThemeColor> {
+        self.theme_color
+    }
+
+    pub fn theme_tint(&self) -> Option<u8> {
+        self.theme_tint
+    }
+
+    pub fn theme_shade(&self) -> Option<u8> {
+        self.theme_shade
+    }
+
+    pub fn size_eighth_points(&self) -> Option<u64> {
+        self.size_eighth_points
+    }
+
+    pub fn space_points(&self) -> Option<u64> {
+        self.space_points
+    }
+
+    pub fn shadow(&self) -> Option<bool> {
+        self.shadow
+    }
+
+    pub fn frame(&self) -> Option<bool> {
+        self.frame
+    }
+}
+
 impl WebSettings {
     /// Return the root frameset definition, if present.
     pub fn frameset(&self) -> Option<&Frameset> {
         self.frameset.as_ref()
+    }
+
+    /// Return the top-level HTML division definitions, preserving part absence.
+    pub fn divs(&self) -> Option<&[HtmlDiv]> {
+        self.divs.as_deref()
     }
 
     /// Return the requested output encoding, if declared.
@@ -445,6 +582,14 @@ impl WebSettings {
                                     "invalid Word web-settings XML nesting".into(),
                                 )
                             })?;
+                        } else if element.local_name().as_ref() == b"divs" {
+                            let divs = parse_div_container(&mut reader, b"divs", 1)?;
+                            set_once(&mut settings.divs, divs, "divs")?;
+                            depth = depth.checked_sub(1).ok_or_else(|| {
+                                OoxmlError::InvalidFormat(
+                                    "invalid Word web-settings XML nesting".into(),
+                                )
+                            })?;
                         } else {
                             parse_setting(&element, decoder, &resolver, &mut settings)?;
                         }
@@ -465,6 +610,8 @@ impl WebSettings {
                     {
                         if element.local_name().as_ref() == b"frameset" {
                             set_once(&mut settings.frameset, Frameset::default(), "frameset")?;
+                        } else if element.local_name().as_ref() == b"divs" {
+                            set_once(&mut settings.divs, Vec::new(), "divs")?;
                         } else {
                             parse_setting(&element, decoder, &resolver, &mut settings)?;
                         }
@@ -742,6 +889,325 @@ fn parse_frameset(reader: &mut NsReader<&[u8]>, nesting: usize) -> Result<Frames
     }
 }
 
+fn parse_div_container(
+    reader: &mut NsReader<&[u8]>,
+    end_name: &[u8],
+    nesting: usize,
+) -> Result<Vec<HtmlDiv>> {
+    if nesting > MAX_FRAMESET_NESTING {
+        return Err(OoxmlError::InvalidFormat(
+            "Word HTML division nesting exceeds the supported safety limit".into(),
+        ));
+    }
+    let mut divs = Vec::new();
+    loop {
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element)
+                if is_wordprocessing_namespace(&namespace)
+                    && element.local_name().as_ref() == b"div" =>
+            {
+                divs.push(parse_html_div(
+                    reader, &element, decoder, &resolver, nesting,
+                )?);
+            },
+            Event::Empty(element)
+                if is_wordprocessing_namespace(&namespace)
+                    && element.local_name().as_ref() == b"div" =>
+            {
+                divs.push(new_html_div(&element, decoder, &resolver)?);
+            },
+            Event::Start(_) => skip_element(reader)?,
+            Event::End(element)
+                if is_wordprocessing_namespace(&namespace)
+                    && element.local_name().as_ref() == end_name =>
+            {
+                return Ok(divs);
+            },
+            Event::Eof => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated Word HTML division container".into(),
+                ));
+            },
+            _ => {},
+        }
+    }
+}
+
+fn new_html_div(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+) -> Result<HtmlDiv> {
+    let id = word_attribute_value(element, b"id", decoder, resolver)?
+        .ok_or_else(|| OoxmlError::InvalidFormat("Word HTML division ID is required".into()))?;
+    Ok(HtmlDiv {
+        id,
+        ..HtmlDiv::default()
+    })
+}
+
+fn parse_html_div(
+    reader: &mut NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    nesting: usize,
+) -> Result<HtmlDiv> {
+    let mut div = new_html_div(element, decoder, resolver)?;
+    let mut children_present = false;
+    loop {
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) if is_wordprocessing_namespace(&namespace) => {
+                match element.local_name().as_ref() {
+                    name if is_html_div_leaf(name) => {
+                        parse_html_div_leaf(&element, decoder, &resolver, &mut div)?;
+                        finish_leaf(reader, "HTML division property")?;
+                    },
+                    b"divBdr" => {
+                        let borders = parse_html_div_borders(reader)?;
+                        set_once(&mut div.borders, borders, "HTML division borders")?;
+                    },
+                    b"divsChild" => {
+                        if children_present {
+                            return Err(OoxmlError::InvalidFormat(
+                                "duplicate Word HTML child division container".into(),
+                            ));
+                        }
+                        children_present = true;
+                        div.children = parse_div_container(reader, b"divsChild", nesting + 1)?;
+                    },
+                    _ => skip_element(reader)?,
+                }
+            },
+            Event::Empty(element) if is_wordprocessing_namespace(&namespace) => {
+                match element.local_name().as_ref() {
+                    name if is_html_div_leaf(name) => {
+                        parse_html_div_leaf(&element, decoder, &resolver, &mut div)?;
+                    },
+                    b"divBdr" => set_once(
+                        &mut div.borders,
+                        HtmlDivBorders::default(),
+                        "HTML division borders",
+                    )?,
+                    b"divsChild" => {
+                        mark_html_div_children_present(&mut children_present)?;
+                    },
+                    _ => {},
+                }
+            },
+            Event::Start(_) => skip_element(reader)?,
+            Event::End(element)
+                if is_wordprocessing_namespace(&namespace)
+                    && element.local_name().as_ref() == b"div" =>
+            {
+                return Ok(div);
+            },
+            Event::Eof => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated Word HTML division".into(),
+                ));
+            },
+            _ => {},
+        }
+    }
+}
+
+fn mark_html_div_children_present(present: &mut bool) -> Result<()> {
+    if std::mem::replace(present, true) {
+        return Err(OoxmlError::InvalidFormat(
+            "duplicate Word HTML child division container".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn is_html_div_leaf(name: &[u8]) -> bool {
+    matches!(
+        name,
+        b"blockQuote" | b"bodyDiv" | b"marLeft" | b"marRight" | b"marTop" | b"marBottom"
+    )
+}
+
+fn parse_html_div_leaf(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    div: &mut HtmlDiv,
+) -> Result<()> {
+    match element.local_name().as_ref() {
+        b"blockQuote" => set_on_off(
+            &mut div.block_quote,
+            element,
+            decoder,
+            resolver,
+            "HTML blockQuote",
+        ),
+        b"bodyDiv" => set_on_off(
+            &mut div.body_div,
+            element,
+            decoder,
+            resolver,
+            "HTML bodyDiv",
+        ),
+        b"marLeft" => set_signed_twips(
+            &mut div.margin_left_twips,
+            element,
+            decoder,
+            resolver,
+            "HTML division left margin",
+        ),
+        b"marRight" => set_signed_twips(
+            &mut div.margin_right_twips,
+            element,
+            decoder,
+            resolver,
+            "HTML division right margin",
+        ),
+        b"marTop" => set_signed_twips(
+            &mut div.margin_top_twips,
+            element,
+            decoder,
+            resolver,
+            "HTML division top margin",
+        ),
+        b"marBottom" => set_signed_twips(
+            &mut div.margin_bottom_twips,
+            element,
+            decoder,
+            resolver,
+            "HTML division bottom margin",
+        ),
+        _ => Ok(()),
+    }
+}
+
+fn set_signed_twips(
+    slot: &mut Option<String>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    description: &str,
+) -> Result<()> {
+    let value = required_value(element, decoder, resolver, description)?;
+    let value = value.trim();
+    if !is_xml_integer(value) {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "invalid {description} value '{value}'"
+        )));
+    }
+    set_once(slot, value.to_owned(), description)
+}
+
+fn parse_html_div_borders(reader: &mut NsReader<&[u8]>) -> Result<HtmlDivBorders> {
+    let mut borders = HtmlDivBorders::default();
+    loop {
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element)
+                if is_wordprocessing_namespace(&namespace)
+                    && is_html_div_border_side(element.local_name().as_ref()) =>
+            {
+                set_html_div_border(&mut borders, &element, decoder, &resolver)?;
+                finish_leaf(reader, "HTML division border")?;
+            },
+            Event::Empty(element)
+                if is_wordprocessing_namespace(&namespace)
+                    && is_html_div_border_side(element.local_name().as_ref()) =>
+            {
+                set_html_div_border(&mut borders, &element, decoder, &resolver)?;
+            },
+            Event::Start(_) => skip_element(reader)?,
+            Event::End(element)
+                if is_wordprocessing_namespace(&namespace)
+                    && element.local_name().as_ref() == b"divBdr" =>
+            {
+                return Ok(borders);
+            },
+            Event::Eof => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated Word HTML division borders".into(),
+                ));
+            },
+            _ => {},
+        }
+    }
+}
+
+fn is_html_div_border_side(name: &[u8]) -> bool {
+    matches!(name, b"top" | b"left" | b"bottom" | b"right")
+}
+
+fn set_html_div_border(
+    borders: &mut HtmlDivBorders,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+) -> Result<()> {
+    let border = parse_html_div_border(element, decoder, resolver)?;
+    let (slot, description) = match element.local_name().as_ref() {
+        b"top" => (&mut borders.top, "top HTML division border"),
+        b"left" => (&mut borders.left, "left HTML division border"),
+        b"bottom" => (&mut borders.bottom, "bottom HTML division border"),
+        b"right" => (&mut borders.right, "right HTML division border"),
+        _ => return Ok(()),
+    };
+    set_once(slot, border, description)
+}
+
+fn parse_html_div_border(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+) -> Result<HtmlDivBorder> {
+    let style = required_value(element, decoder, resolver, "HTML division border style")?;
+    let color = word_attribute_value(element, b"color", decoder, resolver)?;
+    if let Some(color) = &color
+        && color != "auto"
+        && (color.len() != 6 || !color.bytes().all(|byte| byte.is_ascii_hexdigit()))
+    {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "invalid HTML division border color '{color}'"
+        )));
+    }
+    let theme_color = word_attribute_value(element, b"themeColor", decoder, resolver)?
+        .map(|value| {
+            ThemeColor::from_xml(&value)
+                .ok_or_else(|| OoxmlError::InvalidFormat(format!("invalid theme color '{value}'")))
+        })
+        .transpose()?;
+    Ok(HtmlDivBorder {
+        style,
+        color,
+        theme_color,
+        theme_tint: optional_hex_byte(element, b"themeTint", decoder, resolver)?,
+        theme_shade: optional_hex_byte(element, b"themeShade", decoder, resolver)?,
+        size_eighth_points: optional_unsigned_long_attribute(element, b"sz", decoder, resolver)?,
+        space_points: optional_unsigned_long_attribute(element, b"space", decoder, resolver)?,
+        shadow: optional_on_off_attribute(element, b"shadow", decoder, resolver)?,
+        frame: optional_on_off_attribute(element, b"frame", decoder, resolver)?,
+    })
+}
+
 fn parse_frame(reader: &mut NsReader<&[u8]>) -> Result<Frame> {
     let mut frame = Frame::default();
     loop {
@@ -984,6 +1450,40 @@ fn required_unsigned_long(
     value.trim().parse::<u64>().map_err(|_| {
         OoxmlError::InvalidFormat(format!("invalid unsigned {description} value '{value}'"))
     })
+}
+
+fn optional_unsigned_long_attribute(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+) -> Result<Option<u64>> {
+    word_attribute_value(element, name, decoder, resolver)?
+        .map(|value| {
+            value.trim().parse::<u64>().map_err(|_| {
+                OoxmlError::InvalidFormat(format!(
+                    "invalid unsigned Word attribute value '{value}'"
+                ))
+            })
+        })
+        .transpose()
+}
+
+fn optional_on_off_attribute(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+) -> Result<Option<bool>> {
+    word_attribute_value(element, name, decoder, resolver)?
+        .map(|value| match value.as_str() {
+            "true" | "1" | "on" => Ok(true),
+            "false" | "0" | "off" => Ok(false),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid Word on/off value '{value}'"
+            ))),
+        })
+        .transpose()
 }
 
 fn optional_hex_byte(
@@ -1305,5 +1805,85 @@ mod tests {
             true,
         );
         assert!(WebSettings::extract_from_part(&part).is_ok());
+    }
+
+    #[test]
+    fn parses_recursive_html_divisions_and_border_properties() {
+        let xml = br#"<s:webSettings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main" xmlns:false="urn:not-wordprocessingml">
+          <s:divs>
+            <s:div s:id="1785730240">
+              <s:blockQuote/>
+              <s:bodyDiv s:val="off"/>
+              <s:marLeft s:val=" -123456789012345678901234567890 "/>
+              <s:marRight s:val="+42"/>
+              <s:marTop s:val="0"/>
+              <s:marBottom s:val="700"/>
+              <s:divBdr>
+                <s:top s:val="single" s:color="A0b1C2" s:themeColor="text2" s:themeTint="10" s:themeShade="ff" s:sz="18446744073709551615" s:space="6" s:shadow="on" s:frame="0"/>
+                <s:left s:val="zigZagStitch"/>
+              </s:divBdr>
+              <s:divsChild>
+                <s:div s:id="child"><s:bodyDiv/></s:div>
+              </s:divsChild>
+            </s:div>
+            <s:div s:id="second"/>
+            <false:div false:id="ignored"/>
+          </s:divs>
+        </s:webSettings>"#;
+
+        let settings = WebSettings::extract_from_xml(xml).unwrap();
+        let divs = settings.divs().unwrap();
+        assert_eq!(divs.len(), 2);
+        let div = &divs[0];
+        assert_eq!(div.id(), "1785730240");
+        assert_eq!(div.is_block_quote(), Some(true));
+        assert_eq!(div.is_body_div(), Some(false));
+        assert_eq!(
+            div.margin_left_twips(),
+            Some("-123456789012345678901234567890")
+        );
+        assert_eq!(div.margin_right_twips(), Some("+42"));
+        assert_eq!(div.margin_top_twips(), Some("0"));
+        assert_eq!(div.margin_bottom_twips(), Some("700"));
+        assert_eq!(div.children()[0].id(), "child");
+        assert_eq!(div.children()[0].is_body_div(), Some(true));
+
+        let borders = div.borders().unwrap();
+        let top = borders.top().unwrap();
+        assert_eq!(top.style(), "single");
+        assert_eq!(top.color(), Some("A0b1C2"));
+        assert_eq!(top.theme_color(), Some(ThemeColor::Text2));
+        assert_eq!(top.theme_tint(), Some(0x10));
+        assert_eq!(top.theme_shade(), Some(0xff));
+        assert_eq!(top.size_eighth_points(), Some(u64::MAX));
+        assert_eq!(top.space_points(), Some(6));
+        assert_eq!(top.shadow(), Some(true));
+        assert_eq!(top.frame(), Some(false));
+        assert_eq!(borders.left().unwrap().style(), "zigZagStitch");
+        assert!(borders.bottom().is_none());
+        assert!(borders.right().is_none());
+    }
+
+    #[test]
+    fn validates_html_division_structure_and_values() {
+        const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+        let missing_id =
+            format!(r#"<w:webSettings xmlns:w="{W}"><w:divs><w:div/></w:divs></w:webSettings>"#);
+        assert!(WebSettings::extract_from_xml(missing_id.as_bytes()).is_err());
+
+        let invalid_margin = format!(
+            r#"<w:webSettings xmlns:w="{W}"><w:divs><w:div w:id="1"><w:marLeft w:val="1.5"/></w:div></w:divs></w:webSettings>"#
+        );
+        assert!(WebSettings::extract_from_xml(invalid_margin.as_bytes()).is_err());
+
+        let invalid_color = format!(
+            r#"<w:webSettings xmlns:w="{W}"><w:divs><w:div w:id="1"><w:divBdr><w:left w:val="single" w:color="xyz"/></w:divBdr></w:div></w:divs></w:webSettings>"#
+        );
+        assert!(WebSettings::extract_from_xml(invalid_color.as_bytes()).is_err());
+
+        let duplicate_child_container = format!(
+            r#"<w:webSettings xmlns:w="{W}"><w:divs><w:div w:id="1"><w:divsChild/><w:divsChild/></w:div></w:divs></w:webSettings>"#
+        );
+        assert!(WebSettings::extract_from_xml(duplicate_child_container.as_bytes()).is_err());
     }
 }

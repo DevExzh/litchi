@@ -106,7 +106,8 @@ pub use theme::Theme;
 pub use variables::DocumentVariables;
 pub use web_settings::{
     Frame, FrameLayout, FrameScrollbarVisibility, Frameset, FramesetChild, FramesetColor,
-    FramesetSplitBar, TargetScreenSize, ThemeColor, WebSettings,
+    FramesetSplitBar, HtmlDiv, HtmlDivBorder, HtmlDivBorders, TargetScreenSize, ThemeColor,
+    WebSettings,
 };
 // Re-export shared formatting types
 pub use format::{ImageFormat, LineSpacing, ParagraphAlignment, TableBorderStyle, UnderlineStyle};
