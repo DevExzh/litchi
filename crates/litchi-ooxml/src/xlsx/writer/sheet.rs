@@ -973,8 +973,8 @@ impl MutableWorksheet {
     ///
     /// let comment = ThreadedComment {
     ///     cell_ref: Some("A1".to_string()),
-    ///     id: "comment-guid-1".to_string(),
-    ///     person_id: "person-guid-1".to_string(),
+    ///     id: "{22222222-2222-2222-2222-222222222222}".to_string(),
+    ///     person_id: "{11111111-1111-1111-1111-111111111111}".to_string(),
     ///     text: Some("This is a threaded comment".to_string()),
     ///     ..Default::default()
     /// };

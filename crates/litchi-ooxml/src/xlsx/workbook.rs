@@ -579,7 +579,12 @@ impl Workbook {
             .ok_or("Worksheet index out of bounds")?;
 
         let worksheet_uri = self.worksheet_part_uri(ws_info)?;
-        crate::xlsx::read_threaded_comments(self.package(), &worksheet_uri)
+        let comments = crate::xlsx::read_threaded_comments(self.package(), &worksheet_uri)?;
+        if let Some(comments) = comments.as_ref() {
+            let people = self.persons()?;
+            validate_threaded_comment_people(comments.comments.iter(), people.as_ref())?;
+        }
+        Ok(comments)
     }
 
     /// Read threaded comments for a worksheet by name.
@@ -1015,6 +1020,12 @@ impl Workbook {
             .worksheets
             .iter()
             .any(|ws| !ws.threaded_comments().is_empty());
+        validate_threaded_comment_people(
+            data.worksheets
+                .iter()
+                .flat_map(|worksheet| worksheet.threaded_comments()),
+            data.person_list.as_ref(),
+        )?;
 
         if let Some(person_list) = data.person_list.as_ref()
             && !person_list.persons.is_empty()
@@ -1846,18 +1857,85 @@ impl Workbook {
     // - The library is production-ready for standard Excel CRUD operations
 }
 
+fn validate_threaded_comment_people<'a>(
+    comments: impl IntoIterator<Item = &'a crate::xlsx::ThreadedComment>,
+    person_list: Option<&crate::xlsx::PersonList>,
+) -> SheetResult<()> {
+    use std::collections::HashSet;
+
+    let person_ids: HashSet<&str> = person_list
+        .map(|people| {
+            people
+                .persons
+                .iter()
+                .map(|person| person.id.as_str())
+                .collect()
+        })
+        .unwrap_or_default();
+    for comment in comments {
+        if !person_ids.contains(comment.person_id.as_str()) {
+            return Err(format!(
+                "threaded comment '{}' references missing person '{}'",
+                comment.id, comment.person_id
+            )
+            .into());
+        }
+        for mention in &comment.mentions {
+            if !person_ids.contains(mention.mention_person_id.as_str()) {
+                return Err(format!(
+                    "mention '{}' references missing person '{}'",
+                    mention.mention_id, mention.mention_person_id
+                )
+                .into());
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::Workbook;
+    use super::{Workbook, validate_threaded_comment_people};
     use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
     use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
+
+    use crate::xlsx::{Mention, Person, PersonList, ThreadedComment};
 
     const WORKBOOK_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
           xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <sheets><sheet name="Sales" sheetId="42" r:id="rId1"/></sheets>
 </workbook>"#;
+
+    #[test]
+    fn validates_threaded_comment_people_references() {
+        let person_id = "{11111111-1111-1111-1111-111111111111}";
+        let missing_id = "{22222222-2222-2222-2222-222222222222}";
+        let people = PersonList {
+            persons: vec![Person {
+                id: person_id.into(),
+                ..Default::default()
+            }],
+        };
+        let comment = ThreadedComment {
+            id: "{33333333-3333-3333-3333-333333333333}".into(),
+            person_id: person_id.into(),
+            mentions: vec![Mention {
+                mention_id: "{44444444-4444-4444-4444-444444444444}".into(),
+                mention_person_id: person_id.into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        validate_threaded_comment_people([&comment], Some(&people)).unwrap();
+        assert!(validate_threaded_comment_people([&comment], None).is_err());
+
+        let mut invalid = comment;
+        invalid.mentions[0].mention_person_id = missing_id.into();
+        assert!(validate_threaded_comment_people([&invalid], Some(&people)).is_err());
+    }
 
     const WORKSHEET_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"

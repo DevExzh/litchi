@@ -93,7 +93,7 @@ fn generate_basic_example(path: &Path) -> ExampleResult<()> {
 
     let comment2 = ThreadedComment {
         cell_ref: Some("B3".to_string()),
-        id: "{B2C3D4E5-F6G7-8901-BCDE-F12345678901}".to_string(),
+        id: "{B2C3D4E5-F6A7-8901-BCDE-F12345678901}".to_string(),
         person_id: "{22222222-3333-4444-5555-666666666666}".to_string(),
         text: Some("We should follow Material Design guidelines.".to_string()),
         date_time: Some("2024-01-15T11:15:00Z".to_string()),
@@ -104,7 +104,7 @@ fn generate_basic_example(path: &Path) -> ExampleResult<()> {
 
     let comment3 = ThreadedComment {
         cell_ref: Some("B4".to_string()),
-        id: "{C3D4E5F6-G7H8-9012-CDEF-123456789012}".to_string(),
+        id: "{C3D4E5F6-A7B8-9012-CDEF-123456789012}".to_string(),
         person_id: "{11111111-2222-3333-4444-555555555555}".to_string(),
         text: Some("Great job on the documentation!".to_string()),
         date_time: Some("2024-01-15T14:45:00Z".to_string()),
@@ -166,7 +166,7 @@ fn generate_threaded_example(path: &Path) -> ExampleResult<()> {
     // Create a conversation thread with replies
     let main_comment = ThreadedComment {
         cell_ref: Some("A2".to_string()),
-        id: "{D4E5F6G7-H8I9-0123-DEFG-234567890123}".to_string(),
+        id: "{D4E5F6A7-A8B9-0123-DEFA-234567890123}".to_string(),
         person_id: "{33333333-4444-5555-6666-777777777777}".to_string(),
         text: Some("Should we use Elasticsearch or build our own search?".to_string()),
         date_time: Some("2024-01-16T09:00:00Z".to_string()),
@@ -178,11 +178,11 @@ fn generate_threaded_example(path: &Path) -> ExampleResult<()> {
     // Reply to the main comment
     let reply1 = ThreadedComment {
         cell_ref: Some("A2".to_string()),
-        id: "{E5F6G7H8-I9J0-1234-EFGH-345678901234}".to_string(),
+        id: "{E5F6A7B8-A9B0-1234-EFAB-345678901234}".to_string(),
         person_id: "{11111111-2222-3333-4444-555555555555}".to_string(),
         text: Some("I recommend Elasticsearch for scalability.".to_string()),
         date_time: Some("2024-01-16T09:15:00Z".to_string()),
-        parent_id: Some("{D4E5F6G7-H8I9-0123-DEFG-234567890123}".to_string()),
+        parent_id: Some("{D4E5F6A7-A8B9-0123-DEFA-234567890123}".to_string()),
         done: None,
         mentions: Vec::new(),
     };
@@ -190,15 +190,15 @@ fn generate_threaded_example(path: &Path) -> ExampleResult<()> {
     // Another reply with @mention
     let reply2 = ThreadedComment {
         cell_ref: Some("A2".to_string()),
-        id: "{F6G7H8I9-J0K1-2345-FGHI-456789012345}".to_string(),
+        id: "{F6A7B8C9-A0B1-2345-FABC-456789012345}".to_string(),
         person_id: "{22222222-3333-4444-5555-666666666666}".to_string(),
         text: Some("@Alice Chen can you evaluate both options?".to_string()),
         date_time: Some("2024-01-16T10:30:00Z".to_string()),
-        parent_id: Some("{D4E5F6G7-H8I9-0123-DEFG-234567890123}".to_string()),
+        parent_id: Some("{D4E5F6A7-A8B9-0123-DEFA-234567890123}".to_string()),
         done: None,
         mentions: vec![Mention {
             mention_person_id: "{33333333-4444-5555-6666-777777777777}".to_string(),
-            mention_id: "{M1M2M3M4-M5M6-M7M8-M9M0-MAMBMCMDMEMF}".to_string(),
+            mention_id: "{A1A2A3A4-A5A6-A7A8-A9A0-AABBCCDDEEFF}".to_string(),
             start_index: 0,
             length: 11,
         }],
@@ -207,7 +207,7 @@ fn generate_threaded_example(path: &Path) -> ExampleResult<()> {
     // Resolved comment on another cell
     let resolved_comment = ThreadedComment {
         cell_ref: Some("A3".to_string()),
-        id: "{G7H8I9J0-K1L2-3456-GHIJ-567890123456}".to_string(),
+        id: "{A7B8C9D0-A1B2-3456-ABCD-567890123456}".to_string(),
         person_id: "{11111111-2222-3333-4444-555555555555}".to_string(),
         text: Some("We need to use a proper PDF library for this.".to_string()),
         date_time: Some("2024-01-16T11:00:00Z".to_string()),

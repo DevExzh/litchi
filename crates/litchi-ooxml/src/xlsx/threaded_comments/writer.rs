@@ -1,11 +1,15 @@
 //! Writer module for threaded comments XML generation.
 
-use litchi_core::sheet::Result as SheetResult;
-use litchi_core::xml::escape_xml;
+use std::collections::HashSet;
 use std::fmt::Write as FmtWrite;
 
+use litchi_core::sheet::Result as SheetResult;
+use litchi_core::xml::escape_xml;
+
 use super::person::{Mention, Person, PersonList};
+use super::reader::validate_guid;
 use super::{ThreadedComment, ThreadedComments};
+use crate::xlsx::Cell;
 
 const XML_HEADER: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#;
 const THREADED_COMMENTS_NS: &str =
@@ -16,6 +20,7 @@ const THREADED_COMMENTS_NS: &str =
 /// Generates the `xl/persons/person.xml` part containing all persons
 /// who can author threaded comments in the workbook.
 pub fn write_persons(person_list: &PersonList) -> SheetResult<String> {
+    validate_person_list(person_list)?;
     let mut xml = String::with_capacity(1024);
 
     xml.push_str(XML_HEADER);
@@ -59,6 +64,7 @@ fn write_person(xml: &mut String, person: &Person) -> SheetResult<()> {
 /// Generates the `xl/threadedComments/threadedCommentN.xml` part containing
 /// all threaded comments for a specific worksheet.
 pub fn write_threaded_comments(comments: &ThreadedComments) -> SheetResult<String> {
+    validate_threaded_comments(comments)?;
     let mut xml = String::with_capacity(4096);
 
     xml.push_str(XML_HEADER);
@@ -140,4 +146,189 @@ fn write_mentions(xml: &mut String, mentions: &[Mention]) -> SheetResult<()> {
 
     xml.push_str("</mentions>");
     Ok(())
+}
+
+fn validate_person_list(person_list: &PersonList) -> SheetResult<()> {
+    let mut ids = HashSet::with_capacity(person_list.persons.len());
+    for person in &person_list.persons {
+        validate_guid(&person.id, "person ID")?;
+        if !ids.insert(person.id.as_str()) {
+            return Err(format!("duplicate person ID '{}'", person.id).into());
+        }
+    }
+    Ok(())
+}
+
+fn validate_threaded_comments(comments: &ThreadedComments) -> SheetResult<()> {
+    let mut comment_ids = HashSet::with_capacity(comments.comments.len());
+    let mention_count = comments
+        .comments
+        .iter()
+        .map(|comment| comment.mentions.len())
+        .sum();
+    let mut mention_ids = HashSet::with_capacity(mention_count);
+
+    for comment in &comments.comments {
+        validate_guid(&comment.id, "threaded-comment ID")?;
+        validate_guid(&comment.person_id, "threaded-comment person ID")?;
+        if let Some(parent_id) = comment.parent_id.as_deref() {
+            validate_guid(parent_id, "threaded-comment parent ID")?;
+        }
+        if let Some(cell_ref) = comment.cell_ref.as_deref() {
+            Cell::reference_to_coords(cell_ref)?;
+        }
+        if !comment_ids.insert(comment.id.as_str()) {
+            return Err(format!("duplicate threaded-comment ID '{}'", comment.id).into());
+        }
+
+        let text_len = comment
+            .text
+            .as_deref()
+            .map(|text| {
+                u32::try_from(text.encode_utf16().count())
+                    .map_err(|_| "threaded-comment text is too long")
+            })
+            .transpose()?;
+        for mention in &comment.mentions {
+            validate_guid(&mention.mention_person_id, "mention person ID")?;
+            validate_guid(&mention.mention_id, "mention ID")?;
+            if !mention_ids.insert(mention.mention_id.as_str()) {
+                return Err(format!("duplicate mention ID '{}'", mention.mention_id).into());
+            }
+            if let Some(text_len) = text_len {
+                let end = mention
+                    .start_index
+                    .checked_add(mention.length)
+                    .ok_or("mention range overflows")?;
+                if end > text_len {
+                    return Err(format!(
+                        "mention '{}' range exceeds threaded-comment text",
+                        mention.mention_id
+                    )
+                    .into());
+                }
+            }
+        }
+    }
+
+    for comment in &comments.comments {
+        if let Some(parent_id) = comment.parent_id.as_deref()
+            && (!comment_ids.contains(parent_id) || parent_id == comment.id)
+        {
+            return Err(format!(
+                "threaded comment '{}' has invalid parent ID '{parent_id}'",
+                comment.id
+            )
+            .into());
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const PERSON_ID: &str = "{11111111-1111-1111-1111-111111111111}";
+    const COMMENT_ID: &str = "{22222222-2222-2222-2222-222222222222}";
+    const REPLY_ID: &str = "{33333333-3333-3333-3333-333333333333}";
+    const MENTION_ID: &str = "{44444444-4444-4444-4444-444444444444}";
+
+    #[test]
+    fn writes_schema_valid_people_and_comments() {
+        let people = PersonList {
+            persons: vec![Person {
+                display_name: "Alice & Bob".into(),
+                id: PERSON_ID.into(),
+                user_id: Some("alice@example.com".into()),
+                provider_id: None,
+            }],
+        };
+        let people_xml = write_persons(&people).unwrap();
+        assert!(people_xml.contains("Alice &amp; Bob"));
+
+        let comments = ThreadedComments {
+            comments: vec![
+                ThreadedComment {
+                    cell_ref: Some("A1".into()),
+                    id: COMMENT_ID.into(),
+                    person_id: PERSON_ID.into(),
+                    text: Some("Hi @Bob".into()),
+                    mentions: vec![Mention {
+                        mention_person_id: PERSON_ID.into(),
+                        mention_id: MENTION_ID.into(),
+                        start_index: 3,
+                        length: 4,
+                    }],
+                    ..Default::default()
+                },
+                ThreadedComment {
+                    id: REPLY_ID.into(),
+                    person_id: PERSON_ID.into(),
+                    parent_id: Some(COMMENT_ID.into()),
+                    ..Default::default()
+                },
+            ],
+        };
+        let comments_xml = write_threaded_comments(&comments).unwrap();
+        assert!(comments_xml.contains("<text>Hi @Bob</text>"));
+        assert!(comments_xml.contains(&format!(r#" parentId="{COMMENT_ID}""#)));
+    }
+
+    #[test]
+    fn rejects_invalid_people_and_comments() {
+        let duplicate_people = PersonList {
+            persons: vec![
+                Person {
+                    id: PERSON_ID.into(),
+                    ..Default::default()
+                },
+                Person {
+                    id: PERSON_ID.into(),
+                    ..Default::default()
+                },
+            ],
+        };
+        assert!(write_persons(&duplicate_people).is_err());
+
+        let invalid = [
+            ThreadedComment {
+                id: "not-a-guid".into(),
+                person_id: PERSON_ID.into(),
+                ..Default::default()
+            },
+            ThreadedComment {
+                cell_ref: Some("A0".into()),
+                id: COMMENT_ID.into(),
+                person_id: PERSON_ID.into(),
+                ..Default::default()
+            },
+            ThreadedComment {
+                id: COMMENT_ID.into(),
+                person_id: PERSON_ID.into(),
+                parent_id: Some(REPLY_ID.into()),
+                ..Default::default()
+            },
+            ThreadedComment {
+                id: COMMENT_ID.into(),
+                person_id: PERSON_ID.into(),
+                text: Some("x".into()),
+                mentions: vec![Mention {
+                    mention_person_id: PERSON_ID.into(),
+                    mention_id: MENTION_ID.into(),
+                    start_index: 1,
+                    length: 1,
+                }],
+                ..Default::default()
+            },
+        ];
+        for comment in invalid {
+            assert!(
+                write_threaded_comments(&ThreadedComments {
+                    comments: vec![comment]
+                })
+                .is_err()
+            );
+        }
+    }
 }
