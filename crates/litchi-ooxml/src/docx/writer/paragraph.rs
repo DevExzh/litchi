@@ -1,4 +1,5 @@
 //! Paragraph types and implementation for DOCX documents.
+use crate::docx::namespace::normalize_xml_integer;
 use crate::error::{OoxmlError, Result};
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
@@ -304,6 +305,29 @@ impl MutableParagraph {
         self.style = Some(style_id.to_string());
     }
 
+    /// Set the HTML division ID referenced by this paragraph.
+    ///
+    /// Division IDs are XML Schema integers and are kept as strings so values
+    /// larger than the native integer types can be written without truncation.
+    pub fn set_division_id(&mut self, id: impl Into<String>) -> Result<&mut Self> {
+        self.properties.division_id = Some(normalize_xml_integer(
+            id.into(),
+            "Word paragraph division ID",
+        )?);
+        Ok(self)
+    }
+
+    /// Return the HTML division ID referenced by this paragraph, if set.
+    pub fn division_id(&self) -> Option<&str> {
+        self.properties.division_id.as_deref()
+    }
+
+    /// Remove the HTML division reference from this paragraph.
+    pub fn clear_division_id(&mut self) -> &mut Self {
+        self.properties.division_id = None;
+        self
+    }
+
     /// Set paragraph alignment.
     pub fn set_alignment(&mut self, alignment: ParagraphAlignment) {
         self.properties.alignment = Some(alignment);
@@ -490,6 +514,11 @@ impl MutableParagraph {
                 xml.push_str("</w:tabs>");
             }
 
+            if let Some(ref division_id) = self.properties.division_id {
+                write!(xml, "<w:divId w:val=\"{}\"/>", escape_xml(division_id))
+                    .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+            }
+
             xml.push_str("</w:pPr>");
         }
 
@@ -634,6 +663,11 @@ impl MutableParagraph {
                 xml.push_str("</w:tabs>");
             }
 
+            if let Some(ref division_id) = self.properties.division_id {
+                write!(xml, "<w:divId w:val=\"{}\"/>", escape_xml(division_id))
+                    .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+            }
+
             xml.push_str("</w:pPr>");
         }
 
@@ -668,6 +702,7 @@ pub(crate) struct ParagraphProperties {
     pub(crate) indent_right: Option<u32>,
     pub(crate) indent_first_line: Option<i32>,
     pub(crate) tab_stops: Vec<TabStop>,
+    pub(crate) division_id: Option<String>,
 }
 
 impl ParagraphProperties {
@@ -681,6 +716,7 @@ impl ParagraphProperties {
             || self.indent_right.is_some()
             || self.indent_first_line.is_some()
             || !self.tab_stops.is_empty()
+            || self.division_id.is_some()
     }
 }
 
@@ -700,4 +736,55 @@ pub enum ListType {
     UpperLetter,
     LowerRoman,
     UpperRoman,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MutableParagraph;
+    use crate::docx::Paragraph;
+    use crate::docx::writer::relmap::RelationshipMapper;
+
+    #[test]
+    fn writes_paragraph_division_id_for_reader_round_trip() {
+        let mut paragraph = MutableParagraph::new();
+        paragraph
+            .set_division_id("+123456789012345678901234567890")
+            .unwrap();
+
+        assert_eq!(
+            paragraph.division_id(),
+            Some("+123456789012345678901234567890")
+        );
+
+        let mut xml = String::new();
+        paragraph.to_xml(&mut xml).unwrap();
+        let mut relationship_xml = String::new();
+        paragraph
+            .to_xml_with_rels(
+                &mut relationship_xml,
+                &RelationshipMapper::new(),
+                &mut 0,
+                &mut 0,
+            )
+            .unwrap();
+        assert_eq!(relationship_xml, xml);
+
+        let parsed = Paragraph::new(xml.into_bytes());
+        assert_eq!(
+            parsed.division_id().unwrap().as_deref(),
+            Some("+123456789012345678901234567890")
+        );
+
+        paragraph.clear_division_id();
+        let mut cleared_xml = String::new();
+        paragraph.to_xml(&mut cleared_xml).unwrap();
+        assert!(!cleared_xml.contains("<w:divId"));
+    }
+
+    #[test]
+    fn rejects_invalid_paragraph_division_id() {
+        let mut paragraph = MutableParagraph::new();
+        assert!(paragraph.set_division_id("12.5").is_err());
+        assert_eq!(paragraph.division_id(), None);
+    }
 }

@@ -1,4 +1,5 @@
-/// Table types and implementation for DOCX documents.
+//! Table types and implementation for DOCX documents.
+use crate::docx::namespace::normalize_xml_integer;
 use crate::error::{OoxmlError, Result};
 use std::fmt::Write as FmtWrite;
 
@@ -203,12 +204,15 @@ impl MutableTable {
 pub struct MutableRow {
     /// Table cells in this row
     pub(crate) cells: Vec<MutableCell>,
+    /// HTML division ID referenced by this row
+    pub(crate) division_id: Option<String>,
 }
 
 impl MutableRow {
     pub(crate) fn new(cols: usize) -> Self {
         let mut row = Self {
             cells: Vec::with_capacity(cols),
+            division_id: None,
         };
         for _ in 0..cols {
             row.cells.push(MutableCell::new());
@@ -232,8 +236,36 @@ impl MutableRow {
         self.cells.len()
     }
 
+    /// Set the HTML division ID referenced by this row.
+    ///
+    /// Division IDs are XML Schema integers and are kept as strings so values
+    /// larger than the native integer types can be written without truncation.
+    pub fn set_division_id(&mut self, id: impl Into<String>) -> Result<&mut Self> {
+        self.division_id = Some(normalize_xml_integer(
+            id.into(),
+            "Word table-row division ID",
+        )?);
+        Ok(self)
+    }
+
+    /// Return the HTML division ID referenced by this row, if set.
+    pub fn division_id(&self) -> Option<&str> {
+        self.division_id.as_deref()
+    }
+
+    /// Remove the HTML division reference from this row.
+    pub fn clear_division_id(&mut self) -> &mut Self {
+        self.division_id = None;
+        self
+    }
+
     pub(crate) fn to_xml(&self, xml: &mut String) -> Result<()> {
         xml.push_str("<w:tr>");
+
+        if let Some(ref division_id) = self.division_id {
+            write!(xml, "<w:trPr><w:divId w:val=\"{division_id}\"/></w:trPr>")
+                .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+        }
 
         for cell in &self.cells {
             cell.to_xml(xml)?;
@@ -242,6 +274,41 @@ impl MutableRow {
         xml.push_str("</w:tr>");
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MutableRow;
+    use crate::docx::table::Row;
+
+    #[test]
+    fn writes_row_division_id_for_reader_round_trip() {
+        let mut row = MutableRow::new(1);
+        row.set_division_id("-123456789012345678901234567890")
+            .unwrap();
+
+        assert_eq!(row.division_id(), Some("-123456789012345678901234567890"));
+
+        let mut xml = String::new();
+        row.to_xml(&mut xml).unwrap();
+        let parsed = Row::new(xml.into_bytes());
+        assert_eq!(
+            parsed.division_id().unwrap().as_deref(),
+            Some("-123456789012345678901234567890")
+        );
+
+        row.clear_division_id();
+        let mut cleared_xml = String::new();
+        row.to_xml(&mut cleared_xml).unwrap();
+        assert!(!cleared_xml.contains("<w:divId"));
+    }
+
+    #[test]
+    fn rejects_invalid_row_division_id() {
+        let mut row = MutableRow::new(0);
+        assert!(row.set_division_id("+").is_err());
+        assert_eq!(row.division_id(), None);
     }
 }
 
