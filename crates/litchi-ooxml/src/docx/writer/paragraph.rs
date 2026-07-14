@@ -11,6 +11,7 @@ use super::field::MutableField;
 use super::hyperlink::MutableHyperlink;
 use super::image::MutableInlineImage;
 use super::run::MutableRun;
+use super::smart_tag::MutableSmartTag;
 
 /// Elements that can appear in a paragraph.
 #[derive(Debug)]
@@ -24,6 +25,128 @@ pub(crate) enum ParagraphElement {
     BookmarkEnd(u32),
     /// Field
     Field(MutableField),
+    /// Run-level smart tag.
+    SmartTag(MutableSmartTag),
+}
+
+impl ParagraphElement {
+    pub(crate) fn write_placeholder(
+        &self,
+        xml: &mut String,
+        hyperlink_index: &mut usize,
+        image_index: &mut usize,
+    ) -> Result<()> {
+        match self {
+            Self::Run(run) => run.to_xml(xml),
+            Self::Hyperlink(hyperlink) => {
+                let placeholder = format!("{{{{HYPERLINK_{}}}}}", *hyperlink_index);
+                hyperlink.to_xml(xml, Some(&placeholder))?;
+                *hyperlink_index += 1;
+                Ok(())
+            },
+            Self::InlineImage(image) => {
+                xml.push_str("<w:r>");
+                let placeholder = format!("{{{{IMAGE_{}}}}}", *image_index);
+                image.to_xml(xml, &placeholder)?;
+                xml.push_str("</w:r>");
+                *image_index += 1;
+                Ok(())
+            },
+            Self::BookmarkStart(bookmark) => {
+                xml.push_str(&bookmark.to_xml_start()?);
+                Ok(())
+            },
+            Self::BookmarkEnd(id) => write!(xml, r#"<w:bookmarkEnd w:id="{}"/>"#, id)
+                .map_err(|error| OoxmlError::Xml(error.to_string())),
+            Self::Field(field) => {
+                xml.push_str("<w:r>");
+                xml.push_str(&field.to_xml()?);
+                xml.push_str("</w:r>");
+                Ok(())
+            },
+            Self::SmartTag(tag) => tag.write_placeholder(xml, hyperlink_index, image_index),
+        }
+    }
+
+    pub(crate) fn write_with_rels(
+        &self,
+        xml: &mut String,
+        rel_mapper: &crate::docx::writer::relmap::RelationshipMapper,
+        hyperlink_index: &mut usize,
+        image_index: &mut usize,
+    ) -> Result<()> {
+        match self {
+            Self::Run(run) => run.to_xml(xml),
+            Self::Hyperlink(hyperlink) => {
+                if hyperlink.url.is_some() {
+                    if let Some(rel_id) = rel_mapper.get_hyperlink_id(*hyperlink_index) {
+                        hyperlink.to_xml(xml, Some(rel_id))?;
+                    } else {
+                        let placeholder = format!("{{{{HYPERLINK_{}}}}}", *hyperlink_index);
+                        hyperlink.to_xml(xml, Some(&placeholder))?;
+                    }
+                    *hyperlink_index += 1;
+                } else {
+                    hyperlink.to_xml(xml, None)?;
+                }
+                Ok(())
+            },
+            Self::InlineImage(image) => {
+                xml.push_str("<w:r>");
+                if let Some(rel_id) = rel_mapper.get_image_id(*image_index) {
+                    image.to_xml(xml, rel_id)?;
+                } else {
+                    let placeholder = format!("{{{{IMAGE_{}}}}}", *image_index);
+                    image.to_xml(xml, &placeholder)?;
+                }
+                xml.push_str("</w:r>");
+                *image_index += 1;
+                Ok(())
+            },
+            Self::BookmarkStart(bookmark) => {
+                xml.push_str(&bookmark.to_xml_start()?);
+                Ok(())
+            },
+            Self::BookmarkEnd(id) => write!(xml, r#"<w:bookmarkEnd w:id="{}"/>"#, id)
+                .map_err(|error| OoxmlError::Xml(error.to_string())),
+            Self::Field(field) => {
+                xml.push_str("<w:r>");
+                xml.push_str(&field.to_xml()?);
+                xml.push_str("</w:r>");
+                Ok(())
+            },
+            Self::SmartTag(tag) => {
+                tag.write_with_rels(xml, rel_mapper, hyperlink_index, image_index)
+            },
+        }
+    }
+
+    pub(crate) fn collect_hyperlink_urls(&self, urls: &mut Vec<String>) {
+        match self {
+            Self::Hyperlink(link) if let Some(url) = &link.url => urls.push(url.clone()),
+            Self::SmartTag(tag) => tag.collect_hyperlink_urls(urls),
+            _ => {},
+        }
+    }
+
+    pub(crate) fn collect_images<'a>(
+        &'a self,
+        images: &mut Vec<(&'a [u8], crate::docx::format::ImageFormat)>,
+    ) {
+        match self {
+            Self::InlineImage(image) => images.push((image.data(), image.format())),
+            Self::SmartTag(tag) => tag.collect_images(images),
+            _ => {},
+        }
+    }
+
+    pub(crate) fn append_run_text(&self, text: &mut String) {
+        match self {
+            Self::Run(run) => text.push_str(&run.get_text()),
+            Self::SmartTag(tag) => tag.append_run_text(text),
+            _ => {},
+        }
+    }
 }
 
 /// A mutable paragraph in a document.
@@ -164,6 +287,16 @@ impl MutableParagraph {
     /// ```
     pub fn add_field(&mut self, field: MutableField) {
         self.elements.push(ParagraphElement::Field(field));
+    }
+
+    /// Add a run-level smart tag to this paragraph.
+    pub fn add_smart_tag(&mut self, element: impl Into<String>) -> &mut MutableSmartTag {
+        self.elements
+            .push(ParagraphElement::SmartTag(MutableSmartTag::new(element)));
+        match self.elements.last_mut() {
+            Some(ParagraphElement::SmartTag(tag)) => tag,
+            _ => unreachable!(),
+        }
     }
 
     /// Set the paragraph style.
@@ -364,36 +497,8 @@ impl MutableParagraph {
         // Use placeholders for relationship IDs that will be replaced after relationships are created
         let mut hyperlink_idx = 0;
         let mut image_idx = 0;
-        for element in self.elements.iter() {
-            match element {
-                ParagraphElement::Run(run) => run.to_xml(xml)?,
-                ParagraphElement::Hyperlink(hyperlink) => {
-                    let placeholder = format!("{{{{HYPERLINK_{}}}}}", hyperlink_idx);
-                    hyperlink.to_xml(xml, Some(&placeholder))?;
-                    hyperlink_idx += 1;
-                },
-                ParagraphElement::InlineImage(image) => {
-                    xml.push_str("<w:r>");
-                    let placeholder = format!("{{{{IMAGE_{}}}}}", image_idx);
-                    image.to_xml(xml, &placeholder)?;
-                    xml.push_str("</w:r>");
-                    image_idx += 1;
-                },
-                ParagraphElement::BookmarkStart(bookmark) => {
-                    let start_xml = bookmark.to_xml_start()?;
-                    xml.push_str(&start_xml);
-                },
-                ParagraphElement::BookmarkEnd(id) => {
-                    write!(xml, r#"<w:bookmarkEnd w:id="{}"/>"#, id)
-                        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                },
-                ParagraphElement::Field(field) => {
-                    xml.push_str("<w:r>");
-                    let field_xml = field.to_xml()?;
-                    xml.push_str(&field_xml);
-                    xml.push_str("</w:r>");
-                },
-            }
+        for element in &self.elements {
+            element.write_placeholder(xml, &mut hyperlink_idx, &mut image_idx)?;
         }
 
         xml.push_str("</w:p>");
@@ -534,53 +639,8 @@ impl MutableParagraph {
 
         // Write elements with actual relationship IDs
         // Use the passed-in counters to maintain global indices across all paragraphs
-        for element in self.elements.iter() {
-            match element {
-                ParagraphElement::Run(run) => run.to_xml(xml)?,
-                ParagraphElement::Hyperlink(hyperlink) => {
-                    // Only external hyperlinks (with URLs) need relationship IDs and counter increment
-                    // Internal anchor hyperlinks (TOC) don't have URLs and don't need r:id
-                    if hyperlink.url.is_some() {
-                        if let Some(rel_id) = rel_mapper.get_hyperlink_id(*hyperlink_counter) {
-                            hyperlink.to_xml(xml, Some(rel_id))?;
-                        } else {
-                            // Fallback to placeholder if ID not found (shouldn't happen)
-                            let placeholder = format!("{{{{HYPERLINK_{}}}}}", *hyperlink_counter);
-                            hyperlink.to_xml(xml, Some(&placeholder))?;
-                        }
-                        *hyperlink_counter += 1; // Only increment for external hyperlinks
-                    } else {
-                        // Internal anchor hyperlink (no URL, only anchor)
-                        hyperlink.to_xml(xml, None)?;
-                    }
-                },
-                ParagraphElement::BookmarkStart(bookmark) => {
-                    let start_xml = bookmark.to_xml_start()?;
-                    xml.push_str(&start_xml);
-                },
-                ParagraphElement::BookmarkEnd(id) => {
-                    write!(xml, r#"<w:bookmarkEnd w:id="{}"/>"#, id)
-                        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                },
-                ParagraphElement::Field(field) => {
-                    xml.push_str("<w:r>");
-                    let field_xml = field.to_xml()?;
-                    xml.push_str(&field_xml);
-                    xml.push_str("</w:r>");
-                },
-                ParagraphElement::InlineImage(image) => {
-                    xml.push_str("<w:r>");
-                    if let Some(rel_id) = rel_mapper.get_image_id(*image_counter) {
-                        image.to_xml(xml, rel_id)?;
-                    } else {
-                        // Fallback to placeholder if ID not found (shouldn't happen)
-                        let placeholder = format!("{{{{IMAGE_{}}}}}", *image_counter);
-                        image.to_xml(xml, &placeholder)?;
-                    }
-                    xml.push_str("</w:r>");
-                    *image_counter += 1;
-                },
-            }
+        for element in &self.elements {
+            element.write_with_rels(xml, rel_mapper, hyperlink_counter, image_counter)?;
         }
 
         xml.push_str("</w:p>");

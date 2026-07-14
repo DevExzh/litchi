@@ -111,9 +111,9 @@ pub use format::{ImageFormat, LineSpacing, ParagraphAlignment, TableBorderStyle,
 pub use writer::{
     CellProperties, ColorScheme, ContentControlType, DocumentProtection, ListType, MutableBookmark,
     MutableComment, MutableContentControl, MutableDocument, MutableField, MutableHyperlink,
-    MutableInlineImage, MutableParagraph, MutableRun, MutableStyle, MutableTable, MutableTheme,
-    PageNumberFormat, PageOrientation, RunContent, SectionProperties, TableBorder, TableBorders,
-    TableOfContents, Watermark, generate_styles_xml,
+    MutableInlineImage, MutableParagraph, MutableRun, MutableSmartTag, MutableSmartTagAttribute,
+    MutableStyle, MutableTable, MutableTheme, PageNumberFormat, PageOrientation, RunContent,
+    SectionProperties, TableBorder, TableBorders, TableOfContents, Watermark, generate_styles_xml,
 };
 // Note: writer::Note is not re-exported to avoid naming conflict with footnote::Note
 // Use writer::Note explicitly if needed

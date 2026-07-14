@@ -14,6 +14,7 @@ pub mod paragraph;
 pub(crate) mod relmap;
 pub mod run;
 pub mod section;
+pub mod smart_tag;
 pub mod style;
 pub mod table;
 pub mod theme;
@@ -28,6 +29,9 @@ pub use note::Note;
 
 // Re-export section types
 pub use section::{PageNumberFormat, PageOrientation, SectionProperties};
+
+// Re-export smart-tag types
+pub use smart_tag::{MutableSmartTag, MutableSmartTagAttribute};
 
 // Re-export hyperlink types
 pub use hyperlink::MutableHyperlink;

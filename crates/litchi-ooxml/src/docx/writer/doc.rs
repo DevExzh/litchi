@@ -7,7 +7,7 @@ pub use super::super::format::ImageFormat;
 // Import from other writer modules
 use super::comment::MutableComment;
 use super::note::Note;
-use super::paragraph::{MutableParagraph, ParagraphElement};
+use super::paragraph::MutableParagraph;
 use super::section::SectionProperties;
 use super::table::MutableTable;
 use super::theme::MutableTheme;
@@ -64,6 +64,10 @@ pub struct DocumentProtection {
     pub salt: Option<String>,
 }
 
+#[cfg(feature = "fonts")]
+use super::paragraph::ParagraphElement;
+#[cfg(feature = "fonts")]
+use super::smart_tag::MutableSmartTag;
 #[cfg(feature = "fonts")]
 use litchi_fonts::CollectGlyphs;
 #[cfg(feature = "fonts")]
@@ -130,6 +134,26 @@ impl CollectGlyphs for MutableParagraph {
             let element_glyphs = match element {
                 ParagraphElement::Run(r) => r.collect_glyphs(),
                 ParagraphElement::Hyperlink(h) => h.collect_glyphs(),
+                ParagraphElement::SmartTag(tag) => tag.collect_glyphs(),
+                _ => continue,
+            };
+            for (font, bitmap) in element_glyphs {
+                *glyphs.entry(font).or_insert_with(RoaringBitmap::new) |= bitmap;
+            }
+        }
+        glyphs
+    }
+}
+
+#[cfg(feature = "fonts")]
+impl CollectGlyphs for MutableSmartTag {
+    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap> {
+        let mut glyphs = HashMap::new();
+        for element in &self.elements {
+            let element_glyphs = match element {
+                ParagraphElement::Run(run) => run.collect_glyphs(),
+                ParagraphElement::Hyperlink(hyperlink) => hyperlink.collect_glyphs(),
+                ParagraphElement::SmartTag(tag) => tag.collect_glyphs(),
                 _ => continue,
             };
             for (font, bitmap) in element_glyphs {
@@ -591,9 +615,7 @@ impl MutableDocument {
                     // Extract heading text
                     let mut heading_text = String::new();
                     for elem in &para.elements {
-                        if let super::paragraph::ParagraphElement::Run(run) = elem {
-                            heading_text.push_str(&run.get_text());
-                        }
+                        elem.append_run_text(&mut heading_text);
                     }
 
                     // Generate unique bookmark name
@@ -752,11 +774,7 @@ impl MutableDocument {
         for element in &self.body.elements {
             if let BodyElement::Paragraph(para) = element {
                 for para_element in &para.elements {
-                    if let ParagraphElement::Hyperlink(link) = para_element
-                        && let Some(url) = &link.url
-                    {
-                        urls.push(url.clone());
-                    }
+                    para_element.collect_hyperlink_urls(&mut urls);
                 }
             }
         }
@@ -771,9 +789,7 @@ impl MutableDocument {
         for element in &self.body.elements {
             if let BodyElement::Paragraph(para) = element {
                 for para_element in &para.elements {
-                    if let ParagraphElement::InlineImage(image) = para_element {
-                        images.push((image.data(), image.format()));
-                    }
+                    para_element.collect_images(&mut images);
                 }
             }
         }
