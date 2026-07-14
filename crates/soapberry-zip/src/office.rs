@@ -44,6 +44,39 @@ use flate2::write::DeflateEncoder;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 
+/// Resource limits applied while indexing an Office ZIP package.
+///
+/// The defaults accommodate large embedded media while rejecting implausible
+/// archive metadata before any decompression allocation occurs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ArchiveLimits {
+    /// Maximum number of non-directory entries.
+    pub max_files: usize,
+    /// Maximum declared uncompressed size of one entry.
+    pub max_entry_size: u64,
+    /// Maximum sum of all declared uncompressed entry sizes.
+    pub max_total_size: u64,
+}
+
+impl ArchiveLimits {
+    /// Disable resource ceilings while retaining integer and allocation checks.
+    pub const UNBOUNDED: Self = Self {
+        max_files: usize::MAX,
+        max_entry_size: u64::MAX,
+        max_total_size: u64::MAX,
+    };
+}
+
+impl Default for ArchiveLimits {
+    fn default() -> Self {
+        Self {
+            max_files: 100_000,
+            max_entry_size: 512 * 1024 * 1024,
+            max_total_size: 2 * 1024 * 1024 * 1024,
+        }
+    }
+}
+
 /// High-performance ZIP archive reader for Office document formats.
 ///
 /// Provides a simple API for reading ZIP archives with automatic decompression.
@@ -76,10 +109,16 @@ impl<'data> ArchiveReader<'data> {
     /// file lookup. The actual file contents are not decompressed until
     /// accessed via `read()`.
     pub fn new(data: &'data [u8]) -> Result<Self, Error> {
+        Self::new_with_limits(data, ArchiveLimits::default())
+    }
+
+    /// Create a reader with explicit resource limits.
+    pub fn new_with_limits(data: &'data [u8], limits: ArchiveLimits) -> Result<Self, Error> {
         let archive = ZipArchive::from_slice(data)?;
 
         // Build index for fast lookup
         let mut index = HashMap::new();
+        let mut total_uncompressed_size = 0u64;
         for entry_result in archive.entries() {
             let entry = entry_result?;
             let path = entry.file_path();
@@ -87,6 +126,40 @@ impl<'data> ArchiveReader<'data> {
             // Normalize path - convert to string, skip directories
             if entry.is_dir() {
                 continue;
+            }
+
+            if index.len() >= limits.max_files {
+                return Err(ErrorKind::InvalidInput {
+                    msg: format!("archive contains more than {} files", limits.max_files),
+                }
+                .into());
+            }
+
+            let uncompressed_size = entry.uncompressed_size_hint();
+            if uncompressed_size > limits.max_entry_size {
+                return Err(ErrorKind::InvalidInput {
+                    msg: format!(
+                        "archive entry declares {uncompressed_size} uncompressed bytes, exceeding the {}-byte limit",
+                        limits.max_entry_size
+                    ),
+                }
+                .into());
+            }
+            total_uncompressed_size = total_uncompressed_size
+                .checked_add(uncompressed_size)
+                .ok_or_else(|| {
+                    Error::from(ErrorKind::InvalidInput {
+                        msg: "archive uncompressed size total overflows u64".to_string(),
+                    })
+                })?;
+            if total_uncompressed_size > limits.max_total_size {
+                return Err(ErrorKind::InvalidInput {
+                    msg: format!(
+                        "archive declares {total_uncompressed_size} total uncompressed bytes, exceeding the {}-byte limit",
+                        limits.max_total_size
+                    ),
+                }
+                .into());
             }
 
             let name = match path.try_normalize() {
@@ -97,14 +170,22 @@ impl<'data> ArchiveReader<'data> {
                 },
             };
 
-            index.insert(
-                name,
-                EntryInfo {
-                    wayfinder: entry.wayfinder(),
-                    compression_method: entry.compression_method(),
-                    uncompressed_size: entry.uncompressed_size_hint(),
-                },
-            );
+            if index
+                .insert(
+                    name,
+                    EntryInfo {
+                        wayfinder: entry.wayfinder(),
+                        compression_method: entry.compression_method(),
+                        uncompressed_size,
+                    },
+                )
+                .is_some()
+            {
+                return Err(ErrorKind::InvalidInput {
+                    msg: "archive contains duplicate normalized file names".to_string(),
+                }
+                .into());
+            }
         }
 
         Ok(Self { archive, index })
@@ -166,32 +247,32 @@ impl<'data> ArchiveReader<'data> {
                 Ok(data.to_vec())
             },
             CompressionMethod::Deflate => {
-                // Deflate - decompress with pre-allocated buffer
-                // Using unsafe to avoid costly buffer zeroing from read_to_end
-                let size = info.uncompressed_size as usize;
-                let mut decompressed = Vec::with_capacity(size);
+                let size = usize::try_from(info.uncompressed_size).map_err(|_| {
+                    Error::from(ErrorKind::InvalidInput {
+                        msg: format!(
+                            "archive entry size {} does not fit this platform",
+                            info.uncompressed_size
+                        ),
+                    })
+                })?;
+                let mut decompressed = Vec::new();
+                decompressed.try_reserve_exact(size).map_err(|error| {
+                    Error::from(ErrorKind::InvalidInput {
+                        msg: format!("could not allocate {size} bytes for archive entry: {error}"),
+                    })
+                })?;
 
-                // SAFETY: We set the length to the expected uncompressed size.
-                // The decompression will write exactly `size` bytes (verified by CRC32).
-                // Any unwritten bytes at the end are truncated after reading.
-                #[allow(unsafe_code, clippy::uninit_vec)]
-                unsafe {
-                    decompressed.set_len(size);
-                }
-
-                let mut decoder = entry.verifying_reader(DeflateDecoder::new(data));
-                let mut total_read = 0;
-                while total_read < size {
-                    match decoder.read(&mut decompressed[total_read..]) {
-                        Ok(0) => break,
-                        Ok(n) => total_read += n,
-                        Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
-                        Err(e) => return Err(e.into()),
+                let decoder = entry.verifying_reader(DeflateDecoder::new(data));
+                decoder
+                    .take(info.uncompressed_size.saturating_add(1))
+                    .read_to_end(&mut decompressed)?;
+                if decompressed.len() != size {
+                    return Err(ErrorKind::InvalidSize {
+                        expected: info.uncompressed_size,
+                        actual: decompressed.len() as u64,
                     }
+                    .into());
                 }
-
-                // Truncate to actual bytes read (handles size mismatch gracefully)
-                decompressed.truncate(total_read);
                 Ok(decompressed)
             },
             other => Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
@@ -383,7 +464,12 @@ pub struct LazyArchiveReader<'data> {
 impl<'data> LazyArchiveReader<'data> {
     /// Create a new lazy archive reader from a byte slice.
     pub fn new(data: &'data [u8]) -> Result<Self, Error> {
-        let inner = ArchiveReader::new(data)?;
+        Self::new_with_limits(data, ArchiveLimits::default())
+    }
+
+    /// Create a lazy reader with explicit resource limits.
+    pub fn new_with_limits(data: &'data [u8], limits: ArchiveLimits) -> Result<Self, Error> {
+        let inner = ArchiveReader::new_with_limits(data, limits)?;
         Ok(Self {
             inner,
             cache: std::sync::RwLock::new(HashMap::new()),
@@ -637,5 +723,46 @@ mod tests {
         assert_eq!(reader.read("mimetype").unwrap(), b"application/test");
         assert_eq!(reader.read("content.xml").unwrap(), b"<content/>");
         assert_eq!(reader.read("styles.xml").unwrap(), b"<styles/>");
+    }
+
+    #[test]
+    fn rejects_archives_exceeding_configured_resource_limits() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_deflated("first.xml", b"1234").unwrap();
+        writer.write_deflated("second.xml", b"5678").unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        let file_error = ArchiveReader::new_with_limits(
+            &bytes,
+            ArchiveLimits {
+                max_files: 1,
+                ..ArchiveLimits::UNBOUNDED
+            },
+        )
+        .unwrap_err();
+        assert!(file_error.to_string().contains("more than 1 files"));
+
+        let entry_error = ArchiveReader::new_with_limits(
+            &bytes,
+            ArchiveLimits {
+                max_entry_size: 3,
+                ..ArchiveLimits::UNBOUNDED
+            },
+        )
+        .unwrap_err();
+        assert!(entry_error.to_string().contains("3-byte limit"));
+
+        let total_error = ArchiveReader::new_with_limits(
+            &bytes,
+            ArchiveLimits {
+                max_total_size: 7,
+                ..ArchiveLimits::UNBOUNDED
+            },
+        )
+        .unwrap_err();
+        assert!(total_error.to_string().contains("7-byte limit"));
+
+        assert!(ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).is_ok());
+        assert!(LazyArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).is_ok());
     }
 }
