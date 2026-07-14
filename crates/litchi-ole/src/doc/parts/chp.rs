@@ -154,7 +154,9 @@ impl CharacterProperties {
         let sprms = parse_sprms(grpprl);
 
         for sprm in &sprms {
-            Self::apply_sprm(&mut chp, sprm);
+            if get_sprm_type(sprm.opcode) == 2 {
+                Self::apply_sprm(&mut chp, sprm);
+            }
         }
 
         Ok(chp)
@@ -203,7 +205,7 @@ impl CharacterProperties {
             // Operation 0x06: sprmCFData - Data flag
             0x06 => {
                 // Data field flag
-                debug_assert_eq!(sprm.size, 2);
+                debug_assert_eq!(sprm.size, 3);
                 if let Some(val) = sprm.operand_byte() {
                     chp.is_data = val != 0;
                 }
@@ -683,5 +685,16 @@ mod tests {
         // Test toggle old value
         assert!(!CharacterProperties::get_toggle_value(0x81, Some(true)));
         assert!(CharacterProperties::get_toggle_value(0x81, Some(false)));
+    }
+
+    #[test]
+    fn ignores_non_character_sprms_in_mixed_piece_modifier() {
+        let properties = CharacterProperties::from_sprm(&[
+            0x03, 0x24, 0x02, // paragraph justification
+            0x35, 0x08, 0x01, // character bold
+        ])
+        .unwrap();
+        assert_eq!(properties.is_bold, Some(true));
+        assert_eq!(properties.is_strikethrough, None);
     }
 }

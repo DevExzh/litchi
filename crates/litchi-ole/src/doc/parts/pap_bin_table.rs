@@ -77,13 +77,18 @@ impl PapBinTable {
                 let Some(entry) = fkp.entry(entry_index) else {
                     continue;
                 };
-                let properties = Self::parse_properties(&entry.grpprl, data_stream);
                 for (start_cp, end_cp) in piece_table.fc_range_to_cp_ranges(entry.fc, entry.end_fc)
                 {
+                    let piece_modifier = piece_table
+                        .piece_for_cp(start_cp)
+                        .map(|piece| piece.property_modifier())
+                        .unwrap_or_default();
+                    let properties =
+                        Self::parse_properties(&entry.grpprl, piece_modifier, data_stream);
                     runs.push(ParagraphRun {
                         start_cp,
                         end_cp,
-                        properties: properties.clone(),
+                        properties,
                         paragraph_height: entry.paragraph_height,
                     });
                 }
@@ -109,9 +114,13 @@ impl PapBinTable {
         Some(Self { runs })
     }
 
-    fn parse_properties(grpprl_and_istd: &[u8], data_stream: Option<&[u8]>) -> ParagraphProperties {
+    fn parse_properties(
+        grpprl_and_istd: &[u8],
+        piece_modifier: &[u8],
+        data_stream: Option<&[u8]>,
+    ) -> ParagraphProperties {
         if grpprl_and_istd.is_empty() {
-            return ParagraphProperties::default();
+            return ParagraphProperties::from_sprm(piece_modifier).unwrap_or_default();
         }
 
         let (style_index, direct_sprms) = if grpprl_and_istd.len() >= 2 {
@@ -131,8 +140,17 @@ impl PapBinTable {
             direct_sprms
         };
 
+        let combined;
+        let sprms = if piece_modifier.is_empty() {
+            sprms
+        } else {
+            combined = [sprms, piece_modifier].concat();
+            &combined
+        };
         let mut properties = ParagraphProperties::from_sprm(sprms).unwrap_or_default();
-        properties.style_index = style_index;
+        if properties.style_index.is_none() {
+            properties.style_index = style_index;
+        }
         properties
     }
 
@@ -218,7 +236,7 @@ mod tests {
         papx.extend_from_slice(&SPRM_P_HUGE_PAPX.to_le_bytes());
         papx.extend_from_slice(&20u32.to_le_bytes());
 
-        let properties = PapBinTable::parse_properties(&papx, Some(&data));
+        let properties = PapBinTable::parse_properties(&papx, &[], Some(&data));
         assert_eq!(properties.style_index, Some(7));
         assert_eq!(properties.line_spacing, Some(240));
     }
@@ -235,5 +253,16 @@ mod tests {
         let mut visited = HashSet::new();
         let result = PapBinTable::expand_data_indirections(&reference, &data, &mut visited, 0);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn applies_piece_modifiers_after_fkp_properties() {
+        let papx = [0x00, 0x00, 0x03, 0x24, 0x00];
+        let piece_modifier = [0x03, 0x24, 0x02];
+        let properties = PapBinTable::parse_properties(&papx, &piece_modifier, None);
+        assert_eq!(
+            properties.justification,
+            super::super::pap::Justification::Right
+        );
     }
 }

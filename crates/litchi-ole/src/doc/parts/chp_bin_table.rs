@@ -113,14 +113,18 @@ impl ChpBinTable {
             // Parse CHPX FKP
             if let Some(fkp) = ChpxFkp::parse(fkp_page, word_document) {
                 for entry in fkp.entries() {
-                    let properties = Self::parse_chpx(&entry.grpprl);
                     for (start_cp, end_cp) in
                         piece_table.fc_range_to_cp_ranges(entry.fc, entry.end_fc)
                     {
+                        let piece_modifier = piece_table
+                            .piece_for_cp(start_cp)
+                            .map(|piece| piece.property_modifier())
+                            .unwrap_or_default();
+                        let properties = Self::parse_chpx(&entry.grpprl, piece_modifier);
                         all_runs.push(CharacterRun {
                             start_cp,
                             end_cp,
-                            properties: properties.clone(),
+                            properties,
                         });
                     }
                 }
@@ -165,10 +169,18 @@ impl ChpBinTable {
     /// Delegates to CharacterProperties::from_sprm for consistent behavior
     /// with the full SPRM parser (handles is_spec, is_obj, is_data flags correctly).
     #[inline]
-    fn parse_chpx(grpprl: &[u8]) -> CharacterProperties {
-        if grpprl.is_empty() {
+    fn parse_chpx(grpprl: &[u8], piece_modifier: &[u8]) -> CharacterProperties {
+        if grpprl.is_empty() && piece_modifier.is_empty() {
             return CharacterProperties::default();
         }
+
+        let combined;
+        let grpprl = if piece_modifier.is_empty() {
+            grpprl
+        } else {
+            combined = [grpprl, piece_modifier].concat();
+            &combined
+        };
 
         // Use the complete SPRM parser from CharacterProperties
         // This ensures all flags (is_spec, is_obj, is_data, etc.) are set correctly
