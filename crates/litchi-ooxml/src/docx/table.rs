@@ -42,6 +42,65 @@ fn absolute_start(base_offset: u32, relative_start: u32) -> Result<u32> {
     })
 }
 
+fn word_cell_property_value(
+    xml_bytes: &[u8],
+    property_name: &[u8],
+) -> Result<Option<Option<String>>> {
+    let mut result = None;
+    scan_word_element_ranges(xml_bytes, &[b"tcPr".as_slice()], |_, start, length| {
+        let start = start as usize;
+        let end = start.checked_add(length as usize).ok_or_else(|| {
+            OoxmlError::InvalidFormat("Word cell property range overflow".to_string())
+        })?;
+        scan_word_element_ranges(
+            &xml_bytes[start..end],
+            &[property_name],
+            |_, property_start, property_length| {
+                if result.is_some() {
+                    return Ok(());
+                }
+                let property_start = property_start as usize;
+                let property_end = property_start
+                    .checked_add(property_length as usize)
+                    .ok_or_else(|| {
+                        OoxmlError::InvalidFormat("Word property range overflow".to_string())
+                    })?;
+                let property_xml = &xml_bytes[start..end][property_start..property_end];
+                let mut reader = Reader::from_reader(property_xml);
+                let element = loop {
+                    match reader.read_event() {
+                        Ok(Event::Start(element)) | Ok(Event::Empty(element)) => break element,
+                        Ok(Event::Eof) => {
+                            return Err(OoxmlError::InvalidFormat(
+                                "missing Word cell property".to_string(),
+                            ));
+                        },
+                        Err(error) => return Err(OoxmlError::Xml(error.to_string())),
+                        _ => {},
+                    }
+                };
+                let mut value = None;
+                for attribute in element.attributes() {
+                    let attribute =
+                        attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    if attribute.key.local_name().as_ref() == b"val" {
+                        let raw = std::str::from_utf8(attribute.value.as_ref())
+                            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                        value = Some(
+                            quick_xml::escape::unescape(raw)
+                                .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                                .into_owned(),
+                        );
+                    }
+                }
+                result = Some(value);
+                Ok(())
+            },
+        )
+    })?;
+    Ok(result)
+}
+
 /// Vertical merge state for table cells.
 ///
 /// In OOXML, vertical merging uses the `<w:vMerge>` element:
@@ -344,42 +403,21 @@ impl Cell {
     /// </w:tc>
     /// ```
     pub fn grid_span(&self) -> Result<usize> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
-
-        let mut in_tc_pr = false;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    let name = e.local_name();
-                    if name.as_ref() == b"tcPr" {
-                        in_tc_pr = true;
-                    } else if in_tc_pr && name.as_ref() == b"gridSpan" {
-                        // Extract the w:val attribute
-                        for attr in e.attributes().flatten() {
-                            if attr.key.local_name().as_ref() == b"val" {
-                                let val_str = std::str::from_utf8(&attr.value)
-                                    .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                                let span = val_str.parse::<usize>().unwrap_or(1);
-                                return Ok(span);
-                            }
-                        }
-                        // If no val attribute, default to 1
-                        return Ok(1);
-                    }
-                },
-                Ok(Event::End(e)) if e.local_name().as_ref() == b"tcPr" => {
-                    in_tc_pr = false;
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
+        let Some(value) = word_cell_property_value(self.xml_bytes(), b"gridSpan")? else {
+            return Ok(1);
+        };
+        let Some(value) = value else {
+            return Ok(1);
+        };
+        let span = value.parse::<usize>().map_err(|_| {
+            OoxmlError::InvalidFormat(format!("invalid Word gridSpan value: {value}"))
+        })?;
+        if span == 0 {
+            return Err(OoxmlError::InvalidFormat(
+                "Word gridSpan must be positive".to_string(),
+            ));
         }
-
-        // Default: no horizontal merge
-        Ok(1)
+        Ok(span)
     }
 
     /// Get the vertical merge (rowspan) state of this cell.
@@ -409,44 +447,16 @@ impl Cell {
     /// </w:tc>
     /// ```
     pub fn v_merge(&self) -> Result<Option<VMergeState>> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
-
-        let mut in_tc_pr = false;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    let name = e.local_name();
-                    if name.as_ref() == b"tcPr" {
-                        in_tc_pr = true;
-                    } else if in_tc_pr && name.as_ref() == b"vMerge" {
-                        // Check for w:val attribute
-                        for attr in e.attributes().flatten() {
-                            if attr.key.local_name().as_ref() == b"val" {
-                                let val_str = std::str::from_utf8(&attr.value)
-                                    .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                                return match val_str {
-                                    "restart" => Ok(Some(VMergeState::Restart)),
-                                    _ => Ok(Some(VMergeState::Continue)),
-                                };
-                            }
-                        }
-                        // No val attribute means continue
-                        return Ok(Some(VMergeState::Continue));
-                    }
-                },
-                Ok(Event::End(e)) if e.local_name().as_ref() == b"tcPr" => {
-                    in_tc_pr = false;
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
+        let Some(value) = word_cell_property_value(self.xml_bytes(), b"vMerge")? else {
+            return Ok(None);
+        };
+        match value.as_deref() {
+            None | Some("continue") => Ok(Some(VMergeState::Continue)),
+            Some("restart") => Ok(Some(VMergeState::Restart)),
+            Some(value) => Err(OoxmlError::InvalidFormat(format!(
+                "invalid Word vMerge value: {value}"
+            ))),
         }
-
-        // Default: no vertical merge
-        Ok(None)
     }
 
     /// Get the text content of this cell.
@@ -561,5 +571,31 @@ mod tests {
 
         assert!(table.row_count().is_err());
         assert!(table.rows().is_err());
+    }
+
+    #[test]
+    fn cell_properties_ignore_foreign_lookalikes() {
+        let xml = br#"<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:false="urn:not-wordprocessingml">
+            <w:tcPr><false:gridSpan false:val="9"/><false:vMerge false:val="restart"/></w:tcPr>
+        </w:tc>"#;
+        let cell = Cell::new(xml.to_vec());
+
+        assert_eq!(cell.grid_span().unwrap(), 1);
+        assert_eq!(cell.v_merge().unwrap(), None);
+    }
+
+    #[test]
+    fn cell_properties_reject_invalid_values() {
+        let zero_span = Cell::new(
+            br#"<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tcPr><w:gridSpan w:val="0"/></w:tcPr></w:tc>"#
+                .to_vec(),
+        );
+        assert!(zero_span.grid_span().is_err());
+
+        let invalid_merge = Cell::new(
+            br#"<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tcPr><w:vMerge w:val="sideways"/></w:tcPr></w:tc>"#
+                .to_vec(),
+        );
+        assert!(invalid_merge.v_merge().is_err());
     }
 }
